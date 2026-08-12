@@ -6,8 +6,17 @@ class DashboardController < ApplicationController
   before_action :require_participant
 
   def index
-    @participant_events = @participant.participant_events.includes(:event)
-    @pending_invitations = @participant.pending_invitations.includes(:event)
+    # display_status per row walks travel/health/guardian/consent/custom-doc
+    # associations, and the event avatars read logo attachments
+    @participant_events = @participant.participant_events.includes(
+      :consents, :travel_inbound, :travel_outbound, :accommodation,
+      :medical, :dietary, :accessibility, :emergency_contacts,
+      guardian_participant_events: :emergency_contacts,
+      event: [ :custom_documents, { logo_attachment: :blob, event_series: { logo_attachment: :blob } } ]
+    )
+    @pending_invitations = @participant.pending_invitations.includes(
+      event: [ { logo_attachment: :blob, event_series: { logo_attachment: :blob } } ]
+    )
   end
 
   def profile
