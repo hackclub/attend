@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_12_111500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_12_141250) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -224,6 +224,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_111500) do
     t.string "status", default: "pending"
     t.datetime "updated_at", null: false
     t.index ["custom_document_id"], name: "index_consents_on_custom_document_id"
+    t.index ["docuseal_envelope_id"], name: "index_consents_on_docuseal_envelope_id"
     t.index ["guardian_participant_event_id"], name: "index_consents_on_guardian_participant_event_id"
     t.index ["participant_event_id", "custom_document_id"], name: "index_consents_on_pe_and_custom_document", unique: true, where: "(custom_document_id IS NOT NULL)"
     t.index ["participant_event_id"], name: "index_consents_on_participant_event_id"
