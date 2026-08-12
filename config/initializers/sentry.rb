@@ -2,7 +2,7 @@ Sentry.init do |config|
   config.dsn = Rails.application.credentials.dig(:sentry, :dsn)
   config.breadcrumbs_logger = [ :active_support_logger, :http_logger ]
 
-  config.enabled_environments = %w[production staging development]
+  config.enabled_environments = %w[production staging]
 
   config.send_default_pii = false
 
