@@ -50,7 +50,6 @@ config/ssl/
 macos-nfc-bridge/.build/
 .claude/
 .deepsec/
-.kamal/
 
 # macOS noise
 .DS_Store
