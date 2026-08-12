@@ -30,7 +30,7 @@ A web application for onboarding under-18 participants for in-person Hack Club e
 | Caching | Solid Cache |
 | Real-time | Solid Cable (Action Cable) |
 | Asset Pipeline | Propshaft + Importmap |
-| Deployment | Kamal + Docker |
+| Deployment | Docker |
 | Storage | Active Storage with S3 (Cloudflare R2) |
 
 ---
@@ -292,25 +292,7 @@ docker run -d -p 80:80 \
   --name attend attend
 ```
 
-### Kamal
-
-This project is configured for deployment with [Kamal](https://kamal-deploy.org/):
-
-```bash
-# Setup (first time)
-kamal setup
-
-# Deploy
-kamal deploy
-
-# View logs
-kamal logs
-
-# Access Rails console
-kamal console
-```
-
-Set `RAILS_MASTER_KEY` as an environment variable on your production server.
+Set `RAILS_MASTER_KEY` as an environment variable on your production server. Hack Club's production instance builds this Dockerfile and deploys it on every merge to `main`.
 
 ---
 
