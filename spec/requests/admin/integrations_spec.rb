@@ -159,4 +159,35 @@ RSpec.describe "Admin::Integrations", type: :request do
       expect(flash[:notice]).to eq("Airtable sync triggered. It will complete shortly.")
     end
   end
+
+  describe "POST /admin/:slug/integrations/vote_event" do
+    let(:vote_client) { instance_double(Vote::Client, configured?: true) }
+
+    before do
+      allow(Vote::Client).to receive(:new).and_return(vote_client)
+      allow(vote_client).to receive(:find_event).with(event.slug).and_return(
+        "id" => "vote-evt-1",
+        "slug" => event.slug,
+        "adminUrl" => "https://vote.hackclub.com/admin/vote-evt-1",
+        "galleryUrl" => "https://vote.hackclub.com/vote-evt-1"
+      )
+
+      # Consume Devise trackable's sign-in columns on a throwaway request so the
+      # event, not the user, is the changed record log_admin_action picks up.
+      get admin_event_integrations_path(event)
+    end
+
+    it "audit-logs the linkage" do
+      expect {
+        post admin_event_create_vote_event_path(event)
+      }.to change(AuditLog, :count).by(1)
+
+      log = AuditLog.order(:created_at).last
+      expect(log.action).to eq("create_vote_event")
+      expect(log.record).to eq(event)
+      expect(log.actor).to eq(admin)
+      expect(log.event).to eq(event)
+      expect(event.reload.vote_event_id).to eq("vote-evt-1")
+    end
+  end
 end

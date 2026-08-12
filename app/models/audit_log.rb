@@ -61,7 +61,31 @@ class AuditLog < ApplicationRecord
     ticket_set_subject: "set_subject",
     toggle_support_sms: "toggle_support_sms",
     update_support_sms_numbers: "update_support_sms_numbers",
-    trigger_airtable_sync: "trigger_airtable_sync"
+    trigger_airtable_sync: "trigger_airtable_sync",
+    create_vote_event: "create_vote_event",
+    dismiss_pickup: "dismiss_pickup",
+    refresh_all: "refresh_all",
+    revoke: "revoke",
+    reinstate: "reinstate",
+    rotate_api_token: "rotate",
+    reorder_groups: "reorder",
+    unassign: "unassign",
+    cancel: "cancel",
+    confirm: "confirm",
+    send_to_slack: "send_to_slack",
+    send_now: "send_now",
+    retry_delivery: "retry_delivery",
+    retry_failed: "retry_failed",
+    retry_recipient: "retry_recipient",
+    link_guardian: "link_guardian",
+    refresh_flight_tracking: "refresh_flight_tracking",
+    resync_airtable: "resync_airtable",
+    revoke_invite: "revoke_invite",
+    destroy_avatar: "destroy_avatar",
+    toggle_maintenance: "toggle_maintenance",
+    toggle_twilio: "toggle_twilio",
+    toggle_waiver_sending: "toggle_waiver_sending",
+    update_twilio_from_number: "update_twilio_from_number"
   }
 
   validates :record_type, presence: true
