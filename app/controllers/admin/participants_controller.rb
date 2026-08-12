@@ -22,8 +22,10 @@ module Admin
 
         @participant_events = current_event.participant_events.none
       else
+        # preload (not includes): the string order on participants.legal_last_name
+        # would otherwise flip every association into one giant eager-load LEFT JOIN.
         @participant_events = policy_scope(current_event.participant_events)
-          .includes(:participant, :event, :travel_inbound, :travel_outbound, :accommodation, :medical, :safeguarding_info, :dietary, :accessibility, :consents, :emergency_contacts, :groups, guardian_participant_events: :emergency_contacts)
+          .preload(:participant, :event, :travel_inbound, :travel_outbound, :accommodation, :medical, :safeguarding_info, :dietary, :accessibility, :consents, :emergency_contacts, :groups, guardian_participant_events: :emergency_contacts)
 
         if params[:search].present?
           search_term = "%#{ActiveRecord::Base.sanitize_sql_like(params[:search])}%"
@@ -86,7 +88,7 @@ module Admin
         end
       end
 
-      @participant_events = @participant_events.order("participants.legal_last_name ASC") if @participant_events.is_a?(ActiveRecord::Relation)
+      @participant_events = @participant_events.joins(:participant).order("participants.legal_last_name ASC") if @participant_events.is_a?(ActiveRecord::Relation)
     end
 
     def table
