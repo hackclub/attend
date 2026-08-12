@@ -44,9 +44,22 @@ module Api
       end
 
       def set_ticket
+        # Preloads mirror what ticket_json(detailed: true) actually reads:
+        # display_status walks onboarding progress (travel, accommodation,
+        # medical/dietary/accessibility, guardians + their emergency contacts,
+        # consents, custom documents), checked_in? reads scans + scan contexts,
+        # travel_json renders inbound legs, and event_json builds logo/banner
+        # URLs. message_deliveries is intentionally absent — messages_json
+        # builds its own filtered query.
         @ticket = @participant.participant_events
-          .includes(:event, :participant, travel_inbound: :travel_legs,
-                    message_deliveries: { message: :sent_by_user })
+          .includes(
+            :participant, :medical, :dietary, :accessibility, :accommodation,
+            :travel_outbound, :consents,
+            scans: :scan_context,
+            guardian_participant_events: :emergency_contacts,
+            travel_inbound: :travel_legs,
+            event: [ :custom_documents, { logo_attachment: :blob }, { banner_attachment: :blob } ]
+          )
           .find(params[:id])
       rescue ActiveRecord::RecordNotFound
         render json: { error: "Ticket not found" }, status: :not_found
@@ -122,7 +135,9 @@ module Api
           arrival_city: travel.arrival_city,
           departure_time: travel.departure_time&.iso8601,
           arrival_time: travel.arrival_time&.iso8601,
-          legs: travel.travel_legs.order(:position).map do |leg|
+          # The association is already scoped `order(position: :asc)`; a fresh
+          # .order here would bypass the preload and re-query.
+          legs: travel.travel_legs.map do |leg|
             {
               flight_code: leg.flight_code,
               departure_airport: leg.departure_airport,
