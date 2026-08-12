@@ -16,7 +16,9 @@ module Admin
     end
 
     def available_events
-      @available_events ||= policy_scope(Event).order(starts_at: :desc)
+      @available_events ||= policy_scope(Event)
+        .includes(logo_attachment: :blob, event_series: { logo_attachment: :blob })
+        .order(starts_at: :desc)
     end
 
     private
