@@ -576,7 +576,7 @@ GEM
     pg (1.6.3-arm64-darwin)
     pg (1.6.3-x86_64-linux)
     pg (1.6.3-x86_64-linux-musl)
-    phonelib (0.10.22)
+    phonelib (0.10.23)
     postmark (1.25.1)
       json
     postmark-rails (0.22.1)
