@@ -34,8 +34,19 @@ class Admin::DashboardController < Admin::BaseController
     authorize @event, :update?
 
     if @event.airtable_sync_configured?
+      # "Sync Now" is a deliberate retry, so it also lifts a pause left by an
+      # earlier failure — otherwise the scheduled job would skip this event and
+      # the button would look like it did nothing.
+      was_paused = @event.airtable_sync_paused?
+      @event.resume_airtable_sync!
       AirtableJobs::SyncAllJob.perform_later
-      redirect_to admin_event_integrations_path(@event), notice: "Airtable sync triggered. It will complete shortly."
+
+      notice = if was_paused
+        "Airtable sync resumed and triggered. It will complete shortly."
+      else
+        "Airtable sync triggered. It will complete shortly."
+      end
+      redirect_to admin_event_integrations_path(@event), notice: notice
     else
       redirect_to admin_event_integrations_path(@event), alert: "Airtable sync is not fully configured."
     end
@@ -108,6 +119,13 @@ class Admin::DashboardController < Admin::BaseController
     set_current_event(@event)
 
     if @event.update(integration_params)
+      if airtable_settings_saved?
+        # Whoever last touched the credentials is who we email if the sync
+        # later fails and pauses itself.
+        @event.update_column(:airtable_config_updated_by_id, current_user.id)
+        @event.resume_airtable_sync!
+      end
+
       if airtable_settings_saved? && @event.airtable_sync_configured?
         AirtableJobs::SyncAllJob.perform_later
         redirect_to admin_event_integrations_path(@event), notice: "Integration settings updated. Airtable sync started."
@@ -157,6 +175,9 @@ class Admin::DashboardController < Admin::BaseController
     @airtable_sync_error = current_event.airtable_sync_error
     @airtable_sync_error_at = current_event.airtable_sync_error_at
     @airtable_sync_stale = current_event.airtable_sync_stale?
+    @airtable_sync_paused = current_event.airtable_sync_paused?
+    @airtable_sync_paused_at = current_event.airtable_sync_paused_at
+    @airtable_config_owner = current_event.airtable_config_last_saved_by if @airtable_sync_paused
     @airtable_participant_count = current_event.participant_events.count if @airtable_sync_configured
   end
 
