@@ -5,7 +5,12 @@ class Admin::DashboardController < Admin::BaseController
     # The picker's "All events" link deselects the current event.
     set_current_event(nil) if params[:deselect].present?
 
-    @events = policy_scope(Event).includes(:event_series).order(starts_at: :desc)
+    @events = policy_scope(Event)
+      .includes(logo_attachment: :blob, event_series: { logo_attachment: :blob })
+      .order(starts_at: :desc)
+    # One grouped COUNT for the whole page; each row previously ran its own
+    # COUNT-with-JOIN via event.participants.count
+    @event_participant_counts = ParticipantEvent.group(:event_id).count
     authorize Event, :index?
   end
 
