@@ -55,8 +55,9 @@ class GuardianParticipantEvent < ApplicationRecord
   INVITE_VALIDITY = 7.days
 
   def invite_expired?
-    return false if accepted_at.present?
-    invite_token_sent_at.present? && invite_token_sent_at < INVITE_VALIDITY.ago
+    return false if invite_token_sent_at.blank?
+
+    invite_token_sent_at < INVITE_VALIDITY.ago
   end
 
   def mark_accepted!
