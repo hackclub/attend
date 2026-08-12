@@ -96,7 +96,7 @@ module Admin
 
       @participant_events = policy_scope(current_event.participant_events)
         .includes(
-          participant: { headshot_attachment: :blob },
+          participant: [],
           travel_inbound: :travel_legs,
           travel_outbound: :travel_legs,
           accommodation: [],
@@ -111,6 +111,7 @@ module Admin
           scans: [ :scan_context, :user ],
           groups: []
         )
+        .preload(room: { participant_events: :participant })
 
       @sort_field = params[:sort] || "legal_last_name"
       @sort_direction = params[:direction] == "desc" ? "desc" : "asc"
