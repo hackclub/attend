@@ -3,6 +3,11 @@ return unless ActiveRecord::Base.connection.table_exists?("solid_cache_entries")
 
 class Rack::Attack
   throttle("req/ip", limit: 300, period: 5.minutes) do |req|
+    # The Slack events webhook is exempt: it's HMAC-authenticated (Slack
+    # signing secret), Slack retries throttled deliveries (amplifying load),
+    # and counting it costs a cache read + write on every request.
+    next if req.path == "/api/v1/slack/events" && req.post?
+
     req.ip unless req.path.start_with?("/assets")
   end
 
