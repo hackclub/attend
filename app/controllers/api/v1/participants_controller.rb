@@ -509,9 +509,18 @@ module Api
         }
       end
 
+      # Memoized per request: participant_json calls this once per participant,
+      # and safeguarding_lead_for? is an EXISTS query. `defined?` guard because
+      # the memoized value is usually false.
       def can_view_sensitive_data?
-        return false unless current_user
-        current_user.global_admin? || current_user.safeguarding_lead_for?(@event)
+        return @can_view_sensitive_data if defined?(@can_view_sensitive_data)
+
+        @can_view_sensitive_data =
+          if current_user
+            current_user.global_admin? || current_user.safeguarding_lead_for?(@event)
+          else
+            false
+          end
       end
 
       def emergency_contacts_json(pe)
