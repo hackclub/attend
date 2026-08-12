@@ -39,7 +39,7 @@ gem "toolchest", "~> 0.3.7"
 # toolchest 0.3.x overrides MCP::Server#call_tool with the mcp 0.11 signature and
 # predates mcp's DNS-rebinding host check; newer mcp releases break both. Pin to
 # match (same as hackclub/operations).
-gem "mcp", "~> 0.11.0"
+gem "mcp", "~> 1.1.0"
 gem "jb" # JSON view layer for toolbox actions
 
 # Audit logging
