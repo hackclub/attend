@@ -1,0 +1,40 @@
+<p>Hi <%= @first_name %>,</p>
+
+<p>
+  The Airtable sync for <strong><%= @event.name %></strong> failed, so Attend has
+  <strong>paused it</strong>. Nothing will be pushed to Airtable until you fix the
+  settings and save them again.
+</p>
+
+<p>You're getting this because you were the last person to save the Airtable settings for this event.</p>
+
+<div style="border: 1px solid #f5c2c7; background-color: #fdf2f3; border-radius: 6px; padding: 12px 16px; margin: 16px 0;">
+  <p style="margin: 0 0 4px 0;"><strong>What Airtable said:</strong></p>
+  <p style="margin: 0; font-family: monospace; font-size: 13px; word-break: break-all;"><%= @error_message %></p>
+</div>
+
+<p style="margin-bottom: 4px;"><strong>Worth checking:</strong></p>
+<ul style="margin-top: 0;">
+  <li>The personal access token hasn't expired or been revoked, and can still see the base</li>
+  <li>The Base ID, Sync Table and Sync Source ID all still exist in Airtable</li>
+  <li>The sync source hasn't been deleted and recreated — that changes its ID</li>
+</ul>
+
+<p>
+  Once the settings are saved again, syncing resumes straight away and runs every
+  5 minutes as usual.
+</p>
+
+<p><%= mail_button "Fix Airtable settings", @integrations_url %></p>
+
+<p style="color: #6b7280; font-size: 13px;">
+  Paused <%= @paused_at&.strftime("%b %-d, %Y at %-I:%M %p %Z") || "just now" %>.
+  <% if @last_synced_at %>
+    Last successful sync was <%= @last_synced_at.strftime("%b %-d, %Y at %-I:%M %p %Z") %> —
+    Airtable still shows that data.
+  <% else %>
+    This integration has never synced successfully.
+  <% end %>
+</p>
+
+<p>If you're not the right person for this any more, just reply and we'll sort it out.</p>
