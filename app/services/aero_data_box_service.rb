@@ -90,38 +90,16 @@ class AeroDataBoxService
     end
 
     def search_airports(keyword)
+      keyword = keyword.to_s.strip
       return [] if keyword.blank? || keyword.length < 2
 
-      api_key = rapidapi_key
-      return [] if api_key.blank?
-
-      response = Faraday.get(
-        "#{BASE_URL}/airports/search/term",
-        { q: keyword, limit: 10 },
-        {
-          "x-rapidapi-key" => api_key,
-          "x-rapidapi-host" => "aerodatabox.p.rapidapi.com"
-        }
-      )
-
-      return [] unless response.success?
-
-      result = JSON.parse(response.body)
-      items = result["items"] || []
-
-      items.map do |airport|
-        {
-          iata: airport["iata"],
-          icao: airport["icao"],
-          name: airport["name"],
-          city: airport["municipalityName"],
-          country: airport["countryCode"],
-          location: airport["location"]
-        }
-      end
-    rescue Faraday::Error, JSON::ParserError => e
-      Rails.logger.error("[AeroDataBoxService] Error searching airports: #{e.message}")
-      []
+      # Airport data is effectively static, so successful lookups are cached
+      # for a day. Failed lookups return nil from the block, which skip_nil
+      # keeps out of the cache so an API error can't poison it.
+      cache_key = "aero_data_box/search_airports/#{keyword.downcase}"
+      Rails.cache.fetch(cache_key, expires_in: 1.day, skip_nil: true) do
+        search_airports_uncached(keyword)
+      end || []
     end
 
     def get_airport(code)
@@ -170,6 +148,43 @@ class AeroDataBoxService
     end
 
     private
+
+    # Returns the mapped airport list on success, or nil when the lookup
+    # failed (missing API key, HTTP error, parse error) so search_airports
+    # can tell "no matches" apart from "request failed" and only cache the
+    # former.
+    def search_airports_uncached(keyword)
+      api_key = rapidapi_key
+      return nil if api_key.blank?
+
+      response = Faraday.get(
+        "#{BASE_URL}/airports/search/term",
+        { q: keyword, limit: 10 },
+        {
+          "x-rapidapi-key" => api_key,
+          "x-rapidapi-host" => "aerodatabox.p.rapidapi.com"
+        }
+      )
+
+      return nil unless response.success?
+
+      result = JSON.parse(response.body)
+      items = result["items"] || []
+
+      items.map do |airport|
+        {
+          iata: airport["iata"],
+          icao: airport["icao"],
+          name: airport["name"],
+          city: airport["municipalityName"],
+          country: airport["countryCode"],
+          location: airport["location"]
+        }
+      end
+    rescue Faraday::Error, JSON::ParserError => e
+      Rails.logger.error("[AeroDataBoxService] Error searching airports: #{e.message}")
+      nil
+    end
 
     def normalize_flight_number(flight_code)
       flight_code.to_s.strip.upcase.gsub(/[^A-Z0-9]/, "")
