@@ -1,0 +1,11 @@
+<p>Hi <%= @preferred_name %>,</p>
+
+<p>We noticed you haven't connected your Slack account for <%= @event_name %> yet. Connecting your Slack lets us add you to our event channel where you'll get important updates and can chat with other attendees.</p>
+
+<p>It only takes a few seconds:</p>
+
+<p style="margin: 24px 0;">
+  <%= mail_button "Connect your Slack account", @slack_connect_url %>
+</p>
+
+<p>If you have any questions, please reply to this email or contact us at <%= mail_to @support_email %>.</p>

@@ -1,0 +1,99 @@
+<%# locals: (leg:, index:, direction:, show_remove: false, default_date: nil, refresh_url: nil) %>
+<% admin_tool do %>
+  <details>
+    <summary>
+      <span class="select-none inline-block bg-blue-600 text-white px-4 py-2.5 sm:py-2 rounded-md hover:bg-blue-700 text-sm font-medium min-h-[44px] sm:min-h-0 cursor-pointer">Show raw leg data</span>
+    </summary>
+    <pre class="mt-2 bg-gray-900 text-gray-100 p-4 rounded-lg overflow-auto text-wrap"><code class="text-sm font-mono"><%= leg.to_json %></code></pre>
+  </details>
+<% end %>
+<div class="border border-gray-200 rounded-lg p-4 relative"
+     data-travel-form-target="legTemplate"
+     data-autosave-skip>
+  <% if show_remove %>
+    <button type="button" data-action="click->travel-form#removeLeg" class="absolute top-2 right-2 text-gray-400 hover:text-red-600">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+  <% end %>
+  <div class="flex items-center justify-between mb-3">
+    <div class="text-sm font-medium text-gray-500">Leg <%= index + 1 %></div>
+  </div>
+  <input type="hidden" name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][id]" value="<%= leg.id %>">
+  <input type="hidden" name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][position]" value="<%= index %>">
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Flight Code <span class="text-red-500">*</span></label>
+      <input type="text"
+             name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][flight_code]"
+             value="<%= leg.flight_code %>"
+             placeholder="e.g. LH1234"
+             required
+             class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Confirmation Code</label>
+      <input type="text" name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][confirmation_code]" value="<%= leg.confirmation_code %>" placeholder="Booking reference" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+    <div data-controller="airport-autocomplete" class="relative">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Departure Airport <span class="text-red-500">*</span></label>
+      <input type="text"
+             name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][departure_airport]"
+             value="<%= leg.departure_airport %>"
+             placeholder="e.g. LHR"
+             required
+             autocomplete="off"
+             data-airport-autocomplete-target="input"
+             data-action="input->airport-autocomplete#search keydown->airport-autocomplete#onKeydown blur->airport-autocomplete#onBlur"
+             class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <div data-airport-autocomplete-target="dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+        <div data-airport-autocomplete-target="results"></div>
+      </div>
+    </div>
+    <div data-controller="airport-autocomplete" class="relative">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Arrival Airport <span class="text-red-500">*</span></label>
+      <input type="text"
+             name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][arrival_airport]"
+             value="<%= leg.arrival_airport %>"
+             placeholder="e.g. VIE"
+             required
+             autocomplete="off"
+             data-airport-autocomplete-target="input"
+             data-action="input->airport-autocomplete#search keydown->airport-autocomplete#onKeydown blur->airport-autocomplete#onBlur"
+             class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <div data-airport-autocomplete-target="dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+        <div data-airport-autocomplete-target="results"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Departure Time <span class="text-red-500">*</span> <span class="font-normal text-gray-500">(local airport time)</span></label>
+      <input type="datetime-local"
+             name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][departure_time]"
+             value="<%= flight_local_input_value(leg.departure_time, leg.departure_airport, default_date: default_date) %>"
+             required
+             class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <select name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][departure_time_zone]"
+              class="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <%= travel_leg_time_zone_options %>
+      </select>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Arrival Time <span class="text-red-500">*</span> <span class="font-normal text-gray-500">(local airport time)</span></label>
+      <input type="datetime-local"
+             name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][arrival_time]"
+             value="<%= flight_local_input_value(leg.arrival_time, leg.arrival_airport, default_date: default_date) %>"
+             required
+             class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <select name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][arrival_time_zone]"
+              class="mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <%= travel_leg_time_zone_options %>
+      </select>
+    </div>
+  </div>
+</div>

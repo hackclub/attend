@@ -1,0 +1,66 @@
+<% content_for :title, "Incidents – #{current_event.name} – Attend" %>
+
+<div class="w-full">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <h1 class="text-2xl font-bold">Incidents</h1>
+    <%= link_to "New Incident", new_admin_event_incident_path(current_event), class: "bg-[#ec3750] text-white px-4 py-2 rounded-md hover:bg-[#d42f46]" %>
+  </div>
+
+  <% if @incidents.any? %>
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div class="overflow-x-auto -mx-4 sm:mx-0">
+        <table class="min-w-full divide-y divide-gray-100">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Participant</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reported By</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-100 text-xs sm:text-sm">
+            <% @incidents.each do |incident| %>
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= incident.occurred_at&.strftime("%b %d, %Y %H:%M") || incident.created_at.strftime("%b %d, %Y %H:%M") %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <%= render_category_badge(incident.category) %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <%= render_severity_badge(incident.severity) %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <%= render_status_badge(incident.status) %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <% if incident.participants.any? %>
+                    <%= incident.participants.map { |p| p.preferred_name || p.legal_first_name }.join(", ") %>
+                    <% if incident.participants.size > 1 %>
+                      <span class="text-gray-400 text-xs">(+<%= incident.participants.size - 1 %> more)</span>
+                    <% end %>
+                  <% else %>
+                    <span class="text-gray-400">—</span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 truncate max-w-[160px]" title="<%= incident.reported_by.display_name_or_fallback %>">
+                  <%= incident.reported_by.display_name_or_fallback %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <%= link_to "View", admin_event_incident_path(current_event, incident), class: "text-[#ec3750] hover:text-blue-800" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% else %>
+    <div class="bg-white border border-gray-200 rounded-lg p-6 text-center text-gray-500">
+      No incidents reported for this event.
+    </div>
+  <% end %>
+</div>

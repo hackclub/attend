@@ -1,0 +1,53 @@
+<% content_for :title, "Event Series – Attend" %>
+
+<div class="max-w-5xl mx-auto">
+  <div class="flex items-center justify-between mb-8">
+    <h1 class="text-2xl font-semibold text-gray-900">Event Series</h1>
+    <% if policy(EventSeries).create? %>
+      <%= link_to new_admin_series_path, class: "inline-flex items-center gap-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        New Series
+      <% end %>
+    <% end %>
+  </div>
+
+  <% if @series_list.any? %>
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <% @series_list.each_with_index do |series, i| %>
+        <%= link_to admin_series_path(series), class: "flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors group #{'border-t border-gray-100' unless i == 0}" do %>
+          <div class="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+            <%= render "admin/events/avatar", event: series, size: 36, rounded: "rounded-lg" %>
+            <div class="flex-1 min-w-0">
+              <span class="text-sm font-medium text-gray-900 group-hover:text-[#ec3750] transition-colors"><%= series.name %></span>
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-gray-500">
+                <span><%= pluralize(series.events.count, "event") %></span>
+                <span><%= pluralize(series.series_role_assignments.count, "member") %></span>
+                <% if series.description.present? %>
+                  <span class="truncate"><%= series.description %></span>
+                <% end %>
+              </div>
+            </div>
+          </div>
+          <svg class="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        <% end %>
+      <% end %>
+      <div class="px-5 py-3 border-t border-gray-100 text-xs text-gray-500">
+        <%= @series_list.count %> <%= "series".pluralize(@series_list.count) %>
+      </div>
+    </div>
+  <% else %>
+    <div class="bg-white border border-gray-200 rounded-lg p-12 text-center">
+      <div class="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-4">
+        <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+      </div>
+      <h2 class="text-base font-medium text-gray-900 mb-1">No series yet</h2>
+      <p class="text-sm text-gray-500 mb-6">A series groups related events — like Sunbeam London and Sunbeam NYC — under shared branding and a shared team.</p>
+      <% if policy(EventSeries).create? %>
+        <%= link_to new_admin_series_path, class: "inline-flex items-center gap-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          Create Series
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+</div>

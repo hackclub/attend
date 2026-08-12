@@ -1,0 +1,7 @@
+version: 2
+
+issueRules:
+  # Well-known gems (e.g. brakeman) ship minified/compiled assets that Socket
+  # flags as "obfuscated code", blocking unrelated PRs. Disable just this rule;
+  # everything else stays at Socket's defaults.
+  obfuscatedFile: false

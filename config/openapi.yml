@@ -1,0 +1,1535 @@
+openapi: 3.0.3
+
+info:
+  title: Attend API
+  version: v1
+  description: |
+    REST API for [Attend](https://attend.hackclub.com), Hack Club's event
+    management platform. The API is used by the Attend mobile app and by
+    trusted server-to-server integrations.
+
+    ## Authentication
+
+    Almost every endpoint requires a bearer token:
+
+    ```
+    Authorization: Bearer <token>
+    ```
+
+    Three kinds of token are accepted:
+
+    - **Mobile token** — issued to a signed-in user by `POST /session`. Sets the
+      current user. May return the response header
+      `X-Token-Refresh-Recommended: true` when the token is nearing expiry;
+      call `POST /session/refresh` to rotate it.
+    - **Global API token** — a superadmin-issued token. Only honoured while its
+      owner is still a global admin. Sets the current user.
+    - **Event API key** — per-event key (`Event#api_key`). Does **not** set a
+      current user, so it only works on the subset of endpoints that don't
+      require one (participant `lookup`, `roster`, `create`, and `airport_mode`).
+
+    Missing or invalid credentials return `401 { "error": "Unauthorized" }`.
+
+    ## Conventions
+
+    - All timestamps are ISO 8601 strings and may be `null` where noted.
+    - Errors use the envelope `{ "error": "<message>" }`.
+    - `:event_id` path segments accept a numeric id or the event slug on the
+      participants endpoints; other endpoints accept the numeric id only.
+
+    > **Note:** Inbound webhook receivers (Postmark, Help Scout, DocuSeal,
+    > Slack events) also live under `/api/v1` but are called by third parties,
+    > not by API consumers, and are not documented here.
+
+servers:
+  - url: https://attend.hackclub.com/api/v1
+    description: Production
+  - url: http://localhost:3000/api/v1
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Authentication
+    description: Obtain, refresh, and revoke mobile bearer tokens.
+  - name: Account
+    description: The authenticated user's profile and accessible events.
+  - name: Participants
+    description: Participant registrations for an event.
+  - name: Notes
+    description: Staff notes on a participant's registration.
+  - name: Scans
+    description: QR / NFC / manual scans and check-in.
+  - name: Scan Contexts
+    description: The scan stations configured for an event.
+  - name: Airport Mode
+    description: Live flight-tracking dashboard for participant air travel.
+  - name: Slack Blasts
+    description: Broadcast Slack messages to an event's participants.
+  - name: NFC Badges
+    description: Provision and manage participant NFC badges.
+  - name: Push Tokens
+    description: Register device push-notification tokens.
+  - name: Travel
+    description: >-
+      Airport and flight lookups. These endpoints authenticate with the web
+      session cookie (Devise), not a bearer token.
+
+paths:
+  /session:
+    post:
+      tags: [Authentication]
+      summary: Create a mobile token
+      description: >-
+        Exchange a Hack Club OAuth authorization code, or a signed session
+        token, for a mobile bearer token. Public — no bearer token required.
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: Hack Club OAuth authorization code (exchanged server-side).
+                redirect_uri:
+                  type: string
+                  description: Redirect URI used in the OAuth code exchange.
+                code_verifier:
+                  type: string
+                  description: PKCE code verifier, if PKCE was used.
+                session_token:
+                  type: string
+                  description: Signed session token (used when `code` is absent).
+                device_name:
+                  type: string
+                  description: Human-readable device label, stored on the token.
+      responses:
+        "200":
+          description: Token issued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "401":
+          description: Could not resolve a user from the supplied credentials.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      tags: [Authentication]
+      summary: Revoke the current token (log out)
+      responses:
+        "200":
+          description: Token revoked.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Success" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /session/refresh:
+    post:
+      tags: [Authentication]
+      summary: Rotate the current token
+      description: Revoke the current mobile token and issue a fresh one.
+      responses:
+        "200":
+          description: New token issued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SessionResponse" }
+        "422":
+          description: Token could not be refreshed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /me:
+    get:
+      tags: [Account]
+      summary: Current user profile
+      responses:
+        "200":
+          description: The authenticated user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserProfile" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /events:
+    get:
+      tags: [Account]
+      summary: List accessible events
+      description: >-
+        All events for a global admin, otherwise the events the user is
+        assigned to, ordered by start date.
+      responses:
+        "200":
+          description: Events the caller can access.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items: { $ref: "#/components/schemas/Event" }
+        "401":
+          description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /push_tokens:
+    post:
+      tags: [Push Tokens]
+      summary: Register a push token
+      description: >-
+        Upsert a push-notification token for the current user. Platform is
+        auto-detected (`expo` for Expo tokens, otherwise `unknown`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+                  example: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
+      responses:
+        "200":
+          description: Token registered.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Success" }
+        "422":
+          description: Validation failed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /push_tokens/{token}:
+    delete:
+      tags: [Push Tokens]
+      summary: Delete a push token
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema: { type: string }
+          description: The push token to delete.
+      responses:
+        "200":
+          description: Token deleted.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Success" }
+        "404":
+          description: Token not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /events/{event_id}/participants:
+    get:
+      tags: [Participants]
+      summary: List participants
+      description: >-
+        Full per-participant records for an event. Sensitive medical,
+        dietary, safeguarding, and contact fields are only included for global
+        admins and safeguarding leads. Not available to event API keys.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: updated_since
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: Only return registrations updated after this timestamp.
+      responses:
+        "200":
+          description: Participants for the event.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  participants:
+                    type: array
+                    items: { $ref: "#/components/schemas/Participant" }
+                  synced_at: { type: string, format: date-time }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Participants]
+      summary: Invite a participant
+      description: >-
+        Send an event invitation email. Does not create a participant record
+        directly — it enqueues an invitation.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+                first_name: { type: string }
+                last_name: { type: string }
+      responses:
+        "201":
+          description: Invitation enqueued.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string, example: Invitation sent to jane@example.com }
+                  event: { type: string, example: My Event }
+        "409":
+          description: Already invited, or already registered for this event.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InviteError" }
+        "422":
+          description: Missing/invalid email, or the email is banned.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InviteError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/participants/search:
+    get:
+      tags: [Participants]
+      summary: Search participants
+      description: >-
+        Case-insensitive search by name, email, or id. Returns up to 20
+        matches. Not available to event API keys.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+          description: Search term. Blank returns no results.
+      responses:
+        "200":
+          description: Matching participants (max 20).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items: { $ref: "#/components/schemas/Participant" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/participants/lookup:
+    get:
+      tags: [Participants]
+      summary: Look up a registration by email
+      description: >-
+        Read-only check of whether an email is registered for the event. Safe
+        to call on every sign-in; never mutates. Available to event API keys.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: email
+          in: query
+          required: true
+          schema: { type: string, format: email }
+      responses:
+        "200":
+          description: Lookup result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  email: { type: string, format: email }
+                  registered: { type: boolean }
+                  participant_id: { type: integer, nullable: true }
+                  status:
+                    allOf: [{ $ref: "#/components/schemas/ParticipantStatus" }]
+                    nullable: true
+        "422":
+          description: Email is required.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/participants/roster:
+    get:
+      tags: [Participants]
+      summary: Minimal roster
+      description: >-
+        Identity-only roster (no sensitive PII), excluding withdrawn and
+        rejected registrations. Available to event API keys.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Roster.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  participants:
+                    type: array
+                    items: { $ref: "#/components/schemas/RosterEntry" }
+                  synced_at: { type: string, format: date-time }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/participants/{id}:
+    get:
+      tags: [Participants]
+      summary: Get a participant
+      description: >-
+        Full detailed record for one registration, including personal,
+        accommodation, consent, and guardian sections (and sensitive medical /
+        accessibility / safeguarding detail for permitted callers). Not
+        available to event API keys.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+          description: The participant_event id.
+      responses:
+        "200":
+          description: The participant.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  participant: { $ref: "#/components/schemas/ParticipantDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/participants/{participant_id}/notes:
+    get:
+      tags: [Notes]
+      summary: List notes
+      description: Notes on a participant's registration, newest first. User tokens only.
+      parameters:
+        - $ref: "#/components/parameters/EventIdNumeric"
+        - $ref: "#/components/parameters/ParticipantId"
+      responses:
+        "200":
+          description: Notes.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notes:
+                    type: array
+                    items: { $ref: "#/components/schemas/Note" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: Forbidden (event API keys are not allowed on notes).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Notes]
+      summary: Create a note
+      description: Add a note authored by the current user. User tokens only.
+      parameters:
+        - $ref: "#/components/parameters/EventIdNumeric"
+        - $ref: "#/components/parameters/ParticipantId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string }
+                note_type:
+                  type: string
+                  enum: [ops, safeguarding, logistical]
+                  default: ops
+                sensitivity:
+                  type: string
+                  enum: [normal, restricted]
+                  default: normal
+      responses:
+        "201":
+          description: Note created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  note: { $ref: "#/components/schemas/Note" }
+        "422":
+          description: Validation failed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: Forbidden (event API keys are not allowed on notes).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/scans:
+    get:
+      tags: [Scans]
+      summary: List scans
+      description: >-
+        Recent scans for the event. Pass `since` for incremental sync
+        (oldest-first, up to 500); otherwise the latest 100 are returned.
+      parameters:
+        - $ref: "#/components/parameters/EventIdNumeric"
+        - name: scan_context_id
+          in: query
+          required: false
+          schema: { type: integer }
+          description: Restrict to a single scan context.
+        - name: since
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: Return scans created after this time (incremental sync).
+      responses:
+        "200":
+          description: Scans.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scans:
+                    type: array
+                    items: { $ref: "#/components/schemas/Scan" }
+                  has_more: { type: boolean }
+                  synced_at: { type: string, format: date-time }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Scans]
+      summary: Record a scan
+      description: >-
+        Record a QR / NFC / manual scan for a participant. Pass `client_scan_id`
+        for idempotency — a repeat returns the existing scan with
+        `deduplicated: true`. The participant is identified by `badge_token`, or
+        by `participant_id` (matched as a participant_event id first, then a
+        participant id).
+      parameters:
+        - $ref: "#/components/parameters/EventIdNumeric"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                participant_id:
+                  type: integer
+                  description: participant_event id or participant id.
+                scan_context_id:
+                  type: integer
+                  description: Required only when the event has multiple scan contexts.
+                badge_token: { type: string }
+                client_scan_id:
+                  type: string
+                  description: Idempotency key.
+                source:
+                  type: string
+                  description: Set to `manual` to record a manual scan.
+                scanned_at:
+                  type: string
+                  format: date-time
+                  description: Defaults to now.
+      responses:
+        "200":
+          description: >-
+            Scan recorded (or an existing scan returned when deduplicated).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScanCreateResponse" }
+        "404":
+          description: Participant not found for this event.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Missing / invalid scan context, or validation failed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /events/{event_id}/scans/{id}:
+    delete:
+      tags: [Scans]
+      summary: Undo scans for a participant
+      description: >-
+        Delete a participant's scans (all, or just one context) and clear their
+        check-in if no check-in scans remain. Despite the name, `id` is a
+        participant_event id (matched first) or participant id — not a scan id.
+      parameters:
+        - $ref: "#/components/parameters/EventIdNumeric"
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+          description: participant_event id or participant id.
+        - name: scan_context_id
+          in: query
+          required: false
+          schema: { type: integer }
+          description: Restrict the deletion to one context.
+      responses:
+        "200":
+          description: Scans deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  deleted_scans: { type: integer, example: 3 }
+                  participant_event_id: { type: integer }
+                  scan_context_id: { type: integer, nullable: true }
+        "404":
+          description: Participant not found for this event.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Invalid scan context.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /events/{event_id}/scan_contexts:
+    get:
+      tags: [Scan Contexts]
+      summary: List scan contexts
+      parameters:
+        - $ref: "#/components/parameters/EventIdNumeric"
+      responses:
+        "200":
+          description: Scan contexts for the event.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scan_contexts:
+                    type: array
+                    items: { $ref: "#/components/schemas/ScanContext" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/airport_mode:
+    get:
+      tags: [Airport Mode]
+      summary: Flight-tracking dashboard
+      description: >-
+        Live inbound/outbound air-travel journeys for participants with
+        completed registrations, with per-leg tracking, status counts, and
+        airport/terminal lists. Journeys are cached for 5 minutes. Accepts an
+        event API key.
+      parameters:
+        - $ref: "#/components/parameters/EventIdNumeric"
+        - name: tab
+          in: query
+          required: false
+          schema: { type: string, enum: [inbound, outbound], default: inbound }
+      responses:
+        "200":
+          description: Airport-mode dashboard.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AirportModeResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/slack_blasts:
+    get:
+      tags: [Slack Blasts]
+      summary: List Slack blasts
+      parameters:
+        - $ref: "#/components/parameters/EventIdNumeric"
+      responses:
+        "200":
+          description: Slack blasts, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  slack_blasts:
+                    type: array
+                    items: { $ref: "#/components/schemas/SlackBlast" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Slack Blasts]
+      summary: Send a Slack blast
+      description: >-
+        Broadcast a message to every completed participant with a linked Slack
+        account, and enqueue delivery.
+      parameters:
+        - $ref: "#/components/parameters/EventIdNumeric"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { type: string, example: Doors open at 9am! }
+      responses:
+        "201":
+          description: Blast created and enqueued.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  slack_blast: { $ref: "#/components/schemas/SlackBlast" }
+        "422":
+          description: Blank message, or no participants with linked Slack accounts.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/slack_blasts/{id}:
+    get:
+      tags: [Slack Blasts]
+      summary: Get a Slack blast
+      parameters:
+        - $ref: "#/components/parameters/EventIdNumeric"
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: The Slack blast.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  slack_blast: { $ref: "#/components/schemas/SlackBlast" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/participant_events/{participant_event_id}/nfc_badge/ensure:
+    post:
+      tags: [NFC Badges]
+      summary: Ensure an NFC badge token
+      description: Create a badge token for the participant if one does not exist.
+      parameters:
+        - $ref: "#/components/parameters/EventIdNumeric"
+        - $ref: "#/components/parameters/ParticipantEventId"
+      responses:
+        "200":
+          description: Badge token.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  badge_token: { type: string }
+                  assigned: { type: boolean }
+                  assigned_at: { type: string, format: date-time, nullable: true }
+        "422": { $ref: "#/components/responses/NfcNotEnabled" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/participant_events/{participant_event_id}/nfc_badge/confirm:
+    post:
+      tags: [NFC Badges]
+      summary: Confirm an NFC badge assignment
+      parameters:
+        - $ref: "#/components/parameters/EventIdNumeric"
+        - $ref: "#/components/parameters/ParticipantEventId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                badge_token:
+                  type: string
+                  description: If given, must match the stored token.
+      responses:
+        "200":
+          description: Badge assigned.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  badge_token: { type: string }
+                  assigned_at: { type: string, format: date-time }
+        "422":
+          description: No badge token exists, token mismatch, or NFC not enabled.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/participant_events/{participant_event_id}/nfc_badge/reset:
+    post:
+      tags: [NFC Badges]
+      summary: Reset an NFC badge token
+      parameters:
+        - $ref: "#/components/parameters/EventIdNumeric"
+        - $ref: "#/components/parameters/ParticipantEventId"
+      responses:
+        "200":
+          description: Badge token reset.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  badge_token: { type: string, nullable: true }
+        "422": { $ref: "#/components/responses/NfcNotEnabled" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /travel/search_airports:
+    get:
+      tags: [Travel]
+      summary: Search airports
+      description: >-
+        Search airports by keyword. **Authenticated with the web session
+        cookie, not a bearer token.** Returns an empty list for terms shorter
+        than 2 characters.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: keyword
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Matching airports.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  airports:
+                    type: array
+                    items: { $ref: "#/components/schemas/Airport" }
+
+  /travel/validate_flight:
+    post:
+      tags: [Travel]
+      summary: Validate a flight
+      description: >-
+        Validate a flight code + date and return matching legs and airline
+        info. **Authenticated with the web session cookie, not a bearer token.**
+        Always responds `200`; check the `valid` field.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [flight_code, departure_date]
+              properties:
+                flight_code: { type: string, example: AA100 }
+                departure_date: { type: string, format: date, example: "2026-08-01" }
+      responses:
+        "200":
+          description: Validation result (valid or not).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FlightValidation" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Mobile token, global API token, or event API key.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: _attend_session
+      description: Web session cookie (Devise). Used only by the Travel endpoints.
+
+  parameters:
+    EventId:
+      name: event_id
+      in: path
+      required: true
+      schema: { type: string }
+      description: Event id or slug.
+    EventIdNumeric:
+      name: event_id
+      in: path
+      required: true
+      schema: { type: integer }
+      description: Event id.
+    ParticipantId:
+      name: participant_id
+      in: path
+      required: true
+      schema: { type: integer }
+      description: The participant_event id.
+    ParticipantEventId:
+      name: participant_event_id
+      in: path
+      required: true
+      schema: { type: integer }
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: The caller cannot access this event or action.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Event or record not found.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NfcNotEnabled:
+      description: NFC badges are not enabled for this event.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string, example: Unauthorized }
+
+    Success:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+
+    InviteError:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        error: { type: string, example: This email is already registered for this event }
+
+    ParticipantStatus:
+      type: string
+      enum: [invited, in_progress, awaiting_guardian, complete, withdrawn, rejected]
+
+    Event:
+      type: object
+      properties:
+        id: { type: integer, example: 7 }
+        name: { type: string, example: The Great Hackathon }
+        slug: { type: string, example: the-great-hackathon }
+        starts_at: { type: string, format: date-time, nullable: true }
+        ends_at: { type: string, format: date-time, nullable: true }
+        timezone: { type: string, example: America/New_York }
+        location_city: { type: string, nullable: true, example: New York }
+        logo_url: { type: string, nullable: true }
+        banner_url: { type: string, nullable: true }
+
+    SessionResponse:
+      type: object
+      properties:
+        token: { type: string, example: mt_live_abc123 }
+        expires_at: { type: string, format: date-time }
+        user:
+          type: object
+          properties:
+            id: { type: integer, example: 42 }
+            name: { type: string, example: Leo }
+            email: { type: string, format: email }
+            global_admin: { type: boolean }
+            events:
+              type: array
+              items: { $ref: "#/components/schemas/Event" }
+
+    UserProfile:
+      type: object
+      properties:
+        id: { type: integer, example: 42 }
+        email: { type: string, format: email }
+        name: { type: string, example: Leo }
+        global_admin: { type: boolean, example: false }
+        is_organizer: { type: boolean, example: true }
+        is_participant: { type: boolean, example: false }
+
+    RosterEntry:
+      type: object
+      properties:
+        email: { type: string, format: email }
+        first_name: { type: string, example: Jane }
+        last_name: { type: string, example: Doe }
+        slack_user_id: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/ParticipantStatus" }
+
+    ScanContext:
+      type: object
+      properties:
+        id: { type: integer, example: 4 }
+        name: { type: string, example: Check-in }
+        checks_in: { type: boolean }
+        is_airport: { type: boolean }
+        position: { type: integer }
+
+    Scan:
+      type: object
+      properties:
+        id: { type: integer, example: 123 }
+        participant_id: { type: integer }
+        participant_event_id: { type: integer }
+        scanned_at: { type: string, format: date-time }
+        scanned_by: { type: string, example: Jane Staff }
+        client_scan_id: { type: string, nullable: true }
+        source: { type: string, enum: [qr, nfc, manual] }
+        scan_context:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/ScanContext" }]
+        created_at: { type: string, format: date-time }
+
+    ScanCreateResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        deduplicated:
+          type: boolean
+          description: Present and true when an existing scan was returned.
+        first_scan_in_context:
+          type: boolean
+          description: Absent on a deduplicated response.
+        scan: { $ref: "#/components/schemas/Scan" }
+        participant: { $ref: "#/components/schemas/ScanParticipant" }
+
+    ScanParticipant:
+      type: object
+      description: Compact participant summary returned when recording a scan.
+      properties:
+        participant_id: { type: integer }
+        participant_event_id: { type: integer }
+        display_name: { type: string }
+        full_name: { type: string }
+        email: { type: string, format: email }
+        slack_user_id: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        pronouns: { type: string, nullable: true }
+        tshirt_size: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/ParticipantStatus" }
+        has_anaphylaxis_risk: { type: boolean }
+        requires_refrigeration: { type: boolean }
+        allergies: { type: string, nullable: true }
+        medical_conditions: { type: string, nullable: true }
+        medications: { type: string, nullable: true }
+        diet_type: { type: string, nullable: true }
+        life_threatening_allergies: { type: string, nullable: true }
+        cross_contamination_risk: { type: boolean }
+        freedom_waiver_granted: { type: boolean }
+        high_support_flag: { type: boolean }
+        can_leave_unaccompanied: { type: boolean }
+        waiver_signed: { type: boolean }
+        nfc_badge_token: { type: string, nullable: true }
+        nfc_badge_assigned: { type: boolean }
+        groups:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              color: { type: string }
+
+    Note:
+      type: object
+      properties:
+        id: { type: integer, example: 42 }
+        content: { type: string }
+        note_type: { type: string, enum: [ops, safeguarding, logistical] }
+        sensitivity: { type: string, enum: [normal, restricted] }
+        created_at: { type: string, format: date-time }
+        author:
+          type: object
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            email: { type: string, format: email }
+
+    SlackBlast:
+      type: object
+      properties:
+        id: { type: integer, example: 12 }
+        message: { type: string }
+        status: { type: string, example: pending }
+        recipient_count: { type: integer }
+        sent_count: { type: integer }
+        failed_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        sent_by: { type: string, nullable: true }
+
+    Airport:
+      type: object
+      properties:
+        iata: { type: string, example: JFK }
+        icao: { type: string, example: KJFK }
+        name: { type: string, example: New York John F. Kennedy }
+        city: { type: string, example: New York }
+        country: { type: string, example: US }
+        location:
+          type: object
+          properties:
+            lat: { type: number }
+            lon: { type: number }
+
+    FlightValidation:
+      type: object
+      properties:
+        valid: { type: boolean }
+        error: { type: string, description: Present when valid is false. }
+        flight_code: { type: string, example: AA100 }
+        carrier: { type: string, example: AA }
+        number: { type: string, example: "100" }
+        multiple_flights: { type: boolean }
+        airline:
+          type: object
+          properties:
+            code: { type: string }
+            name: { type: string }
+            country: { type: string }
+            logo_url: { type: string }
+        flights:
+          type: array
+          items: { $ref: "#/components/schemas/FlightLeg" }
+        departure_airport: { type: string, description: "Duplicated from flights[0]." }
+        arrival_airport: { type: string }
+        departure_time: { type: string, format: date-time, nullable: true }
+        arrival_time: { type: string, format: date-time, nullable: true }
+        status: { type: string }
+        aircraft_type: { type: string, nullable: true }
+
+    FlightLeg:
+      type: object
+      properties:
+        departure_airport: { type: string }
+        arrival_airport: { type: string }
+        departure_time: { type: string, format: date-time, nullable: true }
+        arrival_time: { type: string, format: date-time, nullable: true }
+        local_departure: { type: string, nullable: true }
+        local_arrival: { type: string, nullable: true }
+        status: { type: string }
+        aircraft_type: { type: string, nullable: true }
+
+    Travel:
+      type: object
+      description: A participant's inbound or outbound travel record.
+      properties:
+        id: { type: integer }
+        direction: { type: string, example: inbound }
+        mode: { type: string, example: plane }
+        visa_required: { type: boolean, nullable: true }
+        visa_status: { type: string, nullable: true }
+        visa_type: { type: string, nullable: true }
+        visa_number: { type: string, nullable: true }
+        passport_nationality: { type: string, nullable: true }
+        is_unaccompanied_minor: { type: boolean }
+        carrier: { type: string, nullable: true }
+        flight_number: { type: string, nullable: true }
+        train_departure_station: { type: string, nullable: true }
+        train_arrival_station: { type: string, nullable: true }
+        departure_station: { type: string, nullable: true }
+        arrival_station: { type: string, nullable: true }
+        departure_city: { type: string, nullable: true }
+        arrival_city: { type: string, nullable: true }
+        departure_time: { type: string, format: date-time, nullable: true }
+        arrival_time: { type: string, format: date-time, nullable: true }
+        expected_arrival_time: { type: string, format: date-time, nullable: true }
+        bus_departure_location: { type: string, nullable: true }
+        bus_arrival_location: { type: string, nullable: true }
+        origin_address: { type: string, nullable: true }
+        other_details: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        pickup_dismissed_at: { type: string, format: date-time, nullable: true }
+        legs:
+          type: array
+          items: { $ref: "#/components/schemas/TravelLeg" }
+
+    TravelLeg:
+      type: object
+      properties:
+        id: { type: integer }
+        position: { type: integer }
+        flight_code: { type: string, nullable: true }
+        departure_airport: { type: string, nullable: true }
+        arrival_airport: { type: string, nullable: true }
+        departure_time: { type: string, format: date-time, nullable: true }
+        arrival_time: { type: string, format: date-time, nullable: true }
+        live_status: { type: string, nullable: true }
+        live_departure_time: { type: string, format: date-time, nullable: true }
+        live_arrival_time: { type: string, format: date-time, nullable: true }
+        airport_picked_up_at: { type: string, format: date-time, nullable: true }
+
+    ScansByContext:
+      type: object
+      properties:
+        scan_context_id: { type: integer }
+        scan_context_name: { type: string }
+        checks_in: { type: boolean }
+        is_airport: { type: boolean }
+        scan_count: { type: integer }
+        first_scanned_at: { type: string, format: date-time, nullable: true }
+        last_scanned_at: { type: string, format: date-time, nullable: true }
+
+    Participant:
+      type: object
+      description: >-
+        A participant registration. Sensitive fields (allergies, medical,
+        dietary, safeguarding, emergency and guardian contacts) are only present
+        for global admins and safeguarding leads.
+      properties:
+        participant_id: { type: integer }
+        participant_event_id: { type: integer }
+        display_name: { type: string, example: Jane }
+        full_name: { type: string, example: Jane Doe }
+        email: { type: string, format: email }
+        slack_user_id: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        pronouns: { type: string, nullable: true }
+        headshot_url: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/ParticipantStatus" }
+        checked_in_at: { type: string, format: date-time, nullable: true }
+        nfc_badge_token: { type: string, nullable: true }
+        nfc_badge_assigned: { type: boolean }
+        has_anaphylaxis_risk: { type: boolean }
+        requires_refrigeration: { type: boolean }
+        cross_contamination_risk: { type: boolean }
+        high_support_flag: { type: boolean }
+        can_leave_unaccompanied: { type: boolean }
+        waiver_signed: { type: boolean }
+        updated_at: { type: string, format: date-time }
+        scans_by_context:
+          type: array
+          items: { $ref: "#/components/schemas/ScansByContext" }
+        travel_inbound:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/Travel" }]
+        travel_outbound:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/Travel" }]
+        allergies:
+          type: string
+          nullable: true
+          description: Sensitive — permitted callers only.
+        medical_conditions: { type: string, nullable: true, description: Sensitive. }
+        medications: { type: string, nullable: true, description: Sensitive. }
+        diet_type: { type: string, nullable: true, description: Sensitive. }
+        life_threatening_allergies: { type: string, nullable: true, description: Sensitive. }
+        freedom_waiver_granted: { type: boolean, description: Sensitive. }
+        emergency_contacts:
+          type: array
+          description: Sensitive — permitted callers only.
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              phone: { type: string }
+              relationship: { type: string }
+              priority: { type: integer }
+        parent_guardian_name: { type: string, description: Sensitive; present only if a primary guardian exists. }
+        parent_guardian_phone: { type: string, description: Sensitive. }
+        parent_guardian_email: { type: string, description: Sensitive. }
+
+    ParticipantDetail:
+      description: >-
+        The full participant record returned by GET /participants/{id}. Extends
+        the list representation with personal, accommodation, consent and
+        guardian sections, plus sensitive medical / accessibility /
+        safeguarding detail for permitted callers.
+      allOf:
+        - $ref: "#/components/schemas/Participant"
+        - type: object
+          properties:
+            personal:
+              type: object
+              properties:
+                legal_first_name: { type: string }
+                legal_last_name: { type: string }
+                preferred_name: { type: string, nullable: true }
+                date_of_birth: { type: string, format: date, nullable: true }
+                age: { type: integer, nullable: true }
+                tshirt_size: { type: string, nullable: true }
+                engagement_preference: { type: string, nullable: true }
+                engagement_notes: { type: string, nullable: true }
+                address:
+                  type: object
+                  description: Blank fields are omitted.
+                  properties:
+                    line_1: { type: string }
+                    line_2: { type: string }
+                    city: { type: string }
+                    state: { type: string }
+                    postal_code: { type: string }
+                    country: { type: string }
+            accommodation:
+              type: object
+              nullable: true
+              properties:
+                check_in_date: { type: string, format: date, nullable: true }
+                check_out_date: { type: string, format: date, nullable: true }
+                gender_identity: { type: string, nullable: true }
+                gender_identity_other: { type: string, nullable: true }
+                assigned_room: { type: string, nullable: true }
+                rooming_exempt: { type: boolean }
+                venue_name: { type: string, nullable: true }
+                preferred_roommate_genders: { type: string, nullable: true }
+                roommate_preferences: { type: string, nullable: true }
+                roommate_exclusions: { type: string, nullable: true }
+                quiet_room_preference: { type: string, nullable: true }
+                room_type_preference: { type: string, nullable: true }
+                accessibility_needs: { type: string, nullable: true }
+                notes: { type: string, nullable: true }
+            consents:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  consent_type: { type: string }
+                  status: { type: string }
+                  pending_on: { type: string, nullable: true }
+                  sent_at: { type: string, format: date-time, nullable: true }
+                  viewed_at: { type: string, format: date-time, nullable: true }
+                  participant_signed_at: { type: string, format: date-time, nullable: true }
+                  guardian_signed_at: { type: string, format: date-time, nullable: true }
+                  signed_at: { type: string, format: date-time, nullable: true }
+                  document_url: { type: string, nullable: true }
+                  failure_reason: { type: string, nullable: true }
+            guardians:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  guardian_id: { type: integer, nullable: true }
+                  name: { type: string, nullable: true }
+                  email: { type: string, nullable: true }
+                  phone: { type: string, nullable: true }
+                  relationship: { type: string, nullable: true }
+                  is_primary: { type: boolean }
+                  status: { type: string }
+                  accepted_at: { type: string, format: date-time, nullable: true }
+                  completed_at: { type: string, format: date-time, nullable: true }
+                  invited_via_email: { type: string, nullable: true }
+                  invite_token_sent_at: { type: string, format: date-time, nullable: true }
+                  media_permission: { type: string, nullable: true }
+                  photo_permission: { type: string, nullable: true }
+                  travel_permission: { type: string, nullable: true }
+                  emergency_medical_consent: { type: string, nullable: true }
+                  otc_medication_consent: { type: string, nullable: true }
+                  emergency_contacts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                        phone: { type: string }
+                        email: { type: string }
+                        relationship: { type: string }
+                        priority: { type: integer }
+            medical_detail:
+              type: object
+              nullable: true
+              description: Sensitive — permitted callers only.
+              properties:
+                allergy_severity: { type: string, nullable: true }
+                emergency_action_plan: { type: string, nullable: true }
+                additional_notes: { type: string, nullable: true }
+            dietary_detail:
+              type: object
+              nullable: true
+              description: Sensitive.
+              properties:
+                intolerances: { type: string, nullable: true }
+                notes: { type: string, nullable: true }
+            accessibility:
+              type: object
+              nullable: true
+              description: Sensitive.
+              additionalProperties: true
+            safeguarding_detail:
+              type: object
+              nullable: true
+              description: Sensitive.
+              properties:
+                high_support_notes: { type: string, nullable: true }
+                authorized_pickup_adults: { type: string, nullable: true }
+                other_instructions: { type: string, nullable: true }
+                curfew_acknowledged: { type: boolean }
+                overnight_rules_acknowledged: { type: boolean }
+
+    AirportModeResponse:
+      type: object
+      properties:
+        tab: { type: string, enum: [inbound, outbound] }
+        last_refreshed_at: { type: string, format: date-time, nullable: true }
+        event_timezone: { type: string }
+        counts:
+          type: object
+          properties:
+            inbound: { $ref: "#/components/schemas/AirportCounts" }
+            outbound: { $ref: "#/components/schemas/AirportCounts" }
+        airports:
+          type: array
+          items: { type: string }
+        terminals:
+          type: array
+          items: { type: string }
+        journeys:
+          type: array
+          items: { $ref: "#/components/schemas/AirportJourney" }
+
+    AirportCounts:
+      type: object
+      properties:
+        total: { type: integer }
+        cancelled: { type: integer }
+        diverted: { type: integer }
+        landed_waiting: { type: integer }
+        picked_up: { type: integer }
+        in_flight: { type: integer }
+        scheduled: { type: integer }
+        delayed: { type: integer }
+        ums: { type: integer }
+        arriving_now: { type: integer }
+        alerts: { type: integer }
+
+    AirportJourney:
+      type: object
+      description: camelCase keys, as returned by the serializer.
+      properties:
+        id: { type: string }
+        participantId: { type: string }
+        participantEventId: { type: string }
+        participantName: { type: string }
+        participantFullName: { type: string }
+        participantHasHeadshot: { type: boolean }
+        participantHeadshotUrl: { type: string, nullable: true }
+        direction: { type: string }
+        status: { type: string, enum: [scheduled, in_flight, landed, picked_up, cancelled, diverted] }
+        statusLabel: { type: string }
+        statusColor: { type: string }
+        isDelayed: { type: boolean }
+        delayMinutes: { type: integer }
+        isUnaccompaniedMinor: { type: boolean }
+        arrivingNow: { type: boolean }
+        isAlert: { type: boolean }
+        scannedIn: { type: boolean }
+        scannedAt: { type: string, format: date-time, nullable: true }
+        legCount: { type: integer }
+        primaryAirport: { type: string, nullable: true }
+        primaryTerminal: { type: string, nullable: true }
+        primaryGate: { type: string, nullable: true }
+        primaryTimezone: { type: string, nullable: true }
+        primaryTimeIso: { type: string, nullable: true }
+        primaryScheduledIso: { type: string, nullable: true }
+        progress: { type: number, nullable: true }
+        lastTrackedAt: { type: string, format: date-time, nullable: true }
+        legs:
+          type: array
+          items: { $ref: "#/components/schemas/AirportLeg" }
+
+    AirportLeg:
+      type: object
+      description: camelCase keys, as returned by the serializer.
+      properties:
+        id: { type: string }
+        flightCode: { type: string }
+        origin: { type: string }
+        destination: { type: string }
+        departureTime: { type: string, format: date-time, nullable: true }
+        arrivalTime: { type: string, format: date-time, nullable: true }
+        status: { type: string }
+        statusLabel: { type: string }
+        statusColor: { type: string }
+        departureTerminal: { type: string, nullable: true }
+        departureGate: { type: string, nullable: true }
+        arrivalTerminal: { type: string, nullable: true }
+        arrivalGate: { type: string, nullable: true }
+        departureTimezone: { type: string, nullable: true }
+        arrivalTimezone: { type: string, nullable: true }
+        scheduledDepartureIso: { type: string, nullable: true }
+        scheduledArrivalIso: { type: string, nullable: true }
+        progress: { type: number, nullable: true }
+        departureCoordinates: { type: object, nullable: true, additionalProperties: true }
+        arrivalCoordinates: { type: object, nullable: true, additionalProperties: true }
+        currentCoordinates: { type: object, nullable: true, additionalProperties: true }
+        delayMinutes: { type: integer }
+        isDelayed: { type: boolean }

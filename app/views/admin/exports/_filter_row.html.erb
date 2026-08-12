@@ -1,0 +1,41 @@
+<%# locals: index (integer or "NEW_RECORD"), filter (hash with "field"/"operator"/"value" or nil), fields_by_category, categories %>
+<% field = filter && Exports::FieldRegistry.fetch(filter["field"].to_s) %>
+<div class="flex flex-wrap items-center gap-2 bg-gray-50 border border-gray-200 rounded-md p-2" data-export-filter-row>
+  <select name="filters[<%= index %>][field]" data-export-field-select data-action="export-builder#fieldChanged"
+          class="rounded-md border-gray-300 text-sm min-w-[14rem]">
+    <option value="">Choose a field…</option>
+    <% fields_by_category.each do |category, fields| %>
+      <optgroup label="<%= categories[category][:label] %>">
+        <% fields.select(&:filterable?).each do |f| %>
+          <option value="<%= f.key %>" <%= "selected" if field&.key == f.key %>><%= f.label %></option>
+        <% end %>
+      </optgroup>
+    <% end %>
+  </select>
+
+  <select name="filters[<%= index %>][operator]" data-export-operator-select data-action="export-builder#operatorChanged"
+          class="rounded-md border-gray-300 text-sm">
+    <% field&.operators&.each do |op| %>
+      <option value="<%= op %>" <%= "selected" if filter["operator"] == op %>><%= Exports::Filter::OPERATOR_LABELS[op] %></option>
+    <% end %>
+  </select>
+
+  <span class="flex-1 min-w-[10rem]" data-export-value-wrapper>
+    <% if field && !Exports::Filter::VALUELESS_OPERATORS.include?(filter["operator"]) %>
+      <% if field.type == :enum %>
+        <select name="filters[<%= index %>][value][]" multiple size="<%= [ field.enum_values.size, 5 ].min %>"
+                class="w-full rounded-md border-gray-300 text-sm">
+          <% field.enum_values.each do |val| %>
+            <option value="<%= val %>" <%= "selected" if Array(filter["value"]).include?(val) %>><%= val.humanize.downcase %></option>
+          <% end %>
+        </select>
+      <% else %>
+        <input name="filters[<%= index %>][value]" value="<%= filter["value"] %>" placeholder="value"
+               type="<%= { date: "date", datetime: "datetime-local" }[field.type] || "text" %>"
+               class="w-full rounded-md border-gray-300 text-sm">
+      <% end %>
+    <% end %>
+  </span>
+
+  <button type="button" data-action="export-builder#removeFilter" class="text-gray-400 hover:text-[#ec3750] text-sm px-1" title="Remove filter">✕</button>
+</div>

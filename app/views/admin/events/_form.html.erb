@@ -1,0 +1,302 @@
+<%= form_with model: [:admin, event], class: "space-y-6", multipart: true do |f| %>
+  <% if event.errors.any? %>
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+      <h3 class="text-red-800 font-medium"><%= pluralize(event.errors.count, "error") %> prohibited this event from being saved:</h3>
+      <ul class="mt-2 list-disc list-inside text-sm text-red-700">
+        <% event.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-semibold mb-4">Basic Information</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <%= f.label :name, class: "block text-sm font-medium text-gray-700" %>
+        <%= f.text_field :name, class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+      </div>
+      <div>
+        <%= f.label :slug, class: "block text-sm font-medium text-gray-700" %>
+        <%= f.text_field :slug, class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "auto-generated from name" %>
+        <p class="mt-1 text-sm text-gray-500">Lowercase letters, numbers, and dashes only</p>
+      </div>
+      <% if current_user.global_admin? && EventSeries.any? %>
+        <div>
+          <%= f.label :event_series_id, "Series", class: "block text-sm font-medium text-gray-700" %>
+          <%= f.collection_select :event_series_id, EventSeries.order(:name), :id, :name, { include_blank: "No series — standalone event" }, class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+          <p class="mt-1 text-sm text-gray-500">Series members can manage this event and it inherits the series' branding.</p>
+        </div>
+      <% elsif event.event_series %>
+        <div>
+          <span class="block text-sm font-medium text-gray-700">Series</span>
+          <p class="mt-2 text-sm text-gray-600 flex items-center gap-2">
+            <%= render "admin/events/avatar", event: event.event_series, size: 20, rounded: "rounded-md" %>
+            Part of <strong><%= event.event_series.name %></strong>
+          </p>
+        </div>
+      <% end %>
+    </div>
+    <div class="mt-4">
+      <%= f.label :logo, "Logo", class: "block text-sm font-medium text-gray-700" %>
+      <div class="mt-1 flex items-center gap-4"
+           data-controller="instant-upload"
+           data-instant-upload-field-value="logo"
+           data-instant-upload-url-value="<%= event.persisted? ? attach_image_admin_event_path(event) : "" %>">
+        <%= render "admin/events/image_preview", event: event, field: "logo" %>
+        <div class="flex flex-col gap-1">
+          <%= f.file_field :logo, accept: "image/jpeg,image/png,image/gif,image/webp,image/svg+xml", data: { instant_upload_target: "input", action: "change->instant-upload#upload" }, class: "block text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 file:cursor-pointer" %>
+          <span data-instant-upload-target="status" class="text-sm text-gray-400" aria-live="polite"></span>
+        </div>
+      </div>
+      <p class="mt-1 text-sm text-gray-500">JPEG, PNG, GIF, WebP, or SVG. Max 5MB. Shown in the sidebar and event picker.<% if event.persisted? %> Uploads as soon as you pick a file.<% end %></p>
+    </div>
+    <div class="mt-4">
+      <%= f.label :banner, "Ticket banner", class: "block text-sm font-medium text-gray-700" %>
+      <div class="mt-1 flex items-center gap-4"
+           data-controller="instant-upload"
+           data-instant-upload-field-value="banner"
+           data-instant-upload-url-value="<%= event.persisted? ? attach_image_admin_event_path(event) : "" %>">
+        <%= render "admin/events/image_preview", event: event, field: "banner" %>
+        <div class="flex flex-col gap-1">
+          <%= f.file_field :banner, accept: "image/jpeg,image/png", data: { instant_upload_target: "input", action: "change->instant-upload#upload" }, class: "block text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 file:cursor-pointer" %>
+          <span data-instant-upload-target="status" class="text-sm text-gray-400" aria-live="polite"></span>
+        </div>
+      </div>
+      <p class="mt-1 text-sm text-gray-500">Shown as the hero image on Google Wallet tickets (full image, roughly 5:4) and cropped to a wide center strip on Apple Wallet tickets. PNG or JPEG, 1032&times;812px recommended, max 5MB. Avoid text in the image and keep the important content centered.<% if event.persisted? %> Uploads as soon as you pick a file.<% end %></p>
+    </div>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-semibold mb-4">Location & Time</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <%= f.label :location_city, class: "block text-sm font-medium text-gray-700" %>
+        <%= f.text_field :location_city, class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+      </div>
+      <div>
+        <%= f.label :location_country, class: "block text-sm font-medium text-gray-700" %>
+        <%= f.text_field :location_country, class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+      </div>
+      <div>
+        <%= f.label :timezone, class: "block text-sm font-medium text-gray-700" %>
+        <%= f.time_zone_select :timezone, nil, {}, class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-semibold mb-4">Venue Details</h2>
+    <p class="text-sm text-gray-500 mb-4">Optional venue information for Google Wallet passes. Both venue name and address are required for the pass to display venue info.</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <%= f.label :venue_name, "Venue Name", class: "block text-sm font-medium text-gray-700" %>
+        <%= f.text_field :venue_name, class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "e.g. Reaktor" %>
+      </div>
+      <div>
+        <%= f.label :location_address, "Venue Address", class: "block text-sm font-medium text-gray-700" %>
+        <%= f.text_field :location_address, 
+            id: "venue-address-input",
+            class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", 
+            placeholder: "Start typing to search...",
+            autocomplete: "off" %>
+        <p class="mt-1 text-sm text-gray-500">Search for a place using Google Places</p>
+      </div>
+    </div>
+    <%= f.hidden_field :location_latitude, id: "venue-latitude" %>
+    <%= f.hidden_field :location_longitude, id: "venue-longitude" %>
+  </div>
+
+  <script>
+    (function() {
+      var script = document.createElement('script');
+      script.src = 'https://maps.googleapis.com/maps/api/js?key=<%= Rails.application.credentials.dig(:google, :key) %>&libraries=places&callback=initPlacesAutocomplete';
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+
+    function initPlacesAutocomplete() {
+      var input = document.getElementById('venue-address-input');
+      if (!input) return;
+
+      var autocomplete = new google.maps.places.Autocomplete(input, {
+        types: ['establishment', 'geocode']
+      });
+
+      autocomplete.addListener('place_changed', function() {
+        var place = autocomplete.getPlace();
+        if (place.geometry) {
+          document.getElementById('venue-latitude').value = place.geometry.location.lat();
+          document.getElementById('venue-longitude').value = place.geometry.location.lng();
+        }
+        if (place.formatted_address) {
+          input.value = place.formatted_address;
+        }
+      });
+    }
+  </script>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-semibold mb-4">Event Dates</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <%= f.label :starts_at, class: "block text-sm font-medium text-gray-700" %>
+        <%= f.datetime_local_field :starts_at, value: f.object.schedule_time_field_value(:starts_at), class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+      </div>
+      <div>
+        <%= f.label :ends_at, class: "block text-sm font-medium text-gray-700" %>
+        <%= f.datetime_local_field :ends_at, value: f.object.schedule_time_field_value(:ends_at), class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-semibold mb-4">Registration Period</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <%= f.label :registration_open_at, class: "block text-sm font-medium text-gray-700" %>
+        <%= f.datetime_local_field :registration_open_at, value: f.object.schedule_time_field_value(:registration_open_at), class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+      </div>
+      <div>
+        <%= f.label :registration_close_at, class: "block text-sm font-medium text-gray-700" %>
+        <%= f.datetime_local_field :registration_close_at, value: f.object.schedule_time_field_value(:registration_close_at), class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-semibold mb-4">Contact</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <%= f.label :support_email, "Support Email", class: "block text-sm font-medium text-gray-700" %>
+        <%= f.email_field :support_email, class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "team@hackclub.com" %>
+        <p class="mt-1 text-sm text-gray-500">Used in guardian invitation emails. Defaults to team@hackclub.com if not set.</p>
+      </div>
+    </div>
+  </div>
+
+  <% if event.persisted? && event.scan_contexts.any? %>
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <h2 class="text-lg font-semibold mb-4">Rooming</h2>
+      <div>
+        <%= f.label :hotel_scan_context_id, "Hotel Scan Context", class: "block text-sm font-medium text-gray-700" %>
+        <%= f.select :hotel_scan_context_id, 
+            event.scan_contexts.map { |c| [c.name, c.id] },
+            { include_blank: "None", selected: event.hotel_scan_context_id },
+            class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+        <p class="mt-1 text-sm text-gray-500">Select the scanning context used for hotel check-in. Participants with this scan will show as green on the rooming finalize page.</p>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-semibold mb-4">Event Options</h2>
+    <div class="space-y-4">
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :freedom_waivers_enabled, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :freedom_waivers_enabled, "Enable Freedom Waivers", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Allow guardians to grant additional freedom permissions for minor participants</p>
+        </div>
+      </div>
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :travel_enabled, { checked: f.object.travel_enabled?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :travel_enabled, "Enable Travel", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Collect travel information from participants. Disabling hides the travel onboarding step, travel dashboards, and Airport Mode</p>
+        </div>
+      </div>
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :visa_options_enabled, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :visa_options_enabled, "Enable Visa Options", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Show visa requirement fields in travel information for international participants</p>
+          <div class="mt-3">
+            <%= f.label :visa_application_url, "Visa letter application URL", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.url_field :visa_application_url, placeholder: "https://visas.hackclub.com/...", class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+            <p class="text-xs text-gray-500 mt-1">Envoy (visas.hackclub.com) application form participants are pointed to when they need a visa letter.</p>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :accommodation_enabled, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :accommodation_enabled, "Enable Accommodation", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Show accommodation/housing preferences in onboarding for events with overnight stays</p>
+        </div>
+      </div>
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :roommate_preferences_enabled, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :roommate_preferences_enabled, "Enable Roommate Preferences", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Show roommate preference fields on the accommodation onboarding step</p>
+        </div>
+      </div>
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :guardian_invites_locked, class: "h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded" %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :guardian_invites_locked, "Lock Guardian Invites", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Hold off sending guardian invitations while waiver details are being finalised</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-semibold mb-4">NFC Badges</h2>
+    <p class="text-sm text-gray-500 mb-4">Enable NFC badge support for events with physical PCB badges or NFC wristbands.</p>
+    <div class="space-y-4">
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :nfc_badges_enabled, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :nfc_badges_enabled, "Enable NFC Badges", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Allow participants to be checked in by scanning NFC badges</p>
+        </div>
+      </div>
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :nfc_badge_write_on_checkin_enabled, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :nfc_badge_write_on_checkin_enabled, "Prompt NFC Write on Initial Check-in", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">After a participant scans their QR code, offer to write their ID to an NFC badge</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-semibold mb-4">Groups</h2>
+    <p class="text-sm text-gray-500 mb-4">Tag participants with named groups (e.g. "Hardware", "General Attendance") to distinguish cohorts within the same event.</p>
+    <div class="flex items-start">
+      <div class="flex items-center h-5">
+        <%= f.check_box :groups_enabled, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" %>
+      </div>
+      <div class="ml-3">
+        <%= f.label :groups_enabled, "Enable Groups", class: "text-sm font-medium text-gray-700" %>
+        <p class="text-sm text-gray-500">Show group chips on tickets, scans, the participant table, messaging, rooming, and airport mode.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex flex-col sm:flex-row justify-end gap-3">
+    <%= link_to "Cancel", (event.persisted? ? admin_event_dashboard_path(event.slug) : admin_root_path), class: "w-full sm:w-auto text-center bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors" %>
+    <%= f.submit class: "w-full sm:w-auto bg-[#ec3750] hover:bg-[#ec3750] text-white font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer" %>
+  </div>
+<% end %>

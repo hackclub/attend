@@ -1,0 +1,182 @@
+<div class="space-y-6 border-2 border-dashed border-orange-400 p-4 rounded-lg">
+  <div class="flex justify-between items-center">
+    <div class="flex items-center gap-4">
+      <%= link_to admin_email_logs_path, class: "text-gray-500 hover:text-gray-700" do %>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        </svg>
+      <% end %>
+      <h1 class="text-2xl font-bold text-gray-900">Email Log Details</h1>
+    </div>
+    <span class="text-sm text-orange-600 font-medium">Global Admin Only</span>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200">
+      <h2 class="text-lg font-medium text-gray-900"><%= @email_log.subject %></h2>
+    </div>
+
+    <dl class="divide-y divide-gray-100">
+      <div class="px-6 py-4 grid grid-cols-3 gap-4">
+        <dt class="text-sm font-medium text-gray-500">To</dt>
+        <dd class="text-sm text-gray-900 col-span-2"><%= @email_log.to_address %></dd>
+      </div>
+      <div class="px-6 py-4 grid grid-cols-3 gap-4">
+        <dt class="text-sm font-medium text-gray-500">From</dt>
+        <dd class="text-sm text-gray-900 col-span-2"><%= @email_log.from_address %></dd>
+      </div>
+      <div class="px-6 py-4 grid grid-cols-3 gap-4">
+        <dt class="text-sm font-medium text-gray-500">Mailer</dt>
+        <dd class="text-sm text-gray-900 col-span-2 font-mono"><%= @email_log.mailer_class %>#<%= @email_log.mailer_action %></dd>
+      </div>
+      <div class="px-6 py-4 grid grid-cols-3 gap-4">
+        <dt class="text-sm font-medium text-gray-500">Status</dt>
+        <dd class="text-sm col-span-2">
+          <% status_color = case @email_log.status
+             when "sent" then "bg-yellow-100 text-yellow-800"
+             when "delivered" then "bg-blue-100 text-blue-800"
+             when "opened" then "bg-green-100 text-green-800"
+             when "bounced" then "bg-red-100 text-red-800"
+             when "failed" then "bg-red-100 text-red-800"
+             else "bg-gray-100 text-gray-800"
+             end %>
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <%= status_color %>">
+            <%= @email_log.status.titleize %>
+          </span>
+        </dd>
+      </div>
+      <div class="px-6 py-4 grid grid-cols-3 gap-4">
+        <dt class="text-sm font-medium text-gray-500">Sent At</dt>
+        <dd class="text-sm text-gray-900 col-span-2"><%= @email_log.created_at.strftime("%Y-%m-%d %H:%M:%S %Z") %></dd>
+      </div>
+      <% if @email_log.delivered_at %>
+        <div class="px-6 py-4 grid grid-cols-3 gap-4">
+          <dt class="text-sm font-medium text-gray-500">Delivered At</dt>
+          <dd class="text-sm text-gray-900 col-span-2"><%= @email_log.delivered_at.strftime("%Y-%m-%d %H:%M:%S %Z") %></dd>
+        </div>
+      <% end %>
+      <% if @email_log.opened_at %>
+        <div class="px-6 py-4 grid grid-cols-3 gap-4">
+          <dt class="text-sm font-medium text-gray-500">Opened At</dt>
+          <dd class="text-sm text-gray-900 col-span-2"><%= @email_log.opened_at.strftime("%Y-%m-%d %H:%M:%S %Z") %></dd>
+        </div>
+      <% end %>
+      <% if @email_log.bounced_at %>
+        <div class="px-6 py-4 grid grid-cols-3 gap-4 bg-red-50">
+          <dt class="text-sm font-medium text-red-700">Bounced At</dt>
+          <dd class="text-sm text-red-900 col-span-2"><%= @email_log.bounced_at.strftime("%Y-%m-%d %H:%M:%S %Z") %></dd>
+        </div>
+        <div class="px-6 py-4 grid grid-cols-3 gap-4 bg-red-50">
+          <dt class="text-sm font-medium text-red-700">Bounce Type</dt>
+          <dd class="text-sm text-red-900 col-span-2"><%= @email_log.bounce_type %></dd>
+        </div>
+        <% if @email_log.bounce_description %>
+          <div class="px-6 py-4 grid grid-cols-3 gap-4 bg-red-50">
+            <dt class="text-sm font-medium text-red-700">Bounce Description</dt>
+            <dd class="text-sm text-red-900 col-span-2"><%= @email_log.bounce_description %></dd>
+          </div>
+        <% end %>
+      <% end %>
+      <% if @email_log.postmark_message_id %>
+        <div class="px-6 py-4 grid grid-cols-3 gap-4">
+          <dt class="text-sm font-medium text-gray-500">Postmark Message ID</dt>
+          <dd class="text-sm text-gray-900 col-span-2 font-mono text-xs"><%= @email_log.postmark_message_id %></dd>
+        </div>
+      <% end %>
+      <% if @email_log.event %>
+        <div class="px-6 py-4 grid grid-cols-3 gap-4">
+          <dt class="text-sm font-medium text-gray-500">Event</dt>
+          <dd class="text-sm text-gray-900 col-span-2">
+            <%= link_to @email_log.event.name, admin_event_dashboard_path(@email_log.event.slug), class: "text-[#ec3750] hover:text-blue-800" %>
+          </dd>
+        </div>
+      <% end %>
+      <% if @email_log.emailable %>
+        <div class="px-6 py-4 grid grid-cols-3 gap-4">
+          <dt class="text-sm font-medium text-gray-500">Related Record</dt>
+          <dd class="text-sm text-gray-900 col-span-2"><%= @email_log.emailable_type %> #<%= @email_log.emailable_id.to_s.first(8) %>...</dd>
+        </div>
+      <% end %>
+    </dl>
+  </div>
+
+  <% if @email_log.body.present? %>
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-lg font-medium text-gray-900">Message Body</h2>
+      </div>
+      <div class="px-6 py-4 prose prose-sm max-w-none">
+        <%= sanitize @email_log.body, tags: %w[p br a strong em ul ol li h1 h2 h3 h4 h5 h6 span div img], attributes: %w[href class style src alt width height] %>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200">
+      <h2 class="text-lg font-medium text-gray-900">Event Timeline</h2>
+    </div>
+
+    <% if @events.any? %>
+      <div class="px-6 py-4">
+        <div class="flow-root">
+          <ul class="-mb-8">
+            <% @events.each_with_index do |event, index| %>
+              <li>
+                <div class="relative pb-8">
+                  <% unless index == @events.size - 1 %>
+                    <span class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                  <% end %>
+                  <div class="relative flex space-x-3">
+                    <div>
+                      <% icon_config = case event.event_type
+                         when "sent"
+                           { bg: "bg-[#ec3750]", icon: "M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" }
+                         when "delivered"
+                           { bg: "bg-green-500", icon: "M5 13l4 4L19 7" }
+                         when "opened"
+                           { bg: "bg-purple-500", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" }
+                         when "bounced"
+                           { bg: "bg-red-500", icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" }
+                         when "link_clicked"
+                           { bg: "bg-indigo-500", icon: "M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" }
+                         when "spam_complaint"
+                           { bg: "bg-orange-500", icon: "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }
+                         else
+                           { bg: "bg-gray-400", icon: "M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }
+                         end %>
+                      <span class="h-8 w-8 rounded-full <%= icon_config[:bg] %> flex items-center justify-center ring-8 ring-white">
+                        <svg class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="<%= icon_config[:icon] %>" />
+                        </svg>
+                      </span>
+                    </div>
+                    <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                      <div>
+                        <p class="text-sm text-gray-900 font-medium"><%= event.event_type.titleize %></p>
+                        <% if event.metadata.present? && event.metadata.any? %>
+                          <div class="mt-1 text-xs text-gray-500 space-y-0.5">
+                            <% event.metadata.each do |key, value| %>
+                              <% next if value.blank? %>
+                              <p><span class="font-medium"><%= key.to_s.humanize %>:</span> <%= value.is_a?(Hash) ? value.to_json : value %></p>
+                            <% end %>
+                          </div>
+                        <% end %>
+                      </div>
+                      <div class="whitespace-nowrap text-right text-sm text-gray-500">
+                        <time datetime="<%= event.occurred_at.iso8601 %>"><%= event.occurred_at.strftime("%b %d, %Y %H:%M:%S") %></time>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            <% end %>
+          </ul>
+        </div>
+      </div>
+    <% else %>
+      <div class="px-6 py-12 text-center">
+        <p class="text-gray-500">No events recorded yet.</p>
+      </div>
+    <% end %>
+  </div>
+</div>

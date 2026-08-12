@@ -1,0 +1,331 @@
+class DashboardController < ApplicationController
+  include TravelLegDateMerging
+  include PhysicalDocumentUploads
+
+  before_action :authenticate_user!
+  before_action :require_participant
+
+  def index
+    @participant_events = @participant.participant_events.includes(:event)
+    @pending_invitations = @participant.pending_invitations.includes(:event)
+  end
+
+  def profile
+    @public_profile_events = @participant.public_profile_eligible_participant_events.preload(:event)
+    # One [event, hidden] pair per staffed event — a user can hold several
+    # roles on an event, and it's hidden only when every assignment is.
+    @public_profile_staff_events = @participant.public_profile_eligible_staff_role_assignments
+      .preload(:event)
+      .group_by(&:event_id)
+      .values
+      .map { |assignments| [ assignments.first.event, assignments.all?(&:hidden_from_public_profile) ] }
+      .sort_by { |event, _hidden| event.starts_at || Time.current }
+      .reverse
+  end
+
+  def update_public_profile
+    if @participant.update(public_profile_params)
+      @participant.public_profile_photo.purge_later if params[:remove_public_profile_photo] == "1"
+      update_public_profile_event_visibility
+      update_public_profile_staff_event_visibility
+      notice = @participant.public_profile_enabled? ? "Public profile updated." : "Public profile is off."
+      redirect_to dashboard_profile_path, notice: notice
+    else
+      redirect_to dashboard_profile_path, alert: @participant.errors.full_messages.to_sentence
+    end
+  end
+
+  def show
+    @participant_event = @participant.participant_events
+      .includes(:event, :consents, :accommodation, :medical, :dietary, :accessibility,
+                :emergency_contacts, guardian_participant_events: :guardian,
+                travel_inbound: :travel_legs, travel_outbound: :travel_legs)
+      .find(params[:id])
+    authorize @participant_event
+    @event = @participant_event.event
+    @scans = @participant_event.scans.includes(:user).recent.limit(20)
+    @messages = @participant_event.message_deliveries
+      .includes(message: :sent_by_user)
+      .where(status: "delivered")
+      .order(delivered_at: :desc)
+      .limit(20)
+
+    @custom_documents = @participant_event.applicable_custom_documents
+    @custom_document_consents = @participant_event.consents
+      .select(&:custom_document_id)
+      .index_by(&:custom_document_id)
+
+    waiver_consent = @participant_event.consents.find { |c| c.consent_type == "waiver" }
+    if waiver_consent&.guardian_signed? && !waiver_consent&.participant_signed?
+      set_current_event(@event)
+      redirect_to onboarding_waiver_path, alert: "Please sign your waiver to complete your registration."
+    end
+  end
+
+  def sign_document
+    @participant_event = @participant.participant_events.includes(:event).find(params[:id])
+    authorize @participant_event, :show?
+    @event = @participant_event.event
+    @custom_document = @event.custom_documents.active.find(params[:custom_document_id])
+
+    unless @custom_document.applies_to?(@participant_event)
+      redirect_to dashboard_event_path(@participant_event), alert: "This document doesn't apply to you."
+      return
+    end
+
+    @consent = @participant_event.consents.find_or_create_by!(
+      consent_type: :custom_document,
+      custom_document: @custom_document
+    )
+
+    # Physical documents never touch DocuSeal — the page shows download +
+    # photo-upload UI instead of an embedded signing form.
+    if @custom_document.physical?
+      @preparing = false
+      return
+    end
+
+    if @consent.failed?
+      @consent.update!(status: :pending, failure_reason: nil, docuseal_envelope_id: nil,
+                       docuseal_participant_slug: nil, docuseal_guardian_slug: nil)
+      DocusealJobs::CreateCustomDocumentJob.perform_later(@consent.id)
+    elsif @consent.docuseal_envelope_id.blank? && !@consent.signed?
+      # Duplicate enqueues are safe: the job no-ops once a submission exists.
+      DocusealJobs::CreateCustomDocumentJob.perform_later(@consent.id)
+    elsif !@consent.signed?
+      # Catch signatures made in another tab or missed webhooks
+      @consent.sync_from_docuseal!
+    end
+
+    @signing_url = @consent.participant_signing_url if @custom_document.participant_signs?
+    @preparing = @consent.docuseal_envelope_id.blank? && @consent.requires_signature?
+  end
+
+  def upload_physical_document
+    @participant_event = @participant.participant_events.includes(:event).find(params[:id])
+    authorize @participant_event, :show?
+    @event = @participant_event.event
+    @custom_document = @event.custom_documents.active.find(params[:custom_document_id])
+
+    unless @custom_document.physical? && @custom_document.applies_to?(@participant_event) && @custom_document.participant_signs?
+      redirect_to dashboard_event_path(@participant_event), alert: "This document doesn't apply to you."
+      return
+    end
+
+    consent = @participant_event.consents.find_or_create_by!(
+      consent_type: :custom_document,
+      custom_document: @custom_document
+    )
+
+    if consent.signed?
+      redirect_to dashboard_sign_document_path(@participant_event, @custom_document), notice: "This document is already confirmed."
+      return
+    end
+
+    error = attach_physical_uploads(consent, params.dig(:consent, :physical_uploads))
+    if error
+      redirect_to dashboard_sign_document_path(@participant_event, @custom_document), alert: error
+      return
+    end
+
+    consent.mark_physical_uploaded_by_participant!
+
+    notice = if consent.signed?
+      "\"#{@custom_document.name}\" uploaded — you're all set."
+    else
+      "\"#{@custom_document.name}\" uploaded. Your parent/guardian can now review and confirm it in their portal."
+    end
+    redirect_to dashboard_sign_document_path(@participant_event, @custom_document), notice: notice
+  end
+
+  # Uploads can be swapped out (blurry photo, wrong page) any time before the
+  # document is confirmed.
+  def remove_physical_upload
+    @participant_event = @participant.participant_events.includes(:event).find(params[:id])
+    authorize @participant_event, :show?
+    @event = @participant_event.event
+    @custom_document = @event.custom_documents.active.find(params[:custom_document_id])
+
+    unless @custom_document.physical? && @custom_document.applies_to?(@participant_event) && @custom_document.participant_signs?
+      redirect_to dashboard_event_path(@participant_event), alert: "This document doesn't apply to you."
+      return
+    end
+
+    consent = @participant_event.consents.find_by(consent_type: :custom_document, custom_document: @custom_document)
+    if consent.nil? || consent.signed?
+      redirect_to dashboard_sign_document_path(@participant_event, @custom_document), alert: "This upload can no longer be removed."
+      return
+    end
+
+    remove_physical_upload_attachment(consent, params[:upload_id])
+    redirect_to dashboard_sign_document_path(@participant_event, @custom_document), notice: "Upload removed."
+  end
+
+  def resend_guardian_invite
+    @participant_event = @participant.participant_events.find(params[:id])
+    authorize @participant_event, :show?
+    gpe = @participant_event.guardian_participant_events.first
+
+    unless @participant_event.requires_guardian? && gpe
+      redirect_to dashboard_event_path(@participant_event), alert: "No guardian on file for this event."
+      return
+    end
+
+    if @participant_event.event.guardian_invites_locked?
+      redirect_to dashboard_event_path(@participant_event), alert: "Guardian invitations aren't open for this event yet. We'll email your guardian as soon as they are."
+      return
+    end
+
+    if gpe.invite_token_sent_at.present? && gpe.invite_token_sent_at > 2.minutes.ago
+      redirect_to dashboard_event_path(@participant_event), alert: "An invitation was just sent — give it a couple of minutes to arrive."
+      return
+    end
+
+    GuardianMailer.invitation(guardian_participant_event: gpe).deliver_later
+    redirect_to dashboard_event_path(@participant_event), notice: "Invitation resent to #{gpe.guardian.email}."
+  end
+
+  def download_ticket
+    @participant_event = @participant.participant_events
+      .includes(:event, travel_inbound: :travel_legs, travel_outbound: :travel_legs)
+      .find(params[:id])
+    authorize @participant_event, :show?
+
+    pdf = TicketPdfService.new(@participant_event).generate
+    filename = "#{@participant_event.event.name.parameterize}-ticket.pdf"
+
+    send_data pdf, filename: filename, type: "application/pdf", disposition: "attachment"
+  end
+
+  def download_excuse_letter
+    @participant_event = @participant.participant_events.includes(:event).find(params[:id])
+    authorize @participant_event, :show?
+
+    pdf = SchoolExcuseLetterService.new(@participant_event).generate
+    filename = "#{@participant_event.event.name.parameterize}-excuse-letter.pdf"
+
+    send_data pdf, filename: filename, type: "application/pdf", disposition: "attachment"
+  end
+
+  def google_wallet
+    @participant_event = @participant.participant_events.find(params[:id])
+    authorize @participant_event, :show?
+
+    # Debug: Check configuration
+    Rails.logger.info("Google Wallet issuer_id: #{GoogleWallet.configuration&.issuer_id}")
+    Rails.logger.info("Google Wallet credentials present: #{GoogleWallet.configuration&.json_credentials.present?}")
+
+    url = ::GoogleWallet::EventTicket.new(@participant_event).save_url
+    render json: { url: url }
+  rescue StandardError => e
+    Rails.logger.error("Google Wallet URL generation failed: #{e.class} - #{e.message}")
+    Rails.logger.error(e.backtrace&.first(10)&.join("\n"))
+    render json: { error: "Failed to generate Google Wallet pass" }, status: :unprocessable_entity
+  end
+
+  def edit_travel
+    @participant_event = @participant.participant_events
+      .includes(travel_inbound: :travel_legs, travel_outbound: :travel_legs)
+      .find(params[:id])
+    authorize @participant_event, :update?
+    @event = @participant_event.event
+    return redirect_to dashboard_event_path(@participant_event) unless @event.travel_enabled?
+
+    @travel_inbound = @participant_event.travel_inbound || @participant_event.build_travel_inbound(direction: :inbound)
+    @travel_outbound = @participant_event.travel_outbound || @participant_event.build_travel_outbound(direction: :outbound)
+
+    @travel_inbound.travel_legs.build(position: 0) if @travel_inbound.plane? && @travel_inbound.travel_legs.empty?
+    @travel_outbound.travel_legs.build(position: 0) if @travel_outbound.plane? && @travel_outbound.travel_legs.empty?
+  end
+
+  def update_travel
+    @participant_event = @participant.participant_events.find(params[:id])
+    authorize @participant_event, :update?
+    @event = @participant_event.event
+    return redirect_to dashboard_event_path(@participant_event) unless @event.travel_enabled?
+
+    @travel_inbound = @participant_event.travel_inbound || @participant_event.build_travel_inbound
+    @travel_outbound = @participant_event.travel_outbound || @participant_event.build_travel_outbound
+
+    Travel.transaction do
+      inbound_saved = @travel_inbound.update(travel_params(:inbound))
+      outbound_saved = @travel_outbound.update(travel_params(:outbound))
+
+      if inbound_saved && outbound_saved
+        redirect_to dashboard_event_path(@participant_event), notice: "Travel information updated successfully."
+      else
+        @travel_inbound.travel_legs.build(position: 0) if @travel_inbound.plane? && @travel_inbound.travel_legs.reject(&:marked_for_destruction?).empty?
+        @travel_outbound.travel_legs.build(position: 0) if @travel_outbound.plane? && @travel_outbound.travel_legs.reject(&:marked_for_destruction?).empty?
+        render :edit_travel, status: :unprocessable_entity
+      end
+    end
+  end
+
+  private
+
+  def public_profile_params
+    params.require(:participant).permit(
+      :public_profile_enabled, :public_profile_slug, :public_profile_bio, :public_profile_show_photo,
+      :public_profile_photo, :public_profile_location, :public_profile_website, :public_profile_github,
+      :public_profile_twitter, :public_profile_linkedin, :public_profile_mastodon, :public_profile_bluesky
+    )
+  end
+
+  # Checked boxes are the events shown on the profile; everything else in the
+  # eligible set gets hidden. Scoped to the eligible set so stray ids can't
+  # touch other rows.
+  def update_public_profile_event_visibility
+    eligible_ids = @participant.public_profile_eligible_participant_events.pluck(:id)
+    return if eligible_ids.empty?
+
+    visible_ids = Array(params[:visible_participant_event_ids]).compact_blank & eligible_ids
+
+    @participant.participant_events.where(id: visible_ids)
+      .update_all(hidden_from_public_profile: false)
+    @participant.participant_events.where(id: eligible_ids - visible_ids)
+      .update_all(hidden_from_public_profile: true)
+  end
+
+  # Same idea for staffed events, keyed by event id since a user can hold
+  # several role assignments on one event. Scoped to the participant's own
+  # eligible assignments so stray ids can't touch other rows.
+  def update_public_profile_staff_event_visibility
+    eligible_scope = @participant.public_profile_eligible_staff_role_assignments
+    eligible_event_ids = eligible_scope.distinct.pluck(:event_id)
+    return if eligible_event_ids.empty?
+
+    visible_event_ids = Array(params[:visible_staff_event_ids]).compact_blank & eligible_event_ids
+
+    eligible_scope.where(event_id: visible_event_ids)
+      .update_all(hidden_from_public_profile: false)
+    eligible_scope.where(event_id: eligible_event_ids - visible_event_ids)
+      .update_all(hidden_from_public_profile: true)
+  end
+
+  def require_participant
+    @participant = current_user.participant
+
+    if @participant.nil?
+      redirect_to onboarding_path, alert: "Please complete your profile first."
+    end
+  end
+
+  def travel_params(direction)
+    key = "travel_#{direction}"
+    return { direction: direction } unless params[key].present?
+
+    permitted = params.require(key).permit(
+      :mode, :carrier, :flight_number, :departure_city, :departure_time,
+      :arrival_city, :arrival_time, :arrival_location, :booking_reference,
+      :visa_status, :visa_notes, :notes,
+      :train_departure_station, :train_arrival_station,
+      :bus_departure_location, :bus_arrival_location,
+      :origin_address, :expected_arrival_time, :other_details,
+      travel_legs_attributes: [ :id, :position, :flight_code, :departure_airport, :arrival_airport,
+                               :departure_time, :departure_time_zone, :arrival_time, :arrival_time_zone, :confirmation_code, :_destroy ]
+    ).merge(direction: direction)
+
+    normalize_leg_times!(permitted)
+    permitted
+  end
+end

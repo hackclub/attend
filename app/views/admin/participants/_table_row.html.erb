@@ -1,0 +1,237 @@
+<tr class="hover:bg-gray-50"
+    data-searchable
+    <%= "data-group=#{group_id}" if group_id.present? %>>
+  <td class="px-2 py-1.5 sticky left-0 bg-white">
+    <input type="checkbox" class="rounded border-gray-300 text-[#ec3750]" data-action="change->data-table#selectRow">
+  </td>
+  <td class="px-2 py-1.5 font-medium whitespace-nowrap" data-column="first_name">
+    <%= link_to pe.participant.legal_first_name, admin_event_participant_path(current_event, pe), class: "text-gray-900 hover:text-[#ec3750]" %>
+  </td>
+  <td class="px-2 py-1.5 whitespace-nowrap" data-column="last_name">
+    <%= pe.participant.legal_last_name %>
+  </td>
+  <td class="px-2 py-1.5 text-gray-500 whitespace-nowrap" data-column="preferred_name">
+    <%= pe.participant.preferred_name.presence || "—" %>
+  </td>
+  <td class="px-2 py-1.5 text-gray-500 max-w-[160px] truncate" data-column="email" title="<%= pe.participant.email %>">
+    <%= pe.participant.email %>
+  </td>
+  <td class="px-2 py-1.5 text-gray-500 whitespace-nowrap" data-column="phone">
+    <%= pe.participant.phone.presence || "—" %>
+  </td>
+  <td class="px-2 py-1.5 text-gray-500 whitespace-nowrap" data-column="pronouns">
+    <%= pe.participant.pronouns.presence || "—" %>
+  </td>
+  <td class="px-2 py-1.5 text-gray-500 whitespace-nowrap" data-column="dob">
+    <%= pe.participant.date_of_birth&.strftime("%Y-%m-%d") || "—" %>
+  </td>
+  <td class="px-2 py-1.5 whitespace-nowrap" data-column="age">
+    <% age = pe.participant.age_on(current_event.starts_at&.to_date || Date.current) %>
+    <% if age %>
+      <span class="<%= age < 18 ? 'text-amber-600 font-medium' : 'text-gray-700' %>"><%= age %></span>
+    <% else %>
+      <span class="text-gray-400">—</span>
+    <% end %>
+  </td>
+  <td class="px-2 py-1.5 whitespace-nowrap" data-column="status">
+    <div class="flex flex-col gap-0.5">
+      <%= render_display_status_badge(pe) %>
+      <%= render_blocking_step_badge(pe) %>
+    </div>
+  </td>
+  <td class="px-2 py-1.5 text-gray-700 whitespace-nowrap" data-column="tshirt">
+    <%= pe.participant.tshirt_size&.upcase || "—" %>
+  </td>
+  <% if current_event.groups_enabled? %>
+    <td class="px-2 py-1.5 whitespace-nowrap" data-column="groups">
+      <% if pe.groups.any? %>
+        <div class="flex flex-wrap gap-1">
+          <% pe.groups.each do |g| %>
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
+                  style="background-color: <%= g.normalized_color || "#e5e7eb" %>; color: <%= g.color.present? ? "white" : "#1f2d3d" %>;"
+                  title="<%= g.description %>">
+              <%= g.name %>
+            </span>
+          <% end %>
+        </div>
+      <% else %>
+        <span class="text-gray-400">—</span>
+      <% end %>
+    </td>
+  <% end %>
+  <td class="px-2 py-1.5 text-gray-500 whitespace-nowrap" data-column="engagement">
+    <%= pe.participant.engagement_preference&.titleize || "—" %>
+  </td>
+  <% if current_event.travel_enabled? %>
+  <td class="px-2 py-1.5 whitespace-nowrap" data-column="travel_mode">
+    <% if pe.travel_inbound %>
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-700">
+        <%= pe.travel_inbound.mode&.titleize %>
+      </span>
+    <% else %>
+      <span class="text-gray-400">—</span>
+    <% end %>
+  </td>
+  <td class="px-2 py-1.5 whitespace-nowrap" data-column="visa">
+    <% if pe.travel_inbound&.visa_status %>
+      <% visa_class = case pe.travel_inbound.visa_status
+        when "approved" then "bg-green-100 text-green-700"
+        when "denied" then "bg-red-100 text-red-700"
+        when "applied" then "bg-[#ec3750]/10 text-[#ec3750]"
+        when "pending" then "bg-yellow-100 text-yellow-700"
+        else "bg-gray-100 text-gray-700"
+      end %>
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs <%= visa_class %>">
+        <%= pe.travel_inbound.visa_status.titleize %>
+      </span>
+    <% else %>
+      <span class="text-gray-400">—</span>
+    <% end %>
+  </td>
+  <td class="px-2 py-1.5 text-gray-600 whitespace-nowrap" data-column="arrival">
+    <% if pe.travel_inbound&.last_arrival_time %>
+      <div><%= pe.travel_inbound.last_arrival_time.strftime("%b %d %H:%M") %></div>
+    <% else %>
+      <span class="text-gray-400">—</span>
+    <% end %>
+  </td>
+  <td class="px-2 py-1.5 text-gray-600 whitespace-nowrap" data-column="departure">
+    <% if pe.travel_outbound&.first_departure_time %>
+      <div><%= pe.travel_outbound.first_departure_time.strftime("%b %d %H:%M") %></div>
+    <% else %>
+      <span class="text-gray-400">—</span>
+    <% end %>
+  </td>
+  <% end %>
+  <td class="px-2 py-1.5 text-gray-700 whitespace-nowrap" data-column="room">
+    <% if pe.room.present? %>
+      <%= link_to pe.room.display_name, finalize_admin_event_rooming_wizard_path(current_event), class: "text-[#ec3750] hover:text-blue-800" %>
+    <% else %>
+      <span class="text-gray-400">—</span>
+    <% end %>
+  </td>
+  <td class="px-2 py-1.5 text-gray-500 whitespace-nowrap" data-column="roommate">
+    <% if pe.room.present? %>
+      <% roommates = pe.room.participant_events.where.not(id: pe.id).includes(:participant) %>
+      <% if roommates.any? %>
+        <% roommates.each_with_index do |r, i| %>
+          <%= link_to (r.participant.preferred_name.presence || r.participant.legal_first_name), admin_event_participant_path(current_event, r), class: "text-[#ec3750] hover:text-blue-800" %><%= ", " unless i == roommates.size - 1 %>
+        <% end %>
+      <% else %>
+        <span class="text-gray-400">—</span>
+      <% end %>
+    <% else %>
+      <span class="text-gray-400">—</span>
+    <% end %>
+  </td>
+  <td class="px-2 py-1.5 text-gray-500 whitespace-nowrap" data-column="gender_identity">
+    <%= pe.accommodation&.gender_identity&.titleize || "—" %>
+  </td>
+  <td class="px-2 py-1.5 whitespace-nowrap" data-column="diet">
+    <% if pe.dietary&.diet_type %>
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-700">
+        <%= pe.dietary.diet_type.titleize %>
+      </span>
+    <% else %>
+      <span class="text-gray-400">—</span>
+    <% end %>
+  </td>
+  <td class="px-2 py-1.5 text-gray-500 max-w-[120px] truncate" data-column="intolerances" title="<%= pe.dietary&.intolerances %>">
+    <%= pe.dietary&.intolerances.presence || "—" %>
+  </td>
+  <td class="px-2 py-1.5 text-gray-500 max-w-[120px] truncate" data-column="allergies" title="<%= pe.medical&.allergies %>">
+    <%= pe.medical&.allergies.presence || "—" %>
+  </td>
+  <td class="px-2 py-1.5 whitespace-nowrap" data-column="anaphylaxis">
+    <% if pe.medical&.has_anaphylaxis_risk %>
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-red-100 text-red-700">Yes</span>
+    <% else %>
+      <span class="text-gray-400">No</span>
+    <% end %>
+  </td>
+  <td class="px-2 py-1.5 text-gray-500 max-w-[120px] truncate" data-column="medical" title="<%= pe.medical&.medical_conditions %>">
+    <%= pe.medical&.medical_conditions.presence || "—" %>
+  </td>
+  <td class="px-2 py-1.5 text-gray-500 max-w-[100px] truncate" data-column="medications" title="<%= pe.medical&.medications %>">
+    <%= pe.medical&.medications.presence || "—" %>
+  </td>
+  <td class="px-2 py-1.5 whitespace-nowrap" data-column="accessibility">
+    <% acc = pe.accessibility %>
+    <% has_access = acc && (acc.uses_wheelchair || acc.step_free_required || acc.needs_captioning || acc.needs_sign_language || acc.has_adhd || acc.has_autism || acc.has_dyslexia || acc.mobility_needs.present? || acc.sensory_needs.present? || acc.other_needs.present?) %>
+    <% if has_access %>
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700" title="Has accessibility needs">Yes</span>
+    <% else %>
+      <span class="text-gray-400">No</span>
+    <% end %>
+  </td>
+  <td class="px-2 py-1.5 whitespace-nowrap" data-column="high_support">
+    <% if pe.safeguarding_info&.high_support? %>
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700">Yes</span>
+    <% else %>
+      <span class="text-gray-400">No</span>
+    <% end %>
+  </td>
+  <td class="px-2 py-1.5 whitespace-nowrap" data-column="freedom">
+    <% if pe.safeguarding_info&.freedom_waiver_granted %>
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700">Yes</span>
+    <% else %>
+      <span class="text-gray-400">No</span>
+    <% end %>
+  </td>
+  <td class="px-2 py-1.5 whitespace-nowrap" data-column="waiver">
+    <% if pe.waiver_signed? %>
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700">Signed</span>
+    <% else %>
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-yellow-100 text-yellow-700">Pending</span>
+    <% end %>
+  </td>
+  <td class="px-2 py-1.5 text-gray-500 max-w-[120px] truncate whitespace-nowrap" data-column="guardian">
+    <% primary = pe.primary_guardian %>
+    <% if primary %>
+      <%= primary.guardian.full_name %>
+    <% elsif pe.requires_guardian? %>
+      <span class="text-yellow-600">Required</span>
+    <% else %>
+      <span class="text-gray-400">N/A</span>
+    <% end %>
+  </td>
+  <td class="px-2 py-1.5 whitespace-nowrap" data-column="slack">
+    <% if pe.participant.slack_user_id.present? %>
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700">Linked</span>
+    <% else %>
+      <span class="text-gray-400">—</span>
+    <% end %>
+  </td>
+  <td class="px-2 py-1.5 whitespace-nowrap" data-column="onboarding">
+    <% progress = pe.onboarding_progress %>
+    <div class="flex gap-0.5">
+      <% progress[:steps].each do |step| %>
+        <span class="w-2 h-2 rounded-full <%= step[:done] ? 'bg-green-500' : 'bg-gray-300' %>" title="<%= step[:name].titleize %>"></span>
+      <% end %>
+    </div>
+  </td>
+  <td class="px-2 py-1.5 whitespace-nowrap" data-column="checked_in">
+    <% if pe.checked_in? %>
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700">Yes</span>
+    <% else %>
+      <span class="text-gray-400">No</span>
+    <% end %>
+  </td>
+  <td class="px-2 py-1.5 whitespace-nowrap" data-column="last_scan">
+    <% last_scan = pe.scans.max_by(&:scanned_at) %>
+    <% if last_scan %>
+      <div class="text-gray-700"><%= last_scan.scanned_at.strftime("%b %d %H:%M") %></div>
+      <div class="text-xs text-gray-500"><%= last_scan.scan_context.name %> · <%= last_scan.user.name %></div>
+    <% else %>
+      <span class="text-gray-400">—</span>
+    <% end %>
+  </td>
+  <td class="px-2 py-1.5 text-gray-500 whitespace-nowrap" data-column="created">
+    <%= pe.created_at.strftime("%Y-%m-%d") %>
+  </td>
+  <td class="px-2 py-1.5 text-right sticky right-0 bg-white whitespace-nowrap">
+    <%= link_to admin_event_participant_path(current_event, pe), class: "text-[#ec3750] hover:text-blue-800" do %>
+      View
+    <% end %>
+  </td>
+</tr>

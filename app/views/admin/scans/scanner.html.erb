@@ -1,0 +1,946 @@
+<% content_for :title, "Scanner – #{current_event.name} – Attend" %>
+
+<%= content_for :head do %>
+  <script src="<%= asset_path("vendor/zxing.min.js") %>"></script>
+<% end %>
+
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-0">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-1">
+    <div class="flex items-center gap-3">
+      <%= link_to admin_event_scans_path(current_event), class: "text-sm text-[#ec3750] hover:text-blue-800" do %>← Check Ins<% end %>
+      <h1 class="text-xl sm:text-2xl font-bold">Scanner</h1>
+    </div>
+    <span class="text-xs sm:text-sm text-gray-500 hidden sm:block">Check in participants by scanning QR codes<%= " or NFC badges" if current_event.nfc_badges_enabled? %></span>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+    <!-- Scanner -->
+    <div class="lg:col-span-2 bg-white rounded-lg border border-gray-200 p-4 sm:p-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div class="flex items-center gap-2">
+          <h2 class="text-base sm:text-lg font-semibold">Camera Scanner</h2>
+          <div id="camera-status" class="flex items-center gap-2">
+            <span class="w-2 h-2 bg-gray-400 rounded-full" id="status-dot"></span>
+            <span class="text-xs sm:text-sm text-gray-500" id="status-text">Initializing...</span>
+          </div>
+        </div>
+        
+        <% if @scan_contexts.size > 1 %>
+          <div class="flex items-center gap-2">
+            <label for="scan-context" class="text-xs sm:text-sm text-gray-500 whitespace-nowrap">Context:</label>
+            <select id="scan-context" class="border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]">
+              <% @scan_contexts.each do |context| %>
+                <option value="<%= context.id %>" <%= "selected" if context == @default_scan_context %>>
+                  <%= context.name %><% if context.is_airport? %> ✈️<% end %><% if context.checks_in? %> ✓<% end %>
+                </option>
+              <% end %>
+            </select>
+          </div>
+        <% else %>
+          <input type="hidden" id="scan-context" value="<%= @default_scan_context&.id %>">
+        <% end %>
+      </div>
+      
+      <div class="flex items-center gap-2 mb-3 hidden" id="camera-select-wrapper">
+        <label for="camera-select" class="text-xs sm:text-sm text-gray-500 whitespace-nowrap">Camera:</label>
+        <select id="camera-select" class="flex-1 border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]"></select>
+      </div>
+
+      <div id="qr-reader" class="w-full bg-gray-900 rounded-lg overflow-hidden" style="min-height: 280px;">
+        <video id="qr-video" class="w-full h-full object-cover" style="min-height: 280px;" muted playsinline></video>
+      </div>
+      
+      <div id="scan-result" class="mt-4 p-3 sm:p-4 rounded-lg hidden">
+        <!-- Scan result appears here -->
+      </div>
+
+      <!-- Search by name or ID -->
+      <div class="mt-4 pt-4 border-t border-gray-200">
+        <p class="text-sm text-gray-500 mb-2">Search by name or ID:</p>
+        <div class="relative">
+          <input type="text" id="participant-search" placeholder="Name or first 8 chars of ID..." 
+                 class="w-full border border-gray-300 rounded-md px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]"
+                 autocomplete="off">
+          <div id="search-results" class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg hidden max-h-64 overflow-y-auto">
+            <!-- Search results appear here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Manual entry fallback -->
+      <div class="mt-4 pt-4 border-t border-gray-200">
+        <p class="text-sm text-gray-500 mb-2">Or enter full participant ID manually:</p>
+        <form id="manual-scan-form" class="flex flex-col sm:flex-row gap-2">
+          <input type="text" id="manual-participant-id" placeholder="Participant ID (UUID)" 
+                 class="flex-1 border border-gray-300 rounded-md px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]">
+          <button type="submit" class="bg-[#ec3750] text-white px-4 py-2.5 sm:py-2 rounded-md hover:bg-[#d42f46] text-sm font-medium min-h-[44px] sm:min-h-0">
+            Look Up
+          </button>
+        </form>
+      </div>
+
+      <% if current_event.nfc_badges_enabled? %>
+        <!-- NFC Scanner (via macOS bridge) -->
+        <div class="mt-4 pt-4 border-t border-gray-200" id="nfc-scanner-section">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <p class="text-sm font-medium text-gray-700">NFC Scanner</p>
+              <div id="nfc-status" class="flex items-center gap-1.5">
+                <span class="w-2 h-2 bg-gray-400 rounded-full" id="nfc-status-dot"></span>
+                <span class="text-xs text-gray-500" id="nfc-status-text">Not connected</span>
+              </div>
+            </div>
+            <button type="button" id="nfc-connect-btn" class="text-xs text-[#ec3750] hover:text-blue-800">
+              Connect
+            </button>
+          </div>
+          <p class="text-xs text-gray-500 mb-3">
+            Connect to the Attend NFC Bridge app to scan NFC badges. 
+            <a href="https://github.com/hackclub/attend-nfc" target="_blank" class="text-[#ec3750] hover:underline">Download bridge app →</a>
+          </p>
+          
+          <!-- NFC Write Panel (shown after QR scan) -->
+          <div id="nfc-write-panel" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-4 mt-3">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-blue-800">Write NFC Badge</span>
+              <button type="button" id="nfc-write-cancel" class="text-xs text-[#ec3750] hover:text-blue-800">Cancel</button>
+            </div>
+            <p class="text-xs text-blue-700 mb-3">
+              Tap a fresh NFC badge to the reader to assign it to <strong id="nfc-write-participant-name"></strong>
+            </p>
+            <div id="nfc-write-status" class="text-xs text-[#ec3750]">Waiting for badge...</div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- Recent Scans -->
+    <div class="bg-white rounded-lg border border-gray-200 p-4 sm:p-6" data-controller="event-scans" data-event-scans-event-id-value="<%= current_event.id %>">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base sm:text-lg font-semibold">Recent Scans</h2>
+        <%= link_to "View All", history_admin_event_scans_path(current_event), class: "text-xs text-[#ec3750] hover:text-blue-800" %>
+      </div>
+      <div id="recent-scans" class="space-y-3 max-h-[300px] sm:max-h-[500px] overflow-y-auto" data-event-scans-target="scans">
+        <% if @recent_scans.any? %>
+          <% @recent_scans.each do |scan| %>
+            <div class="flex items-center justify-between border-b border-gray-100 pb-3 last:border-0">
+              <div class="min-w-0 flex-1 mr-2">
+                <p class="font-medium text-sm truncate"><%= scan.participant.display_name %></p>
+                <p class="text-xs text-gray-500">
+                  <%= scan.scanned_at.strftime("%H:%M") %>
+                  <% if scan.scan_context %>
+                    <span class="text-gray-400">@ <%= scan.scan_context.name %></span>
+                  <% end %>
+                </p>
+                <p class="text-xs text-gray-400">by <%= scan.user.display_name_or_fallback %></p>
+              </div>
+              <%= link_to "View", admin_event_participant_path(current_event, scan.participant_event), 
+                  class: "text-xs text-[#ec3750] hover:text-blue-800 min-h-[44px] min-w-[44px] flex items-center justify-center" %>
+            </div>
+          <% end %>
+        <% else %>
+          <p class="text-gray-500 text-center py-8 text-sm" data-event-scans-target="empty">No scans yet today</p>
+        <% end %>
+      </div>
+      
+      <div class="mt-4 pt-4 border-t border-gray-200">
+        <p class="text-sm text-gray-500">
+          <span class="font-medium text-gray-700" id="scan-count" data-event-scans-target="count"><%= @recent_scans.count %></span> scans today
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Participant Modal -->
+<div id="participant-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+    <!-- Header -->
+    <div id="modal-header" class="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-4 sm:px-6 py-4">
+      <div class="flex justify-between items-start gap-4">
+        <div class="min-w-0 flex-1">
+          <p class="text-blue-200 text-xs sm:text-sm" id="modal-action-text">Checked In</p>
+          <h3 class="text-xl sm:text-2xl font-bold truncate" id="modal-name"></h3>
+          <div id="modal-groups" class="flex flex-wrap gap-1 mt-1"></div>
+          <p class="text-blue-200 text-xs mt-1" id="modal-context-name"></p>
+        </div>
+        <button onclick="closeModal()" class="text-white/70 hover:text-white text-2xl leading-none min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2">&times;</button>
+      </div>
+    </div>
+    
+    <!-- Alerts -->
+    <div id="modal-alerts" class="px-4 sm:px-6"></div>
+    
+    <!-- Content -->
+    <div class="p-4 sm:p-6">
+      <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
+        <div>
+          <dt class="text-gray-500">Status</dt>
+          <dd id="modal-status" class="font-semibold"></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">Pronouns</dt>
+          <dd id="modal-pronouns"></dd>
+        </div>
+        <div class="sm:col-span-2">
+          <dt class="text-gray-500">Email</dt>
+          <dd id="modal-email" class="truncate"></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">Phone</dt>
+          <dd id="modal-phone"></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">T-Shirt Size</dt>
+          <dd id="modal-tshirt" class="font-medium"></dd>
+        </div>
+        <div class="sm:col-span-2">
+          <dt class="text-gray-500">Dietary</dt>
+          <dd id="modal-dietary"></dd>
+        </div>
+      </dl>
+
+      <div class="mt-6 flex flex-col sm:flex-row gap-3">
+        <a id="modal-view-link" href="#" class="flex-1 bg-[#ec3750] text-white px-4 py-3 sm:py-2 rounded-lg text-center hover:bg-[#d42f46] font-medium min-h-[44px] flex items-center justify-center">
+          View Full Profile
+        </a>
+        <button onclick="closeModal()" class="flex-1 bg-gray-100 text-gray-700 px-4 py-3 sm:py-2 rounded-lg hover:bg-gray-200 font-medium min-h-[44px]">
+          Scan Next
+        </button>
+      </div>
+      <% if current_event.nfc_badges_enabled? %>
+      <div id="modal-nfc-section" class="mt-4 pt-4 border-t border-gray-200 hidden">
+        <button id="modal-write-nfc-btn" onclick="triggerNfcWriteFromModal()" class="w-full bg-purple-600 text-white px-4 py-3 sm:py-2 rounded-lg hover:bg-purple-700 font-medium min-h-[44px] flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
+          <span id="modal-nfc-btn-text">Write NFC Badge</span>
+        </button>
+        <p id="modal-nfc-status" class="text-xs text-gray-500 text-center mt-2"></p>
+      </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const scanUrl = '<%= admin_event_scans_path(current_event) %>';
+  const searchUrl = '<%= search_admin_event_scans_path(current_event) %>';
+  const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+  let scanner = null;
+  let lastScannedCode = null;
+  let scanCooldown = false;
+  let searchTimeout = null;
+
+  function getCurrentContextId() {
+    const contextSelect = document.getElementById('scan-context');
+    return contextSelect ? contextSelect.value : null;
+  }
+
+  function updateStatus(message, state = 'loading') {
+    const dot = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    text.textContent = message;
+    
+    dot.className = 'w-2 h-2 rounded-full';
+    if (state === 'ready') dot.classList.add('bg-green-500');
+    else if (state === 'error') dot.classList.add('bg-red-500');
+    else if (state === 'scanning') dot.classList.add('bg-yellow-500', 'animate-pulse');
+    else dot.classList.add('bg-gray-400');
+  }
+
+  function showResult(message, isError = false) {
+    const result = document.getElementById('scan-result');
+    result.className = `mt-4 p-4 rounded-lg ${isError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`;
+    result.textContent = message;
+    result.classList.remove('hidden');
+    
+    setTimeout(() => result.classList.add('hidden'), 3000);
+  }
+
+  function parseQrCode(scannedValue) {
+    const deepLinkMatch = scannedValue.match(/^attend:\/\/checkin\/(.+)$/);
+    if (deepLinkMatch) {
+      return deepLinkMatch[1];
+    }
+    return scannedValue;
+  }
+
+  async function processScan(scannedValue) {
+    if (scanCooldown) return;
+    if (scannedValue === lastScannedCode) return;
+    
+    const participantId = parseQrCode(scannedValue);
+    const scanContextId = getCurrentContextId();
+    
+    scanCooldown = true;
+    lastScannedCode = scannedValue;
+    updateStatus('Processing...', 'scanning');
+
+    try {
+      const response = await fetch(scanUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken
+        },
+        body: JSON.stringify({ 
+          participant_id: participantId,
+          scan_context_id: scanContextId
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        const contextName = data.scan_context?.name || '';
+        const firstScan = data.first_scan_in_context;
+        
+        if (firstScan) {
+          showResult('✓ ' + data.participant.display_name + ' scanned in at ' + contextName);
+        } else {
+          showResult('↻ ' + data.participant.display_name + ' re-scanned at ' + contextName);
+        }
+        
+        showParticipantModal(data.participant, data.scan_context, firstScan);
+        addToRecentScans(data.participant, data.scan_context, data.scanned_by);
+        updateScanCount();
+        
+        // Offer NFC write if enabled, check-in context, and badge not yet assigned
+        console.log('NFC write check:', {
+          nfcBridge: !!window.nfcBridge,
+          writeOnCheckinEnabled: window.nfcBridge?.writeOnCheckinEnabled,
+          isConnected: window.nfcBridge?.isConnected?.(),
+          checksIn: data.scan_context?.checks_in,
+          hasBadgeToken: !!data.participant.nfc_badge_token,
+          hasSlackId: !!data.participant.slack_user_id,
+          badgeAssigned: data.participant.nfc_badge_assigned
+        });
+        
+        if (window.nfcBridge && 
+            window.nfcBridge.writeOnCheckinEnabled && 
+            window.nfcBridge.isConnected() &&
+            data.scan_context?.checks_in && 
+            data.participant.nfc_badge_token &&
+            !data.participant.nfc_badge_assigned) {
+          
+          if (!data.participant.slack_user_id) {
+            console.warn('NFC write skipped: participant missing slack_user_id', data.participant.display_name);
+          } else {
+            window.nfcBridge.showWritePanel(
+              data.participant.display_name,
+              data.participant.participant_event_id,
+              data.participant.nfc_badge_token,
+              data.participant.slack_user_id
+            );
+          }
+        }
+      } else {
+        showResult(data.error || 'Participant not found', true);
+      }
+    } catch (error) {
+      console.error('Scan error:', error);
+      showResult('Error processing scan', true);
+    }
+
+    setTimeout(() => {
+      scanCooldown = false;
+      lastScannedCode = null;
+      updateStatus('Ready to scan', 'ready');
+    }, 2000);
+  }
+
+  async function initScanner() {
+    if (typeof ZXing === 'undefined' || !ZXing.BrowserQRCodeReader) {
+      updateStatus('Scanner library not loaded', 'error');
+      return;
+    }
+
+    // Check for secure context (HTTPS or localhost)
+    if (!window.isSecureContext) {
+      updateStatus('Camera requires HTTPS or localhost', 'error');
+      console.error('Camera access requires a secure context (HTTPS or localhost). Current URL:', window.location.href);
+      return;
+    }
+
+    // Check if mediaDevices API is available
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      updateStatus('Camera API not available', 'error');
+      return;
+    }
+
+    // Request camera permission (also unlocks device labels for selection below)
+    try {
+      console.log('Requesting camera access...');
+      updateStatus('Requesting camera access...', 'ready');
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      console.log('Camera access granted, got stream:', stream);
+      stream.getTracks().forEach(track => track.stop());
+    } catch (err) {
+      console.error('Camera permission error:', err.name, err.message, err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        updateStatus('Camera blocked - check browser settings', 'error');
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        updateStatus('No camera found on device', 'error');
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        updateStatus('Camera in use by another app', 'error');
+      } else if (err.name === 'OverconstrainedError') {
+        // Try again without facing mode constraint
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          stream.getTracks().forEach(track => track.stop());
+        } catch (retryErr) {
+          updateStatus('Camera access failed: ' + retryErr.message, 'error');
+          return;
+        }
+      } else {
+        updateStatus('Camera error: ' + err.name + ' - ' + err.message, 'error');
+      }
+      return;
+    }
+
+    scanner = new ZXing.BrowserQRCodeReader();
+
+    try {
+      const cameras = await scanner.listVideoInputDevices();
+      if (!cameras || !cameras.length) {
+        updateStatus('No cameras found', 'error');
+        return;
+      }
+
+      // Populate the camera picker
+      const select = document.getElementById('camera-select');
+      select.innerHTML = cameras
+        .map((c, i) => `<option value="${c.deviceId}">${c.label || `Camera ${i + 1}`}</option>`)
+        .join('');
+
+      // Pick a sensible default: remembered choice, else a back/rear camera, else last device
+      const savedId = localStorage.getItem('scannerCameraId');
+      const savedValid = savedId && cameras.some(c => c.deviceId === savedId);
+      const backCamera = cameras.find(c => /back|rear|environment/i.test(c.label));
+      const defaultId = savedValid ? savedId : (backCamera || cameras[cameras.length - 1]).deviceId;
+      select.value = defaultId;
+
+      // Only show the picker when there's an actual choice to make
+      if (cameras.length > 1) {
+        document.getElementById('camera-select-wrapper').classList.remove('hidden');
+      }
+
+      select.addEventListener('change', () => {
+        localStorage.setItem('scannerCameraId', select.value);
+        startCamera(select.value);
+      });
+
+      await startCamera(defaultId);
+    } catch (err) {
+      console.error('Camera start error:', err);
+      updateStatus('Camera access denied', 'error');
+    }
+  }
+
+  async function startCamera(deviceId) {
+    if (!scanner) return;
+    updateStatus('Starting camera...', 'loading');
+    scanner.reset(); // stop any in-progress stream before switching
+    try {
+      await scanner.decodeFromVideoDevice(deviceId, 'qr-video', (result, err) => {
+        if (result) {
+          processScan(result.getText());
+        }
+        // err is a NotFoundException on every frame without a QR code - ignore it
+      });
+      updateStatus('Ready to scan', 'ready');
+    } catch (err) {
+      console.error('Camera start error:', err);
+      updateStatus('Could not start camera', 'error');
+    }
+  }
+
+  // Manual form submission
+  document.getElementById('manual-scan-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const input = document.getElementById('manual-participant-id');
+    const participantId = input.value.trim();
+    if (participantId) {
+      processScan(participantId);
+      input.value = '';
+    }
+  });
+
+  // Search functionality
+  const searchInput = document.getElementById('participant-search');
+  const searchResults = document.getElementById('search-results');
+
+  searchInput.addEventListener('input', function() {
+    const query = this.value.trim();
+    
+    if (searchTimeout) clearTimeout(searchTimeout);
+    
+    if (query.length < 2) {
+      searchResults.classList.add('hidden');
+      return;
+    }
+
+    searchTimeout = setTimeout(async () => {
+      try {
+        const response = await fetch(`${searchUrl}?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        
+        if (data.results.length === 0) {
+          searchResults.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500">No participants found</div>';
+        } else {
+          searchResults.innerHTML = data.results.map(p => `
+            <div class="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0 search-result" 
+                 data-participant-id="${p.id}">
+              <div class="flex justify-between items-center">
+                <div>
+                  <p class="font-medium text-sm">${p.display_name}</p>
+                  <p class="text-xs text-gray-500">ID: ${p.short_id}</p>
+                  ${(p.groups && p.groups.length) ? `<div class="flex flex-wrap gap-1 mt-1">${p.groups.map(g => `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium" style="background-color: ${g.color || '#e5e7eb'}; color: ${g.color ? 'white' : '#1f2d3d'};">${g.name}</span>`).join('')}</div>` : ''}
+                </div>
+                <span class="text-xs px-2 py-1 rounded-full ${p.status === 'complete' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                  ${p.status.replace('_', ' ')}
+                </span>
+              </div>
+            </div>
+          `).join('');
+        }
+        
+        searchResults.classList.remove('hidden');
+      } catch (error) {
+        console.error('Search error:', error);
+      }
+    }, 300);
+  });
+
+  // Handle search result click
+  searchResults.addEventListener('click', function(e) {
+    const result = e.target.closest('.search-result');
+    if (result) {
+      const participantId = result.dataset.participantId;
+      processScan(participantId);
+      searchInput.value = '';
+      searchResults.classList.add('hidden');
+    }
+  });
+
+  // Hide search results when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+      searchResults.classList.add('hidden');
+    }
+  });
+
+  // Initialize scanner
+  setTimeout(initScanner, 500);
+  
+  // Expose functions for NFC bridge integration
+  window.showResult = showResult;
+  window.getCurrentContextId = getCurrentContextId;
+});
+
+let currentModalParticipant = null;
+
+function showParticipantModal(data, scanContext, firstScan) {
+  const modal = document.getElementById('participant-modal');
+  const header = document.getElementById('modal-header');
+  const actionText = document.getElementById('modal-action-text');
+  const contextName = document.getElementById('modal-context-name');
+  
+  // Store participant data for NFC write button
+  currentModalParticipant = data;
+  
+  // Update header based on whether it's first scan or re-scan
+  if (firstScan) {
+    actionText.textContent = scanContext?.checks_in ? 'Checked In' : 'Scanned';
+    header.className = 'bg-gradient-to-r from-blue-600 to-blue-800 text-white px-4 sm:px-6 py-4';
+  } else {
+    actionText.textContent = 'Already Scanned';
+    header.className = 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-4 sm:px-6 py-4';
+  }
+  
+  contextName.textContent = scanContext?.name ? '@ ' + scanContext.name : '';
+  
+  document.getElementById('modal-name').textContent = data.display_name;
+  const groupsEl = document.getElementById('modal-groups');
+  if (groupsEl) {
+    groupsEl.innerHTML = (data.groups && data.groups.length)
+      ? data.groups.map(g => `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium" style="background-color: ${g.color || '#ffffff'}; color: ${g.color ? 'white' : '#1f2d3d'};">${g.name}</span>`).join('')
+      : '';
+  }
+  document.getElementById('modal-status').textContent = data.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+  document.getElementById('modal-pronouns').textContent = data.pronouns || '—';
+  document.getElementById('modal-email').textContent = data.email || '—';
+  document.getElementById('modal-phone').textContent = data.phone || '—';
+  document.getElementById('modal-tshirt').textContent = data.tshirt_size?.toUpperCase() || '—';
+  document.getElementById('modal-dietary').textContent = data.dietary?.replace('_', ' ') || 'None specified';
+  document.getElementById('modal-view-link').href = data.show_url;
+
+  const alertsDiv = document.getElementById('modal-alerts');
+  alertsDiv.innerHTML = '';
+
+  if (data.has_anaphylaxis_risk) {
+    alertsDiv.innerHTML += '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 px-4 py-3 mt-4"><strong>⚠️ Anaphylaxis Risk</strong></div>';
+  }
+  if (data.requires_refrigeration) {
+    alertsDiv.innerHTML += '<div class="bg-blue-100 border-l-4 border-[#ec3750] text-blue-700 px-4 py-3 mt-4"><strong>❄️ Needs Medication Refrigeration</strong></div>';
+  }
+
+  // Show NFC section if NFC is enabled and bridge is connected
+  const nfcSection = document.getElementById('modal-nfc-section');
+  const nfcBtnText = document.getElementById('modal-nfc-btn-text');
+  const nfcStatus = document.getElementById('modal-nfc-status');
+  
+  if (nfcSection && window.nfcBridge) {
+    if (window.nfcBridge.isConnected()) {
+      nfcSection.classList.remove('hidden');
+      if (data.nfc_badge_assigned) {
+        nfcBtnText.textContent = 'Rewrite NFC Badge';
+        nfcStatus.textContent = 'Badge already assigned - rewrite will update the badge';
+      } else {
+        nfcBtnText.textContent = 'Write NFC Badge';
+        nfcStatus.textContent = data.slack_user_id ? '' : 'Missing Slack ID - badge URL will be limited';
+      }
+    } else {
+      nfcSection.classList.add('hidden');
+    }
+  }
+
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+async function triggerNfcWriteFromModal() {
+  if (!currentModalParticipant || !window.nfcBridge) return;
+  
+  const data = currentModalParticipant;
+  const nfcStatus = document.getElementById('modal-nfc-status');
+  
+  // If no badge token, fetch/generate one first
+  let badgeToken = data.nfc_badge_token;
+  if (!badgeToken) {
+    if (nfcStatus) nfcStatus.textContent = 'Generating badge token...';
+    try {
+      const response = await fetch(`/api/v1/events/<%= current_event.id %>/participant_events/${data.participant_event_id}/nfc_badge/ensure`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+        }
+      });
+      const result = await response.json();
+      if (response.ok && result.badge_token) {
+        badgeToken = result.badge_token;
+        currentModalParticipant.nfc_badge_token = badgeToken;
+      } else {
+        if (nfcStatus) nfcStatus.textContent = 'Failed to generate badge token';
+        return;
+      }
+    } catch (error) {
+      console.error('Error generating badge token:', error);
+      if (nfcStatus) nfcStatus.textContent = 'Error generating badge token';
+      return;
+    }
+  }
+  
+  // Close the modal and show the write panel
+  closeModal();
+  
+  window.nfcBridge.showWritePanel(
+    data.display_name,
+    data.participant_event_id,
+    badgeToken,
+    data.slack_user_id || ''
+  );
+}
+
+function closeModal() {
+  const modal = document.getElementById('participant-modal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+
+function addToRecentScans(participant, scanContext, scannedBy) {
+  const container = document.getElementById('recent-scans');
+  const emptyMessage = container.querySelector('.text-center.py-8');
+  if (emptyMessage) emptyMessage.remove();
+
+  const contextInfo = scanContext?.name ? `<span class="text-gray-400">@ ${scanContext.name}</span>` : '';
+  const scanHtml = `
+    <div class="flex items-center justify-between border-b border-gray-100 pb-3 bg-green-50 -mx-2 px-2 rounded transition-colors">
+      <div class="min-w-0 flex-1 mr-2">
+        <p class="font-medium text-sm truncate">${participant.display_name}</p>
+        <p class="text-xs text-gray-500">just now ${contextInfo}</p>
+        <p class="text-xs text-gray-400">by ${scannedBy}</p>
+      </div>
+      <a href="${participant.show_url}" class="text-xs text-[#ec3750] hover:text-blue-800">View</a>
+    </div>
+  `;
+  container.insertAdjacentHTML('afterbegin', scanHtml);
+
+  setTimeout(() => {
+    const firstChild = container.firstElementChild;
+    if (firstChild) firstChild.classList.remove('bg-green-50');
+  }, 2000);
+}
+
+function updateScanCount() {
+  const countEl = document.getElementById('scan-count');
+  if (countEl) countEl.textContent = parseInt(countEl.textContent) + 1;
+}
+
+document.getElementById('participant-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// NFC Bridge Integration
+<% if current_event.nfc_badges_enabled? %>
+(function() {
+  const nfcEnabled = true;
+  const nfcWriteOnCheckin = <%= current_event.nfc_badge_write_on_checkin_enabled? %>;
+  const eventId = '<%= current_event.id %>';
+  const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+  
+  let nfcBridge = null;
+  let pendingWriteData = null;
+  
+  const nfcStatusDot = document.getElementById('nfc-status-dot');
+  const nfcStatusText = document.getElementById('nfc-status-text');
+  const nfcConnectBtn = document.getElementById('nfc-connect-btn');
+  const nfcWritePanel = document.getElementById('nfc-write-panel');
+  const nfcWriteCancel = document.getElementById('nfc-write-cancel');
+  const nfcWriteParticipantName = document.getElementById('nfc-write-participant-name');
+  const nfcWriteStatus = document.getElementById('nfc-write-status');
+  
+  function updateNfcStatus(status, message) {
+    if (!nfcStatusDot || !nfcStatusText) return;
+    
+    nfcStatusDot.className = 'w-2 h-2 rounded-full';
+    switch (status) {
+      case 'connected':
+        nfcStatusDot.classList.add('bg-green-500');
+        nfcConnectBtn.textContent = 'Disconnect';
+        break;
+      case 'connecting':
+        nfcStatusDot.classList.add('bg-yellow-500', 'animate-pulse');
+        nfcConnectBtn.textContent = 'Connecting...';
+        break;
+      case 'error':
+        nfcStatusDot.classList.add('bg-red-500');
+        nfcConnectBtn.textContent = 'Retry';
+        break;
+      default:
+        nfcStatusDot.classList.add('bg-gray-400');
+        nfcConnectBtn.textContent = 'Connect';
+    }
+    nfcStatusText.textContent = message;
+  }
+  
+  function connectNfcBridge() {
+    if (nfcBridge && nfcBridge.readyState === WebSocket.OPEN) {
+      nfcBridge.close();
+      nfcBridge = null;
+      updateNfcStatus('disconnected', 'Not connected');
+      return;
+    }
+    
+    updateNfcStatus('connecting', 'Connecting...');
+    
+    try {
+      nfcBridge = new WebSocket('ws://localhost:9876');
+      
+      nfcBridge.onopen = function() {
+        updateNfcStatus('connected', 'Ready to scan');
+      };
+      
+      nfcBridge.onclose = function() {
+        updateNfcStatus('disconnected', 'Disconnected');
+        nfcBridge = null;
+      };
+      
+      nfcBridge.onerror = function() {
+        updateNfcStatus('error', 'Bridge not running');
+        nfcBridge = null;
+      };
+      
+      nfcBridge.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        handleNfcMessage(data);
+      };
+    } catch (e) {
+      updateNfcStatus('error', 'Connection failed');
+    }
+  }
+  
+  function handleNfcMessage(data) {
+    console.log('NFC message:', data.type, data);
+    switch (data.type) {
+      case 'tag_read':
+        handleNfcTagRead(data.tag);
+        break;
+      case 'write_result':
+        handleNfcWriteResult(data);
+        break;
+      case 'write_pending':
+        if (nfcWriteStatus) nfcWriteStatus.textContent = 'Tap badge to reader...';
+        break;
+    }
+  }
+  
+  function handleNfcTagRead(tag) {
+    console.log('NFC tag read:', tag, 'pendingWriteData:', pendingWriteData);
+    
+    // If we're in write mode (waiting for write or verifying), don't process as normal scan
+    if (pendingWriteData) {
+      if (pendingWriteData.verifying) {
+        // Verify the written badge - check for attend token in external record
+        if (tag.attendToken === pendingWriteData.token) {
+          confirmNfcBadge(pendingWriteData.participantEventId, pendingWriteData.token);
+        } else {
+          if (nfcWriteStatus) nfcWriteStatus.textContent = 'Badge mismatch! Try again.';
+        }
+      } else {
+        // Still waiting for write - tag was tapped, bridge should handle writing
+        if (nfcWriteStatus) nfcWriteStatus.textContent = 'Writing...';
+      }
+      return;
+    }
+    
+    // Normal NFC scan - use attend token from external record
+    if (tag.attendToken) {
+      processNfcScan(tag.attendToken);
+    } else {
+      console.log('Tag has no attendToken, showing as unrecognized');
+      window.showResult?.('Unrecognized NFC tag - no badge data found', true);
+    }
+  }
+  
+  async function processNfcScan(badgeToken) {
+    const scanUrl = '<%= admin_event_scans_path(current_event) %>';
+    const scanContextId = window.getCurrentContextId?.();
+    
+    try {
+      const response = await fetch(scanUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken
+        },
+        body: JSON.stringify({ 
+          badge_token: badgeToken,
+          scan_context_id: scanContextId
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        const contextName = result.scan_context?.name || '';
+        const firstScan = result.first_scan_in_context;
+        
+        if (firstScan) {
+          window.showResult?.('📱 ' + result.participant.display_name + ' scanned via NFC at ' + contextName);
+        } else {
+          window.showResult?.('↻ ' + result.participant.display_name + ' re-scanned via NFC at ' + contextName);
+        }
+        
+        showParticipantModal(result.participant, result.scan_context, firstScan);
+      } else {
+        window.showResult?.(result.error || 'Unknown participant', true);
+      }
+    } catch (error) {
+      console.error('NFC scan error:', error);
+      window.showResult?.('Error processing NFC scan', true);
+    }
+  }
+  
+  function handleNfcWriteResult(data) {
+    if (data.success) {
+      if (nfcWriteStatus) nfcWriteStatus.textContent = 'Written! Tap again to verify...';
+      if (pendingWriteData) {
+        pendingWriteData.verifying = true;
+      }
+    } else {
+      if (nfcWriteStatus) nfcWriteStatus.textContent = 'Write failed: ' + (data.error || 'Unknown error');
+    }
+  }
+  
+  async function confirmNfcBadge(participantEventId, token) {
+    const confirmUrl = `/admin/events/<%= current_event.slug %>/participant_events/${participantEventId}/confirm_nfc_badge`;
+    
+    try {
+      const response = await fetch(confirmUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken
+        },
+        body: JSON.stringify({ badge_token: token })
+      });
+      
+      if (response.ok) {
+        if (nfcWriteStatus) nfcWriteStatus.textContent = '✓ Badge assigned successfully!';
+        setTimeout(hideNfcWritePanel, 2000);
+      } else {
+        if (nfcWriteStatus) nfcWriteStatus.textContent = 'Confirmation failed';
+      }
+    } catch (error) {
+      if (nfcWriteStatus) nfcWriteStatus.textContent = 'Error confirming badge';
+    }
+    
+    pendingWriteData = null;
+  }
+  
+  function showNfcWritePanel(participantName, participantEventId, token, slackUserId) {
+    if (!nfcWritePanel) return;
+    
+    nfcWriteParticipantName.textContent = participantName;
+    nfcWriteStatus.textContent = 'Waiting for badge...';
+    nfcWritePanel.classList.remove('hidden');
+    
+    pendingWriteData = {
+      participantEventId: participantEventId,
+      token: token,
+      slackUserId: slackUserId,
+      verifying: false
+    };
+    
+    // Send write command to bridge with both payloads
+    if (nfcBridge && nfcBridge.readyState === WebSocket.OPEN) {
+      nfcBridge.send(JSON.stringify({
+        action: 'write',
+        badge_url: 'https://badge.hackclub.com/t/' + slackUserId,
+        attend_token: token
+      }));
+    } else {
+      nfcWriteStatus.textContent = 'NFC bridge not connected';
+    }
+  }
+  
+  function hideNfcWritePanel() {
+    if (nfcWritePanel) nfcWritePanel.classList.add('hidden');
+    pendingWriteData = null;
+  }
+  
+  // Wire up UI events
+  if (nfcConnectBtn) {
+    nfcConnectBtn.addEventListener('click', connectNfcBridge);
+  }
+  
+  if (nfcWriteCancel) {
+    nfcWriteCancel.addEventListener('click', hideNfcWritePanel);
+  }
+  
+  // Expose functions for use in main scanner code
+  window.nfcBridge = {
+    isConnected: function() {
+      return nfcBridge && nfcBridge.readyState === WebSocket.OPEN;
+    },
+    showWritePanel: showNfcWritePanel,
+    writeOnCheckinEnabled: nfcWriteOnCheckin
+  };
+  
+  // Auto-connect on page load
+  setTimeout(connectNfcBridge, 1000);
+})();
+<% end %>
+</script>

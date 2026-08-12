@@ -1,0 +1,285 @@
+<% content_for :title, "Participants – #{current_event.name} – Attend" %>
+
+<div<% if current_event.slack_channel_id.present? %> data-controller="sync-slack" data-sync-slack-preview-url-value="<%= sync_slack_channel_preview_admin_event_participants_path(current_event) %>" data-sync-slack-form-url-value="<%= sync_slack_channel_admin_event_participants_path(current_event) %>"<% end %>>
+  <% if current_event.slack_channel_id.present? %>
+    <div data-controller="slack-sync-progress" data-slack-sync-progress-event-id-value="<%= current_event.id %>">
+      <div data-slack-sync-progress-target="banner" class="hidden mb-4 rounded-md bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800">
+        <span data-slack-sync-progress-target="message">Syncing Slack channel…</span>
+      </div>
+    </div>
+  <% end %>
+
+  <!-- Page header -->
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-semibold text-gray-900">Participants</h1>
+    <div class="flex items-center gap-2">
+      <% if current_event.slack_channel_id.present? %>
+        <button type="button" data-action="click->sync-slack#open" class="text-sm font-medium text-gray-700 bg-white border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Sync Slack
+        </button>
+      <% end %>
+      <%= link_to new_admin_event_import_path(current_event), class: "text-sm font-medium text-gray-700 bg-white border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5" do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+        </svg>
+        Import
+      <% end %>
+      <%= link_to new_invite_admin_event_participants_path(current_event), class: "text-sm font-medium text-white bg-[#ec3750] px-3 py-1.5 rounded-md hover:bg-[#d42f46] transition-colors inline-flex items-center gap-1.5" do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Add participant
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="mb-5 border-b border-gray-200">
+    <nav class="-mb-px flex gap-6">
+      <% if @show_pending_invitations %>
+        <%= link_to admin_event_participants_path(current_event), class: "py-2.5 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700" do %>
+          All <span class="ml-1 text-xs text-gray-400"><%= @participant_events.count %></span>
+        <% end %>
+        <span class="py-2.5 border-b-2 border-[#ec3750] text-sm font-medium text-[#ec3750]">
+          Pending invitations <span class="ml-1 text-xs"><%= @pending_invitations.count %></span>
+        </span>
+      <% else %>
+        <span class="py-2.5 border-b-2 border-[#ec3750] text-sm font-medium text-[#ec3750]">
+          All <span class="ml-1 text-xs"><%= @participant_events.count %></span>
+        </span>
+        <%= link_to admin_event_participants_path(current_event, status: "pending_invitations"), class: "py-2.5 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700" do %>
+          Pending invitations
+        <% end %>
+      <% end %>
+    </nav>
+  </div>
+
+  <!-- Filters -->
+  <div class="mb-4">
+    <form action="<%= admin_event_participants_path(current_event) %>" method="get" class="flex flex-wrap items-center gap-2">
+      <div class="flex-1 min-w-[200px] max-w-xs">
+        <%= text_field_tag :search, params[:search],
+            placeholder: "Search...",
+            class: "w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750]" %>
+      </div>
+      <%= select_tag :status,
+          options_for_select(
+            [
+              ["All Statuses", ""],
+              ["Pending Invitations", "pending_invitations"],
+              ["Awaiting Participant", "awaiting_participant"],
+              ["Awaiting Parent", "awaiting_parent"],
+              ["Complete", "complete"],
+              ["Withdrawn", "withdrawn"],
+              ["Rejected", "rejected"]
+            ],
+            params[:status]
+          ),
+          class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
+      <%= select_tag :flag,
+          options_for_select([
+            ["All Flags", ""],
+            ["Incomplete Onboarding", "incomplete_onboarding"],
+            *(current_event.travel_enabled? ? [["Missing Travel", "missing_travel"]] : []),
+            ["Missing Medical", "missing_medical"],
+            ["High Support", "high_support"],
+            ["Anaphylaxis Risk", "anaphylaxis"]
+          ], params[:flag]),
+          class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
+      <%= select_tag :checked_in,
+          options_for_select([
+            ["All Check-In", ""],
+            ["Checked In", "yes"],
+            ["Not Checked In", "no"]
+          ], params[:checked_in]),
+          class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
+      <% if current_event.groups_enabled? && current_event.groups.any? %>
+        <%= select_tag :group_id,
+            options_for_select(
+              [["All Groups", ""], ["No Group", "none"]] + current_event.groups.ordered.map { |g| [g.name, g.id] },
+              params[:group_id]
+            ),
+            class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
+      <% end %>
+      <%= submit_tag "Filter", class: "text-sm font-medium bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 cursor-pointer" %>
+      <% if params[:search].present? || params[:status].present? || params[:flag].present? || params[:checked_in].present? || params[:group_id].present? %>
+        <%= link_to "Clear", admin_event_participants_path(current_event), class: "text-sm text-gray-500 hover:text-gray-700" %>
+      <% end %>
+      <div class="ml-auto flex items-center gap-1">
+        <%= link_to admin_event_participants_path(current_event), class: "p-1.5 rounded #{@show_pending_invitations || !request.path.include?('table') ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-600'}", title: "List view" do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+        <% end %>
+        <%= link_to table_admin_event_participants_path(current_event), class: "p-1.5 rounded text-gray-400 hover:text-gray-600", title: "Table view" do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M3 12h18M3 18h18M9 4v16M15 4v16"/></svg>
+        <% end %>
+      </div>
+    </form>
+  </div>
+
+  <!-- Table -->
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <% if @show_pending_invitations %>
+      <table class="min-w-full">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="px-4 py-2.5 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">Email</th>
+            <th class="px-4 py-2.5 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-2.5 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">Sent</th>
+            <th class="px-4 py-2.5 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">Expires</th>
+            <th class="px-4 py-2.5 text-right text-[11px] font-medium text-gray-500 uppercase tracking-wider"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @pending_invitations.each do |invitation| %>
+            <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+              <td class="px-4 py-3 text-sm font-medium text-gray-900"><%= invitation.email %></td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">Pending</span>
+              </td>
+              <td class="px-4 py-3 text-sm text-gray-500"><%= time_ago_in_words(invitation.created_at) %> ago</td>
+              <td class="px-4 py-3 text-sm text-gray-500"><%= time_ago_in_words(invitation.expires_at) %></td>
+              <td class="px-4 py-3 text-right text-sm space-x-3">
+                <%= button_to "Resend", send_invite_admin_event_participants_path(current_event, invite: { email: invitation.email }), method: :post, class: "text-[#ec3750] hover:text-[#d42f46] text-sm font-medium" %>
+                <%= button_to "Revoke", revoke_invite_admin_event_participants_path(current_event, id: invitation.id), method: :delete, data: { confirm: "Are you sure you want to revoke the invitation for #{invitation.email}?" }, class: "text-gray-500 hover:text-red-600 text-sm" %>
+              </td>
+            </tr>
+          <% end %>
+          <% if @pending_invitations.empty? %>
+            <tr>
+              <td colspan="5" class="px-4 py-12 text-center text-sm text-gray-500">No pending invitations.</td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+      <% if @pending_invitations.any? %>
+        <div class="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-500"><%= @pending_invitations.count %> <%= "invitation".pluralize(@pending_invitations.count) %></div>
+      <% end %>
+    <% else %>
+      <table class="min-w-full">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="px-4 py-2.5 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">Participant</th>
+            <th class="px-4 py-2.5 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-4 py-2.5 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+            <th class="px-4 py-2.5 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider">Flags</th>
+            <th class="px-4 py-2.5 text-right text-[11px] font-medium text-gray-500 uppercase tracking-wider"></th>
+          </tr>
+        </thead>
+        <tbody>
+        <% @participant_events.each do |pe| %>
+          <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+            <td class="px-4 py-3">
+              <div>
+                <%= link_to pe.participant.display_name, admin_event_participant_path(current_event, pe), class: "text-sm font-medium text-gray-900 hover:text-[#ec3750]" %>
+                <div class="text-xs text-gray-500 truncate max-w-[200px]" title="<%= pe.participant.email %>"><%= pe.participant.email %></div>
+                <% if current_event.groups_enabled? && pe.groups.any? %>
+                  <div class="flex flex-wrap gap-1 mt-1">
+                    <% pe.groups.each do |g| %>
+                      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+                            style="background-color: <%= g.normalized_color || '#e5e7eb' %>; color: <%= g.color.present? ? 'white' : '#1f2d3d' %>;"
+                            title="<%= g.description %>">
+                        <%= g.name %>
+                      </span>
+                    <% end %>
+                  </div>
+                <% end %>
+              </div>
+            </td>
+            <td class="px-4 py-3">
+              <%= render_display_status_badge(pe) %>
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex gap-1">
+                <% if current_event.travel_enabled? %>
+                  <span class="w-2 h-2 rounded-full <%= pe.travel_inbound ? 'bg-green-500' : 'bg-gray-200' %>" title="Inbound Travel"></span>
+                  <span class="w-2 h-2 rounded-full <%= pe.travel_outbound ? 'bg-green-500' : 'bg-gray-200' %>" title="Outbound Travel"></span>
+                <% end %>
+                <% if current_event.accommodation_enabled? %>
+                  <span class="w-2 h-2 rounded-full <%= pe.accommodation ? 'bg-green-500' : 'bg-gray-200' %>" title="Accommodation"></span>
+                <% end %>
+                <span class="w-2 h-2 rounded-full <%= pe.medical ? 'bg-green-500' : 'bg-gray-200' %>" title="Medical"></span>
+                <span class="w-2 h-2 rounded-full <%= pe.consents.signed.any? ? 'bg-green-500' : 'bg-gray-200' %>" title="Consents"></span>
+              </div>
+              <div class="text-[11px] text-gray-400 mt-0.5">
+                <%= pe.onboarding_complete? ? "Complete" : "In progress" %>
+              </div>
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1">
+                <% if pe.medical&.has_anaphylaxis_risk %>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-red-50 text-red-700">Anaphylaxis</span>
+                <% end %>
+                <% if pe.safeguarding_info&.high_support? %>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-700">High Support</span>
+                <% end %>
+                <% if pe.participant.minor_on?(current_event.starts_at || Date.current) %>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-700">Minor</span>
+                <% end %>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-right">
+              <%= link_to admin_event_participant_path(current_event, pe), class: "text-sm text-[#ec3750] hover:text-[#d42f46] font-medium" do %>View<% end %>
+              <span class="text-gray-300 mx-1">·</span>
+              <%= link_to "Edit", edit_admin_event_participant_path(current_event, pe), class: "text-sm text-gray-500 hover:text-gray-700" %>
+            </td>
+          </tr>
+        <% end %>
+          <% if @participant_events.empty? %>
+            <tr>
+              <td colspan="5" class="px-4 py-12 text-center text-sm text-gray-500">No participants found matching your criteria.</td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+      <% if @participant_events.any? %>
+        <div class="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-500"><%= @participant_events.count %> <%= "participant".pluralize(@participant_events.count) %></div>
+      <% end %>
+    <% end %>
+  </div>
+
+  <% if current_event.slack_channel_id.present? %>
+    <div data-sync-slack-target="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-action="click->sync-slack#closeOnBackdrop">
+      <div class="bg-white rounded-lg border border-gray-200 max-w-md w-full mx-4">
+        <div class="p-6">
+          <h3 class="text-base font-semibold mb-4">Sync Slack Channel</h3>
+
+          <div data-sync-slack-target="loading" class="flex items-center justify-center py-8">
+            <svg class="animate-spin h-6 w-6 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </div>
+
+          <div data-sync-slack-target="content" class="hidden">
+            <p class="text-sm text-gray-600 mb-4">You are about to:</p>
+            <ul class="text-sm text-gray-700 mb-4 space-y-2">
+              <li data-sync-slack-target="slackRow" class="flex items-center gap-2">
+                <input type="checkbox" checked disabled class="rounded text-purple-600">
+                <span>Invite <strong data-sync-slack-target="slackCount">0</strong> people to the Slack channel</span>
+              </li>
+              <li data-sync-slack-target="emailRow" class="flex items-center gap-2">
+                <input type="checkbox" checked data-sync-slack-target="emailCheckbox" class="rounded text-purple-600">
+                <span>Email <strong data-sync-slack-target="emailCount">0</strong> people to connect their Slack</span>
+              </li>
+            </ul>
+            <p class="text-xs text-gray-500 mb-6">
+              Last performed <strong data-sync-slack-target="lastSync">never</strong>.
+            </p>
+
+            <div class="flex justify-end gap-3">
+              <button type="button" data-action="click->sync-slack#close" class="text-sm text-gray-700 hover:text-gray-900 px-3 py-1.5">
+                Cancel
+              </button>
+              <button type="button" data-action="click->sync-slack#submit" class="text-sm font-medium bg-purple-600 text-white rounded-md hover:bg-purple-700 px-3 py-1.5">
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>

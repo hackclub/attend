@@ -1,0 +1,235 @@
+<% content_for :title, "Attend – Hack Club" %>
+
+<% if user_signed_in? %>
+  <div class="flex flex-col items-center justify-center py-16">
+    <h1 class="text-2xl font-semibold mb-4">Welcome back</h1>
+    <p class="text-gray-600 mb-8">You're signed in as <%= current_user.email %></p>
+    <%= link_to "Go to Dashboard", dashboard_path,
+          class: "bg-[#ec3750] hover:bg-[#d42f46] text-white font-medium py-2.5 px-6 rounded-md transition-colors" %>
+  </div>
+<% else %>
+  <style>
+    /* Override default layout chrome for the landing page */
+    body > .text-white.text-center { display: none; }
+    body > main { padding: 0 !important; max-width: none !important; margin: 0 !important; }
+    body > footer { display: none; }
+    body { background: #0f0f1e !important; }
+    /* Ignore the user's custom theme on the landing page — themes.css remaps
+       --color-white/black/gray-* to surface colors, which breaks the dark hero. */
+    #attend-landing {
+      --color-white: #ffffff;
+      --color-black: #000000;
+      --color-gray-50: #f9fafb;
+      --color-gray-100: #f3f4f6;
+      --color-gray-200: #e5e7eb;
+      --color-gray-300: #d1d5db;
+      --color-gray-400: #9ca3af;
+      --color-gray-500: #6b7280;
+      --color-gray-600: #4b5563;
+      --color-gray-700: #374151;
+      --color-gray-800: #1f2937;
+      --color-gray-900: #111827;
+      --color-gray-950: #030712;
+    }
+  </style>
+
+  <div id="attend-landing" class="relative min-h-dvh isolate overflow-hidden bg-[#0f0f1e] text-white antialiased">
+    <!-- Ambient background -->
+    <div aria-hidden="true" class="absolute inset-0 -z-10">
+      <div class="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,#ec3750_0%,transparent_55%)] opacity-30"></div>
+      <div class="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_90%_110%,#338eda_0%,transparent_60%)] opacity-25"></div>
+      <div class="absolute inset-0 [background-image:linear-gradient(to_right,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.04)_1px,transparent_1px)] [background-size:64px_64px] [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)]"></div>
+    </div>
+
+    <!-- Top nav -->
+    <header class="relative">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="flex items-center justify-between py-6">
+          <div class="flex items-center gap-3">
+            <img src="/icon-192.png" alt="" class="h-9 w-9 rounded-xl">
+            <div class="flex items-baseline gap-2">
+              <span class="text-lg font-bold tracking-tight">Attend</span>
+              <span class="whitespace-nowrap text-xs text-white/40">by Hack Club</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-x-6">
+            <%= link_to "Parents & guardians", guardian_portal_center_path, class: "hidden whitespace-nowrap text-sm text-white/60 hover:text-white sm:inline-block" %>
+            <%= link_to "Report an incident", incident_report_path, class: "hidden whitespace-nowrap text-sm text-white/60 hover:text-white md:inline-block" %>
+            <a href="mailto:attend@hackclub.com" class="hidden whitespace-nowrap text-sm text-white/60 hover:text-white lg:inline-block">Get in touch</a>
+            <%= button_to user_hack_club_omniauth_authorize_path,
+                  method: :post,
+                  data: { turbo: false },
+                  class: "inline-flex items-center gap-2 whitespace-nowrap rounded-lg bg-white px-4 py-2 text-sm font-medium text-[#0f0f1e] hover:bg-white/90 transition-colors" do %>
+              Sign in
+              <svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M7.21 4.47a.75.75 0 011.06 0l5 5a.75.75 0 010 1.06l-5 5a.75.75 0 11-1.06-1.06L11.69 10 7.21 5.53a.75.75 0 010-1.06z" clip-rule="evenodd"/>
+              </svg>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="relative">
+      <div class="mx-auto max-w-7xl px-6 pt-12 pb-20 lg:px-8 lg:pt-20 lg:pb-28">
+        <div class="grid grid-cols-1 items-center gap-16 lg:grid-cols-2 lg:gap-12">
+          <!-- Copy -->
+          <div class="max-w-xl">
+            <h1 class="text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl">
+              Run the event.<br>
+              <span class="text-[#ec3750]">Not the spreadsheet.</span>
+            </h1>
+            <p class="mt-6 text-lg text-white/70">
+              Attend is the internal platform Hack Club staff use to wrangle participants, travel, waivers, rooming, and everything else that goes into pulling off an event.
+            </p>
+            <div class="mt-10 flex flex-wrap items-center gap-4">
+              <%= button_to user_hack_club_omniauth_authorize_path,
+                    method: :post,
+                    data: { turbo: false },
+                    class: "group inline-flex items-center gap-3 rounded-lg bg-[#ec3750] px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_-10px_rgba(236,55,80,0.6)] hover:bg-[#d42f46] transition-colors" do %>
+                <img src="https://assets.hackclub.com/icon-rounded.svg" alt="" class="size-5">
+                Continue with Hack Club
+              <% end %>
+              <a href="mailto:attend@hackclub.com" class="text-sm font-medium text-white/70 hover:text-white">
+                Need access? <span aria-hidden="true">→</span>
+              </a>
+            </div>
+
+            <% if Rails.env.development? %>
+              <div class="mt-12 rounded-xl bg-white/[0.03] p-5 ring-1 ring-inset ring-white/10">
+                <p class="mb-3 text-xs font-medium uppercase tracking-wider text-white/40">Development only</p>
+                <%= form_with url: dev_sign_in_path, method: :post, class: "space-y-3" do |f| %>
+                  <%= f.email_field :email, placeholder: "you@hackclub.com",
+                        required: true,
+                        class: "w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 focus:border-[#ec3750] focus:outline-none focus:ring-1 focus:ring-[#ec3750]" %>
+                  <div class="flex items-center justify-between">
+                    <label class="flex items-center gap-2 text-xs text-white/50">
+                      <%= f.check_box :create_user, class: "rounded border-white/20 bg-transparent text-[#ec3750] focus:ring-[#ec3750]" %>
+                      Create user if not found
+                    </label>
+                    <%= f.submit "Continue", class: "cursor-pointer rounded-lg bg-white px-4 py-2 text-sm font-medium text-[#0f0f1e] hover:bg-white/90 transition-colors" %>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+
+          <!-- Decorative product peek -->
+          <div class="relative">
+            <div class="relative mx-auto aspect-square w-full max-w-lg">
+              <!-- Glow -->
+              <div aria-hidden="true" class="absolute inset-8 rounded-[3rem] bg-linear-to-br from-[#ec3750]/30 via-fuchsia-500/10 to-[#338eda]/30 blur-3xl"></div>
+
+              <!-- Event card -->
+              <div class="absolute left-0 top-4 w-[68%] rotate-[-5deg] rounded-2xl bg-white/[0.04] p-5 ring-1 ring-inset ring-white/10 backdrop-blur-md">
+                <div class="flex items-center justify-between">
+                  <p class="text-[10px] font-semibold uppercase tracking-widest text-white/40">Event</p>
+                  <span class="rounded-full bg-[#33d6a6]/15 px-2 py-0.5 text-[10px] font-medium text-[#33d6a6]">Live</span>
+                </div>
+                <h3 class="mt-3 text-xl font-bold">Assemble</h3>
+                <p class="mt-1 text-xs text-white/50">San Francisco · Aug 8–11</p>
+                <div class="mt-5 grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <p class="text-base font-semibold tabular-nums">312</p>
+                    <p class="text-[10px] uppercase tracking-wider text-white/40">Teens</p>
+                  </div>
+                  <div>
+                    <p class="text-base font-semibold tabular-nums">41</p>
+                    <p class="text-[10px] uppercase tracking-wider text-white/40">Staff</p>
+                  </div>
+                  <div>
+                    <p class="text-base font-semibold tabular-nums">28</p>
+                    <p class="text-[10px] uppercase tracking-wider text-white/40">Countries</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Participant card -->
+              <div class="absolute right-0 top-24 w-[60%] rotate-[6deg] overflow-hidden rounded-2xl bg-white text-[#0f0f1e] shadow-2xl ring-1 ring-black/5">
+                <div class="bg-[#ec3750] px-4 py-2.5">
+                  <p class="text-[10px] font-semibold uppercase tracking-widest text-white/80">Attend · Pass</p>
+                </div>
+                <div class="p-4">
+                  <div class="flex items-center gap-3">
+                    <div class="flex size-10 items-center justify-center rounded-full bg-linear-to-br from-[#ec3750] to-[#ff8c37] text-sm font-bold text-white">FA</div>
+                    <div class="min-w-0">
+                      <p class="truncate text-sm font-semibold">Fiona Albright</p>
+                      <p class="text-[11px] text-[#8492a6]">Participant · Group B</p>
+                    </div>
+                  </div>
+                  <div class="mt-4 grid grid-cols-5 gap-1">
+                    <% 20.times do |i| %>
+                      <div class="aspect-square rounded-[2px] <%= [0,3,5,7,8,11,14,16,18].include?(i) ? 'bg-[#0f0f1e]' : 'bg-[#0f0f1e]/15' %>"></div>
+                    <% end %>
+                  </div>
+                  <div class="mt-3 flex items-center justify-between text-[10px] text-[#8492a6]">
+                    <span>NFC · A8-3F-2C</span>
+                    <span class="font-medium text-[#33d6a6]">Checked in</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Scanner pill -->
+              <div class="absolute bottom-6 left-6 w-[58%] rotate-[-2deg] rounded-2xl bg-[#1a1a2e]/90 p-4 ring-1 ring-inset ring-white/10 backdrop-blur-md">
+                <div class="flex items-center gap-3">
+                  <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#33d6a6]/15 text-[#33d6a6]">
+                    <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                    </svg>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-xs font-semibold">Scanned in · Dining Hall</p>
+                    <p class="text-[11px] text-white/50">Just now · by Max</p>
+                  </div>
+                  <span class="text-[10px] tabular-nums text-white/40">+1</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quiet detail strip -->
+    <section class="relative border-t border-white/5">
+      <div class="mx-auto max-w-7xl px-6 py-10 lg:px-8">
+        <div class="grid grid-cols-2 gap-8 text-sm sm:grid-cols-4">
+          <div>
+            <p class="text-xs uppercase tracking-wider text-white/40">Participants</p>
+            <p class="mt-2 text-white/80">Invites, waivers, guardians, and emergency contacts in one record.</p>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wider text-white/40">Travel</p>
+            <p class="mt-2 text-white/80">Live flight tracking and airport pickups when the day comes.</p>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wider text-white/40">On-site</p>
+            <p class="mt-2 text-white/80">NFC scanners, rooming, and Slack blasts during the event.</p>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wider text-white/40">Aftermath</p>
+            <p class="mt-2 text-white/80">Exports, audit logs, and incident reports when it wraps.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="relative border-t border-white/5">
+      <div class="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-8 text-sm text-white/40 sm:flex-row sm:items-center sm:justify-between lg:px-8">
+        <div class="flex items-center gap-3">
+          <a href="https://hackclub.com" target="_blank" rel="noopener noreferrer">
+            <img src="/flag.png" alt="Hack Club" class="h-6">
+          </a>
+          <span>Built with care by Hack Club</span>
+        </div>
+        <div class="flex items-center gap-4">
+          <%= link_to "Parents & guardians", guardian_portal_center_path, class: "text-white/60 hover:text-white" %>
+          <%= link_to "Report an incident", incident_report_path, class: "text-white/60 hover:text-white" %>
+          <p>&copy; <%= Date.current.year %> Hack Club · 501(c)(3) · EIN 81-2908499</p>
+        </div>
+      </div>
+    </footer>
+  </div>
+<% end %>

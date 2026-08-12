@@ -1,0 +1,102 @@
+<div class="flex flex-col lg:flex-row justify-between items-start gap-4 mb-6">
+  <div class="flex items-start gap-4">
+    <% if @participant.headshot.attached? && @participant.headshot.blob.persisted? %>
+      <%= image_tag @participant.headshot, class: "w-20 h-20 rounded-full object-cover border-2 border-gray-200" %>
+    <% else %>
+      <div class="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-medium text-2xl">
+        <%= @participant.legal_first_name[0] %><%= @participant.legal_last_name[0] %>
+      </div>
+    <% end %>
+    <div>
+      <div class="flex flex-wrap items-center gap-2 sm:gap-4">
+        <h1 class="text-2xl font-bold"><%= @participant.display_name %></h1>
+        <%= render_display_status_badge(@participant_event) %>
+        <%= render_blocking_step_badge(@participant_event) %>
+        <% if current_event.groups_enabled? %>
+          <% @participant_event.groups.ordered.each do |g| %>
+            <%= link_to edit_admin_event_group_path(current_event, g),
+                class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border border-gray-200",
+                style: "background-color: #{g.normalized_color || '#e5e7eb'}; color: #{g.color.present? ? 'white' : '#1f2d3d'};",
+                title: "Edit group: #{g.name}" do %>
+              <%= g.name %>
+            <% end %>
+          <% end %>
+        <% end %>
+        <% if current_event.freedom_waivers_enabled? && policy(@safeguarding_info || SafeguardingInfo.new(participant_event: @participant_event)).show? %>
+          <% if @safeguarding_info&.freedom_waiver_granted? %>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">✓ FREEDOM</span>
+          <% else %>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">✗ NO FREEDOM</span>
+          <% end %>
+        <% end %>
+      </div>
+      <% if @participant.preferred_name.present? %>
+        <p class="text-gray-600">Legal name: <%= @participant.full_name %></p>
+      <% end %>
+      <p class="text-gray-600"><%= @participant.email %></p>
+    </div>
+  </div>
+  <div class="relative w-full lg:w-auto" data-controller="dropdown">
+    <button type="button" data-action="dropdown#toggle" class="w-full lg:w-auto inline-flex items-center justify-center gap-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50 cursor-pointer">
+      Actions
+      <svg class="w-4 h-4 -mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+    </button>
+    <div class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 py-1" data-dropdown-target="menu">
+      <%= link_to "Edit", edit_admin_event_participant_path(current_event, @participant_event), class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" %>
+      <% if policy(@participant_event).merge_duplicate? %>
+        <%= link_to "Merge Duplicate", merge_admin_event_participant_path(current_event, @participant_event), class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" %>
+      <% end %>
+      <% if @participant_event.participant.slack_user_id.present? %>
+        <%= link_to "View on Slack", "https://hackclub.enterprise.slack.com/team/#{@participant_event.participant.slack_user_id}", target: "_blank", rel: "noopener noreferrer", class: "block px-4 py-2 text-sm text-purple-700 hover:bg-gray-50" %>
+      <% end %>
+      <% if policy(@participant_event).withdraw? || policy(@participant_event).destroy? %>
+        <div class="border-t border-gray-100 my-1"></div>
+      <% end %>
+      <% if policy(@participant_event).withdraw? && !@participant_event.withdrawn? %>
+        <%= button_to "Withdraw", withdraw_admin_event_participant_path(current_event, @participant_event),
+            method: :post,
+            data: { turbo_confirm: "Are you sure you want to mark #{@participant.display_name} as withdrawn?" },
+            class: "w-full text-left px-4 py-2 text-sm text-amber-700 hover:bg-gray-50 cursor-pointer" %>
+      <% end %>
+      <% if policy(@participant_event).withdraw? && @participant_event.withdrawn? %>
+        <%= button_to "Reinstate", unwithdraw_admin_event_participant_path(current_event, @participant_event),
+            method: :post,
+            data: { turbo_confirm: "Are you sure you want to reinstate #{@participant.display_name}?" },
+            class: "w-full text-left px-4 py-2 text-sm text-emerald-700 hover:bg-gray-50 cursor-pointer" %>
+      <% end %>
+      <% if policy(@participant_event).destroy? %>
+        <%= button_to "Remove from Event", admin_event_participant_path(current_event, @participant_event),
+            method: :delete,
+            data: { turbo_confirm: "Are you sure you want to remove #{@participant.display_name} from this event? This action cannot be undone." },
+            class: "w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-gray-50 cursor-pointer" %>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<div class="mb-6 border-b border-gray-200 overflow-x-auto overflow-y-hidden">
+  <nav class="-mb-px flex gap-4 sm:gap-6 min-w-max">
+    <%= link_to "Overview", admin_event_participant_path(current_event, @participant_event),
+        class: "py-3 px-1 border-b-2 #{action_name == 'show' ? 'border-[#ec3750] text-[#ec3750]' : 'border-transparent text-gray-500 hover:text-gray-700'}" %>
+    <% if current_event.travel_enabled? %>
+      <%= link_to "Travel", travel_admin_event_participant_path(current_event, @participant_event),
+          class: "py-3 px-1 border-b-2 #{action_name == 'travel' ? 'border-[#ec3750] text-[#ec3750]' : 'border-transparent text-gray-500 hover:text-gray-700'}" %>
+    <% end %>
+    <%= link_to "Accommodation", accommodation_admin_event_participant_path(current_event, @participant_event),
+        class: "py-3 px-1 border-b-2 #{action_name == 'accommodation' ? 'border-[#ec3750] text-[#ec3750]' : 'border-transparent text-gray-500 hover:text-gray-700'}" %>
+    <% if policy(@participant_event.medical || Medical.new(participant_event: @participant_event)).show? %>
+      <%= link_to "Medical", medical_admin_event_participant_path(current_event, @participant_event),
+          class: "py-3 px-1 border-b-2 #{action_name == 'medical' ? 'border-[#ec3750] text-[#ec3750]' : 'border-transparent text-gray-500 hover:text-gray-700'}" %>
+    <% end %>
+    <% if policy(@safeguarding_info || SafeguardingInfo.new(participant_event: @participant_event)).show? %>
+      <%= link_to "Safeguarding", safeguarding_admin_event_participant_path(current_event, @participant_event),
+          class: "py-3 px-1 border-b-2 #{action_name == 'safeguarding' ? 'border-[#ec3750] text-[#ec3750]' : 'border-transparent text-gray-500 hover:text-gray-700'}" %>
+    <% end %>
+    <%= link_to "Consents", consents_admin_event_participant_path(current_event, @participant_event),
+        class: "py-3 px-1 border-b-2 #{action_name == 'consents' ? 'border-[#ec3750] text-[#ec3750]' : 'border-transparent text-gray-500 hover:text-gray-700'}" %>
+    <%= link_to "Notes (#{@notes.count})", notes_admin_event_participant_path(current_event, @participant_event),
+        class: "py-3 px-1 border-b-2 #{action_name == 'notes' ? 'border-[#ec3750] text-[#ec3750]' : 'border-transparent text-gray-500 hover:text-gray-700'}" %>
+    <%= link_to "History", history_admin_event_participant_path(current_event, @participant_event),
+        class: "py-3 px-1 border-b-2 #{action_name == 'history' ? 'border-[#ec3750] text-[#ec3750]' : 'border-transparent text-gray-500 hover:text-gray-700'}" %>
+  </nav>
+</div>

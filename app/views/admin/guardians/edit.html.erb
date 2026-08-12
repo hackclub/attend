@@ -1,0 +1,117 @@
+<% content_for :breadcrumbs do %>
+  <ol class="flex items-center space-x-2 text-sm text-gray-500">
+    <li><%= link_to "Participants", admin_event_participants_path(current_event), class: "hover:text-gray-700" %></li>
+    <li><span class="mx-2">/</span></li>
+    <li><%= link_to @participant_event.participant.display_name, admin_event_participant_path(current_event, @participant_event), class: "hover:text-gray-700" %></li>
+    <li><span class="mx-2">/</span></li>
+    <li class="text-gray-900 font-medium">Edit Guardian</li>
+  </ol>
+<% end %>
+
+<div class="max-w-2xl">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold">Edit Guardian</h1>
+    <p class="text-gray-600 mt-1">
+      Editing guardian for <%= @participant_event.participant.display_name %>
+    </p>
+  </div>
+
+  <% unless @guardian_participant_event.completed? %>
+    <div class="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded mb-6">
+      <strong>Note:</strong> If you change the email address, the invite will need to be resent to the new address.
+    </div>
+  <% end %>
+
+  <% if @guardian_participant_event.completed? %>
+    <div class="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded mb-6">
+      <strong>Info:</strong> This guardian has already completed their portal. Changes here will update their information directly.
+    </div>
+  <% end %>
+
+  <div class="bg-white rounded-lg border border-gray-200 p-6">
+    <%= form_with model: @guardian, url: admin_event_participant_guardian_path(current_event, @participant_event, @guardian_participant_event), method: :patch, local: true, data: { controller: "phone-input" } do |f| %>
+      <% if @guardian.errors.any? %>
+        <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded mb-6">
+          <ul class="list-disc list-inside">
+            <% @guardian.errors.full_messages.each do |msg| %>
+              <li><%= msg %></li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+
+      <div class="space-y-6">
+        <section>
+          <h3 class="font-medium text-gray-900 mb-4">Contact Information</h3>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <%= f.label :legal_first_name, "First Name", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= f.text_field :legal_first_name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", required: true %>
+            </div>
+            <div>
+              <%= f.label :legal_last_name, "Last Name", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= f.text_field :legal_last_name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", required: true %>
+            </div>
+          </div>
+
+          <div class="mt-4">
+            <%= f.label :email, class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.email_field :email, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", required: true %>
+            <% if @guardian_participant_event.invited_via_email.present? && @guardian_participant_event.invited_via_email != @guardian.email %>
+              <p class="mt-1 text-sm text-gray-500">
+                Originally invited via: <%= @guardian_participant_event.invited_via_email %>
+              </p>
+            <% end %>
+          </div>
+
+          <div class="mt-4">
+            <%= f.label :phone, class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.telephone_field :phone, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          </div>
+        </section>
+
+        <section>
+          <h3 class="font-medium text-gray-900 mb-4">Address</h3>
+
+          <div data-controller="address-autocomplete" data-address-autocomplete-fill-components-value="true" class="space-y-4">
+            <div>
+              <%= f.label :address_line_1, "Address Line 1", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= f.text_field :address_line_1, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", data: { address_autocomplete_target: "input" } %>
+            </div>
+
+            <div>
+              <%= f.label :address_line_2, "Address Line 2", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= f.text_field :address_line_2, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="col-span-2 md:col-span-1">
+                <%= f.label :city, class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :city, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", data: { address_autocomplete_target: "city" } %>
+              </div>
+              <div>
+                <%= f.label :state, "State/Province", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :state, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", data: { address_autocomplete_target: "state" } %>
+              </div>
+              <div>
+                <%= f.label :postal_code, "Postal Code", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :postal_code, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", data: { address_autocomplete_target: "postalCode" } %>
+              </div>
+            </div>
+
+            <div>
+              <%= f.label :country, class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= f.text_field :country, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", data: { address_autocomplete_target: "country" } %>
+            </div>
+          </div>
+        </section>
+
+        <div class="pt-4 border-t flex flex-col sm:flex-row gap-3">
+          <%= f.submit "Save Guardian", class: "w-full sm:w-auto bg-[#ec3750] text-white px-6 py-2 rounded-md hover:bg-[#d42f46] cursor-pointer" %>
+          <%= link_to "Cancel", admin_event_participant_path(current_event, @participant_event), class: "w-full sm:w-auto text-center px-6 py-2 text-gray-600 hover:text-gray-900" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

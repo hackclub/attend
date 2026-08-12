@@ -1,0 +1,933 @@
+<% content_for :title, "#{@event.name} – Attend" %>
+<% days_until = @event.starts_at.present? ? (@event.starts_at.to_date - Date.current).to_i : nil %>
+
+<div class="w-full max-w-4xl mx-auto">
+  <!-- Back -->
+  <%= link_to dashboard_path, class: "inline-flex items-center gap-1.5 text-sm text-(--text-muted) hover:text-(--text-strong) transition-colors mb-6" do %>
+    <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>
+    Dashboard
+  <% end %>
+
+  <!-- Event hero with countdown -->
+  <section class="mb-8 rounded-3xl bg-(--bg-darker) text-(--text-on-dark) relative overflow-hidden">
+    <div class="absolute -top-24 -right-16 size-72 rounded-full bg-[#ec3750]/25 blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-24 -left-16 size-64 rounded-full bg-[#338eda]/20 blur-3xl pointer-events-none"></div>
+
+    <div class="relative p-6 sm:p-8">
+      <div class="flex items-start gap-4">
+        <%= render "admin/events/avatar", event: @event, size: 64, rounded: "rounded-2xl" %>
+        <div class="min-w-0 flex-1">
+          <h1 class="text-2xl sm:text-3xl font-bold truncate"><%= @event.name %></h1>
+          <% if @event.location_city.present? %>
+            <p class="text-sm text-(--text-on-dark)/70 mt-1 flex items-center gap-1.5">
+              <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+              <%= [@event.location_city, @event.location_country].compact.reject(&:blank?).join(", ") %>
+            </p>
+          <% end %>
+          <% if @event.starts_at.present? %>
+            <p class="text-sm text-(--text-on-dark)/60 mt-0.5">
+              <%= @event.starts_at.strftime("%b %d") %><%= " – #{@event.ends_at.strftime('%b %d, %Y')}" if @event.ends_at %>
+            </p>
+          <% end %>
+          <% if @event.event_series %>
+            <p class="text-sm text-(--text-on-dark)/70 mt-1.5">
+              Part of the <span class="font-medium"><%= @event.event_series.name %></span> series
+            </p>
+          <% end %>
+        </div>
+      </div>
+
+      <% if days_until.present? %>
+        <div class="mt-6 pt-6 border-t border-(--text-on-dark)/10">
+          <% if days_until > 0 %>
+            <p class="text-xs uppercase tracking-wider text-(--text-on-dark)/60 mb-1">Starts in</p>
+            <div class="flex items-baseline gap-2 tabular-nums">
+              <span class="text-5xl sm:text-6xl font-bold leading-none"><%= days_until %></span>
+              <span class="text-xl text-(--text-on-dark)/80"><%= days_until == 1 ? "day" : "days" %></span>
+            </div>
+            <p class="mt-2 text-sm text-(--text-on-dark)/70"><%= @event.starts_at.strftime("%A, %B %d at %I:%M %p") %></p>
+          <% elsif days_until == 0 %>
+            <p class="text-4xl font-bold text-[#33d6a6]">Happening today</p>
+          <% else %>
+            <p class="text-sm text-(--text-on-dark)/70">This event has ended · <%= time_ago_in_words(@event.starts_at) %> ago</p>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <!-- Finish registration CTA (still in the wizard) -->
+  <% if @participant_event.invited? || @participant_event.in_progress? %>
+    <section class="mb-8">
+      <div class="rounded-2xl border-2 border-[#ec3750]/30 bg-[#ec3750]/5 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div class="flex-1 min-w-0">
+          <h2 class="text-lg font-semibold text-(--text-strong)">Finish your registration</h2>
+          <p class="text-sm text-(--text-soft) mt-1">
+            You're not registered until you complete every step and submit — pick up where you left off.
+          </p>
+        </div>
+        <%= link_to "Continue registration", onboarding_path(event_id: @event.id),
+            class: "shrink-0 inline-flex items-center justify-center px-5 py-2.5 bg-[#ec3750] hover:bg-[#d42f46] text-white font-medium rounded-lg transition-colors" %>
+      </div>
+    </section>
+  <% end %>
+
+  <!-- Boarding Pass (when complete) -->
+  <% if @participant_event.complete? %>
+    <section class="mb-8">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-(--text-muted) mb-3 flex items-center gap-2">
+        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+        </svg>
+        Your boarding pass
+      </h2>
+
+      <div class="max-w-md bg-white rounded-2xl shadow-lg overflow-hidden border border-[#e0e6ed]">
+        <div class="bg-[#ec3750] text-white px-4 py-3 flex justify-between items-center">
+          <span class="font-bold tracking-wider text-sm">BOARDING PASS</span>
+          <img src="/flag.png" alt="Hack Club" class="h-5 opacity-90">
+        </div>
+
+        <div class="flex flex-col md:flex-row">
+          <div class="flex-1 p-4 border-b md:border-b-0 md:border-r border-dashed border-[#e0e6ed]">
+            <div class="flex justify-between items-start mb-4">
+              <div>
+                <p class="text-xs text-[#8492a6] uppercase tracking-wide">Passenger</p>
+                <p class="font-bold text-lg text-[#1f2d3d]"><%= @participant.display_name.upcase %></p>
+              </div>
+              <div class="text-right">
+                <p class="text-xs text-[#8492a6] uppercase tracking-wide">Status</p>
+                <p class="text-[#33d6a6] font-semibold text-sm">CONFIRMED</p>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between mb-4">
+              <div class="text-center">
+                <p class="text-xs text-[#8492a6]">FROM</p>
+                <p class="text-2xl font-bold text-[#1f2d3d]"><%= @participant_event.origin_airport_code.presence || "HOME" %></p>
+                <p class="text-xs text-[#8492a6]"><%= @participant.city.presence || "Your City" %></p>
+              </div>
+              <div class="flex-1 px-4">
+                <div class="relative">
+                  <div class="border-t-2 border-[#e0e6ed] border-dashed"></div>
+                  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white px-2">
+                    <svg class="size-6 text-[#ec3750]" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <div class="text-center">
+                <p class="text-xs text-[#8492a6]">TO</p>
+                <p class="text-2xl font-bold text-[#ec3750]"><%= @participant_event.destination_airport_code.presence || @event.location_city&.first(3)&.upcase || "EVT" %></p>
+                <p class="text-xs text-[#8492a6]"><%= @event.location_city.presence || "Event Location" %></p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-4 gap-2 text-center border-t border-[#e0e6ed] pt-3">
+              <div>
+                <p class="text-xs text-[#8492a6] uppercase">Event</p>
+                <p class="font-semibold text-sm text-[#1f2d3d] truncate"><%= @event.name %></p>
+              </div>
+              <div>
+                <p class="text-xs text-[#8492a6] uppercase">Date</p>
+                <p class="font-semibold text-sm text-[#1f2d3d]"><%= @event.starts_at&.strftime("%b %d") %></p>
+              </div>
+              <div>
+                <p class="text-xs text-[#8492a6] uppercase">T-Shirt</p>
+                <p class="font-semibold text-sm text-[#1f2d3d]"><%= @participant.tshirt_size&.upcase || "—" %></p>
+              </div>
+              <% if @event.freedom_waivers_enabled? %>
+                <div>
+                  <p class="text-xs text-[#8492a6] uppercase">Freedom</p>
+                  <% if @participant_event.safeguarding_info&.freedom_waiver_granted? %>
+                    <p class="font-bold text-sm text-[#33d6a6]">✓ YES</p>
+                  <% else %>
+                    <p class="font-bold text-sm text-[#ec3750]">✗ NO</p>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+          </div>
+
+          <div class="w-full md:w-36 bg-[#f9fafc] p-3 flex flex-col items-center justify-center relative">
+            <div class="absolute left-0 top-0 bottom-0 hidden md:flex flex-col justify-around -ml-2">
+              <% 6.times do %>
+                <div class="size-4 bg-white rounded-full border border-[#e0e6ed]"></div>
+              <% end %>
+            </div>
+            <p class="text-xs text-[#8492a6] uppercase tracking-wide mb-2">Scan to Check In</p>
+            <div class="bg-white p-2 rounded-lg shadow-sm border border-[#e0e6ed]">
+              <%= qr_code_svg(attend_deep_link(@participant_event.participant_id), size: 100) %>
+            </div>
+            <p class="text-xs text-[#8492a6] mt-2 font-mono"><%= @participant_event.participant_id[0..7].upcase %></p>
+          </div>
+        </div>
+
+        <div class="bg-[#17171d] px-4 py-2 text-xs text-[#8492a6] flex justify-between">
+          <span>Please present this pass at registration</span>
+          <span class="font-mono text-white"><%= @event.slug.upcase %></span>
+        </div>
+      </div>
+
+      <!-- Add to Wallet -->
+      <div class="mt-4 rounded-2xl border border-(--border-card) bg-(--bg-elev) p-4">
+        <p class="text-sm font-medium text-(--text-soft) mb-3 flex items-center gap-2">
+          <svg class="size-5 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+          Save your pass for easy access
+        </p>
+        <div class="flex flex-wrap gap-2 items-center">
+          <%= link_to wallet_pass_url(@participant_event), class: "inline-flex items-center hover:opacity-80 transition-opacity" do %>
+            <img src="/add-to-apple-wallet.svg" alt="Add to Apple Wallet" class="h-11">
+          <% end %>
+          <button
+            id="google-wallet-btn"
+            data-url="<%= dashboard_google_wallet_path(@participant_event) %>"
+            class="inline-flex items-center hover:opacity-80 transition-opacity cursor-pointer relative"
+          >
+            <img src="/add-to-google-wallet.svg" alt="Add to Google Wallet" class="h-11" id="google-wallet-img">
+            <div id="google-wallet-loading" class="hidden absolute inset-0 flex items-center justify-center bg-white/80 rounded">
+              <svg class="animate-spin size-6 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+          </button>
+          <%= link_to dashboard_download_ticket_path(@participant_event), class: "inline-flex items-center gap-2 px-4 h-11 rounded-lg bg-(--bg-elev-2) hover:bg-(--bg-elev-3) text-(--text) transition-colors" do %>
+            <svg class="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span class="text-sm font-medium">Download PDF</span>
+          <% end %>
+          <%= link_to dashboard_download_excuse_letter_path(@participant_event), class: "inline-flex items-center gap-2 px-4 h-11 rounded-lg bg-(--bg-elev-2) hover:bg-(--bg-elev-3) text-(--text) transition-colors" do %>
+            <svg class="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span class="text-sm font-medium">Excuse letter</span>
+          <% end %>
+        </div>
+      </div>
+
+      <script nonce="<%= content_security_policy_nonce %>">
+        document.getElementById('google-wallet-btn').addEventListener('click', function(e) {
+          var btn = this;
+          var loading = document.getElementById('google-wallet-loading');
+          btn.disabled = true;
+          loading.classList.remove('hidden');
+          fetch(btn.dataset.url)
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+              if (data.url) {
+                window.location.href = data.url;
+              } else {
+                alert('Failed to generate Google Wallet pass. Please try again.');
+                loading.classList.add('hidden');
+                btn.disabled = false;
+              }
+            })
+            .catch(function(error) {
+              console.error('Error:', error);
+              alert('Failed to generate Google Wallet pass. Please try again.');
+              loading.classList.add('hidden');
+              btn.disabled = false;
+            });
+        });
+      </script>
+    </section>
+  <% end %>
+
+  <!-- Parent/Guardian -->
+  <% gpe = @participant_event.guardian_participant_events.first if @participant_event.requires_guardian? %>
+  <% if gpe %>
+    <% guardian_pending = !gpe.completed? && !@participant_event.in_progress? && !@participant_event.invited? %>
+    <section class="mb-8">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-(--text-muted) mb-3 flex items-center gap-2">
+        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+        </svg>
+        Parent / Guardian
+      </h2>
+      <div class="rounded-2xl border <%= guardian_pending ? 'border-2 border-amber-300 bg-amber-50/50' : 'border-(--border-card) bg-(--bg-elev)' %> p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-(--text-strong)"><%= gpe.guardian.full_name %></p>
+          <p class="text-sm text-(--text-soft) truncate"><%= gpe.guardian.email %></p>
+          <p class="text-sm <%= guardian_pending ? 'text-amber-700 font-medium' : 'text-(--text-muted)' %> mt-1.5">
+            <% if gpe.completed? %>
+              ✓ Completed their portion<%= " on #{gpe.completed_at.strftime('%b %d, %Y')}" if gpe.completed_at %>
+            <% elsif gpe.invite_token_sent_at %>
+              Invitation sent <%= time_ago_in_words(gpe.invite_token_sent_at) %> ago — waiting on them to complete their portion
+            <% elsif @participant_event.in_progress? || @participant_event.invited? %>
+              Not invited yet — we'll email them once you submit your registration
+            <% else %>
+              Invitation hasn't gone out yet — use the button to send it now
+            <% end %>
+          </p>
+        </div>
+        <% if guardian_pending %>
+          <%= button_to gpe.invite_token_sent_at ? "Resend invitation" : "Send invitation",
+              dashboard_resend_guardian_invite_path(@participant_event),
+              method: :post,
+              class: "shrink-0 inline-flex items-center px-4 py-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium rounded-lg transition-colors cursor-pointer" %>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
+  <!-- Documents to sign (pre-submit signing lives in the wizard's documents step) -->
+  <% if @custom_documents.any? && !@participant_event.invited? && !@participant_event.in_progress? %>
+  <section class="mb-8">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-(--text-muted) mb-3 flex items-center gap-2">
+      <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+      Documents
+    </h2>
+    <div class="rounded-2xl border border-(--border-card) bg-(--bg-elev) divide-y divide-(--border-card)">
+      <% @custom_documents.each do |doc| %>
+        <% consent = @custom_document_consents[doc.id] %>
+        <% guardian_handling = consent&.docuseal_envelope_id.present? && consent.docuseal_participant_slug.blank? %>
+        <div class="p-4 flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <p class="font-medium text-(--text-strong) truncate"><%= doc.name %></p>
+            <p class="text-xs text-(--text-muted) mt-0.5">
+              <% if consent&.signed? %>
+                Signed <%= consent.signed_at&.strftime("%b %d, %Y") %>
+              <% elsif consent&.participant_signed? && doc.guardian_signs? %>
+                Waiting on your guardian
+              <% elsif guardian_handling || doc.signed_by_guardian? %>
+                <%= consent&.sent? || consent&.viewed? ? "Being handled by your guardian" : "Your guardian will be asked to sign this" %>
+              <% else %>
+                Needs your signature
+              <% end %>
+            </p>
+          </div>
+          <div class="shrink-0">
+            <% if consent&.signed? %>
+              <span class="inline-flex items-center gap-1 text-sm font-medium text-[#33d6a6]">
+                <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                Signed
+              </span>
+            <% elsif consent&.participant_signed? && doc.guardian_signs? %>
+              <span class="text-sm text-(--text-muted)">Pending guardian</span>
+            <% elsif guardian_handling %>
+              <span class="text-sm text-(--text-muted)">Pending guardian</span>
+            <% elsif doc.participant_signs? %>
+              <%= link_to doc.physical? ? "Sign & upload" : "Sign now", dashboard_sign_document_path(@participant_event, doc),
+                  class: "inline-flex items-center px-3 py-1.5 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium rounded-lg transition-colors" %>
+            <% elsif consent.nil? || consent.pending? %>
+              <span class="text-sm text-(--text-muted)">Pending guardian</span>
+            <% else %>
+              <span class="text-sm text-(--text-muted)"><%= consent.status.titleize %></span>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </section>
+  <% end %>
+
+  <!-- Travel -->
+  <% if @event.travel_enabled? %>
+  <section class="mb-8">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-(--text-muted) flex items-center gap-2">
+        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+        </svg>
+        Travel
+      </h2>
+      <%= link_to "Edit", dashboard_event_travel_edit_path(@participant_event), class: "text-sm font-medium text-[#ec3750] hover:text-[#d42f46] transition-colors" %>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-3">
+      <% [
+        [:travel_inbound, "Arriving", "text-[#33d6a6]", "M13 7l5 5m0 0l-5 5m5-5H6"],
+        [:travel_outbound, "Departing", "text-[#ec3750]", "M11 17l-5-5m0 0l5-5m-5 5h12"]
+      ].each do |attr, label, color, path| %>
+        <% travel = @participant_event.public_send(attr) %>
+        <div class="rounded-2xl border border-(--border-card) bg-(--bg-elev) p-4">
+          <h3 class="text-sm font-semibold text-(--text-strong) mb-3 flex items-center gap-2">
+            <svg class="size-4 <%= color %>" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="<%= path %>"/>
+            </svg>
+            <%= label %>
+          </h3>
+          <% if travel.present? %>
+            <% if travel.plane? && travel.travel_legs.any? %>
+              <div class="space-y-2">
+                <% travel.travel_legs.each do |leg| %>
+                  <div class="flex items-start gap-3 p-3 rounded-xl bg-(--bg-elev-2)">
+                    <% if leg.flight_code.present? %>
+                      <% iata_code = extract_airline_iata(leg.flight_code) %>
+                      <% if iata_code.present? %>
+                        <img
+                          src="https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/<%= iata_code %>.svg"
+                          alt="<%= iata_code %>"
+                          class="size-10 object-contain bg-white rounded-lg p-1"
+                          onerror="this.style.display='none'"
+                        >
+                      <% end %>
+                    <% end %>
+                    <div class="flex-1 min-w-0">
+                      <p class="font-mono font-semibold text-(--text-strong)"><%= leg.flight_code %></p>
+                      <p class="text-sm text-(--text-soft)">
+                        <%= leg.departure_airport %> → <%= leg.arrival_airport %>
+                      </p>
+                      <% if leg.departure_time.present? %>
+                        <p class="text-xs text-(--text-muted) mt-0.5">
+                          <%= leg.departure_time.strftime("%b %d · %H:%M") %>
+                        </p>
+                      <% end %>
+                    </div>
+                  </div>
+                <% end %>
+              </div>
+            <% else %>
+              <p class="text-(--text-soft) capitalize"><%= travel.mode %></p>
+              <% if travel.arrival_time.present? %>
+                <p class="text-sm text-(--text-muted) mt-1">
+                  Arriving <%= travel.arrival_time.strftime("%b %d · %H:%M") %>
+                </p>
+              <% elsif travel.departure_time.present? %>
+                <p class="text-sm text-(--text-muted) mt-1">
+                  Departing <%= travel.departure_time.strftime("%b %d · %H:%M") %>
+                </p>
+              <% end %>
+            <% end %>
+          <% else %>
+            <p class="text-sm text-(--text-faint) italic">No travel info submitted</p>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </section>
+  <% end %>
+
+  <!-- Your Information -->
+  <section class="mb-8">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-(--text-muted) mb-3 flex items-center gap-2">
+      <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+      Your info
+    </h2>
+
+    <div class="rounded-2xl border border-(--border-card) bg-(--bg-elev) divide-y divide-(--border-soft) overflow-hidden">
+      <!-- Personal Details -->
+      <div class="p-5">
+        <h3 class="text-xs font-semibold text-(--text-muted) uppercase tracking-wide mb-3">Personal</h3>
+        <dl class="grid grid-cols-2 gap-4">
+          <div>
+            <dt class="text-xs text-(--text-muted)">Name</dt>
+            <dd class="font-medium text-(--text-strong)"><%= @participant.display_name %></dd>
+          </div>
+          <% if @participant.pronouns.present? %>
+            <div>
+              <dt class="text-xs text-(--text-muted)">Pronouns</dt>
+              <dd class="font-medium text-(--text-strong)"><%= @participant.pronouns %></dd>
+            </div>
+          <% end %>
+          <div>
+            <dt class="text-xs text-(--text-muted)">Email</dt>
+            <dd class="font-medium text-(--text-strong) break-all"><%= @participant.email %></dd>
+          </div>
+          <% if @participant.phone.present? %>
+            <div>
+              <dt class="text-xs text-(--text-muted)">Phone</dt>
+              <dd class="font-medium text-(--text-strong)"><%= @participant.phone %></dd>
+            </div>
+          <% end %>
+          <% if @participant.tshirt_size.present? %>
+            <div>
+              <dt class="text-xs text-(--text-muted)">T-shirt</dt>
+              <dd class="font-medium text-(--text-strong)"><%= @participant.tshirt_size.upcase %></dd>
+            </div>
+          <% end %>
+        </dl>
+      </div>
+
+      <!-- Dietary -->
+      <% if @participant_event.dietary.present? && (@participant_event.dietary.diet_type.present? || @participant_event.dietary.intolerances.present?) %>
+        <div class="p-5">
+          <h3 class="text-xs font-semibold text-(--text-muted) uppercase tracking-wide mb-3">Dietary</h3>
+          <dl class="grid grid-cols-2 gap-4">
+            <% if @participant_event.dietary.diet_type.present? %>
+              <div>
+                <dt class="text-xs text-(--text-muted)">Diet type</dt>
+                <dd class="font-medium text-(--text-strong) capitalize"><%= @participant_event.dietary.diet_type %></dd>
+              </div>
+            <% end %>
+            <% if @participant_event.dietary.intolerances.present? %>
+              <div>
+                <dt class="text-xs text-(--text-muted)">Intolerances</dt>
+                <dd class="font-medium text-(--text-strong)"><%= @participant_event.dietary.intolerances %></dd>
+              </div>
+            <% end %>
+          </dl>
+        </div>
+      <% end %>
+
+      <!-- Accommodation -->
+      <% if @participant_event.accommodation.present? %>
+        <div class="p-5">
+          <h3 class="text-xs font-semibold text-(--text-muted) uppercase tracking-wide mb-3">Accommodation</h3>
+          <dl class="grid grid-cols-2 gap-4">
+            <% if @participant_event.accommodation.gender_identity.present? %>
+              <div>
+                <dt class="text-xs text-(--text-muted)">Gender identity</dt>
+                <dd class="font-medium text-(--text-strong) capitalize"><%= @participant_event.accommodation.gender_identity.titleize %></dd>
+              </div>
+            <% end %>
+            <% if @participant_event.accommodation.preferred_roommate_genders.present? %>
+              <div>
+                <dt class="text-xs text-(--text-muted)">Preferred roommate genders</dt>
+                <dd class="font-medium text-(--text-strong)"><%= @participant_event.accommodation.preferred_roommate_genders.map(&:titleize).join(", ") %></dd>
+              </div>
+            <% end %>
+            <% if @participant_event.accommodation.roommate_preferences.present? %>
+              <div>
+                <dt class="text-xs text-(--text-muted)">Preferred roommates</dt>
+                <dd class="font-medium text-(--text-strong)"><%= @participant_event.accommodation.roommate_preferences %></dd>
+              </div>
+            <% end %>
+          </dl>
+        </div>
+      <% end %>
+
+      <!-- Accessibility -->
+      <% if @participant_event.accessibility.present? %>
+        <% accessibility = @participant_event.accessibility %>
+        <% has_needs = accessibility.mobility_needs.present? || accessibility.sensory_needs.present? || accessibility.communication_needs.present? || accessibility.religious_practices.present? %>
+        <% if has_needs %>
+          <div class="p-5">
+            <h3 class="text-xs font-semibold text-(--text-muted) uppercase tracking-wide mb-3">Accessibility & needs</h3>
+            <dl class="grid grid-cols-2 gap-4">
+              <% if accessibility.mobility_needs.present? %>
+                <div>
+                  <dt class="text-xs text-(--text-muted)">Mobility</dt>
+                  <dd class="font-medium text-(--text-strong)"><%= accessibility.mobility_needs %></dd>
+                </div>
+              <% end %>
+              <% if accessibility.sensory_needs.present? %>
+                <div>
+                  <dt class="text-xs text-(--text-muted)">Sensory</dt>
+                  <dd class="font-medium text-(--text-strong)"><%= accessibility.sensory_needs %></dd>
+                </div>
+              <% end %>
+              <% if accessibility.communication_needs.present? %>
+                <div>
+                  <dt class="text-xs text-(--text-muted)">Communication</dt>
+                  <dd class="font-medium text-(--text-strong)"><%= accessibility.communication_needs %></dd>
+                </div>
+              <% end %>
+              <% if accessibility.religious_practices.present? %>
+                <div>
+                  <dt class="text-xs text-(--text-muted)">Religious</dt>
+                  <dd class="font-medium text-(--text-strong)"><%= accessibility.religious_practices %></dd>
+                </div>
+              <% end %>
+            </dl>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  </section>
+
+  <!-- Review All Submitted Information -->
+  <section class="mb-8">
+    <details class="group rounded-2xl border border-(--border-card) bg-(--bg-elev) overflow-hidden">
+      <summary class="flex items-center justify-between cursor-pointer list-none px-5 py-4 hover:bg-(--bg-elev-2) transition-colors">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-(--text-muted) flex items-center gap-2">
+          <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          All submitted information
+        </h2>
+        <svg class="size-5 text-(--text-faint) transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </summary>
+
+      <div class="px-5 pb-5 space-y-4 border-t border-(--border-soft) pt-4">
+        <!-- Profile -->
+        <div class="rounded-xl bg-(--bg-elev-2) p-4">
+          <h3 class="font-semibold text-(--text-strong) mb-3">Profile</h3>
+          <% if @participant.headshot.attached? && @participant.headshot.blob.persisted? %>
+            <div class="mb-3">
+              <%= image_tag @participant.headshot, class: "size-16 rounded-full object-cover ring-1 ring-(--border-card)" %>
+            </div>
+          <% end %>
+          <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <div>
+              <dt class="text-(--text-muted)">Legal name</dt>
+              <dd class="font-medium text-(--text-strong)"><%= @participant.full_name.presence || "—" %></dd>
+            </div>
+            <div>
+              <dt class="text-(--text-muted)">Preferred name</dt>
+              <dd class="font-medium text-(--text-strong)"><%= @participant.preferred_name.presence || "—" %></dd>
+            </div>
+            <div>
+              <dt class="text-(--text-muted)">Date of birth</dt>
+              <dd class="font-medium text-(--text-strong)"><%= @participant.date_of_birth&.strftime("%B %d, %Y") || "—" %></dd>
+            </div>
+            <div>
+              <dt class="text-(--text-muted)">Email</dt>
+              <dd class="font-medium text-(--text-strong) break-all"><%= @participant.email.presence || "—" %></dd>
+            </div>
+            <div>
+              <dt class="text-(--text-muted)">Phone</dt>
+              <dd class="font-medium text-(--text-strong)"><%= @participant.phone.presence || "—" %></dd>
+            </div>
+            <div>
+              <dt class="text-(--text-muted)">Pronouns</dt>
+              <dd class="font-medium text-(--text-strong)"><%= @participant.pronouns.presence || "—" %></dd>
+            </div>
+            <div>
+              <dt class="text-(--text-muted)">T-shirt</dt>
+              <dd class="font-medium text-(--text-strong)"><%= @participant.tshirt_size&.upcase || "—" %></dd>
+            </div>
+            <div class="md:col-span-2">
+              <dt class="text-(--text-muted)">Address</dt>
+              <dd class="font-medium text-(--text-strong)">
+                <%= [@participant.address_line_1, @participant.address_line_2].compact.reject(&:blank?).join(", ").presence || "—" %><br>
+                <%= [@participant.city, @participant.state, @participant.postal_code].compact.reject(&:blank?).join(", ").presence %><br>
+                <%= @participant.country_of_residence.presence %>
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        <!-- Travel -->
+        <% if @event.travel_enabled? %>
+        <div class="rounded-xl bg-(--bg-elev-2) p-4">
+          <h3 class="font-semibold text-(--text-strong) mb-3">Travel details</h3>
+          <div class="space-y-4">
+            <% if @event.visa_options_enabled? && @participant_event.travel_inbound&.visa_status.present? %>
+              <div>
+                <dt class="text-sm text-(--text-muted)">Visa status</dt>
+                <dd class="font-medium">
+                  <% case @participant_event.travel_inbound.visa_status %>
+                  <% when "not_required" %>
+                    <span class="text-green-700">No visa required</span>
+                  <% when "not_applied" %>
+                    <span class="text-yellow-700">Visa required – not yet applied</span>
+                  <% when "applied" %>
+                    <span class="text-blue-700">Visa application pending</span>
+                  <% when "approved" %>
+                    <span class="text-green-700">Visa approved</span>
+                  <% when "denied" %>
+                    <span class="text-red-700">Visa denied</span>
+                  <% end %>
+                </dd>
+              </div>
+            <% end %>
+
+            <% [
+              [:travel_inbound, "Arrival"],
+              [:travel_outbound, "Departure"]
+            ].each_with_index do |(attr, label), idx| %>
+              <div class="<%= 'border-t border-(--border-soft) pt-4' if idx > 0 %>">
+                <h4 class="text-sm font-semibold text-(--text) mb-2"><%= label %></h4>
+                <% travel = @participant_event.public_send(attr) %>
+                <% if travel.present? %>
+                  <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div>
+                      <dt class="text-(--text-muted)">Mode</dt>
+                      <dd class="font-medium text-(--text-strong)"><%= travel.mode&.titleize || "—" %></dd>
+                    </div>
+                    <% if travel.plane? %>
+                      <% travel.travel_legs.each_with_index do |leg, i| %>
+                        <div class="md:col-span-2">
+                          <dt class="text-(--text-muted)">Flight <%= i + 1 %></dt>
+                          <dd class="font-medium text-(--text-strong)">
+                            <%= leg.flight_code %> · <%= leg.departure_airport %> → <%= leg.arrival_airport %><br>
+                            <span class="text-(--text-soft)">Departs: <%= leg.departure_time&.strftime("%b %d, %Y %H:%M") %> · Arrives: <%= leg.arrival_time&.strftime("%b %d, %Y %H:%M") %></span>
+                          </dd>
+                        </div>
+                      <% end %>
+                      <% if travel.is_unaccompanied_minor %>
+                        <div class="md:col-span-2">
+                          <dd class="text-yellow-700 font-medium">⚠️ Travelling as unaccompanied minor</dd>
+                          <% if @participant_event.um_approved? %>
+                            <dd class="text-green-700 text-xs mt-0.5">UM booking verified — we'll reach out with pickup/dropoff information within 2 weeks of the event.</dd>
+                          <% elsif @participant_event.um_rejected? %>
+                            <dd class="text-red-700 text-xs mt-0.5">We couldn't verify your UM booking — please upload updated proof in your travel info or contact us.</dd>
+                          <% else %>
+                            <dd class="text-(--text-muted) text-xs mt-0.5">UM booking proof under review — we'll reach out with pickup/dropoff information within 2 weeks of the event.</dd>
+                          <% end %>
+                        </div>
+                      <% end %>
+                    <% elsif travel.train? %>
+                      <div>
+                        <dt class="text-(--text-muted)">Route</dt>
+                        <dd class="font-medium text-(--text-strong)"><%= [travel.train_departure_station, travel.train_arrival_station].compact.join(" → ") %></dd>
+                      </div>
+                      <div>
+                        <dt class="text-(--text-muted)"><%= label == "Arrival" ? "Arrival time" : "Departure time" %></dt>
+                        <dd class="font-medium text-(--text-strong)"><%= (label == "Arrival" ? travel.arrival_time : travel.departure_time)&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                      </div>
+                    <% elsif travel.bus? %>
+                      <div>
+                        <dt class="text-(--text-muted)">Route</dt>
+                        <dd class="font-medium text-(--text-strong)"><%= [travel.bus_departure_location, travel.bus_arrival_location].compact.join(" → ") %></dd>
+                      </div>
+                      <div>
+                        <dt class="text-(--text-muted)">Times</dt>
+                        <dd class="font-medium text-(--text-strong)">Depart: <%= travel.departure_time&.strftime("%b %d, %Y %H:%M") %> · Arrive: <%= travel.arrival_time&.strftime("%b %d, %Y %H:%M") %></dd>
+                      </div>
+                    <% elsif travel.car? %>
+                      <div>
+                        <dt class="text-(--text-muted)"><%= label == "Arrival" ? "Travelling from" : "Travelling to" %></dt>
+                        <dd class="font-medium text-(--text-strong)"><%= travel.origin_address.presence || "—" %></dd>
+                      </div>
+                      <div>
+                        <dt class="text-(--text-muted)"><%= label == "Arrival" ? "Expected arrival" : "Departure time" %></dt>
+                        <dd class="font-medium text-(--text-strong)"><%= (label == "Arrival" ? travel.expected_arrival_time : travel.departure_time)&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                      </div>
+                    <% elsif travel.other? %>
+                      <div class="md:col-span-2">
+                        <dt class="text-(--text-muted)">Details</dt>
+                        <dd class="font-medium text-(--text-strong) whitespace-pre-wrap"><%= travel.other_details.presence || "—" %></dd>
+                      </div>
+                    <% end %>
+                  </dl>
+                <% else %>
+                  <p class="text-sm text-(--text-faint) italic">No <%= label.downcase %> information submitted</p>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        </div>
+        <% end %>
+
+        <!-- Accommodation -->
+        <% if @participant_event.accommodation.present? %>
+          <div class="rounded-xl bg-(--bg-elev-2) p-4">
+            <h3 class="font-semibold text-(--text-strong) mb-3">Accommodation</h3>
+            <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              <div>
+                <dt class="text-(--text-muted)">Gender identity</dt>
+                <dd class="font-medium text-(--text-strong)"><%= @participant_event.accommodation.gender_identity&.titleize || "—" %></dd>
+              </div>
+              <div>
+                <dt class="text-(--text-muted)">Preferred roommate genders</dt>
+                <dd class="font-medium text-(--text-strong)"><%= @participant_event.accommodation.preferred_roommate_genders&.map(&:titleize)&.join(", ").presence || "—" %></dd>
+              </div>
+              <div class="md:col-span-2">
+                <dt class="text-(--text-muted)">Roommate preferences</dt>
+                <dd class="font-medium text-(--text-strong)"><%= @participant_event.accommodation.roommate_preferences.presence || "—" %></dd>
+              </div>
+              <% if @participant_event.accommodation.roommate_exclusions.present? %>
+                <div class="md:col-span-2">
+                  <dt class="text-(--text-muted)">Roommate exclusions</dt>
+                  <dd class="font-medium text-(--text-strong)"><%= @participant_event.accommodation.roommate_exclusions %></dd>
+                </div>
+              <% end %>
+            </dl>
+          </div>
+        <% end %>
+
+        <!-- Health & Dietary -->
+        <div class="rounded-xl bg-(--bg-elev-2) p-4">
+          <h3 class="font-semibold text-(--text-strong) mb-3">Health & dietary</h3>
+          <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <% medical = @participant_event.medical %>
+            <% dietary = @participant_event.dietary %>
+            <% accessibility = @participant_event.accessibility %>
+            <div>
+              <dt class="text-(--text-muted)">Allergies</dt>
+              <dd class="font-medium text-(--text-strong)"><%= medical&.allergies.presence || "None" %></dd>
+            </div>
+            <div>
+              <dt class="text-(--text-muted)">Medical conditions</dt>
+              <dd class="font-medium text-(--text-strong)"><%= medical&.medical_conditions.presence || "None" %></dd>
+            </div>
+            <div>
+              <dt class="text-(--text-muted)">Medications</dt>
+              <dd class="font-medium text-(--text-strong)"><%= medical&.medications.presence || "None" %></dd>
+            </div>
+            <div>
+              <dt class="text-(--text-muted)">Anaphylaxis risk</dt>
+              <dd class="font-medium text-(--text-strong)"><%= medical&.has_anaphylaxis_risk ? "Yes" : "No" %></dd>
+            </div>
+            <div>
+              <dt class="text-(--text-muted)">Requires refrigeration</dt>
+              <dd class="font-medium text-(--text-strong)"><%= medical&.requires_refrigeration ? "Yes" : "No" %></dd>
+            </div>
+            <div>
+              <dt class="text-(--text-muted)">Diet type</dt>
+              <dd class="font-medium text-(--text-strong)"><%= dietary&.diet_type&.titleize || "No specific diet" %></dd>
+            </div>
+            <div>
+              <dt class="text-(--text-muted)">Intolerances</dt>
+              <dd class="font-medium text-(--text-strong)"><%= dietary&.intolerances.presence || "None" %></dd>
+            </div>
+            <div>
+              <dt class="text-(--text-muted)">Life-threatening food allergies</dt>
+              <dd class="font-medium text-(--text-strong)"><%= dietary&.life_threatening_allergies.presence || "None" %></dd>
+            </div>
+            <div class="md:col-span-2">
+              <dt class="text-(--text-muted)">Learning & cognitive needs</dt>
+              <dd class="font-medium text-(--text-strong)">
+                <% needs = [] %>
+                <% needs << "ADHD" if accessibility&.has_adhd %>
+                <% needs << "Dyslexia" if accessibility&.has_dyslexia %>
+                <% needs << "Autism" if accessibility&.has_autism %>
+                <%= needs.any? ? needs.join(", ") : "None specified" %>
+                <% if accessibility&.neurodivergent_notes.present? %>
+                  <br><span class="text-(--text-soft)"><%= accessibility.neurodivergent_notes %></span>
+                <% end %>
+              </dd>
+            </div>
+            <div class="md:col-span-2">
+              <dt class="text-(--text-muted)">Accessibility needs</dt>
+              <dd class="font-medium text-(--text-strong)">
+                <% access_needs = [] %>
+                <% access_needs << "Wheelchair accessible" if accessibility&.uses_wheelchair %>
+                <% access_needs << "Step-free access" if accessibility&.step_free_required %>
+                <% access_needs << "Large print" if accessibility&.needs_large_print %>
+                <% access_needs << "Captioning" if accessibility&.needs_captioning %>
+                <% access_needs << "Sign language interpreter" if accessibility&.needs_sign_language %>
+                <%= access_needs.any? ? access_needs.join(", ") : "None" %>
+                <% if accessibility&.other_needs.present? %>
+                  <br><span class="text-(--text-soft)"><%= accessibility.other_needs %></span>
+                <% end %>
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        <!-- Guardian -->
+        <% guardians = @participant_event.guardian_participant_events %>
+        <% if guardians.any? %>
+          <div class="rounded-xl bg-(--bg-elev-2) p-4">
+            <h3 class="font-semibold text-(--text-strong) mb-3">Guardian</h3>
+            <% guardians.each do |gpe| %>
+              <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <div>
+                  <dt class="text-(--text-muted)">Name</dt>
+                  <dd class="font-medium text-(--text-strong)"><%= gpe.guardian&.full_name || "—" %></dd>
+                </div>
+                <div>
+                  <dt class="text-(--text-muted)">Relationship</dt>
+                  <dd class="font-medium text-(--text-strong)"><%= gpe.relationship.presence || "—" %></dd>
+                </div>
+                <div>
+                  <dt class="text-(--text-muted)">Email</dt>
+                  <dd class="font-medium text-(--text-strong) break-all"><%= gpe.guardian&.email.presence || "—" %></dd>
+                </div>
+                <div>
+                  <dt class="text-(--text-muted)">Phone</dt>
+                  <dd class="font-medium text-(--text-strong)"><%= gpe.guardian&.phone.presence || "—" %></dd>
+                </div>
+              </dl>
+            <% end %>
+          </div>
+        <% end %>
+
+        <!-- Emergency Contacts -->
+        <% emergency_contacts = @participant_event.emergency_contacts %>
+        <% if emergency_contacts.any? %>
+          <div class="rounded-xl bg-(--bg-elev-2) p-4">
+            <h3 class="font-semibold text-(--text-strong) mb-3">Emergency contacts</h3>
+            <div class="space-y-4">
+              <% emergency_contacts.each_with_index do |contact, i| %>
+                <div class="<%= 'border-t border-(--border-soft) pt-4' if i > 0 %>">
+                  <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div>
+                      <dt class="text-(--text-muted)">Name</dt>
+                      <dd class="font-medium text-(--text-strong)"><%= contact.name %></dd>
+                    </div>
+                    <div>
+                      <dt class="text-(--text-muted)">Relationship</dt>
+                      <dd class="font-medium text-(--text-strong)"><%= contact.relationship.presence || "—" %></dd>
+                    </div>
+                    <div>
+                      <dt class="text-(--text-muted)">Phone</dt>
+                      <dd class="font-medium text-(--text-strong)"><%= contact.phone %></dd>
+                    </div>
+                    <% if contact.email.present? %>
+                      <div>
+                        <dt class="text-(--text-muted)">Email</dt>
+                        <dd class="font-medium text-(--text-strong) break-all"><%= contact.email %></dd>
+                      </div>
+                    <% end %>
+                  </dl>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </details>
+  </section>
+
+  <!-- Messages -->
+  <% if @messages.any? %>
+    <section class="mb-8">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-(--text-muted) mb-3 flex items-center gap-2">
+        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+        </svg>
+        Messages
+      </h2>
+
+      <div class="rounded-2xl border border-(--border-card) bg-(--bg-elev) divide-y divide-(--border-soft) overflow-hidden">
+        <% @messages.each do |delivery| %>
+          <div class="p-4">
+            <div class="flex items-start justify-between gap-3 mb-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <% if delivery.message.subject.present? %>
+                  <p class="font-semibold text-(--text-strong) truncate"><%= delivery.message.subject %></p>
+                <% end %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0
+                  <%= case delivery.channel
+                      when 'slack' then 'bg-purple-100 text-purple-800'
+                      when 'email' then 'bg-blue-100 text-blue-800'
+                      when 'sms' then 'bg-green-100 text-green-800'
+                      end %>">
+                  <%= delivery.channel.titleize %>
+                </span>
+              </div>
+              <span class="text-xs text-(--text-faint) shrink-0"><%= time_ago_in_words(delivery.delivered_at) %> ago</span>
+            </div>
+            <div class="prose prose-sm max-w-none text-(--text)">
+              <%= sanitize delivery.message.body_as_html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
+  <!-- Scan History -->
+  <% if @scans.any? %>
+    <section class="mb-8">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-(--text-muted) mb-3 flex items-center gap-2">
+        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+        </svg>
+        Check-ins
+      </h2>
+
+      <div class="rounded-2xl border border-(--border-card) bg-(--bg-elev) divide-y divide-(--border-soft) overflow-hidden">
+        <% @scans.each do |scan| %>
+          <div class="p-4 flex items-center justify-between">
+            <div>
+              <p class="font-medium text-(--text-strong)"><%= scan.scanned_at.strftime("%B %d, %Y") %></p>
+              <p class="text-sm text-(--text-muted)"><%= scan.scanned_at.strftime("%I:%M %p") %></p>
+            </div>
+            <span class="text-xs text-(--text-faint)"><%= time_ago_in_words(scan.scanned_at) %> ago</span>
+          </div>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+</div>

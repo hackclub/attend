@@ -1,0 +1,86 @@
+<% content_for :title, "Event Setup: Team – Attend" %>
+
+<div class="w-full max-w-3xl">
+  <%= render "progress", current_step: "team" %>
+
+  <h1 class="text-2xl font-bold mb-1">Who's running <%= @event.name %>?</h1>
+  <p class="text-gray-500 mb-6">Add event admins and other staff so they can access this event. You can skip this and manage staff later from event settings.</p>
+
+  <div class="space-y-6">
+    <% if @event_role_assignments.any? %>
+      <div class="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+        <% @event_role_assignments.each do |assignment| %>
+          <div class="flex items-center justify-between px-6 py-3">
+            <div>
+              <p class="text-sm font-medium text-gray-900"><%= assignment.user.email %></p>
+              <p class="text-xs text-gray-500"><%= EventRoleAssignment::ROLE_DETAILS.dig(assignment.role, :label) || assignment.role.humanize %></p>
+            </div>
+            <%= button_to "Remove", admin_event_setup_team_member_path(@event, assignment), method: :delete, class: "text-sm text-gray-400 hover:text-red-600 font-medium cursor-pointer", form: { data: { turbo_confirm: "Remove #{assignment.user.email} from #{@event.name}?" } } %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <h2 class="text-lg font-semibold mb-4">Add a staff member</h2>
+      <%= form_with url: admin_event_setup_team_path(@event), method: :post, class: "space-y-4" do |f| %>
+        <div>
+          <%= label_tag :email, "User Email", class: "block text-sm font-medium text-gray-700" %>
+          <%= email_field_tag :email, params[:email], class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "user@example.com", required: true %>
+          <p class="mt-1 text-sm text-gray-500">The user must already have an account. If they don't, they need to sign in to Attend first.</p>
+        </div>
+
+        <%= fields_for :event_role_assignment do |era| %>
+          <div data-controller="role-info">
+            <%= era.label :role, "Role", class: "block text-sm font-medium text-gray-700" %>
+            <%= era.select :role,
+              EventRoleAssignment::ROLE_DETAILS.map { |role, details| [details[:label], role] },
+              { selected: "event_admin" },
+              class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2",
+              data: { role_info_target: "select", action: "change->role-info#update" } %>
+
+            <% EventRoleAssignment::ROLE_DETAILS.each do |role, details| %>
+              <div data-role-info-target="panel" data-role="<%= role %>" class="mt-3 rounded-md border border-gray-200 bg-gray-50 p-4 hidden">
+                <p class="text-sm font-medium text-gray-900"><%= details[:label] %></p>
+                <p class="text-sm text-gray-600"><%= details[:summary] %></p>
+                <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-green-700">Can</p>
+                    <ul class="mt-1 space-y-1">
+                      <% details[:can].each do |perm| %>
+                        <li class="flex items-start gap-1.5 text-sm text-gray-700">
+                          <span class="text-green-600">✓</span><span><%= perm %></span>
+                        </li>
+                      <% end %>
+                    </ul>
+                  </div>
+                  <% if details[:cannot].any? %>
+                    <div>
+                      <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Cannot</p>
+                      <ul class="mt-1 space-y-1">
+                        <% details[:cannot].each do |perm| %>
+                          <li class="flex items-start gap-1.5 text-sm text-gray-500">
+                            <span class="text-gray-400">✕</span><span><%= perm %></span>
+                          </li>
+                        <% end %>
+                      </ul>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+
+        <div class="flex justify-end">
+          <%= f.submit "Add Staff Member", class: "px-4 py-2 bg-white border border-[#ec3750] text-[#ec3750] rounded-md hover:bg-[#ec3750]/5 font-medium transition-colors cursor-pointer" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="mt-6 flex flex-col sm:flex-row justify-between gap-3">
+    <%= link_to "Back", admin_event_setup_waivers_path(@event), class: "w-full sm:w-auto text-center text-gray-500 hover:text-gray-700 font-medium py-2 px-4" %>
+    <%= link_to "Continue", admin_event_setup_review_path(@event), class: "w-full sm:w-auto text-center bg-[#ec3750] hover:bg-[#d63146] text-white font-semibold py-2 px-4 rounded-lg transition-colors" %>
+  </div>
+</div>

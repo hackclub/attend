@@ -1,0 +1,186 @@
+<%= form_with model: [:admin, current_event, incident], local: true, class: "space-y-6", data: { controller: "firehouse-confirm", action: "submit->firehouse-confirm#confirm" } do |f| %>
+  <% if incident.errors.any? %>
+    <div class="bg-red-50 border border-red-200 rounded-md p-4">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+          </svg>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800">
+            <%= pluralize(incident.errors.count, "error") %> prohibited this incident from being saved:
+          </h3>
+          <div class="mt-2 text-sm text-red-700">
+            <ul class="list-disc list-inside space-y-1">
+              <% incident.errors.full_messages.each do |message| %>
+                <li><%= message %></li>
+              <% end %>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div>
+      <%= f.label :category, class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= f.select :category, Incident.categories.keys.map { |c| [c.humanize, c] }, { prompt: "Select category" }, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+    </div>
+
+    <div>
+      <%= f.label :severity, class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= f.select :severity, Incident.severities.keys.map { |s| [s.humanize, s] }, { prompt: "Select severity" }, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+    </div>
+  </div>
+
+  <div>
+    <%= f.label :status, class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <%= f.select :status, Incident.statuses.keys.map { |s| [s.humanize.titleize, s] }, {}, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+  </div>
+
+  <div data-controller="multiselect">
+    <label class="block text-sm font-medium text-gray-700 mb-2">Participants Involved</label>
+    <div class="border border-gray-300 rounded-lg overflow-hidden">
+      <div class="p-3 border-b border-gray-200 bg-gray-50">
+        <input type="text" 
+               data-multiselect-target="search"
+               placeholder="Search participants..."
+               class="w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] text-sm px-3 py-2"
+               data-action="input->multiselect#filter">
+      </div>
+      <div class="px-3 py-2 bg-blue-50 border-b border-gray-200 flex items-center justify-between">
+        <span class="text-sm text-blue-800">
+          <strong data-multiselect-target="count"><%= incident.participant_event_ids.count %></strong> participant<span data-multiselect-target="plural"><%= incident.participant_event_ids.count == 1 ? '' : 's' %></span> selected
+        </span>
+        <button type="button" 
+                class="text-xs text-[#ec3750] hover:text-blue-800 font-medium"
+                data-action="click->multiselect#clearAll">
+          Clear all
+        </button>
+      </div>
+      <div class="max-h-48 overflow-y-auto" data-multiselect-target="list">
+        <% current_event.participant_events.includes(:participant).order("participants.legal_first_name").each do |pe| %>
+          <label class="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0"
+                 data-name="<%= pe.participant.display_name.downcase %> <%= pe.participant.email.downcase %>">
+            <input type="checkbox" 
+                   name="incident[participant_event_ids][]" 
+                   value="<%= pe.id %>"
+                   <%= incident.participant_event_ids.include?(pe.id) ? 'checked' : '' %>
+                   class="rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]"
+                   data-multiselect-target="checkbox"
+                   data-action="change->multiselect#updateCount">
+            <div class="ml-3 flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 truncate"><%= pe.participant.display_name %></p>
+              <p class="text-xs text-gray-500 truncate"><%= pe.participant.email %></p>
+            </div>
+          </label>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <% staff_users = current_event.event_role_assignments.includes(:user).map(&:user).uniq.sort_by { |u| u.display_name_or_fallback } %>
+  <div data-controller="multiselect">
+    <label class="block text-sm font-medium text-gray-700 mb-2">Staff Who Helped</label>
+    <div class="border border-gray-300 rounded-lg overflow-hidden">
+      <div class="p-3 border-b border-gray-200 bg-gray-50">
+        <input type="text" 
+               data-multiselect-target="search"
+               placeholder="Search staff..."
+               class="w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] text-sm px-3 py-2"
+               data-action="input->multiselect#filter">
+      </div>
+      <div class="px-3 py-2 bg-blue-50 border-b border-gray-200 flex items-center justify-between">
+        <span class="text-sm text-blue-800">
+          <strong data-multiselect-target="count"><%= incident.helping_staff_ids.count %></strong> staff member<span data-multiselect-target="plural"><%= incident.helping_staff_ids.count == 1 ? '' : 's' %></span> selected
+        </span>
+        <button type="button" 
+                class="text-xs text-[#ec3750] hover:text-blue-800 font-medium"
+                data-action="click->multiselect#clearAll">
+          Clear all
+        </button>
+      </div>
+      <div class="max-h-48 overflow-y-auto" data-multiselect-target="list">
+        <% staff_users.each do |user| %>
+          <label class="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0"
+                 data-name="<%= user.display_name_or_fallback.downcase %> <%= user.email.downcase %>">
+            <input type="checkbox" 
+                   name="incident[helping_staff_ids][]" 
+                   value="<%= user.id %>"
+                   <%= incident.helping_staff_ids.include?(user.id) ? 'checked' : '' %>
+                   class="rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]"
+                   data-multiselect-target="checkbox"
+                   data-action="change->multiselect#updateCount">
+            <% if user.avatar_displayable? %>
+              <%= image_tag user.avatar.variant(resize_to_fill: [32, 32]), class: "ml-3 w-8 h-8 rounded-full object-cover flex-shrink-0" %>
+            <% else %>
+              <span class="ml-3 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 text-xs font-medium text-gray-600"><%= user.initials %></span>
+            <% end %>
+            <div class="ml-3 flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 truncate"><%= user.display_name_or_fallback %></p>
+              <p class="text-xs text-gray-500 truncate"><%= user.email %></p>
+            </div>
+          </label>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div>
+      <%= f.label :occurred_at, "Date/Time of Incident", class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= f.datetime_local_field :occurred_at, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+    </div>
+
+    <div>
+      <%= f.label :location, class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= f.text_field :location, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "e.g., Main Hall, Room 204" %>
+    </div>
+  </div>
+
+  <div>
+    <%= f.label :summary, class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <%= f.text_field :summary, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "Brief summary of the incident" %>
+  </div>
+
+  <div>
+    <%= f.label :details, class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <%= f.text_area :details, rows: 6, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "Detailed description of what happened..." %>
+  </div>
+
+  <div>
+    <%= f.label :actions_taken, class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <%= f.text_area :actions_taken, rows: 4, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "What actions have been taken or are planned..." %>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-2">Visible To Roles</label>
+    <div class="space-y-2">
+      <% EventRoleAssignment.roles.keys.each do |role| %>
+        <label class="inline-flex items-center mr-4">
+          <%= check_box_tag "incident[visible_to_roles][]", role, incident.visible_to_roles.include?(role), class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+          <span class="ml-2 text-sm text-gray-700"><%= role.humanize %></span>
+        </label>
+      <% end %>
+      <%= hidden_field_tag "incident[visible_to_roles][]", "" %>
+    </div>
+    <p class="mt-1 text-sm text-gray-500">Select which roles can view this incident</p>
+  </div>
+
+  <% unless incident.persisted? %>
+    <div>
+      <label class="inline-flex items-center">
+        <%= check_box_tag "sync_to_slack", "1", false, class: "rounded border-gray-300 text-purple-600 focus:ring-purple-500" %>
+        <span class="ml-2 text-sm text-gray-700">Sync to HQ Firehouse?</span>
+      </label>
+      <p class="mt-1 text-sm text-gray-500">This will post the incident to the HQ Slack channel for visibility</p>
+    </div>
+  <% end %>
+
+  <div class="pt-4 flex flex-col sm:flex-row justify-end gap-3">
+    <%= link_to "Cancel", admin_event_incidents_path(current_event), class: "w-full sm:w-auto text-center bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300" %>
+    <%= f.submit incident.persisted? ? "Update Incident" : "Create Incident", class: "w-full sm:w-auto bg-[#ec3750] text-white px-4 py-2 rounded-md hover:bg-[#d42f46] cursor-pointer" %>
+  </div>
+<% end %>

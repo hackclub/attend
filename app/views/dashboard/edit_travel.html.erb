@@ -1,0 +1,305 @@
+<div class="w-full max-w-2xl mx-auto">
+  <div class="mb-6">
+    <%= link_to "← Back to Event", dashboard_event_path(@participant_event), class: "text-blue-600 hover:text-blue-800" %>
+  </div>
+
+  <h1 class="text-2xl font-bold mb-2">Update Travel Information</h1>
+  <p class="text-sm text-gray-600 mb-6">
+    Please update your travel details for <strong><%= @event.name %></strong>.
+  </p>
+
+  <%= form_with url: dashboard_event_travel_path(@participant_event), method: :patch, local: true, data: { turbo: false, controller: "travel-form" } do |f| %>
+    <div class="space-y-8">
+      <% if @event.visa_options_enabled? %>
+      <!-- Visa Information -->
+      <section class="bg-white rounded-lg shadow-sm border p-6">
+        <h2 class="text-lg font-semibold mb-4 pb-2 border-b">Visa Requirements</h2>
+        
+        <div>
+          <label for="visa_status" class="block text-sm font-medium text-gray-700 mb-1">What is your visa status for <%= @event.location_country || "the event location" %>?</label>
+          <select name="travel_inbound[visa_status]" id="visa_status" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="not_required" <%= "selected" if @travel_inbound&.not_required? %>>I don't need a visa (citizen or visa-exempt nationality)</option>
+            <option value="pending" <%= "selected" if @travel_inbound&.pending? %>>I need a visa but haven't applied yet</option>
+            <option value="applied" <%= "selected" if @travel_inbound&.applied? %>>I've applied for a visa and am waiting for approval</option>
+            <option value="approved" <%= "selected" if @travel_inbound&.approved? %>>My visa has been approved</option>
+            <option value="denied" <%= "selected" if @travel_inbound&.denied? %>>My visa application was denied</option>
+          </select>
+        </div>
+        <% if @event.visa_application_url.present? %>
+          <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-900">
+            <p class="mb-2">If you need a visa letter to support your application, request one through our visa letter system.</p>
+            <%= link_to "Request a visa letter →", @event.visa_application_url, target: "_blank", rel: "noopener noreferrer", class: "inline-flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium" %>
+          </div>
+        <% end %>
+      </section>
+      <% end %>
+
+      <!-- Inbound Travel -->
+      <section class="bg-white rounded-lg shadow-sm border p-6" data-travel-form-target="inboundSection">
+        <h2 class="text-lg font-semibold mb-4 pb-2 border-b">Arrival Travel (Getting to <%= @event.location_city || "the event" %>)</h2>
+
+        <div class="space-y-4">
+          <div>
+            <label for="travel_inbound_mode" class="block text-sm font-medium text-gray-700 mb-1">How are you travelling? <span class="text-red-500">*</span></label>
+            <select name="travel_inbound[mode]" id="travel_inbound_mode" data-action="change->travel-form#updateFields" data-travel-form-target="inboundMode" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+              <option value="">Select travel mode</option>
+              <option value="plane" <%= "selected" if @travel_inbound&.plane? %>>Flight</option>
+              <option value="train" <%= "selected" if @travel_inbound&.train? %>>Train</option>
+              <option value="bus" <%= "selected" if @travel_inbound&.bus? %>>Bus</option>
+              <option value="car" <%= "selected" if @travel_inbound&.car? %>>Car</option>
+              <option value="other" <%= "selected" if @travel_inbound&.other? %>>Other</option>
+            </select>
+          </div>
+
+          <!-- Flight Fields -->
+          <div data-travel-form-target="inboundPlane" class="<%= 'hidden' unless @travel_inbound&.plane? %>">
+            <div class="space-y-4">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="font-medium text-gray-900">Flight Legs</h3>
+                <button type="button" data-action="click->travel-form#addLeg" data-direction="inbound" class="text-sm text-blue-600 hover:text-blue-800 font-medium">+ Add Connection</button>
+              </div>
+              
+              <div data-travel-form-target="inboundLegs" class="space-y-4">
+                <% legs = @travel_inbound&.travel_legs.presence || [TravelLeg.new(position: 0)] %>
+                <% legs.each_with_index do |leg, index| %>
+                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "inbound", show_remove: index > 0 || leg.persisted?, default_date: nil %>
+                <% end %>
+              </div>
+            </div>
+          </div>
+
+          <!-- Train Fields -->
+          <div data-travel-form-target="inboundTrain" class="<%= 'hidden' unless @travel_inbound&.train? %>">
+            <div class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Departure Station</label>
+                  <input type="text" name="travel_inbound[train_departure_station]" value="<%= @travel_inbound&.train_departure_station %>" placeholder="e.g. London St Pancras" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Arrival Station</label>
+                  <input type="text" name="travel_inbound[train_arrival_station]" value="<%= @travel_inbound&.train_arrival_station %>" placeholder="e.g. Wien Hauptbahnhof" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Arrival Time</label>
+                <input type="datetime-local" name="travel_inbound[arrival_time]" value="<%= @travel_inbound&.arrival_time&.strftime('%Y-%m-%dT%H:%M') %>" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+          </div>
+
+          <!-- Bus Fields -->
+          <div data-travel-form-target="inboundBus" class="<%= 'hidden' unless @travel_inbound&.bus? %>">
+            <div class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Departure Location</label>
+                  <input type="text" name="travel_inbound[bus_departure_location]" value="<%= @travel_inbound&.bus_departure_location %>" placeholder="Bus station or city" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Arrival Location</label>
+                  <input type="text" name="travel_inbound[bus_arrival_location]" value="<%= @travel_inbound&.bus_arrival_location %>" placeholder="Bus station" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Departure Time</label>
+                  <input type="datetime-local" name="travel_inbound[departure_time]" value="<%= @travel_inbound&.departure_time&.strftime('%Y-%m-%dT%H:%M') %>" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Arrival Time</label>
+                  <input type="datetime-local" name="travel_inbound[arrival_time]" value="<%= @travel_inbound&.arrival_time&.strftime('%Y-%m-%dT%H:%M') %>" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Car Fields -->
+          <div data-travel-form-target="inboundCar" class="<%= 'hidden' unless @travel_inbound&.car? %>">
+            <div class="space-y-4">
+              <div data-controller="address-autocomplete">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Where are you travelling from?</label>
+                <textarea name="travel_inbound[origin_address]" rows="2" placeholder="Full address or city" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" data-address-autocomplete-target="input"><%= @travel_inbound&.origin_address %></textarea>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Expected Arrival Time</label>
+                <input type="datetime-local" name="travel_inbound[expected_arrival_time]" value="<%= @travel_inbound&.expected_arrival_time&.strftime('%Y-%m-%dT%H:%M') %>" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+          </div>
+
+          <!-- Other Fields -->
+          <div data-travel-form-target="inboundOther" class="<%= 'hidden' unless @travel_inbound&.other? %>">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Please describe your travel arrangements</label>
+              <textarea name="travel_inbound[other_details]" rows="4" placeholder="Please provide details about how you'll be getting to the event" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"><%= @travel_inbound&.other_details %></textarea>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Outbound Travel -->
+      <section class="bg-white rounded-lg shadow-sm border p-6" data-travel-form-target="outboundSection">
+        <h2 class="text-lg font-semibold mb-4 pb-2 border-b">Departure Travel (Leaving <%= @event.location_city || "the event" %>)</h2>
+
+        <div class="space-y-4">
+          <div>
+            <label for="travel_outbound_mode" class="block text-sm font-medium text-gray-700 mb-1">How are you leaving? <span class="text-red-500">*</span></label>
+            <select name="travel_outbound[mode]" id="travel_outbound_mode" data-action="change->travel-form#updateFields" data-travel-form-target="outboundMode" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+              <option value="">Select travel mode</option>
+              <option value="plane" <%= "selected" if @travel_outbound&.plane? %>>Flight</option>
+              <option value="train" <%= "selected" if @travel_outbound&.train? %>>Train</option>
+              <option value="bus" <%= "selected" if @travel_outbound&.bus? %>>Bus</option>
+              <option value="car" <%= "selected" if @travel_outbound&.car? %>>Car</option>
+              <option value="other" <%= "selected" if @travel_outbound&.other? %>>Other</option>
+            </select>
+          </div>
+
+          <!-- Flight Fields -->
+          <div data-travel-form-target="outboundPlane" class="<%= 'hidden' unless @travel_outbound&.plane? %>">
+            <div class="space-y-4">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="font-medium text-gray-900">Flight Legs</h3>
+                <button type="button" data-action="click->travel-form#addLeg" data-direction="outbound" class="text-sm text-blue-600 hover:text-blue-800 font-medium">+ Add Connection</button>
+              </div>
+              
+              <div data-travel-form-target="outboundLegs" class="space-y-4">
+                <% legs = @travel_outbound&.travel_legs.presence || [TravelLeg.new(position: 0)] %>
+                <% legs.each_with_index do |leg, index| %>
+                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "outbound", show_remove: index > 0 || leg.persisted?, default_date: nil %>
+                <% end %>
+              </div>
+            </div>
+          </div>
+
+          <!-- Train Fields -->
+          <div data-travel-form-target="outboundTrain" class="<%= 'hidden' unless @travel_outbound&.train? %>">
+            <div class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Departure Station</label>
+                  <input type="text" name="travel_outbound[train_departure_station]" value="<%= @travel_outbound&.train_departure_station %>" placeholder="e.g. Wien Hauptbahnhof" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Arrival Station</label>
+                  <input type="text" name="travel_outbound[train_arrival_station]" value="<%= @travel_outbound&.train_arrival_station %>" placeholder="e.g. London St Pancras" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Departure Time</label>
+                <input type="datetime-local" name="travel_outbound[departure_time]" value="<%= @travel_outbound&.departure_time&.strftime('%Y-%m-%dT%H:%M') %>" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+          </div>
+
+          <!-- Bus Fields -->
+          <div data-travel-form-target="outboundBus" class="<%= 'hidden' unless @travel_outbound&.bus? %>">
+            <div class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Departure Location</label>
+                  <input type="text" name="travel_outbound[bus_departure_location]" value="<%= @travel_outbound&.bus_departure_location %>" placeholder="Bus station" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Arrival Location</label>
+                  <input type="text" name="travel_outbound[bus_arrival_location]" value="<%= @travel_outbound&.bus_arrival_location %>" placeholder="Your destination" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Departure Time</label>
+                  <input type="datetime-local" name="travel_outbound[departure_time]" value="<%= @travel_outbound&.departure_time&.strftime('%Y-%m-%dT%H:%M') %>" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Arrival Time</label>
+                  <input type="datetime-local" name="travel_outbound[arrival_time]" value="<%= @travel_outbound&.arrival_time&.strftime('%Y-%m-%dT%H:%M') %>" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Car Fields -->
+          <div data-travel-form-target="outboundCar" class="<%= 'hidden' unless @travel_outbound&.car? %>">
+            <div class="space-y-4">
+              <div data-controller="address-autocomplete">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Where are you travelling to?</label>
+                <textarea name="travel_outbound[origin_address]" rows="2" placeholder="Full address or city" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" data-address-autocomplete-target="input"><%= @travel_outbound&.origin_address %></textarea>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Expected Departure Time</label>
+                <input type="datetime-local" name="travel_outbound[departure_time]" value="<%= @travel_outbound&.departure_time&.strftime('%Y-%m-%dT%H:%M') %>" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+          </div>
+
+          <!-- Other Fields -->
+          <div data-travel-form-target="outboundOther" class="<%= 'hidden' unless @travel_outbound&.other? %>">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Please describe your travel arrangements</label>
+              <textarea name="travel_outbound[other_details]" rows="4" placeholder="Please provide details about how you'll be leaving the event" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"><%= @travel_outbound&.other_details %></textarea>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Submit -->
+      <div class="flex justify-end gap-3">
+        <%= link_to "Cancel", dashboard_event_path(@participant_event), class: "px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200" %>
+        <%= f.submit "Save Travel Information", class: "px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<!-- Leg Template for JavaScript -->
+<template id="leg-template">
+  <div class="border border-gray-200 rounded-lg p-4 relative"
+       data-travel-form-target="legTemplate">
+    <button type="button" data-action="click->travel-form#removeLeg" class="absolute top-2 right-2 text-gray-400 hover:text-red-600">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+    <div class="text-sm font-medium text-gray-500 mb-3 leg-number">Leg</div>
+    <input type="hidden" class="leg-position" name="" value="">
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Flight Code <span class="text-red-500">*</span></label>
+        <input type="text" class="leg-flight-code w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. LH1234" required>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Confirmation Code</label>
+        <input type="text" class="leg-confirmation-code w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Booking reference">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div data-controller="airport-autocomplete" class="relative">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Departure Airport <span class="text-red-500">*</span></label>
+        <input type="text" class="leg-departure-airport w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. LHR" required autocomplete="off" data-airport-autocomplete-target="input" data-action="input->airport-autocomplete#search keydown->airport-autocomplete#onKeydown blur->airport-autocomplete#onBlur">
+        <div data-airport-autocomplete-target="dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+          <div data-airport-autocomplete-target="results"></div>
+        </div>
+      </div>
+      <div data-controller="airport-autocomplete" class="relative">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Arrival Airport <span class="text-red-500">*</span></label>
+        <input type="text" class="leg-arrival-airport w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. VIE" required autocomplete="off" data-airport-autocomplete-target="input" data-action="input->airport-autocomplete#search keydown->airport-autocomplete#onKeydown blur->airport-autocomplete#onBlur">
+        <div data-airport-autocomplete-target="dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+          <div data-airport-autocomplete-target="results"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Departure Time <span class="text-red-500">*</span> <span class="font-normal text-gray-500">(local airport time)</span></label>
+        <input type="datetime-local" class="leg-departure-time w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" name="">
+        <select class="leg-departure-tz mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" name=""><%= travel_leg_time_zone_options %></select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Arrival Time <span class="text-red-500">*</span> <span class="font-normal text-gray-500">(local airport time)</span></label>
+        <input type="datetime-local" class="leg-arrival-time w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" name="">
+        <select class="leg-arrival-tz mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" name=""><%= travel_leg_time_zone_options %></select>
+      </div>
+    </div>
+  </div>
+</template>

@@ -1,0 +1,91 @@
+<% content_for :title, "Edit #{@participant.display_name} – #{current_event.name} – Attend" %>
+
+<div class="max-w-2xl">
+  <div class="mb-6">
+    <%= link_to "← Back to Participant", admin_event_participant_path(current_event, @participant_event), class: "text-gray-600 hover:text-gray-900" %>
+  </div>
+
+  <h1 class="text-2xl font-bold mb-6">Edit Participant</h1>
+
+  <div class="bg-white rounded-lg border border-gray-200 p-6">
+    <%= form_with model: @participant, url: admin_event_participant_path(current_event, @participant_event), method: :patch, local: true, multipart: true, data: { controller: "phone-input" } do |f| %>
+      <% if @participant.errors.any? %>
+        <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded mb-6">
+          <ul class="list-disc list-inside">
+            <% @participant.errors.full_messages.each do |msg| %>
+              <li><%= msg %></li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+
+      <div class="space-y-6">
+        <div class="border-2 border-dashed border-orange-400 rounded px-4 py-4">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Profile Photo</label>
+          <div class="flex items-center gap-4">
+            <% if @participant.headshot.attached? && @participant.headshot.blob.persisted? %>
+              <%= image_tag @participant.headshot, class: "w-20 h-20 rounded-full object-cover border-2 border-gray-200" %>
+            <% else %>
+              <div class="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-medium text-2xl">
+                <%= @participant.legal_first_name[0] %><%= @participant.legal_last_name[0] %>
+              </div>
+            <% end %>
+            <div class="flex-1">
+              <%= f.file_field :headshot, accept: "image/jpeg,image/png,image/webp", class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+              <p class="mt-1 text-sm text-gray-500">JPEG, PNG, or WebP. Max 10MB.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <%= f.label :legal_first_name, "Legal First Name", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_field :legal_first_name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          </div>
+          <div>
+            <%= f.label :legal_last_name, "Legal Last Name", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_field :legal_last_name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          </div>
+        </div>
+
+        <div>
+          <%= f.label :preferred_name, "Preferred Name", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_field :preferred_name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          <p class="mt-1 text-sm text-gray-500">Leave blank if same as legal name</p>
+        </div>
+
+        <div>
+          <%= f.label :email, class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.email_field :email, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <%= f.label :date_of_birth, "Date of Birth", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.date_field :date_of_birth, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          </div>
+          <div>
+            <%= f.label :phone, class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.telephone_field :phone, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <%= f.label :pronouns, class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_field :pronouns, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          </div>
+          <div>
+            <%= f.label :tshirt_size, "T-Shirt Size", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.select :tshirt_size, [["Select size", ""], "XS", "S", "M", "L", "XL", "XXL"], {}, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          </div>
+        </div>
+
+        <div class="pt-4 flex flex-col sm:flex-row gap-3">
+          <%= f.submit "Save Changes", class: "w-full sm:w-auto bg-[#ec3750] text-white px-6 py-2 rounded-md hover:bg-[#d42f46] cursor-pointer" %>
+          <%= link_to "Cancel", admin_event_participant_path(current_event, @participant_event), class: "w-full sm:w-auto text-center px-6 py-2 text-gray-600 hover:text-gray-900" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

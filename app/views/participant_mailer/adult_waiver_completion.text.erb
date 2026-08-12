@@ -1,0 +1,13 @@
+Hi,
+
+Your waiver has been completed for <%= @event_name %>.
+
+<% if @waiver_link.present? %>
+Waiver: <%= @waiver_link %>
+<% end %>
+
+<% if @freedom_waiver_link.present? %>
+Freedom Waiver: <%= @freedom_waiver_link %>
+<% end %>
+
+If you have any questions, reach out to <%= @support_email %>.

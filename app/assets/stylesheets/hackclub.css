@@ -1,0 +1,286 @@
+/* Hack Club Brand Colors and Theme */
+:root {
+  /* Hack Club Colors */
+  --hc-darker: #121217;
+  --hc-dark: #17171d;
+  --hc-darkless: #252429;
+  --hc-black: #1f2d3d;
+  --hc-steel: #273444;
+  --hc-slate: #3c4858;
+  --hc-muted: #8492a6;
+  --hc-smoke: #e0e6ed;
+  --hc-snow: #f9fafc;
+  --hc-white: #ffffff;
+  --hc-red: #ec3750;
+  --hc-orange: #ff8c37;
+  --hc-yellow: #f1c40f;
+  --hc-green: #33d6a6;
+  --hc-cyan: #5bc0de;
+  --hc-blue: #338eda;
+  --hc-purple: #a633d6;
+  --hc-primary: #ec3750;
+
+  /* Shadows */
+  --hc-shadow-small: 0 1px 2px rgba(0, 0, 0, 0.0625), 0 2px 4px rgba(0, 0, 0, 0.0625);
+  --hc-shadow-card: 0 4px 8px rgba(0, 0, 0, 0.125);
+  --hc-shadow-elevated: 0 1px 2px rgba(0, 0, 0, 0.0625), 0 8px 12px rgba(0, 0, 0, 0.125);
+
+  /* Border radius */
+  --hc-radii-small: 4px;
+  --hc-radii-default: 8px;
+  --hc-radii-extra: 12px;
+  --hc-radii-circle: 99999px;
+}
+
+/* Hack Club primary button style */
+.btn-hc-primary {
+  background-color: var(--hc-red);
+  color: white;
+  font-weight: 700;
+  border-radius: var(--hc-radii-circle);
+  padding: 0.75rem 1.5rem;
+  box-shadow: var(--hc-shadow-card);
+  transition: transform 0.125s ease-in-out, box-shadow 0.125s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-hc-primary:hover,
+.btn-hc-primary:focus {
+  box-shadow: var(--hc-shadow-elevated);
+  transform: scale(1.0625);
+}
+
+/* Hack Club outline button */
+.btn-hc-outline {
+  background-color: transparent;
+  color: var(--hc-red);
+  font-weight: 700;
+  border: 2px solid var(--hc-red);
+  border-radius: var(--hc-radii-circle);
+  padding: 0.75rem 1.5rem;
+  transition: transform 0.125s ease-in-out, box-shadow 0.125s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn-hc-outline:hover,
+.btn-hc-outline:focus {
+  box-shadow: var(--hc-shadow-card);
+  transform: scale(1.0625);
+}
+
+/* Hack Club card styles */
+.card-hc {
+  background-color: var(--hc-white);
+  border-radius: var(--hc-radii-extra);
+  box-shadow: var(--hc-shadow-card);
+  padding: 1.5rem;
+  overflow: hidden;
+}
+
+.card-hc-sunken {
+  background-color: var(--hc-smoke);
+  border-radius: var(--hc-radii-extra);
+  padding: 1.5rem;
+}
+
+.card-hc-interactive {
+  background-color: var(--hc-white);
+  border-radius: var(--hc-radii-extra);
+  box-shadow: var(--hc-shadow-card);
+  padding: 1.5rem;
+  overflow: hidden;
+  transition: transform 0.125s ease-in-out, box-shadow 0.125s ease-in-out;
+  text-decoration: none;
+}
+
+.card-hc-interactive:hover,
+.card-hc-interactive:focus {
+  transform: scale(1.0625);
+  box-shadow: var(--hc-shadow-elevated);
+}
+
+/* Text colors */
+.text-hc-red { color: var(--hc-red); }
+.text-hc-orange { color: var(--hc-orange); }
+.text-hc-green { color: var(--hc-green); }
+.text-hc-blue { color: var(--hc-blue); }
+.text-hc-muted { color: var(--hc-muted); }
+
+/* Background colors */
+.bg-hc-red { background-color: var(--hc-red); }
+.bg-hc-dark { background-color: var(--hc-dark); }
+.bg-hc-darker { background-color: var(--hc-darker); }
+.bg-hc-snow { background-color: var(--hc-snow); }
+.bg-hc-smoke { background-color: var(--hc-smoke); }
+
+.turbo-progress-bar { background-color: var(--hc-red); }
+
+/* Expo-style light sidebar navigation */
+.nav-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: 6px;
+  color: #3c4858;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  text-decoration: none;
+  line-height: 1.4;
+}
+.nav-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: #1f2d3d;
+}
+.nav-item-active {
+  background: #e6e6ea;
+  color: #1f2d3d;
+  font-weight: 600;
+}
+.nav-item svg {
+  margin-right: 10px;
+  flex-shrink: 0;
+  color: #6b7280;
+}
+.nav-item-active svg {
+  color: #1f2d3d;
+}
+
+/* Sidebar pills (user / event selectors) */
+.sidebar-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px 6px 6px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 9999px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+  text-align: left;
+}
+.sidebar-pill:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* Sidebar floating dropdown */
+.sidebar-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+.sidebar-dropdown-up {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+.sidebar-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 0.8125rem;
+  color: #1f2d3d;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+}
+.sidebar-dropdown-item:hover {
+  background: #f3f4f6;
+}
+.sidebar-dropdown-item-active {
+  background: #e6e6ea;
+  font-weight: 600;
+}
+
+/* Small sidebar icon button (search, kebab) */
+.sidebar-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: #6b7280;
+  background: transparent;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.sidebar-icon-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1f2d3d;
+}
+
+/* Stripe-style search trigger */
+.search-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 0.875rem;
+  color: #9ca3af;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  min-width: 240px;
+}
+.search-trigger:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.search-trigger kbd {
+  margin-left: auto;
+  padding: 2px 6px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: #9ca3af;
+  background: #e5e7eb;
+  border-radius: 4px;
+}
+
+/* Header icon buttons */
+.header-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: #6b7280;
+  transition: all 0.15s ease;
+}
+.header-icon-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+/* Sidebar section label */
+.nav-section-label {
+  padding: 0 12px;
+  margin-bottom: 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--hc-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

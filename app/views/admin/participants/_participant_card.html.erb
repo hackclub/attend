@@ -1,0 +1,76 @@
+<div class="bg-white rounded-lg border border-gray-200 p-4">
+  <div class="flex items-start justify-between">
+    <div class="flex items-center gap-4">
+      <% if participant.headshot.attached? && participant.headshot.blob.persisted? %>
+        <%= image_tag participant.headshot, class: "w-12 h-12 rounded-full object-cover" %>
+      <% else %>
+        <div class="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 font-medium text-lg">
+          <%= participant.legal_first_name[0] %><%= participant.legal_last_name[0] %>
+        </div>
+      <% end %>
+      <div>
+        <h3 class="font-semibold text-gray-900"><%= participant.display_name %></h3>
+        <% if participant.preferred_name.present? %>
+          <p class="text-sm text-gray-500">Legal: <%= participant.full_name %></p>
+        <% end %>
+        <p class="text-sm text-gray-600"><%= participant.email %></p>
+      </div>
+    </div>
+    <% if defined?(participant_event) && participant_event %>
+      <div class="flex flex-col items-end gap-1">
+        <%= render_status_badge(participant_event.status) %>
+        <% if defined?(event) && event&.groups_enabled? && participant_event.groups.any? %>
+          <div class="flex flex-wrap gap-1 justify-end">
+            <% participant_event.groups.each do |g| %>
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
+                    style="background-color: <%= g.normalized_color || '#e5e7eb' %>; color: <%= g.color.present? ? 'white' : '#1f2d3d' %>;">
+                <%= g.name %>
+              </span>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+    <div>
+      <span class="text-gray-500">Date of Birth:</span>
+      <span class="text-gray-900"><%= participant.date_of_birth&.strftime("%B %d, %Y") %></span>
+    </div>
+    <% if defined?(event) && event %>
+      <div>
+        <span class="text-gray-500">Age at Event:</span>
+        <span class="text-gray-900"><%= participant.age_on(event.starts_at || Date.current) %> years</span>
+      </div>
+    <% end %>
+    <% if participant.phone.present? %>
+      <div>
+        <span class="text-gray-500">Phone:</span>
+        <span class="text-gray-900"><%= participant.phone %></span>
+      </div>
+    <% end %>
+    <% if participant.pronouns.present? %>
+      <div>
+        <span class="text-gray-500">Pronouns:</span>
+        <span class="text-gray-900"><%= participant.pronouns %></span>
+      </div>
+    <% end %>
+  </div>
+
+  <% if defined?(participant_event) && participant_event %>
+    <div class="mt-4 pt-4 border-t border-gray-200">
+      <div class="flex gap-2">
+        <% if participant_event.medical&.has_anaphylaxis_risk %>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Anaphylaxis Risk</span>
+        <% end %>
+        <% if participant_event.safeguarding_info&.high_support? %>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">High Support</span>
+        <% end %>
+        <% if participant.minor_on?(event&.starts_at || Date.current) %>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Minor</span>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>

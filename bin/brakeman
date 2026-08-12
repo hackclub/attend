@@ -1,0 +1,8 @@
+#!/usr/bin/env ruby
+require "rubygems"
+require "bundler/setup"
+
+# No --ensure-latest here: it fails CI whenever a new brakeman is released,
+# regardless of the change under test. Dependabot keeps the gem current.
+
+load Gem.bin_path("brakeman", "brakeman")

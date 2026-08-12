@@ -1,0 +1,19 @@
+<p>Dear <%= @first_name %>,</p>
+
+<p>We're super excited to invite your child, <%= @child_first_name %> to Hack Club's <%= @event_name %>. We enjoyed reviewing their projects, and are happy to welcome them to <%= @location %> for a fun, engaging hackathon where they'll no doubt make new friends, and skills for life.</p>
+
+<p style="margin: 24px 0;">
+  <%= mail_button "Complete your child's onboarding", @portal_url %>
+</p>
+
+<p><strong>What does this include?</strong></p>
+<ul>
+  <li>You'll add information like your name, and your contact info as well as your child's medical information.</li>
+  <li>You'll let us know how your child is getting to <%= @location %> - plane, bus, car etc.</li>
+  <li>You'll sign <%= @child_first_name %>'s waiver(s).</li>
+  <li>You'll let us know any other notes around safeguarding or special considerations.</li>
+</ul>
+
+<p>If you have any questions about this process, don't hesitate to email us at <%= mail_to @support_email %>, or just hit reply to this email!</p>
+
+<p>We can't wait to see <%= @child_first_name %> at <%= @event_name %>!</p>

@@ -1,0 +1,256 @@
+<% content_for :title, "Ticket ##{@ticket.id[0..7]} – Support – Attend" %>
+
+<div class="-mx-4 sm:-mx-6 lg:-mx-8 -my-8 h-[calc(100vh-8rem)] flex overflow-hidden" data-controller="ticket-sidebar">
+  <!-- Main chat area -->
+  <div class="flex-1 flex flex-col min-w-0 min-h-0">
+    <!-- Header -->
+    <div class="flex-shrink-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2 sm:gap-4 min-w-0">
+          <%= link_to support_tickets_path, class: "text-gray-400 hover:text-gray-600 flex-shrink-0" do %>
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+          <% end %>
+          <div class="min-w-0">
+            <h1 class="text-base sm:text-lg font-semibold flex items-center gap-1 sm:gap-2 flex-wrap">
+              <span class="font-mono truncate"><%= @ticket.phone_number %></span>
+              <% if @ticket.whatsapp? %>
+                <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">WhatsApp</span>
+              <% elsif @ticket.signal? %>
+                <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">Signal</span>
+              <% else %>
+                <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">SMS</span>
+              <% end %>
+              <% if @ticket.open? %>
+                <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Open</span>
+              <% else %>
+                <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">Closed</span>
+              <% end %>
+            </h1>
+            <p class="text-sm text-gray-500 truncate">
+              <% if @ticket.subject.present? %>
+                <%= @ticket.subject.full_name %> (<%= @ticket.subject_type %>)
+              <% else %>
+                Unknown contact
+              <% end %>
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <!-- Mobile sidebar toggle -->
+          <button type="button" data-action="click->ticket-sidebar#toggle" class="lg:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </button>
+          <% if @ticket.open? %>
+            <%= button_to "Close Ticket", close_support_ticket_path(@ticket), method: :patch, class: "bg-gray-600 text-white px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm hover:bg-gray-700" %>
+          <% else %>
+            <%= button_to "Reopen Ticket", reopen_support_ticket_path(@ticket), method: :patch, class: "bg-green-600 text-white px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm hover:bg-green-700" %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <%= turbo_stream_from @ticket, :messages %>
+    <%= turbo_stream_from "user_#{current_user.id}_notifications" %>
+    <div id="user_notifications" class="hidden" data-controller="assigned-notification"></div>
+    <div class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4" id="ticket_<%= @ticket.id %>_messages">
+      <% @ticket.ticket_messages.order(created_at: :asc).each do |message| %>
+        <%= render "message", message: message %>
+      <% end %>
+    </div>
+
+    <!-- Reply form -->
+    <% if @ticket.open? %>
+      <div class="flex-shrink-0 bg-white border-t border-gray-200 p-3 sm:p-4 pb-16 sm:pb-4">
+        <%= form_with url: support_ticket_messages_path(@ticket), class: "flex gap-2 sm:gap-3" do |f| %>
+          <%= text_area_tag "ticket_message[body]", nil, rows: 2, class: "flex-1 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none", placeholder: "Type your reply..." %>
+          <%= f.submit "Send", class: "bg-blue-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-blue-700 font-medium cursor-pointer self-end" %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Sidebar overlay for mobile -->
+  <div data-ticket-sidebar-target="overlay" class="hidden fixed inset-0 bg-black/50 z-40 lg:hidden" data-action="click->ticket-sidebar#close"></div>
+
+  <!-- Sidebar -->
+  <div data-ticket-sidebar-target="sidebar" class="fixed inset-y-0 right-0 z-50 w-80 sm:w-96 transform translate-x-full transition-transform duration-300 ease-in-out lg:relative lg:inset-auto lg:z-auto lg:translate-x-0 flex-shrink-0 bg-white border-l border-gray-200 overflow-y-auto">
+    <div class="p-6 space-y-6">
+      <!-- Ticket Info -->
+      <div>
+        <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-3">Ticket Info</h3>
+        <dl class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <dt class="text-gray-500">ID</dt>
+            <dd class="font-mono text-gray-900"><%= @ticket.id[0..7] %></dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Created</dt>
+            <dd class="text-gray-900"><%= @ticket.created_at.strftime("%b %d, %Y %H:%M") %></dd>
+          </div>
+          <div class="flex justify-between">
+            <dt class="text-gray-500">Last Message</dt>
+            <dd class="text-gray-900"><%= @ticket.last_message_at&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+          </div>
+        </dl>
+      </div>
+
+      <!-- Contact Matching -->
+      <div>
+        <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-3">Matching Contacts</h3>
+
+        <% if @matching_participants.any? || @matching_guardians.any? %>
+          <div class="space-y-3">
+            <% @matching_participants.each do |participant| %>
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-medium text-blue-900"><%= participant.full_name %></span>
+                  <span class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Participant</span>
+                </div>
+                <div class="text-xs text-blue-700 space-y-1">
+                  <p><%= participant.email %></p>
+                </div>
+                <% if @ticket.subject_id == participant.id && @ticket.subject_type == "Participant" %>
+                  <% if @ticket.event %>
+                    <p class="mt-2 text-xs text-green-600 font-medium">✓ Linked for <%= @ticket.event.name %></p>
+                  <% else %>
+                    <p class="mt-2 text-xs text-orange-600 font-medium">✓ Linked – select event:</p>
+                    <div class="mt-1 space-y-1">
+                      <% participant.events.select { |event| can_link_ticket_to_event?(event) }.each do |event| %>
+                        <%= button_to set_subject_support_ticket_path(@ticket, subject_type: "Participant", subject_id: participant.id, event_id: event.id), method: :patch, class: "flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium" do %>
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                          <%= event.name %>
+                        <% end %>
+                      <% end %>
+                    </div>
+                  <% end %>
+                <% else %>
+                  <div class="mt-2 space-y-1">
+                    <% participant.events.select { |event| can_link_ticket_to_event?(event) }.each do |event| %>
+                      <%= button_to set_subject_support_ticket_path(@ticket, subject_type: "Participant", subject_id: participant.id, event_id: event.id), method: :patch, class: "flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium" do %>
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        Link for <%= event.name %>
+                      <% end %>
+                    <% end %>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+
+            <% @matching_guardians.each do |guardian| %>
+              <div class="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-medium text-purple-900"><%= guardian.full_name %></span>
+                  <span class="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">Guardian</span>
+                </div>
+                <div class="text-xs text-purple-700 space-y-1">
+                  <p><%= guardian.email %></p>
+                </div>
+                <% if @ticket.subject_id == guardian.id && @ticket.subject_type == "Guardian" %>
+                  <% if @ticket.event %>
+                    <p class="mt-2 text-xs text-green-600 font-medium">✓ Linked for <%= @ticket.event.name %></p>
+                  <% else %>
+                    <p class="mt-2 text-xs text-orange-600 font-medium">✓ Linked – select event:</p>
+                    <div class="mt-1 space-y-1">
+                      <% guardian.guardian_participant_events.includes(:event, :participant).select { |gpe| can_link_ticket_to_event?(gpe.event) }.each do |gpe| %>
+                        <%= button_to set_subject_support_ticket_path(@ticket, subject_type: "Guardian", subject_id: guardian.id, event_id: gpe.event.id), method: :patch, class: "flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 font-medium" do %>
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                          <%= gpe.event.name %> (<%= gpe.participant.full_name %>)
+                        <% end %>
+                      <% end %>
+                    </div>
+                  <% end %>
+                <% else %>
+                  <div class="mt-2 space-y-1">
+                    <% guardian.guardian_participant_events.includes(:event, :participant).select { |gpe| can_link_ticket_to_event?(gpe.event) }.each do |gpe| %>
+                      <%= button_to set_subject_support_ticket_path(@ticket, subject_type: "Guardian", subject_id: guardian.id, event_id: gpe.event.id), method: :patch, class: "flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 font-medium" do %>
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        Link for <%= gpe.event.name %> (<%= gpe.participant.full_name %>)
+                      <% end %>
+                    <% end %>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-gray-500">No matching contacts found for this phone number.</p>
+        <% end %>
+      </div>
+
+      <!-- Linked Participants -->
+      <% if @linked_participants.any? %>
+        <div>
+          <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-3">Participant Details</h3>
+          <div class="space-y-4">
+            <% @linked_participants.each do |participant| %>
+              <% participant_event = @ticket.event ? participant.participant_events.find_by(event: @ticket.event) : nil %>
+              <% wrapper_class = "block bg-gray-50 border border-gray-200 rounded-lg p-3" %>
+              <% if participant_event && current_user.can_access_event?(@ticket.event) %>
+                <%= link_to admin_event_participant_path(@ticket.event, participant_event), class: "#{wrapper_class} hover:bg-gray-100 transition-colors" do %>
+                  <%= render partial: "support/tickets/participant_card", locals: { participant: participant, participant_event: participant_event, event: @ticket.event } %>
+                <% end %>
+              <% else %>
+                <div class="<%= wrapper_class %>">
+                  <%= render partial: "support/tickets/participant_card", locals: { participant: participant, participant_event: nil, event: nil } %>
+                  <div class="mt-3 pt-3 border-t border-gray-200">
+                    <p class="text-xs text-gray-500 mb-1">Events:</p>
+                    <% participant.participant_events.includes(:event).each do |pe| %>
+                      <div class="text-xs text-gray-600 flex items-center justify-between">
+                        <span><%= pe.event.name %></span>
+                        <span class="px-1.5 py-0.5 rounded text-xs <%= pe.status == 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600' %>"><%= pe.status.humanize %></span>
+                      </div>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <!-- Previous Tickets -->
+      <% if @previous_tickets.any? %>
+        <div>
+          <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-3">Message History</h3>
+          <div class="space-y-2">
+            <% @previous_tickets.each do |ticket| %>
+              <%= link_to support_ticket_path(ticket), class: "block p-3 rounded-lg border hover:bg-gray-50 transition-colors #{ticket.open? ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}" do %>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-mono text-gray-500">#<%= ticket.id[0..7] %></span>
+                  <% if ticket.open? %>
+                    <span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Open</span>
+                  <% else %>
+                    <span class="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">Closed</span>
+                  <% end %>
+                </div>
+                <% if ticket.ticket_messages.any? %>
+                  <p class="text-sm text-gray-700 line-clamp-2"><%= ticket.ticket_messages.order(created_at: :desc).first&.body&.truncate(80) %></p>
+                <% end %>
+                <p class="text-xs text-gray-500 mt-1"><%= time_ago_in_words(ticket.last_message_at || ticket.created_at) %> ago</p>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <!-- Notes -->
+      <div>
+        <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-3">Notes</h3>
+        <div id="ticket_notes" class="space-y-2 mb-3">
+          <% @ticket.notes.includes(:author).order(created_at: :desc).each do |note| %>
+            <%= render "note", note: note %>
+          <% end %>
+        </div>
+        <%= form_with url: support_ticket_notes_path(@ticket), class: "space-y-2" do |f| %>
+          <%= text_area_tag "note[body]", nil, rows: 2, class: "w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500", placeholder: "Add a note..." %>
+          <%= f.submit "Add Note", class: "w-full bg-gray-100 text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-gray-200 cursor-pointer font-medium" %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

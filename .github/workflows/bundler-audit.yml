@@ -1,0 +1,60 @@
+name: Bundler Audit
+
+# Runs separately from CI's scan_ruby so a newly published advisory for a
+# pinned gem doesn't turn unrelated PRs red. Dependency-touching PRs still
+# get a blocking check; everything else is covered by the nightly run.
+on:
+  schedule:
+    - cron: '15 6 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - Gemfile
+      - Gemfile.lock
+      - config/bundler-audit.yml
+      - bin/bundler-audit
+  push:
+    branches: [ main ]
+    paths:
+      - Gemfile
+      - Gemfile.lock
+      - config/bundler-audit.yml
+      - bin/bundler-audit
+
+permissions:
+  contents: read
+
+jobs:
+  bundler-audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Scan for known security vulnerabilities in gems used
+        run: bin/bundler-audit
+
+      - name: Open an issue when the nightly audit finds new advisories
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" \
+            --search 'in:title "bundler-audit found new advisories"' \
+            --state open --json number --jq length)
+          if [ "$existing" = "0" ]; then
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "bundler-audit found new advisories" \
+              --body "The nightly bundler-audit run failed: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+
+          Bump the flagged gem(s), or add a justified entry to config/bundler-audit.yml if the advisory doesn't apply."
+          fi

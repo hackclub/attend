@@ -1,0 +1,55 @@
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.5; color: #1a1a1a; max-width: 640px; margin: 0 auto; padding: 20px;">
+  <h2 style="margin: 0 0 4px;">New Incident Report</h2>
+  <p style="margin: 0 0 16px; color: #666;">Filed <%= @incident_report.created_at.strftime("%B %-d, %Y at %H:%M %Z") %></p>
+
+  <table style="width: 100%; border-collapse: collapse;">
+    <tbody>
+      <% rows = [
+           ["Priority", @incident_report.priority_label],
+           ["Incident type", @incident_report.incident_type_label]
+         ]
+         if @incident_report.medical_emergency?
+           rows << ["Emergency services called?", @incident_report.emergency_services_called? ? "Yes" : "No"]
+         end
+         rows += [
+           ["Event", @event_name],
+           ["Reporter", @incident_report.reporter_name],
+           ["Role", @incident_report.role_label],
+           ["Email", @incident_report.reporter_email],
+           ["Phone", @incident_report.reporter_phone],
+           ["Hack Club account", @incident_report.user&.email || "Not signed in"]
+         ]
+         rows.each do |label, value| %>
+        <tr>
+          <td style="padding: 6px 12px 6px 0; vertical-align: top; color: #666; white-space: nowrap;"><%= label %></td>
+          <td style="padding: 6px 0; vertical-align: top; font-weight: 600;"><%= value %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <h3 style="margin: 24px 0 4px;">Summary</h3>
+  <p style="margin: 0;"><%= @incident_report.summary %></p>
+
+  <h3 style="margin: 24px 0 4px;">Details</h3>
+  <p style="margin: 0; white-space: pre-wrap;"><%= @incident_report.details %></p>
+
+  <% if @incident_report.attachments.attached? %>
+    <h3 style="margin: 24px 0 4px;">Attachments</h3>
+    <ul style="margin: 0; padding-left: 20px;">
+      <% @incident_report.attachments.each do |attachment| %>
+        <li><%= attachment.filename %> (<%= number_to_human_size(attachment.byte_size) %>)</li>
+      <% end %>
+    </ul>
+    <% if @skipped_attachments.any? %>
+      <p style="margin: 8px 0 0; color: #b45309; font-size: 13px;">
+        The following files were too large to attach to this email and must be retrieved from Attend:
+        <%= @skipped_attachments.join(", ") %>.
+      </p>
+    <% end %>
+  <% end %>
+
+  <p style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e5e5; font-size: 13px; color: #666;">
+    This report is confidential. Reply directly to this email to reach the reporter.
+  </p>
+</div>

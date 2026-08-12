@@ -1,0 +1,108 @@
+<% content_for :title, "Messages – Attend" %>
+
+<div class="w-full max-w-4xl mx-auto">
+  <!-- Back -->
+  <%= link_to dashboard_path, class: "inline-flex items-center gap-1.5 text-sm text-(--text-muted) hover:text-(--text-strong) transition-colors mb-6" do %>
+    <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>
+    Dashboard
+  <% end %>
+
+  <!-- Header -->
+  <section class="mb-6 flex items-end justify-between gap-4 flex-wrap">
+    <div>
+      <h1 class="text-3xl font-bold text-(--text-strong)">Messages</h1>
+      <p class="text-sm text-(--text-muted) mt-1">All messages from event organizers</p>
+    </div>
+  </section>
+
+  <!-- Search and Filter -->
+  <%= form_with url: dashboard_messages_path, method: :get, local: true, class: "flex flex-col sm:flex-row gap-2 mb-6" do %>
+    <div class="relative flex-1">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-(--text-faint)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 110-16 8 8 0 010 16z"/>
+      </svg>
+      <input
+        type="text"
+        name="q"
+        value="<%= params[:q] %>"
+        placeholder="Search messages…"
+        class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-(--border-card) bg-(--bg-elev) text-(--text-strong) placeholder:text-(--text-faint) focus:ring-2 focus:ring-[#ec3750]/30 focus:border-[#ec3750] outline-none transition"
+      >
+    </div>
+    <select name="event_id" class="sm:w-52 px-3 py-2.5 rounded-lg border border-(--border-card) bg-(--bg-elev) text-(--text-strong) focus:ring-2 focus:ring-[#ec3750]/30 focus:border-[#ec3750] outline-none transition">
+      <option value="">All events</option>
+      <% @events.each do |event| %>
+        <option value="<%= event.id %>" <%= "selected" if params[:event_id] == event.id.to_s %>><%= event.name %></option>
+      <% end %>
+    </select>
+    <button type="submit" class="px-4 py-2.5 rounded-lg bg-(--text-strong) text-(--text-on-dark) text-sm font-semibold hover:opacity-90 transition-opacity">
+      Search
+    </button>
+    <% if params[:q].present? || params[:event_id].present? %>
+      <%= link_to "Clear", dashboard_messages_path, class: "px-4 py-2.5 rounded-lg border border-(--border-card) bg-(--bg-elev) text-(--text) text-sm font-medium hover:bg-(--bg-elev-2) transition-colors text-center" %>
+    <% end %>
+  <% end %>
+
+  <!-- Messages List -->
+  <% if @grouped_deliveries.any? %>
+    <div class="rounded-2xl border border-(--border-card) bg-(--bg-elev) divide-y divide-(--border-soft) overflow-hidden">
+      <% @grouped_deliveries.each do |group| %>
+        <%= link_to dashboard_message_path(group[:deliveries].first),
+            class: "group block p-4 sm:p-5 hover:bg-(--bg-elev-2) transition-colors #{'bg-[#ec3750]/5' if group[:unread]}" do %>
+          <div class="flex items-start gap-3">
+            <span class="mt-2 size-2 rounded-full shrink-0 <%= group[:unread] ? 'bg-[#ec3750]' : 'bg-transparent' %>"></span>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-baseline justify-between gap-3 mb-1">
+                <h3 class="truncate text-(--text-strong) <%= group[:unread] ? 'font-semibold' : 'font-medium' %> group-hover:text-[#ec3750] transition-colors">
+                  <%= group[:message].subject.presence || "Message from #{group[:message].event.name}" %>
+                </h3>
+                <span class="text-xs text-(--text-faint) shrink-0"><%= time_ago_in_words(group[:delivered_at]) %> ago</span>
+              </div>
+              <p class="text-sm text-(--text-soft) truncate mb-2">
+                <%= truncate(group[:message].body_as_plain.to_s.squish, length: 120) %>
+              </p>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-(--bg-elev-2) text-(--text-soft)">
+                  <svg class="size-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <%= group[:message].event.name %>
+                </span>
+                <% group[:channels].each do |channel| %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                    <%= case channel
+                        when 'slack' then 'bg-purple-100 text-purple-800'
+                        when 'email' then 'bg-blue-100 text-blue-800'
+                        when 'sms' then 'bg-green-100 text-green-800'
+                        end %>">
+                    <%= channel.titleize %>
+                  </span>
+                <% end %>
+              </div>
+            </div>
+            <svg class="size-5 text-(--text-faint) group-hover:text-[#ec3750] transition-colors shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  <% else %>
+    <div class="rounded-2xl border border-dashed border-(--border-card) bg-(--bg-elev) p-10 text-center">
+      <div class="mx-auto size-14 rounded-2xl bg-(--bg-elev-2) flex items-center justify-center mb-4">
+        <svg class="size-7 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      </div>
+      <p class="text-(--text-soft)">
+        <% if params[:q].present? || params[:event_id].present? %>
+          No messages match your search.
+        <% else %>
+          You don't have any messages yet.
+        <% end %>
+      </p>
+    </div>
+  <% end %>
+</div>

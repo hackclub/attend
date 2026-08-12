@@ -1,0 +1,11 @@
+<p>Please find attached the link to your child's waiver for <%= @event_name %>.</p>
+
+<p>Should you have any questions, do not hesitate to reply to this email for further information.</p>
+
+<% if @waiver_link.present? %>
+  <p><%= link_to "View Waiver", @waiver_link %></p>
+<% end %>
+
+<% if @freedom_waiver_link.present? %>
+  <p><%= link_to "View Freedom Waiver", @freedom_waiver_link %></p>
+<% end %>

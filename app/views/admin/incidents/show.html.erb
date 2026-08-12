@@ -1,0 +1,228 @@
+<% content_for :title, "Incident Details – #{current_event.name} – Attend" %>
+
+<div class="w-full max-w-4xl">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <h1 class="text-2xl font-bold">Incident Details</h1>
+    <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+      <% if @incident.behavior? || @incident.safeguarding? || @incident.other? %>
+        <%= button_to "Send to Slack", send_to_slack_admin_event_incident_path(current_event, @incident), method: :post, class: "w-full sm:w-auto text-center bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 cursor-pointer", data: { turbo_confirm: "Send this conduct report to Slack?" } %>
+      <% end %>
+      <%= link_to "Edit", edit_admin_event_incident_path(current_event, @incident), class: "w-full sm:w-auto text-center bg-[#ec3750] text-white px-4 py-2 rounded-md hover:bg-[#d42f46]" %>
+      <%= link_to "← Back to Incidents", admin_event_incidents_path(current_event), class: "w-full sm:w-auto text-center bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300" %>
+    </div>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200">
+      <div class="flex items-center space-x-4">
+        <%= render_category_badge(@incident.category) %>
+        <%= render_severity_badge(@incident.severity) %>
+        <%= render_status_badge(@incident.status) %>
+      </div>
+    </div>
+
+    <div class="p-6 space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <h3 class="text-sm font-medium text-gray-500">Reported By</h3>
+          <p class="mt-1 text-sm text-gray-900"><%= @incident.reported_by.display_name_or_fallback %></p>
+        </div>
+
+        <div>
+          <h3 class="text-sm font-medium text-gray-500">Date/Time</h3>
+          <p class="mt-1 text-sm text-gray-900">
+            <%= @incident.occurred_at&.strftime("%B %d, %Y at %H:%M") || "Not specified" %>
+          </p>
+        </div>
+
+        <div>
+          <h3 class="text-sm font-medium text-gray-500">Location</h3>
+          <p class="mt-1 text-sm text-gray-900"><%= @incident.location.presence || "Not specified" %></p>
+        </div>
+
+        <div>
+          <h3 class="text-sm font-medium text-gray-500">Participants Involved</h3>
+          <div class="mt-1 text-sm text-gray-900">
+            <% if @incident.participants.any? %>
+              <ul class="list-disc list-inside">
+                <% @incident.incident_participants.includes(participant_event: :participant).each do |ip| %>
+                  <li>
+                    <%= link_to "#{ip.participant_event.participant.preferred_name || ip.participant_event.participant.legal_first_name} #{ip.participant_event.participant.legal_last_name}",
+                        admin_event_participant_path(current_event, ip.participant_event),
+                        class: "text-[#ec3750] hover:text-blue-800" %>
+                  </li>
+                <% end %>
+              </ul>
+            <% else %>
+              <span class="text-gray-400">No participants linked</span>
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-medium text-gray-500">Staff Who Helped</h3>
+        <div class="mt-1 text-sm text-gray-900">
+          <% if @incident.helping_staff.any? %>
+            <ul class="list-disc list-inside">
+              <% @incident.helping_staff.each do |staff| %>
+                <li><%= staff.display_name_or_fallback %></li>
+              <% end %>
+            </ul>
+          <% else %>
+            <span class="text-gray-400">No staff recorded</span>
+          <% end %>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-medium text-gray-500">Summary</h3>
+        <p class="mt-1 text-sm text-gray-900"><%= @incident.summary.presence || "No summary provided" %></p>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-medium text-gray-500">Details</h3>
+        <div class="mt-1 text-sm text-gray-900 whitespace-pre-wrap bg-gray-50 p-4 rounded-md">
+          <%= @incident.details.presence || "No details provided" %>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-medium text-gray-500">Actions Taken</h3>
+        <div class="mt-1 text-sm text-gray-900 whitespace-pre-wrap bg-gray-50 p-4 rounded-md">
+          <%= @incident.actions_taken.presence || "No actions recorded yet" %>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-medium text-gray-500">Visible To</h3>
+        <div class="mt-1 flex flex-wrap gap-2">
+          <% @incident.visible_to_roles.reject(&:blank?).each do |role| %>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+              <%= role.humanize %>
+            </span>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-8">
+    <h2 class="text-lg font-semibold mb-4">Add Comment</h2>
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <%= form_with model: IncidentComment.new, url: admin_event_incident_comments_path(current_event, @incident), class: "space-y-4" do |f| %>
+        <div>
+          <%= f.label :body, "Comment", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_area :body, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "Add a comment or note about this incident..." %>
+        </div>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <%= f.label :new_status, "Change status to:", class: "text-sm font-medium text-gray-700" %>
+            <%= f.select :new_status, 
+                [["No change", ""]] + Incident.statuses.keys.map { |s| [s.humanize.titleize, s] },
+                {},
+                class: "border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          </div>
+          <%= f.submit "Add Comment", class: "bg-[#ec3750] text-white px-4 py-2 rounded-md hover:bg-[#d42f46] cursor-pointer" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="mt-8">
+    <h2 class="text-lg font-semibold mb-4">Timeline</h2>
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <div class="flow-root">
+        <%
+          timeline_items = []
+          comments_with_status_change = @incident.comments.includes(:user).select { |c| c.new_status.present? }
+          status_change_times = comments_with_status_change.map { |c| c.created_at.to_i }
+          
+          @incident.versions.each do |v|
+            # Skip version updates that happened at same second as a comment with status change
+            next if v.event == "update" && status_change_times.include?(v.created_at.to_i)
+            timeline_items << { type: :version, item: v, time: v.created_at }
+          end
+          @incident.comments.includes(:user).each do |c|
+            timeline_items << { type: :comment, item: c, time: c.created_at }
+          end
+          timeline_items.sort_by! { |t| t[:time] }.reverse!
+        %>
+        <ul class="-mb-8">
+          <% timeline_items.each_with_index do |entry, index| %>
+            <li>
+              <div class="relative pb-8">
+                <% unless index == timeline_items.length - 1 %>
+                  <span class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200"></span>
+                <% end %>
+                <div class="relative flex space-x-3">
+                  <div>
+                    <% timeline_user = entry[:type] == :comment ? entry[:item].user : User.find_by(id: entry[:item].whodunnit) %>
+                    <% is_slack_comment = entry[:type] == :comment && entry[:item].source == "slack" %>
+                    <% if is_slack_comment %>
+                      <% if entry[:item].slack_avatar_url.present? %>
+                        <img src="<%= entry[:item].slack_avatar_url %>" class="h-8 w-8 rounded-full object-cover ring-8 ring-white" alt="<%= entry[:item].slack_display_name %>">
+                      <% else %>
+                        <span class="h-8 w-8 rounded-full bg-red-500 flex items-center justify-center ring-8 ring-white text-base">
+                          🚒
+                        </span>
+                      <% end %>
+                    <% elsif timeline_user&.avatar_displayable? %>
+                      <%= image_tag timeline_user.avatar.variant(resize_to_fill: [32, 32]), class: "h-8 w-8 rounded-full object-cover ring-8 ring-white" %>
+                    <% elsif entry[:type] == :comment %>
+                      <span class="h-8 w-8 rounded-full bg-[#ec3750] flex items-center justify-center ring-8 ring-white text-xs font-medium text-white">
+                        <%= timeline_user&.initials || "?" %>
+                      </span>
+                    <% else %>
+                      <span class="h-8 w-8 rounded-full bg-gray-400 flex items-center justify-center ring-8 ring-white text-xs font-medium text-white">
+                        <%= timeline_user&.initials || "S" %>
+                      </span>
+                    <% end %>
+                  </div>
+                  <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                    <div class="flex-1">
+                      <% if entry[:type] == :comment %>
+                        <% comment = entry[:item] %>
+                        <p class="text-sm text-gray-500">
+                          <% if comment.source == "slack" %>
+                            <span class="font-medium text-gray-900">🚒 Fire Dept (<%= comment.slack_display_name.presence || comment.slack_user_id %>)</span>
+                            <% slack_link = "https://hackclub.slack.com/archives/#{comment.slack_channel_id}/p#{comment.slack_message_ts&.delete('.')}" %>
+                            <a href="<%= slack_link %>" target="_blank" class="text-[#ec3750] hover:underline">commented</a>
+                          <% else %>
+                            <span class="font-medium text-gray-900"><%= comment.user.display_name_or_fallback %></span>
+                            commented
+                          <% end %>
+                          <% if comment.new_status.present? %>
+                            and changed status to <span class="font-medium"><%= comment.new_status.humanize.titleize %></span>
+                          <% end %>
+                        </p>
+                        <div class="mt-2 text-sm text-gray-700 bg-gray-50 rounded-md p-3">
+                          <%= simple_format(comment.body) %>
+                        </div>
+                      <% else %>
+                        <% version = entry[:item] %>
+                        <p class="text-sm text-gray-500">
+                          <% actor = User.find_by(id: version.whodunnit) %>
+                          <span class="font-medium text-gray-900"><%= actor&.display_name_or_fallback || "System" %></span>
+                          <%= version.event == "create" ? "created" : "updated" %> the incident
+                          <% if version.changeset.present? %>
+                            <span class="text-gray-400">
+                              (<%= version.changeset.keys.reject { |k| k == "updated_at" }.map(&:humanize).join(", ") %>)
+                            </span>
+                          <% end %>
+                        </p>
+                      <% end %>
+                    </div>
+                    <div class="whitespace-nowrap text-right text-sm text-gray-500">
+                      <%= entry[:time].strftime("%b %d, %Y %H:%M") %>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

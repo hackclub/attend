@@ -1,0 +1,511 @@
+<div class="w-full max-w-2xl mx-auto">
+  <%= render "wizard_nav" %>
+
+  <h1 class="text-2xl font-bold mb-6">Review Your Information</h1>
+
+  <p class="text-gray-600 mb-8">Please review your information below before submitting. Click any section to make changes.</p>
+
+  <div class="space-y-6">
+    <section class="border rounded-lg p-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-semibold">Profile</h2>
+        <%= link_to "Edit", onboarding_step_path(step: "profile", event_id: current_event.id), class: "text-blue-600 hover:underline text-sm" %>
+      </div>
+      <% if @participant&.headshot&.attached? && @participant.headshot.blob.persisted? %>
+        <div class="mb-4">
+          <%= image_tag @participant.headshot, class: "w-20 h-20 rounded-full object-cover border border-gray-300" %>
+        </div>
+      <% end %>
+      <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        <div>
+          <dt class="text-gray-500">Legal Name</dt>
+          <dd><%= @participant&.full_name.presence || "—" %></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">Preferred Name</dt>
+          <dd><%= @participant&.preferred_name.presence || "—" %></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">Date of Birth</dt>
+          <dd><%= @participant&.date_of_birth&.strftime("%B %d, %Y") || "—" %></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">Email</dt>
+          <dd><%= @participant&.email.presence || "—" %></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">Phone</dt>
+          <dd><%= @participant&.phone.presence || "—" %></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">Pronouns</dt>
+          <dd><%= @participant&.pronouns.presence || "—" %></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">Location</dt>
+          <dd><%= [@participant&.city, @participant&.country_of_residence].compact.join(", ").presence || "—" %></dd>
+        </div>
+      </dl>
+    </section>
+
+    <% if current_event.travel_enabled? %>
+    <section class="border rounded-lg p-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-semibold">Travel</h2>
+        <%= link_to "Edit", onboarding_step_path(step: "travel", event_id: current_event.id), class: "text-blue-600 hover:underline text-sm" %>
+      </div>
+      <div class="space-y-4">
+        <% if current_event.visa_options_enabled? %>
+        <!-- Visa Status -->
+        <div class="mb-4">
+          <dl class="text-sm">
+            <div>
+              <dt class="text-gray-500">Visa Status</dt>
+              <dd>
+                <% case @travel_inbound&.visa_status %>
+                <% when "not_required" %>
+                  <span class="text-green-700">No visa required</span>
+                <% when "not_applied" %>
+                  <span class="text-yellow-700">Visa required - not yet applied</span>
+                <% when "applied" %>
+                  <span class="text-blue-700">Visa application pending</span>
+                <% when "approved" %>
+                  <span class="text-green-700">Visa approved</span>
+                <% when "denied" %>
+                  <span class="text-red-700">Visa denied</span>
+                <% else %>
+                  <span>—</span>
+                <% end %>
+              </dd>
+            </div>
+          </dl>
+        </div>
+        <% end %>
+
+        <!-- Inbound -->
+        <div>
+          <h3 class="text-sm font-medium text-gray-700 mb-2">Arrival (Getting to <%= current_event.location_city || "the event" %>)</h3>
+          <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <div>
+              <dt class="text-gray-500">Mode</dt>
+              <dd><%= @travel_inbound&.mode&.titleize || "—" %></dd>
+            </div>
+            <% if @travel_inbound&.plane? %>
+              <% @travel_inbound.travel_legs.each_with_index do |leg, i| %>
+                <div class="md:col-span-2 <%= 'border-t pt-2 mt-2' if i > 0 %>">
+                  <dt class="text-gray-500">Flight <%= i + 1 %></dt>
+                  <dd>
+                    <span class="font-medium"><%= leg.flight_code.presence || "—" %></span>
+                    <%= "#{leg.departure_airport} → #{leg.arrival_airport}" if leg.departure_airport.present? || leg.arrival_airport.present? %>
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-gray-500">Departure</dt>
+                  <dd><%= leg.departure_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                </div>
+                <div>
+                  <dt class="text-gray-500">Arrival</dt>
+                  <dd><%= leg.arrival_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                </div>
+              <% end %>
+              <% if @travel_inbound.is_unaccompanied_minor %>
+                <div class="md:col-span-2">
+                  <dd class="text-yellow-700 font-medium">⚠️ Travelling as unaccompanied minor</dd>
+                  <dd class="text-gray-500 text-xs mt-0.5">We'll review your UM booking proof and reach out with pickup/dropoff information within 2 weeks of the event.</dd>
+                </div>
+              <% end %>
+            <% elsif @travel_inbound&.train? %>
+              <div>
+                <dt class="text-gray-500">Route</dt>
+                <dd><%= [@travel_inbound.train_departure_station, @travel_inbound.train_arrival_station].compact.join(" → ").presence || "—" %></dd>
+              </div>
+              <div>
+                <dt class="text-gray-500">Arrival Time</dt>
+                <dd><%= @travel_inbound.arrival_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+              </div>
+            <% elsif @travel_inbound&.bus? %>
+              <div>
+                <dt class="text-gray-500">Route</dt>
+                <dd><%= [@travel_inbound.bus_departure_location, @travel_inbound.bus_arrival_location].compact.join(" → ").presence || "—" %></dd>
+              </div>
+              <div>
+                <dt class="text-gray-500">Departure</dt>
+                <dd><%= @travel_inbound.departure_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+              </div>
+              <div>
+                <dt class="text-gray-500">Arrival</dt>
+                <dd><%= @travel_inbound.arrival_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+              </div>
+            <% elsif @travel_inbound&.car? %>
+              <div class="md:col-span-2">
+                <dt class="text-gray-500">Travelling From</dt>
+                <dd><%= @travel_inbound.origin_address.presence || "—" %></dd>
+              </div>
+              <div>
+                <dt class="text-gray-500">Expected Arrival</dt>
+                <dd><%= @travel_inbound.expected_arrival_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+              </div>
+            <% elsif @travel_inbound&.other? %>
+              <div class="md:col-span-2">
+                <dt class="text-gray-500">Details</dt>
+                <dd class="whitespace-pre-wrap"><%= @travel_inbound.other_details.presence || "—" %></dd>
+              </div>
+            <% end %>
+          </dl>
+        </div>
+
+        <!-- Outbound -->
+        <div class="border-t pt-4">
+          <h3 class="text-sm font-medium text-gray-700 mb-2">Departure (Leaving <%= current_event.location_city || "the event" %>)</h3>
+          <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <div>
+              <dt class="text-gray-500">Mode</dt>
+              <dd><%= @travel_outbound&.mode&.titleize || "—" %></dd>
+            </div>
+            <% if @travel_outbound&.plane? %>
+              <% @travel_outbound.travel_legs.each_with_index do |leg, i| %>
+                <div class="md:col-span-2 <%= 'border-t pt-2 mt-2' if i > 0 %>">
+                  <dt class="text-gray-500">Flight <%= i + 1 %></dt>
+                  <dd>
+                    <span class="font-medium"><%= leg.flight_code.presence || "—" %></span>
+                    <%= "#{leg.departure_airport} → #{leg.arrival_airport}" if leg.departure_airport.present? || leg.arrival_airport.present? %>
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-gray-500">Departure</dt>
+                  <dd><%= leg.departure_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                </div>
+                <div>
+                  <dt class="text-gray-500">Arrival</dt>
+                  <dd><%= leg.arrival_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                </div>
+              <% end %>
+              <% if @travel_outbound.is_unaccompanied_minor %>
+                <div class="md:col-span-2">
+                  <dd class="text-yellow-700 font-medium">⚠️ Travelling as unaccompanied minor</dd>
+                  <dd class="text-gray-500 text-xs mt-0.5">We'll review your UM booking proof and reach out with pickup/dropoff information within 2 weeks of the event.</dd>
+                </div>
+              <% end %>
+            <% elsif @travel_outbound&.train? %>
+              <div>
+                <dt class="text-gray-500">Route</dt>
+                <dd><%= [@travel_outbound.train_departure_station, @travel_outbound.train_arrival_station].compact.join(" → ").presence || "—" %></dd>
+              </div>
+              <div>
+                <dt class="text-gray-500">Departure Time</dt>
+                <dd><%= @travel_outbound.departure_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+              </div>
+            <% elsif @travel_outbound&.bus? %>
+              <div>
+                <dt class="text-gray-500">Route</dt>
+                <dd><%= [@travel_outbound.bus_departure_location, @travel_outbound.bus_arrival_location].compact.join(" → ").presence || "—" %></dd>
+              </div>
+              <div>
+                <dt class="text-gray-500">Departure</dt>
+                <dd><%= @travel_outbound.departure_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+              </div>
+              <div>
+                <dt class="text-gray-500">Arrival</dt>
+                <dd><%= @travel_outbound.arrival_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+              </div>
+            <% elsif @travel_outbound&.car? %>
+              <div class="md:col-span-2">
+                <dt class="text-gray-500">Travelling To</dt>
+                <dd><%= @travel_outbound.origin_address.presence || "—" %></dd>
+              </div>
+              <div>
+                <dt class="text-gray-500">Departure Time</dt>
+                <dd><%= @travel_outbound.departure_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+              </div>
+            <% elsif @travel_outbound&.other? %>
+              <div class="md:col-span-2">
+                <dt class="text-gray-500">Details</dt>
+                <dd class="whitespace-pre-wrap"><%= @travel_outbound.other_details.presence || "—" %></dd>
+              </div>
+            <% end %>
+          </dl>
+        </div>
+      </div>
+    </section>
+    <% end %>
+
+    <section class="border rounded-lg p-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-semibold">Accommodation</h2>
+        <%= link_to "Edit", onboarding_step_path(step: "accommodation", event_id: current_event.id), class: "text-blue-600 hover:underline text-sm" %>
+      </div>
+      <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        <div>
+          <dt class="text-gray-500">Gender Identity</dt>
+          <dd><%= @accommodation&.gender_identity&.titleize || "—" %></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">Preferred Roommate Genders</dt>
+          <dd><%= @accommodation&.preferred_roommate_genders&.map(&:titleize)&.join(", ").presence || "—" %></dd>
+        </div>
+        <div class="md:col-span-2">
+          <dt class="text-gray-500">Roommate Preferences</dt>
+          <dd><%= @accommodation&.roommate_preferences.presence || "—" %></dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="border rounded-lg p-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-semibold">Health & Dietary</h2>
+        <%= link_to "Edit", onboarding_step_path(step: "health", event_id: current_event.id), class: "text-blue-600 hover:underline text-sm" %>
+      </div>
+      <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        <div>
+          <dt class="text-gray-500">Allergies</dt>
+          <dd><%= @medical&.allergies.presence || "None" %></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">Medical Conditions</dt>
+          <dd><%= @medical&.medical_conditions.presence || "None" %></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">Diet Type</dt>
+          <dd><%= @dietary&.diet_type&.titleize || "No specific diet" %></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">Food Intolerances</dt>
+          <dd><%= @dietary&.intolerances.presence || "None" %></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">Anaphylaxis Risk</dt>
+          <dd><%= @medical&.has_anaphylaxis_risk ? "Yes" : "No" %></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">Refrigeration Needed</dt>
+          <dd><%= @medical&.requires_refrigeration ? "Yes" : "No" %></dd>
+        </div>
+        <div class="md:col-span-2">
+          <dt class="text-gray-500">Learning & Cognitive Needs</dt>
+          <dd>
+            <% needs = [] %>
+            <% needs << "ADHD" if @accessibility&.has_adhd %>
+            <% needs << "Dyslexia" if @accessibility&.has_dyslexia %>
+            <% needs << "Autism" if @accessibility&.has_autism %>
+            <%= needs.any? ? needs.join(", ") : "None specified" %>
+          </dd>
+        </div>
+        <div class="md:col-span-2">
+          <dt class="text-gray-500">Accessibility Needs</dt>
+          <dd>
+            <% accessibility = [] %>
+            <% accessibility << "Wheelchair accessible" if @accessibility&.uses_wheelchair %>
+            <% accessibility << "Step-free access" if @accessibility&.step_free_required %>
+            <% accessibility << "Captioning" if @accessibility&.needs_captioning %>
+            <% accessibility << "Large print" if @accessibility&.needs_large_print %>
+            <% accessibility << "Sign language interpreter" if @accessibility&.needs_sign_language %>
+            <%= accessibility.any? ? accessibility.join(", ") : "None" %>
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <% if @guardians&.any? %>
+      <section class="border rounded-lg p-4">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-semibold">Guardian</h2>
+          <%= link_to "Edit", onboarding_step_path(step: "guardian", event_id: current_event.id), class: "text-blue-600 hover:underline text-sm" %>
+        </div>
+        <% @guardians.each do |gpe| %>
+          <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <div>
+              <dt class="text-gray-500">Name</dt>
+              <dd><%= gpe.guardian&.full_name || "—" %></dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Relationship</dt>
+              <dd><%= gpe.relationship.presence || "—" %></dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Email</dt>
+              <dd><%= gpe.guardian&.email.presence || "—" %></dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Phone</dt>
+              <dd><%= gpe.guardian&.phone.presence || "—" %></dd>
+            </div>
+          </dl>
+        <% end %>
+      </section>
+    <% end %>
+
+    <% if @emergency_contacts&.any? %>
+      <section class="border rounded-lg p-4">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-semibold">Emergency Contact</h2>
+          <%= link_to "Edit", onboarding_step_path(step: "emergency", event_id: current_event.id), class: "text-blue-600 hover:underline text-sm" %>
+        </div>
+        <% @emergency_contacts.each do |contact| %>
+          <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <div>
+              <dt class="text-gray-500">Name</dt>
+              <dd><%= contact.name.presence || "—" %></dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Relationship</dt>
+              <dd><%= contact.relationship.presence || "—" %></dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Phone</dt>
+              <dd><%= contact.phone.presence || "—" %></dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Email</dt>
+              <dd><%= contact.email.presence || "—" %></dd>
+            </div>
+          </dl>
+        <% end %>
+      </section>
+    <% end %>
+  </div>
+
+  <%= form_with url: complete_onboarding_path(event_id: current_event.id), method: :post, local: true, data: { turbo: false } do |f| %>
+    <div class="mt-8 pt-6 border-t">
+      <!-- Code of Conduct Section -->
+      <section class="mb-8">
+        <h2 class="text-lg font-semibold mb-4">Code of Conduct &amp; Safeguarding Agreement</h2>
+        <p class="text-sm text-gray-600 mb-4">
+          Please read and agree to the Hack Club Code of Conduct and Safeguarding Policy before submitting your registration.
+        </p>
+
+        <div class="border rounded-lg bg-gray-50 mb-4" data-controller="tabs" data-tabs-active-class="bg-white text-gray-900 border-gray-200 border-b-white -mb-px" data-tabs-inactive-class="text-gray-500 border-transparent hover:text-gray-700">
+          <div class="flex border-b border-gray-200" role="tablist" aria-label="Policy summaries">
+            <button type="button" role="tab" data-tabs-target="tab" data-action="click->tabs#select keydown->tabs#keydown"
+                    class="px-4 py-2.5 text-sm font-medium border border-b-2 rounded-t-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
+              Code of Conduct
+            </button>
+            <button type="button" role="tab" data-tabs-target="tab" data-action="click->tabs#select keydown->tabs#keydown"
+                    class="px-4 py-2.5 text-sm font-medium border border-b-2 rounded-t-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
+              Safeguarding
+            </button>
+          </div>
+
+          <!-- Code of Conduct TL;DR -->
+          <div data-tabs-target="panel" role="tabpanel" class="p-4 max-h-64 overflow-y-auto text-sm">
+            <h3 class="font-semibold text-gray-900 mb-2">TL;DR</h3>
+            <ul class="list-disc list-inside text-gray-700 mb-4 space-y-1">
+              <li>Treat everyone with respect and kindness.</li>
+              <li>Be thoughtful in how you communicate.</li>
+              <li>Don't be destructive or inflammatory.</li>
+              <li>If you encounter an issue, please mail <a href="mailto:conduct@hackclub.com" class="text-blue-600 hover:underline">conduct@hackclub.com</a>.</li>
+            </ul>
+
+            <h3 class="font-semibold text-gray-900 mb-2">Hacker Values</h3>
+            <ul class="list-disc list-inside text-gray-700 mb-4 space-y-1">
+              <li><strong>Be friendly and welcoming</strong></li>
+              <li><strong>Be patient</strong> – Remember that people have varying communication styles and that not everyone is using their native language.</li>
+              <li><strong>Be thoughtful</strong> – Productive communication requires effort. Think about how your words will be interpreted.</li>
+              <li><strong>Be respectful</strong> – In particular, respect differences of opinion.</li>
+              <li><strong>Be charitable</strong> – Interpret the arguments of others in good faith, do not seek to disagree.</li>
+            </ul>
+
+            <h3 class="font-semibold text-gray-900 mb-2">Unwelcome Behavior</h3>
+            <p class="text-gray-700 mb-2">These actions are explicitly forbidden in Hack Club spaces:</p>
+            <ul class="list-disc list-inside text-gray-700 mb-4 space-y-1">
+              <li>Insulting, demeaning, hateful, or threatening remarks</li>
+              <li>Discrimination based on age, nationality, race, disability, gender, sexuality, religion, or similar personal characteristic</li>
+              <li>Bullying or systematic harassment</li>
+              <li>Unwelcome sexual advances, including sexually explicit content</li>
+              <li>Posting spam-like content that disrupts the environment of the community</li>
+            </ul>
+
+            <h3 class="font-semibold text-gray-900 mb-2">Enforcement</h3>
+            <p class="text-gray-700 mb-2">
+              Unacceptable behavior will not be tolerated. You will be warned and asked to stop. Repeated offenses may result in a temporary or permanent ban from the community and events.
+            </p>
+
+            <p class="text-gray-500 text-xs mt-4">
+              <a href="https://hackclub.com/conduct/" target="_blank" class="text-blue-600 hover:underline">Read the full Code of Conduct →</a>
+            </p>
+          </div>
+
+          <!-- Safeguarding Policy TL;DR -->
+          <div data-tabs-target="panel" role="tabpanel" class="p-4 max-h-64 overflow-y-auto text-sm hidden">
+            <h3 class="font-semibold text-gray-900 mb-2">TL;DR</h3>
+            <ul class="list-disc list-inside text-gray-700 mb-4 space-y-1">
+              <li>Everyone is treated with dignity and respect — keeping minors safe is the top priority.</li>
+              <li>No drugs, alcohol, tobacco, or being under the influence at events.</li>
+              <li>No sexual, violent, or discriminatory content, and no harassment.</li>
+              <li>Adults shouldn't be alone with minors or swap private contact details.</li>
+              <li>See something wrong? Tell an organizer or safeguarding officer right away — reports are confidential and protected.</li>
+            </ul>
+
+            <h3 class="font-semibold text-gray-900 mb-2">Getting Help</h3>
+            <ul class="list-disc list-inside text-gray-700 mb-4 space-y-1">
+              <li>Emergency line: <strong>1-855-625-HACK</strong></li>
+              <li>Email <a href="mailto:safeguarding@hackclub.com" class="text-blue-600 hover:underline">safeguarding@hackclub.com</a></li>
+              <li>Your event's safeguarding officer (contact info is posted at the event).</li>
+            </ul>
+
+            <p class="text-gray-500 text-xs mt-4">
+              <a href="https://hackclub.com/safeguarding" target="_blank" class="text-blue-600 hover:underline">Read the full Safeguarding Policy →</a>
+            </p>
+          </div>
+        </div>
+
+        <div class="bg-white border rounded-lg p-4">
+          <div class="mb-4">
+            <%= f.label :code_of_conduct_accepted, class: "flex items-start gap-3 cursor-pointer" do %>
+              <%= f.check_box :code_of_conduct_accepted, class: "w-4 h-4 mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500", required: true, id: "code_of_conduct_accepted" %>
+              <span class="text-sm text-gray-700">
+                I have read and agree to abide by the <a href="https://hackclub.com/conduct/" target="_blank" class="text-blue-600 hover:underline">Hack Club Code of Conduct</a> and <a href="https://hackclub.com/safeguarding" target="_blank" class="text-blue-600 hover:underline">Safeguarding Policy</a>.
+              </span>
+            <% end %>
+          </div>
+
+          <div class="border-t pt-4">
+            <label for="code_of_conduct_signature" class="block text-sm font-medium text-gray-700 mb-2">
+              Digital Signature <span class="text-red-500">*</span>
+            </label>
+            <p class="text-xs text-gray-500 mb-2">
+              Type your full legal name below to digitally sign this agreement.
+            </p>
+            <%= f.text_field :code_of_conduct_signature, 
+                id: "code_of_conduct_signature",
+                required: true,
+                placeholder: @participant&.full_name,
+                class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium",
+                autocomplete: "off" %>
+            <p class="text-xs text-gray-400 mt-1">
+              By typing your name, you acknowledge this constitutes a legally binding electronic signature.
+            </p>
+          </div>
+        </div>
+
+        <a href="https://hackclub.com/safety" target="_blank"
+           class="mt-4 flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 hover:bg-blue-100 transition-colors">
+          <svg class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span>
+            <span class="block text-sm font-medium text-gray-900">Need help or want to read the policies?</span>
+            <span class="block text-sm text-gray-600">Visit our safety hub for the full Code of Conduct, Safeguarding Policy, and how to report a concern.</span>
+          </span>
+        </a>
+      </section>
+
+      <!-- Terms acceptance -->
+      <div class="bg-gray-50 rounded-md p-4 mb-6">
+        <%= f.label :terms_accepted, class: "flex items-start gap-3 cursor-pointer" do %>
+          <%= f.check_box :terms_accepted, class: "w-4 h-4 mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500", required: true %>
+          <span class="text-sm text-gray-700">
+            I confirm that the information provided is accurate and complete. I agree to the event terms and conditions.
+          </span>
+        <% end %>
+      </div>
+
+      <div class="flex gap-3">
+        <% if @step_index && @step_index > 0 %>
+          <%= link_to "Back", onboarding_step_path(step: @steps[@step_index - 1], event_id: current_event.id), 
+              class: "w-1/4 bg-white text-gray-700 border border-gray-300 px-6 py-3 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 font-medium text-center" %>
+        <% end %>
+        <%= f.submit "Submit Registration", class: "flex-1 bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 font-medium cursor-pointer" %>
+      </div>
+    </div>
+  <% end %>
+</div>

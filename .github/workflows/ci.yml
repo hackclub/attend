@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  scan_ruby:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Scan for common Rails security vulnerabilities using static analysis
+        run: bin/brakeman --no-pager -i config/brakeman.ignore
+
+      # bundler-audit runs in its own workflow (bundler-audit.yml): nightly and
+      # on dependency-touching changes, so a newly published advisory doesn't
+      # fail CI on unrelated PRs.
+
+  scan_js:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # bin/importmap boots the Rails app, which loads ruby-vips and needs the
+      # libvips shared library present on the runner.
+      - name: Install libvips
+        run: sudo apt-get update && sudo apt-get install -y libvips
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Scan for security vulnerabilities in JavaScript dependencies
+        run: bin/importmap audit
+
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      RAILS_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/attend_test
+      # Booting the app touches the passkit gem, which reads its config straight
+      # from ENV and raises on nil. There are no credentials on a runner, so give
+      # it inert values and two empty cert files (nothing reads their contents
+      # unless a pass is actually generated).
+      PASSKIT_CERTIFICATE_KEY: ci
+      PASSKIT_APPLE_TEAM_IDENTIFIER: CITEAMID
+      PASSKIT_PASS_TYPE_IDENTIFIER: pass.com.example.ci
+      PASSKIT_WEB_SERVICE_HOST: https://ci.invalid
+      PASSKIT_PRIVATE_P12_CERTIFICATE: tmp/ci-certs/certificate.p12
+      PASSKIT_APPLE_INTERMEDIATE_CERTIFICATE: tmp/ci-certs/WWDR.cer
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # libvips backs ruby-vips, which the app loads at boot (see the
+      # vips_svg_loader initializer) — without it nothing boots.
+      - name: Install libvips
+        run: sudo apt-get update && sudo apt-get install -y libvips
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Create placeholder passkit certificates
+        run: mkdir -p tmp/ci-certs && touch tmp/ci-certs/certificate.p12 tmp/ci-certs/WWDR.cer
+
+      - name: Prepare the test database
+        run: bin/rails db:test:prepare
+
+      - name: Run tests
+        run: bundle exec rspec
+
+      - name: Upload failure screenshots
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: rspec-artifacts
+          path: tmp/screenshots
+          if-no-files-found: ignore
+
+  lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RUBOCOP_CACHE_ROOT: tmp/rubocop
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Prepare RuboCop cache
+        uses: actions/cache@v6
+        env:
+          DEPENDENCIES_HASH: ${{ hashFiles('.ruby-version', '**/.rubocop.yml', '**/.rubocop_todo.yml', 'Gemfile.lock') }}
+        with:
+          path: ${{ env.RUBOCOP_CACHE_ROOT }}
+          key: rubocop-${{ runner.os }}-${{ env.DEPENDENCIES_HASH }}-${{ github.ref_name == github.event.repository.default_branch && github.run_id || 'default' }}
+          restore-keys: |
+            rubocop-${{ runner.os }}-${{ env.DEPENDENCIES_HASH }}-
+
+      - name: Lint code for consistent style
+        run: bin/rubocop -f github

@@ -1,0 +1,81 @@
+<% existing_contacts = @emergency_contacts.select { |c| c.persisted? && c.name.present? } %>
+<% has_existing_contacts = existing_contacts.any? %>
+
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+  <% if has_existing_contacts %>
+    <p class="text-gray-600 mb-4">
+      We've added your details as the primary emergency contact. You can add an additional contact below if someone else should be reached during the event.
+    </p>
+    <div>
+      <h3 class="text-sm font-medium text-gray-700 mb-2">Emergency Contacts</h3>
+      <div class="space-y-2">
+        <% existing_contacts.each do |contact| %>
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-gray-50 rounded-md p-3">
+            <div>
+              <span class="font-medium"><%= contact.name %></span>
+              <span class="text-gray-500 text-sm">(<%= contact.relationship %>)</span>
+              <span class="text-gray-500 text-sm ml-2"><%= contact.phone %></span>
+            </div>
+            <%= link_to "Edit", guardian_portal_step_path(token: @token, step: "emergency", contact_id: contact.id), class: "text-blue-600 hover:text-blue-800 text-sm" %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% else %>
+    <p class="text-gray-600">
+      Please provide at least one emergency contact who can be reached during the event.
+    </p>
+  <% end %>
+</div>
+
+<%= form_with model: @emergency_contact, url: guardian_portal_update_step_path(token: @token, step: "emergency"), method: :patch, local: true, data: { turbo: false, controller: "phone-input" } do |f| %>
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <h3 class="text-lg font-medium mb-4"><%= @emergency_contact.persisted? ? "Edit" : (has_existing_contacts ? "Add Additional" : "Add") %> Emergency Contact</h3>
+
+    <p class="text-sm text-gray-600 mb-6">Fields marked with <span class="text-red-500">*</span> are required.</p>
+
+    <%= f.hidden_field :id if @emergency_contact.persisted? %>
+
+    <div class="space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <%= f.label :name, label_text("Full Name", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_field :name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true %>
+        </div>
+
+        <div>
+          <%= f.label :relationship, label_text("Relationship", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_field :relationship, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true, placeholder: "e.g., Aunt, Family Friend" %>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <%= f.label :phone, label_text("Phone", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.telephone_field :phone, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true %>
+        </div>
+
+        <div>
+          <%= f.label :email, "Email (optional)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.email_field :email, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+        </div>
+      </div>
+
+      <div>
+        <%= f.label :priority, "Priority", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.select :priority, [["Primary contact", 1], ["Secondary contact", 2], ["Tertiary contact", 3]], {}, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+      </div>
+
+      <div class="pt-4 flex flex-col sm:flex-row gap-3">
+        <% if has_existing_contacts && !@emergency_contact.persisted? %>
+          <%= link_to "Skip", guardian_portal_step_path(token: @token, step: "consents"), class: "w-full sm:w-auto bg-gray-200 text-gray-800 px-6 py-2 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 font-medium text-center" %>
+        <% else %>
+          <%= f.submit "Save Contact", class: "w-full sm:w-auto bg-gray-200 text-gray-800 px-6 py-2 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 font-medium cursor-pointer" %>
+        <% end %>
+        <button type="submit" name="advance" value="true" class="w-full sm:w-auto bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium cursor-pointer">
+          <%= has_existing_contacts && !@emergency_contact.persisted? ? "Add & Continue" : "Save & Continue" %>
+        </button>
+      </div>
+    </div>
+  </div>
+<% end %>

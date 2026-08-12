@@ -1,0 +1,249 @@
+require "rails_helper"
+
+RSpec.describe "Custom documents", type: :request do
+  include Devise::Test::IntegrationHelpers
+  include ActiveJob::TestHelper
+
+  let(:event) { create(:event) }
+
+  describe "admin management" do
+    let(:admin) { User.create!(email: "admin-docs@example.com", name: "Admin", global_role: "global_admin") }
+
+    before { sign_in admin }
+
+    it "lists custom documents on the integrations page" do
+      create(:custom_document, event: event, name: "Hotel Waiver")
+
+      get admin_event_integrations_path(event)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Hotel Waiver")
+    end
+
+    it "creates a custom document" do
+      expect {
+        post admin_event_custom_documents_path(event), params: {
+          custom_document: { name: "Hotel Waiver", docuseal_template_id: "1234", signer_type: "participant_and_guardian" }
+        }
+      }.to change(event.custom_documents, :count).by(1)
+
+      doc = event.custom_documents.last
+      expect(doc.name).to eq("Hotel Waiver")
+      expect(doc.signer_type).to eq("participant_and_guardian")
+      expect(response).to redirect_to(admin_event_integrations_path(event))
+    end
+
+    it "destroys a document without consents but archives one with consents" do
+      unused = create(:custom_document, event: event)
+      used = create(:custom_document, event: event)
+      create(:consent, :custom_document, custom_document: used,
+        participant_event: create(:participant_event, event: event))
+
+      expect {
+        delete admin_event_custom_document_path(event, unused)
+      }.to change(CustomDocument, :count).by(-1)
+
+      expect {
+        delete admin_event_custom_document_path(event, used)
+      }.not_to change(CustomDocument, :count)
+      expect(used.reload).to be_archived
+    end
+
+    it "renders the mappings page for a custom document via its mapping key" do
+      doc = create(:custom_document, event: event, name: "Hotel Waiver")
+
+      get admin_event_docuseal_template_mappings_path(event, doc.mapping_key)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Hotel Waiver Field Mappings")
+    end
+
+    it "saves mappings for a custom document under its mapping key" do
+      doc = create(:custom_document, event: event)
+
+      patch admin_event_docuseal_template_mappings_path(event, doc.mapping_key), params: {
+        mappings: [ { field_name: "Attendee Name", source_key: "participant.full_name", readonly: "1", role: "Attendee" } ]
+      }
+
+      config = event.reload.docuseal_field_mappings[doc.mapping_key]
+      expect(config["mappings"].first).to include(
+        "field_name" => "Attendee Name",
+        "source_key" => "participant.full_name",
+        "readonly" => true
+      )
+      expect(doc.field_mapper.has_mappings?).to be true
+    end
+  end
+
+  describe "participant signing flow" do
+    let(:user) { create(:user) }
+    let(:participant) { create(:participant, user: user) }
+    let!(:participant_event) { create(:participant_event, participant: participant, event: event, status: :complete) }
+
+    before { sign_in user }
+
+    it "shows applicable documents on the event dashboard" do
+      create(:custom_document, event: event, name: "Hotel Waiver")
+
+      get dashboard_event_path(participant_event)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Hotel Waiver")
+      expect(response.body).to include("Sign now")
+    end
+
+    it "hides guardian-only documents from adult participants" do
+      participant.update!(date_of_birth: 25.years.ago)
+      create(:custom_document, :guardian_only, event: event, name: "Guardian Consent Form")
+
+      get dashboard_event_path(participant_event)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("Guardian Consent Form")
+    end
+
+    it "creates the consent, enqueues the submission job, and shows the preparing state" do
+      doc = create(:custom_document, event: event)
+
+      expect {
+        get dashboard_sign_document_path(participant_event, doc)
+      }.to change(participant_event.consents, :count).by(1)
+        .and have_enqueued_job(DocusealJobs::CreateCustomDocumentJob)
+
+      consent = participant_event.consents.last
+      expect(consent.consent_type).to eq("custom_document")
+      expect(consent.custom_document).to eq(doc)
+      expect(response.body).to include("Getting this document ready")
+    end
+
+    it "embeds the signing form once the submission slug exists" do
+      doc = create(:custom_document, event: event)
+      create(:consent, participant_event: participant_event, consent_type: :custom_document,
+        custom_document: doc, status: :sent, docuseal_envelope_id: "sub-1",
+        docuseal_participant_slug: "abc123")
+
+      client = instance_double(Docuseal::Client)
+      allow(Docuseal::Client).to receive(:for).and_return(client)
+      allow(client).to receive(:get_submission).and_return(
+        "submitters" => [ { "slug" => "abc123", "completed_at" => nil } ]
+      )
+
+      get dashboard_sign_document_path(participant_event, doc)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("docuseal-form")
+      expect(response.body).to include("abc123")
+    end
+
+    it "rejects documents that don't apply to the participant" do
+      participant.update!(date_of_birth: 25.years.ago)
+      doc = create(:custom_document, :guardian_only, event: event)
+
+      get dashboard_sign_document_path(participant_event, doc)
+
+      expect(response).to redirect_to(dashboard_event_path(participant_event))
+    end
+  end
+
+  describe "guardian portal signing" do
+    let(:participant_event) { create(:participant_event, event: event) }
+    let(:gpe) { create(:guardian_participant_event, participant_event: participant_event) }
+    let(:token) { gpe.generate_invite_token! }
+
+    it "creates the consent, enqueues the job as guardian, and shows the loading state" do
+      doc = create(:custom_document, :guardian_only, event: event)
+
+      expect {
+        get guardian_portal_custom_document_path(token: token, custom_document_id: doc.id)
+      }.to change(participant_event.consents, :count).by(1)
+        .and have_enqueued_job(DocusealJobs::CreateCustomDocumentJob).with(anything, "guardian")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Preparing")
+    end
+
+    it "embeds the signing form once the guardian slug exists" do
+      doc = create(:custom_document, :guardian_only, event: event)
+      create(:consent, participant_event: participant_event, consent_type: :custom_document,
+        custom_document: doc, status: :sent, docuseal_envelope_id: "sub-1",
+        docuseal_guardian_slug: "gslug123", guardian_participant_event: gpe)
+
+      get guardian_portal_custom_document_path(token: token, custom_document_id: doc.id)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("docuseal-form")
+      expect(response.body).to include("gslug123")
+    end
+
+    it "redirects instead of spinning when the submission has no guardian slot" do
+      doc = create(:custom_document, :dual_signer, event: event)
+      create(:consent, participant_event: participant_event, consent_type: :custom_document,
+        custom_document: doc, status: :sent, docuseal_envelope_id: "sub-1",
+        docuseal_participant_slug: "pslug123")
+
+      get guardian_portal_custom_document_path(token: token, custom_document_id: doc.id)
+
+      expect(response).to redirect_to(guardian_portal_confirmed_path(token: token))
+    end
+
+    it "rejects participant-only documents" do
+      doc = create(:custom_document, event: event)
+
+      get guardian_portal_custom_document_path(token: token, custom_document_id: doc.id)
+
+      expect(response).to redirect_to(guardian_portal_confirmed_path(token: token))
+    end
+  end
+
+  describe "completion gating via webhook" do
+    let(:secret) { "test-webhook-secret" }
+    let(:participant_event) do
+      create(:participant_event, event: event, code_of_conduct_accepted_at: Time.current)
+        .tap { |pe| pe.participant.update!(date_of_birth: 18.years.ago - 1.month) }
+    end
+
+    before { allow(Docuseal::HostConfig).to receive(:webhook_secrets).and_return([ secret ]) }
+
+    def post_completed(consent)
+      post docuseal_api_v1_webhooks_path,
+        params: { event_type: "submission.completed", data: { metadata: { consent_id: consent.id } } },
+        headers: { "X-Webhook-Secret" => secret },
+        as: :json
+    end
+
+    it "keeps the participant incomplete until custom documents are signed" do
+      doc = create(:custom_document, event: event)
+      waiver = create(:consent, participant_event: participant_event, status: :sent)
+      doc_consent = create(:consent, participant_event: participant_event, consent_type: :custom_document,
+        custom_document: doc, status: :sent)
+
+      post_completed(waiver)
+      expect(response).to have_http_status(:ok)
+      expect(participant_event.reload).not_to be_complete
+
+      post_completed(doc_consent)
+      expect(response).to have_http_status(:ok)
+      expect(participant_event.reload).to be_complete
+    end
+
+    it "still completes on waiver signature when no custom documents exist" do
+      waiver = create(:consent, participant_event: participant_event, status: :sent)
+
+      post_completed(waiver)
+
+      expect(participant_event.reload).to be_complete
+    end
+
+    it "completes a minor when the freedom waiver is the last signature" do
+      freedom_event = create(:event, freedom_waivers_enabled: true)
+      minor_pe = create(:participant_event, event: freedom_event, code_of_conduct_accepted_at: Time.current)
+      create(:guardian_participant_event, participant_event: minor_pe, status: :completed, completed_at: Time.current)
+      create(:consent, :signed, participant_event: minor_pe)
+      freedom = create(:consent, :freedom_waiver, participant_event: minor_pe, status: :sent)
+
+      post_completed(freedom)
+
+      expect(minor_pe.reload).to be_complete
+    end
+  end
+end

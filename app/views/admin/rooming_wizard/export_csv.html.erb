@@ -1,0 +1,52 @@
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Export Rooming List</h1>
+      <p class="mt-1 text-sm text-gray-600">Download the final rooming assignments</p>
+    </div>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <div class="text-center py-8">
+      <svg class="mx-auto h-16 w-16 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      
+      <h2 class="mt-4 text-xl font-medium text-gray-900">Rooming Complete!</h2>
+      <p class="mt-2 text-gray-500">The rooming assignments have been finalized.</p>
+      
+      <div class="mt-6 flex justify-center gap-4">
+        <%= link_to export_csv_admin_event_rooming_wizard_path(@event.slug, format: :csv), class: "inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md  text-white bg-[#ec3750] hover:bg-[#d42f46]" do %>
+          <svg class="-ml-1 mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          Download CSV
+        <% end %>
+        
+        <%= link_to finalize_admin_event_rooming_wizard_path(@event.slug), class: "inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50" do %>
+          View Room List
+        <% end %>
+      </div>
+      
+      <p class="mt-4 text-sm text-gray-500">
+        The CSV contains only legal names for privacy compliance.
+      </p>
+    </div>
+  </div>
+
+  <!-- Quick Links -->
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <h3 class="font-medium text-gray-900 mb-4">Quick Links</h3>
+    <div class="flex gap-4">
+      <%= link_to setup_admin_event_rooming_wizard_path(@event.slug), class: "text-[#ec3750] hover:text-blue-800" do %>
+        ← Start Over (Setup)
+      <% end %>
+      <%= link_to assignments_admin_event_rooming_wizard_path(@event.slug), class: "text-[#ec3750] hover:text-blue-800" do %>
+        View Assignments
+      <% end %>
+      <%= link_to admin_event_participants_path(@event.slug), class: "text-[#ec3750] hover:text-blue-800" do %>
+        Back to Participants
+      <% end %>
+    </div>
+  </div>
+</div>

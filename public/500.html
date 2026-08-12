@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Something Went Wrong – Attend</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="/icon-32.png" type="image/png" sizes="32x32">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 1rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      padding: 3rem;
+      text-align: center;
+      max-width: 28rem;
+      width: 100%;
+    }
+    
+    .error-code {
+      font-size: 6rem;
+      font-weight: 800;
+      color: #fecaca;
+      line-height: 1;
+      margin-bottom: 1rem;
+    }
+    
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 0.75rem;
+    }
+    
+    p {
+      color: #6b7280;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+    
+    .btn {
+      display: inline-block;
+      background: #dc2626;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      text-decoration: none;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    
+    .btn:hover {
+      background: #b91c1c;
+    }
+    
+    .logo {
+      width: 3rem;
+      height: 3rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: linear-gradient(135deg, #450a0a 0%, #7f1d1d 100%);
+      }
+      .container {
+        background: #1f2937;
+      }
+      .error-code {
+        color: #7f1d1d;
+      }
+      h1 {
+        color: #f9fafb;
+      }
+      p {
+        color: #9ca3af;
+      }
+    }
+  </style>
+  <script async src="https://plausible.io/js/pa-_d2ghIq2L9Mv3kvZk8u3A.js"></script>
+  <script>
+    window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+    plausible.init()
+    plausible("500", { props: { path: document.location.pathname } })
+  </script>
+</head>
+<body>
+  <div class="container">
+    <img src="/hackclub-logo.png" alt="Hack Club" class="logo">
+    <div class="error-code">500</div>
+    <h1>Something Went Wrong</h1>
+    <p>We're sorry, but something unexpected happened. Our team has been notified and we're working on it.</p>
+    <a href="/" class="btn">Go Home</a>
+  </div>
+</body>
+</html>

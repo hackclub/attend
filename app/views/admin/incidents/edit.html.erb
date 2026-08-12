@@ -1,0 +1,12 @@
+<% content_for :title, "Edit Incident – #{current_event.name} – Attend" %>
+
+<div class="w-full max-w-3xl mx-auto">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <h1 class="text-2xl font-bold">Edit Incident</h1>
+    <%= link_to "Back to Incident", admin_event_incident_path(current_event, @incident), class: "text-gray-600 hover:text-gray-800" %>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <%= render "form", incident: @incident %>
+  </div>
+</div>

@@ -1,0 +1,59 @@
+<% content_for :title, "Invite Participant – #{current_event.name} – Attend" %>
+
+<div class="space-y-6">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <h1 class="text-2xl font-bold text-gray-900">Invite Participant</h1>
+    <%= link_to "← Back to Participants", admin_event_participants_path(current_event), class: "text-[#ec3750] hover:text-blue-800" %>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div class="px-6 py-4">
+      <%= form_with url: send_invite_admin_event_participants_path(current_event), method: :post, class: "space-y-6", data: { turbo: false } do |f| %>
+        <p class="text-gray-600">
+          Send an email invitation to a participant to complete their onboarding for <strong><%= current_event.name %></strong>.
+        </p>
+
+        <div>
+          <%= f.label "invite[email]", "Email Address", class: "block text-sm font-medium text-gray-700" %>
+          <%= f.email_field "invite[email]", required: true, placeholder: "participant@example.com", class: "mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+        </div>
+
+        <div>
+          <%= f.label "invite[name]", "Name (optional)", class: "block text-sm font-medium text-gray-700" %>
+          <%= f.text_field "invite[name]", placeholder: "First Last", class: "mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          <p class="mt-1 text-sm text-gray-500">If provided, the name will be used in the email greeting.</p>
+        </div>
+
+        <% if current_event.groups_enabled? && current_event.groups.any? %>
+          <div>
+            <span class="block text-sm font-medium text-gray-700 mb-1">Groups (optional)</span>
+            <div class="border border-gray-300 rounded-md p-3 space-y-2">
+              <% current_event.groups.ordered.each do |g| %>
+                <label class="flex items-center gap-3 cursor-pointer">
+                  <%= check_box_tag "invite[group_ids][]", g.id, false,
+                      class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                        style="background-color: <%= g.normalized_color || '#e5e7eb' %>; color: <%= g.color.present? ? 'white' : '#1f2d3d' %>;">
+                    <%= g.name %>
+                  </span>
+                </label>
+              <% end %>
+            </div>
+            <p class="mt-1 text-sm text-gray-500">Selected groups will be applied when the participant accepts the invite.</p>
+          </div>
+        <% end %>
+
+        <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+          <p class="text-sm text-blue-800">
+            <strong>What happens next:</strong> The participant will receive an email with a link to sign in with Hack Club Auth and complete the onboarding process for this event.
+          </p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row justify-end gap-3">
+          <%= link_to "Cancel", admin_event_participants_path(current_event), class: "w-full sm:w-auto text-center px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors" %>
+          <%= f.submit "Send Invitation", class: "w-full sm:w-auto px-4 py-2 bg-[#ec3750] text-white rounded-md hover:bg-[#d42f46] transition-colors cursor-pointer" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,19 @@
+<p>Hi <%= @first_name %>!</p>
+
+<p>We're super excited to invite you to complete your onboarding materials for Hack Club's <%= @event_name %>. We enjoyed reviewing your projects, and now welcome you to <%= @location %> to join us for an amazing hackathon.</p>
+
+<p style="margin: 24px 0;">
+  <%= mail_button "Complete your onboarding using Attend", @onboarding_url %>
+</p>
+
+<p><strong>What does this include?</strong></p>
+<ul>
+  <li>You'll be asked to sign in with Hack Club Account - if you don't have one, it'll run you through the process automatically.</li>
+  <li>You'll add information like your name, birthday, and your contact info as well as your medical information.</li>
+  <li>You'll let us know how you're getting to <%= @location %> - plane, bus, car etc.</li>
+  <li>You'll let us know your parent/guardian's email & contact details in case of emergency.</li>
+</ul>
+
+<p>If you have any questions about this process, don't hesitate to email us at <%= mail_to @support_email %>, or just hit reply to this email!</p>
+
+<p>We can't wait to see you at <%= @event_name %>!</p>

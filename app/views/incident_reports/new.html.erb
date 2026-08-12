@@ -1,0 +1,198 @@
+<% content_for :title, "Report an Incident – Hack Club" %>
+
+<div class="w-full max-w-2xl mx-auto"
+     data-controller="incident-report"
+     data-incident-report-signed-in-value="<%= user_signed_in? %>">
+
+  <h1 class="text-2xl font-bold text-[#1f2d3d] mb-1">File a Confidential Incident Report</h1>
+  <p class="text-sm text-[#33d6a6] font-semibold mb-6">Average response time: 4–5 hours</p>
+
+  <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 text-sm text-blue-900 space-y-3">
+    <p>
+      Hi there! This form is for Hack Club event staff, volunteers, organizers, mentors,
+      parents, attendees, and anyone else to file incident reports directly to Hack Club HQ.
+      This data is <strong>100% confidential</strong> and is not accessible to other Hack Club
+      staff members. Please file your report freely and candidly — we assure you that we will
+      fully and thoroughly investigate the incident.
+    </p>
+    <p class="font-medium text-red-700">
+      For medical emergencies, call 911 (or your local emergency number) and get the affected
+      person the help they need before filling out this form.
+    </p>
+    <p>
+      If you have any questions, please reach out directly to
+      <a href="mailto:deven@hackclub.com" class="underline font-medium">deven@hackclub.com</a>.
+    </p>
+  </div>
+
+  <% unless user_signed_in? %>
+    <div class="flex items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-6">
+      <p class="text-sm text-gray-600">
+        Hack Club participant or staff? Log in to prefill your details.
+      </p>
+      <%= button_to user_hack_club_omniauth_authorize_path,
+            method: :post,
+            data: { turbo: false },
+            class: "shrink-0 text-sm bg-white border border-gray-300 hover:border-gray-400 text-[#1f2d3d] font-medium px-3 py-1.5 rounded-lg transition-colors" do %>
+        Log in with Hack Club
+      <% end %>
+    </div>
+  <% end %>
+
+  <%= form_with model: @incident_report, url: incident_report_path, method: :post,
+        html: { multipart: true, novalidate: false },
+        data: { incident_report_target: "form" } do |f| %>
+
+    <% if @incident_report.errors.any? %>
+      <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <p class="text-sm font-medium text-red-800 mb-1">Please fix the following:</p>
+        <ul class="list-disc list-inside text-sm text-red-700">
+          <% @incident_report.errors.full_messages.each do |message| %>
+            <li><%= message %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div class="space-y-6">
+      <div>
+        <%= f.label :reporter_name, "What is your full name?", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.text_field :reporter_name, required: true,
+              data: { incident_report_target: "persist" },
+              class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+      </div>
+
+      <div>
+        <%= f.label :reporter_email, "What is your email?", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.email_field :reporter_email, required: true,
+              data: { incident_report_target: "persist" },
+              class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+      </div>
+
+      <div>
+        <%= f.label :reporter_phone, "What is your phone number?", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <p class="text-xs text-gray-500 mb-1">
+          We'll only use this if we need more information, and to send you SMS updates on your case if needed.
+        </p>
+        <%= f.telephone_field :reporter_phone, required: true,
+              data: { incident_report_target: "persist" },
+              class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+      </div>
+
+      <div>
+        <%= f.label :reporter_role, "What best describes you?", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.select :reporter_role,
+              IncidentReport::ROLES.map { |value, label| [ label, value ] },
+              { prompt: "Select one" },
+              required: true,
+              data: { incident_report_target: "persist role", action: "change->incident-report#roleChanged" },
+              class: "w-full border border-gray-300 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+
+        <div data-incident-report-target="loginPrompt" class="hidden mt-2 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-sm text-amber-900 flex items-center justify-between gap-3">
+          <span>Logging in lets us link this report to your Hack Club account. Your progress on this form will be saved.</span>
+          <%= button_to user_hack_club_omniauth_authorize_path,
+                method: :post,
+                data: { turbo: false },
+                form: { class: "shrink-0" },
+                class: "shrink-0 text-sm bg-white border border-amber-300 hover:border-amber-400 text-amber-900 font-medium px-3 py-1.5 rounded-lg" do %>
+            Log in
+          <% end %>
+        </div>
+      </div>
+
+      <div>
+        <% selected_choice = @incident_report.event_id.presence || (@incident_report.custom_event_name.present? ? "custom:#{@incident_report.custom_event_name}" : nil) %>
+        <label for="event_choice" class="block text-sm font-medium text-gray-700 mb-1">Event name</label>
+        <select name="event_choice" id="event_choice" required
+                data-incident-report-target="persist eventSelect"
+                data-action="change->incident-report#eventChanged"
+                class="w-full border border-gray-300 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">Select the event</option>
+          <% @events.each do |event| %>
+            <% allowed = event.ends_at.nil? || event.ends_at >= 1.month.ago %>
+            <option value="<%= event.id %>" data-emergency-allowed="<%= allowed %>" <%= "selected" if selected_choice == event.id %>><%= event.name %></option>
+          <% end %>
+          <% if custom_events.any? %>
+            <optgroup label="Other / past events">
+              <% custom_events.each do |name| %>
+                <option value="custom:<%= name %>" data-emergency-allowed="false" <%= "selected" if selected_choice == "custom:#{name}" %>><%= name %></option>
+              <% end %>
+            </optgroup>
+          <% end %>
+        </select>
+      </div>
+
+      <div>
+        <%= f.label :incident_type, "Incident type", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.select :incident_type,
+              IncidentReport::INCIDENT_TYPES.map { |value, label| [ label, value ] },
+              { prompt: "Select one" },
+              required: true,
+              data: { incident_report_target: "persist incidentType", action: "change->incident-report#incidentTypeChanged" },
+              class: "w-full border border-gray-300 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+
+        <div data-incident-report-target="medicalQuestion" class="hidden mt-2 bg-red-50 border border-red-200 rounded-md px-3 py-2.5">
+          <label class="flex items-start gap-2 text-sm text-red-900">
+            <%= f.check_box :emergency_services_called,
+                  data: { incident_report_target: "persist emergencyServices", action: "change->incident-report#emergencyServicesChanged" },
+                  class: "mt-0.5 rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+            <span>Emergency services (e.g. 911) have already been called for this incident.</span>
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <%= f.label :priority, "Priority", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <p class="text-xs text-gray-500 mb-1">
+          Please use the Emergency option sparingly and only if needed. It rings our personal phones!
+        </p>
+        <%= f.select :priority,
+              IncidentReport::PRIORITIES.map { |value, label| [ label, value ] },
+              { prompt: "Select one" },
+              required: true,
+              data: { incident_report_target: "persist priority" },
+              class: "w-full border border-gray-300 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500" %>
+        <p data-incident-report-target="priorityLock" class="hidden mt-1 text-xs text-red-700">
+          Priority is set to Emergency because emergency services have been called.
+        </p>
+      </div>
+
+      <div>
+        <%= f.label :summary, "Describe the incident in one line", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.text_field :summary, required: true,
+              data: { incident_report_target: "persist" },
+              class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+      </div>
+
+      <div>
+        <%= f.label :details, "Please add additional notes — be as thorough as you can!", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.text_area :details, rows: 8, required: true,
+              data: { incident_report_target: "persist" },
+              class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+      </div>
+
+      <div>
+        <%= f.label :attachments, "Attachments (if any)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <p class="text-xs text-gray-500 mb-1">Up to <%= IncidentReport::MAX_ATTACHMENT_COUNT %> files, 25MB each.</p>
+        <%= f.file_field :attachments, multiple: true,
+              data: { incident_report_target: "fileInput", action: "change->incident-report#validateFiles" },
+              class: "block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200" %>
+        <p data-incident-report-target="fileError" class="hidden mt-1 text-sm text-red-600"></p>
+      </div>
+
+      <% if TurnstileVerifier.site_key.present? && !user_signed_in? %>
+        <div class="cf-turnstile" data-sitekey="<%= TurnstileVerifier.site_key %>"></div>
+      <% end %>
+
+      <div>
+        <%= f.submit "Submit report",
+              data: { incident_report_target: "submit" },
+              class: "w-full sm:w-auto bg-[#ec3750] hover:bg-[#d42f46] text-white font-semibold px-6 py-2.5 rounded-lg transition-colors cursor-pointer" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if TurnstileVerifier.site_key.present? && !user_signed_in? %>
+  <%= javascript_include_tag "https://challenges.cloudflare.com/turnstile/v0/api.js", async: true, defer: true %>
+<% end %>

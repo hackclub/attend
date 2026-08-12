@@ -1,0 +1,668 @@
+/*
+ * attend theming
+ *
+ * how it works:
+ *   - each theme defines a semantic palette (--bg-app, --text-strong, etc.)
+ *   - we override tailwind v4's `--color-*` tokens to point at those semantic vars,
+ *     so utilities like `bg-white`, `text-gray-700`, `border-gray-200` re-skin
+ *     automatically
+ *   - the codebase also uses arbitrary tailwind values like `bg-[#f9fafc]`. those
+ *     bake the literal hex into the generated css, so we override each one
+ *     explicitly at the bottom of this file
+ *
+ * to add a new theme: copy a block, change the semantic vars, done.
+ */
+
+/* ---------- default (light / hack club) ---------- */
+:root,
+[data-theme="light"] {
+  /* surfaces */
+  --bg-app: #f9fafc;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #f7f7f9;
+  --bg-elev-3: #f3f4f6;
+  --bg-sunken: #e6e6ea;
+  --bg-dark: #17171d;
+  --bg-darker: #1f2d3d;
+
+  /* text */
+  --text-strong: #1f2d3d;
+  --text: #3c4858;
+  --text-soft: #5a6473;
+  --text-muted: #8492a6;
+  --text-faint: #9ca3af;
+  --text-on-dark: #ffffff;
+  --text-link: #2563eb;
+
+  /* borders */
+  --border-soft: #f3f4f6;
+  --border: #e5e7eb;
+  --border-strong: #d1d5db;
+  --border-card: #e0e6ed;
+
+  /* brand */
+  --accent: #ec3750;
+  --accent-strong: #d42f46;
+  --accent-soft: rgba(236, 55, 80, 0.10);
+  --accent-on: #ffffff;
+
+  /* states */
+  --success: #33d6a6;
+  --success-strong: #2ab890;
+  --success-soft: rgba(51, 214, 166, 0.10);
+  --warning: #ff8c37;
+  --warning-strong: #f97316;
+  --danger: #ec3750;
+  --danger-strong: #d42f46;
+  --info: #338eda;
+
+  /* shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.10);
+
+  color-scheme: light;
+}
+
+/* ---------- dark (neutral, brand-preserving) ---------- */
+[data-theme="dark"] {
+  --bg-app: #0f1115;
+  --bg-elev: #161922;
+  --bg-elev-2: #1c2030;
+  --bg-elev-3: #242938;
+  --bg-sunken: #2a2f40;
+  --bg-dark: #0a0c11;
+  --bg-darker: #07090d;
+
+  --text-strong: #f3f4f8;
+  --text: #d6dae5;
+  --text-soft: #aab1c1;
+  --text-muted: #8089a0;
+  --text-faint: #5b6377;
+  --text-on-dark: #f3f4f8;
+  --text-link: #7dabff;
+
+  --border-soft: #1d2231;
+  --border: #2a3043;
+  --border-strong: #3a4159;
+  --border-card: #2a3043;
+
+  --accent: #ec3750;
+  --accent-strong: #ff5670;
+  --accent-soft: rgba(236, 55, 80, 0.16);
+  --accent-on: #ffffff;
+
+  --success: #33d6a6;
+  --success-strong: #4ee2b4;
+  --success-soft: rgba(51, 214, 166, 0.14);
+  --warning: #ff8c37;
+  --warning-strong: #ffa55c;
+  --danger: #ff5670;
+  --danger-strong: #ff7588;
+  --info: #5aa4e6;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+
+  color-scheme: dark;
+}
+
+/* ---------- catppuccin latte ---------- */
+[data-theme="catppuccin-latte"] {
+  --bg-app: #eff1f5;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #e6e9ef;
+  --bg-elev-3: #dce0e8;
+  --bg-sunken: #ccd0da;
+  --bg-dark: #4c4f69;
+  --bg-darker: #3e4055;
+
+  --text-strong: #4c4f69;
+  --text: #5c5f77;
+  --text-soft: #6c6f85;
+  --text-muted: #8c8fa1;
+  --text-faint: #9ca0b0;
+  --text-on-dark: #eff1f5;
+  --text-link: #1e66f5;
+
+  --border-soft: #e6e9ef;
+  --border: #ccd0da;
+  --border-strong: #bcc0cc;
+  --border-card: #ccd0da;
+
+  --accent: #d20f39;        /* red */
+  --accent-strong: #b3082e;
+  --accent-soft: rgba(210, 15, 57, 0.10);
+  --accent-on: #ffffff;
+
+  --success: #40a02b;
+  --success-strong: #2f8020;
+  --success-soft: rgba(64, 160, 43, 0.12);
+  --warning: #fe640b;
+  --warning-strong: #df8e1d;
+  --danger: #d20f39;
+  --danger-strong: #b3082e;
+  --info: #1e66f5;
+
+  color-scheme: light;
+}
+
+/* ---------- catppuccin frappé ---------- */
+[data-theme="catppuccin-frappe"] {
+  --bg-app: #303446;
+  --bg-elev: #414559;
+  --bg-elev-2: #292c3c;
+  --bg-elev-3: #51576d;
+  --bg-sunken: #232634;
+  --bg-dark: #232634;
+  --bg-darker: #1e2030;
+
+  --text-strong: #c6d0f5;
+  --text: #b5bfe2;
+  --text-soft: #a5adce;
+  --text-muted: #838ba7;
+  --text-faint: #737994;
+  --text-on-dark: #c6d0f5;
+  --text-link: #8caaee;
+
+  --border-soft: #292c3c;
+  --border: #51576d;
+  --border-strong: #626880;
+  --border-card: #51576d;
+
+  --accent: #e78284;
+  --accent-strong: #ef9b9d;
+  --accent-soft: rgba(231, 130, 132, 0.14);
+  --accent-on: #303446;
+
+  --success: #a6d189;
+  --success-strong: #b9dfa0;
+  --success-soft: rgba(166, 209, 137, 0.14);
+  --warning: #ef9f76;
+  --warning-strong: #f2b48f;
+  --danger: #e78284;
+  --danger-strong: #ef9b9d;
+  --info: #8caaee;
+
+  color-scheme: dark;
+}
+
+/* ---------- catppuccin macchiato ---------- */
+[data-theme="catppuccin-macchiato"] {
+  --bg-app: #24273a;
+  --bg-elev: #363a4f;
+  --bg-elev-2: #1e2030;
+  --bg-elev-3: #494d64;
+  --bg-sunken: #181926;
+  --bg-dark: #181926;
+  --bg-darker: #11111b;
+
+  --text-strong: #cad3f5;
+  --text: #b8c0e0;
+  --text-soft: #a5adcb;
+  --text-muted: #8087a2;
+  --text-faint: #6e738d;
+  --text-on-dark: #cad3f5;
+  --text-link: #8aadf4;
+
+  --border-soft: #1e2030;
+  --border: #494d64;
+  --border-strong: #5b6078;
+  --border-card: #494d64;
+
+  --accent: #ed8796;
+  --accent-strong: #f0a5b0;
+  --accent-soft: rgba(237, 135, 150, 0.14);
+  --accent-on: #24273a;
+
+  --success: #a6da95;
+  --success-strong: #bce4ae;
+  --success-soft: rgba(166, 218, 149, 0.14);
+  --warning: #f5a97f;
+  --warning-strong: #f7bc99;
+  --danger: #ed8796;
+  --danger-strong: #f0a5b0;
+  --info: #8aadf4;
+
+  color-scheme: dark;
+}
+
+/* ---------- catppuccin mocha ---------- */
+[data-theme="catppuccin-mocha"] {
+  --bg-app: #1e1e2e;
+  --bg-elev: #313244;
+  --bg-elev-2: #181825;
+  --bg-elev-3: #45475a;
+  --bg-sunken: #11111b;
+  --bg-dark: #11111b;
+  --bg-darker: #0a0a12;
+
+  --text-strong: #cdd6f4;
+  --text: #bac2de;
+  --text-soft: #a6adc8;
+  --text-muted: #7f849c;
+  --text-faint: #6c7086;
+  --text-on-dark: #cdd6f4;
+  --text-link: #89b4fa;
+
+  --border-soft: #181825;
+  --border: #45475a;
+  --border-strong: #585b70;
+  --border-card: #45475a;
+
+  --accent: #f38ba8;
+  --accent-strong: #f7a6bd;
+  --accent-soft: rgba(243, 139, 168, 0.14);
+  --accent-on: #1e1e2e;
+
+  --success: #a6e3a1;
+  --success-strong: #bdebb9;
+  --success-soft: rgba(166, 227, 161, 0.14);
+  --warning: #fab387;
+  --warning-strong: #fbc4a0;
+  --danger: #f38ba8;
+  --danger-strong: #f7a6bd;
+  --info: #89b4fa;
+
+  color-scheme: dark;
+}
+
+/* ---------- dracula ---------- */
+[data-theme="dracula"] {
+  --bg-app: #282a36;
+  --bg-elev: #343746;
+  --bg-elev-2: #21222c;
+  --bg-elev-3: #44475a;
+  --bg-sunken: #191a21;
+  --bg-dark: #191a21;
+  --bg-darker: #0e0f14;
+
+  --text-strong: #f8f8f2;
+  --text: #e2e2dc;
+  --text-soft: #c5c5bf;
+  --text-muted: #a4a4a0;
+  --text-faint: #6272a4;
+  --text-on-dark: #f8f8f2;
+  --text-link: #8be9fd;
+
+  --border-soft: #21222c;
+  --border: #44475a;
+  --border-strong: #6272a4;
+  --border-card: #44475a;
+
+  --accent: #ff79c6;
+  --accent-strong: #ff92d3;
+  --accent-soft: rgba(255, 121, 198, 0.14);
+  --accent-on: #282a36;
+
+  --success: #50fa7b;
+  --success-strong: #6dfb91;
+  --success-soft: rgba(80, 250, 123, 0.14);
+  --warning: #ffb86c;
+  --warning-strong: #ffc78a;
+  --danger: #ff5555;
+  --danger-strong: #ff7474;
+  --info: #8be9fd;
+
+  color-scheme: dark;
+}
+
+/* ---------- nord ---------- */
+[data-theme="nord"] {
+  --bg-app: #2e3440;
+  --bg-elev: #3b4252;
+  --bg-elev-2: #292e39;
+  --bg-elev-3: #434c5e;
+  --bg-sunken: #242832;
+  --bg-dark: #242832;
+  --bg-darker: #1a1d24;
+
+  --text-strong: #eceff4;
+  --text: #d8dee9;
+  --text-soft: #c4cad3;
+  --text-muted: #9aa3b2;
+  --text-faint: #6c7686;
+  --text-on-dark: #eceff4;
+  --text-link: #88c0d0;
+
+  --border-soft: #292e39;
+  --border: #434c5e;
+  --border-strong: #4c566a;
+  --border-card: #434c5e;
+
+  --accent: #88c0d0;
+  --accent-strong: #9fcedb;
+  --accent-soft: rgba(136, 192, 208, 0.14);
+  --accent-on: #2e3440;
+
+  --success: #a3be8c;
+  --success-strong: #b6ce9f;
+  --success-soft: rgba(163, 190, 140, 0.14);
+  --warning: #d08770;
+  --warning-strong: #db9d85;
+  --danger: #bf616a;
+  --danger-strong: #cc7a82;
+  --info: #81a1c1;
+
+  color-scheme: dark;
+}
+
+/* ---------- solarized dark ---------- */
+[data-theme="solarized-dark"] {
+  --bg-app: #002b36;
+  --bg-elev: #073642;
+  --bg-elev-2: #00212b;
+  --bg-elev-3: #0a4554;
+  --bg-sunken: #001a22;
+  --bg-dark: #001a22;
+  --bg-darker: #00111a;
+
+  --text-strong: #fdf6e3;
+  --text: #eee8d5;
+  --text-soft: #93a1a1;
+  --text-muted: #839496;
+  --text-faint: #657b83;
+  --text-on-dark: #fdf6e3;
+  --text-link: #268bd2;
+
+  --border-soft: #00212b;
+  --border: #0a4554;
+  --border-strong: #586e75;
+  --border-card: #0a4554;
+
+  --accent: #dc322f;
+  --accent-strong: #e75452;
+  --accent-soft: rgba(220, 50, 47, 0.14);
+  --accent-on: #fdf6e3;
+
+  --success: #859900;
+  --success-strong: #a3bd00;
+  --success-soft: rgba(133, 153, 0, 0.16);
+  --warning: #cb4b16;
+  --warning-strong: #d56230;
+  --danger: #dc322f;
+  --danger-strong: #e75452;
+  --info: #268bd2;
+
+  color-scheme: dark;
+}
+
+/* ====================================================================
+ * tailwind v4 default color token overrides
+ *
+ * tailwind v4 exposes every theme color as a `--color-*` css variable
+ * and its utilities reference them via `var(--color-*)`. by overriding
+ * the variables inside a theme scope, every utility built on those
+ * tokens (bg-white, text-gray-700, border-red-500, etc.) re-skins for
+ * free.
+ *
+ * we re-declare them on `:root` too so the default theme keeps the same
+ * literal values tailwind ships with.
+ * ==================================================================== */
+
+/* `data-theme="light"` is intentionally absent — we leave tailwind's defaults
+ * alone so light mode is byte-identical to before. every other theme below
+ * remaps the `--color-*` tokens to the semantic palette declared above. */
+[data-theme="dark"],
+[data-theme="catppuccin-latte"],
+[data-theme="catppuccin-frappe"],
+[data-theme="catppuccin-macchiato"],
+[data-theme="catppuccin-mocha"],
+[data-theme="dracula"],
+[data-theme="nord"],
+[data-theme="solarized-dark"] {
+  --color-white: var(--bg-elev);
+  --color-black: var(--bg-darker);
+
+  --color-gray-50: var(--bg-app);
+  --color-gray-100: var(--bg-elev-2);
+  --color-gray-200: var(--border);
+  --color-gray-300: var(--border-strong);
+  --color-gray-400: var(--text-faint);
+  --color-gray-500: var(--text-muted);
+  --color-gray-600: var(--text-soft);
+  --color-gray-700: var(--text);
+  --color-gray-800: var(--text-strong);
+  --color-gray-900: var(--text-strong);
+  --color-gray-950: var(--bg-darker);
+
+  --color-slate-50: var(--bg-app);
+  --color-slate-100: var(--bg-elev-2);
+  --color-slate-200: var(--border);
+  --color-slate-300: var(--border-strong);
+  --color-slate-400: var(--text-faint);
+  --color-slate-500: var(--text-muted);
+  --color-slate-600: var(--text-soft);
+  --color-slate-700: var(--text);
+  --color-slate-800: var(--text-strong);
+  --color-slate-900: var(--text-strong);
+
+  --color-zinc-50: var(--bg-app);
+  --color-zinc-100: var(--bg-elev-2);
+  --color-zinc-200: var(--border);
+  --color-zinc-300: var(--border-strong);
+  --color-zinc-700: var(--text);
+  --color-zinc-800: var(--text-strong);
+  --color-zinc-900: var(--text-strong);
+
+  --color-neutral-100: var(--bg-elev-2);
+  --color-neutral-200: var(--border);
+  --color-neutral-700: var(--text);
+  --color-neutral-800: var(--text-strong);
+  --color-neutral-900: var(--text-strong);
+
+  /* tinted surfaces (the 50/100/200 shades that show up as light-tinted
+   * cards on white) get mapped to dark tinted surfaces. the 500/600 stay
+   * saturated for accent buttons. the 700/800/900 (typically used for text
+   * on those light tints) get flipped to light tints of the same hue so
+   * text stays readable. we use color-mix against bg-elev so each theme's
+   * surface tone shows through. */
+  --color-red-50:  color-mix(in oklab, #ef4444 12%, var(--bg-elev));
+  --color-red-100: color-mix(in oklab, #ef4444 20%, var(--bg-elev));
+  --color-red-200: color-mix(in oklab, #ef4444 28%, var(--bg-elev));
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+  --color-red-900: #fee2e2;
+
+  --color-orange-50:  color-mix(in oklab, #f97316 12%, var(--bg-elev));
+  --color-orange-100: color-mix(in oklab, #f97316 20%, var(--bg-elev));
+  --color-orange-200: color-mix(in oklab, #f97316 28%, var(--bg-elev));
+  --color-orange-700: #fdba74;
+  --color-orange-800: #fed7aa;
+
+  --color-amber-50:  color-mix(in oklab, #f59e0b 14%, var(--bg-elev));
+  --color-amber-100: color-mix(in oklab, #f59e0b 22%, var(--bg-elev));
+  --color-amber-200: color-mix(in oklab, #f59e0b 30%, var(--bg-elev));
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fef3c7;
+
+  --color-yellow-50:  color-mix(in oklab, #eab308 14%, var(--bg-elev));
+  --color-yellow-100: color-mix(in oklab, #eab308 22%, var(--bg-elev));
+  --color-yellow-200: color-mix(in oklab, #eab308 30%, var(--bg-elev));
+  --color-yellow-700: #fde047;
+  --color-yellow-800: #fef08a;
+
+  --color-green-50:  color-mix(in oklab, #22c55e 12%, var(--bg-elev));
+  --color-green-100: color-mix(in oklab, #22c55e 20%, var(--bg-elev));
+  --color-green-200: color-mix(in oklab, #22c55e 28%, var(--bg-elev));
+  --color-green-700: #86efac;
+  --color-green-800: #bbf7d0;
+  --color-green-900: #dcfce7;
+
+  --color-emerald-50:  color-mix(in oklab, #10b981 12%, var(--bg-elev));
+  --color-emerald-100: color-mix(in oklab, #10b981 20%, var(--bg-elev));
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+
+  --color-teal-50:  color-mix(in oklab, #14b8a6 12%, var(--bg-elev));
+  --color-teal-100: color-mix(in oklab, #14b8a6 20%, var(--bg-elev));
+
+  --color-sky-50:  color-mix(in oklab, #0ea5e9 12%, var(--bg-elev));
+  --color-sky-100: color-mix(in oklab, #0ea5e9 20%, var(--bg-elev));
+  --color-sky-700: #7dd3fc;
+  --color-sky-800: #bae6fd;
+
+  --color-blue-50:  color-mix(in oklab, #3b82f6 12%, var(--bg-elev));
+  --color-blue-100: color-mix(in oklab, #3b82f6 20%, var(--bg-elev));
+  --color-blue-200: color-mix(in oklab, #3b82f6 28%, var(--bg-elev));
+  --color-blue-700: #93c5fd;
+  --color-blue-800: #bfdbfe;
+  --color-blue-900: #dbeafe;
+
+  --color-indigo-50:  color-mix(in oklab, #6366f1 12%, var(--bg-elev));
+  --color-indigo-100: color-mix(in oklab, #6366f1 20%, var(--bg-elev));
+  --color-indigo-700: #a5b4fc;
+  --color-indigo-800: #c7d2fe;
+
+  --color-violet-50:  color-mix(in oklab, #8b5cf6 12%, var(--bg-elev));
+  --color-violet-100: color-mix(in oklab, #8b5cf6 20%, var(--bg-elev));
+  --color-violet-700: #c4b5fd;
+  --color-violet-800: #ddd6fe;
+
+  --color-purple-50:  color-mix(in oklab, #a855f7 12%, var(--bg-elev));
+  --color-purple-100: color-mix(in oklab, #a855f7 20%, var(--bg-elev));
+  --color-purple-200: color-mix(in oklab, #a855f7 28%, var(--bg-elev));
+  --color-purple-700: #d8b4fe;
+  --color-purple-800: #e9d5ff;
+
+  --color-pink-50:  color-mix(in oklab, #ec4899 12%, var(--bg-elev));
+  --color-pink-100: color-mix(in oklab, #ec4899 20%, var(--bg-elev));
+  --color-pink-700: #f9a8d4;
+  --color-pink-800: #fbcfe8;
+
+  --color-rose-50:  color-mix(in oklab, #f43f5e 12%, var(--bg-elev));
+  --color-rose-100: color-mix(in oklab, #f43f5e 20%, var(--bg-elev));
+  --color-rose-700: #fda4af;
+  --color-rose-800: #fecdd3;
+}
+
+/* ====================================================================
+ * arbitrary hex utility overrides
+ *
+ * tailwind bakes the literal hex into utilities like `bg-[#f9fafc]`,
+ * so we can't theme those via @theme. instead we use the same class
+ * selector tailwind generates (with css escaping for `[`, `#`, `]`)
+ * and remap to semantic vars under each non-default theme scope.
+ *
+ * default (light) is left alone — those classes already render the
+ * intended hack club hex.
+ * ==================================================================== */
+
+[data-theme]:not([data-theme="light"]) {
+  /* backgrounds */
+  .bg-\[\#f9fafc\] { background-color: var(--bg-app); }
+  .bg-\[\#f7f7f9\] { background-color: var(--bg-elev-2); }
+  .bg-\[\#e5e7eb\] { background-color: var(--border); }
+  .bg-\[\#17171d\] { background-color: var(--bg-dark); }
+  .bg-\[\#252429\] { background-color: var(--bg-elev-2); }
+  .bg-\[\#1a1a2e\] { background-color: var(--bg-darker); }
+  .bg-\[\#1a1d21\] { background-color: var(--bg-elev-2); }
+  .bg-\[\#4A154B\] { background-color: var(--bg-darker); }
+  .bg-\[\#ec3750\] { background-color: var(--accent); }
+  .bg-\[\#ec3750\]\/10 { background-color: var(--accent-soft); }
+  .bg-\[\#33d6a6\]\/10 { background-color: var(--success-soft); }
+
+  /* text */
+  .text-\[\#1f2d3d\] { color: var(--text-strong); }
+  .text-\[\#3c4858\] { color: var(--text); }
+  .text-\[\#5a6473\] { color: var(--text-soft); }
+  .text-\[\#8492a6\] { color: var(--text-muted); }
+  .text-\[\#33d6a6\] { color: var(--success); }
+  .text-\[\#ec3750\] { color: var(--accent); }
+  .text-\[\#ff8c37\] { color: var(--warning); }
+
+  /* borders */
+  .border-\[\#e0e6ed\] { border-color: var(--border-card); }
+  .border-\[\#e5e7eb\] { border-color: var(--border); }
+  .border-\[\#252429\] { border-color: var(--border); }
+  .border-\[\#ec3750\] { border-color: var(--accent); }
+  .border-\[\#ec3750\]\/30 { border-color: color-mix(in oklab, var(--accent) 30%, transparent); }
+  .border-\[\#33d6a6\]\/30 { border-color: color-mix(in oklab, var(--success) 30%, transparent); }
+  .border-\[\#ff8c37\] { border-color: var(--warning); }
+  .border-l-\[\#ec3750\] { border-left-color: var(--accent); }
+  .border-l-\[\#33d6a6\] { border-left-color: var(--success); }
+
+  /* interactive states */
+  .hover\:bg-\[\#252429\]:hover { background-color: var(--bg-elev-3); }
+  .hover\:bg-\[\#3e1240\]:hover { background-color: var(--bg-darker); }
+  .hover\:bg-\[\#d42f46\]:hover { background-color: var(--accent-strong); }
+  .hover\:bg-\[\#ec3750\]:hover { background-color: var(--accent); }
+  .hover\:bg-\[\#f9fafc\]:hover { background-color: var(--bg-elev-2); }
+  .hover\:border-\[\#ec3750\]:hover { border-color: var(--accent); }
+  .hover\:text-\[\#1f2d3d\]:hover { color: var(--text-strong); }
+  .hover\:text-\[\#2ab890\]:hover { color: var(--success-strong); }
+  .hover\:text-\[\#3c4858\]:hover { color: var(--text); }
+  .hover\:text-\[\#d42f46\]:hover { color: var(--accent-strong); }
+  .hover\:text-\[\#ec3750\]:hover { color: var(--accent); }
+  .group:hover .group-hover\:text-\[\#ec3750\] { color: var(--accent); }
+  .focus\:border-\[\#ec3750\]:focus { border-color: var(--accent); }
+  .focus\:ring-\[\#ec3750\]:focus { --tw-ring-color: var(--accent); }
+  .focus\:ring-\[\#ec3750\]\/30:focus { --tw-ring-color: color-mix(in oklab, var(--accent) 30%, transparent); }
+}
+
+/* ====================================================================
+ * hack club legacy variables — keep them aligned with the active theme
+ * so .btn-hc-primary, .card-hc, .nav-item, etc. all re-skin.
+ * ==================================================================== */
+
+[data-theme]:not([data-theme="light"]) {
+  --hc-snow: var(--bg-app);
+  --hc-smoke: var(--border-card);
+  --hc-white: var(--bg-elev);
+  --hc-black: var(--text-strong);
+  --hc-slate: var(--text);
+  --hc-muted: var(--text-muted);
+  --hc-dark: var(--bg-dark);
+  --hc-darker: var(--bg-darker);
+  --hc-darkless: var(--bg-elev-2);
+  --hc-red: var(--accent);
+  --hc-orange: var(--warning);
+  --hc-green: var(--success);
+  --hc-blue: var(--info);
+  --hc-primary: var(--accent);
+}
+
+/* legacy css component overrides for dark-ish themes (the .nav-item etc.
+ * in hackclub.css use literal hex values that aren't variables) */
+[data-theme]:not([data-theme="light"]):not([data-theme="catppuccin-latte"]) {
+  .nav-item { color: var(--text); }
+  .nav-item:hover { background: rgba(255, 255, 255, 0.06); color: var(--text-strong); }
+  .nav-item-active { background: var(--bg-elev-3); color: var(--text-strong); }
+  .nav-item svg { color: var(--text-muted); }
+  .nav-item-active svg { color: var(--text-strong); }
+
+  .sidebar-pill { background: var(--bg-elev); border-color: var(--border); }
+  .sidebar-pill:hover { border-color: var(--border-strong); }
+
+  .sidebar-dropdown { background: var(--bg-elev); border-color: var(--border); }
+  .sidebar-dropdown-item { color: var(--text-strong); }
+  .sidebar-dropdown-item:hover { background: var(--bg-elev-3); }
+  .sidebar-dropdown-item-active { background: var(--bg-elev-3); }
+
+  .sidebar-icon-btn { color: var(--text-muted); }
+  .sidebar-icon-btn:hover { background: rgba(255, 255, 255, 0.06); color: var(--text-strong); }
+
+  .search-trigger { background: var(--bg-elev-2); border-color: var(--border); color: var(--text-muted); }
+  .search-trigger:hover { border-color: var(--border-strong); }
+  .search-trigger kbd { background: var(--bg-elev-3); color: var(--text-muted); }
+
+  .header-icon-btn { color: var(--text-muted); }
+  .header-icon-btn:hover { background: var(--bg-elev-3); color: var(--text-strong); }
+
+  .card-hc { background-color: var(--bg-elev); }
+  .card-hc-sunken { background-color: var(--bg-elev-2); }
+  .card-hc-interactive { background-color: var(--bg-elev); }
+}
+
+/* keep system scrollbars + form controls consistent with theme */
+[data-theme]:not([data-theme="light"]):not([data-theme="catppuccin-latte"]) {
+  input, select, textarea {
+    background-color: var(--bg-elev);
+    color: var(--text-strong);
+  }
+  input::placeholder, textarea::placeholder {
+    color: var(--text-muted);
+  }
+}

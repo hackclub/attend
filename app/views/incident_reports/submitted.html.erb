@@ -1,0 +1,24 @@
+<% content_for :title, "Report submitted – Hack Club" %>
+
+<div class="w-full max-w-2xl mx-auto text-center py-10" data-controller="incident-report-clear">
+  <div class="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-[#33d6a6]/15">
+    <svg class="h-7 w-7 text-[#33d6a6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+    </svg>
+  </div>
+
+  <h1 class="text-2xl font-bold text-[#1f2d3d] mb-2">Thank you — your report has been received.</h1>
+  <p class="text-gray-600 mb-2">
+    Your report is confidential and has been sent directly to Hack Club HQ. Our average
+    response time is 4–5 hours.
+  </p>
+  <p class="text-gray-600">
+    If you need to add anything or have questions, email
+    <a href="mailto:deven@hackclub.com" class="text-[#ec3750] underline">deven@hackclub.com</a>.
+  </p>
+
+  <div class="mt-8">
+    <%= link_to "File another report", incident_report_path,
+          class: "text-sm text-[#338eda] hover:underline" %>
+  </div>
+</div>

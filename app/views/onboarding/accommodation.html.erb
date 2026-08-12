@@ -1,0 +1,139 @@
+<div class="w-full max-w-2xl mx-auto">
+  <%= render "wizard_nav" %>
+
+  <h1 class="text-2xl font-bold mb-2">Accommodation</h1>
+  <p class="text-sm text-gray-600 mb-6">Fields marked with <span class="text-red-500">*</span> are required.</p>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      const genderBaseRadios = document.querySelectorAll('input[name="accommodation[gender_base]"]');
+      const isTransgenderCheckbox = document.getElementById("is_transgender_checkbox");
+      const roommateSection = document.getElementById("preferred_roommate_genders_section");
+      const genderBaseError = document.getElementById("gender_base_error");
+
+      function getSelectedGenderBase() {
+        for (const radio of genderBaseRadios) {
+          if (radio.checked) return radio.value;
+        }
+        return null;
+      }
+
+      function toggleRoommateSection() {
+        const genderBase = getSelectedGenderBase();
+        const isTransgender = isTransgenderCheckbox.checked;
+        
+        // Show roommate preferences for non-binary, trans female, trans male
+        if (genderBase === "non_binary" || isTransgender) {
+          roommateSection.classList.remove("hidden");
+        } else {
+          roommateSection.classList.add("hidden");
+        }
+      }
+
+      genderBaseRadios.forEach(radio => {
+        radio.addEventListener("change", toggleRoommateSection);
+      });
+      isTransgenderCheckbox.addEventListener("change", toggleRoommateSection);
+
+      const form = document.querySelector('form');
+      form.addEventListener("submit", function(e) {
+        const genderBase = getSelectedGenderBase();
+        const genderBaseError = document.getElementById("gender_base_error");
+        
+        if (!genderBase) {
+          e.preventDefault();
+          genderBaseError.classList.remove("hidden");
+          return false;
+        }
+        
+        genderBaseError.classList.add("hidden");
+      });
+      
+      genderBaseRadios.forEach(radio => {
+        radio.addEventListener("change", function() {
+          document.getElementById("gender_base_error").classList.add("hidden");
+        });
+      });
+
+      toggleRoommateSection();
+    });
+  </script>
+
+  <%= form_with model: @accommodation, url: onboarding_step_path(step: @step, event_id: current_event.id), scope: :accommodation, method: :patch, local: true, data: { turbo: false, controller: "autosave", autosave_url_value: onboarding_step_path(step: @step, event_id: current_event.id), action: "input->autosave#input change->autosave#change" }, novalidate: true do |f| %>
+    <%= render "autosave_status" %>
+    <div class="space-y-6">
+      <section>
+        <h2 class="text-lg font-semibold mb-4 pb-2 border-b">Gender & Room Preferences</h2>
+
+        <div class="space-y-4">
+          <div>
+             <%= f.label :gender_base, label_text("What gender do you identify as?", required: true), class: "block text-sm font-medium text-gray-700 mb-3" %>
+             <div id="gender_base_error" class="text-red-500 text-sm mb-2 hidden">Please select your gender identity</div>
+             <div class="space-y-2">
+               <label class="flex items-center gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors" style="border: 2px solid transparent; border-radius: 8px;">
+                 <%= f.radio_button :gender_base, "female", { id: "gender_base_female", class: "h-4 w-4 text-blue-600 focus:ring-blue-500", data: { gender_base_field: true } } %>
+                 <span class="text-gray-700 font-medium">Woman</span>
+               </label>
+               <label class="flex items-center gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors" style="border: 2px solid transparent; border-radius: 8px;">
+                 <%= f.radio_button :gender_base, "male", { id: "gender_base_male", class: "h-4 w-4 text-blue-600 focus:ring-blue-500", data: { gender_base_field: true } } %>
+                 <span class="text-gray-700 font-medium">Man</span>
+               </label>
+               <label class="flex items-center gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors" style="border: 2px solid transparent; border-radius: 8px;">
+                 <%= f.radio_button :gender_base, "non_binary", { id: "gender_base_non_binary", class: "h-4 w-4 text-blue-600 focus:ring-blue-500", data: { gender_base_field: true } } %>
+                 <span class="text-gray-700 font-medium">Non-binary</span>
+               </label>
+             </div>
+           </div>
+
+          <div>
+            <label class="flex items-center gap-3 p-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+              <%= f.check_box :is_transgender, { id: "is_transgender_checkbox", class: "h-5 w-5 text-blue-600 focus:ring-blue-500 rounded" }, "true", "false" %>
+              <span class="text-gray-700 font-medium">I identify as transgender</span>
+            </label>
+          </div>
+
+          <div id="preferred_roommate_genders_section" class="<%= 'hidden' unless @accommodation.gender_base.in?(%w[non_binary]) || @accommodation.is_transgender %>">
+            <span class="block text-sm font-medium text-gray-700 mb-2">What gender(s) would you like to be paired with? <span class="text-red-500">*</span></span>
+            <p class="mb-3 text-sm text-gray-500">Select at least one</p>
+            <div class="space-y-2">
+              <% Accommodation::ROOMMATE_GENDER_OPTIONS.each do |key, value| %>
+                <label class="flex items-center gap-2">
+                  <%= check_box_tag "accommodation[preferred_roommate_genders][]",
+                    value,
+                    @accommodation.preferred_roommate_genders&.include?(value),
+                    id: "preferred_roommate_genders_#{key}",
+                    class: "h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" %>
+                  <span class="text-sm text-gray-700"><%= key.to_s.titleize %></span>
+                </label>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <% if current_event.roommate_preferences_enabled? %>
+        <section>
+          <h2 class="text-lg font-semibold mb-4 pb-2 border-b">Roommate Preferences</h2>
+
+          <div class="space-y-4">
+            <div>
+              <%= f.label :roommate_preferences, "Preferred Roommates", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= f.text_area :roommate_preferences, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", placeholder: "Enter names of people you'd like to room with" %>
+              <p class="mt-1 text-sm text-gray-500">We'll do our best to accommodate preferences</p>
+            </div>
+
+            <div>
+              <%= f.label :roommate_exclusions, "Roommate Exclusions", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= f.text_area :roommate_exclusions, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", placeholder: "Enter names of people you cannot room with" %>
+              <p class="mt-1 text-sm text-gray-500">This information is kept confidential</p>
+            </div>
+          </div>
+        </section>
+      <% end %>
+
+      <%= f.hidden_field :onboarding_step, value: "accommodation" %>
+
+      <%= render "step_navigation" %>
+    </div>
+  <% end %>
+</div>

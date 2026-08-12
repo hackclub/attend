@@ -1,0 +1,75 @@
+<% content_for :title, "Events – Attend" %>
+
+<div class="w-full">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <h1 class="text-2xl font-bold">Events</h1>
+    <% if policy(Event).create? %>
+      <%= link_to "New Event", admin_new_event_path, class: "bg-[#ec3750] hover:bg-[#ec3750] text-white font-semibold py-2 px-4 rounded-lg transition-colors" %>
+    <% end %>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div class="overflow-x-auto -mx-4 sm:mx-0">
+      <table class="min-w-full divide-y divide-gray-100">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dates</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Participants</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-100 text-xs sm:text-sm">
+        <% @events.each do |event| %>
+          <tr>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="text-sm font-medium text-gray-900"><%= event.name %></div>
+              <div class="text-sm text-gray-500"><%= event.slug %></div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <% if event.completed? %>
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Past</span>
+              <% elsif event.active? %>
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+              <% elsif event.starts_at && event.starts_at > Time.current %>
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Upcoming</span>
+              <% else %>
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+              <% end %>
+              <% if event.registration_open? %>
+                <span class="ml-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Reg Open</span>
+              <% end %>
+              <% unless event.setup_complete? %>
+                <%= link_to "Setup incomplete", admin_event_setup_path(event), class: "ml-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800 hover:bg-amber-200" %>
+              <% end %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <% if event.starts_at && event.ends_at %>
+                <%= event.starts_at.strftime("%b %d") %> - <%= event.ends_at.strftime("%b %d, %Y") %>
+              <% else %>
+                <span class="text-gray-400">Dates not set</span>
+              <% end %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <%= event.participants.count %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+              <%= link_to "Select ↗", select_admin_event_path(event), class: "text-[#ec3750] hover:text-blue-900" %>
+            </td>
+          </tr>
+        <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if @events.empty? %>
+      <div class="text-center py-12 text-gray-500">
+        No events found.
+        <% if policy(Event).create? %>
+          <%= link_to "Create your first event", admin_new_event_path, class: "text-[#ec3750] hover:underline" %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>

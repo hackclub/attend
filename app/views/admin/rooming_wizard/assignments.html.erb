@@ -1,0 +1,306 @@
+<div class="space-y-6" data-controller="rooming-assignments">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Rooming Wizard</h1>
+      <p class="mt-1 text-sm text-gray-600">Step 3: Review and adjust room assignments</p>
+    </div>
+    <div class="flex items-center gap-4">
+      <span class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
+        Step 3 of 4
+      </span>
+      <%= link_to preferences_admin_event_rooming_wizard_path(@event.slug), class: "text-sm text-gray-500 hover:text-gray-700" do %>
+        ← Back to Preferences
+      <% end %>
+    </div>
+  </div>
+
+  <%= render "group_filter" %>
+
+  <!-- Summary Bar -->
+  <%= render partial: "admin/rooming_wizard/summary_bar" %>
+
+  <div class="grid grid-cols-4 gap-6">
+    <!-- Unassigned Participants Sidebar -->
+    <div class="col-span-1">
+      <%= render partial: "admin/rooming_wizard/unassigned_sidebar" %>
+    </div>
+
+    <!-- Rooms Grid -->
+    <div class="col-span-3">
+      <div id="rooms_container">
+        <%= render partial: "admin/rooming_wizard/rooms_container" %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Room Modal -->
+<div id="add-room-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true">
+  <div class="flex min-h-screen items-center justify-center p-4">
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="document.getElementById('add-room-modal').classList.add('hidden')"></div>
+    
+    <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+      <h3 class="text-lg font-medium text-gray-900 mb-4">Add Room</h3>
+      
+      <%= form_with url: create_room_admin_event_rooming_wizard_path(@event.slug), method: :post, data: { turbo: false } do |f| %>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Room Name/Number</label>
+            <input type="text" name="name" placeholder="e.g., Room 101" class="mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750]">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Capacity</label>
+            <input type="number" name="capacity" value="<%= @rooming_plan.room_capacity %>" min="1" class="mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750]">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Notes</label>
+            <textarea name="notes" rows="2" class="mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750]"></textarea>
+          </div>
+        </div>
+        
+        <div class="mt-6 flex justify-end gap-3">
+          <button type="button" onclick="document.getElementById('add-room-modal').classList.add('hidden')" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md">
+            Cancel
+          </button>
+          <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-[#ec3750] hover:bg-[#d42f46] rounded-md">
+            Create Room
+          </button>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  initDragAndDrop();
+  initRoomReorder();
+});
+
+let draggedRoomId = null;
+
+function initRoomReorder() {
+  document.querySelectorAll('.room-card').forEach(card => {
+    if (card.getAttribute('draggable') !== 'true') return;
+
+    card.addEventListener('dragstart', handleRoomDragStart);
+    card.addEventListener('dragend', handleRoomDragEnd);
+    card.addEventListener('dragover', handleRoomDragOver);
+    card.addEventListener('drop', handleRoomDrop);
+  });
+}
+
+function handleRoomDragStart(e) {
+  // Skip if the drag started from inside a participant card (those have their own handler)
+  if (e.target.closest('.draggable-participant')) return;
+  draggedRoomId = e.currentTarget.dataset.roomId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/room-id', draggedRoomId);
+  e.currentTarget.classList.add('opacity-50');
+}
+
+function handleRoomDragEnd(e) {
+  e.currentTarget.classList.remove('opacity-50');
+  draggedRoomId = null;
+}
+
+function handleRoomDragOver(e) {
+  if (!draggedRoomId) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+async function handleRoomDrop(e) {
+  if (!draggedRoomId) return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  const targetId = e.currentTarget.dataset.roomId;
+  if (!targetId || targetId === draggedRoomId) return;
+
+  const list = document.getElementById('rooms_list');
+  const dragged = document.getElementById('room_' + draggedRoomId);
+  const target = e.currentTarget;
+  if (!list || !dragged || !target) return;
+
+  const cards = Array.from(list.children);
+  const draggedIndex = cards.indexOf(dragged);
+  const targetIndex = cards.indexOf(target);
+  if (draggedIndex < targetIndex) {
+    list.insertBefore(dragged, target.nextSibling);
+  } else {
+    list.insertBefore(dragged, target);
+  }
+
+  await persistRoomOrder();
+}
+
+async function persistRoomOrder() {
+  const ids = Array.from(document.querySelectorAll('#rooms_list .room-card')).map(c => c.dataset.roomId);
+  const formData = new FormData();
+  ids.forEach(id => formData.append('room_ids[]', id));
+
+  await fetch('<%= reorder_rooms_admin_event_rooming_wizard_path(@event.slug) %>', {
+    method: 'POST',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+    },
+    body: formData
+  });
+}
+
+function initDragAndDrop() {
+  document.querySelectorAll('.draggable-participant').forEach(el => {
+    el.addEventListener('dragstart', handleDragStart);
+    el.addEventListener('dragend', handleDragEnd);
+  });
+  
+  document.querySelectorAll('.room-drop-zone').forEach(zone => {
+    zone.addEventListener('dragover', handleDragOver);
+    zone.addEventListener('drop', handleDrop);
+    zone.addEventListener('dragleave', handleDragLeave);
+  });
+  
+  document.getElementById('unassigned-drop-zone')?.addEventListener('dragover', handleDragOver);
+  document.getElementById('unassigned-drop-zone')?.addEventListener('drop', handleDropToUnassigned);
+  document.getElementById('unassigned-drop-zone')?.addEventListener('dragleave', handleDragLeave);
+}
+
+function handleDragStart(e) {
+  e.dataTransfer.setData('text/plain', e.target.dataset.peId);
+  e.target.classList.add('opacity-50');
+}
+
+function handleDragEnd(e) {
+  e.target.classList.remove('opacity-50');
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('bg-blue-50', 'border-blue-300');
+}
+
+function handleDragLeave(e) {
+  e.currentTarget.classList.remove('bg-blue-50', 'border-blue-300');
+}
+
+async function handleDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('bg-blue-50', 'border-blue-300');
+  
+  const peId = e.dataTransfer.getData('text/plain');
+  const roomId = e.currentTarget.dataset.roomId;
+  
+  await moveAssignment(peId, roomId);
+}
+
+async function handleDropToUnassigned(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('bg-blue-50', 'border-blue-300');
+  
+  const peId = e.dataTransfer.getData('text/plain');
+  await moveAssignment(peId, null);
+}
+
+async function moveAssignment(peId, roomId) {
+  const formData = new FormData();
+  formData.append('participant_event_id', peId);
+  if (roomId) formData.append('room_id', roomId);
+  
+  const response = await fetch('<%= move_assignment_admin_event_rooming_wizard_path(@event.slug) %>', {
+    method: 'POST',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'text/vnd.turbo-stream.html'
+    },
+    body: formData
+  });
+  
+  if (response.ok) {
+    const html = await response.text();
+    Turbo.renderStreamMessage(html);
+    setTimeout(initDragAndDrop, 100);
+  } else {
+    const data = await response.json();
+    alert(data.error || 'Failed to move participant');
+  }
+}
+
+async function acknowledgeTransNb(assignmentId) {
+  await fetch('<%= acknowledge_trans_nb_admin_event_rooming_wizard_path(@event.slug) %>', {
+    method: 'POST',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: 'assignment_id=' + assignmentId
+  });
+  location.reload();
+}
+
+async function addStaff(e) {
+  e.preventDefault();
+  const roomId = document.getElementById('add-staff-room-id').value;
+  const staffName = document.getElementById('add-staff-name').value.trim();
+  
+  if (!staffName) {
+    alert('Please enter a staff name');
+    return;
+  }
+  
+  const response = await fetch('<%= add_staff_admin_event_rooming_wizard_path(@event.slug) %>', {
+    method: 'POST',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'text/vnd.turbo-stream.html',
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: 'room_id=' + roomId + '&staff_name=' + encodeURIComponent(staffName)
+  });
+  
+  if (response.ok) {
+    document.getElementById('add-staff-modal').classList.add('hidden');
+    const html = await response.text();
+    Turbo.renderStreamMessage(html);
+    setTimeout(initDragAndDrop, 100);
+  } else {
+    const data = await response.json();
+    alert(data.error || 'Failed to add staff');
+  }
+}
+</script>
+
+<!-- Add Staff Modal -->
+<div id="add-staff-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true">
+  <div class="flex min-h-screen items-center justify-center p-4">
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="document.getElementById('add-staff-modal').classList.add('hidden')"></div>
+    
+    <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+      <h3 class="text-lg font-medium text-gray-900 mb-4">Add Staff Member</h3>
+      
+      <form onsubmit="addStaff(event)">
+        <input type="hidden" id="add-staff-room-id">
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Staff Name</label>
+            <input type="text" id="add-staff-name" placeholder="e.g., Deven" 
+                   class="mt-1 block w-full rounded-md border-gray-300  focus:border-orange-500 focus:ring-orange-500">
+          </div>
+          <p class="text-sm text-gray-500">
+            Once a staff member is added to a room, participants cannot be assigned to it.
+          </p>
+        </div>
+        
+        <div class="mt-6 flex justify-end gap-3">
+          <button type="button" onclick="document.getElementById('add-staff-modal').classList.add('hidden')" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md">
+            Cancel
+          </button>
+          <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-md">
+            Add Staff
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

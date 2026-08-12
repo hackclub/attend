@@ -1,0 +1,80 @@
+<div class="w-full max-w-2xl mx-auto">
+  <div class="text-center py-12">
+    <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+      <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+      </svg>
+    </div>
+
+    <h1 class="text-3xl font-bold text-gray-900 mb-4">All Done!</h1>
+    <p class="text-lg text-gray-600 mb-8">
+      Thank you for completing the consent process for <%= @participant.legal_first_name %>.
+    </p>
+  </div>
+
+  <div class="bg-white border rounded-lg p-6 mb-8">
+    <h2 class="text-lg font-semibold mb-4">Submission Summary</h2>
+
+    <dl class="space-y-3">
+      <div class="flex justify-between py-2 border-b">
+        <dt class="text-gray-600">Participant</dt>
+        <dd class="font-medium"><%= @participant.legal_first_name %></dd>
+      </div>
+      <div class="flex justify-between py-2 border-b">
+        <dt class="text-gray-600">Event</dt>
+        <dd class="font-medium"><%= @event.name %></dd>
+      </div>
+      <div class="flex justify-between py-2 border-b">
+        <dt class="text-gray-600">Guardian</dt>
+        <dd class="font-medium"><%= @guardian.full_name %></dd>
+      </div>
+      <div class="flex justify-between py-2">
+        <dt class="text-gray-600">Completed</dt>
+        <dd class="font-medium"><%= @guardian_participant_event.completed_at&.strftime("%B %d, %Y at %l:%M %p") %></dd>
+      </div>
+    </dl>
+  </div>
+
+  <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+    <h3 class="font-semibold text-blue-900 mb-2">What happens next?</h3>
+    <ul class="text-sm text-blue-800 space-y-2">
+      <li class="flex items-start gap-2">
+        <svg class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>
+        <span>You'll receive a confirmation email with a copy of your signed documents.</span>
+      </li>
+      <li class="flex items-start gap-2">
+        <svg class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>
+        <span>The event team will review your submission and may contact you if they have questions.</span>
+      </li>
+      <li class="flex items-start gap-2">
+        <svg class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>
+        <span>You can return to this page anytime using the link in your email to review your submissions.</span>
+      </li>
+    </ul>
+  </div>
+
+  <div class="bg-gray-50 rounded-lg p-6">
+    <h3 class="font-semibold text-gray-900 mb-4">Need to make changes?</h3>
+    <p class="text-sm text-gray-600 mb-4">
+      If you need to update any information or have questions, please contact the event organizers.
+    </p>
+    <% if @event.contact_email.present? %>
+      <%= link_to "Contact Event Team", "mailto:#{@event.contact_email}", class: "inline-flex items-center text-blue-600 hover:text-blue-700 font-medium" do %>
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+        </svg>
+        <%= @event.contact_email %>
+      <% end %>
+    <% end %>
+  </div>
+
+  <div class="text-center mt-8">
+    <p class="text-sm text-gray-500">You can safely close this page.</p>
+  </div>
+</div>

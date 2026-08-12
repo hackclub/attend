@@ -1,0 +1,18 @@
+<h2>New <%= @ticket.channel.to_s.upcase %> chat</h2>
+
+<p>
+  <strong>From:</strong> <%= @ticket.phone_number %><br>
+  <strong>Channel:</strong> <%= @ticket.channel %><br>
+  <% if @ticket.subject.present? %>
+    <strong>Matched:</strong> <%= @ticket.subject_type %> #<%= @ticket.subject_id %><br>
+  <% end %>
+</p>
+
+<p><strong>First message:</strong></p>
+<blockquote style="border-left: 3px solid #ec3750; padding-left: 12px; margin: 0 0 16px;">
+  <%= simple_format(@message.body) %>
+</blockquote>
+
+<p>
+  <a class="button" href="<%= @ticket_url %>">Open ticket on Attend</a>
+</p>

@@ -1,0 +1,59 @@
+<% content_for :title, "Support Tickets – Attend" %>
+
+<div class="h-full flex flex-col p-6" data-controller="ticket-notifications">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Support Tickets</h1>
+    <div class="flex items-center gap-4">
+      <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+        <input type="checkbox" 
+               data-ticket-notifications-target="toggle"
+               data-action="ticket-notifications#toggleNotifications"
+               class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+        <span>Desktop notifications</span>
+      </label>
+
+    </div>
+  </div>
+
+  <%= turbo_stream_from :tickets_index %>
+  <%= turbo_stream_from :tickets_notifications %>
+  <%= turbo_stream_from "user_#{current_user.id}_notifications" %>
+  <div id="ticket_notifications" class="hidden" data-ticket-notifications-target="notifications"></div>
+  <div id="user_notifications" class="hidden" data-ticket-notifications-target="notifications"></div>
+
+  <% if @tickets.any? %>
+    <div class="bg-white shadow rounded-lg overflow-hidden flex-1">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Channel</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Message</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned To</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+            </tr>
+          </thead>
+          <tbody id="tickets" class="bg-white divide-y divide-gray-200 text-sm">
+            <% @tickets.each do |ticket| %>
+              <%= render "ticket_row", ticket: ticket %>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% else %>
+    <div class="bg-white shadow rounded-lg p-6 text-center text-gray-500 flex-1 flex items-center justify-center">
+      <div>
+        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+        </svg>
+        <p class="text-lg font-medium">No tickets yet</p>
+        <p class="mt-1 text-sm">Tickets will appear here when messages are received via Twilio.</p>
+      </div>
+    </div>
+  <% end %>
+</div>

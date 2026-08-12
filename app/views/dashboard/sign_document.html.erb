@@ -1,0 +1,114 @@
+<% content_for :title, "#{@custom_document.name} – #{@event.name} – Attend" %>
+
+<div class="w-full max-w-3xl mx-auto">
+  <div class="mb-6 text-center">
+    <p class="text-sm text-gray-500"><%= @event.name %></p>
+    <h2 class="text-lg font-semibold text-gray-900"><%= @custom_document.name %></h2>
+  </div>
+
+  <% if @consent.signed? %>
+    <div class="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+      <svg class="mx-auto h-12 w-12 text-green-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <p class="text-gray-700 text-lg">This document has been signed. You're all set!</p>
+    </div>
+    <div class="mt-6 text-center">
+      <%= link_to "Back to Dashboard", dashboard_event_path(@participant_event), class: "text-blue-600 hover:underline" %>
+    </div>
+  <% elsif @custom_document.physical? %>
+    <% if @consent.awaiting_guardian_verification? %>
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center mb-6">
+        <p class="text-gray-700 text-lg mb-2">Your upload is in — waiting on your parent/guardian.</p>
+        <p class="text-gray-500">They'll review the photo and confirm the document is complete. Need to swap a blurry photo? You can add more below.</p>
+      </div>
+    <% elsif !@custom_document.participant_signs? %>
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+        <p class="text-gray-700 text-lg mb-2">Your guardian is handling this document.</p>
+        <p class="text-gray-500">There's nothing you need to do right now.</p>
+      </div>
+      <div class="mt-6 text-center">
+        <%= link_to "Back to Dashboard", dashboard_event_path(@participant_event), class: "text-blue-600 hover:underline" %>
+      </div>
+    <% end %>
+    <% if @custom_document.participant_signs? %>
+      <%= render "shared/physical_document_upload",
+          custom_document: @custom_document,
+          consent: @consent,
+          participant_event: @participant_event,
+          upload_url: dashboard_upload_physical_document_path(@participant_event, @custom_document),
+          remove_url_for: ->(upload) { dashboard_remove_physical_upload_path(@participant_event, @custom_document, upload_id: upload.id) } %>
+      <div class="mt-6 text-center">
+        <%= link_to "Back to Dashboard", dashboard_event_path(@participant_event), class: "text-blue-600 hover:underline" %>
+      </div>
+    <% end %>
+  <% elsif @preparing %>
+    <% content_for :head do %>
+      <meta http-equiv="refresh" content="3">
+    <% end %>
+    <%= render "shared/document_preparing", title: "Getting this document ready" %>
+    <div class="mt-6 text-center">
+      <%= link_to "Back to Dashboard", dashboard_event_path(@participant_event), class: "text-blue-600 hover:underline" %>
+    </div>
+  <% elsif @consent.failed? %>
+    <div class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+      <p class="text-gray-700 text-lg mb-2">We couldn't prepare this document.</p>
+      <p class="text-gray-500">Please try again in a moment, or contact the event team if this keeps happening.</p>
+    </div>
+    <div class="mt-6 text-center">
+      <%= link_to "Back to Dashboard", dashboard_event_path(@participant_event), class: "text-blue-600 hover:underline" %>
+    </div>
+  <% elsif @custom_document.participant_signs? && @signing_url.present? %>
+    <% if @consent.participant_signed? && @custom_document.guardian_signs? %>
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+        <p class="text-gray-700 text-lg mb-2">You've signed your portion.</p>
+        <p class="text-gray-500">We've sent the document to your guardian for their signature.</p>
+      </div>
+      <div class="mt-6 text-center">
+        <%= link_to "Back to Dashboard", dashboard_event_path(@participant_event), class: "text-blue-600 hover:underline" %>
+      </div>
+    <% else %>
+      <% if @custom_document.guardian_signs? %>
+        <p class="text-gray-600 mb-6 text-center">
+          Please review and sign your portion below. Once you've signed, we'll send the document to your parent/guardian for their signature.
+        </p>
+      <% else %>
+        <p class="text-gray-600 mb-6 text-center">
+          Please review and sign the document below.
+        </p>
+      <% end %>
+
+      <div class="border rounded-lg overflow-hidden bg-white shadow-sm mb-6">
+        <docuseal-form
+          id="docusealForm"
+          data-src="<%= @signing_url %>"
+          style="height: 500px; overflow: auto;">
+        </docuseal-form>
+      </div>
+
+      <div class="text-center text-sm text-gray-500">
+        <p>Having trouble? <a href="<%= @signing_url %>" target="_blank" class="text-blue-600 hover:underline">Open in a new tab</a></p>
+      </div>
+
+      <script src="https://<%= @consent.docuseal_host %>/js/form.js"></script>
+      <script nonce="<%= content_security_policy_nonce %>">
+        document.getElementById('docusealForm').addEventListener('completed', function(e) {
+          window.location.href = '<%= dashboard_event_path(@participant_event) %>';
+        });
+      </script>
+    <% end %>
+  <% else %>
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+      <% if @custom_document.signed_by_guardian? %>
+        <p class="text-gray-700 text-lg mb-2">This document has been sent to your guardian.</p>
+        <p class="text-gray-500">They'll receive an email from DocuSeal with a link to sign.</p>
+      <% else %>
+        <p class="text-gray-700 text-lg mb-2">Your guardian is handling this document.</p>
+        <p class="text-gray-500">There's nothing you need to do right now.</p>
+      <% end %>
+    </div>
+    <div class="mt-6 text-center">
+      <%= link_to "Back to Dashboard", dashboard_event_path(@participant_event), class: "text-blue-600 hover:underline" %>
+    </div>
+  <% end %>
+</div>

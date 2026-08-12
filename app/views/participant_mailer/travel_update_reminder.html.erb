@@ -1,0 +1,9 @@
+<p>Hi <%= @preferred_name %>,</p>
+
+<p>I'm writing to you because after looking at our records for your participation in <%= @event_name %>, it doesn't look like we have your full/correct travel info?</p>
+
+<p>Please can you take 5 minutes to complete it, and if you have any questions, please send me an email either by replying to this or emailing me at <%= mail_to "attend@hackclub.com" %></p>
+
+<p style="margin: 24px 0;">
+  <%= mail_button "Complete your travel info here", @action_link %>
+</p>

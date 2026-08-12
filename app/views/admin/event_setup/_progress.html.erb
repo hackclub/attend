@@ -1,0 +1,38 @@
+<% persisted = @event.persisted?
+   steps = [
+     { key: "basics", label: "Basics", path: persisted ? edit_admin_event_path(@event) : nil },
+     { key: "schedule", label: "Schedule & Location", path: persisted ? admin_event_setup_schedule_path(@event) : nil },
+     { key: "modules", label: "Modules", path: persisted ? admin_event_setup_modules_path(@event) : nil },
+     { key: "waivers", label: "Waivers", path: persisted ? admin_event_setup_waivers_path(@event) : nil },
+     { key: "team", label: "Team", path: persisted ? admin_event_setup_team_path(@event) : nil },
+     { key: "review", label: "Review", path: persisted ? admin_event_setup_review_path(@event) : nil }
+   ]
+   current_index = steps.index { |s| s[:key] == current_step } %>
+
+<nav aria-label="Setup progress" class="mb-8">
+  <ol class="flex items-center gap-2 sm:gap-4 text-sm">
+    <% steps.each_with_index do |step, index| %>
+      <li class="flex items-center gap-2 sm:gap-4">
+        <% if index > 0 %>
+          <span class="h-px w-4 sm:w-8 bg-gray-300" aria-hidden="true"></span>
+        <% end %>
+        <% step_content = capture do %>
+          <span class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold
+            <%= index == current_index ? 'bg-[#ec3750] text-white' : (index < current_index ? 'bg-[#ec3750]/10 text-[#ec3750]' : 'bg-gray-100 text-gray-500 group-hover:bg-gray-200') %>">
+            <%= index + 1 %>
+          </span>
+          <span class="hidden sm:inline <%= index == current_index ? 'font-semibold text-gray-900' : 'text-gray-500 group-hover:text-gray-700' %>">
+            <%= step[:label] %>
+          </span>
+        <% end %>
+        <% if step[:path] %>
+          <%= link_to step[:path], class: "flex items-center gap-2 group" do %>
+            <%= step_content %>
+          <% end %>
+        <% else %>
+          <span class="flex items-center gap-2"><%= step_content %></span>
+        <% end %>
+      </li>
+    <% end %>
+  </ol>
+</nav>

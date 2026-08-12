@@ -1,0 +1,128 @@
+<% content_for :title, "Check Ins – #{current_event.name} – Attend" %>
+
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-0">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-3">
+    <div>
+      <h1 class="text-xl sm:text-2xl font-bold">Check Ins</h1>
+      <p class="text-sm text-gray-500 mt-1">Scan stats and activity for <%= current_event.name %>.</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <%= link_to admin_event_scan_contexts_path(current_event), class: "inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors" do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        Manage Contexts
+      <% end %>
+      <%= link_to history_admin_event_scans_path(current_event), class: "inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-colors" do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+        History
+      <% end %>
+      <%= link_to scanner_admin_event_scans_path(current_event), class: "inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#ec3750] text-sm font-semibold text-white hover:bg-[#d42f46] transition-colors" do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+        </svg>
+        Launch Scanner
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Top-level stats -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-lg border border-gray-200 p-4">
+      <p class="text-xs uppercase tracking-wide text-gray-500 font-medium">Scans today</p>
+      <p class="text-3xl font-bold text-[#1f2d3d] mt-1"><%= @scans_today %></p>
+    </div>
+    <div class="bg-white rounded-lg border border-gray-200 p-4">
+      <p class="text-xs uppercase tracking-wide text-gray-500 font-medium">Scans all time</p>
+      <p class="text-3xl font-bold text-[#1f2d3d] mt-1"><%= @scans_total %></p>
+    </div>
+    <div class="bg-white rounded-lg border border-gray-200 p-4">
+      <p class="text-xs uppercase tracking-wide text-gray-500 font-medium">Checked in today</p>
+      <p class="text-3xl font-bold text-[#1f2d3d] mt-1"><%= @checked_in_today %></p>
+    </div>
+    <div class="bg-white rounded-lg border border-gray-200 p-4">
+      <p class="text-xs uppercase tracking-wide text-gray-500 font-medium">Checked in total</p>
+      <p class="text-3xl font-bold text-[#1f2d3d] mt-1"><%= @checked_in_total %></p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Per-context stats -->
+    <div class="bg-white rounded-lg border border-gray-200 p-4 sm:p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base sm:text-lg font-semibold">By Context</h2>
+        <%= link_to "Manage", admin_event_scan_contexts_path(current_event), class: "text-xs text-[#ec3750] hover:text-blue-800" %>
+      </div>
+      <% if @per_context_stats.any? %>
+        <div class="space-y-3">
+          <% @per_context_stats.each do |row| %>
+            <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <p class="font-medium text-sm truncate"><%= row[:context].name %></p>
+                  <% if row[:context].is_airport? %><span class="text-xs">✈️</span><% end %>
+                  <% if row[:context].checks_in? %><span class="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium">Check-in</span><% end %>
+                </div>
+              </div>
+              <div class="flex items-baseline gap-3 text-sm">
+                <span class="text-gray-500"><span class="font-semibold text-[#1f2d3d]"><%= row[:today] %></span> today</span>
+                <span class="text-gray-400"><span class="font-semibold text-[#1f2d3d]"><%= row[:total] %></span> total</span>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <div class="text-center py-8">
+          <p class="text-sm text-gray-500 mb-3">No scan contexts configured yet.</p>
+          <%= link_to "Create a context", new_admin_event_scan_context_path(current_event), class: "inline-flex items-center gap-1.5 text-sm text-[#ec3750] hover:text-[#d42f46] font-medium" %>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- Recent activity -->
+    <div class="bg-white rounded-lg border border-gray-200 p-4 sm:p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base sm:text-lg font-semibold">Recent Activity</h2>
+        <%= link_to "View All", history_admin_event_scans_path(current_event), class: "text-xs text-[#ec3750] hover:text-blue-800" %>
+      </div>
+      <% if @recent_scans.any? %>
+        <ul class="space-y-3">
+          <% @recent_scans.each do |scan| %>
+            <li class="flex items-center justify-between border-b border-gray-100 pb-3 last:border-0">
+              <div class="min-w-0 flex-1 mr-2">
+                <p class="font-medium text-sm truncate"><%= scan.participant.display_name %></p>
+                <p class="text-xs text-gray-500">
+                  <%= scan.scanned_at.strftime("%b %-d, %H:%M") %>
+                  <% if scan.scan_context %>
+                    <span class="text-gray-400">@ <%= scan.scan_context.name %></span>
+                  <% end %>
+                </p>
+                <p class="text-xs text-gray-400">by <%= scan.user.display_name_or_fallback %></p>
+              </div>
+              <%= link_to "View", admin_event_participant_path(current_event, scan.participant_event), class: "text-xs text-[#ec3750] hover:text-blue-800" %>
+            </li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p class="text-sm text-gray-500 text-center py-8">No scans yet.</p>
+      <% end %>
+    </div>
+  </div>
+
+  <% if @top_staff_today.any? %>
+    <div class="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 mt-6">
+      <h2 class="text-base sm:text-lg font-semibold mb-4">Top Scanners Today</h2>
+      <div class="space-y-2">
+        <% @top_staff_today.each do |(user_id, user_name, user_email), count| %>
+          <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+            <p class="text-sm text-[#1f2d3d] truncate"><%= user_name.presence || user_email %></p>
+            <p class="text-sm font-semibold text-[#1f2d3d]"><%= count %></p>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>

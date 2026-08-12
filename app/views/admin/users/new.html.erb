@@ -1,0 +1,52 @@
+<div class="space-y-6">
+  <div class="flex justify-between items-center">
+    <h1 class="text-2xl font-bold text-gray-900">Add User</h1>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div class="px-6 py-4">
+      <%= form_with model: [:admin, @user], class: "space-y-6" do |f| %>
+        <% if @user.errors.any? %>
+          <div class="bg-red-50 border border-red-200 rounded-md p-4">
+            <ul class="list-disc list-inside text-sm text-red-600">
+              <% @user.errors.full_messages.each do |message| %>
+                <li><%= message %></li>
+              <% end %>
+            </ul>
+          </div>
+        <% end %>
+
+        <p class="text-sm text-gray-500">Fields marked with <span class="text-red-500">*</span> are required.</p>
+
+        <div>
+          <%= f.label :email, label_text("Email", required: true), class: "block text-sm font-medium text-gray-700" %>
+          <%= f.email_field :email, required: true, class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750]" %>
+        </div>
+
+        <div>
+          <%= f.label :name, class: "block text-sm font-medium text-gray-700" %>
+          <%= f.text_field :name, class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750]" %>
+        </div>
+
+        <div>
+          <%= f.label :global_role, "Global Role", class: "block text-sm font-medium text-gray-700" %>
+          <%= f.select :global_role, [["No Role", "no_role"], ["Global Admin", "global_admin"], ["Read Only", "read_only"]], {}, class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750]" %>
+          <p class="mt-1 text-sm text-gray-500">
+            <strong>Global Admin:</strong> Full access to all events and settings.<br>
+            <strong>Read Only:</strong> Can view all events but cannot make changes.<br>
+            <strong>No Role:</strong> Only has access to specifically assigned events.
+          </p>
+        </div>
+
+        <p class="text-sm text-gray-500">
+          The user will sign in using Hack Club Auth.
+        </p>
+
+        <div class="flex flex-col sm:flex-row justify-end gap-3">
+          <%= link_to "Cancel", admin_users_path, class: "w-full sm:w-auto text-center px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors" %>
+          <%= f.submit "Create User", class: "w-full sm:w-auto px-4 py-2 bg-[#ec3750] text-white rounded-md hover:bg-[#d42f46] transition-colors cursor-pointer" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

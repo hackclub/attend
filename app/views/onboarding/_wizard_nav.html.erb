@@ -1,0 +1,50 @@
+<div class="mb-6 text-center">
+  <p class="text-sm text-gray-500">Registering for</p>
+  <h2 class="text-lg font-semibold text-gray-900"><%= current_event.name %></h2>
+</div>
+
+<nav class="mb-8 overflow-x-auto">
+  <ol class="flex w-full min-w-max">
+    <% current_index = @steps.index(@current_step) %>
+    <% @steps.each_with_index do |step, index| %>
+      <% step_number = index + 1 %>
+      <% is_completed = index < current_index %>
+      <% is_current = step == @current_step %>
+      <% is_last = index == @steps.length - 1 %>
+
+      <li class="relative flex-1 min-w-[5.5rem] px-1">
+        <% unless is_last %>
+          <%# Connector spans from this circle's edge to the next circle's edge,
+              independent of label widths %>
+          <div class="absolute top-[19px] h-0.5 left-[calc(50%+1.5rem)] right-[calc(-50%+1.5rem)] <%= is_completed ? 'bg-green-600' : 'bg-gray-300' %>" aria-hidden="true"></div>
+        <% end %>
+        <div class="relative flex flex-col items-center">
+          <div class="flex items-center justify-center w-10 h-10 rounded-full border-2 shrink-0 <%= if is_completed
+              'bg-green-600 border-green-600 text-white'
+            elsif is_current
+              'bg-blue-600 border-blue-600 text-white'
+            else
+              'bg-white border-gray-300 text-gray-500'
+            end %>">
+            <% if is_completed %>
+              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+              </svg>
+            <% else %>
+              <%= step_number %>
+            <% end %>
+          </div>
+          <span class="mt-2 text-xs font-medium whitespace-nowrap <%= if is_current
+              'text-blue-600'
+            elsif is_completed
+              'text-green-600'
+            else
+              'text-gray-500'
+            end %>">
+            <%= step.to_s.titleize %>
+          </span>
+        </div>
+      </li>
+    <% end %>
+  </ol>
+</nav>

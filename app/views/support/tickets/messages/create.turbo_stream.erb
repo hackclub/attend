@@ -1,0 +1,7 @@
+<%= turbo_stream.append "ticket_#{@ticket.id}_messages" do %>
+  <%= render "support/tickets/message", message: @message %>
+<% end %>
+
+<%= turbo_stream.replace "ticket_message_body" do %>
+  <textarea name="ticket_message[body]" id="ticket_message_body" rows="2" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" placeholder="Type your reply..."></textarea>
+<% end %>

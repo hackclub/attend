@@ -1,0 +1,89 @@
+<div class="space-y-6">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <h1 class="text-2xl font-bold text-gray-900">Ban</h1>
+    <div class="flex gap-3">
+      <%= link_to "Edit", edit_admin_ban_path(@ban), class: "px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors" %>
+      <% if @ban.revoked? %>
+        <%= button_to "Reinstate", reinstate_admin_ban_path(@ban), method: :patch, class: "px-4 py-2 bg-[#ec3750] text-white rounded-md hover:bg-[#d42f46] transition-colors", data: { turbo_confirm: "Reinstate this ban? Its emails will be blocked from events again." } %>
+      <% else %>
+        <%= button_to "Revoke", revoke_admin_ban_path(@ban), method: :patch, class: "px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors", data: { turbo_confirm: "Revoke this ban? Its emails will be allowed into events again, but the record is kept." } %>
+      <% end %>
+      <%= button_to "Delete", admin_ban_path(@ban), method: :delete, class: "px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors", data: { turbo_confirm: "Permanently delete this ban record? This cannot be undone." } %>
+    </div>
+  </div>
+
+  <% if @ban.revoked? %>
+    <div class="bg-amber-50 border border-amber-200 rounded-md p-4 text-sm text-amber-800">
+      This ban is revoked and no longer blocks anyone. Reinstate it to enforce again, or delete it to remove the record.
+    </div>
+  <% end %>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+    <div>
+      <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Banned emails</h2>
+      <ul class="mt-1 text-sm text-gray-900 list-disc list-inside">
+        <% @ban.ban_emails.each do |ban_email| %>
+          <li><%= ban_email.email %></li>
+        <% end %>
+      </ul>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div>
+        <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Status</h2>
+        <p class="mt-1 text-sm text-gray-900"><%= @ban.status %></p>
+      </div>
+      <div>
+        <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Expires</h2>
+        <p class="mt-1 text-sm text-gray-900"><%= @ban.expires_at ? l(@ban.expires_at, format: :long) : "Indefinite" %></p>
+      </div>
+      <div>
+        <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Added by</h2>
+        <p class="mt-1 text-sm text-gray-900"><%= @ban.created_by&.email || "—" %></p>
+      </div>
+    </div>
+
+    <% if @ban.revoked? %>
+      <div>
+        <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Revoked</h2>
+        <p class="mt-1 text-sm text-gray-900">
+          <%= l(@ban.revoked_at, format: :long) %><%= " by #{@ban.revoked_by.email}" if @ban.revoked_by %>
+        </p>
+      </div>
+    <% end %>
+
+    <% if @ban.reason.present? %>
+      <div>
+        <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Reason</h2>
+        <p class="mt-1 text-sm text-gray-900 whitespace-pre-line"><%= @ban.reason %></p>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-1">Existing event enrollments</h2>
+    <p class="text-sm text-gray-500 mb-4">This ban does not remove anyone already added. Review and withdraw these manually if needed.</p>
+
+    <% if @affected_participants.empty? %>
+      <p class="text-sm text-gray-500">No existing participants match these emails.</p>
+    <% else %>
+      <ul class="divide-y divide-gray-100">
+        <% @affected_participants.each do |participant| %>
+          <li class="py-3">
+            <div class="text-sm font-medium text-gray-900"><%= participant.display_name %></div>
+            <div class="text-sm text-gray-500"><%= participant.email %></div>
+            <% if participant.events.any? %>
+              <div class="mt-1 flex flex-wrap gap-1">
+                <% participant.events.each do |event| %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700"><%= event.name %></span>
+                <% end %>
+              </div>
+            <% else %>
+              <div class="text-xs text-gray-400">Not enrolled in any events.</div>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </div>
+</div>

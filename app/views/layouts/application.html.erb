@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full" data-theme="<%= current_theme %>">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="Attend">
+
+    <title><%= content_for(:title) || "Attend – Hack Club" %></title>
+
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%= render "shared/plausible" %>
+
+    <%= yield :head %>
+
+    <% if google_maps_api_key.present? %>
+      <meta name="google-maps-api-key" content="<%= google_maps_api_key %>">
+    <% end %>
+
+    <link rel="icon" href="/icon-32.png?v=3" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3">
+
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "hackclub", "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "themes", "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body class="h-full bg-[#f9fafc] flex flex-col" style="background-color: var(--bg-app);">
+    <% if impersonating? %>
+      <div class="text-center py-2 text-sm" style="background-color: #f97316; color: white;">
+        <span class="font-medium">You are impersonating <%= current_user.display_name_or_fallback %>.</span>
+        <%= button_to "Stop Impersonating", stop_impersonation_path, method: :delete, class: "ml-2 underline hover:no-underline font-semibold", style: "color: white;", form: { class: "inline" } %>
+      </div>
+    <% end %>
+    <% if user_signed_in? && user_needs_slack_link?(current_user) %>
+      <div class="text-white text-center py-2 text-sm" style="background-color: #4A154B;">
+        Link your Slack ID to receive updates sent from the event organizers.
+        <%= link_to "Connect Slack", slack_oauth_url_for_user(current_user), class: "underline hover:no-underline font-semibold ml-1" %>
+      </div>
+    <% end %>
+    <% if user_signed_in? %>
+      <% unread_count = unread_messages_count(current_user) %>
+      <header class="bg-white shadow-sm border-b border-[#e0e6ed]" data-controller="dropdown">
+        <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="flex justify-between items-center h-16">
+            <% dashboard_active = request.path == dashboard_path || request.path.start_with?("#{dashboard_path}/events") %>
+            <% messages_active = request.path.start_with?(dashboard_messages_path) %>
+            <% incident_active = request.path.start_with?(incident_report_path) %>
+            <div class="flex items-center gap-8">
+              <%= link_to root_path, class: "flex items-center gap-2.5", aria: { label: "Homepage" } do %>
+                <img src="/icon-512.png" alt="" class="size-8">
+                <span class="text-xl font-bold text-[#1f2d3d]">Attend</span>
+              <% end %>
+              <div class="hidden md:flex items-center gap-1">
+                <%= link_to "Dashboard", dashboard_path, class: "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors #{dashboard_active ? 'bg-[#ec3750]/10 text-[#ec3750]' : 'text-[#3c4858] hover:bg-[#f9fafc] hover:text-[#ec3750]'}" %>
+                <%= link_to "Messages", dashboard_messages_path, class: "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors #{messages_active ? 'bg-[#ec3750]/10 text-[#ec3750]' : 'text-[#3c4858] hover:bg-[#f9fafc] hover:text-[#ec3750]'}" %>
+                <%= link_to "Report Incident", incident_report_path, class: "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors #{incident_active ? 'bg-[#ec3750]/10 text-[#ec3750]' : 'text-[#3c4858] hover:bg-[#f9fafc] hover:text-[#ec3750]'}" %>
+              </div>
+            </div>
+
+            <!-- Desktop navigation (visible md and up) -->
+            <div class="hidden md:flex items-center gap-3">
+              <%= link_to dashboard_messages_path, class: "relative p-2 rounded-lg text-[#8492a6] hover:bg-[#f9fafc] hover:text-[#ec3750] transition-colors", aria: { label: "Messages" } do %>
+                <svg class="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <% if unread_count > 0 %>
+                  <span class="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-[#ec3750] rounded-full">
+                    <%= unread_count > 99 ? "99+" : unread_count %>
+                  </span>
+                <% end %>
+              <% end %>
+              <% if current_user.admin? %>
+                <div class="border-2 border-dashed border-[#ff8c37] rounded-lg px-3 py-1">
+                  <%= link_to "Admin", admin_root_path, class: "text-sm text-[#ff8c37] hover:text-[#ec3750] font-bold transition-colors" %>
+                </div>
+              <% end %>
+              <%= link_to dashboard_profile_path, class: "group flex items-center gap-2 rounded-full border border-[#e0e6ed] py-1 pl-1 pr-3 hover:border-[#ec3750] transition-colors", aria: { label: "Profile settings" } do %>
+                <% if current_user.avatar_displayable? %>
+                  <%= image_tag current_user.avatar.variant(resize_to_fill: [ 48, 48 ]), alt: "", class: "size-6 rounded-full object-cover" %>
+                <% else %>
+                  <span class="flex size-6 items-center justify-center rounded-full bg-[#ec3750]/10 text-xs font-semibold text-[#ec3750]"><%= current_user.initials %></span>
+                <% end %>
+                <span class="max-w-40 truncate text-sm font-medium text-[#3c4858] group-hover:text-[#ec3750] transition-colors"><%= current_user.display_name_or_fallback %></span>
+              <% end %>
+              <%= button_to "Sign Out", destroy_user_session_path, method: :delete, class: "text-sm font-medium text-[#8492a6] hover:text-[#ec3750] transition-colors" %>
+            </div>
+
+            <!-- Mobile hamburger button (visible below md) -->
+            <button type="button" class="md:hidden p-2 rounded-lg text-[#8492a6] hover:text-[#ec3750] hover:bg-[#f9fafc]" data-action="dropdown#toggle">
+              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+              </svg>
+            </button>
+          </div>
+        </nav>
+
+        <!-- Mobile dropdown menu (full width, below nav) -->
+        <div class="hidden md:hidden border-t border-[#e0e6ed]" data-dropdown-target="menu">
+          <div class="px-4 py-3 space-y-1">
+            <%= link_to "Dashboard", dashboard_path, class: "block px-3 py-2 rounded-lg text-base font-medium #{dashboard_active ? 'bg-[#ec3750]/10 text-[#ec3750]' : 'text-[#3c4858] hover:bg-[#f9fafc] hover:text-[#ec3750]'}" %>
+            <%= link_to dashboard_messages_path, class: "flex items-center justify-between px-3 py-2 rounded-lg text-base font-medium #{messages_active ? 'bg-[#ec3750]/10 text-[#ec3750]' : 'text-[#3c4858] hover:bg-[#f9fafc] hover:text-[#ec3750]'}" do %>
+              <span class="flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                Messages
+              </span>
+              <% if unread_count > 0 %>
+                <span class="inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold text-white bg-[#ec3750] rounded-full">
+                  <%= unread_count > 99 ? "99+" : unread_count %>
+                </span>
+              <% end %>
+            <% end %>
+            <%= link_to "Report Incident", incident_report_path, class: "block px-3 py-2 rounded-lg text-base font-medium #{incident_active ? 'bg-[#ec3750]/10 text-[#ec3750]' : 'text-[#3c4858] hover:bg-[#f9fafc] hover:text-[#ec3750]'}" %>
+            <% if current_user.admin? %>
+              <div class="border-2 border-dashed border-[#ff8c37] rounded-lg">
+                <%= link_to "Admin", admin_root_path, class: "block px-3 py-2 text-base font-bold text-[#ff8c37] hover:text-[#ec3750]" %>
+              </div>
+            <% end %>
+          </div>
+          <div class="border-t border-[#e0e6ed] px-4 py-3 space-y-1">
+            <%= link_to dashboard_profile_path, class: "flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#f9fafc]" do %>
+              <% if current_user.avatar_displayable? %>
+                <%= image_tag current_user.avatar.variant(resize_to_fill: [ 64, 64 ]), alt: "", class: "size-8 rounded-full object-cover" %>
+              <% else %>
+                <span class="flex size-8 items-center justify-center rounded-full bg-[#ec3750]/10 text-sm font-semibold text-[#ec3750]"><%= current_user.initials %></span>
+              <% end %>
+              <span class="min-w-0">
+                <span class="block truncate text-sm font-medium text-[#1f2d3d]"><%= current_user.display_name_or_fallback %></span>
+                <span class="block truncate text-xs text-[#8492a6]"><%= current_user.email %></span>
+              </span>
+            <% end %>
+            <%= button_to "Sign Out", destroy_user_session_path, method: :delete, class: "block w-full text-left px-3 py-2 rounded-lg text-base font-medium text-[#3c4858] hover:bg-[#f9fafc] hover:text-[#ec3750]" %>
+          </div>
+        </div>
+      </header>
+    <% end %>
+
+    <% if flash[:email_changed].is_a?(Hash) %>
+      <% prev_email = flash[:email_changed]["previous_email"] || flash[:email_changed][:previous_email] %>
+      <% curr_email = flash[:email_changed]["current_email"] || flash[:email_changed][:current_email] %>
+      <div class="bg-[#338eda]/10 border-b border-[#338eda]/30" data-controller="flash" data-flash-target="container">
+        <div class="container mx-auto px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <p class="text-[#1f2d3d] text-sm">
+            Your email was updated from <strong><%= prev_email %></strong> to <strong><%= curr_email %></strong> to match your Hack Club Auth account.
+          </p>
+          <div class="flex items-center gap-2">
+            <%= link_to "Email attend@hackclub.com", "mailto:attend@hackclub.com?subject=#{ERB::Util.url_encode('Email change on Attend')}", class: "text-sm bg-[#338eda] hover:bg-[#2a7bc4] text-white font-medium px-3 py-1.5 rounded-lg transition-colors" %>
+            <button type="button" class="text-[#338eda] hover:text-[#2a7bc4]" data-action="flash#dismiss" aria-label="Dismiss">
+              <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+    <% if flash[:notice] %>
+      <div class="bg-[#33d6a6]/10 border-b border-[#33d6a6]/30" data-controller="flash" data-flash-target="container">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+          <p class="text-[#1f2d3d]"><%= flash[:notice] %></p>
+          <button type="button" class="text-[#33d6a6] hover:text-[#2ab890]" data-action="flash#dismiss">
+            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    <% end %>
+
+    <% if flash[:alert] %>
+      <div class="bg-[#ec3750]/10 border-b border-[#ec3750]/30" data-controller="flash" data-flash-target="container">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+          <p class="text-[#1f2d3d]"><%= flash[:alert] %></p>
+          <button type="button" class="text-[#ec3750] hover:text-[#d42f46]" data-action="flash#dismiss">
+            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    <% end %>
+
+    <main class="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <%= yield %>
+    </main>
+
+    <footer class="bg-[#17171d] mt-auto">
+      <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
+          <div class="flex items-center space-x-3">
+            <%= link_to "https://hackclub.com", target: "_blank", rel: "noopener noreferrer" do %>
+              <img src="/flag.png" alt="Hack Club" class="h-8">
+            <% end %>
+            <span class="text-[#8492a6] text-sm">Built with ❤️ by Hack Club</span>
+          </div>
+          <p class="text-[#8492a6] text-sm">&copy; <%= Date.current.year %> Hack Club. 501(c)(3) nonprofit (EIN: 81-2908499)</p>
+        </div>
+      </div>
+      <%= render "shared/debug_footer" %>
+    </footer>
+  </body>
+</html>

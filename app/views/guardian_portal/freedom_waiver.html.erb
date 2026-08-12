@@ -1,0 +1,77 @@
+<div class="w-full max-w-3xl mx-auto">
+  <div class="mb-4">
+    <%= link_to guardian_portal_step_path(token: @token, step: :consents), class: "inline-flex items-center text-sm text-gray-600 hover:text-gray-900" do %>
+      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+      Back to Consents
+    <% end %>
+  </div>
+
+  <% if @waiver_paused %>
+    <h1 class="text-2xl font-bold mb-4">Freedom Waiver Not Available Yet</h1>
+    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+      <svg class="mx-auto h-12 w-12 text-yellow-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <p class="text-gray-700 text-lg mb-2">The Freedom Waiver is not available to sign yet.</p>
+      <p class="text-gray-500">You'll receive an email when this is ready.</p>
+    </div>
+  <% else %>
+  <h1 class="text-2xl font-bold mb-4">Freedom Waiver</h1>
+
+  <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+    <div class="flex items-start gap-3">
+      <svg class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+      </svg>
+      <div class="text-sm text-blue-800">
+        <p class="font-medium mb-1">What is the Freedom Waiver?</p>
+        <p>
+          This waiver allows you to grant or deny permission for your child to leave the event venue unsupervised during the event. 
+          If granted, <%= @participant.legal_first_name %> will be allowed to leave and explore the surrounding area independently during designated free time.
+          If denied, they will remain with Hack Club staff at all times.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <p class="text-gray-600 mb-6">
+    Please complete the Freedom Waiver below for <strong><%= @participant.legal_first_name %> <%= @participant.legal_last_name %></strong>'s participation in <strong><%= @event.name %></strong>.
+  </p>
+
+  <div class="border rounded-lg overflow-hidden bg-white shadow-sm mb-6">
+    <docuseal-form
+      id="docusealForm"
+      data-src="<%= @signing_url %>"
+      style="height: 500px; overflow: auto;">
+    </docuseal-form>
+  </div>
+
+  <div class="text-center text-sm text-gray-500">
+    <p>Having trouble? <a href="<%= @signing_url %>" target="_blank" class="text-blue-600 hover:underline">Open in a new tab</a></p>
+  </div>
+  <% end %>
+</div>
+
+<% unless @waiver_paused %>
+<script src="https://<%= @consent.docuseal_host %>/js/form.js"></script>
+<script nonce="<%= content_security_policy_nonce %>">
+  document.getElementById('docusealForm').addEventListener('completed', function(e) {
+    console.log('Freedom Waiver completed by guardian:', e.detail);
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '<%= guardian_portal_freedom_waiver_complete_path(token: @token) %>';
+    
+    var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    var csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'authenticity_token';
+    csrfInput.value = csrfToken;
+    form.appendChild(csrfInput);
+    
+    document.body.appendChild(form);
+    form.submit();
+  });
+</script>
+<% end %>

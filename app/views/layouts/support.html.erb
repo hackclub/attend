@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full" data-theme="<%= current_theme %>">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title><%= content_for(:title) || "Support Chat – Attend – Hack Club" %></title>
+
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%= render "shared/plausible" %>
+
+    <%= yield :head %>
+
+    <link rel="icon" href="/icon-32.png?v=3" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3">
+
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "hackclub", "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "themes", "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body class="h-full bg-[#f9fafc] flex flex-col">
+    <% if impersonating? %>
+      <div class="flex-shrink-0 text-center py-2 text-sm" style="background-color: #f97316; color: white;">
+        <span class="font-medium">You are impersonating <%= current_user.display_name_or_fallback %>.</span>
+        <%= button_to "Stop Impersonating", stop_impersonation_path, method: :delete, class: "ml-2 underline hover:no-underline font-semibold", style: "color: white;", form: { class: "inline" } %>
+      </div>
+    <% end %>
+
+    <div class="flex-1 flex min-h-0">
+      <!-- Sidebar -->
+      <aside class="hidden lg:flex lg:flex-shrink-0">
+        <div class="w-64 flex flex-col">
+          <div class="flex-1 flex flex-col min-h-0 bg-[#17171d]">
+            <div class="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
+              <div class="flex items-center flex-shrink-0 px-4">
+                <%= link_to support_tickets_path, class: "flex items-center space-x-2" do %>
+                  <img src="/flag.png" alt="Hack Club" class="h-6">
+                  <span class="text-white font-bold text-lg">Attend</span>
+                  <span class="text-[#8492a6] text-xs font-medium">Support</span>
+                <% end %>
+              </div>
+
+              <nav class="mt-8 flex-1 px-2 space-y-1">
+                <%= link_to support_tickets_path, class: "group flex items-center px-3 py-2 text-sm font-medium rounded-lg #{request.path == support_tickets_path ? 'bg-[#ec3750] text-white' : 'text-[#8492a6] hover:bg-[#252429] hover:text-white'}" do %>
+                  <svg class="mr-3 h-5 w-5 text-current opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                  </svg>
+                  All Tickets
+                <% end %>
+
+                <%= link_to admin_root_path, class: "group flex items-center px-3 py-2 text-sm font-medium rounded-lg text-[#8492a6] hover:bg-[#252429] hover:text-white" do %>
+                  <svg class="mr-3 h-5 w-5 text-current opacity-75" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                  </svg>
+                  Back to Admin
+                <% end %>
+              </nav>
+            </div>
+
+            <!-- User menu -->
+            <div class="flex-shrink-0 flex border-t border-[#252429] p-4">
+              <div class="flex-shrink-0 w-full">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <% if current_user.avatar_displayable? %>
+                      <%= image_tag current_user.avatar.variant(resize_to_fill: [32, 32]), class: "flex-shrink-0 h-8 w-8 rounded-full object-cover" %>
+                    <% else %>
+                      <span class="flex-shrink-0 h-8 w-8 rounded-full bg-[#252429] flex items-center justify-center text-xs font-medium text-[#8492a6]">
+                        <%= current_user.initials %>
+                      </span>
+                    <% end %>
+                    <div class="min-w-0">
+                      <p class="text-sm font-medium text-white truncate"><%= current_user.display_name_or_fallback %></p>
+                    </div>
+                  </div>
+                  <%= button_to destroy_user_session_path, method: :delete, class: "ml-3 p-1 text-[#8492a6] hover:text-white", title: "Sign out" do %>
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                    </svg>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main content area -->
+      <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <!-- Flash messages -->
+        <% if flash[:notice] %>
+          <div class="bg-[#33d6a6]/10 border-b border-[#33d6a6]/30" data-controller="flash" data-flash-target="container">
+            <div class="px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+              <p class="text-[#1f2d3d]"><%= flash[:notice] %></p>
+              <button type="button" class="text-[#33d6a6] hover:text-[#2ab890]" data-action="flash#dismiss">
+                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        <% end %>
+
+        <% if flash[:alert] %>
+          <div class="bg-[#ec3750]/10 border-b border-[#ec3750]/30" data-controller="flash" data-flash-target="container">
+            <div class="px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+              <p class="text-[#1f2d3d]"><%= flash[:alert] %></p>
+              <button type="button" class="text-[#ec3750] hover:text-[#d42f46]" data-action="flash#dismiss">
+                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        <% end %>
+
+        <!-- Main content -->
+        <main class="flex-1 overflow-hidden">
+          <%= yield %>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

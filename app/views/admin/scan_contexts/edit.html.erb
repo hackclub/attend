@@ -1,0 +1,10 @@
+<div class="max-w-2xl mx-auto">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold">Edit Scan Context</h1>
+    <p class="text-sm text-gray-500 mt-1">Update settings for "<%= @scan_context.name %>"</p>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <%= render "form", scan_context: @scan_context %>
+  </div>
+</div>

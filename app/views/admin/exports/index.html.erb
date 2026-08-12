@@ -1,0 +1,154 @@
+<%
+  fields_meta = @fields_by_category.values.flatten.select(&:filterable?).to_h do |f|
+    [ f.key, { label: f.label, type: f.type, operators: f.operators, enumValues: f.enum_values || [] } ]
+  end
+  prefill_columns = @prefill ? @prefill[:columns].map(&:to_s) : []
+  prefill_filters = @prefill ? @prefill[:filters] : []
+  prefill_row_mode = @prefill ? @prefill[:row_mode] : "participant"
+%>
+
+<div>
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Export Data</h1>
+      <p class="text-gray-600 mt-1">Build a custom CSV export — pick columns, filter rows, save templates</p>
+    </div>
+    <%= link_to "← Back to Dashboard", admin_root_path, class: "text-[#ec3750] hover:text-blue-800" %>
+  </div>
+
+  <% if @templates.any? || @presets.any? %>
+    <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+      <h2 class="text-lg font-medium text-gray-900 mb-4">Saved Templates & Presets</h2>
+
+      <% if @templates.any? %>
+        <div class="space-y-2 mb-4">
+          <% @templates.each do |template| %>
+            <div class="flex items-center justify-between gap-2 py-2 px-3 bg-gray-50 rounded-md border border-gray-200">
+              <div class="min-w-0">
+                <span class="font-medium text-gray-900"><%= template.name %></span>
+                <span class="text-xs text-gray-500 ml-2"><%= pluralize(template.columns.size, "column") %><%= ", #{pluralize(template.filters.size, 'filter')}" if template.filters.any? %></span>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <%= button_to "Download", admin_event_exports_path(current_event, template_id: template.id), method: :post, data: { turbo: false }, class: "px-3 py-1 bg-[#ec3750] text-white rounded-md hover:bg-[#d42f46] text-xs" %>
+                <%= link_to "Load", admin_event_exports_path(current_event, template_id: template.id), class: "px-3 py-1 border border-gray-300 rounded-md text-xs text-gray-700 hover:bg-gray-100" %>
+                <%= button_to "Delete", admin_event_export_template_path(current_event, template), method: :delete, data: { turbo_confirm: "Delete template \"#{template.name}\"?" }, class: "px-3 py-1 border border-gray-300 rounded-md text-xs text-gray-500 hover:text-[#ec3750]" %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <div class="flex flex-wrap gap-2">
+        <% @presets.each do |key, preset| %>
+          <%= link_to admin_event_exports_path(current_event, preset: key), class: "px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-100", title: preset[:description] do %>
+            <%= preset[:label] %>
+          <% end %>
+        <% end %>
+      </div>
+      <p class="text-xs text-gray-500 mt-2">Presets load the classic exports into the builder below — tweak them or download as-is.</p>
+    </div>
+  <% end %>
+
+  <%= form_with url: admin_event_exports_path(current_event), method: :post,
+        data: {
+          turbo: false,
+          controller: "export-builder",
+          export_builder_fields_value: fields_meta.to_json,
+          export_builder_operator_labels_value: Exports::Filter::OPERATOR_LABELS.to_json
+        } do %>
+
+    <div class="bg-white rounded-lg border border-gray-200 mb-6">
+      <div class="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+        <div>
+          <h2 class="text-lg font-medium text-gray-900">Columns</h2>
+          <p class="text-sm text-gray-500 mt-1">Pick exactly which fields end up in the CSV</p>
+        </div>
+        <div class="flex items-center gap-4">
+          <input type="search" placeholder="Search fields…" autocomplete="off"
+                 class="rounded-md border-gray-300 text-sm w-56"
+                 data-export-builder-target="searchInput"
+                 data-action="input->export-builder#search">
+          <span class="text-sm text-gray-500 shrink-0" data-export-builder-target="count"></span>
+        </div>
+      </div>
+
+      <div class="divide-y divide-gray-100">
+        <% @fields_by_category.each do |category, fields| %>
+          <details class="group" data-export-category="<%= category %>" <%= "open" if fields.any? { |f| prefill_columns.include?(f.key) } %>>
+            <summary class="p-4 cursor-pointer flex items-center justify-between hover:bg-gray-50">
+              <div>
+                <span class="font-medium text-gray-900"><%= @categories[category][:label] %></span>
+                <span class="text-sm text-gray-500 ml-2"><%= @categories[category][:description] %></span>
+              </div>
+              <span class="flex items-center gap-3 text-xs shrink-0 ml-4">
+                <button type="button" data-action="export-builder#selectCategory" class="text-[#ec3750] hover:underline">all</button>
+                <button type="button" data-action="export-builder#deselectCategory" class="text-gray-500 hover:underline">none</button>
+                <span class="text-gray-400 group-open:rotate-180 transition-transform">▾</span>
+              </span>
+            </summary>
+            <div class="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
+              <% fields.each do |field| %>
+                <label class="flex items-center gap-2 text-sm text-gray-700 py-1">
+                  <%= check_box_tag "columns[]", field.key, prefill_columns.include?(field.key),
+                        id: "column_#{field.key.parameterize(separator: '_')}",
+                        class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]",
+                        data: { export_builder_target: "columnCheckbox", action: "export-builder#updateCount" } %>
+                  <%= field.label %>
+                </label>
+              <% end %>
+            </div>
+          </details>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg border border-gray-200 mb-6 p-6">
+      <div class="flex items-center justify-between mb-1">
+        <h2 class="text-lg font-medium text-gray-900">Filters</h2>
+      </div>
+      <p class="text-sm text-gray-500 mb-4">Only rows matching <strong>all</strong> filters are exported. Any field can be a filter — it doesn't need to be an exported column.</p>
+
+      <div class="space-y-2 mb-3" data-export-builder-target="filtersContainer">
+        <% prefill_filters.each_with_index do |filter, i| %>
+          <%= render "filter_row", index: i, filter: filter, fields_by_category: @fields_by_category, categories: @categories %>
+        <% end %>
+      </div>
+
+      <template data-export-builder-target="filterTemplate">
+        <%= render "filter_row", index: "NEW_RECORD", filter: nil, fields_by_category: @fields_by_category, categories: @categories %>
+      </template>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button" data-action="export-builder#addFilter" class="px-3 py-1.5 border border-dashed border-gray-400 rounded-md text-sm text-gray-700 hover:bg-gray-50">+ Add filter</button>
+        <span class="text-xs text-gray-400 ml-1">quick add:</span>
+        <button type="button" data-action="export-builder#addFilter" data-field="participant_event.status" data-operator="in" class="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600 hover:bg-gray-200">status</button>
+        <button type="button" data-action="export-builder#addFilter" data-field="participant_event.checked_in_at" data-operator="present" class="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600 hover:bg-gray-200">checked-in only</button>
+        <button type="button" data-action="export-builder#addFilter" data-field="groups.names" data-operator="contains" class="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600 hover:bg-gray-200">group</button>
+        <button type="button" data-action="export-builder#addFilter" data-field="travel.inbound.mode" data-operator="in" class="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600 hover:bg-gray-200">travel mode</button>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg border border-gray-200 mb-6 p-6">
+      <h2 class="text-lg font-medium text-gray-900 mb-2">Rows</h2>
+      <div class="flex flex-col sm:flex-row gap-3">
+        <label class="flex items-center gap-2 text-sm text-gray-700">
+          <%= radio_button_tag :row_mode, "participant", prefill_row_mode != "flight_leg", class: "text-[#ec3750] focus:ring-[#ec3750]" %>
+          One row per participant
+        </label>
+        <label class="flex items-center gap-2 text-sm text-gray-700">
+          <%= radio_button_tag :row_mode, "flight_leg", prefill_row_mode == "flight_leg", class: "text-[#ec3750] focus:ring-[#ec3750]" %>
+          One row per flight leg <span class="text-xs text-gray-400">(enables the Flight Legs fields; participants without flights are skipped)</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg border border-gray-200 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <%= button_tag "Download CSV", type: "submit", class: "px-6 py-2 bg-[#ec3750] text-white rounded-md hover:bg-[#d42f46] text-sm font-medium cursor-pointer" %>
+      <div class="flex items-center gap-2">
+        <%= text_field_tag :template_name, nil, placeholder: "Template name", class: "rounded-md border-gray-300 text-sm" %>
+        <%= button_tag "Save as template", type: "submit", formaction: admin_event_export_templates_path(current_event), formmethod: "post",
+              class: "px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-100 cursor-pointer" %>
+      </div>
+    </div>
+  <% end %>
+</div>

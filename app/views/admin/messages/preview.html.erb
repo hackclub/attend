@@ -1,0 +1,166 @@
+<div class="max-w-4xl mx-auto">
+  <div class="mb-6">
+    <%= link_to "← Back to Edit", edit_admin_event_message_path(current_event, @message), class: "text-gray-600 hover:text-gray-900" %>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-bold">Preview & Send</h1>
+        <p class="text-gray-600">Step 2 of 2 — Review and send your message</p>
+      </div>
+    </div>
+
+    <!-- Audience Preview -->
+    <div class="mb-8">
+      <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+        </svg>
+        Audience: <%= @message.audience_label %>
+      </h2>
+      
+      <div class="bg-gray-50 rounded-lg p-4">
+        <p class="text-sm text-gray-600 mb-3">
+          <strong class="text-gray-900"><%= @total_count %></strong> recipient<%= @total_count == 1 ? '' : 's' %> will receive this message via 
+          <strong class="text-gray-900"><%= @message.channel_labels %></strong>.
+        </p>
+        
+        <% if @recipients.any? %>
+          <div class="flex flex-wrap gap-2">
+            <% @recipients.each do |recipient| %>
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-gray-200 ">
+                <% if recipient.respond_to?(:participant) %>
+                  <%= recipient.participant.display_name %>
+                <% else %>
+                  <%= recipient.full_name %>
+                <% end %>
+              </span>
+            <% end %>
+            <% if @total_count > 20 %>
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-600">
+                +<%= @total_count - 20 %> more
+              </span>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-amber-600">⚠️ No recipients match this criteria. The message won't be sent to anyone.</p>
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Channel Previews -->
+    <div class="space-y-6">
+      <% if @message.channels.include?("slack") %>
+        <div>
+          <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+            <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-purple-100">
+              <svg class="w-3 h-3 text-purple-600" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/>
+              </svg>
+            </span>
+            Slack Preview
+          </h2>
+          <div class="bg-[#1a1d21] rounded-lg p-4 text-white">
+            <div class="flex items-start gap-3">
+              <div class="w-9 h-9 rounded bg-[#ec3750] flex items-center justify-center flex-shrink-0">
+                <span class="text-white font-bold text-sm">HC</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline gap-2">
+                  <span class="font-bold text-white">Hack Club Attend</span>
+                  <span class="text-xs text-gray-400">App</span>
+                </div>
+                <div class="mt-1 text-[15px] text-gray-100 whitespace-pre-wrap break-words"><%= @message.body_as_slack_preview_html %></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% end %>
+
+      <% if @message.channels.include?("email") %>
+        <div>
+          <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+            <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-blue-100">
+              <svg class="w-3 h-3 text-[#ec3750]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+            </span>
+            Email Preview
+          </h2>
+          <div class="border border-gray-200 rounded-lg overflow-hidden">
+            <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+              <p class="text-sm">
+                <span class="text-gray-500">Subject:</span>
+                <span class="font-medium"><%= @message.subject.presence || "You have a new message from #{current_event.name}" %></span>
+              </p>
+            </div>
+            <div class="p-4 bg-white">
+              <div class="prose prose-sm max-w-none">
+                <%= sanitize @message.body_as_html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% end %>
+
+      <% if @message.channels.include?("sms") %>
+        <div>
+          <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+            <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-green-100">
+              <svg class="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+              </svg>
+            </span>
+            SMS Preview
+          </h2>
+          <div class="max-w-xs">
+            <div class="bg-gray-100 rounded-2xl p-4">
+              <div class="bg-green-500 text-white rounded-2xl rounded-bl-sm px-4 py-2 text-sm">
+                <%= @message.body_as_plain %>
+              </div>
+              <p class="text-xs text-gray-400 mt-2 text-right">
+                <%= @message.body_as_plain.length %> characters
+                <% if @message.body_as_plain.length > 160 %>
+                  <span class="text-amber-500">(~<%= (@message.body_as_plain.length / 160.0).ceil %> segments)</span>
+                <% end %>
+              </p>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- Scheduling Info -->
+    <% if @message.scheduled_at.present? %>
+      <div class="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <p class="text-yellow-800">
+          <strong>Scheduled:</strong> This message will be sent on 
+          <strong><%= @message.scheduled_at.strftime("%B %d, %Y at %l:%M %p") %></strong>
+        </p>
+      </div>
+    <% end %>
+
+    <!-- Actions -->
+    <div class="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
+      <%= link_to "← Edit Message", edit_admin_event_message_path(current_event, @message), 
+          class: "text-gray-600 hover:text-gray-900" %>
+      
+      <div class="flex gap-3">
+        <% if @message.scheduled_at.present? && @message.scheduled_at > Time.current %>
+          <%= button_to "Schedule Message", send_now_admin_event_message_path(current_event, @message), 
+              method: :post,
+              data: { confirm: "Schedule this message to be sent on #{@message.scheduled_at.strftime("%B %d at %l:%M %p")}?" },
+              class: "bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-6 rounded-lg",
+              disabled: @total_count == 0 %>
+        <% else %>
+          <%= button_to "Send Now", send_now_admin_event_message_path(current_event, @message), 
+              method: :post,
+              data: { confirm: "Send this message to #{@total_count} recipients now?" },
+              class: "bg-[#ec3750] hover:bg-[#d42f46] text-white font-semibold py-2 px-6 rounded-lg",
+              disabled: @total_count == 0 %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

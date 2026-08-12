@@ -1,0 +1,72 @@
+<% content_for :title, "#{@message.subject.presence || @event.name} – Messages" %>
+
+<div class="w-full max-w-3xl mx-auto">
+  <!-- Back -->
+  <%= link_to dashboard_messages_path, class: "inline-flex items-center gap-1.5 text-sm text-(--text-muted) hover:text-(--text-strong) transition-colors mb-6" do %>
+    <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>
+    All messages
+  <% end %>
+
+  <article class="rounded-2xl border border-(--border-card) bg-(--bg-elev) overflow-hidden">
+    <!-- Header -->
+    <header class="px-6 py-5 sm:px-8 sm:py-6 border-b border-(--border-soft)">
+      <div class="flex items-start justify-between gap-3 mb-3">
+        <h1 class="text-xl sm:text-2xl font-bold text-(--text-strong)">
+          <%= @message.subject.presence || "Message from #{@event.name}" %>
+        </h1>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <% @channels.each do |channel| %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+              <%= case channel
+                  when 'slack' then 'bg-purple-100 text-purple-800'
+                  when 'email' then 'bg-blue-100 text-blue-800'
+                  when 'sms' then 'bg-green-100 text-green-800'
+                  end %>">
+              <%= channel.titleize %>
+            </span>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-(--text-soft)">
+        <%= link_to dashboard_event_path(@delivery.participant_event), class: "inline-flex items-center gap-1.5 font-medium text-(--text) hover:text-[#ec3750] transition-colors" do %>
+          <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <%= @event.name %>
+        <% end %>
+        <span class="text-(--text-faint)">·</span>
+        <span><%= @delivery.delivered_at.strftime("%b %d, %Y at %l:%M %p") %></span>
+        <% if @message.sent_by_user.present? %>
+          <span class="text-(--text-faint)">·</span>
+          <span>From <%= @message.sent_by_user.display_name_or_fallback %></span>
+        <% end %>
+      </div>
+    </header>
+
+    <!-- Body -->
+    <div class="p-6 sm:p-8">
+      <div class="prose prose-lg max-w-none text-(--text)">
+        <%= sanitize @message.body_as_html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote hr], attributes: %w[href target rel] %>
+      </div>
+    </div>
+  </article>
+
+  <!-- Footer actions -->
+  <div class="mt-6 flex items-center justify-between gap-3">
+    <%= link_to dashboard_messages_path, class: "inline-flex items-center gap-1.5 text-sm font-medium text-(--text-soft) hover:text-(--text-strong) transition-colors" do %>
+      <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+      </svg>
+      Back to inbox
+    <% end %>
+    <%= link_to dashboard_event_path(@delivery.participant_event), class: "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#ec3750] text-white text-sm font-semibold hover:bg-[#d42f46] transition-colors" do %>
+      View event
+      <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+      </svg>
+    <% end %>
+  </div>
+</div>

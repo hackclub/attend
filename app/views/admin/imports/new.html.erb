@@ -1,0 +1,80 @@
+<div>
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Import Participants</h1>
+      <p class="text-gray-600 mt-1">Import participants from a CSV file</p>
+    </div>
+    <%= link_to "← Back to Participants", admin_event_participants_path(current_event), class: "text-[#ec3750] hover:text-blue-800" %>
+  </div>
+
+  <div class="bg-white rounded-lg border border-gray-200 p-6" data-controller="dropzone">
+    <%= form_with url: admin_event_imports_path(current_event), method: :post, multipart: true, local: true, id: "import-form", class: "space-y-6" do |f| %>
+      
+      <div 
+        data-action="click->dropzone#openFilePicker dragover->dropzone#handleDragOver dragleave->dropzone#handleDragLeave drop->dropzone#handleDrop"
+        class="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-[#ec3750] hover:bg-blue-50 transition-colors cursor-pointer"
+        data-dropzone-target="zone"
+      >
+        <div data-dropzone-target="content">
+          <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <p class="mt-4 text-lg text-gray-600">Drag and drop your CSV file here</p>
+          <p class="mt-2 text-sm text-gray-500">or click to browse</p>
+        </div>
+        <div data-dropzone-target="selected" class="hidden">
+          <svg class="mx-auto h-12 w-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p class="mt-4 text-lg text-gray-900 font-medium" data-dropzone-target="fileName"></p>
+          <p class="mt-2 text-sm text-gray-500">Click to change file</p>
+        </div>
+        <%= file_field_tag :csv_file, accept: ".csv", class: "hidden", data: { dropzone_target: "input", action: "change->dropzone#fileSelected" } %>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <%= check_box_tag :send_invitations, "1", true, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" %>
+        <%= label_tag :send_invitations, "Send invitation emails to imported participants", class: "text-sm text-gray-700" %>
+      </div>
+
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="font-semibold text-blue-800">Need a template?</h3>
+            <p class="text-sm text-blue-700">Download a CSV template with all supported columns.</p>
+          </div>
+          <%= link_to template_admin_event_imports_path(current_event), class: "px-4 py-2 bg-[#ec3750] text-white rounded-md hover:bg-[#d42f46] text-sm" do %>
+            Download Template
+          <% end %>
+        </div>
+      </div>
+
+      <div class="bg-gray-50 rounded-lg p-4">
+        <h3 class="font-semibold text-gray-900 mb-2">What will be imported:</h3>
+        <ul class="text-sm text-gray-600 space-y-1">
+          <li>• Participant details (name, email, phone, address, t-shirt size)</li>
+          <li>• Parent/guardian information (will receive consent invitation)</li>
+          <li>• Emergency contact details</li>
+          <li>• Dietary requirements and allergies</li>
+          <li>• Medical conditions and requirements</li>
+          <li>• Travel and flight information</li>
+        </ul>
+      </div>
+
+      <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <h3 class="font-semibold text-yellow-800 mb-2">Important Notes:</h3>
+        <ul class="text-sm text-yellow-700 space-y-1">
+          <li>• You'll see a preview before the import starts</li>
+          <li>• Participants already registered for this event will be skipped</li>
+          <li>• Existing participants (by email) will have their details updated</li>
+          <li>• Invitation emails are sent at a controlled pace to avoid rate limits</li>
+        </ul>
+      </div>
+
+      <div class="flex justify-end gap-4">
+        <%= link_to "Cancel", admin_event_participants_path(current_event), class: "px-4 py-2 text-gray-700 hover:text-gray-900" %>
+        <%= submit_tag "Upload & Preview", class: "px-6 py-2 bg-[#ec3750] text-white rounded-md hover:bg-[#d42f46] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed", id: "submit-btn", data: { dropzone_target: "submit" }, disabled: true %>
+      </div>
+    <% end %>
+  </div>
+</div>

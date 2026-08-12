@@ -1,0 +1,37 @@
+Hi <%= @first_name %>,
+
+<% if @added_by %>
+<%= @added_by.name.presence || @added_by.email %> added you to <%= @event_name %> on Attend as <%= @role_label %>.
+<% else %>
+You've been added to <%= @event_name %> on Attend as <%= @role_label %>.
+<% end %>
+<% if @role_summary.present? %>
+
+<%= @role_summary %>
+<% end %>
+<% if @role_can.any? %>
+
+What you can do:
+<% @role_can.each do |permission| %>
+- <%= permission %>
+<% end %>
+<% end %>
+<% if @role_cannot.any? %>
+
+What you can't do:
+<% @role_cannot.each do |permission| %>
+- <%= permission %>
+<% end %>
+<% end %>
+
+Sign in with your Hack Club account using this email address (<%= @user.email %>) to get started:
+
+<%= @dashboard_url %>
+
+Everything in Attend is audit-logged, and staff often see participants' medical, travel, and safeguarding details -- please only look at what you need for your role.
+
+<% if @added_by %>
+Questions about your access? Just reply to this email and it'll go to <%= @added_by.email %>.
+<% else %>
+Questions about your access? Just reply to this email.
+<% end %>

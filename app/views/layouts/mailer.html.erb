@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+        color: #1a1a1a;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      a {
+        color: #ec3750;
+      }
+      a.button,
+      a.button:link,
+      a.button:visited,
+      a.button:hover,
+      a.button:active {
+        display: inline-block;
+        padding: 12px 24px;
+        background-color: #ec3750;
+        color: #ffffff !important;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: 600;
+      }
+      .signature {
+        margin-top: 32px;
+      }
+      .signature-name {
+        font-weight: 600;
+        color: #1a1a1a;
+      }
+      .signature-title {
+        color: #666666;
+        font-size: 14px;
+        margin-top: 2px;
+      }
+      .signature-phone {
+        color: #666666;
+        font-size: 14px;
+        margin-top: 2px;
+      }
+      .signature-logo {
+        margin-top: 16px;
+      }
+      .signature-logo img {
+        max-width: 120px;
+        height: auto;
+      }
+      .footer {
+        margin-top: 32px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e5e5;
+        font-size: 13px;
+        color: #666666;
+        line-height: 1.6;
+      }
+      .footer a {
+        color: #666666;
+      }
+      .footer-links {
+        margin-top: 12px;
+      }
+      .footer-links a {
+        color: #ec3750;
+        text-decoration: none;
+      }
+      .footer-links a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <%= yield %>
+
+      <div class="signature">
+        <p style="margin: 0;">Kind Regards,<br>Leo from the Events Team</p>
+
+        <p style="margin: 16px 0 0 0;">
+          <span class="signature-name">Leo Wilkin</span><br>
+          <span class="signature-title">Director of Operations @ Events, Hack Club</span><br>
+          <span class="signature-phone">Direct line: +1 (415) 469-1764</span>
+        </p>
+
+        <div class="signature-logo">
+          <img src="https://images.vialoops.com/cmj7m7euo032y0i0ext3fj7iz/cmj7m7eye03320i0ev0e3scjx.png" alt="Hack Club" width="120">
+        </div>
+      </div>
+
+      <div class="footer">
+        <p style="margin: 0;">
+          Hack Club is an <a href="https://github.com/hackclub/hackclub">open source</a> and
+          <a href="https://hcb.hackclub.com/hq/">financially transparent</a> 501(c)(3) nonprofit.
+          Our EIN is 81-2908499. By the students, for the students.
+        </p>
+        <p class="footer-links" style="margin: 12px 0 0 0;">
+          <a href="https://hackclub.com/">Clubs</a> •
+          <a href="https://hackclub.com/slack">Slack</a> •
+          <a href="https://hackclub.com/hcb/">Fiscal Sponsorship</a> •
+          <a href="https://hackclub.com/hackathons">Hackathons</a>
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+<div class="w-full max-w-2xl mx-auto">
+  <div class="mb-6">
+    <%= link_to "← Back to Overview", guardian_portal_path(token: @token), class: "text-blue-600 hover:text-blue-800" %>
+  </div>
+
+  <h1 class="text-2xl font-bold mb-6"><%= @step.titleize %></h1>
+
+  <%= render "guardian_portal/steps/#{@step}" %>
+</div>

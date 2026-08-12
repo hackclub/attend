@@ -1,0 +1,68 @@
+<div class="max-w-4xl mx-auto">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Slack Blast History</h1>
+    <%= link_to "Send New Blast", new_admin_event_slack_blast_path(current_event), class: "bg-[#ec3750] hover:bg-[#d42f46] text-white font-semibold py-2 px-4 rounded-lg" %>
+  </div>
+
+  <% if @slack_blasts.any? %>
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <table class="min-w-full divide-y divide-gray-100">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sent By</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Message</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipients</th>
+            <th class="px-6 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-100">
+          <% @slack_blasts.each do |blast| %>
+            <tr>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <%= blast.created_at.strftime("%b %d, %Y %l:%M %p") %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <%= blast.sent_by_user.display_name_or_fallback %>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
+                <%= truncate(blast.message, length: 50) %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <% case blast.status %>
+                <% when "pending" %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">Pending</span>
+                <% when "in_progress" %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">In Progress</span>
+                <% when "completed" %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Completed</span>
+                <% when "failed" %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Failed</span>
+                <% end %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <span class="text-green-600"><%= blast.sent_count %></span> / 
+                <span class="text-gray-500"><%= blast.recipient_count %></span>
+                <% if blast.failed_count > 0 %>
+                  <span class="text-red-600">(<%= blast.failed_count %> failed)</span>
+                <% end %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
+                <%= link_to "View", admin_event_slack_blast_path(current_event, blast), class: "text-[#ec3750] hover:text-blue-800" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <div class="bg-white border border-gray-200 rounded-lg p-6 text-center text-gray-500">
+      No Slack blasts have been sent yet.
+    </div>
+  <% end %>
+
+  <div class="mt-6">
+    <%= link_to "← Back to Event", admin_event_dashboard_path(current_event.slug), class: "text-gray-600 hover:text-gray-900" %>
+  </div>
+</div>

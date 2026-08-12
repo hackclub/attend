@@ -1,0 +1,15 @@
+<p>Dear <%= @first_name %>,</p>
+
+<p>We need you to re-sign the <strong><%= @waiver_type_name %></strong> for <%= @child_first_name %>'s participation in <%= @event_name %>.</p>
+
+<% if @waiver_type == :freedom_waiver %>
+<p>The Freedom Waiver allows you to specify whether <%= @child_first_name %> has permission to leave the event venue unsupervised during the event.</p>
+<% end %>
+
+<p style="margin: 24px 0;">
+  <%= mail_button "Complete the #{@waiver_type_name}", @portal_url %>
+</p>
+
+<p>Please complete this as soon as possible to ensure <%= @child_first_name %>'s registration is up to date.</p>
+
+<p>If you have any questions, don't hesitate to email us at <%= mail_to @support_email %>, or just hit reply to this email!</p>

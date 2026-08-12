@@ -1,0 +1,48 @@
+<div class="w-full">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Groups</h1>
+      <p class="text-sm text-gray-500 mt-1">Cohorts within this event (e.g. Hardware, General Attendance). Shown on tickets, scans, and the participant table.</p>
+    </div>
+    <%= link_to "New Group", new_admin_event_group_path(current_event), class: "bg-[#ec3750] text-white px-4 py-2 rounded-md hover:bg-[#d42f46]" %>
+  </div>
+
+  <% if @groups.any? %>
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <table class="min-w-full divide-y divide-gray-100">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Group</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Slug</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Members</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Position</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-100 text-xs sm:text-sm">
+          <% @groups.each do |group| %>
+            <tr>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                      style="background-color: <%= group.normalized_color || "#e5e7eb" %>; color: <%= group.color.present? ? "white" : "#1f2d3d" %>;">
+                  <%= group.name %>
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-gray-500"><%= group.slug %></td>
+              <td class="px-6 py-4 whitespace-nowrap"><%= @member_counts[group.id] || 0 %></td>
+              <td class="px-6 py-4 whitespace-nowrap text-gray-500"><%= group.position %></td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm space-x-3">
+                <%= link_to "Edit", edit_admin_event_group_path(current_event, group), class: "text-[#ec3750] hover:text-blue-800" %>
+                <%= button_to "Delete", admin_event_group_path(current_event, group), method: :delete, class: "text-red-600 hover:text-red-800 inline", data: { confirm: "Delete #{group.name}? This removes the group from all members." } %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <div class="bg-white border border-gray-200 rounded-lg p-6 text-center text-gray-500">
+      No groups yet. Create one to start tagging participants.
+    </div>
+  <% end %>
+</div>

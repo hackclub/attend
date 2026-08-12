@@ -1,0 +1,197 @@
+<div class="max-w-3xl mx-auto">
+  <div class="mb-6 flex items-center justify-between">
+    <%= link_to "← Back to Messages", admin_event_messages_path(current_event), class: "text-gray-600 hover:text-gray-900" %>
+    <span class="text-sm text-gray-400" id="save-status">Draft</span>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-bold">Compose Message</h1>
+        <p class="text-gray-600">Step 1 of 2 — Write your message</p>
+      </div>
+    </div>
+
+    <%= form_with model: @message,
+        url: @message.persisted? ? admin_event_message_path(current_event, @message) : admin_event_messages_path(current_event),
+        method: @message.persisted? ? :patch : :post,
+        id: "message-form",
+        data: {
+          controller: "autosave",
+          autosave_create_url_value: admin_event_messages_path(current_event, format: :json),
+          autosave_url_value: @message.persisted? ? admin_event_message_path(current_event, @message, format: :json) : ""
+        },
+        class: "space-y-6" do |f| %>
+
+      <% if @message.errors.any? %>
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+          <ul class="text-sm text-red-700 list-disc list-inside">
+            <% @message.errors.full_messages.each do |error| %>
+              <li><%= error %></li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Audience Selection -->
+        <div>
+          <%= f.label :audience, "Audience", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.select :audience,
+              Message::AUDIENCES.reject { |k, _| k == :attendees_in_groups && !current_event.groups_enabled? }.map { |k, v| [v, k] },
+              {},
+              class: "w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750]",
+              data: { action: "change->autosave#save change->autosave#toggleParticipantSelect" } %>
+        </div>
+
+        <!-- Channel Selection -->
+         <div>
+           <span class="block text-sm font-medium text-gray-700 mb-1">Channels</span>
+           <div class="space-y-2">
+             <% Message::CHANNELS.each do |key, label| %>
+               <label class="flex items-center gap-2 <%= key == :sms && !Setting.twilio_enabled? ? 'opacity-50' : '' %>">
+                 <%= check_box_tag "message[channels][]", key, @message.channels.include?(key.to_s),
+                     class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]",
+                     id: "channel_#{key}",
+                     disabled: key == :sms && !Setting.twilio_enabled?,
+                     data: { action: "change->autosave#save" } %>
+                 <span class="text-sm text-gray-700"><%= label %></span>
+                 <% if key == :slack %>
+                   <span class="text-xs text-gray-400">(attendees only)</span>
+                 <% elsif key == :sms && !Setting.twilio_enabled? %>
+                   <span class="text-xs text-gray-500">(disabled in settings)</span>
+                 <% end %>
+               </label>
+             <% end %>
+           </div>
+         </div>
+      </div>
+
+      <!-- Specific Participants Selection -->
+      <% selected_ids = @message.audience_filters["participant_event_ids"] || [] %>
+      <div id="participant-select-container" class="<%= @message.audience == 'specific_participants' ? '' : 'hidden' %>">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Select Participants</label>
+        <div class="border border-gray-300 rounded-lg overflow-hidden">
+          <!-- Search -->
+          <div class="p-3 border-b border-gray-200 bg-gray-50">
+            <input type="text"
+                   id="participant-search"
+                   placeholder="Search participants..."
+                   class="w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] text-sm px-3 py-2"
+                   data-action="input->autosave#filterParticipants">
+          </div>
+          <!-- Selected count -->
+          <div class="px-3 py-2 bg-blue-50 border-b border-gray-200 flex items-center justify-between">
+            <span class="text-sm text-blue-800">
+              <strong id="selected-count"><%= selected_ids.count %></strong> participant<span id="selected-plural"><%= selected_ids.count == 1 ? '' : 's' %></span> selected
+            </span>
+            <button type="button"
+                    class="text-xs text-[#ec3750] hover:text-blue-800 font-medium"
+                    data-action="click->autosave#clearAllParticipants">
+              Clear all
+            </button>
+          </div>
+          <!-- Participant list -->
+          <div class="max-h-64 overflow-y-auto" id="participant-list">
+            <% current_event.participant_events.includes(:participant).order("participants.legal_first_name").each do |pe| %>
+              <label class="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0 participant-row"
+                     data-name="<%= pe.participant.display_name.downcase %> <%= pe.participant.email.downcase %>">
+                <input type="checkbox"
+                       name="message[participant_event_ids][]"
+                       value="<%= pe.id %>"
+                       <%= selected_ids.include?(pe.id) ? 'checked' : '' %>
+                       class="rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750] participant-checkbox"
+                       data-action="change->autosave#updateSelectedCount change->autosave#debouncedSave">
+                <div class="ml-3 flex-1 min-w-0">
+                  <p class="text-sm font-medium text-gray-900 truncate"><%= pe.participant.display_name %></p>
+                  <p class="text-xs text-gray-500 truncate"><%= pe.participant.email %></p>
+                </div>
+                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                  <%= case pe.status
+                      when 'complete' then 'bg-green-100 text-green-800'
+                      when 'in_progress', 'awaiting_guardian' then 'bg-yellow-100 text-yellow-800'
+                      else 'bg-gray-100 text-gray-600'
+                      end %>">
+                  <%= pe.status.titleize %>
+                </span>
+              </label>
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+      <% if current_event.groups_enabled? && current_event.groups.any? %>
+        <% selected_group_ids = @message.audience_filters["group_ids"] || [] %>
+        <div id="group-select-container">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Restrict to Groups <span class="text-gray-400 font-normal">(optional — narrows the audience above)</span>
+          </label>
+          <div class="border border-gray-300 rounded-lg p-3 space-y-2">
+            <% current_event.groups.ordered.each do |g| %>
+              <label class="flex items-center gap-2">
+                <%= check_box_tag "message[group_ids][]", g.id, selected_group_ids.include?(g.id),
+                    class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]",
+                    data: { action: "change->autosave#save" } %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                      style="background-color: <%= g.normalized_color || '#e5e7eb' %>; color: <%= g.color.present? ? 'white' : '#1f2d3d' %>;">
+                  <%= g.name %>
+                </span>
+              </label>
+            <% end %>
+          </div>
+          <p class="mt-1 text-xs text-gray-500">
+            Examples: "Incomplete Onboarding" + Exhibitor → exhibitors not yet onboarded. "All Guardians" + Attendees → guardians of attendees in that group.
+            Leave all unchecked to send to the full audience above.
+          </p>
+        </div>
+      <% end %>
+
+      <!-- Subject (optional) -->
+      <div>
+        <%= f.label :subject, "Subject (optional)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.text_field :subject,
+            class: "w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2",
+            placeholder: "e.g., Important update about your travel",
+            data: { action: "input->autosave#debouncedSave" } %>
+        <p class="mt-1 text-sm text-gray-500">Used as the email subject line. Slack and SMS will use the event name.</p>
+      </div>
+
+      <!-- Message Body -->
+      <div data-controller="tinymce">
+        <%= f.label :body, "Message", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.text_area :body,
+            rows: 10,
+            class: "w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2",
+            data: { tinymce_target: "editor", action: "input->autosave#debouncedSave" } %>
+        <p class="mt-1 text-sm text-gray-500">
+          Use the toolbar for formatting. Links, bold, italic, and lists are supported.
+          Formatting will be adapted for each channel.
+        </p>
+      </div>
+
+      <!-- Scheduling -->
+      <div class="border border-gray-200 rounded-lg p-4">
+        <label class="flex items-center gap-2 mb-3">
+          <input type="checkbox" id="schedule-toggle"
+                 class="rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]"
+                 <%= @message.scheduled_at.present? ? "checked" : "" %>
+                 data-action="change->autosave#toggleSchedule">
+          <span class="text-sm font-medium text-gray-700">Schedule for later</span>
+        </label>
+        <div id="schedule-fields" class="<%= @message.scheduled_at.present? ? '' : 'hidden' %>">
+          <%= f.label :scheduled_at, "Send at", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.datetime_local_field :scheduled_at,
+              class: "rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750]",
+              min: Time.current.strftime("%Y-%m-%dT%H:%M"),
+              data: { action: "change->autosave#save" } %>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex justify-end items-center pt-4 border-t border-gray-200">
+        <%= f.submit "Next: Preview →",
+            class: "bg-[#ec3750] hover:bg-[#d42f46] text-white font-semibold py-2 px-6 rounded-lg cursor-pointer" %>
+      </div>
+    <% end %>
+  </div>
+</div>

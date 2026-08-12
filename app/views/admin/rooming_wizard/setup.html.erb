@@ -1,0 +1,267 @@
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Rooming Wizard</h1>
+      <p class="mt-1 text-sm text-gray-600">Step 1: Setup room configuration</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
+        Step 1 of 4
+      </span>
+    </div>
+  </div>
+
+  <%= render "group_filter" %>
+
+  <!-- Participant Stats -->
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-medium text-gray-900 mb-4">Participant Overview</h2>
+    
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-gray-50 rounded-lg p-4">
+        <p class="text-sm text-gray-500">Total Participants</p>
+        <p class="text-2xl font-bold text-gray-900"><%= @participant_stats[:total] %></p>
+      </div>
+      <div class="bg-yellow-50 rounded-lg p-4">
+        <p class="text-sm text-yellow-700">18 Year Olds</p>
+        <p class="text-2xl font-bold text-yellow-900"><%= @participant_stats[:age_18_count] %></p>
+        <p class="text-xs text-yellow-600">Must room together (unless siblings)</p>
+      </div>
+      <div class="bg-red-50 rounded-lg p-4">
+        <p class="text-sm text-red-700">Missing Gender</p>
+        <p class="text-2xl font-bold text-red-900"><%= @participant_stats[:missing_gender] %></p>
+      </div>
+      <div class="bg-blue-50 rounded-lg p-4">
+        <p class="text-sm text-blue-700">Rooms Needed (est.)</p>
+        <p class="text-2xl font-bold text-blue-900"><%= (@participant_stats[:total].to_f / (@rooming_plan.room_capacity || 2)).ceil %></p>
+        <p class="text-xs text-blue-600">at <%= @rooming_plan.room_capacity || 2 %> per room</p>
+      </div>
+    </div>
+
+    <div class="mt-6 grid grid-cols-2 gap-6">
+      <div>
+        <h3 class="text-sm font-medium text-gray-700 mb-2">By Gender</h3>
+        <div class="space-y-1">
+          <% @participant_stats[:by_gender].sort.each do |gender, count| %>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-600"><%= gender.titleize %></span>
+              <span class="font-medium"><%= count %></span>
+            </div>
+          <% end %>
+        </div>
+      </div>
+      <div>
+        <h3 class="text-sm font-medium text-gray-700 mb-2">By Age</h3>
+        <div class="space-y-1">
+          <% @participant_stats[:by_age].sort.each do |age, count| %>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-600"><%= age %> years old</span>
+              <span class="font-medium"><%= count %></span>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Room Configuration -->
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-medium text-gray-900 mb-1">Room Configuration</h2>
+    <p class="text-sm text-gray-500 mb-4">Mix different room sizes as needed. Existing empty rooms are replaced to match this configuration; rooms with assignments or staff are kept.</p>
+
+    <%= form_with url: setup_admin_event_rooming_wizard_path(@event.slug), method: :post, class: "space-y-4" do |f| %>
+      <div class="border border-gray-200 rounded-lg overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="px-4 py-2 text-left font-medium text-gray-700">People per room</th>
+              <th class="px-4 py-2 text-left font-medium text-gray-700">Number of rooms</th>
+              <th class="px-4 py-2 w-10"></th>
+            </tr>
+          </thead>
+          <tbody id="room-configurations-body" class="divide-y divide-gray-100">
+            <tr class="configuration-row">
+              <td class="px-4 py-3">
+                <input type="number" name="room_configurations[][capacity]"
+                       value="<%= @rooming_plan.room_capacity || 2 %>" min="1"
+                       class="w-28 rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] text-sm">
+              </td>
+              <td class="px-4 py-3">
+                <input type="number" name="room_configurations[][count]"
+                       value="<%= (@participant_stats[:total].to_f / (@rooming_plan.room_capacity || 2)).ceil %>"
+                       min="1"
+                       class="w-28 rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] text-sm">
+              </td>
+              <td class="px-4 py-3">
+                <button type="button" onclick="removeConfigRow(this)"
+                        class="remove-row-btn hidden text-gray-400 hover:text-red-500 text-xl leading-none">&times;</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <button type="button" onclick="addConfigRow()"
+              class="inline-flex items-center text-sm text-[#ec3750] hover:text-[#d42f46]">
+        <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Add another room size
+      </button>
+
+      <div class="flex justify-end pt-2">
+        <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#ec3750] hover:bg-[#d42f46] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ec3750]">
+          Continue to Preference Linking
+          <svg class="ml-2 -mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+        </button>
+      </div>
+    <% end %>
+  </div>
+
+  <script>
+    function addConfigRow() {
+      const tbody = document.getElementById('room-configurations-body');
+      const row = document.createElement('tr');
+      row.className = 'configuration-row';
+      row.innerHTML = `
+        <td class="px-4 py-3">
+          <input type="number" name="room_configurations[][capacity]"
+                 value="2" min="1"
+                 class="w-28 rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] text-sm">
+        </td>
+        <td class="px-4 py-3">
+          <input type="number" name="room_configurations[][count]"
+                 value="1" min="1"
+                 class="w-28 rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] text-sm">
+        </td>
+        <td class="px-4 py-3">
+          <button type="button" onclick="removeConfigRow(this)"
+                  class="remove-row-btn text-gray-400 hover:text-red-500 text-xl leading-none">&times;</button>
+        </td>
+      `;
+      tbody.appendChild(row);
+      updateRemoveButtons();
+    }
+
+    function removeConfigRow(btn) {
+      btn.closest('tr').remove();
+      updateRemoveButtons();
+    }
+
+    function updateRemoveButtons() {
+      const rows = document.querySelectorAll('#room-configurations-body .configuration-row');
+      rows.forEach(row => {
+        const btn = row.querySelector('.remove-row-btn');
+        if (btn) btn.classList.toggle('hidden', rows.length === 1);
+      });
+    }
+  </script>
+
+  <!-- Sibling Groups -->
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-lg font-medium text-gray-900">Sibling Groups</h2>
+        <p class="text-sm text-gray-500">Siblings can room together regardless of age</p>
+      </div>
+      <button type="button" 
+              onclick="document.getElementById('sibling-modal').classList.remove('hidden')"
+              class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+        <svg class="-ml-0.5 mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Add Sibling Group
+      </button>
+    </div>
+
+    <% if @suggested_siblings.any? %>
+      <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <h3 class="text-sm font-medium text-yellow-800 mb-2">Suggested Sibling Groups (by surname)</h3>
+        <div class="space-y-2">
+          <% @suggested_siblings.each do |suggestion| %>
+            <div class="flex items-center justify-between rounded p-2 border <%= suggestion[:already_grouped] ? 'bg-gray-100 border-gray-200' : 'bg-white border-yellow-100' %>">
+              <div>
+                <span class="font-medium <%= suggestion[:already_grouped] ? 'text-gray-500' : 'text-gray-900' %>"><%= suggestion[:surname] %></span>
+                <span class="text-sm text-gray-500 ml-2">
+                  <%= suggestion[:participants].map(&:full_name).join(", ") %>
+                </span>
+              </div>
+              <% if suggestion[:already_grouped] %>
+                <span class="text-sm text-gray-400 font-medium flex items-center">
+                  <svg class="w-4 h-4 mr-1 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                  </svg>
+                  Created
+                </span>
+              <% else %>
+                <%= form_with url: admin_event_sibling_groups_path(@event.slug), method: :post, class: "inline", data: { turbo: true } do %>
+                  <% suggestion[:participants].each do |p| %>
+                    <input type="hidden" name="participant_ids[]" value="<%= p.id %>">
+                  <% end %>
+                  <input type="hidden" name="label" value="<%= suggestion[:surname] %> siblings">
+                  <button type="submit" class="text-sm text-[#ec3750] hover:text-blue-800 font-medium">
+                    Create Group
+                  </button>
+                <% end %>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <div id="sibling_groups_list" class="space-y-2">
+      <% SiblingGroup.includes(:participants).joins(participants: :participant_events).where(participant_events: { event_id: @event.id }).distinct.each do |group| %>
+        <%= render partial: "admin/sibling_groups/sibling_group", locals: { sibling_group: group } %>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<!-- Sibling Group Modal -->
+<div id="sibling-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true">
+  <div class="flex min-h-screen items-center justify-center p-4">
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="document.getElementById('sibling-modal').classList.add('hidden')"></div>
+    
+    <div class="relative bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
+      <h3 class="text-lg font-medium text-gray-900 mb-4">Create Sibling Group</h3>
+      
+      <%= form_with url: admin_event_sibling_groups_path(@event.slug), method: :post, data: { turbo_frame: "_top" } do |f| %>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Label (optional)</label>
+            <input type="text" name="label" placeholder="e.g., Smith siblings" class="mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750]">
+          </div>
+          
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Select Participants</label>
+            <div class="max-h-60 overflow-y-auto border rounded-md p-2 space-y-1">
+              <% @event.participants.includes(:sibling_groups).order(:legal_last_name, :legal_first_name).each do |participant| %>
+                <label class="flex items-center p-2 hover:bg-gray-50 rounded">
+                  <input type="checkbox" name="participant_ids[]" value="<%= participant.id %>" class="rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]">
+                  <span class="ml-2 text-sm">
+                    <%= participant.full_name %>
+                    <% if participant.sibling_groups.any? %>
+                      <span class="text-gray-400">(already in a group)</span>
+                    <% end %>
+                  </span>
+                </label>
+              <% end %>
+            </div>
+          </div>
+        </div>
+        
+        <div class="mt-6 flex justify-end gap-3">
+          <button type="button" onclick="document.getElementById('sibling-modal').classList.add('hidden')" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md">
+            Cancel
+          </button>
+          <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-[#ec3750] hover:bg-[#d42f46] rounded-md">
+            Create Group
+          </button>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,12 @@
+<% if current_event.groups_enabled? && current_event.groups.any? %>
+  <div class="mb-4 flex items-center gap-2 text-sm">
+    <span class="text-gray-500">Group:</span>
+    <%= link_to "All", url_for(request.params.except(:group_id).merge(only_path: true)),
+        class: "px-2.5 py-1 rounded-full border #{selected_group.nil? ? 'bg-[#ec3750] text-white border-[#ec3750]' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}" %>
+    <% current_event.groups.ordered.each do |g| %>
+      <%= link_to g.name, url_for(request.params.merge(group_id: g.id, only_path: true)),
+          class: "px-2.5 py-1 rounded-full border #{selected_group&.id == g.id ? 'border-transparent text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}",
+          style: (selected_group&.id == g.id ? "background-color: #{g.normalized_color || '#ec3750'}" : "") %>
+    <% end %>
+  </div>
+<% end %>

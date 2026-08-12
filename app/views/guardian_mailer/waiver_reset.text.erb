@@ -1,0 +1,13 @@
+Dear <%= @first_name %>,
+
+We need you to re-sign the <%= @waiver_type_name %> for <%= @child_first_name %>'s participation in <%= @event_name %>.
+
+<% if @waiver_type == :freedom_waiver %>
+The Freedom Waiver allows you to specify whether <%= @child_first_name %> has permission to leave the event venue unsupervised during the event.
+
+<% end %>
+Please complete the <%= @waiver_type_name %> here: <%= @portal_url %>
+
+Please complete this as soon as possible to ensure <%= @child_first_name %>'s registration is up to date.
+
+If you have any questions, don't hesitate to email us at <%= @support_email %>, or just hit reply to this email!

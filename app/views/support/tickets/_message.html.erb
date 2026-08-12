@@ -1,0 +1,59 @@
+<div id="<%= dom_id(message) %>" class="flex items-end gap-2 <%= message.inbound? ? 'justify-start' : 'justify-end' %>">
+  <% if message.outbound? && message.user.present? %>
+    <div class="order-2 w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-white text-xs font-medium flex-shrink-0" title="<%= message.user.display_name_or_fallback %>">
+      <%= message.user.display_name_or_fallback.split.map(&:first).join.upcase[0..1] %>
+    </div>
+  <% end %>
+  <div class="max-w-[85%] sm:max-w-md <%= message.inbound? ? 'bg-gray-100' : 'bg-blue-600 text-white order-1' %> rounded-lg px-3 sm:px-4 py-2">
+    <% if message.media.attached? %>
+      <div class="flex flex-wrap gap-2 mb-2">
+        <% message.media.each do |attachment| %>
+          <% if attachment.content_type&.start_with?("image/") %>
+            <%= link_to rails_blob_path(attachment, disposition: "inline"), target: "_blank", class: "block" do %>
+              <%= image_tag rails_blob_path(attachment), class: "max-w-full rounded max-h-48 object-contain" %>
+            <% end %>
+          <% else %>
+            <%= link_to rails_blob_path(attachment, disposition: "attachment"), class: "text-sm underline #{message.inbound? ? 'text-blue-600' : 'text-blue-200'}" do %>
+              📎 <%= attachment.filename %>
+            <% end %>
+          <% end %>
+        <% end %>
+      </div>
+    <% end %>
+    <% unless message.body == "(media)" %>
+      <p class="whitespace-pre-wrap"><%= message.body %></p>
+    <% end %>
+    <div class="flex items-center justify-end gap-2 mt-1">
+      <% if message.outbound? && message.user.present? %>
+        <span class="text-xs <%= message.inbound? ? 'text-gray-500' : 'text-blue-200' %>">
+          <%= message.user.display_name_or_fallback %>
+        </span>
+      <% end %>
+      <span class="text-xs <%= message.inbound? ? 'text-gray-500' : 'text-blue-200' %>">
+        <%= message.sent_at&.strftime("%H:%M") || message.created_at.strftime("%H:%M") %>
+      </span>
+      <% if message.outbound? && message.twilio_status.present? %>
+        <span class="text-xs flex items-center gap-1 <%= message.inbound? ? 'text-gray-400' : 'text-blue-200' %>" title="<%= message.twilio_status %>">
+          <% case message.twilio_status %>
+          <% when "queued", "accepted" %>
+            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3"/></svg>
+          <% when "sending", "sent" %>
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          <% when "delivered" %>
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <% when "read" %>
+            <svg class="w-3 h-3 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <% when "failed", "undelivered" %>
+            <svg class="w-3 h-3 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="text-red-300">Failed</span>
+          <% else %>
+            <%= message.twilio_status %>
+          <% end %>
+        </span>
+      <% end %>
+    </div>
+    <% if message.error_message.present? %>
+      <p class="text-xs text-red-300 mt-1"><%= message.error_message %></p>
+    <% end %>
+  </div>
+</div>

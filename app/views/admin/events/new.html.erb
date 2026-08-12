@@ -1,0 +1,70 @@
+<% content_for :title, "New Event – Attend" %>
+
+<div class="w-full max-w-3xl">
+  <%= render "admin/event_setup/progress", current_step: "basics" %>
+
+  <div class="mb-8">
+    <h1 class="text-2xl font-bold mb-1">Let's set up your event</h1>
+    <p class="text-gray-500">Start with the basics — we'll walk through dates, modules, and waivers next.</p>
+  </div>
+
+  <%= form_with model: [ :admin, @event ], class: "space-y-6", multipart: true do |f| %>
+    <% if @event.errors.any? %>
+      <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+        <h3 class="text-red-800 font-medium"><%= pluralize(@event.errors.count, "error") %> prohibited this event from being saved:</h3>
+        <ul class="mt-2 list-disc list-inside text-sm text-red-700">
+          <% @event.errors.full_messages.each do |message| %>
+            <li><%= message %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <% if @event.event_series %>
+      <%= f.hidden_field :event_series_id %>
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">
+        <%= render "admin/events/avatar", event: @event.event_series, size: 28, rounded: "rounded-md" %>
+        <p class="text-sm text-blue-800">This event will be part of the <strong><%= @event.event_series.name %></strong> series and will inherit its branding unless you set its own.</p>
+      </div>
+    <% elsif current_user.global_admin? && EventSeries.any? %>
+      <div class="bg-white border border-gray-200 rounded-lg p-6">
+        <%= f.label :event_series_id, "Series", class: "block text-sm font-medium text-gray-700" %>
+        <%= f.collection_select :event_series_id, EventSeries.order(:name), :id, :name, { include_blank: "No series — standalone event" }, class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+        <p class="mt-1 text-sm text-gray-500">Optional. Events in a series inherit its branding and can be managed by series members.</p>
+      </div>
+    <% end %>
+
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <%= f.label :name, class: "block text-sm font-medium text-gray-700" %>
+          <%= f.text_field :name, class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+        </div>
+        <div>
+          <%= f.label :slug, class: "block text-sm font-medium text-gray-700" %>
+          <%= f.text_field :slug, class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "auto-generated from name" %>
+          <p class="mt-1 text-sm text-gray-500">Lowercase letters, numbers, and dashes only</p>
+        </div>
+        <div>
+          <%= f.label :support_email, "Support Email", class: "block text-sm font-medium text-gray-700" %>
+          <%= f.email_field :support_email, class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "team@hackclub.com" %>
+          <p class="mt-1 text-sm text-gray-500">Used in guardian invitation emails. Defaults to team@hackclub.com if not set.</p>
+        </div>
+        <div>
+          <%= f.label :timezone, class: "block text-sm font-medium text-gray-700" %>
+          <%= f.time_zone_select :timezone, nil, {}, class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+        </div>
+      </div>
+      <div class="mt-4">
+        <%= f.label :logo, "Logo", class: "block text-sm font-medium text-gray-700" %>
+        <%= f.file_field :logo, accept: "image/jpeg,image/png,image/gif,image/webp,image/svg+xml", class: "mt-1 block text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 file:cursor-pointer" %>
+        <p class="mt-1 text-sm text-gray-500">Optional. JPEG, PNG, GIF, WebP, or SVG. Max 5MB. Shown in the sidebar and event picker.</p>
+      </div>
+    </div>
+
+    <div class="flex flex-col sm:flex-row justify-between gap-3">
+      <%= link_to "Cancel", admin_root_path, class: "w-full sm:w-auto text-center text-gray-500 hover:text-gray-700 font-medium py-2 px-4" %>
+      <%= f.submit "Create event & continue", class: "w-full sm:w-auto bg-[#ec3750] hover:bg-[#d63146] text-white font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer" %>
+    </div>
+  <% end %>
+</div>

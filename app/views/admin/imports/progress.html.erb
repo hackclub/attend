@@ -1,0 +1,90 @@
+<div data-controller="import-progress" data-import-progress-import-batch-id-value="<%= @import_batch.id %>">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Import Progress</h1>
+      <p class="text-gray-600 mt-1" data-import-progress-target="statusMessage"><%= @import_batch.current_status_message %></p>
+    </div>
+    <% if @import_batch.completed? %>
+      <%= link_to "← Back to Participants", admin_event_participants_path(current_event), class: "text-[#ec3750] hover:text-blue-800" %>
+    <% end %>
+  </div>
+
+  <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+    <div class="mb-4">
+      <div class="flex justify-between text-sm text-gray-600 mb-1">
+        <span>Progress</span>
+        <span data-import-progress-target="percentage"><%= @import_batch.progress_percentage %>%</span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-4">
+        <div 
+          class="h-4 rounded-full transition-all duration-300"
+          data-import-progress-target="progressBar"
+          style="width: <%= @import_batch.progress_percentage %>%; background-color: <%= @import_batch.completed? ? '#16a34a' : (@import_batch.failed? ? '#dc2626' : '#2563eb') %>"
+        ></div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
+      <div class="text-center p-3 bg-gray-50 rounded-lg">
+        <div class="text-2xl font-bold text-gray-900" data-import-progress-target="totalCount"><%= @import_batch.total_count %></div>
+        <div class="text-xs text-gray-500">Total</div>
+      </div>
+      <div class="text-center p-3 bg-green-50 rounded-lg">
+        <div class="text-2xl font-bold text-green-600" data-import-progress-target="importedCount"><%= @import_batch.imported_count %></div>
+        <div class="text-xs text-gray-500">Imported</div>
+      </div>
+      <div class="text-center p-3 bg-yellow-50 rounded-lg">
+        <div class="text-2xl font-bold text-yellow-600" data-import-progress-target="skippedCount"><%= @import_batch.skipped_count %></div>
+        <div class="text-xs text-gray-500">Skipped</div>
+      </div>
+      <div class="text-center p-3 bg-red-50 rounded-lg">
+        <div class="text-2xl font-bold text-red-600" data-import-progress-target="errorCount"><%= @import_batch.error_count %></div>
+        <div class="text-xs text-gray-500">Errors</div>
+      </div>
+      <% if @import_batch.send_invitations %>
+        <div class="text-center p-3 bg-blue-50 rounded-lg">
+          <div class="text-2xl font-bold text-[#ec3750]" data-import-progress-target="invitesSentCount"><%= @import_batch.invites_sent_count %></div>
+          <div class="text-xs text-gray-500">Invites Sent</div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg border border-gray-200" data-import-progress-target="errorsSection" style="<%= @import_batch.errors_data.empty? ? 'display: none;' : '' %>">
+    <div class="px-4 py-3 border-b border-gray-200">
+      <h2 class="font-semibold text-red-700">Errors</h2>
+    </div>
+    <div class="p-4">
+      <ul class="text-sm text-red-700 space-y-2" data-import-progress-target="errorsList">
+        <% @import_batch.errors_data.last(10).each do |error| %>
+          <li>
+            <% if error["row"] %>
+              Row <%= error["row"] %><%= " (#{error["email"]})" if error["email"] %>: <%= error["error"] %>
+            <% else %>
+              <%= error["email"] %>: <%= error["error"] %>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+  </div>
+
+  <% if @import_batch.completed? %>
+    <div class="mt-6 flex justify-center">
+      <%= link_to "View Imported Participants", admin_event_participants_path(current_event), class: "px-6 py-2 bg-[#ec3750] text-white rounded-md hover:bg-[#d42f46]" %>
+    </div>
+  <% end %>
+
+  <% if @import_batch.failed? %>
+    <div class="mt-6 bg-red-50 border border-red-200 rounded-lg p-4">
+      <h3 class="font-semibold text-red-800">Import Failed</h3>
+      <p class="text-sm text-red-700 mt-1">
+        The import encountered an error and could not complete.
+        <%= @import_batch.imported_count %> participants were imported before the failure.
+      </p>
+      <div class="mt-4">
+        <%= link_to "Try Again", new_admin_event_import_path(current_event), class: "px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700" %>
+      </div>
+    </div>
+  <% end %>
+</div>

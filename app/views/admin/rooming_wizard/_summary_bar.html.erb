@@ -1,0 +1,55 @@
+<div id="summary_bar" class="bg-white border border-gray-200 rounded-lg p-4">
+  <% if @rooming_plan.locked? %>
+    <div class="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <svg class="h-5 w-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+        <span class="text-sm font-medium text-yellow-800">Rooming is locked - assignments cannot be modified</span>
+      </div>
+      <%= button_to unlock_admin_event_rooming_wizard_path(@event.slug), method: :post, class: "inline-flex items-center px-3 py-1 text-sm font-medium rounded-md text-yellow-800 bg-yellow-100 hover:bg-yellow-200" do %>
+        Unlock
+      <% end %>
+    </div>
+  <% end %>
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-6">
+      <div class="text-sm">
+        <span class="font-medium"><%= @rooms.sum { |r| r.room_assignments.size } %></span> assigned
+      </div>
+      <div class="text-sm">
+        <span class="font-medium text-orange-600"><%= @unassigned.size %></span> unassigned
+      </div>
+      <% if @needs_acknowledgment.any? %>
+        <div class="text-sm">
+          <span class="font-medium text-purple-600"><%= @needs_acknowledgment.size %></span> need acknowledgment
+        </div>
+      <% end %>
+    </div>
+    <div class="flex gap-3">
+      <% unless @rooming_plan.locked? %>
+        <%= form_with url: auto_assign_admin_event_rooming_wizard_path(@event.slug), method: :post, class: "inline" do %>
+          <button type="submit" class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+            Re-run Auto-Assign
+          </button>
+        <% end %>
+        <button type="button" onclick="document.getElementById('add-room-modal').classList.remove('hidden')"
+                class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+          + Add Room
+        </button>
+        <%= button_to lock_admin_event_rooming_wizard_path(@event.slug), method: :post, class: "inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50" do %>
+          <svg class="-ml-0.5 mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+          Lock
+        <% end %>
+      <% end %>
+      <%= link_to finalize_admin_event_rooming_wizard_path(@event.slug), class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md  text-white bg-[#ec3750] hover:bg-[#d42f46]" do %>
+        Continue to Finalize
+        <svg class="ml-2 -mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+      <% end %>
+    </div>
+  </div>
+</div>

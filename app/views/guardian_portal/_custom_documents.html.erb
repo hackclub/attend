@@ -1,0 +1,65 @@
+<% guardian_docs = @participant_event.applicable_custom_documents.select(&:guardian_signs?) %>
+<% if guardian_docs.any? %>
+  <div class="space-y-4 mt-6 text-left">
+    <h3 class="font-medium text-gray-900">Additional Documents</h3>
+    <% guardian_docs.each do |doc| %>
+      <% consent = @participant_event.consents.find { |c| c.custom_document_id == doc.id } %>
+      <% if doc.physical? %>
+        <% awaiting_upload = doc.participant_signs? && !consent&.physical_uploads&.attached? %>
+        <div class="border border-gray-200 rounded-lg p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-medium text-gray-900"><%= doc.name %></h4>
+            <% if consent&.signed? %>
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Confirmed</span>
+            <% elsif awaiting_upload %>
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Awaiting Student</span>
+            <% else %>
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>
+            <% end %>
+          </div>
+
+          <% if consent&.signed? %>
+            <p class="text-sm text-gray-500">Confirmed on <%= consent.signed_at&.strftime("%B %d, %Y at %I:%M %p") %></p>
+          <% elsif awaiting_upload %>
+            <p class="text-sm text-gray-600">This document is signed on paper. <%= @participant.legal_first_name %> needs to upload a photo of the signed form first — then you'll review and confirm it here.</p>
+          <% elsif doc.signed_by_guardian? %>
+            <p class="text-sm text-gray-600 mb-4">Download this document, print and sign it, then upload a photo of the signed form.</p>
+            <%= link_to "Sign & Upload #{doc.name}", guardian_portal_custom_document_path(token: @token, custom_document_id: doc.id),
+                class: "bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium inline-block" %>
+          <% else %>
+            <p class="text-sm text-gray-600 mb-4"><%= @participant.legal_first_name %> uploaded a photo of the signed document — please review and confirm it.</p>
+            <%= link_to "Review & Confirm #{doc.name}", guardian_portal_custom_document_path(token: @token, custom_document_id: doc.id),
+                class: "bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium inline-block" %>
+          <% end %>
+        </div>
+        <% next %>
+      <% end %>
+      <% participant_handling = consent&.docuseal_envelope_id.present? && consent.docuseal_guardian_slug.blank? %>
+      <% awaiting_participant = (doc.signed_by_participant_and_guardian? || doc.signed_by_minor_and_guardian?) && !consent&.participant_signed? %>
+      <div class="border border-gray-200 rounded-lg p-4">
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="font-medium text-gray-900"><%= doc.name %></h4>
+          <% if consent&.signed? %>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Signed</span>
+          <% elsif participant_handling || awaiting_participant %>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Awaiting Student</span>
+          <% else %>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>
+          <% end %>
+        </div>
+
+        <% if consent&.signed? %>
+          <p class="text-sm text-gray-500">Signed on <%= consent.signed_at&.strftime("%B %d, %Y at %I:%M %p") %></p>
+        <% elsif participant_handling %>
+          <p class="text-sm text-gray-600"><%= @participant.legal_first_name %> is signing this document themselves.</p>
+        <% elsif awaiting_participant %>
+          <p class="text-sm text-gray-600"><%= @participant.legal_first_name %> needs to sign their portion first — then you'll be able to sign yours.</p>
+        <% else %>
+          <p class="text-sm text-gray-600 mb-4">Please sign this document for <%= @participant.legal_first_name %>'s participation.</p>
+          <%= link_to "Sign #{doc.name}", guardian_portal_custom_document_path(token: @token, custom_document_id: doc.id),
+              class: "bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium inline-block" %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+<% end %>

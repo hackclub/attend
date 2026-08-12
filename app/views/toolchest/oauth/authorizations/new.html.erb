@@ -1,0 +1,107 @@
+<% content_for :title, "Authorize #{@client_name}" %>
+<style>
+  .tc-wrap { display: flex; align-items: center; justify-content: center; padding: 2.5rem 1rem; min-height: 70vh; }
+  .tc-card { width: 100%; max-width: 34rem; background: #14151d; border: 1px solid rgba(255,255,255,.10);
+             border-radius: 16px; padding: 1.75rem; box-shadow: 0 24px 60px -20px rgba(0,0,0,.7); }
+  .tc-head { display: flex; align-items: flex-start; gap: .75rem; margin-bottom: 1.25rem; }
+  .tc-icon { flex: 0 0 auto; width: 2.75rem; height: 2.75rem; border-radius: 12px; display: flex;
+             align-items: center; justify-content: center; background: rgba(236,55,80,.15); color: #ec3750; }
+  .tc-title { font-size: 1.25rem; font-weight: 700; color: #fff; margin: 0; line-height: 1.2; }
+  .tc-sub { font-size: .875rem; color: rgba(255,255,255,.55); margin: .15rem 0 0; }
+  .tc-trust { margin-bottom: 1.25rem; border: 1px solid rgba(255,255,255,.10); background: rgba(0,0,0,.25);
+              border-radius: 8px; padding: .625rem .75rem; font-size: .75rem; line-height: 1.5; color: rgba(255,255,255,.6); }
+  .tc-trust code { color: rgba(255,255,255,.85); word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .tc-label { font-size: .875rem; font-weight: 500; color: rgba(255,255,255,.7); margin: 0 0 .75rem; }
+  .tc-scopes { list-style: none; margin: 0 0 1.5rem; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+  .tc-scope { display: flex; align-items: flex-start; gap: .75rem; border: 1px solid rgba(255,255,255,.10);
+              background: rgba(255,255,255,.03); border-radius: 8px; padding: .625rem .75rem; cursor: pointer; }
+  .tc-scope.tc-sensitive { border-color: rgba(251,191,36,.3); background: rgba(251,191,36,.07); }
+  .tc-scope input[type=checkbox] { margin-top: .15rem; width: 1rem; height: 1rem; flex: 0 0 auto; accent-color: #ec3750; }
+  .tc-fixed { margin-top: .15rem; width: 1rem; height: 1rem; flex: 0 0 auto; border-radius: 4px; background: #ec3750;
+              color: #fff; display: inline-flex; align-items: center; justify-content: center; }
+  .tc-scope-name { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .875rem; font-weight: 600; color: #fff; }
+  .tc-scope-desc { display: block; margin-top: .15rem; font-size: .875rem; color: rgba(255,255,255,.6); }
+  .tc-badge { display: inline-block; margin-left: .4rem; border-radius: 999px; padding: .1rem .4rem; font-size: 10px;
+              font-weight: 600; text-transform: uppercase; letter-spacing: .03em; vertical-align: middle; }
+  .tc-badge.sensitive { background: rgba(251,191,36,.16); color: #fcd34d; }
+  .tc-badge.required { background: rgba(255,255,255,.12); color: rgba(255,255,255,.65); }
+  .tc-btn { display: block; width: 100%; border-radius: 8px; padding: .625rem 1rem; font-size: .875rem;
+            font-weight: 600; text-align: center; cursor: pointer; border: 0; }
+  .tc-btn-primary { background: #ec3750; color: #fff; box-shadow: 0 10px 30px -10px rgba(236,55,80,.6); }
+  .tc-btn-primary:hover { background: #d42f46; }
+  .tc-btn-ghost { margin-top: .75rem; background: transparent; color: rgba(255,255,255,.7);
+                  border: 1px solid rgba(255,255,255,.15); font-weight: 500; }
+  .tc-btn-ghost:hover { background: rgba(255,255,255,.05); color: #fff; }
+  .tc-foot { margin-top: 1.5rem; text-align: center; font-size: .75rem; color: rgba(255,255,255,.4); }
+</style>
+
+<div class="tc-wrap">
+  <div class="tc-card">
+    <div class="tc-head">
+      <span class="tc-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </span>
+      <div>
+        <h1 class="tc-title">Authorize <%= @client_name %></h1>
+        <p class="tc-sub">wants to access your Attend account as <%= @current_resource_owner.try(:email) || "you" %></p>
+      </div>
+    </div>
+
+    <div class="tc-trust">
+      After you authorize, you'll be sent to <code><%= @redirect_uri %></code>.
+      Only continue if you started this from a tool you trust.
+    </div>
+
+    <%= form_tag @authorize_url, method: :post, data: { turbo: false } do %>
+      <% @oauth_params&.each do |key, value| %>
+        <%= hidden_field_tag key, value %>
+      <% end %>
+      <%= hidden_field_tag "original_scope", @original_scope %>
+
+      <% if @scope_list&.any? %>
+        <p class="tc-label">This will be allowed to:</p>
+        <ul class="tc-scopes">
+          <% @scope_list.each do |s|
+            sensitive = s[:description].to_s.include?("(sensitive)")
+            description = s[:description].to_s.sub(/\s*\(sensitive\)\s*/, "") %>
+            <li>
+              <label class="tc-scope <%= "tc-sensitive" if sensitive %>">
+                <% if @optional %>
+                  <%= check_box_tag "scope[]", s[:name], true, disabled: s[:required], id: "scope_#{s[:name].parameterize}" %>
+                  <% if s[:required] %><%= hidden_field_tag "scope[]", s[:name] %><% end %>
+                <% else %>
+                  <%= hidden_field_tag "scope[]", s[:name] %>
+                  <span class="tc-fixed">
+                    <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 1 1 1.4-1.4l3.1 3.1 6.8-6.8a1 1 0 0 1 1.4 0z" clip-rule="evenodd"/></svg>
+                  </span>
+                <% end %>
+                <span>
+                  <span class="tc-scope-name"><%= s[:name] %></span>
+                  <% if sensitive %><span class="tc-badge sensitive">sensitive</span><% end %>
+                  <% if s[:required] %><span class="tc-badge required">required</span><% end %>
+                  <span class="tc-scope-desc"><%= description %></span>
+                </span>
+              </label>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+
+      <%= submit_tag "Authorize", class: "tc-btn tc-btn-primary" %>
+    <% end %>
+
+    <%= form_tag @authorize_url, method: :delete, data: { turbo: false } do %>
+      <% @oauth_params&.each do |key, value| %>
+        <%= hidden_field_tag key, value %>
+      <% end %>
+      <%= submit_tag "Deny", class: "tc-btn tc-btn-ghost" %>
+    <% end %>
+
+    <p class="tc-foot">
+      You can change or revoke access anytime.
+      <% if @optional %>Uncheck anything you don't want to grant.<% end %>
+    </p>
+  </div>
+</div>

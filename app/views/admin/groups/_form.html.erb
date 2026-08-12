@@ -1,0 +1,51 @@
+<%= form_with model: [:admin, current_event, group], local: true, class: "space-y-6" do |f| %>
+  <% if group.errors.any? %>
+    <div class="bg-red-50 border border-red-200 rounded-md p-4">
+      <h3 class="text-sm font-medium text-red-800">
+        <%= pluralize(group.errors.count, "error") %> prohibited this group from being saved:
+      </h3>
+      <ul class="mt-2 text-sm text-red-700 list-disc list-inside space-y-1">
+        <% group.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div>
+    <%= f.label :name, class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <%= f.text_field :name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "e.g., Hardware, General Attendance, Staff" %>
+  </div>
+
+  <div>
+    <%= f.label :slug, class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <%= f.text_field :slug, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "auto-generated from name if blank" %>
+    <p class="mt-1 text-sm text-gray-500">Lowercase, dashes only. Used for URLs / filters.</p>
+  </div>
+
+  <div>
+    <%= f.label :color, "Color (hex)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <div class="flex items-center gap-2">
+      <%= f.text_field :color, class: "w-40 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "#ec3750" %>
+      <% if group.color.present? %>
+        <span class="inline-block h-6 w-6 rounded border border-gray-200" style="background-color: <%= group.normalized_color %>"></span>
+      <% end %>
+    </div>
+    <p class="mt-1 text-sm text-gray-500">6-digit hex (with or without #). Used as the chip background.</p>
+  </div>
+
+  <div>
+    <%= f.label :description, class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <%= f.text_area :description, rows: 2, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+  </div>
+
+  <div>
+    <%= f.label :position, "Display order", class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <%= f.number_field :position, class: "w-32 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", min: 0 %>
+  </div>
+
+  <div class="pt-4 flex flex-col sm:flex-row justify-end gap-3">
+    <%= link_to "Cancel", admin_event_groups_path(current_event), class: "w-full sm:w-auto text-center bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300" %>
+    <%= f.submit group.persisted? ? "Update Group" : "Create Group", class: "w-full sm:w-auto bg-[#ec3750] text-white px-4 py-2 rounded-md hover:bg-[#d42f46] cursor-pointer" %>
+  </div>
+<% end %>

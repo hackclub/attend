@@ -1,0 +1,251 @@
+<div id="room_<%= room.id %>" class="bg-white border border-gray-200 rounded-lg overflow-hidden room-card" data-room-id="<%= room.id %>" draggable="<%= !@rooming_plan.locked? %>">
+  <!-- Room Header -->
+  <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 <%= 'cursor-move' unless @rooming_plan.locked? %>">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2 min-w-0">
+        <% unless @rooming_plan.locked? %>
+          <span class="text-gray-400 select-none" title="Drag to reorder">⋮⋮</span>
+        <% end %>
+        <% if @rooming_plan.locked? %>
+          <h3 class="font-medium text-gray-900 truncate">
+            <%= room.display_name %>
+          </h3>
+        <% else %>
+          <h3 class="font-medium text-gray-900 truncate hover:bg-white hover:px-1 hover:rounded cursor-text room-name-display"
+              onclick="startEditRoomName(event, '<%= room.id %>')"
+              title="Click to rename">
+            <%= room.display_name %>
+          </h3>
+          <input type="text"
+                 class="hidden border border-gray-300 rounded px-2 py-0.5 text-sm font-medium room-name-input"
+                 value="<%= room.name %>"
+                 placeholder="Room name"
+                 onblur="saveRoomName('<%= room.id %>', this.value)"
+                 onkeydown="handleRoomNameKey(event, '<%= room.id %>')"
+                 onclick="event.stopPropagation()">
+        <% end %>
+        <span class="text-sm text-gray-500">
+          (<%= room.total_occupancy %>/<%= room.capacity %>)
+        </span>
+        <% if room.has_staff? %>
+          <span class="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">Has Staff</span>
+        <% end %>
+      </div>
+      <div class="flex items-center gap-2">
+        <% if room.age_gap > 2 %>
+          <span class="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800" title="Age gap exceeds 2 years">
+            Age gap: <%= room.age_gap %>y
+          </span>
+        <% end %>
+        <% if room.has_trans_nb_pairing? %>
+          <% needs_ack = room.room_assignments.any? { |ra| ra.trans_nb_flagged? && !ra.trans_nb_acknowledged } %>
+          <% if needs_ack %>
+            <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
+              Trans/NB - Needs Review
+            </span>
+          <% else %>
+            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+              Trans/NB - Acknowledged
+            </span>
+          <% end %>
+        <% end %>
+        <% unless @rooming_plan.locked? %>
+          <button type="button" onclick="if(confirm('Delete this room?')) { deleteRoom('<%= room.id %>') }" class="text-red-500 hover:text-red-700 text-sm">
+            &times;
+          </button>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Room Drop Zone -->
+  <div class="<%= room.can_add_participants? ? 'room-drop-zone' : '' %> min-h-[120px] p-3 space-y-2 border-2 border-transparent transition" data-room-id="<%= room.id %>">
+    
+    <!-- Staff Cards -->
+    <% room.staff_names_list.each do |staff_name| %>
+      <div class="bg-orange-50 rounded p-2 border border-orange-200">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-orange-900">
+              <%= staff_name %>
+            </p>
+            <p class="text-xs text-orange-600">Staff</p>
+          </div>
+          <% unless @rooming_plan.locked? %>
+            <button type="button" 
+                    onclick="removeStaff('<%= room.id %>', '<%= j(staff_name) %>')"
+                    class="text-orange-500 hover:text-orange-700 text-sm">
+              &times;
+            </button>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <!-- Participant Cards -->
+    <% room.room_assignments.each do |assignment| %>
+      <% pe = assignment.participant_event %>
+      <div class="<%= 'draggable-participant cursor-move hover:border-blue-300' unless @rooming_plan.locked? %> bg-white rounded p-2 border border-gray-200 transition"
+           draggable="<%= !@rooming_plan.locked? %>"
+           data-pe-id="<%= pe.id %>">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-900">
+              <%= pe.participant.full_name %>
+              <% if assignment.staff_override? %>
+                <span class="text-orange-500 text-xs">(override)</span>
+              <% end %>
+            </p>
+            <p class="text-xs text-gray-500">
+              Age <%= pe.age_on_event %>
+              <% if pe.is_18_on_event? %>
+                <span class="text-yellow-600 font-medium">(18)</span>
+              <% end %>
+              · <%= pe.accommodation&.gender_identity&.titleize || "?" %>
+              <% if pe.accommodation&.trans_or_nb? %>
+                <span class="text-purple-600">(T/NB)</span>
+              <% end %>
+            </p>
+          </div>
+          <div class="flex items-center gap-1">
+            <% if pe.participant.sibling_groups.any? %>
+              <span class="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded" title="Has siblings in event">Sib</span>
+            <% end %>
+            <% if room.room_assignments.size >= 2 %>
+              <% assignment.display_flags.each do |flag| %>
+                <span class="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded"><%= flag %></span>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+        
+        <% if assignment.trans_nb_flagged? && !assignment.trans_nb_acknowledged && room.room_assignments.size >= 2 %>
+          <div class="mt-2 p-2 bg-purple-50 rounded text-xs">
+            <p class="text-purple-700 mb-1">Trans/NB pairing requires acknowledgment</p>
+            <button type="button" onclick="acknowledgeTransNb('<%= assignment.id %>')" class="text-purple-600 hover:text-purple-800 underline">
+              Mark as acknowledged
+            </button>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+    
+    <!-- Empty State / Add Staff Button -->
+    <% if room.total_occupancy == 0 %>
+      <div class="text-center py-4 space-y-2">
+        <p class="text-sm text-gray-400"><%= @rooming_plan.locked? ? 'Empty room' : 'Drag participants here' %></p>
+        <% unless @rooming_plan.locked? %>
+          <p class="text-xs text-gray-400">or</p>
+          <button type="button" 
+                  onclick="showAddStaffModal('<%= room.id %>')"
+                  class="inline-flex items-center px-3 py-1.5 border border-orange-300 text-sm font-medium rounded-md text-orange-700 bg-orange-50 hover:bg-orange-100">
+            + Add Staff
+          </button>
+        <% end %>
+      </div>
+    <% elsif room.has_staff? && room.remaining_capacity > 0 && !@rooming_plan.locked? %>
+      <button type="button" 
+              onclick="showAddStaffModal('<%= room.id %>')"
+              class="w-full inline-flex items-center justify-center px-3 py-1.5 border border-dashed border-orange-300 text-sm font-medium rounded-md text-orange-600 hover:bg-orange-50">
+        + Add Another Staff (<%= room.remaining_capacity %> spots left)
+      </button>
+    <% end %>
+  </div>
+</div>
+
+<script>
+async function deleteRoom(roomId) {
+  await fetch('<%= destroy_room_admin_event_rooming_wizard_path(@event.slug) %>', {
+    method: 'DELETE',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: 'room_id=' + roomId
+  });
+  document.getElementById('room_' + roomId)?.remove();
+}
+
+async function removeStaff(roomId, staffName) {
+  if (!confirm('Remove ' + staffName + ' from this room?')) return;
+  
+  const response = await fetch('<%= remove_staff_admin_event_rooming_wizard_path(@event.slug) %>', {
+    method: 'DELETE',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'text/vnd.turbo-stream.html',
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: 'room_id=' + roomId + '&staff_name=' + encodeURIComponent(staffName)
+  });
+  
+  if (response.ok) {
+    const html = await response.text();
+    Turbo.renderStreamMessage(html);
+  }
+}
+
+function showAddStaffModal(roomId) {
+  document.getElementById('add-staff-room-id').value = roomId;
+  document.getElementById('add-staff-name').value = '';
+  document.getElementById('add-staff-modal').classList.remove('hidden');
+  document.getElementById('add-staff-name').focus();
+}
+
+function startEditRoomName(event, roomId) {
+  event.stopPropagation();
+  const card = document.getElementById('room_' + roomId);
+  if (!card) return;
+  const display = card.querySelector('.room-name-display');
+  const input = card.querySelector('.room-name-input');
+  if (!display || !input) return;
+  display.classList.add('hidden');
+  input.classList.remove('hidden');
+  input.focus();
+  input.select();
+}
+
+function handleRoomNameKey(event, roomId) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    event.target.blur();
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    const card = document.getElementById('room_' + roomId);
+    const display = card.querySelector('.room-name-display');
+    const input = card.querySelector('.room-name-input');
+    input.value = input.defaultValue;
+    input.classList.add('hidden');
+    display.classList.remove('hidden');
+  }
+}
+
+async function saveRoomName(roomId, name) {
+  const card = document.getElementById('room_' + roomId);
+  const display = card.querySelector('.room-name-display');
+  const input = card.querySelector('.room-name-input');
+  input.classList.add('hidden');
+  display.classList.remove('hidden');
+
+  if (input.defaultValue === name) return;
+
+  const response = await fetch('<%= update_room_admin_event_rooming_wizard_path(@event.slug) %>', {
+    method: 'PATCH',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'text/vnd.turbo-stream.html',
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: 'room_id=' + roomId + '&name=' + encodeURIComponent(name)
+  });
+
+  if (response.ok) {
+    const html = await response.text();
+    Turbo.renderStreamMessage(html);
+    if (typeof initDragAndDrop === 'function') setTimeout(initDragAndDrop, 100);
+    if (typeof initRoomReorder === 'function') setTimeout(initRoomReorder, 100);
+  } else {
+    alert('Failed to rename room');
+  }
+}
+</script>

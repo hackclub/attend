@@ -1,0 +1,573 @@
+<% content_for :title, "Integrations – #{current_event.name} – Attend" %>
+
+<div class="max-w-4xl mx-auto px-4 py-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8">
+    <div>
+      <div class="flex items-center gap-3 mb-1">
+        <%= link_to admin_event_dashboard_path(current_event), class: "text-gray-400 hover:text-gray-600" do %>
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+        <% end %>
+        <h1 class="text-2xl font-bold text-gray-900">Integrations</h1>
+      </div>
+      <p class="text-sm text-gray-500">Configure external services and API access for <%= current_event.name %></p>
+    </div>
+  </div>
+
+  <%= form_with model: current_event, url: admin_event_integrations_path(current_event), method: :patch, class: "space-y-6" do |f| %>
+    <% if current_event.errors.any? %>
+      <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+        <h3 class="text-red-800 font-medium"><%= pluralize(current_event.errors.count, "error") %> prohibited saving:</h3>
+        <ul class="mt-2 list-disc list-inside text-sm text-red-700">
+          <% current_event.errors.full_messages.each do |message| %>
+            <li><%= message %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <!-- DocuSeal Configuration -->
+    <div class="bg-white border border-gray-200 rounded-lg ">
+      <div class="p-4 border-b border-gray-100 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+          <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+        </div>
+        <div>
+          <h2 class="font-semibold text-gray-900">DocuSeal</h2>
+          <p class="text-sm text-gray-500">Digital waiver and consent form signing</p>
+        </div>
+      </div>
+      <div class="p-4 space-y-4">
+        <!-- Waiver Template -->
+        <div class="border border-gray-200 rounded-lg p-4">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <h3 class="font-medium text-gray-900">Waiver Template</h3>
+              <p class="text-xs text-gray-500">Standard participant waiver for minors (dual-signer: teen + guardian)</p>
+            </div>
+            <% if current_event.docuseal_waiver_template_id.present? %>
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                Configured
+              </span>
+            <% end %>
+          </div>
+          <div class="flex items-center gap-3">
+            <% if current_event.docuseal_waiver_template_id.present? %>
+              <span class="text-sm font-mono text-gray-600">ID: <%= current_event.docuseal_waiver_template_id %></span>
+              <%= link_to "Configure Mappings", admin_event_docuseal_template_mappings_path(current_event, "waiver"),
+                  class: "text-sm text-indigo-600 hover:text-indigo-800 font-medium" %>
+            <% else %>
+              <%= link_to "Use default template",
+                  admin_event_docuseal_template_use_default_path(current_event, "waiver"),
+                  data: { turbo_method: :post },
+                  class: "inline-flex items-center px-3 py-1.5 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium rounded-lg transition-colors cursor-pointer" %>
+            <% end %>
+          </div>
+        </div>
+
+        <!-- Freedom Waiver Template -->
+        <% if current_event.freedom_waivers_enabled? %>
+          <div class="border border-gray-200 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-2">
+              <div>
+                <h3 class="font-medium text-gray-900">Freedom Waiver Template</h3>
+                <p class="text-xs text-gray-500">Independence waiver (single-signer: guardian only).</p>
+              </div>
+              <% if current_event.docuseal_freedom_waiver_template_id.present? %>
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  Configured
+                </span>
+              <% end %>
+            </div>
+            <div class="flex items-center gap-3">
+              <% if current_event.docuseal_freedom_waiver_template_id.present? %>
+                <span class="text-sm font-mono text-gray-600">ID: <%= current_event.docuseal_freedom_waiver_template_id %></span>
+                <%= link_to "Configure Mappings", admin_event_docuseal_template_mappings_path(current_event, "freedom_waiver"),
+                    class: "text-sm text-indigo-600 hover:text-indigo-800 font-medium" %>
+              <% else %>
+                <%= link_to "Use default template",
+                    admin_event_docuseal_template_use_default_path(current_event, "freedom_waiver"),
+                    data: { turbo_method: :post },
+                    class: "inline-flex items-center px-3 py-1.5 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium rounded-lg transition-colors cursor-pointer" %>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <%= link_to "Guided waiver setup →",
+              admin_event_setup_waivers_path(current_event, return_to: "integrations"),
+              class: "inline-flex items-center px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors" %>
+          <%= link_to "Need to use custom waivers? →",
+              "https://docs.hackclub.com/hack-club-playbook/events/attend/custom-waivers",
+              target: "_blank", rel: "noopener",
+              class: "inline-flex items-center px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors" %>
+        </div>
+
+        <!-- Manual Template ID Entry (Advanced) -->
+        <details class="mt-2">
+          <summary class="cursor-pointer text-sm text-gray-500 hover:text-gray-700">Advanced: Enter Template IDs manually</summary>
+          <div class="mt-3 space-y-3 p-3 bg-gray-50 rounded-lg">
+            <div>
+              <%= f.label :docuseal_waiver_template_id, "Waiver Template ID", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= f.text_field :docuseal_waiver_template_id, 
+                  class: "block w-full rounded-md border-gray-300  focus:border-indigo-500 focus:ring-indigo-500 px-3 py-2 font-mono text-sm",
+                  placeholder: "Enter template ID from DocuSeal" %>
+            </div>
+            <div>
+              <%= f.label :docuseal_freedom_waiver_template_id, "Freedom Waiver Template ID", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= f.text_field :docuseal_freedom_waiver_template_id,
+                  class: "block w-full rounded-md border-gray-300  focus:border-indigo-500 focus:ring-indigo-500 px-3 py-2 font-mono text-sm",
+                  placeholder: "Enter template ID from DocuSeal" %>
+            </div>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <!-- Slack Configuration -->
+    <div class="bg-white border border-gray-200 rounded-lg ">
+      <div class="p-4 border-b border-gray-100 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+          <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+        </div>
+        <div>
+          <h2 class="font-semibold text-gray-900">Slack</h2>
+          <p class="text-sm text-gray-500">Team communication and notifications</p>
+        </div>
+      </div>
+      <div class="p-4">
+        <div>
+          <%= f.label :slack_channel_id, "Channel ID", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_field :slack_channel_id,
+              class: "block w-full rounded-md border-gray-300  focus:border-purple-500 focus:ring-purple-500 px-3 py-2 font-mono text-sm",
+              placeholder: "C0123456789" %>
+          <p class="text-xs text-gray-500 mt-1">Private channel ID for participants to be invited to after linking Slack. Right-click the channel in Slack → View channel details → scroll to bottom to find the ID.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Airtable Sync Configuration -->
+    <div class="bg-white border border-gray-200 rounded-lg ">
+      <div class="p-4 border-b border-gray-100 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center">
+          <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+        </div>
+        <div>
+          <h2 class="font-semibold text-gray-900">Airtable Sync</h2>
+          <p class="text-sm text-gray-500">Read-only mirror of participant data via the Sync API</p>
+        </div>
+        <% if @airtable_sync_stale %>
+          <span class="ml-auto inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+            Stale
+          </span>
+        <% elsif @airtable_sync_configured %>
+          <span class="ml-auto inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+            Active
+          </span>
+        <% end %>
+      </div>
+      <div class="p-4 space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <%= f.label :airtable_api_key, "Personal Access Token", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.password_field :airtable_api_key,
+                value: current_event.airtable_api_key,
+                class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm",
+                placeholder: "pat..." %>
+            <p class="text-xs text-gray-500 mt-1">Requires <code>data.records:write</code> and <code>schema.bases:write</code> scopes</p>
+          </div>
+          <div>
+            <%= f.label :airtable_base_id, "Base ID", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_field :airtable_base_id,
+                class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm",
+                placeholder: "app..." %>
+            <p class="text-xs text-gray-500 mt-1">Found in Airtable URL: airtable.com/<strong>appXXXXX</strong>/...</p>
+          </div>
+          <div>
+            <%= f.label :airtable_sync_source_id, "Sync Source ID", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_field :airtable_sync_source_id,
+                class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm",
+                placeholder: "snc..." %>
+            <p class="text-xs text-gray-500 mt-1">The <code>apiEndpointSyncId</code> from the Sync API setup in Airtable</p>
+          </div>
+          <div>
+            <%= f.label :airtable_sync_table_id, "Sync Table", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_field :airtable_sync_table_id,
+                class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm",
+                placeholder: "tbl... or table name" %>
+            <p class="text-xs text-gray-500 mt-1">Table ID or name where the sync source was created</p>
+          </div>
+        </div>
+
+        <% if @airtable_sync_configured %>
+          <!-- Sync Status -->
+          <div class="border <%= @airtable_sync_stale ? "border-red-300 bg-red-50" : "border-gray-200 bg-gray-50" %> rounded-lg p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="font-medium text-gray-900 text-sm">Sync Status</h3>
+                <div class="mt-1 space-y-1">
+                  <% if @airtable_sync_stale %>
+                    <p class="text-sm text-red-700 font-medium">
+                      <% if @airtable_synced_at %>
+                        Sync is failing — last successful sync was <%= time_ago_in_words(@airtable_synced_at) %> ago
+                        <span class="font-normal text-red-600">(<%= @airtable_synced_at.strftime("%b %-d, %Y at %-I:%M %p %Z") %>)</span>
+                      <% else %>
+                        Never synced successfully
+                      <% end %>
+                    </p>
+                    <p class="text-sm text-red-600">
+                      <% unless @airtable_synced_at %>If you just saved these settings, a sync is already running — refresh in a minute. Otherwise, <% end %>
+                      Airtable is showing stale data — check that the Base ID, Sync Table and Sync Source ID
+                      above still exist in Airtable and that the token can see that base.
+                    </p>
+                  <% else %>
+                    <p class="text-sm text-gray-600">
+                      Last synced <strong><%= time_ago_in_words(@airtable_synced_at) %> ago</strong>
+                      <span class="text-gray-400">(<%= @airtable_synced_at.strftime("%b %-d, %Y at %-I:%M %p %Z") %>)</span>
+                    </p>
+                  <% end %>
+                  <% if @airtable_sync_error %>
+                    <div class="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2">
+                      <p class="text-sm font-medium text-red-700">
+                        Last sync attempt failed<%= " #{time_ago_in_words(@airtable_sync_error_at)} ago" if @airtable_sync_error_at %>
+                      </p>
+                      <p class="text-sm text-red-600 font-mono break-all"><%= @airtable_sync_error %></p>
+                    </div>
+                  <% end %>
+                  <p class="text-sm text-gray-500"><%= @airtable_participant_count %> participant records will be synced</p>
+                  <p class="text-xs text-gray-400">Syncs automatically every 5 minutes and whenever these settings are saved</p>
+                </div>
+              </div>
+              <%= button_to "Sync Now",
+                  admin_event_trigger_airtable_sync_path(current_event),
+                  method: :post,
+                  class: "bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors" %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Save Button -->
+    <div class="flex justify-end">
+      <%= f.submit "Save Integration Settings", class: "bg-[#ec3750] hover:bg-[#d42f46] text-white font-medium py-2 px-4 rounded-lg transition-colors cursor-pointer" %>
+    </div>
+  <% end %>
+
+  <!-- Custom Documents (not part of the form) -->
+  <div class="bg-white border border-gray-200 rounded-lg mt-6">
+    <div class="p-4 border-b border-gray-100 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center">
+        <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+      </div>
+      <div>
+        <h2 class="font-semibold text-gray-900">Custom Documents</h2>
+        <p class="text-sm text-gray-500">Extra DocuSeal documents participants must sign, e.g. a hotel waiver</p>
+      </div>
+    </div>
+    <div class="p-4 space-y-4">
+      <% active_custom_documents = current_event.custom_documents.active.order(:created_at) %>
+      <% if active_custom_documents.any? %>
+        <div class="space-y-3">
+          <% active_custom_documents.each do |doc| %>
+            <div class="border border-gray-200 rounded-lg p-4 flex items-center justify-between gap-4">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <h3 class="font-medium text-gray-900 truncate"><%= doc.name %></h3>
+                  <% if doc.physical? %>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                      Physical
+                    </span>
+                  <% end %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                    <%= doc.signer_type.humanize %>
+                  </span>
+                </div>
+                <div class="text-xs text-gray-500 mt-0.5">
+                  <% if doc.physical? %>
+                    <span>Downloaded, physically signed, and uploaded as a photo</span>
+                  <% else %>
+                    <span class="font-mono">Template ID: <%= doc.docuseal_template_id %></span>
+                    <% if doc.field_mapper.has_mappings? %>
+                      · <span class="text-green-600">Pre-fill configured</span>
+                    <% end %>
+                  <% end %>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 shrink-0">
+                <% if doc.physical? %>
+                  <% if doc.template_pdf.attached? %>
+                    <%= link_to "Download PDF", rails_blob_path(doc.template_pdf, disposition: "attachment"),
+                        class: "text-sm text-indigo-600 hover:text-indigo-800 font-medium" %>
+                  <% end %>
+                <% else %>
+                  <%= link_to "Configure Mappings", admin_event_docuseal_template_mappings_path(current_event, doc.mapping_key),
+                      class: "text-sm text-indigo-600 hover:text-indigo-800 font-medium" %>
+                <% end %>
+                <%= button_to "Remove", admin_event_custom_document_path(current_event, doc),
+                    method: :delete,
+                    data: { turbo_confirm: "Remove \"#{doc.name}\"? Participants will no longer be asked to sign it. Existing signatures are kept." },
+                    class: "text-sm text-red-600 hover:text-red-800 font-medium" %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <div class="border border-dashed border-gray-300 rounded-lg px-4 py-6 text-center">
+          <svg class="w-6 h-6 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+          <p class="text-sm font-medium text-gray-700 mt-2">No custom documents yet</p>
+          <p class="text-xs text-gray-500 mt-0.5">Add one below and participants will be asked to sign it during registration.</p>
+        </div>
+      <% end %>
+
+      <%= form_with url: admin_event_custom_documents_path(current_event), scope: :custom_document, method: :post,
+          multipart: true, data: { controller: "document-kind" }, class: "border-t border-gray-100 pt-4" do |cd| %>
+        <h3 class="text-sm font-semibold text-gray-900">Add a document</h3>
+        <fieldset class="mt-3">
+          <legend class="sr-only">Document type</legend>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-teal-500 transition-colors has-[:checked]:border-teal-500 has-[:checked]:ring-1 has-[:checked]:ring-teal-500">
+              <div class="flex items-start gap-3">
+                <%= cd.radio_button :document_kind, "electronic", checked: true,
+                    data: { action: "document-kind#toggle" },
+                    class: "mt-0.5 h-4 w-4 accent-teal-600 text-teal-600 focus:ring-teal-500 border-gray-300" %>
+                <div>
+                  <p class="text-sm font-semibold text-gray-900">Electronic</p>
+                  <p class="text-sm text-gray-500 mt-0.5">Signed online through DocuSeal, with participant details pre-filled.</p>
+                </div>
+              </div>
+            </label>
+            <label class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-teal-500 transition-colors has-[:checked]:border-teal-500 has-[:checked]:ring-1 has-[:checked]:ring-teal-500">
+              <div class="flex items-start gap-3">
+                <%= cd.radio_button :document_kind, "physical",
+                    data: { action: "document-kind#toggle" },
+                    class: "mt-0.5 h-4 w-4 accent-teal-600 text-teal-600 focus:ring-teal-500 border-gray-300" %>
+                <div>
+                  <p class="text-sm font-semibold text-gray-900">Physical</p>
+                  <p class="text-sm text-gray-500 mt-0.5">Downloaded as a PDF, signed on paper, and uploaded as a photo.</p>
+                </div>
+              </div>
+            </label>
+          </div>
+        </fieldset>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+          <div>
+            <%= cd.label :name, "Name", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= cd.text_field :name, required: true,
+                class: "block w-full rounded-md border-gray-300 focus:border-teal-500 focus:ring-teal-500 px-3 py-2 text-sm",
+                placeholder: "Hotel Waiver" %>
+          </div>
+          <div data-document-kind-target="electronic">
+            <%= cd.label :docuseal_template_id, "DocuSeal Template ID", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= cd.text_field :docuseal_template_id, required: true,
+                class: "block w-full rounded-md border-gray-300 focus:border-teal-500 focus:ring-teal-500 px-3 py-2 font-mono text-sm",
+                placeholder: "1234" %>
+          </div>
+          <div data-document-kind-target="physical" class="hidden">
+            <%= cd.label :template_pdf, "PDF document", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= cd.file_field :template_pdf, required: true, accept: "application/pdf",
+                class: "block w-full text-sm text-gray-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100" %>
+          </div>
+          <div>
+            <%= cd.label :signer_type, "Who signs?", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= cd.select :signer_type,
+                [ [ "Participant", "participant" ], [ "Guardian", "guardian" ],
+                  [ "Participant + Guardian", "participant_and_guardian" ],
+                  [ "Participant + Guardian, under-18s only", "minor_and_guardian" ] ],
+                {},
+                class: "block w-full rounded-md border-gray-300 focus:border-teal-500 focus:ring-teal-500 px-3 py-2 text-sm" %>
+            <p class="text-xs text-gray-500 mt-1">Guardian roles only apply to under-18s — adults sign by themselves, and guardian-only or under-18s-only documents are skipped for them.</p>
+          </div>
+        </div>
+        <div data-document-kind-target="physical" class="hidden mt-4">
+          <%= cd.label :description, "Description (optional)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= cd.text_area :description, rows: 2,
+              class: "block w-full rounded-md border-gray-300 focus:border-teal-500 focus:ring-teal-500 px-3 py-2 text-sm",
+              placeholder: "Shown to participants — e.g. instructions on which sections to fill in" %>
+        </div>
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3 mt-4">
+          <%= cd.button "Add Document", type: :submit, class: "bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors cursor-pointer shrink-0" %>
+          <p class="text-xs text-gray-500">
+            Participants can't complete registration until it's signed.
+            <span data-document-kind-target="electronic">After adding, use <strong>Configure Mappings</strong> to set up pre-fill.</span>
+            <span data-document-kind-target="physical" class="hidden">Participants download the PDF, sign it on paper, and
+            upload a photo of the signed form. For under-18s, the parent/guardian then reviews the photo and confirms it's
+            complete.</span>
+          </p>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- API Access (not part of the form) -->
+  <div class="bg-white border border-gray-200 rounded-lg  mt-6">
+    <div class="p-4 border-b border-gray-100 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+        <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+      </div>
+      <div class="flex-1">
+        <h2 class="font-semibold text-gray-900">API Access</h2>
+        <p class="text-sm text-gray-500">Programmatic access to add and list participants</p>
+      </div>
+      <%= link_to docs_path, target: "_blank", rel: "noopener",
+          class: "shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-[#ec3750] hover:text-[#d42f46]" do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+        API docs
+      <% end %>
+    </div>
+    <div class="p-4 space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">API Endpoints</label>
+        <code class="block bg-gray-100 px-3 py-2 rounded text-sm font-mono overflow-x-auto">POST <%= api_v1_event_participants_url(current_event) %></code>
+        <code class="block bg-gray-100 px-3 py-2 rounded text-sm font-mono overflow-x-auto mt-1">GET&nbsp; <%= api_v1_event_participants_url(current_event) %></code>
+      </div>
+
+      <!-- API Tokens -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">API Tokens</label>
+
+        <% if flash[:event_api_token] %>
+          <div class="mb-3">
+            <code class="block bg-yellow-100 px-3 py-2 rounded text-sm font-mono break-all"><%= flash[:event_api_token] %></code>
+            <p class="text-xs text-amber-600 mt-1">⚠️ Copy this token now. It won't be shown again.</p>
+          </div>
+        <% end %>
+
+        <% if @event_api_tokens.present? %>
+          <div class="border border-gray-200 rounded-lg divide-y divide-gray-100">
+            <% @event_api_tokens.each do |token| %>
+              <div class="flex items-center gap-3 px-3 py-2.5">
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-mono text-gray-900 truncate"><%= token.name %></p>
+                  <p class="text-xs text-gray-500">
+                    <% if token.last_used_at %>
+                      Last used <%= time_ago_in_words(token.last_used_at) %> ago
+                    <% else %>
+                      Never used
+                    <% end %>
+                    · Created <%= token.created_at.to_date.to_fs(:long) %>
+                  </p>
+                </div>
+                <%= button_to "Rotate", admin_rotate_event_api_token_path(current_event.slug, token.id),
+                    method: :post,
+                    data: { confirm: "Rotating issues a new secret and invalidates the current one. Integrations using this token will stop working until updated. Continue?" },
+                    class: "shrink-0 text-sm font-medium text-[#ec3750] hover:text-[#d42f46]" %>
+                <%= button_to "Revoke", admin_event_api_token_path(current_event.slug, token.id),
+                    method: :delete,
+                    data: { confirm: "This permanently revokes the token. Any integration using it will stop working. Continue?" },
+                    class: "shrink-0 text-sm font-medium text-gray-500 hover:text-gray-700" %>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-gray-400">No API tokens yet.</p>
+        <% end %>
+
+        <%= form_with url: admin_event_api_tokens_path(current_event.slug), method: :post, class: "flex items-center gap-2 mt-3" do |f| %>
+          <div class="flex flex-1 items-center bg-gray-100 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-[#ec3750]">
+            <span class="pl-3 text-sm font-mono text-gray-400 select-none"><%= current_user.email.to_s.split("@").first %>@</span>
+            <%= f.text_field :name, placeholder: "attend-integration-name", required: true,
+                class: "flex-1 bg-transparent px-1 py-2 text-sm font-mono focus:outline-none" %>
+          </div>
+          <%= f.submit "Create token", class: "bg-[#ec3750] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#d42f46] cursor-pointer" %>
+        <% end %>
+      </div>
+
+      <% if current_event.api_key_set? %>
+        <div class="border-t border-gray-100 pt-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Legacy API Key</label>
+          <div class="flex items-center gap-3">
+            <% if flash[:api_key] %>
+              <div class="flex-1">
+                <code class="block bg-yellow-100 px-3 py-2 rounded text-sm font-mono"><%= flash[:api_key] %></code>
+                <p class="text-xs text-amber-600 mt-1">⚠️ Copy this key now. It won't be shown again.</p>
+              </div>
+            <% else %>
+              <code class="flex-1 bg-gray-100 px-3 py-2 rounded text-sm font-mono">••••••••••••••••••••••••••••••••</code>
+            <% end %>
+            <%= button_to "Regenerate",
+                regenerate_api_key_admin_event_path(current_event),
+                method: :post,
+                data: { confirm: "This will invalidate the existing legacy API key. Any integrations using it will stop working. Continue?" },
+                class: "shrink-0 text-sm font-medium text-gray-500 hover:text-gray-700" %>
+          </div>
+          <p class="text-xs text-gray-400 mt-1">The single-key access from before named tokens. Still works; prefer named tokens above.</p>
+        </div>
+      <% end %>
+
+      <details class="mt-4">
+        <summary class="cursor-pointer text-sm text-[#ec3750] hover:text-blue-800 font-medium">View API Usage Example</summary>
+        <div class="mt-3 bg-gray-50 rounded-lg p-4">
+          <p class="text-sm font-medium text-gray-700 mb-2">Invite a participant:</p>
+          <pre class="bg-gray-800 text-gray-100 p-3 rounded text-xs overflow-x-auto">curl -X POST <%= api_v1_event_participants_url(current_event) %> \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "first_name": "Jane",
+    "last_name": "Doe",
+    "email": "jane@example.com"
+  }'</pre>
+          <p class="text-sm font-medium text-gray-700 mt-4 mb-2">List participants:</p>
+          <pre class="bg-gray-800 text-gray-100 p-3 rounded text-xs overflow-x-auto">curl <%= api_v1_event_participants_url(current_event) %> \
+  -H "Authorization: Bearer YOUR_API_TOKEN"</pre>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  <!-- vote.hackclub.com (not part of the form) -->
+  <% vote_ready = current_event.logo.attached? && current_event.banner.attached? %>
+  <div class="bg-white border border-gray-200 rounded-lg mt-6">
+    <div class="p-4 border-b border-gray-100 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+        <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+      </div>
+      <div>
+        <h2 class="font-semibold text-gray-900">vote.hackclub.com</h2>
+        <p class="text-sm text-gray-500">Create a peer-voting gallery for this event</p>
+      </div>
+    </div>
+    <div class="p-4 space-y-4">
+      <% if current_event.vote_event_linked? %>
+        <div class="flex items-center gap-2">
+          <span class="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">Linked</span>
+          <% if current_event.vote_event_linked_at %>
+            <span class="text-sm text-gray-500">Linked <%= time_ago_in_words(Time.zone.parse(current_event.vote_event_linked_at.to_s)) %> ago</span>
+          <% end %>
+        </div>
+        <div class="flex items-center gap-3">
+          <% if current_event.vote_event_admin_url.present? %>
+            <%= link_to "Manage on vote.hackclub.com", current_event.vote_event_admin_url, target: "_blank", rel: "noopener",
+                class: "bg-[#ec3750] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#d42f46]" %>
+          <% end %>
+          <% if current_event.vote_event_gallery_url.present? %>
+            <%= link_to "View gallery", current_event.vote_event_gallery_url, target: "_blank", rel: "noopener",
+                class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="text-sm text-gray-600">
+          Creates a new <strong>DRAFT</strong> event on vote.hackclub.com using this event's
+          name, slug, logo and banner. You can then finish setting it up on vote.hackclub.com.
+          If an event with this slug already exists, it will be linked instead.
+        </p>
+
+        <% unless vote_ready %>
+          <div class="bg-amber-50 border border-amber-200 rounded px-3 py-2 text-sm text-amber-700">
+            ⚠️ This event needs both a <strong>logo</strong> and a <strong>banner</strong> image before you can create a vote event.
+          </div>
+        <% end %>
+
+        <div class="flex items-center gap-3">
+          <%= button_to "Create vote.hackclub.com event",
+              admin_event_create_vote_event_path(current_event),
+              method: :post,
+              disabled: !vote_ready,
+              data: { confirm: "Create a new DRAFT event on vote.hackclub.com for \"#{current_event.name}\"?" },
+              class: "bg-[#ec3750] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#d42f46] disabled:opacity-50 disabled:cursor-not-allowed" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

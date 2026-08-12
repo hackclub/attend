@@ -1,0 +1,312 @@
+<% content_for :title, "Participants Table – #{current_event.name} – Attend" %>
+
+<div data-controller="data-table"
+     data-data-table-base-url-value="<%= table_admin_event_participants_path(current_event) %>"
+     data-data-table-scan-contexts-value="<%= @scan_contexts.map { |sc| { id: sc.id, name: sc.name } }.to_json %>"
+     data-data-table-groups-value="<%= (current_event.groups_enabled? ? current_event.groups.ordered.map { |g| { id: g.id, name: g.name } } : []).to_json %>">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <div class="flex items-center gap-4">
+      <h1 class="text-2xl font-bold">Participants</h1>
+      <span class="text-gray-500 text-sm"><%= @participant_events.count %> total</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <%= link_to admin_event_participants_path(current_event), class: "px-3 py-1.5 text-gray-600 hover:text-gray-900 text-sm flex items-center gap-1" do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+        </svg>
+        List
+      <% end %>
+      <%= link_to table_admin_event_participants_path(current_event), class: "px-3 py-1.5 bg-[#ec3750]/10 text-[#ec3750] rounded text-sm flex items-center gap-1" do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18M3 6h18M3 18h18"/>
+        </svg>
+        Table
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="bg-white rounded-lg border border-gray-200 mb-4 p-3 sticky top-12 lg:top-0 z-20 shadow-sm">
+    <div class="flex flex-wrap items-center gap-3">
+      <!-- Search -->
+      <div class="flex-1 min-w-[200px]">
+        <div class="relative">
+          <input type="text"
+                 placeholder="Search participants..."
+                 class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#ec3750] focus:border-[#ec3750]"
+                 data-data-table-target="searchInput"
+                 data-action="input->data-table#search">
+          <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Filter Button -->
+      <button type="button"
+              class="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+              data-action="click->data-table#toggleFilterPanel">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+        </svg>
+        Filter
+        <% if params[:filters].present? %>
+          <span class="bg-[#ec3750] text-white text-xs px-1.5 py-0.5 rounded-full"><%= params[:filters].keys.count %></span>
+        <% end %>
+      </button>
+
+      <!-- Group By Dropdown -->
+      <div class="relative">
+        <button type="button"
+                class="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+                data-action="click->data-table#toggleGroupDropdown">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+          </svg>
+          Group
+          <% if @group_by.present? && @group_by != "none" %>
+            <span class="text-[#ec3750]"><%= @group_by.titleize %></span>
+          <% end %>
+        </button>
+        <div class="hidden absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg ring-1 ring-gray-200 z-20"
+             data-data-table-target="groupDropdown">
+          <div class="py-1">
+            <button type="button" data-action="click->data-table#clearGrouping"
+                    class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 <%= 'font-medium text-[#ec3750]' if @group_by == 'none' %>">
+              No Grouping
+            </button>
+            <hr class="my-1">
+            <% group_by_options = [ ["status", "Status"], *(current_event.travel_enabled? ? [["travel_mode", "Travel Mode"]] : []), ["tshirt_size", "T-Shirt Size"], ["is_minor", "Minor/Adult"], ["onboarding_complete", "Onboarding"], ["waiver_signed", "Waiver"], ["freedom_waiver_granted", "Freedom Waiver"], ["has_anaphylaxis", "Anaphylaxis Risk"], ["high_support", "High Support"], ["diet_type", "Diet Type"] ] %>
+            <% group_by_options << ["group", "Group"] if current_event.groups_enabled? %>
+            <% group_by_options.each do |value, label| %>
+              <button type="button"
+                      data-action="click->data-table#groupBy"
+                      data-value="<%= value %>"
+                      class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 <%= 'font-medium text-[#ec3750]' if @group_by == value %>">
+                <%= label %>
+              </button>
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+      <!-- Columns Toggle -->
+      <div class="relative">
+        <button type="button"
+                class="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+                data-action="click->data-table#toggleColumnToggle">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+          </svg>
+          Columns
+        </button>
+        <div class="hidden absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg ring-1 ring-gray-200 z-20 max-h-96 overflow-y-auto"
+             data-data-table-target="columnToggle">
+          <div class="py-2 px-3">
+            <p class="text-xs font-medium text-gray-500 mb-2">Toggle columns</p>
+            <% [
+              ["first_name", "First Name"],
+              ["last_name", "Last Name"],
+              ["preferred_name", "Preferred Name"],
+              ["email", "Email"],
+              ["phone", "Phone"],
+              ["pronouns", "Pronouns"],
+              ["dob", "Date of Birth"],
+              ["age", "Age"],
+              ["status", "Status"],
+              ["tshirt", "T-Shirt"],
+              *(current_event.groups_enabled? ? [["groups", "Groups"]] : []),
+              ["engagement", "Engagement Pref"],
+              *(current_event.travel_enabled? ? [["travel_mode", "Travel Mode"], ["visa", "Visa Status"], ["arrival", "Arrival"], ["departure", "Departure"]] : []),
+              ["room", "Room"],
+              ["roommate", "Roommate"],
+              ["gender_identity", "Gender Identity"],
+              ["diet", "Diet Type"],
+              ["intolerances", "Intolerances"],
+              ["allergies", "Allergies"],
+              ["anaphylaxis", "Anaphylaxis"],
+              ["medical", "Medical Conditions"],
+              ["medications", "Medications"],
+              ["accessibility", "Accessibility"],
+              ["high_support", "High Support"],
+              ["freedom", "Freedom Waiver"],
+              ["waiver", "Waiver Status"],
+              ["guardian", "Guardian"],
+              ["slack", "Slack"],
+              ["onboarding", "Onboarding"],
+              ["checked_in", "Checked In"],
+              ["last_scan", "Last Scanned"],
+              ["created", "Created At"]
+            ].each do |column, label| %>
+              <label class="flex items-center gap-2 py-1 cursor-pointer">
+                <input type="checkbox" checked
+                       data-column="<%= column %>"
+                       data-action="change->data-table#toggleColumn"
+                       class="rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]">
+                <span class="text-sm text-gray-700"><%= label %></span>
+              </label>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter Panel (hidden by default) -->
+  <div class="hidden bg-white rounded-lg border border-gray-200 mb-4 p-4" data-data-table-target="filterPanel">
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-4">
+        <h3 class="font-medium text-gray-900">Filters</h3>
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-gray-500">Match</span>
+          <select class="border border-gray-300 rounded px-2 py-1 text-sm"
+                  data-action="change->data-table#setFilterLogic">
+            <option value="and" <%= 'selected' if params[:filter_logic] != 'or' %>>All (AND)</option>
+            <option value="or" <%= 'selected' if params[:filter_logic] == 'or' %>>Any (OR)</option>
+          </select>
+          <span class="text-gray-500">conditions</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button"
+                class="text-sm text-gray-600 hover:text-gray-900"
+                data-action="click->data-table#clearFilters">
+          Clear all
+        </button>
+        <button type="button"
+                class="px-3 py-1.5 bg-[#ec3750] text-white text-sm rounded hover:bg-[#d42f46]"
+                data-action="click->data-table#applyFilters">
+          Apply Filters
+        </button>
+      </div>
+    </div>
+    <div class="space-y-2" data-data-table-target="filterList">
+      <!-- Filter rows will be added here dynamically -->
+    </div>
+    <button type="button"
+            class="mt-3 flex items-center gap-1 text-sm text-[#ec3750] hover:text-blue-700"
+            data-action="click->data-table#addFilter">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      Add filter
+    </button>
+  </div>
+
+  <!-- Table -->
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-100 text-xs" data-data-table-target="table">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-2 py-2 text-left w-8 sticky left-0 bg-gray-50 z-10">
+              <input type="checkbox" class="rounded border-gray-300 text-[#ec3750]" data-action="change->data-table#selectAll">
+            </th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap"
+                data-column="first_name" data-action="click->data-table#sort" data-sort-field="legal_first_name">
+              <div class="flex items-center gap-1">First Name <%= render_sort_icon("legal_first_name", @sort_field, @sort_direction) %></div>
+            </th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap"
+                data-column="last_name" data-action="click->data-table#sort" data-sort-field="legal_last_name">
+              <div class="flex items-center gap-1">Last Name <%= render_sort_icon("legal_last_name", @sort_field, @sort_direction) %></div>
+            </th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="preferred_name">Preferred</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap"
+                data-column="email" data-action="click->data-table#sort" data-sort-field="email">
+              <div class="flex items-center gap-1">Email <%= render_sort_icon("email", @sort_field, @sort_direction) %></div>
+            </th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="phone">Phone</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap"
+                data-column="pronouns" data-action="click->data-table#sort" data-sort-field="pronouns">
+              <div class="flex items-center gap-1">Pronouns <%= render_sort_icon("pronouns", @sort_field, @sort_direction) %></div>
+            </th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap"
+                data-column="dob" data-action="click->data-table#sort" data-sort-field="date_of_birth">
+              <div class="flex items-center gap-1">DOB <%= render_sort_icon("date_of_birth", @sort_field, @sort_direction) %></div>
+            </th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="age">Age</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap"
+                data-column="status" data-action="click->data-table#sort" data-sort-field="status">
+              <div class="flex items-center gap-1">Status <%= render_sort_icon("status", @sort_field, @sort_direction) %></div>
+            </th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="tshirt">T-Shirt</th>
+            <% if current_event.groups_enabled? %>
+              <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="groups">Groups</th>
+            <% end %>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="engagement">Engagement</th>
+            <% if current_event.travel_enabled? %>
+              <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="travel_mode">Travel</th>
+              <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="visa">Visa</th>
+              <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap"
+                  data-column="arrival" data-action="click->data-table#sort" data-sort-field="arrival_time">
+                <div class="flex items-center gap-1">Arrival <%= render_sort_icon("arrival_time", @sort_field, @sort_direction) %></div>
+              </th>
+              <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap"
+                  data-column="departure" data-action="click->data-table#sort" data-sort-field="departure_time">
+                <div class="flex items-center gap-1">Departure <%= render_sort_icon("departure_time", @sort_field, @sort_direction) %></div>
+              </th>
+            <% end %>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="room">Room</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="roommate">Roommate</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap"
+                data-column="gender_identity" data-action="click->data-table#sort" data-sort-field="gender_identity">
+              <div class="flex items-center gap-1">Gender <%= render_sort_icon("gender_identity", @sort_field, @sort_direction) %></div>
+            </th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="diet">Diet</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="intolerances">Intolerances</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="allergies">Allergies</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="anaphylaxis">Anaphy.</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="medical">Medical</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="medications">Meds</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="accessibility">Access.</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="high_support">High Sup.</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="freedom">Freedom</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="waiver">Waiver</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="guardian">Guardian</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="slack">Slack</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="onboarding">Onboard.</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="checked_in">Checked In</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="last_scan">Last Scanned</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap"
+                data-column="created" data-action="click->data-table#sort" data-sort-field="created_at">
+              <div class="flex items-center gap-1">Created <%= render_sort_icon("created_at", @sort_field, @sort_direction) %></div>
+            </th>
+            <th class="px-2 py-2 text-right font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap sticky right-0 bg-gray-50 z-10">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-100">
+          <% if @grouped_participants.present? %>
+            <% @grouped_participants.each do |group_name, participants| %>
+              <tr class="bg-gray-100 cursor-pointer" data-action="click->data-table#collapseGroup" data-group-id="<%= group_name.to_s.parameterize %>">
+                <td colspan="35" class="px-2 py-2">
+                  <div class="flex items-center gap-2 font-medium text-gray-700">
+                    <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                    <span><%= group_name.to_s.titleize %></span>
+                    <span class="text-gray-500 font-normal">(<%= participants.size %>)</span>
+                  </div>
+                </td>
+              </tr>
+              <% participants.each do |pe| %>
+                <%= render partial: "table_row", locals: { pe: pe, group_id: group_name.to_s.parameterize } %>
+              <% end %>
+            <% end %>
+          <% else %>
+            <% @participant_events.each do |pe| %>
+              <%= render partial: "table_row", locals: { pe: pe, group_id: nil } %>
+            <% end %>
+          <% end %>
+
+          <% if @participant_events.empty? %>
+            <tr>
+              <td colspan="35" class="px-6 py-12 text-center text-gray-500">
+                No participants found.
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

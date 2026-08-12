@@ -1,0 +1,278 @@
+<% content_for :title, "Profile – Attend" %>
+
+<div class="w-full max-w-6xl mx-auto">
+  <!-- Account header -->
+  <div class="mb-8 flex items-center gap-4">
+    <% if @participant.headshot.attached? && @participant.headshot.blob.persisted? %>
+      <%= image_tag @participant.headshot, class: "size-14 rounded-full object-cover ring-2 ring-(--border-card)" %>
+    <% else %>
+      <div class="flex size-14 items-center justify-center rounded-full bg-(--bg-elev-2) text-xl font-semibold text-(--text-muted)">
+        <%= @participant.display_name.to_s.first&.upcase %>
+      </div>
+    <% end %>
+    <div class="min-w-0">
+      <h1 class="text-xl font-bold text-(--text-strong) truncate">
+        <%= @participant.display_name %>
+        <span class="font-normal text-(--text-muted)">(<%= @participant.email %>)</span>
+      </h1>
+      <p class="text-sm text-(--text-muted)">Your personal account</p>
+    </div>
+  </div>
+
+  <div class="grid items-start gap-x-8 gap-y-8 lg:grid-cols-[220px_minmax(0,1fr)]">
+    <!-- Settings nav -->
+    <nav class="flex gap-1 overflow-x-auto max-lg:border-b max-lg:border-(--border-soft) max-lg:pb-3 lg:sticky lg:top-8 lg:flex-col" aria-label="Settings">
+      <a href="#account" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
+        <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+        </svg>
+        Account
+      </a>
+      <a href="#public-profile" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
+        <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM3.6 9h16.8M3.6 15h16.8M12 3a15.3 15.3 0 010 18M12 3a15.3 15.3 0 000 18"/>
+        </svg>
+        Public profile
+      </a>
+      <a href="#appearance" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
+        <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+        </svg>
+        Appearance
+      </a>
+    </nav>
+
+    <div class="min-w-0 space-y-10">
+      <!-- Account -->
+      <section id="account" class="scroll-mt-8">
+        <h2 class="border-b border-(--border-soft) pb-3 text-xl font-semibold text-(--text-strong)">Account</h2>
+
+        <div class="mt-4 flex items-start gap-3 rounded-xl border border-(--border-card) bg-(--bg-elev) p-4">
+          <svg class="mt-0.5 size-5 shrink-0 text-(--info)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <p class="text-sm text-(--text)">
+            These details are synced from
+            <a href="https://auth.hackclub.com" target="_blank" rel="noopener noreferrer" class="font-medium text-(--text-link) hover:underline">Hack Club Auth</a>.
+            To change something, update it there, then sign out and back in to Attend to pull in the changes.
+          </p>
+        </div>
+
+        <div class="mt-4 overflow-hidden rounded-2xl border border-(--border-card) bg-(--bg-elev)">
+          <dl class="divide-y divide-(--border-soft)">
+            <div class="px-6 py-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <dt class="text-sm font-medium text-(--text-muted)">Name</dt>
+              <dd class="text-sm text-(--text-strong)"><%= @participant.display_name %></dd>
+            </div>
+            <% if @participant.preferred_name.present? %>
+              <div class="px-6 py-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <dt class="text-sm font-medium text-(--text-muted)">Legal name</dt>
+                <dd class="text-sm text-(--text-strong)"><%= @participant.full_name %></dd>
+              </div>
+            <% end %>
+            <div class="px-6 py-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <dt class="text-sm font-medium text-(--text-muted)">Email</dt>
+              <dd class="text-sm text-(--text-strong) break-all"><%= @participant.email %></dd>
+            </div>
+            <% if @participant.phone.present? %>
+              <div class="px-6 py-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <dt class="text-sm font-medium text-(--text-muted)">Phone</dt>
+                <dd class="text-sm text-(--text-strong)"><%= @participant.phone %></dd>
+              </div>
+            <% end %>
+            <div class="px-6 py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <dt class="text-sm font-medium text-(--text-muted)">Slack</dt>
+              <dd class="text-sm">
+                <% if @participant.slack_user_id.present? %>
+                  <%= link_to "slack://user?team=T0266FRGM&id=#{@participant.slack_user_id}", class: "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-(--bg-elev-2) hover:bg-(--bg-elev-3) text-(--text) font-mono transition-colors" do %>
+                    <svg class="size-3.5" viewBox="0 0 24 24">
+                      <path fill="#E01E5A" d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313z"/>
+                      <path fill="#36C5F0" d="M8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312z"/>
+                      <path fill="#2EB67D" d="M18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312z"/>
+                      <path fill="#ECB22E" d="M15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/>
+                    </svg>
+                    <span class="text-xs"><%= @participant.slack_user_id %></span>
+                  <% end %>
+                <% else %>
+                  <% slack_url = slack_oauth_url_for_user(current_user) %>
+                  <% if slack_url %>
+                    <%= link_to slack_url, class: "inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#4A154B] text-white text-sm font-semibold rounded-lg hover:bg-[#3e1240] transition-colors" do %>
+                      <svg class="size-4" viewBox="0 0 24 24" fill="currentColor"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/></svg>
+                      Connect Slack
+                    <% end %>
+                  <% else %>
+                    <span class="text-(--text-faint)">Not linked</span>
+                  <% end %>
+                <% end %>
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <!-- Public profile -->
+      <section id="public-profile" class="scroll-mt-8">
+        <h2 class="border-b border-(--border-soft) pb-3 text-xl font-semibold text-(--text-strong)">Public profile</h2>
+        <p class="mt-3 text-sm text-(--text-muted)">
+          Optionally share a public page with your name and the Hack Club events you've been to.
+          It's off by default, only shows events you checked in at after they've ended, and is hidden from search engines.
+        </p>
+        <div class="mt-4 overflow-hidden rounded-2xl border border-(--border-card) bg-(--bg-elev)">
+          <%= form_with model: @participant, url: dashboard_public_profile_path, method: :patch, class: "px-6 py-5 space-y-5" do |f| %>
+            <label class="flex items-start gap-3 cursor-pointer">
+              <%= f.check_box :public_profile_enabled, class: "mt-0.5 size-4 rounded border-(--border-card) accent-[#ec3750]" %>
+              <span>
+                <span class="block text-sm font-medium text-(--text-strong)">Make my profile public</span>
+                <span class="block text-sm text-(--text-muted)">Anyone with the link can see it.</span>
+              </span>
+            </label>
+
+            <% if @participant.public_profile_enabled? && @participant.public_profile_slug.present? %>
+              <div class="rounded-lg bg-(--bg-elev-2) px-4 py-3 text-sm">
+                <span class="text-(--text-muted)">Your profile is live at</span>
+                <%= link_to public_profile_url(slug: @participant.public_profile_slug), public_profile_path(slug: @participant.public_profile_slug), class: "font-medium text-[#ec3750] hover:underline break-all", target: "_blank", rel: "noopener" %>
+              </div>
+            <% end %>
+
+            <div>
+              <%= f.label :public_profile_slug, "Profile URL", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+              <div class="flex items-center gap-1">
+                <span class="text-sm text-(--text-muted) whitespace-nowrap"><%= request.host_with_port %>/p/</span>
+                <%= f.text_field :public_profile_slug, placeholder: "your-name", class: "w-full rounded-lg border border-(--border-card) bg-(--bg-app) px-3 py-2 text-sm text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-[#ec3750]/40" %>
+              </div>
+              <p class="text-xs text-(--text-faint) mt-1">Lowercase letters, numbers, and hyphens. Leave blank to generate one from your name.</p>
+            </div>
+
+            <div>
+              <%= f.label :public_profile_bio, "Bio", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+              <%= f.text_area :public_profile_bio, rows: 3, maxlength: 500, placeholder: "A sentence or two about you (optional)", class: "w-full rounded-lg border border-(--border-card) bg-(--bg-app) px-3 py-2 text-sm text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-[#ec3750]/40" %>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <%= f.label :public_profile_location, "Location", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+                <%= f.text_field :public_profile_location, maxlength: 100, placeholder: "e.g. Shelburne, VT", class: "w-full rounded-lg border border-(--border-card) bg-(--bg-app) px-3 py-2 text-sm text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-[#ec3750]/40" %>
+              </div>
+              <div>
+                <%= f.label :public_profile_website, "Website", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+                <%= f.text_field :public_profile_website, placeholder: "https://example.com", class: "w-full rounded-lg border border-(--border-card) bg-(--bg-app) px-3 py-2 text-sm text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-[#ec3750]/40" %>
+              </div>
+              <div>
+                <%= f.label :public_profile_github, "GitHub", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+                <%= f.text_field :public_profile_github, placeholder: "username or URL", class: "w-full rounded-lg border border-(--border-card) bg-(--bg-app) px-3 py-2 text-sm text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-[#ec3750]/40" %>
+              </div>
+              <div>
+                <%= f.label :public_profile_twitter, "X (Twitter)", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+                <%= f.text_field :public_profile_twitter, placeholder: "handle or URL", class: "w-full rounded-lg border border-(--border-card) bg-(--bg-app) px-3 py-2 text-sm text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-[#ec3750]/40" %>
+              </div>
+              <div>
+                <%= f.label :public_profile_linkedin, "LinkedIn", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+                <%= f.text_field :public_profile_linkedin, placeholder: "slug or URL", class: "w-full rounded-lg border border-(--border-card) bg-(--bg-app) px-3 py-2 text-sm text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-[#ec3750]/40" %>
+              </div>
+              <div>
+                <%= f.label :public_profile_mastodon, "Mastodon", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+                <%= f.text_field :public_profile_mastodon, placeholder: "@user@instance or URL", class: "w-full rounded-lg border border-(--border-card) bg-(--bg-app) px-3 py-2 text-sm text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-[#ec3750]/40" %>
+              </div>
+              <div>
+                <%= f.label :public_profile_bluesky, "Bluesky", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+                <%= f.text_field :public_profile_bluesky, placeholder: "handle or URL", class: "w-full rounded-lg border border-(--border-card) bg-(--bg-app) px-3 py-2 text-sm text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-[#ec3750]/40" %>
+              </div>
+            </div>
+
+            <label class="flex items-start gap-3 cursor-pointer">
+              <%= f.check_box :public_profile_show_photo, class: "mt-0.5 size-4 rounded border-(--border-card) accent-[#ec3750]" %>
+              <span>
+                <span class="block text-sm font-medium text-(--text-strong)">Show my photo</span>
+                <span class="block text-sm text-(--text-muted)">Display a photo on the public page. Off shows your initial instead.</span>
+              </span>
+            </label>
+
+            <div>
+              <%= f.label :public_profile_photo, "Profile photo", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+              <div class="flex items-center gap-4">
+                <% current_photo = @participant.public_profile_photo.attached? && @participant.public_profile_photo.blob.persisted? ? @participant.public_profile_photo : (@participant.headshot if @participant.headshot.attached? && @participant.headshot.blob.persisted?) %>
+                <% if current_photo %>
+                  <div class="relative size-12 rounded-full overflow-hidden ring-2 ring-(--border-card) bg-(--bg-elev-2) shrink-0">
+                    <div class="absolute inset-0 flex items-center justify-center text-(--text-muted) text-lg font-semibold" aria-hidden="true">
+                      <%= @participant.display_name.to_s.first&.upcase %>
+                    </div>
+                    <%= image_tag current_photo, alt: "", class: "absolute inset-0 size-full object-cover" %>
+                  </div>
+                <% end %>
+                <div class="min-w-0">
+                  <%= f.file_field :public_profile_photo, accept: "image/jpeg,image/png,image/webp", class: "block w-full text-sm text-(--text-muted) file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-(--bg-elev-2) file:text-(--text-strong) file:text-sm file:font-medium file:cursor-pointer" %>
+                  <p class="text-xs text-(--text-faint) mt-1">
+                    Only used on your public profile — it never changes the headshot event organizers see.
+                    <% if @participant.public_profile_photo.attached? %>
+                      Without an upload, your event headshot is used.
+                    <% end %>
+                  </p>
+                </div>
+              </div>
+              <% if @participant.public_profile_photo.attached? %>
+                <label class="mt-2 flex items-center gap-2 cursor-pointer text-sm text-(--text-muted)">
+                  <%= check_box_tag :remove_public_profile_photo, "1", false, class: "size-4 rounded border-(--border-card) accent-[#ec3750]" %>
+                  Remove uploaded photo
+                </label>
+              <% end %>
+            </div>
+
+            <% if @public_profile_events.any? %>
+              <fieldset>
+                <legend class="text-sm font-medium text-(--text-strong) mb-2">Events on your profile</legend>
+                <div class="space-y-2">
+                  <% @public_profile_events.each do |participant_event| %>
+                    <label class="flex items-center gap-3 cursor-pointer">
+                      <%= check_box_tag "visible_participant_event_ids[]", participant_event.id, !participant_event.hidden_from_public_profile?, id: "visible_participant_event_#{participant_event.id}", class: "size-4 rounded border-(--border-card) accent-[#ec3750]" %>
+                      <span class="text-sm text-(--text)">
+                        <%= participant_event.event.name %>
+                        <% if participant_event.event.starts_at.present? %>
+                          <span class="text-(--text-faint)">· <%= participant_event.event.starts_at.strftime("%b %Y") %></span>
+                        <% end %>
+                      </span>
+                    </label>
+                  <% end %>
+                </div>
+                <p class="text-xs text-(--text-faint) mt-2">Only events you checked in at, after they've ended. Upcoming events are never shown.</p>
+              </fieldset>
+            <% end %>
+
+            <% if @public_profile_staff_events.any? %>
+              <fieldset>
+                <legend class="text-sm font-medium text-(--text-strong) mb-2">Events you staffed</legend>
+                <div class="space-y-2">
+                  <% @public_profile_staff_events.each do |event, hidden| %>
+                    <label class="flex items-center gap-3 cursor-pointer">
+                      <%= check_box_tag "visible_staff_event_ids[]", event.id, !hidden, id: "visible_staff_event_#{event.id}", class: "size-4 rounded border-(--border-card) accent-[#ec3750]" %>
+                      <span class="text-sm text-(--text)">
+                        <%= event.name %>
+                        <% if event.starts_at.present? %>
+                          <span class="text-(--text-faint)">· <%= event.starts_at.strftime("%b %Y") %></span>
+                        <% end %>
+                      </span>
+                    </label>
+                  <% end %>
+                </div>
+                <p class="text-xs text-(--text-faint) mt-2">Events where you were on the staff team, after they've ended. Shown with a “Staff” badge.</p>
+              </fieldset>
+            <% end %>
+
+            <div class="pt-1">
+              <%# f.button (not f.submit): themes.css themes every `input` element in dark
+                  modes with an unlayered rule that beats Tailwind's utility layer. %>
+              <%= f.button "Save public profile", class: "inline-flex items-center px-4 py-2 bg-[#ec3750] hover:bg-[#d42f46] text-[#ffffff] text-sm font-semibold rounded-lg transition-colors cursor-pointer" %>
+            </div>
+          <% end %>
+        </div>
+      </section>
+
+      <!-- Appearance -->
+      <section id="appearance" class="scroll-mt-8">
+        <h2 class="border-b border-(--border-soft) pb-3 text-xl font-semibold text-(--text-strong)">Appearance</h2>
+        <div class="mt-4 rounded-2xl border border-(--border-card) bg-(--bg-elev) p-6">
+          <%= render "shared/theme_picker" %>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>

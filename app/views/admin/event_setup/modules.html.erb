@@ -1,0 +1,104 @@
+<% content_for :title, "Event Setup: Modules – Attend" %>
+
+<div class="w-full max-w-3xl">
+  <%= render "progress", current_step: "modules" %>
+
+  <h1 class="text-2xl font-bold mb-1">Which modules does <%= @event.name %> need?</h1>
+  <p class="text-gray-500 mb-6">Turn off anything you won't use — it hides those steps from participant onboarding and keeps your dashboards focused. All of this can be changed later.</p>
+
+  <%= form_with model: @event, url: admin_event_setup_modules_path(@event, return_to: params[:return_to].presence), method: :patch, class: "space-y-6" do |f| %>
+    <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-5">
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :travel_enabled, { checked: f.object.travel_enabled?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :travel_enabled, "Travel", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Collect travel information from participants. Disabling hides the travel onboarding step, travel dashboards, and Airport Mode.</p>
+        </div>
+      </div>
+
+      <div data-controller="wizard-reveal">
+        <div class="flex items-start">
+          <div class="flex items-center h-5">
+            <%= f.check_box :visa_options_enabled, checked: f.object.visa_options_enabled?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded", data: { wizard_reveal_target: "input", action: "change->wizard-reveal#update" } %>
+          </div>
+          <div class="ml-3">
+            <%= f.label :visa_options_enabled, "Visa Options", class: "text-sm font-medium text-gray-700" %>
+            <p class="text-sm text-gray-500">Show visa requirement fields in travel information for international participants.</p>
+          </div>
+        </div>
+        <div class="ml-7 mt-3" data-wizard-reveal-target="panel" data-show-when="checked">
+          <%= f.label :visa_application_url, "Visa letter application URL", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.url_field :visa_application_url, placeholder: "https://visas.hackclub.com/...", class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          <p class="text-xs text-gray-500 mt-1">Envoy (visas.hackclub.com) application form participants are pointed to when they need a visa letter.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :accommodation_enabled, { checked: f.object.accommodation_enabled?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :accommodation_enabled, "Accommodation", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Show accommodation/housing preferences in onboarding for events with overnight stays.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :roommate_preferences_enabled, { checked: f.object.roommate_preferences_enabled?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :roommate_preferences_enabled, "Roommate Preferences", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Show roommate preference fields on the accommodation onboarding step.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :freedom_waivers_enabled, { checked: f.object.freedom_waivers_enabled?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :freedom_waivers_enabled, "Freedom Waivers", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Allow guardians to grant additional freedom permissions for minor participants. Affects the next step's waiver setup.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :groups_enabled, { checked: f.object.groups_enabled?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :groups_enabled, "Groups", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Tag participants with named groups (e.g. "Hardware", "General Attendance") to distinguish cohorts within the same event.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :nfc_badges_enabled, { checked: f.object.nfc_badges_enabled?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :nfc_badges_enabled, "NFC Badges", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Check participants in by scanning NFC badges or wristbands. You can enable write-on-check-in later in event settings.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :guardian_invites_locked, { checked: f.object.guardian_invites_locked?, class: "h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :guardian_invites_locked, "Lock Guardian Invites", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Hold off sending guardian invitations while waiver details are being finalised. Useful until your waivers are set up.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-col sm:flex-row justify-between gap-3">
+      <%= link_to "Back", admin_event_setup_schedule_path(@event), class: "w-full sm:w-auto text-center text-gray-500 hover:text-gray-700 font-medium py-2 px-4" %>
+      <%= f.submit "Continue", class: "w-full sm:w-auto bg-[#ec3750] hover:bg-[#d63146] text-white font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer" %>
+    </div>
+  <% end %>
+</div>

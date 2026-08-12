@@ -1,0 +1,18 @@
+<p>Hey Leo,</p>
+
+<p>
+  <strong><%= @participant.display_name %></strong> has submitted their onboarding for
+  <strong><%= @event.name %></strong> and declared that they're travelling as an
+  unaccompanied minor (airline UM service). Their proof of UM booking needs review.
+</p>
+
+<ul>
+  <li>Inbound flight UM: <%= @participant_event.travel_inbound&.is_unaccompanied_minor? ? "Yes" : "No" %></li>
+  <li>Outbound flight UM: <%= @participant_event.travel_outbound&.is_unaccompanied_minor? ? "Yes" : "No" %></li>
+  <li>Proof uploaded: <%= @participant_event.um_proof.attached? ? "Yes" : "No" %></li>
+  <li>Guardian double-confirmed: <%= @participant_event.um_guardian_confirmed_at.present? ? @participant_event.um_guardian_confirmed_at.strftime("%b %d, %Y %H:%M") : "Not yet" %></li>
+</ul>
+
+<p style="margin: 24px 0;">
+  <%= mail_button "Review UM status", @review_url %>
+</p>

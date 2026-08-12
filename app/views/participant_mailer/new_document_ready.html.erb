@@ -1,0 +1,19 @@
+<p>Hi <%= @preferred_name %>,</p>
+
+<p>You'd already finished your registration for <%= @event_name %>, but the event team has since added <%= @pending_documents.many? ? "new documents" : "a new document" %> that also <%= @pending_documents.many? ? "need" : "needs" %> to be signed:</p>
+
+<ul>
+  <% @pending_documents.each do |document| %>
+    <li><%= document.name %></li>
+  <% end %>
+</ul>
+
+<% if @participant_event.requires_guardian? && @pending_documents.any?(&:guardian_signs?) %>
+<p>Your parent/guardian will need to sign too — your dashboard will walk you both through it.</p>
+<% end %>
+
+<p style="margin: 24px 0;">
+  <%= mail_button "View Your Documents", @documents_link %>
+</p>
+
+<p>If you have any questions, reach out to <%= mail_to @support_email %>.</p>

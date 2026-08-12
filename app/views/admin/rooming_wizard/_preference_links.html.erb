@@ -1,0 +1,69 @@
+<div class="space-y-3">
+  <!-- Linked Preferences -->
+  <div>
+    <div class="flex items-center justify-between mb-1">
+      <p class="text-xs font-medium text-green-700 uppercase">Linked Preferences</p>
+      <button type="button" onclick="openLinkModal('<%= participant_event.id %>', 'preference')" 
+              class="text-xs text-[#ec3750] hover:text-blue-800">+ Add</button>
+    </div>
+    <div class="space-y-1">
+      <% participant_event.roommate_preferences.sort_by { |p| p.rank || Float::INFINITY }.each do |pref| %>
+        <div class="flex items-center justify-between bg-green-50 rounded px-2 py-1 text-sm">
+          <span>
+            <% if pref.rank %><span class="text-green-600 font-medium">#<%= pref.rank %></span><% end %>
+            <%= pref.preferred_participant_event.participant.full_name %>
+            <% if pref.mutual? %>
+              <span class="inline-flex items-center rounded-full bg-green-200 px-1.5 py-0.5 text-xs font-medium text-green-800">Mutual</span>
+            <% end %>
+          </span>
+          <button type="button" 
+                  onclick="unlinkPreference('<%= pref.id %>', 'preference')"
+                  class="text-red-500 hover:text-red-700">&times;</button>
+        </div>
+      <% end %>
+      <% if participant_event.roommate_preferences.empty? %>
+        <p class="text-xs text-gray-400 italic">No linked preferences</p>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Linked Exclusions -->
+  <div>
+    <div class="flex items-center justify-between mb-1">
+      <p class="text-xs font-medium text-red-700 uppercase">Linked Exclusions</p>
+      <button type="button" onclick="openLinkModal('<%= participant_event.id %>', 'exclusion')" 
+              class="text-xs text-[#ec3750] hover:text-blue-800">+ Add</button>
+    </div>
+    <div class="space-y-1">
+      <% participant_event.roommate_exclusions.each do |excl| %>
+        <div class="flex items-center justify-between bg-red-50 rounded px-2 py-1 text-sm">
+          <span><%= excl.excluded_participant_event.participant.full_name %></span>
+          <button type="button" 
+                  onclick="unlinkPreference('<%= excl.id %>', 'exclusion')"
+                  class="text-red-500 hover:text-red-700">&times;</button>
+        </div>
+      <% end %>
+      <% if participant_event.roommate_exclusions.empty? %>
+        <p class="text-xs text-gray-400 italic">No linked exclusions</p>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<script>
+async function unlinkPreference(linkId, kind) {
+  if (!confirm('Remove this link?')) return;
+  
+  await fetch('<%= unlink_preference_admin_event_rooming_wizard_path(@event.slug) %>?' + new URLSearchParams({
+    link_id: linkId,
+    kind: kind
+  }), {
+    method: 'DELETE',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+    }
+  });
+  
+  location.reload();
+}
+</script>

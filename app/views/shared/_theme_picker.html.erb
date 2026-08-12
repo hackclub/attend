@@ -1,0 +1,18 @@
+<%# theme picker — usable from anywhere %>
+<% compact = local_assigns.fetch(:compact, false) %>
+<div data-controller="theme" data-theme-url-value="<%= update_theme_path %>" class="<%= compact ? "" : "max-w-sm" %>">
+  <% unless compact %>
+    <label for="theme-select" class="block text-sm font-medium mb-1" style="color: var(--text-strong);">
+      Theme
+    </label>
+    <p class="text-xs mb-2" style="color: var(--text-muted);">
+      Pick how Attend looks. Catppuccin, Dracula and Nord are all in the box.
+    </p>
+  <% end %>
+  <%= select_tag :theme,
+        theme_options_for_select(current_theme),
+        id: compact ? nil : "theme-select",
+        class: "w-full rounded-lg border px-3 py-2 text-sm",
+        style: "background-color: var(--bg-elev); color: var(--text-strong); border-color: var(--border);",
+        data: { action: "change->theme#apply" } %>
+</div>

@@ -1,0 +1,41 @@
+<% content_for :title, "Enter your verification code – Attend" %>
+
+<div class="w-full max-w-lg mx-auto">
+  <div class="text-center py-12">
+    <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+      <svg class="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+      </svg>
+    </div>
+
+    <h1 class="text-3xl font-bold text-gray-900 mb-4">Check your <%= @pending&.dig("contact_type") == "phone" ? "messages" : "email" %></h1>
+    <p class="text-lg text-gray-600">
+      If we have any parent or guardian portals linked to
+      <strong class="text-gray-900"><%= @pending&.dig("contact_value") %></strong>,
+      we've sent it a 6-digit verification code. It expires in 10 minutes.
+    </p>
+  </div>
+
+  <div class="bg-white border rounded-lg p-6 mb-8">
+    <%= form_with url: guardian_portal_center_verify_path, method: :post do |f| %>
+      <label for="code" class="block text-sm font-medium text-gray-700 mb-3">Verification code</label>
+      <%= f.text_field :code, id: "code", required: true, autofocus: true,
+            inputmode: "numeric", autocomplete: "one-time-code", maxlength: 6, pattern: "\\d{6}",
+            placeholder: "123456",
+            class: "w-full border border-gray-300 rounded-md px-3 py-2 text-center text-2xl tracking-[0.5em] font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+
+      <%= f.submit "Verify",
+            class: "mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors cursor-pointer" %>
+    <% end %>
+  </div>
+
+  <div class="text-center space-y-2">
+    <%= form_with url: guardian_portal_center_request_code_path, method: :post, class: "inline" do |f| %>
+      <%= f.hidden_field :contact, value: @pending&.dig("contact_value") %>
+      <%= f.submit "Resend code", class: "text-blue-600 hover:text-blue-700 font-medium bg-transparent border-0 cursor-pointer" %>
+    <% end %>
+    <p>
+      <%= link_to "Use a different email or phone number", guardian_portal_center_path, class: "text-sm text-gray-500 hover:text-gray-700" %>
+    </p>
+  </div>
+</div>

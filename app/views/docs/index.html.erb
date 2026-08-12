@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Attend API Reference</title>
+    <style>
+      html, body { margin: 0; padding: 0; height: 100%; }
+    </style>
+  </head>
+  <body>
+    <%# Scalar reads the OpenAPI document from data-url and renders the whole page.
+        The reference bundle is vendored (app/assets/javascripts) and served
+        same-origin rather than from a CDN. %>
+    <script
+      id="api-reference"
+      data-url="<%= docs_openapi_path(format: :json) %>"
+      data-configuration='<%= { theme: "default", layout: "modern" }.to_json %>'></script>
+
+    <%= javascript_include_tag "scalar.standalone", defer: true %>
+  </body>
+</html>

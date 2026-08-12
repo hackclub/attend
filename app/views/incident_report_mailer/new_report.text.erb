@@ -1,0 +1,27 @@
+NEW INCIDENT REPORT
+Filed <%= @incident_report.created_at.strftime("%B %-d, %Y at %H:%M %Z") %>
+
+Priority:          <%= @incident_report.priority_label %>
+Incident type:     <%= @incident_report.incident_type_label %>
+<% if @incident_report.medical_emergency? -%>
+Emergency services called? <%= @incident_report.emergency_services_called? ? "Yes" : "No" %>
+<% end -%>
+Event:             <%= @event_name %>
+Reporter:          <%= @incident_report.reporter_name %>
+Role:              <%= @incident_report.role_label %>
+Email:             <%= @incident_report.reporter_email %>
+Phone:             <%= @incident_report.reporter_phone %>
+Hack Club account: <%= @incident_report.user&.email || "Not signed in" %>
+
+SUMMARY
+<%= @incident_report.summary %>
+
+DETAILS
+<%= @incident_report.details %>
+<% if @incident_report.attachments.attached? %>
+ATTACHMENTS
+<% @incident_report.attachments.each do |attachment| %>- <%= attachment.filename %> (<%= number_to_human_size(attachment.byte_size) %>)
+<% end %><% if @skipped_attachments.any? %>
+Too large to attach (retrieve from Attend): <%= @skipped_attachments.join(", ") %>
+<% end %><% end %>
+This report is confidential. Reply directly to this email to reach the reporter.

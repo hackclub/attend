@@ -1,0 +1,96 @@
+<div class="space-y-6">
+  <div class="flex justify-between items-center">
+    <h1 class="text-2xl font-bold text-gray-900">Record Versions</h1>
+    <%= link_to "Action log", admin_audit_logs_path, class: "text-sm text-[#ec3750] hover:text-blue-900" %>
+  </div>
+
+  <p class="text-sm text-gray-600">Every change to every tracked record across the app, regardless of how it was made (admin UI, guardian portal, onboarding, API, etc.).</p>
+
+  <div class="bg-white border border-gray-200 rounded-lg">
+    <div class="p-4 border-b border-gray-200">
+      <%= form_with url: versions_admin_audit_logs_path, method: :get, class: "grid grid-cols-2 md:grid-cols-5 gap-4", data: { turbo_frame: "_top" } do |f| %>
+        <div>
+          <%= f.label :item_type, "Record Type", class: "block text-sm font-medium text-gray-700" %>
+          <%= f.text_field :item_type, value: params[:item_type], placeholder: "e.g. Participant", class: "mt-1 block w-full px-3 py-2 rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] text-sm" %>
+        </div>
+        <div>
+          <%= f.label :item_id, "Record ID", class: "block text-sm font-medium text-gray-700" %>
+          <%= f.text_field :item_id, value: params[:item_id], class: "mt-1 block w-full px-3 py-2 rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] text-sm" %>
+        </div>
+        <div>
+          <%= f.label :event, "Action", class: "block text-sm font-medium text-gray-700" %>
+          <%= f.select :event, [["All", ""], ["Create", "create"], ["Update", "update"], ["Destroy", "destroy"]], { selected: params[:event] }, class: "mt-1 block w-full px-3 py-2 rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] text-sm" %>
+        </div>
+        <div>
+          <%= f.label :start_date, "From", class: "block text-sm font-medium text-gray-700" %>
+          <%= f.date_field :start_date, value: params[:start_date], class: "mt-1 block w-full px-3 py-2 rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] text-sm" %>
+        </div>
+        <div>
+          <%= f.label :end_date, "To", class: "block text-sm font-medium text-gray-700" %>
+          <%= f.date_field :end_date, value: params[:end_date], class: "mt-1 block w-full px-3 py-2 rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] text-sm" %>
+        </div>
+        <div class="col-span-2 md:col-span-5 flex justify-end">
+          <%= link_to "Clear", versions_admin_audit_logs_path, class: "px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 mr-2" %>
+          <%= f.submit "Filter", class: "px-4 py-2 bg-[#ec3750] text-white rounded-md hover:bg-[#d42f46] cursor-pointer" %>
+        </div>
+      <% end %>
+    </div>
+
+    <% if @versions.any? %>
+      <div class="divide-y divide-gray-100">
+        <% @versions.each do |version| %>
+          <% changes = audit_version_changes(version) %>
+          <details class="group">
+            <summary class="px-6 py-3 flex items-center gap-3 cursor-pointer hover:bg-gray-50 list-none">
+              <span class="text-xs text-gray-500 font-mono w-44 flex-shrink-0"><%= version.created_at.strftime("%Y-%m-%d %H:%M:%S") %></span>
+              <% color = case version.event when "create" then "bg-green-100 text-green-800" when "update" then "bg-blue-100 text-blue-800" when "destroy" then "bg-red-100 text-red-800" else "bg-gray-100 text-gray-800" end %>
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium <%= color %> w-20 justify-center"><%= version.event.titleize %></span>
+              <span class="text-sm font-medium text-gray-900 w-48 truncate" title="<%= version.item_type %> #<%= version.item_id %>">
+                <%= version.item_type %>
+              </span>
+              <span class="text-xs text-gray-400 font-mono w-24 truncate" title="<%= version.item_id %>"><%= version.item_id.to_s.first(8) %></span>
+              <span class="text-sm text-gray-600 flex-1 truncate">
+                <%= audit_user_label(version.whodunnit, @users_by_id) %>
+              </span>
+              <span class="text-xs text-gray-400">
+                <% if changes.any? %><%= pluralize(changes.size, "field") %> changed<% else %>—<% end %>
+              </span>
+              <span class="text-gray-400 group-open:rotate-90 transition-transform">›</span>
+            </summary>
+            <div class="px-6 pb-4 pt-1 bg-gray-50">
+              <% if changes.any? %>
+                <div class="space-y-2">
+                  <% changes.each do |field, change| %>
+                    <% old_value, new_value = change.is_a?(Array) ? change : [nil, change] %>
+                    <div>
+                      <div class="text-xs font-medium text-gray-700 mb-1"><%= audit_field_label(field) %></div>
+                      <% if version.event == "create" %>
+                        <div class="text-xs bg-green-50 border border-green-200 rounded px-2 py-1 text-green-900"><%= audit_format_value(field, new_value) %></div>
+                      <% elsif version.event == "destroy" %>
+                        <div class="text-xs bg-red-50 border border-red-200 rounded px-2 py-1 text-red-900 line-through"><%= audit_format_value(field, old_value) %></div>
+                      <% else %>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                          <div class="bg-red-50 border border-red-200 rounded px-2 py-1 text-red-900"><%= audit_format_value(field, old_value) %></div>
+                          <div class="bg-green-50 border border-green-200 rounded px-2 py-1 text-green-900"><%= audit_format_value(field, new_value) %></div>
+                        </div>
+                      <% end %>
+                    </div>
+                  <% end %>
+                </div>
+              <% else %>
+                <div class="text-xs text-gray-500 italic py-2">No tracked field changes recorded for this version.</div>
+              <% end %>
+            </div>
+          </details>
+        <% end %>
+      </div>
+      <% if @versions.size >= 500 %>
+        <div class="px-6 py-3 text-xs text-gray-500 border-t border-gray-100">Showing first 500 results — narrow filters to see more.</div>
+      <% end %>
+    <% else %>
+      <div class="px-6 py-12 text-center">
+        <p class="text-gray-500">No versions found matching your criteria.</p>
+      </div>
+    <% end %>
+  </div>
+</div>

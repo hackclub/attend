@@ -1,0 +1,30 @@
+<%# A collapsible row grouping a series' events on the events list. %>
+<%# Locals: series, events (this series' events, in list order), first %>
+<details class="group/series <%= 'border-t border-gray-100' unless first %>">
+  <summary class="list-none cursor-pointer flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors">
+    <div class="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+      <%= render "admin/events/avatar", event: series, size: 36, rounded: "rounded-lg" %>
+      <div class="flex-1 min-w-0">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span class="text-sm font-medium text-gray-900"><%= series.name %></span>
+          <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">Series</span>
+        </div>
+        <div class="mt-1 text-xs text-gray-500">
+          <%= pluralize(events.count, "event") %>
+        </div>
+      </div>
+    </div>
+    <svg class="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-transform group-open/series:rotate-90 flex-shrink-0 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+  </summary>
+  <div class="border-t border-gray-100 bg-gray-50/50 pl-4">
+    <% events.each do |event| %>
+      <%= render "admin/dashboard/event_row", event: event, first: false %>
+    <% end %>
+    <% if policy(series).show? %>
+      <%= link_to admin_series_path(series), class: "flex items-center gap-1.5 px-5 py-3 border-t border-gray-100 text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors" do %>
+        View series
+        <span aria-hidden="true">→</span>
+      <% end %>
+    <% end %>
+  </div>
+</details>

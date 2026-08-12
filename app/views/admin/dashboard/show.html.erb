@@ -1,0 +1,460 @@
+<% content_for :title, "Dashboard – #{@event.name} – Attend" %>
+
+<div class="max-w-7xl mx-auto px-4 py-6">
+  <% unless @event.setup_complete? %>
+    <div class="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div>
+        <p class="text-sm font-medium text-amber-800">Setup isn't finished yet</p>
+        <p class="text-sm text-amber-700">Pick up where you left off to configure dates, modules, and waivers.</p>
+      </div>
+      <%= link_to "Resume setup →", admin_event_setup_path(@event), class: "inline-flex items-center self-start sm:self-auto px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap" %>
+    </div>
+  <% end %>
+
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+      <div class="flex items-center gap-3">
+        <h1 class="text-2xl font-bold text-gray-900"><%= @event.name %></h1>
+        <span class="text-sm text-gray-400">/<%= @event.slug %></span>
+      </div>
+      <p class="text-sm text-gray-500 mt-1">Event Dashboard</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <%= link_to edit_admin_event_path(@event), class: "inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50" do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+        Settings
+      <% end %>
+      <%= link_to admin_event_integrations_path(@event.slug), class: "inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50" do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+        Integrations
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Event Status Banner -->
+  <% event_status_colors = { "green" => "bg-green-50 border-green-200 text-green-800", "blue" => "bg-blue-50 border-blue-200 text-blue-800", "gray" => "bg-gray-50 border-gray-200 text-gray-600" } %>
+  <div class="<%= event_status_colors[@event_status[:color]] %> border rounded-lg px-4 py-3 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <% if @event_status[:phase] == :active %>
+        <span class="relative flex h-3 w-3 flex-shrink-0">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+        </span>
+      <% end %>
+      <span class="font-medium"><%= @event_status[:label] %></span>
+      <% if @event.starts_at && @event.ends_at %>
+        <span class="text-sm opacity-75 whitespace-nowrap">
+          <%= @event.starts_at.strftime("%b %d") %> – <%= @event.ends_at.strftime("%b %d, %Y") %>
+        </span>
+      <% end %>
+    </div>
+    <div class="flex items-center gap-2 text-sm whitespace-nowrap">
+      <span><%= @staff_count %> staff assigned</span>
+      <span>•</span>
+      <%= link_to "Manage Staff", admin_event_staff_index_path(@event), class: "underline hover:no-underline" %>
+    </div>
+  </div>
+
+  <!-- Quick Actions Bar -->
+  <div class="bg-white border border-gray-200 rounded-lg  mb-6">
+    <div class="p-4 border-b border-gray-100">
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Quick Actions</h2>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 divide-x divide-gray-100">
+      <%= link_to admin_event_scans_path(@event), class: "flex flex-col items-center gap-2 p-4 hover:bg-gray-50 transition-colors" do %>
+        <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+          <svg class="w-5 h-5 text-[#ec3750]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+        </div>
+        <span class="text-xs font-medium text-gray-700 text-center">Check Ins</span>
+      <% end %>
+      <%= link_to admin_event_participants_path(@event), class: "flex flex-col items-center gap-2 p-4 hover:bg-gray-50 transition-colors" do %>
+        <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+          <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+        </div>
+        <span class="text-xs font-medium text-gray-700 text-center">Participants</span>
+      <% end %>
+      <% if @event.travel_enabled? %>
+        <%= link_to admin_event_airport_mode_path(@event), class: "flex flex-col items-center gap-2 p-4 hover:bg-gray-50 transition-colors" do %>
+          <div class="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center">
+            <svg class="w-5 h-5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+          </div>
+          <span class="text-xs font-medium text-gray-700 text-center">Airport Mode</span>
+        <% end %>
+      <% end %>
+      <% if @event.accommodation_enabled? %>
+        <%= link_to admin_event_rooming_wizard_path(@event), class: "flex flex-col items-center gap-2 p-4 hover:bg-gray-50 transition-colors" do %>
+          <div class="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center">
+            <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+          </div>
+          <span class="text-xs font-medium text-gray-700 text-center">Rooming</span>
+        <% end %>
+      <% end %>
+      <%= link_to admin_event_incidents_path(@event), class: "flex flex-col items-center gap-2 p-4 hover:bg-gray-50 transition-colors" do %>
+        <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+          <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+        </div>
+        <span class="text-xs font-medium text-gray-700 text-center">Incidents</span>
+      <% end %>
+      <%= link_to admin_event_messages_path(@event), class: "flex flex-col items-center gap-2 p-4 hover:bg-gray-50 transition-colors" do %>
+        <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+          <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+        </div>
+        <span class="text-xs font-medium text-gray-700 text-center">Messages</span>
+      <% end %>
+      <%= link_to admin_event_exports_path(@event), class: "flex flex-col items-center gap-2 p-4 hover:bg-gray-50 transition-colors" do %>
+        <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+          <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+        </div>
+        <span class="text-xs font-medium text-gray-700 text-center">Exports</span>
+      <% end %>
+      <%= link_to admin_audit_logs_path(event_id: @event.id), class: "flex flex-col items-center gap-2 p-4 hover:bg-gray-50 transition-colors" do %>
+        <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+          <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+        </div>
+        <span class="text-xs font-medium text-gray-700 text-center">Audit Logs</span>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <!-- Total Participants -->
+    <%= link_to admin_event_participants_path(@event), class: "bg-white border border-gray-200 rounded-lg p-5  hover:shadow-md transition-shadow group" do %>
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium text-gray-500">Total Participants</p>
+          <p class="text-3xl font-bold text-gray-900 mt-1"><%= @total_participants %></p>
+        </div>
+        <div class="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors flex-shrink-0">
+          <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+        </div>
+      </div>
+      <div class="mt-3 text-xs text-gray-500">
+        <span class="text-green-600 font-medium"><%= @display_status_counts["Complete"] || 0 %> complete</span>
+        <span class="mx-1">•</span>
+        <span><%= (@display_status_counts["Awaiting Participant"] || 0) + (@display_status_counts["Awaiting Parent"] || 0) %> in progress</span>
+      </div>
+    <% end %>
+
+    <!-- High Support -->
+    <div class="bg-white border border-gray-200 rounded-lg p-5  <%= @high_support_participants.any? ? 'border-l-4 border-l-amber-400' : '' %>">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium text-gray-500">High Support</p>
+          <p class="text-3xl font-bold <%= @high_support_participants.any? ? 'text-amber-600' : 'text-gray-900' %> mt-1"><%= @high_support_participants.count %></p>
+        </div>
+        <div class="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0">
+          <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+        </div>
+      </div>
+      <p class="mt-3 text-xs text-gray-500">Participants flagged for support</p>
+    </div>
+
+    <!-- Pending Consents -->
+    <div class="bg-white border border-gray-200 rounded-lg p-5 ">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium text-gray-500">Pending Consents</p>
+          <p class="text-3xl font-bold text-gray-900 mt-1"><%= @consent_stats[:pending] %></p>
+        </div>
+        <div class="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center flex-shrink-0">
+          <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+        </div>
+      </div>
+      <div class="mt-3 text-xs text-gray-500">
+        <span class="text-green-600 font-medium"><%= @consent_stats[:signed] %> signed</span>
+        <span class="mx-1">•</span>
+        <span><%= @consent_stats[:waivers_pending] %> waivers pending</span>
+      </div>
+    </div>
+
+    <!-- Open Incidents -->
+    <%= link_to admin_event_incidents_path(@event), class: "bg-white border border-gray-200 rounded-lg p-5  hover:shadow-md transition-shadow group #{@open_incidents_count > 0 ? 'border-l-4 border-l-orange-400' : ''}" do %>
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium text-gray-500">Open Incidents</p>
+          <p class="text-3xl font-bold <%= @open_incidents_count > 0 ? 'text-orange-600' : 'text-gray-900' %> mt-1"><%= @open_incidents_count %></p>
+        </div>
+        <div class="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center group-hover:bg-orange-100 transition-colors flex-shrink-0">
+          <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        </div>
+      </div>
+      <p class="mt-3 text-xs text-gray-500 group-hover:text-[#ec3750]">Click to view all incidents</p>
+    <% end %>
+  </div>
+
+  <!-- Two Column Layout -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <!-- Left Column - Onboarding & Travel -->
+    <div class="lg:col-span-2 space-y-6">
+      <!-- Onboarding Progress -->
+      <div class="bg-white border border-gray-200 rounded-lg ">
+        <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 class="font-semibold text-gray-900">Onboarding Progress</h2>
+          <%= link_to "Invite Participants", new_invite_admin_event_participants_path(@event), class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
+        </div>
+        <div class="p-4">
+          <% display_status_colors = { "Awaiting Participant" => "bg-blue-50 text-blue-700", "Awaiting Parent" => "bg-amber-50 text-amber-700", "Complete" => "bg-green-50 text-green-700", "Withdrawn" => "bg-gray-100 text-gray-500" } %>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <% %w[Awaiting\ Participant Awaiting\ Parent Complete Withdrawn].each do |ds| %>
+              <% count = @display_status_counts[ds] || 0 %>
+              <div class="text-center p-3 rounded-lg <%= display_status_colors[ds] || 'bg-gray-50' %>">
+                <p class="text-2xl font-bold"><%= count %></p>
+                <p class="text-xs mt-1 opacity-75"><%= ds %></p>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+      <!-- Travel Overview -->
+      <% if @event.travel_enabled? %>
+      <div class="bg-white border border-gray-200 rounded-lg ">
+        <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 class="font-semibold text-gray-900">Travel Overview</h2>
+          <%= link_to "Airport Mode", admin_event_airport_mode_path(@event), class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
+        </div>
+        <div class="p-4">
+          <div class="grid grid-cols-2 gap-6">
+            <div>
+              <h3 class="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+                Arrivals (Inbound)
+              </h3>
+              <div class="space-y-2">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm text-gray-600">Submitted</span>
+                  <span class="font-medium text-green-600"><%= @travel_stats[:inbound_complete] %></span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-sm text-gray-600">Missing</span>
+                  <span class="font-medium <%= @travel_stats[:missing_inbound] > 0 ? 'text-red-600' : 'text-gray-400' %>"><%= @travel_stats[:missing_inbound] %></span>
+                </div>
+                <% if @travel_stats[:arriving_today] > 0 %>
+                  <div class="mt-2 p-2 bg-green-50 rounded text-sm text-green-800">
+                    <span class="font-medium"><%= @travel_stats[:arriving_today] %></span> arriving today
+                  </div>
+                <% end %>
+              </div>
+            </div>
+            <div>
+              <h3 class="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4 text-[#ec3750]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
+                Departures (Outbound)
+              </h3>
+              <div class="space-y-2">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm text-gray-600">Submitted</span>
+                  <span class="font-medium text-green-600"><%= @travel_stats[:outbound_complete] %></span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-sm text-gray-600">Missing</span>
+                  <span class="font-medium <%= @travel_stats[:missing_outbound] > 0 ? 'text-red-600' : 'text-gray-400' %>"><%= @travel_stats[:missing_outbound] %></span>
+                </div>
+                <% if @travel_stats[:departing_today] > 0 %>
+                  <div class="mt-2 p-2 bg-blue-50 rounded text-sm text-blue-800">
+                    <span class="font-medium"><%= @travel_stats[:departing_today] %></span> departing today
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <% end %>
+
+      <!-- Recent Incidents -->
+      <div class="bg-white border border-gray-200 rounded-lg ">
+        <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 class="font-semibold text-gray-900">Recent Incidents</h2>
+          <div class="flex items-center gap-3">
+            <%= link_to "Report New", new_admin_event_incident_path(@event), class: "text-sm bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 font-medium" %>
+            <%= link_to "View All", admin_event_incidents_path(@event), class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
+          </div>
+        </div>
+        <% if @recent_incidents.any? %>
+          <div class="divide-y divide-gray-100">
+            <% @recent_incidents.each do |incident| %>
+              <%= link_to admin_event_incident_path(@event, incident), class: "block p-4 hover:bg-gray-50 transition-colors" do %>
+                <div class="flex items-start justify-between">
+                  <div class="flex items-start gap-3">
+                    <span class="px-2 py-0.5 text-xs font-medium rounded <%= severity_badge_class(incident.severity) %>">
+                      <%= incident.severity.upcase %>
+                    </span>
+                    <div>
+                      <p class="text-sm font-medium text-gray-900"><%= incident.category.titleize %></p>
+                      <p class="text-sm text-gray-500 mt-0.5">
+                        <% if incident.participant_event %>
+                          <%= incident.participant_event.participant.display_name %>
+                        <% else %>
+                          General incident
+                        <% end %>
+                      </p>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-xs px-2 py-0.5 rounded-full <%= incident.status == 'closed' ? 'bg-gray-100 text-gray-600' : 'bg-yellow-100 text-yellow-800' %>">
+                      <%= incident.status.titleize %>
+                    </span>
+                    <p class="text-xs text-gray-400 mt-1"><%= time_ago_in_words(incident.created_at) %> ago</p>
+                  </div>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        <% else %>
+          <div class="p-8 text-center text-gray-500">
+            <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <p>No incidents reported</p>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Right Column - Activity & Alerts -->
+    <div class="space-y-6">
+      <!-- High Support Participants -->
+      <% if @high_support_participants.any? %>
+        <div class="bg-amber-50 border border-amber-200 rounded-lg ">
+          <div class="p-4 border-b border-amber-200">
+            <h2 class="font-semibold text-amber-800 flex items-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+              High Support Participants
+            </h2>
+          </div>
+          <div class="p-2 max-h-64 overflow-y-auto">
+            <% @high_support_participants.limit(10).each do |pe| %>
+              <%= link_to safeguarding_admin_event_participant_path(@event, pe), class: "block p-2 rounded hover:bg-amber-100 transition-colors" do %>
+                <p class="font-medium text-amber-900 text-sm"><%= pe.participant.display_name %></p>
+                <p class="text-xs text-amber-700"><%= pe.status.titleize %></p>
+              <% end %>
+            <% end %>
+            <% if @high_support_participants.count > 10 %>
+              <p class="text-xs text-amber-600 p-2 text-center">+ <%= @high_support_participants.count - 10 %> more</p>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <!-- Recent Activity -->
+      <div class="bg-white border border-gray-200 rounded-lg ">
+        <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 class="font-semibold text-gray-900">Recent Activity</h2>
+          <%= link_to "View All", admin_audit_logs_path(event_id: @event.id), class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
+        </div>
+        <% if @recent_activity.any? %>
+          <div class="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+            <% @recent_activity.each do |log| %>
+              <%= link_to admin_audit_log_path(log), class: "block p-3 hover:bg-gray-50 transition-colors" do %>
+                <div class="flex items-start gap-3">
+                  <% if log.actor&.avatar_displayable? %>
+                    <%= image_tag log.actor.avatar.variant(resize_to_fill: [32, 32]), class: "w-8 h-8 rounded-full object-cover flex-shrink-0" %>
+                  <% else %>
+                    <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                      <span class="text-xs font-medium text-gray-600"><%= log.actor&.initials || "SY" %></span>
+                    </div>
+                  <% end %>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm text-gray-900">
+                      <span class="font-medium"><%= log.action&.titleize || "Unknown" %></span>
+                      <span class="text-gray-500"><%= log.record_type %></span>
+                    </p>
+                    <p class="text-xs text-gray-400 mt-0.5"><%= time_ago_in_words(log.created_at) %> ago</p>
+                  </div>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        <% else %>
+          <div class="p-6 text-center text-gray-500">
+            <p class="text-sm">No recent activity</p>
+          </div>
+        <% end %>
+      </div>
+
+      <!-- Admin Tools -->
+      <div class="bg-white border border-gray-200 rounded-lg ">
+        <div class="p-4 border-b border-gray-100">
+          <h2 class="font-semibold text-gray-900">Admin Tools</h2>
+        </div>
+        <div class="p-2">
+          <%= link_to new_admin_event_import_path(@event), class: "flex items-center gap-3 p-2 rounded hover:bg-gray-50 transition-colors" do %>
+            <div class="w-8 h-8 rounded bg-blue-100 flex items-center justify-center">
+              <svg class="w-4 h-4 text-[#ec3750]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+            </div>
+            <span class="text-sm font-medium text-gray-700">Import Participants</span>
+          <% end %>
+          <%= link_to admin_event_exports_path(@event), class: "flex items-center gap-3 p-2 rounded hover:bg-gray-50 transition-colors" do %>
+            <div class="w-8 h-8 rounded bg-green-100 flex items-center justify-center">
+              <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            </div>
+            <span class="text-sm font-medium text-gray-700">Export Data</span>
+          <% end %>
+          <%= link_to admin_event_staff_index_path(@event), class: "flex items-center gap-3 p-2 rounded hover:bg-gray-50 transition-colors" do %>
+            <div class="w-8 h-8 rounded bg-purple-100 flex items-center justify-center">
+              <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+            </div>
+            <span class="text-sm font-medium text-gray-700">Manage Staff</span>
+          <% end %>
+          <%= link_to admin_event_integrations_path(@event.slug), class: "flex items-center gap-3 p-2 rounded hover:bg-gray-50 transition-colors" do %>
+            <div class="w-8 h-8 rounded bg-indigo-100 flex items-center justify-center">
+              <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+            </div>
+            <span class="text-sm font-medium text-gray-700">Integrations & API</span>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Staff Table -->
+  <div class="bg-white border border-gray-200 rounded-lg  overflow-hidden">
+    <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="font-semibold text-gray-900">Event Staff</h2>
+      <%= link_to "Manage Staff", admin_event_staff_index_path(@event), class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
+    </div>
+    <% if @event_role_assignments.any? %>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-100">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Added</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-100">
+            <% @event_role_assignments.limit(5).each do |assignment| %>
+              <tr>
+                <td class="px-4 py-3 whitespace-nowrap">
+                  <div class="text-sm font-medium text-gray-900"><%= assignment.user.display_name_or_fallback %></div>
+                  <div class="text-xs text-gray-500"><%= assignment.user.email %></div>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap">
+                  <% role_colors = { "event_admin" => "bg-purple-100 text-purple-800", "ops" => "bg-blue-100 text-blue-800", "safeguarding_lead" => "bg-red-100 text-red-800", "read_only" => "bg-gray-100 text-gray-800" } %>
+                  <span class="px-2 py-0.5 text-xs font-medium rounded-full <%= role_colors[assignment.role] || 'bg-gray-100 text-gray-800' %>">
+                    <%= assignment.role.titleize %>
+                  </span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                  <%= assignment.created_at.strftime("%b %d, %Y") %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+      <% if @event_role_assignments.count > 5 %>
+        <div class="p-3 border-t border-gray-100 text-center">
+          <%= link_to "View all #{@event_role_assignments.count} staff members", admin_event_staff_index_path(@event), class: "text-sm text-[#ec3750] hover:text-blue-800" %>
+        </div>
+      <% end %>
+    <% else %>
+      <div class="p-6 text-center">
+        <p class="text-gray-500 mb-2">No staff members assigned yet.</p>
+        <%= link_to "Add Staff Member", new_admin_event_staff_path(@event), class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
+      </div>
+    <% end %>
+  </div>
+</div>

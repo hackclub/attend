@@ -1,0 +1,112 @@
+<% content_for :title, "Event Setup: Review – Attend" %>
+
+<div class="w-full max-w-3xl">
+  <%= render "progress", current_step: "review" %>
+
+  <h1 class="text-2xl font-bold mb-1">Almost there!</h1>
+  <p class="text-gray-500 mb-6">Here's how <%= @event.name %> is set up. Everything can be changed later from event settings.</p>
+
+  <div class="space-y-4">
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">Basics</h2>
+        <%= link_to "Edit", edit_admin_event_path(@event), class: "text-sm text-[#ec3750] font-medium hover:underline" %>
+      </div>
+      <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+        <div><dt class="text-gray-500 inline">Name:</dt> <dd class="inline text-gray-900"><%= @event.name %></dd></div>
+        <div><dt class="text-gray-500 inline">Slug:</dt> <dd class="inline text-gray-900 font-mono"><%= @event.slug %></dd></div>
+        <div><dt class="text-gray-500 inline">Support email:</dt> <dd class="inline text-gray-900"><%= @event.support_email.presence || "team@hackclub.com (default)" %></dd></div>
+        <div><dt class="text-gray-500 inline">Timezone:</dt> <dd class="inline text-gray-900"><%= @event.timezone.presence || "Not set" %></dd></div>
+      </dl>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">Schedule & Location</h2>
+        <%= link_to "Edit", admin_event_setup_schedule_path(@event), class: "text-sm text-[#ec3750] font-medium hover:underline" %>
+      </div>
+      <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+        <div><dt class="text-gray-500 inline">Dates:</dt> <dd class="inline text-gray-900"><%= @event.formatted_date_range || "Not set" %></dd></div>
+        <div>
+          <dt class="text-gray-500 inline">Registration:</dt>
+          <dd class="inline text-gray-900">
+            <% if @event.registration_open_at && @event.registration_close_at %>
+              <%= @event.registration_open_at.to_date.strftime("%b %-d") %> – <%= @event.registration_close_at.to_date.strftime("%b %-d, %Y") %>
+            <% else %>
+              Not set
+            <% end %>
+          </dd>
+        </div>
+        <div><dt class="text-gray-500 inline">Location:</dt> <dd class="inline text-gray-900"><%= [ @event.location_city, @event.location_country ].compact_blank.join(", ").presence || "Not set" %></dd></div>
+        <div><dt class="text-gray-500 inline">Venue:</dt> <dd class="inline text-gray-900"><%= @event.venue_name.presence || "Not set" %></dd></div>
+      </dl>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">Modules</h2>
+        <%= link_to "Edit", admin_event_setup_modules_path(@event), class: "text-sm text-[#ec3750] font-medium hover:underline" %>
+      </div>
+      <% modules = {
+           "Travel" => @event.travel_enabled?,
+           "Visa options" => @event.visa_options_enabled?,
+           "Accommodation" => @event.accommodation_enabled?,
+           "Roommate preferences" => @event.roommate_preferences_enabled?,
+           "Freedom waivers" => @event.freedom_waivers_enabled?,
+           "Groups" => @event.groups_enabled?,
+           "NFC badges" => @event.nfc_badges_enabled?
+         } %>
+      <div class="flex flex-wrap gap-2">
+        <% modules.each do |label, enabled| %>
+          <span class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium <%= enabled ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-50 text-gray-400 border border-gray-200 line-through' %>">
+            <%= label %>
+          </span>
+        <% end %>
+      </div>
+      <% if @event.guardian_invites_locked? %>
+        <p class="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">Guardian invites are locked — remember to unlock them once waivers are finalised.</p>
+      <% end %>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">Waivers</h2>
+        <%= link_to "Edit", admin_event_setup_waivers_path(@event), class: "text-sm text-[#ec3750] font-medium hover:underline" %>
+      </div>
+      <% if @event.docuseal_waiver_template_id.present? %>
+        <p class="text-sm text-gray-900">
+          <span class="inline-flex items-center rounded-full bg-green-50 text-green-700 border border-green-200 px-3 py-1 text-xs font-medium mr-2">Configured</span>
+          Waiver template <span class="font-mono"><%= @event.docuseal_waiver_template_id %></span><% if @event.freedom_waivers_enabled? && @event.docuseal_freedom_waiver_template_id.present? %>, freedom waiver template <span class="font-mono"><%= @event.docuseal_freedom_waiver_template_id %></span><% end %>
+        </p>
+      <% else %>
+        <p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+          Waivers aren't configured yet — participants can't complete onboarding without them.
+          Set them up from the <%= link_to "waivers step", admin_event_setup_waivers_path(@event), class: "font-medium underline" %> or the <%= link_to "integrations page", admin_event_integrations_path(@event), class: "font-medium underline" %>.
+        </p>
+      <% end %>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">Team</h2>
+        <%= link_to "Edit", admin_event_setup_team_path(@event), class: "text-sm text-[#ec3750] font-medium hover:underline" %>
+      </div>
+      <% if @event_role_assignments.any? %>
+        <ul class="space-y-1 text-sm">
+          <% @event_role_assignments.each do |assignment| %>
+            <li>
+              <span class="text-gray-900"><%= assignment.user.email %></span>
+              <span class="text-gray-500">— <%= EventRoleAssignment::ROLE_DETAILS.dig(assignment.role, :label) || assignment.role.humanize %></span>
+            </li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p class="text-sm text-gray-500">No staff added yet — only global admins can access this event. Add event admins from the <%= link_to "team step", admin_event_setup_team_path(@event), class: "text-[#ec3750] font-medium hover:underline" %>.</p>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="mt-6 flex flex-col sm:flex-row justify-end gap-3">
+    <%= button_to "Finish setup", admin_event_setup_complete_path(@event), method: :post, class: "w-full sm:w-auto bg-[#ec3750] hover:bg-[#d63146] text-white font-semibold py-2 px-6 rounded-lg transition-colors cursor-pointer" %>
+  </div>
+</div>

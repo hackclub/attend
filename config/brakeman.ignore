@@ -1,0 +1,46 @@
+{
+  "ignored_warnings": [
+    {
+      "fingerprint": "5edabe22893b08bbf5969bb6d53e0cb3ce1372cb7a32a1f66259d23fa5317764",
+      "note": "Role assignment in admin controller is intentional - only admins can access this endpoint"
+    },
+    {
+      "fingerprint": "d9ec2962ec202f5807eba9108699e5ed8b20ca5f0b456a5dbd4125461df07842",
+      "note": "Step is validated against allowlist before render - see steps.include?(@step) check"
+    },
+    {
+      "fingerprint": "24a0ba63f6dafc547eef2a86e7c08fd1f55f74f59078655e32c1bd32c38e2b3f",
+      "note": "Step is validated against allowlist before render - see steps.include?(@step) check"
+    },
+    {
+      "fingerprint": "637b5ba2275aeedf93d465c6c60e2fbb937aad96764970af251cbf425e1ed3b4",
+      "note": "False positive - this is URL path interpolation for Faraday HTTP client, not SQL"
+    },
+    {
+      "fingerprint": "0a71c5870cda9202c8ca233d6abb98cb9ae134a2a6de6179d1ed05968479fa10",
+      "note": "False positive - message_as_html uses Rails sanitize with allowlisted tags/attributes"
+    },
+    {
+      "warning_type": "Mass Assignment",
+      "warning_code": 105,
+      "fingerprint": "28b4bac3ca8bd5a95ee71c94dd6c818b45399bdeb779dbb034ff8f516873023a",
+      "check_name": "PermitAttributes",
+      "message": "Potentially dangerous key allowed for mass assignment",
+      "file": "app/controllers/admin/series_members_controller.rb",
+      "line": 54,
+      "link": "https://brakemanscanner.org/docs/warning_types/mass_assignment/",
+      "code": "params.require(:series_role_assignment).permit(:role)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::SeriesMembersController",
+        "method": "series_role_assignment_params"
+      },
+      "user_input": ":role",
+      "confidence": "Medium",
+      "note": "Role assignment in admin controller is intentional - only series owners/global admins reach this (require_series_owner_access), and role is an enum restricted to owner/organizer."
+    }
+  ],
+  "updated": "2026-02-04",
+  "brakeman_version": "8.0.2"
+}

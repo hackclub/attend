@@ -1,0 +1,61 @@
+<%= form_with model: [ :admin, @series ], url: @series.persisted? ? admin_series_path(@series) : admin_series_index_path, class: "space-y-6", multipart: true do |f| %>
+  <% if @series.errors.any? %>
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+      <h3 class="text-red-800 font-medium"><%= pluralize(@series.errors.count, "error") %> prohibited this series from being saved:</h3>
+      <ul class="mt-2 list-disc list-inside text-sm text-red-700">
+        <% @series.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <%= f.label :name, class: "block text-sm font-medium text-gray-700" %>
+        <%= f.text_field :name, class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+      </div>
+      <div>
+        <%= f.label :slug, class: "block text-sm font-medium text-gray-700" %>
+        <%= f.text_field :slug, class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "auto-generated from name" %>
+        <p class="mt-1 text-sm text-gray-500">Lowercase letters, numbers, and dashes only</p>
+      </div>
+    </div>
+
+    <div>
+      <%= f.label :description, class: "block text-sm font-medium text-gray-700" %>
+      <%= f.text_area :description, rows: 2, class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "Optional — a short line about what this series is" %>
+    </div>
+
+    <div>
+      <%= f.label :contact_email, "Contact email", class: "block text-sm font-medium text-gray-700" %>
+      <%= f.email_field :contact_email, class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "sunbeam@hackclub.com" %>
+      <p class="mt-1 text-sm text-gray-500">Used as the sender/reply-to for emails from events in this series that don't set their own support email. Defaults to team@hackclub.com if neither is set.</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <%= f.label :logo, "Logo", class: "block text-sm font-medium text-gray-700" %>
+        <% if @series.logo.attached? %>
+          <div class="mt-2 mb-2"><%= render "admin/events/avatar", event: @series, size: 48, rounded: "rounded-lg" %></div>
+        <% end %>
+        <%= f.file_field :logo, accept: "image/jpeg,image/png,image/gif,image/webp,image/svg+xml", class: "mt-1 block text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 file:cursor-pointer" %>
+        <p class="mt-1 text-sm text-gray-500">JPEG, PNG, GIF, WebP, or SVG. Max 5MB. Events in this series without their own logo inherit it.</p>
+      </div>
+      <div>
+        <%= f.label :banner, "Banner", class: "block text-sm font-medium text-gray-700" %>
+        <% if @series.banner.attached? %>
+          <div class="mt-2 mb-2"><%= image_tag @series.banner, class: "h-16 rounded-md object-cover" %></div>
+        <% end %>
+        <%= f.file_field :banner, accept: "image/jpeg,image/png", class: "mt-1 block text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 file:cursor-pointer" %>
+        <p class="mt-1 text-sm text-gray-500">PNG or JPEG. Max 5MB. Inherited by events in this series too.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex flex-col sm:flex-row justify-between gap-3">
+    <%= link_to "Cancel", @series.persisted? ? admin_series_path(@series) : admin_series_index_path, class: "w-full sm:w-auto text-center text-gray-500 hover:text-gray-700 font-medium py-2 px-4" %>
+    <%= f.submit @series.persisted? ? "Save changes" : "Create series", class: "w-full sm:w-auto bg-[#ec3750] hover:bg-[#d63146] text-white font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer" %>
+  </div>
+<% end %>

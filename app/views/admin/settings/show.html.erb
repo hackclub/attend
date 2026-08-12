@@ -1,0 +1,147 @@
+<div class="max-w-4xl mx-auto px-4 py-6">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-3xl font-bold">Global Settings</h1>
+    <%= link_to "Incident Report Settings →", admin_incident_settings_path,
+          class: "text-sm font-medium text-[#ec3750] hover:text-[#d42f46]" %>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg ">
+    <div class="p-6 border-b border-gray-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-semibold">Maintenance Mode</h3>
+          <p class="text-gray-600 text-sm mt-1">
+            When enabled, non-admin users will see a maintenance page instead of the site.
+          </p>
+        </div>
+        <div class="flex items-center gap-4">
+          <span class="px-3 py-1 rounded-full text-sm font-medium <%= @maintenance_mode ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800' %>">
+            <%= @maintenance_mode ? 'Enabled' : 'Disabled' %>
+          </span>
+          <%= button_to toggle_maintenance_admin_settings_path,
+                method: :post,
+                class: "px-4 py-2 rounded-md font-medium transition-colors #{@maintenance_mode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'}",
+                data: { turbo_confirm: @maintenance_mode ? "Are you sure you want to disable maintenance mode? The site will be accessible to all users." : "Are you sure you want to enable maintenance mode? Non-admin users will be locked out." } do %>
+            <%= @maintenance_mode ? 'Disable' : 'Enable' %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg  mt-6">
+    <div class="p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-semibold">Pause Waiver Sending</h3>
+          <p class="text-gray-600 text-sm mt-1">
+            When paused, no waivers will be sent to participants or guardians. Participants will see a message that waivers are not yet available.
+          </p>
+        </div>
+        <div class="flex items-center gap-4">
+          <span class="px-3 py-1 rounded-full text-sm font-medium <%= @waiver_sending_paused ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800' %>">
+            <%= @waiver_sending_paused ? 'Paused' : 'Active' %>
+          </span>
+          <%= button_to toggle_waiver_sending_admin_settings_path,
+                method: :post,
+                class: "px-4 py-2 rounded-md font-medium transition-colors #{@waiver_sending_paused ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-yellow-600 hover:bg-yellow-700 text-white'}",
+                data: { turbo_confirm: @waiver_sending_paused ? "Resume waiver sending? Participants will be able to sign waivers again." : "Pause all waiver sending? Participants will not be able to sign waivers until resumed." } do %>
+            <%= @waiver_sending_paused ? 'Resume' : 'Pause' %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="text-xl font-bold mt-8 mb-4">Twilio SMS</h2>
+
+  <div class="bg-white border border-gray-200 rounded-lg ">
+    <div class="p-6 border-b border-gray-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-semibold">Enable SMS</h3>
+          <p class="text-gray-600 text-sm mt-1">
+            When enabled, SMS notifications will be sent via Twilio.
+          </p>
+        </div>
+        <div class="flex items-center gap-4">
+          <span class="px-3 py-1 rounded-full text-sm font-medium <%= @twilio_enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' %>">
+            <%= @twilio_enabled ? 'Enabled' : 'Disabled' %>
+          </span>
+          <%= button_to toggle_twilio_admin_settings_path,
+                method: :post,
+                class: "px-4 py-2 rounded-md font-medium transition-colors #{@twilio_enabled ? 'bg-gray-600 hover:bg-gray-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}",
+                data: { turbo_confirm: @twilio_enabled ? "Are you sure you want to disable Twilio? SMS notifications will stop being sent." : "Are you sure you want to enable Twilio? SMS notifications will be sent." } do %>
+            <%= @twilio_enabled ? 'Disable' : 'Enable' %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-semibold">From Phone Number</h3>
+          <p class="text-gray-600 text-sm mt-1">
+            The phone number used to send SMS messages. Format: +1234567890
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <%= form_with url: update_twilio_from_number_admin_settings_path, method: :post, class: "flex items-center gap-2" do |f| %>
+            <%= f.telephone_field :twilio_from_number,
+                  value: @twilio_from_number,
+                  placeholder: "+1234567890",
+                  class: "px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#ec3750] focus:border-[#ec3750]" %>
+            <%= f.submit "Save", class: "px-4 py-2 bg-[#ec3750] hover:bg-[#d42f46] text-white rounded-md font-medium transition-colors cursor-pointer" %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="text-xl font-bold mt-8 mb-4">Support Inbox Notifications</h2>
+
+  <div class="bg-white border border-gray-200 rounded-lg ">
+    <div class="p-6 border-b border-gray-200">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-semibold">Text Notifications</h3>
+          <p class="text-gray-600 text-sm mt-1">
+            When enabled, the numbers below get a text when a new support ticket comes in,
+            and assignees get texts about replies on their tickets (at most one per ticket every 15 minutes).
+            Sending also requires Twilio SMS to be enabled above.
+          </p>
+        </div>
+        <div class="flex items-center gap-4">
+          <span class="px-3 py-1 rounded-full text-sm font-medium <%= @support_sms_notifications_enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' %>">
+            <%= @support_sms_notifications_enabled ? 'Enabled' : 'Disabled' %>
+          </span>
+          <%= button_to toggle_support_sms_admin_settings_path,
+                method: :post,
+                class: "px-4 py-2 rounded-md font-medium transition-colors #{@support_sms_notifications_enabled ? 'bg-gray-600 hover:bg-gray-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}" do %>
+            <%= @support_sms_notifications_enabled ? 'Disable' : 'Enable' %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-6">
+      <div>
+        <h3 class="text-lg font-semibold">Notification Numbers</h3>
+        <p class="text-gray-600 text-sm mt-1 mb-3">
+          Phone numbers texted when a new ticket is opened. One per line (or comma-separated), E.164 format: +14155551234
+        </p>
+        <%= form_with url: update_support_sms_numbers_admin_settings_path, method: :post, class: "space-y-2" do |f| %>
+          <%= f.text_area :support_sms_notification_numbers,
+                value: @support_sms_notification_numbers.join("\n"),
+                rows: 4,
+                placeholder: "+14155551234\n+447700900123",
+                class: "w-full max-w-md px-3 py-2 border border-gray-300 rounded-md text-sm font-mono focus:ring-2 focus:ring-[#ec3750] focus:border-[#ec3750]" %>
+          <div>
+            <%= f.submit "Save", class: "px-4 py-2 bg-[#ec3750] hover:bg-[#d42f46] text-white rounded-md font-medium transition-colors cursor-pointer" %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

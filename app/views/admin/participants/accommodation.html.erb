@@ -1,0 +1,119 @@
+<% content_for :title, "Accommodation – #{@participant_event.participant.full_name} – #{current_event.name} – Attend" %>
+
+<div>
+  <%= render "header" %>
+
+  <div class="bg-white rounded-lg border border-gray-200 p-6">
+    <%= form_with model: @accommodation, url: accommodation_admin_event_participant_path(current_event, @participant_event), method: :patch, local: true do |f| %>
+      <% if @accommodation.errors.any? %>
+        <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded mb-6">
+          <ul class="list-disc list-inside">
+            <% @accommodation.errors.full_messages.each do |msg| %>
+              <li><%= msg %></li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+
+      <div class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <%= f.label :check_in_date, "Check-in Date", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.date_field :check_in_date, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          </div>
+          <div>
+            <%= f.label :check_out_date, "Check-out Date", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.date_field :check_out_date, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <%= f.label :gender_base, "Gender Identity", class: "block text-sm font-medium text-gray-700 mb-3" %>
+            <div class="space-y-2">
+              <label class="flex items-center gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <%= f.radio_button :gender_base, "female", { id: "gender_base_female", class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750]" } %>
+                <span class="text-sm text-gray-700">Woman</span>
+              </label>
+              <label class="flex items-center gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <%= f.radio_button :gender_base, "male", { id: "gender_base_male", class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750]" } %>
+                <span class="text-sm text-gray-700">Man</span>
+              </label>
+              <label class="flex items-center gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <%= f.radio_button :gender_base, "non_binary", { id: "gender_base_non_binary", class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750]" } %>
+                <span class="text-sm text-gray-700">Non-binary</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label class="flex items-center gap-2">
+              <%= f.check_box :is_transgender, { id: "is_transgender_checkbox", class: "h-4 w-4 rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" }, "true", "false" %>
+              <span class="text-sm text-gray-700">Transgender</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <span class="block text-sm font-medium text-gray-700 mb-2">Preferred Roommate Genders</span>
+          <div class="flex flex-wrap gap-3">
+            <% Accommodation::ROOMMATE_GENDER_OPTIONS.each do |key, value| %>
+              <label class="flex items-center gap-2">
+                <%= check_box_tag "accommodation[preferred_roommate_genders][]",
+                  value,
+                  @accommodation.preferred_roommate_genders&.include?(value),
+                  id: "preferred_roommate_genders_#{key}",
+                  class: "h-4 w-4 rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+                <span class="text-sm text-gray-700"><%= key.to_s.titleize %></span>
+              </label>
+            <% end %>
+          </div>
+        </div>
+
+        <div>
+          <%= f.label :roommate_preferences, class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_area :roommate_preferences, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          <p class="mt-1 text-sm text-gray-500">Names of requested roommates</p>
+        </div>
+
+        <div>
+          <%= f.label :roommate_exclusions, class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_area :roommate_exclusions, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          <p class="mt-1 text-sm text-gray-500">People this participant should NOT be roomed with</p>
+        </div>
+
+        <div>
+          <%= f.label :accessibility_needs, class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_area :accessibility_needs, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+        </div>
+
+        <hr class="my-6">
+
+        <h3 class="font-medium text-gray-900">Room Assignment (Admin Only)</h3>
+
+        <div>
+          <label class="flex items-center gap-2">
+            <%= f.check_box :rooming_exempt, class: "h-4 w-4 rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+            <span class="text-sm font-medium text-gray-700">Exempt from rooming</span>
+          </label>
+          <p class="mt-1 text-sm text-gray-500">Check if this participant doesn't need a room (e.g., staying at home)</p>
+        </div>
+
+        <div>
+          <%= f.label :assigned_room, class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_field :assigned_room, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+        </div>
+
+        <div>
+          <%= f.label :notes, "Admin Notes", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_area :notes, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+        </div>
+
+        <div class="pt-4 flex flex-col sm:flex-row gap-3">
+          <%= f.submit "Save Accommodation", class: "w-full sm:w-auto bg-[#ec3750] text-white px-6 py-2 rounded-md hover:bg-[#d42f46] cursor-pointer" %>
+          <%= link_to "Cancel", admin_event_participant_path(current_event, @participant_event), class: "w-full sm:w-auto text-center px-6 py-2 text-gray-600 hover:text-gray-900" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

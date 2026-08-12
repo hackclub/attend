@@ -1,0 +1,52 @@
+<% content_for :title, "Parent & Guardian Portal Center – Attend" %>
+
+<div class="w-full max-w-lg mx-auto">
+  <div class="text-center py-12">
+    <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+      <svg class="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6-4a4 4 0 11-4-4"/>
+      </svg>
+    </div>
+
+    <h1 class="text-3xl font-bold text-gray-900 mb-4">Parent &amp; Guardian Portal Center</h1>
+    <p class="text-lg text-gray-600">
+      Find every portal linked to you — including ones you've already completed — and get a fresh
+      link if yours has expired.
+    </p>
+  </div>
+
+  <div class="bg-white border rounded-lg p-6 mb-8">
+    <%= form_with url: guardian_portal_center_request_code_path, method: :post do |f| %>
+      <label for="contact" class="block text-sm font-medium text-gray-700 mb-1">
+        Email address or phone number
+      </label>
+      <p class="text-sm text-gray-500 mb-3">
+        Use the email or phone number the event organizers have on file for you. Include the country
+        code for phone numbers (e.g. +1 555 555 5555).
+      </p>
+      <%= f.text_field :contact, id: "contact", required: true, autofocus: true,
+            autocomplete: "email",
+            placeholder: "you@example.com or +1 555 555 5555",
+            class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+
+      <% if TurnstileVerifier.site_key.present? && !user_signed_in? %>
+        <div class="cf-turnstile mt-4" data-sitekey="<%= TurnstileVerifier.site_key %>"></div>
+      <% end %>
+
+      <%= f.submit "Send verification code",
+            class: "mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors cursor-pointer" %>
+    <% end %>
+  </div>
+
+  <div class="bg-gray-50 rounded-lg p-6">
+    <h3 class="font-semibold text-gray-900 mb-2">How does this work?</h3>
+    <p class="text-sm text-gray-600">
+      We'll send a 6-digit code to verify it's really you. Once verified, you'll see every pending
+      and completed portal linked to that email or phone number — no invite link needed.
+    </p>
+  </div>
+</div>
+
+<% if TurnstileVerifier.site_key.present? && !user_signed_in? %>
+  <%= javascript_include_tag "https://challenges.cloudflare.com/turnstile/v0/api.js", async: true, defer: true %>
+<% end %>

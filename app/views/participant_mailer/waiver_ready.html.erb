@@ -1,0 +1,17 @@
+<p>Hi <%= @preferred_name %>,</p>
+
+<% if @participant_event.requires_guardian? %>
+<p>You're almost there! Before your parent/guardian can complete the waiver for <%= @event_name %>, we need you to sign your portion first.</p>
+<% else %>
+<p>You're almost there! Please sign the waiver for <%= @event_name %> to complete your registration.</p>
+<% end %>
+
+<p style="margin: 24px 0;">
+  <%= mail_button "Sign Your Waiver", @waiver_link %>
+</p>
+
+<% if @participant_event.requires_guardian? %>
+<p>Once you've signed, we'll automatically send the waiver to your parent/guardian for their signature.</p>
+<% end %>
+
+<p>If you have any questions, reach out to <%= mail_to @support_email %>.</p>

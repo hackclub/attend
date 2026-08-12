@@ -1,0 +1,432 @@
+<% content_for :title, "#{@participant.display_name} – #{current_event.name} – Attend" %>
+
+<div>
+  <%= render "header" %>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 space-y-6">
+      <section class="bg-white rounded-lg border border-gray-200 p-6">
+        <h2 class="text-lg font-semibold mb-4">Personal Information</h2>
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <dt class="text-sm text-gray-500">Email</dt>
+            <dd class="text-gray-900"><%= @participant.email %></dd>
+          </div>
+          <div>
+            <dt class="text-sm text-gray-500">Phone</dt>
+            <dd class="text-gray-900"><%= @participant.phone || "—" %></dd>
+          </div>
+          <div>
+            <dt class="text-sm text-gray-500">Date of Birth</dt>
+            <dd class="text-gray-900"><%= @participant.date_of_birth&.strftime("%B %d, %Y") %></dd>
+          </div>
+          <div>
+            <dt class="text-sm text-gray-500">Age at Event</dt>
+            <dd class="text-gray-900">
+              <%= @participant.age_on(current_event.starts_at || Date.current) %> years
+              <% if @participant.minor_on?(current_event.starts_at || Date.current) %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 ml-2">Minor</span>
+              <% end %>
+            </dd>
+          </div>
+          <div>
+            <dt class="text-sm text-gray-500">Pronouns</dt>
+            <dd class="text-gray-900"><%= @participant.pronouns || "—" %></dd>
+          </div>
+          <div>
+            <dt class="text-sm text-gray-500">Address</dt>
+            <dd class="text-gray-900"><%= [@participant.address_line_1, @participant.address_line_2, @participant.city, @participant.state, @participant.postal_code, @participant.country_of_residence].compact.reject(&:blank?).join(", ").presence || "—" %></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="bg-white rounded-lg border border-gray-200 p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-semibold">Travel</h2>
+          <div class="flex items-center gap-3">
+            <div class="">
+              <%= button_to "Send Update Reminder",
+                  send_travel_update_reminder_admin_event_participant_path(current_event, @participant_event),
+                  method: :post,
+                  class: "text-sm text-[#ec3750] hover:text-blue-800",
+                  data: { confirm: "Send a travel update reminder email to #{@participant.email}?" } %>
+            </div>
+            <%= link_to "Edit", travel_admin_event_participant_path(current_event, @participant_event), class: "text-sm text-[#ec3750] hover:text-blue-800" %>
+          </div>
+        </div>
+        <% if @travel_inbound || @travel_outbound %>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h3 class="font-medium text-gray-900 mb-2">Inbound</h3>
+              <% if @travel_inbound %>
+                <dl class="space-y-1 text-sm">
+                  <div><span class="text-gray-500">Mode:</span> <%= @travel_inbound.mode&.titleize %></div>
+                  <% if @travel_inbound.plane? && @travel_inbound.travel_legs.any? %>
+                    <% first_leg = @travel_inbound.travel_legs.first %>
+                    <% last_leg = @travel_inbound.travel_legs.last %>
+                    <div><span class="text-gray-500">From:</span> <%= first_leg.departure_airport %></div>
+                    <div><span class="text-gray-500">Arrival:</span> <%= [ flight_local_time(last_leg.arrival_time, last_leg.arrival_airport), last_leg.arrival_airport ].compact.join(" - ") %></div>
+                    <div><span class="text-gray-500">Flight:</span> <%= first_leg.flight_code %></div>
+                  <% elsif @travel_inbound.car? %>
+                    <div><span class="text-gray-500">From:</span> <%= @travel_inbound.origin_address %></div>
+                    <div><span class="text-gray-500">Arrival:</span> <%= @travel_inbound.expected_arrival_time&.strftime("%b %d, %Y %H:%M") %></div>
+                  <% elsif @travel_inbound.train? %>
+                    <div><span class="text-gray-500">From:</span> <%= @travel_inbound.train_departure_station %></div>
+                    <div><span class="text-gray-500">Arrival:</span> <%= @travel_inbound.arrival_time&.strftime("%b %d, %Y %H:%M") %> - <%= @travel_inbound.train_arrival_station %></div>
+                  <% elsif @travel_inbound.bus? %>
+                    <div><span class="text-gray-500">From:</span> <%= @travel_inbound.bus_departure_location %></div>
+                    <div><span class="text-gray-500">Arrival:</span> <%= @travel_inbound.arrival_time&.strftime("%b %d, %Y %H:%M") %> - <%= @travel_inbound.bus_arrival_location %></div>
+                  <% else %>
+                    <div><span class="text-gray-500">Details:</span> <%= @travel_inbound.other_details %></div>
+                  <% end %>
+                </dl>
+              <% else %>
+                <p class="text-gray-500 text-sm">Not provided</p>
+              <% end %>
+            </div>
+            <div>
+              <h3 class="font-medium text-gray-900 mb-2">Outbound</h3>
+              <% if @travel_outbound %>
+                <dl class="space-y-1 text-sm">
+                  <div><span class="text-gray-500">Mode:</span> <%= @travel_outbound.mode&.titleize %></div>
+                  <% if @travel_outbound.plane? && @travel_outbound.travel_legs.any? %>
+                    <% first_leg = @travel_outbound.travel_legs.first %>
+                    <% last_leg = @travel_outbound.travel_legs.last %>
+                    <div><span class="text-gray-500">To:</span> <%= last_leg.arrival_airport %></div>
+                    <div><span class="text-gray-500">Departure:</span> <%= flight_local_time(first_leg.departure_time, first_leg.departure_airport) %> - <%= first_leg.departure_airport %></div>
+                    <div><span class="text-gray-500">Flight:</span> <%= first_leg.flight_code %></div>
+                  <% elsif @travel_outbound.car? %>
+                    <div><span class="text-gray-500">To:</span> <%= @travel_outbound.origin_address %></div>
+                    <div><span class="text-gray-500">Departure:</span> <%= @travel_outbound.departure_time&.strftime("%b %d, %Y %H:%M") %></div>
+                  <% elsif @travel_outbound.train? %>
+                    <div><span class="text-gray-500">To:</span> <%= @travel_outbound.train_arrival_station %></div>
+                    <div><span class="text-gray-500">Departure:</span> <%= @travel_outbound.departure_time&.strftime("%b %d, %Y %H:%M") %> - <%= @travel_outbound.train_departure_station %></div>
+                  <% elsif @travel_outbound.bus? %>
+                    <div><span class="text-gray-500">To:</span> <%= @travel_outbound.bus_arrival_location %></div>
+                    <div><span class="text-gray-500">Departure:</span> <%= @travel_outbound.departure_time&.strftime("%b %d, %Y %H:%M") %> - <%= @travel_outbound.bus_departure_location %></div>
+                  <% else %>
+                    <div><span class="text-gray-500">Details:</span> <%= @travel_outbound.other_details %></div>
+                  <% end %>
+                </dl>
+              <% else %>
+                <p class="text-gray-500 text-sm">Not provided</p>
+              <% end %>
+            </div>
+          </div>
+        <% else %>
+          <p class="text-gray-500">No travel information provided.</p>
+        <% end %>
+      </section>
+
+      <section class="bg-white rounded-lg border border-gray-200 p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-semibold">Accommodation</h2>
+          <%= link_to "Edit", accommodation_admin_event_participant_path(current_event, @participant_event), class: "text-sm text-[#ec3750] hover:text-blue-800" %>
+        </div>
+        <% if @accommodation %>
+          <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <div>
+              <dt class="text-gray-500">Check-in</dt>
+              <dd class="text-gray-900"><%= @accommodation.check_in_date&.strftime("%B %d, %Y") %></dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Check-out</dt>
+              <dd class="text-gray-900"><%= @accommodation.check_out_date&.strftime("%B %d, %Y") %></dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Gender Identity</dt>
+              <dd class="text-gray-900"><%= @accommodation.gender_identity&.titleize || "—" %></dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Preferred Roommate Genders</dt>
+              <dd class="text-gray-900"><%= @accommodation.preferred_roommate_genders&.map(&:titleize)&.join(", ").presence || "—" %></dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Assigned Room</dt>
+              <dd class="text-gray-900"><%= @accommodation.assigned_room || "Not assigned" %></dd>
+            </div>
+            <% if @accommodation.roommate_preferences.present? %>
+              <div class="col-span-2">
+                <dt class="text-gray-500">Roommate Preferences</dt>
+                <dd class="text-gray-900"><%= @accommodation.roommate_preferences %></dd>
+              </div>
+            <% end %>
+            <% if @accommodation.roommate_exclusions.present? %>
+              <div class="col-span-2">
+                <dt class="text-gray-500">Do Not Room With</dt>
+                <dd class="text-red-700"><%= @accommodation.roommate_exclusions %></dd>
+              </div>
+            <% end %>
+          </dl>
+        <% else %>
+          <p class="text-gray-500">No accommodation information provided.</p>
+        <% end %>
+      </section>
+
+      <% if policy(@medical || Medical.new(participant_event: @participant_event)).show? %>
+        <section class="bg-white rounded-lg border border-gray-200 p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold">Medical Summary</h2>
+            <%= link_to "View Details", medical_admin_event_participant_path(current_event, @participant_event), class: "text-sm text-[#ec3750] hover:text-blue-800" %>
+          </div>
+          <% if @medical %>
+            <div class="flex flex-wrap gap-2">
+              <% if @medical.has_anaphylaxis_risk %>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">⚠️ Anaphylaxis Risk</span>
+              <% end %>
+              <% if @medical.has_allergies? %>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">Has Allergies</span>
+              <% end %>
+              <% if @medical.needs_medication_storage? %>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">Needs Refrigeration</span>
+              <% end %>
+              <% unless @medical.has_anaphylaxis_risk || @medical.has_allergies? || @medical.needs_medication_storage? %>
+                <span class="text-gray-500">No special medical flags</span>
+              <% end %>
+            </div>
+          <% else %>
+            <p class="text-gray-500">No medical information provided.</p>
+          <% end %>
+        </section>
+      <% end %>
+
+      <% if current_event.groups_enabled? && current_event.groups.any? %>
+        <section class="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 class="text-lg font-semibold mb-4">Groups</h2>
+          <%= form_with url: groups_admin_event_participant_path(current_event, @participant_event), method: :patch, local: true, class: "space-y-3" do %>
+            <% current_member_ids = @participant_event.groups.pluck(:id) %>
+            <div class="space-y-2">
+              <% current_event.groups.ordered.each do |g| %>
+                <label class="flex items-center gap-3 cursor-pointer">
+                  <%= check_box_tag "group_ids[]", g.id, current_member_ids.include?(g.id),
+                      class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                        style="background-color: <%= g.normalized_color || '#e5e7eb' %>; color: <%= g.color.present? ? 'white' : '#1f2d3d' %>;">
+                    <%= g.name %>
+                  </span>
+                  <% if g.description.present? %>
+                    <span class="text-xs text-gray-500"><%= g.description %></span>
+                  <% end %>
+                </label>
+              <% end %>
+            </div>
+            <%# always submit at least an empty array %>
+            <input type="hidden" name="group_ids[]" value="">
+            <div class="pt-2">
+              <button type="submit" class="bg-[#ec3750] text-white px-4 py-1.5 rounded-md hover:bg-[#d42f46] text-sm">Save groups</button>
+              <%= link_to "Manage groups", admin_event_groups_path(current_event), class: "ml-3 text-sm text-gray-500 hover:text-gray-700" %>
+            </div>
+          <% end %>
+        </section>
+      <% end %>
+    </div>
+
+    <div class="space-y-6">
+      <section class="bg-white rounded-lg border border-gray-200 p-6">
+        <h2 class="text-lg font-semibold mb-4">Guardians</h2>
+        <% if @guardian_participant_events.any? %>
+          <ul class="space-y-3">
+            <% @guardian_participant_events.each do |gpe| %>
+              <li class="border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <div class="font-medium"><%= gpe.guardian.full_name %></div>
+                    <div class="text-sm text-gray-600"><%= gpe.guardian.email %></div>
+                    <div class="text-sm text-gray-500"><%= gpe.guardian.phone %></div>
+                  </div>
+                  <div class="text-right">
+                    <% if gpe.completed? %>
+                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Completed</span>
+                    <% elsif current_event.guardian_invites_locked? %>
+                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">🔒 Invites locked</span>
+                    <% elsif gpe.invite_token_sent_at.present? %>
+                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Invite sent</span>
+                      <div class="text-xs text-gray-500 mt-1"><%= time_ago_in_words(gpe.invite_token_sent_at) %> ago</div>
+                    <% else %>
+                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">Pending</span>
+                    <% end %>
+                  <%= link_to "Edit",
+                      edit_admin_event_participant_guardian_path(current_event, @participant_event, gpe),
+                      class: "text-xs text-[#ec3750] hover:text-blue-800 font-medium" %>
+                  </div>
+                </div>
+                <div class=" rounded px-2 py-1 mt-2 flex items-center gap-3">
+                  <% unless gpe.completed? || current_event.guardian_invites_locked? %>
+                    <%= button_to "Resend Invite",
+                        resend_guardian_invite_admin_event_participant_path(current_event, @participant_event, guardian_participant_event_id: gpe.id),
+                        method: :post,
+                        class: "text-xs text-[#ec3750] hover:text-blue-800 font-medium" %>
+                    <button type="button"
+                            data-controller="clipboard"
+                            data-clipboard-content-value="<%= gpe.invite_url %>"
+                            data-action="click->clipboard#copy"
+                            class="text-xs text-[#ec3750] hover:text-blue-800 font-medium">
+                      Copy Portal Link
+                    </button>
+                  <% end %>
+                </div>
+              </li>
+            <% end %>
+          </ul>
+        <% else %>
+          <p class="text-gray-500">No guardians linked.</p>
+        <% end %>
+
+        <div class="mt-4 border-2 border-dashed border-orange-400 rounded-lg p-4">
+          <h3 class="text-sm font-semibold text-orange-700 mb-3">Link Guardian (Admin)</h3>
+          <%= form_with url: link_guardian_admin_event_participant_path(current_event, @participant_event), method: :post, local: true, class: "space-y-3" do |f| %>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <%= f.label :guardian_first_name, "First Name", class: "block text-xs font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :guardian_first_name, class: "w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]", required: true %>
+              </div>
+              <div>
+                <%= f.label :guardian_last_name, "Last Name", class: "block text-xs font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :guardian_last_name, class: "w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]", required: true %>
+              </div>
+            </div>
+            <div>
+              <%= f.label :guardian_email, "Email", class: "block text-xs font-medium text-gray-700 mb-1" %>
+              <%= f.email_field :guardian_email, class: "w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]", required: true %>
+            </div>
+            <div>
+              <%= f.label :guardian_phone, "Phone", class: "block text-xs font-medium text-gray-700 mb-1" %>
+              <%= f.telephone_field :guardian_phone, class: "w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+            </div>
+            <div>
+              <%= f.label :guardian_relationship, "Relationship", class: "block text-xs font-medium text-gray-700 mb-1" %>
+              <%= f.select :guardian_relationship, ["Parent", "Legal Guardian", "Other"], { prompt: "Select..." }, class: "w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]", required: true %>
+            </div>
+            <div>
+              <%= f.submit "Link Guardian", class: "bg-orange-500 text-white px-4 py-1.5 rounded-md text-sm hover:bg-orange-600 cursor-pointer" %>
+            </div>
+          <% end %>
+        </div>
+      </section>
+
+      <section class="bg-white rounded-lg border border-gray-200 p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-semibold">Consents</h2>
+          <%= link_to "View All", consents_admin_event_participant_path(current_event, @participant_event), class: "text-sm text-[#ec3750] hover:text-blue-800" %>
+        </div>
+        <% if @consents.any? %>
+          <ul class="space-y-2">
+            <% @consents.each do |consent| %>
+              <li class="flex justify-between items-center text-sm">
+                <span><%= consent.display_name %></span>
+                <span class="<%= consent.signed? ? 'text-green-600' : 'text-yellow-600' %>">
+                  <%= consent.status.titleize %>
+                </span>
+              </li>
+            <% end %>
+          </ul>
+        <% else %>
+          <p class="text-gray-500">No consents recorded.</p>
+        <% end %>
+      </section>
+
+      <section class="bg-white rounded-lg border border-gray-200 p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-semibold">Recent Notes</h2>
+          <%= link_to "View All", notes_admin_event_participant_path(current_event, @participant_event), class: "text-sm text-[#ec3750] hover:text-blue-800" %>
+        </div>
+        <% if @notes.any? %>
+          <ul class="space-y-3">
+            <% @notes.limit(3).each do |note| %>
+              <li class="border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+                <div class="text-sm text-gray-900"><%= truncate(note.body, length: 100) %></div>
+                <div class="text-xs text-gray-500 mt-1">
+                  <%= note.author&.email %> · <%= time_ago_in_words(note.created_at) %> ago
+                </div>
+              </li>
+            <% end %>
+          </ul>
+        <% else %>
+          <p class="text-gray-500">No notes yet.</p>
+        <% end %>
+      </section>
+
+      <% if @participant_event.complete? %>
+        <section class="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 class="text-lg font-semibold mb-4">Slack Integration</h2>
+          <% if @participant_event.participant.slack_user_id.present? %>
+            <div class="flex items-center gap-2 mb-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Connected</span>
+              <%= link_to "slack://user?team=T0266FRGM&id=#{@participant_event.participant.slack_user_id}", class: "hover:underline" do %><code class="text-xs bg-gray-100 px-1.5 py-0.5 rounded"><%= @participant_event.participant.slack_user_id %></code><% end %>
+            </div>
+            <% if current_event.slack_channel_id.present? %>
+              <%= button_to "Invite to Channel",
+                  invite_to_slack_channel_admin_event_participant_path(current_event, @participant_event),
+                  method: :post,
+                  class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
+            <% else %>
+              <p class="text-sm text-gray-500">No Slack channel configured for this event.</p>
+            <% end %>
+          <% else %>
+            <p class="text-sm text-gray-600 mb-3">Participant has not linked their Slack account via Hack Club Auth.</p>
+            <%= link_to "Generate OAuth Invite Link",
+                slack_invite_link_admin_event_participant_path(current_event, @participant_event),
+                class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
+          <% end %>
+        </section>
+      <% end %>
+
+      <section class="bg-white rounded-lg border border-gray-200 p-6">
+        <h2 class="text-lg font-semibold mb-4">Onboarding Progress</h2>
+        <ul class="space-y-2">
+          <li class="flex items-center gap-2">
+            <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @travel_inbound ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
+            <span class="text-sm">Inbound Travel</span>
+          </li>
+          <li class="flex items-center gap-2">
+            <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @travel_outbound ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
+            <span class="text-sm">Outbound Travel</span>
+          </li>
+          <li class="flex items-center gap-2">
+            <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @accommodation ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
+            <span class="text-sm">Accommodation</span>
+          </li>
+          <li class="flex items-center gap-2">
+            <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @medical ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
+            <span class="text-sm">Medical</span>
+          </li>
+          <li class="flex items-center gap-2">
+            <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @dietary ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
+            <span class="text-sm">Dietary</span>
+          </li>
+          <li class="flex items-center gap-2">
+            <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @accessibility ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
+            <span class="text-sm">Accessibility</span>
+          </li>
+          <li class="flex items-center gap-2">
+            <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @consents.signed.any? ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
+            <span class="text-sm">Consents</span>
+          </li>
+        </ul>
+      </section>
+
+      <section class="bg-white rounded-lg border border-gray-200 p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold">Scan History</h2>
+          <%= link_to "View all", history_admin_event_scans_path(current_event, search: @participant.email),
+              class: "text-sm text-[#ec3750] hover:text-blue-800" %>
+        </div>
+        <% if @scans.any? %>
+          <ul class="space-y-3">
+            <% @scans.each do |scan| %>
+              <li class="flex items-start justify-between border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+                <div>
+                  <div class="text-sm font-medium"><%= scan.user.display_name_or_fallback %></div>
+                  <div class="text-xs text-gray-500"><%= scan.scan_context.name %> · <%= scan.scanned_at.strftime("%B %d, %Y at %H:%M") %></div>
+                </div>
+                <span class="text-xs text-gray-400"><%= time_ago_in_words(scan.scanned_at) %> ago</span>
+              </li>
+            <% end %>
+          </ul>
+        <% else %>
+          <p class="text-gray-500 text-sm">No scans recorded yet.</p>
+        <% end %>
+      </section>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,10 @@
+New <%= @ticket.channel.to_s.upcase %> chat
+
+From: <%= @ticket.phone_number %>
+Channel: <%= @ticket.channel %>
+<% if @ticket.subject.present? %>Matched: <%= @ticket.subject_type %> #<%= @ticket.subject_id %><% end %>
+
+First message:
+<%= @message.body %>
+
+Open ticket: <%= @ticket_url %>

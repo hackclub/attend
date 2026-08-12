@@ -1,0 +1,235 @@
+<%# Shared sidebar navigation for mobile and desktop %>
+<%# Pass close_action: "click->mobile-menu#close" for mobile, nil for desktop %>
+
+<div class="space-y-3">
+  <%# Event pill — opens event switcher dropdown %>
+  <div class="relative" data-controller="dropdown">
+    <button type="button" class="sidebar-pill" data-action="dropdown#toggle">
+      <span class="flex items-center gap-2 min-w-0">
+        <% if current_event %>
+          <%= render "admin/events/avatar", event: current_event, size: 24 %>
+          <span class="truncate text-sm font-medium text-[#1f2d3d]"><%= current_event.name %></span>
+        <% else %>
+          <span class="h-6 w-6 rounded-full bg-[#e5e7eb] flex items-center justify-center flex-shrink-0">
+            <svg class="h-3.5 w-3.5 text-[#8492a6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+          </span>
+          <span class="truncate text-sm font-medium text-[#8492a6]">Select event</span>
+        <% end %>
+      </span>
+      <svg class="h-4 w-4 text-[#8492a6] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+      </svg>
+    </button>
+    <div class="hidden sidebar-dropdown" data-dropdown-target="menu">
+      <div class="border-b border-[#e5e7eb] py-1">
+        <%= link_to admin_root_path(deselect: 1), class: "sidebar-dropdown-item", data: close_action ? { action: close_action } : {} do %>
+          <svg class="h-4 w-4 text-[#8492a6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+          </svg>
+          All events
+        <% end %>
+      </div>
+      <div class="max-h-72 overflow-y-auto py-1">
+        <% available_events.each do |event| %>
+          <% is_current = current_event && event.id == current_event.id %>
+          <% next if event.completed? && !is_current %>
+          <% if is_current %>
+            <div class="sidebar-dropdown-item sidebar-dropdown-item-active">
+              <%= render "admin/events/avatar", event: event, size: 20 %>
+              <span class="truncate flex-1"><%= event.name %></span>
+              <svg class="h-4 w-4 text-[#1f2d3d] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+          <% else %>
+            <%= button_to select_admin_event_path(event), method: :post, data: { turbo: false }, class: "sidebar-dropdown-item w-full text-left", form: { class: "block" } do %>
+              <%= render "admin/events/avatar", event: event, size: 20 %>
+              <span class="truncate flex-1"><%= event.name %></span>
+            <% end %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if current_event %>
+  <div class="pt-5">
+    <p class="nav-section-label">Event</p>
+    <div class="mt-1 space-y-0.5">
+      <%= link_to admin_event_dashboard_path(current_event.slug), class: "nav-item #{request.path == admin_event_dashboard_path(current_event.slug) ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+        </svg>
+        Event Home
+      <% end %>
+
+      <%= link_to admin_event_participants_path(current_event), class: "nav-item #{request.path.include?('/participants') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+        </svg>
+        Participants
+      <% end %>
+
+      <%= link_to admin_event_incidents_path(current_event), class: "nav-item #{request.path.include?('/incidents') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+        Incidents
+      <% end %>
+
+      <%= link_to admin_event_scans_path(current_event), class: "nav-item #{request.path.include?('/scans') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+        </svg>
+        Check Ins
+      <% end %>
+
+      <% if current_event.travel_enabled? %>
+        <%= link_to admin_event_airport_mode_path(current_event), class: "nav-item #{request.path.include?('/airport_mode') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+          </svg>
+          Airport Mode
+        <% end %>
+      <% end %>
+
+      <% if current_event.accommodation_enabled? %>
+        <%= link_to admin_event_rooming_wizard_path(current_event), class: "nav-item #{request.path.include?('/rooming_wizard') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+          </svg>
+          Rooming
+        <% end %>
+      <% end %>
+
+      <% if current_event.groups_enabled? %>
+        <%= link_to admin_event_groups_path(current_event), class: "nav-item #{request.path.include?('/groups') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z"/>
+          </svg>
+          Groups
+        <% end %>
+      <% end %>
+
+      <%= link_to admin_event_messages_path(current_event), class: "nav-item #{request.path.include?('/messages') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+        </svg>
+        Messages
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<% if policy(EventSeries).index? %>
+  <div class="pt-5">
+    <p class="nav-section-label">Series</p>
+    <div class="mt-1 space-y-0.5">
+      <%= link_to admin_series_index_path, class: "nav-item #{request.path.start_with?('/admin/series') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+        </svg>
+        Event Series
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<% if policy(Ticket).index? %>
+  <div class="pt-5">
+    <p class="nav-section-label">Administration</p>
+    <div class="mt-1 space-y-0.5">
+      <%= link_to support_tickets_path, class: "nav-item #{request.path.start_with?('/support') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+        </svg>
+        Support Chat
+      <% end %>
+
+      <% if current_user.global_admin? %>
+        <%= link_to admin_users_path, class: "nav-item #{request.path.start_with?('/admin/users') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+          </svg>
+          Users
+        <% end %>
+
+        <% conduct_active = request.path.start_with?('/admin/bans') || request.path.start_with?('/admin/incidents') %>
+        <details class="group" <%= "open" if conduct_active %>>
+          <summary class="nav-item w-full cursor-pointer list-none <%= "nav-item-active" if conduct_active %>">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Conduct
+            <svg class="h-4 w-4 ml-auto !mr-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </summary>
+
+          <div class="mt-0.5 ml-3 space-y-0.5 border-l border-[#e5e7eb] pl-2">
+            <%= link_to admin_bans_path, class: "nav-item #{request.path.start_with?('/admin/bans') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+              </svg>
+              Ban List
+            <% end %>
+
+            <%= link_to admin_incidents_path, class: "nav-item #{request.path.start_with?('/admin/incidents') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19H19a2 2 0 001.75-2.96l-6.93-12a2 2 0 00-3.5 0l-6.93 12A2 2 0 005.07 19z"/>
+              </svg>
+              Incident Reports
+            <% end %>
+          </div>
+        </details>
+
+        <% logs_active = request.path.start_with?('/admin/audit_logs') || request.path.start_with?('/admin/email_logs') %>
+        <details class="group" <%= "open" if logs_active %>>
+          <summary class="nav-item w-full cursor-pointer list-none <%= "nav-item-active" if logs_active %>">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            Logs
+            <svg class="h-4 w-4 ml-auto !mr-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </summary>
+
+          <div class="mt-0.5 ml-3 space-y-0.5 border-l border-[#e5e7eb] pl-2">
+            <%= link_to admin_audit_logs_path, class: "nav-item #{request.path.start_with?('/admin/audit_logs') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+              Audit Log
+            <% end %>
+
+            <%= link_to admin_email_logs_path, class: "nav-item #{request.path.start_with?('/admin/email_logs') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+              Email Logs
+            <% end %>
+          </div>
+        </details>
+
+        <%= link_to admin_global_api_tokens_path, class: "nav-item #{request.path.start_with?('/admin/global_api_tokens') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+          </svg>
+          API Tokens
+        <% end %>
+
+        <%= link_to admin_settings_path, class: "nav-item #{request.path.start_with?('/admin/settings') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+          Settings
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+<% end %>

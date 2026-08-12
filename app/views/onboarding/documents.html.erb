@@ -1,0 +1,146 @@
+<div class="w-full max-w-3xl mx-auto">
+  <%= render "wizard_nav" %>
+
+  <h1 class="text-2xl font-bold mb-2">Sign Your Documents</h1>
+  <% if @participant_event.requires_guardian? %>
+    <p class="text-sm text-gray-600 mb-6">
+      Sign your portion of each document below. Anything that also needs a parent/guardian signature
+      will be sent to them after you submit.
+    </p>
+  <% else %>
+    <p class="text-sm text-gray-600 mb-6">Review and sign each document below to continue.</p>
+  <% end %>
+
+  <% if @documents_paused %>
+    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center mb-6">
+      <p class="text-gray-700 text-lg mb-2">Documents aren't ready to sign yet.</p>
+      <p class="text-gray-500">You can finish submitting your registration — we'll email you when your documents are ready.</p>
+    </div>
+    <div class="flex justify-end">
+      <%= form_with url: onboarding_step_path(step: "documents", event_id: current_event.id), method: :patch, data: { turbo: false } do %>
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors cursor-pointer">
+          Continue to Review
+        </button>
+      <% end %>
+    </div>
+  <% elsif @missing_guardian %>
+    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center mb-6">
+      <p class="text-gray-700 text-lg mb-2">We need your guardian's details first.</p>
+      <%= link_to "Add guardian details", onboarding_step_path(step: "guardian", event_id: current_event.id), class: "text-blue-600 hover:underline" %>
+    </div>
+  <% else %>
+    <!-- Checklist -->
+    <div class="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100 mb-6">
+      <% @documents.each do |doc| %>
+        <% consent = doc[:consent] %>
+        <div class="p-4 flex items-center justify-between gap-4">
+          <div class="flex items-center gap-3 min-w-0">
+            <% if consent&.participant_portion_signed? %>
+              <span class="flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-600 shrink-0">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+              </span>
+            <% elsif doc == @current_document %>
+              <span class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 shrink-0">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3a7 7 0 100 14 7 7 0 000-14z"/></svg>
+              </span>
+            <% else %>
+              <span class="w-6 h-6 rounded-full border-2 border-gray-300 shrink-0"></span>
+            <% end %>
+            <span class="font-medium text-gray-900 truncate"><%= doc[:name] %></span>
+          </div>
+          <div class="shrink-0 text-sm">
+            <% if consent&.participant_portion_signed? %>
+              <span class="text-green-600 font-medium"><%= doc[:custom_document]&.physical? ? "Uploaded" : "Signed" %></span>
+            <% elsif doc[:custom_document]&.physical? && @current_document.nil? && !@documents_preparing %>
+              <%# Matches the render condition on the upload sections below —
+                  while an electronic document is being signed or prepared the
+                  upload UI isn't on the page yet. %>
+              <span class="text-blue-600 font-medium">Upload below</span>
+            <% elsif consent&.failed? %>
+              <%= button_to "Retry", onboarding_document_signed_path(consent_id: consent.id, event_id: current_event.id, retry: 1),
+                  method: :post, class: "text-red-600 hover:text-red-800 font-medium" %>
+            <% elsif doc == @current_document %>
+              <span class="text-blue-600 font-medium">Sign below</span>
+            <% else %>
+              <span class="text-gray-400">Waiting</span>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+
+    <% if @current_document %>
+      <% consent = @current_document[:consent] %>
+      <% signing_url = Docuseal.signing_url(consent.docuseal_participant_slug, host: consent.docuseal_host) %>
+      <h2 class="text-lg font-semibold text-gray-900 mb-3">Now signing: <%= @current_document[:name] %></h2>
+      <div class="border rounded-lg overflow-hidden bg-white shadow-sm mb-4">
+        <docuseal-form
+          id="docusealForm"
+          data-src="<%= signing_url %>"
+          style="height: 500px; overflow: auto;">
+        </docuseal-form>
+      </div>
+      <div class="text-center text-sm text-gray-500 mb-6">
+        <p>Having trouble? <a href="<%= signing_url %>" target="_blank" class="text-blue-600 hover:underline">Open in a new tab</a></p>
+      </div>
+
+      <script src="https://<%= consent.docuseal_host %>/js/form.js"></script>
+      <script nonce="<%= content_security_policy_nonce %>">
+        document.getElementById('docusealForm').addEventListener('completed', function(e) {
+          var form = document.createElement('form');
+          form.method = 'POST';
+          form.action = '<%= onboarding_document_signed_path(consent_id: consent.id, event_id: current_event.id) %>';
+
+          var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+          var csrfInput = document.createElement('input');
+          csrfInput.type = 'hidden';
+          csrfInput.name = 'authenticity_token';
+          csrfInput.value = csrfToken;
+          form.appendChild(csrfInput);
+
+          document.body.appendChild(form);
+          form.submit();
+        });
+      </script>
+    <% elsif @documents_preparing %>
+      <% content_for :head do %>
+        <meta http-equiv="refresh" content="3">
+      <% end %>
+      <%= render "shared/document_preparing", title: "Getting your documents ready to sign" %>
+    <% end %>
+
+    <% if @physical_pending.present? && @current_document.nil? && !@documents_preparing %>
+      <% @physical_pending.each do |doc| %>
+        <div class="mb-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-3"><%= doc[:name] %> — print, sign & upload</h2>
+          <%= render "shared/physical_document_upload",
+              custom_document: doc[:custom_document],
+              consent: doc[:consent],
+              participant_event: @participant_event,
+              upload_url: onboarding_physical_document_upload_path(consent_id: doc[:consent].id, event_id: current_event.id),
+              remove_url_for: ->(upload) { onboarding_remove_physical_upload_path(consent_id: doc[:consent].id, upload_id: upload.id, event_id: current_event.id) } %>
+        </div>
+      <% end %>
+    <% end %>
+
+    <!-- Continue -->
+    <div class="flex items-center justify-between mt-6">
+      <span class="text-sm text-gray-500">
+        <% unless @all_documents_signed %>
+          <%= @documents.count { |d| d[:consent]&.participant_portion_signed? } %> of <%= @documents.size %> signed
+        <% end %>
+      </span>
+      <% if @all_documents_signed %>
+        <%= form_with url: onboarding_step_path(step: "documents", event_id: current_event.id), method: :patch, data: { turbo: false } do %>
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors cursor-pointer">
+            Continue to Review
+          </button>
+        <% end %>
+      <% else %>
+        <button disabled class="bg-gray-200 text-gray-400 font-medium py-2 px-6 rounded-lg cursor-not-allowed">
+          Continue to Review
+        </button>
+      <% end %>
+    </div>
+  <% end %>
+</div>

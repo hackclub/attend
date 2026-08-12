@@ -1,0 +1,225 @@
+<% content_for :title, "Scan History – #{current_event.name} – Attend" %>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-0">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-2">
+    <div>
+      <h1 class="text-xl sm:text-2xl font-bold">Scan History</h1>
+      <p class="text-sm text-gray-500"><%= @total_count %> total scans</p>
+    </div>
+    <%= link_to "← Back to Check Ins", admin_event_scans_path(current_event), class: "text-sm text-[#ec3750] hover:text-blue-800" %>
+  </div>
+
+  <div class="bg-white rounded-lg border border-gray-200 mb-6 p-4">
+    <form action="<%= history_admin_event_scans_path(current_event) %>" method="get">
+      <div class="flex flex-wrap gap-4">
+        <div class="flex-1 min-w-64">
+          <%= text_field_tag :search, params[:search],
+              placeholder: "Search by participant name or email...",
+              class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+        </div>
+
+        <div>
+          <%= select_tag :scan_context_id,
+              options_for_select(
+                [["All Locations", ""]] + @scan_contexts.map { |c| [c.name, c.id] },
+                params[:scan_context_id]
+              ),
+              class: "border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+        </div>
+
+        <div>
+          <%= select_tag :user_id,
+              options_for_select(
+                [["All Staff", ""]] + @staff_users.map { |u| [u.display_name_or_fallback, u.id] },
+                params[:user_id]
+              ),
+              class: "border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+        </div>
+
+        <div>
+          <%= date_field_tag :date, params[:date],
+              class: "border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+        </div>
+
+        <% if current_event.groups_enabled? && current_event.groups.any? %>
+          <div>
+            <%= select_tag :group_id,
+                options_for_select(
+                  [["All Groups", ""], ["No Group", "none"]] + current_event.groups.ordered.map { |g| [g.name, g.id] },
+                  params[:group_id]
+                ),
+                class: "border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          </div>
+        <% end %>
+
+        <div>
+          <%= submit_tag "Filter", class: "bg-[#ec3750] text-white px-4 py-2 rounded-md hover:bg-[#d42f46] cursor-pointer" %>
+          <% if params[:search].present? || params[:scan_context_id].present? || params[:user_id].present? || params[:date].present? || params[:group_id].present? %>
+            <%= link_to "Clear", history_admin_event_scans_path(current_event), class: "ml-2 text-gray-600 hover:text-gray-900" %>
+          <% end %>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-100">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Participant</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Scanned By</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+            <% if current_user.global_admin? %>
+              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            <% end %>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-100 text-xs sm:text-sm">
+          <% @scans.each do |scan| %>
+            <tr class="hover:bg-gray-50" id="scan-row-<%= scan.id %>">
+              <td class="px-6 py-4">
+                <div>
+                  <div class="font-medium text-gray-900">
+                    <%= link_to scan.participant.display_name, admin_event_participant_path(current_event, scan.participant_event), class: "hover:text-[#ec3750]" %>
+                  </div>
+                  <div class="text-xs text-gray-500"><%= scan.participant.email %></div>
+                </div>
+              </td>
+              <td class="px-6 py-4">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  <%= scan.scan_context&.name || "Unknown" %>
+                  <% if scan.scan_context&.is_airport? %> ✈️<% end %>
+                  <% if scan.scan_context&.checks_in? %> ✓<% end %>
+                </span>
+              </td>
+              <td class="px-6 py-4 text-gray-500">
+                <%= scan.user.display_name_or_fallback %>
+              </td>
+              <td class="px-6 py-4 text-gray-500" data-controller="local-time" data-local-time-datetime-value="<%= scan.scanned_at.iso8601 %>" title="<%= scan.scanned_at.utc.strftime("%b %d, %Y %H:%M:%S UTC") %>">
+                <div data-local-time-target="date"><%= scan.scanned_at.strftime("%b %d, %Y") %></div>
+                <div class="text-xs" data-local-time-target="time"><%= scan.scanned_at.strftime("%H:%M:%S") %></div>
+              </td>
+              <% if current_user.global_admin? %>
+                <td class="px-6 py-4 text-right">
+                  <button type="button" 
+                          onclick="openEditModal('<%= scan.id %>', '<%= scan.scan_context_id %>', '<%= scan.user_id %>')"
+                          class="text-[#ec3750] hover:text-blue-900 text-xs border-2 border-dashed border-orange-400 px-2 py-1 rounded">
+                    Edit
+                  </button>
+                </td>
+              <% end %>
+            </tr>
+          <% end %>
+
+          <% if @scans.empty? %>
+            <tr>
+              <td colspan="<%= current_user.global_admin? ? 5 : 4 %>" class="px-6 py-12 text-center text-gray-500">
+                No scans found matching your criteria.
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <% total_pages = (@total_count.to_f / @per_page).ceil %>
+  <% if total_pages > 1 %>
+    <div class="mt-6 flex items-center justify-between">
+      <div class="text-sm text-gray-500">
+        Showing <%= (@page - 1) * @per_page + 1 %> to <%= [(@page * @per_page), @total_count].min %> of <%= @total_count %> scans
+      </div>
+      <div class="flex gap-2">
+        <% if @page > 1 %>
+          <%= link_to "← Previous", history_admin_event_scans_path(current_event, params.permit(:search, :scan_context_id, :user_id, :date).merge(page: @page - 1)), 
+              class: "px-4 py-2 bg-white border border-gray-300 rounded-md text-sm hover:bg-gray-50" %>
+        <% end %>
+        <% if @page < total_pages %>
+          <%= link_to "Next →", history_admin_event_scans_path(current_event, params.permit(:search, :scan_context_id, :user_id, :date).merge(page: @page + 1)), 
+              class: "px-4 py-2 bg-white border border-gray-300 rounded-md text-sm hover:bg-gray-50" %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if current_user.global_admin? %>
+  <!-- Edit Scan Modal -->
+  <div id="edit-scan-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full">
+      <div class="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-4 rounded-t-xl">
+        <div class="flex justify-between items-center">
+          <h3 class="text-lg font-bold">Edit Scan</h3>
+          <button onclick="closeEditModal()" class="text-white/70 hover:text-white text-2xl leading-none">&times;</button>
+        </div>
+        <p class="text-orange-200 text-xs mt-1">Global Admin Only</p>
+      </div>
+      
+      <form id="edit-scan-form" method="post" class="p-6">
+        <input type="hidden" name="_method" value="patch">
+        <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+        
+        <div class="space-y-4">
+          <div>
+            <label for="edit-scan-context" class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+            <select id="edit-scan-context" name="scan[scan_context_id]" 
+                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]">
+              <% @scan_contexts.each do |context| %>
+                <option value="<%= context.id %>">
+                  <%= context.name %><% if context.is_airport? %> ✈️<% end %><% if context.checks_in? %> ✓<% end %>
+                </option>
+              <% end %>
+            </select>
+          </div>
+          
+          <div>
+            <label for="edit-scan-user" class="block text-sm font-medium text-gray-700 mb-1">Scanned By</label>
+            <select id="edit-scan-user" name="scan[user_id]" 
+                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]">
+              <% @staff_users.each do |user| %>
+                <option value="<%= user.id %>"><%= user.display_name_or_fallback %> (<%= user.email %>)</option>
+              <% end %>
+            </select>
+          </div>
+        </div>
+        
+        <div class="mt-6 flex gap-3">
+          <button type="submit" class="flex-1 bg-[#ec3750] text-white px-4 py-2 rounded-lg hover:bg-[#d42f46] font-medium">
+            Save Changes
+          </button>
+          <button type="button" onclick="closeEditModal()" class="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 font-medium">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function openEditModal(scanId, contextId, userId) {
+      const modal = document.getElementById('edit-scan-modal');
+      const form = document.getElementById('edit-scan-form');
+      const contextSelect = document.getElementById('edit-scan-context');
+      const userSelect = document.getElementById('edit-scan-user');
+      
+      form.action = '<%= admin_event_scans_path(current_event) %>/' + scanId;
+      contextSelect.value = contextId;
+      userSelect.value = userId;
+      
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+    
+    function closeEditModal() {
+      const modal = document.getElementById('edit-scan-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+    
+    document.getElementById('edit-scan-modal').addEventListener('click', function(e) {
+      if (e.target === this) closeEditModal();
+    });
+  </script>
+<% end %>

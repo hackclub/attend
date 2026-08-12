@@ -1,0 +1,60 @@
+<%= form_with url: admin_event_setup_waivers_path(event, return_to: return_to), method: :patch, class: "space-y-6", data: { controller: "wizard-reveal" } do |f| %>
+  <div class="space-y-3">
+    <label class="block bg-white border border-gray-200 rounded-lg p-5 cursor-pointer hover:border-[#ec3750] transition-colors has-[:checked]:border-[#ec3750] has-[:checked]:ring-1 has-[:checked]:ring-[#ec3750]">
+      <div class="flex items-start gap-3">
+        <%= radio_button_tag :waiver_mode, "auto", true, class: "mt-1 h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300", data: { wizard_reveal_target: "input", action: "change->wizard-reveal#update" } %>
+        <div>
+          <span class="text-sm font-semibold text-gray-900">Use the standard Hack Club waivers <span class="ml-1 text-xs font-medium text-white bg-[#ec3750] rounded-full px-2 py-0.5">Recommended</span></span>
+          <p class="text-sm text-gray-500 mt-1">
+            We'll create <%= event.freedom_waivers_enabled? ? "waiver and freedom waiver templates" : "a waiver template" %> for this event on DocuSeal and wire up all the field mappings automatically. Nothing else to configure.
+          </p>
+        </div>
+      </div>
+    </label>
+
+    <label class="block bg-white border border-gray-200 rounded-lg p-5 cursor-pointer hover:border-[#ec3750] transition-colors has-[:checked]:border-[#ec3750] has-[:checked]:ring-1 has-[:checked]:ring-[#ec3750]">
+      <div class="flex items-start gap-3">
+        <%= radio_button_tag :waiver_mode, "manual", false, class: "mt-1 h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300", data: { wizard_reveal_target: "input", action: "change->wizard-reveal#update" } %>
+        <div class="w-full">
+          <span class="text-sm font-semibold text-gray-900">Use custom waivers</span>
+          <p class="text-sm text-gray-500 mt-1">
+            Bring your own DocuSeal templates — for example if your event needs different legal language.
+            Read the <%= link_to "custom waivers guide", "https://docs.hackclub.com/hack-club-playbook/events/attend/custom-waivers", target: "_blank", rel: "noopener", class: "text-[#ec3750] font-medium hover:underline" %> to create your templates, then enter their IDs below.
+          </p>
+          <div class="mt-4 space-y-4" data-wizard-reveal-target="panel" data-show-when="manual">
+            <div>
+              <label for="event_docuseal_waiver_template_id" class="block text-sm font-medium text-gray-700">Waiver template ID</label>
+              <%= text_field_tag "event[docuseal_waiver_template_id]", event.docuseal_waiver_template_id, id: "event_docuseal_waiver_template_id", class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "e.g. 2274072" %>
+            </div>
+            <% if event.freedom_waivers_enabled? %>
+              <div>
+                <label for="event_docuseal_freedom_waiver_template_id" class="block text-sm font-medium text-gray-700">Freedom waiver template ID</label>
+                <%= text_field_tag "event[docuseal_freedom_waiver_template_id]", event.docuseal_freedom_waiver_template_id, id: "event_docuseal_freedom_waiver_template_id", class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+            <% end %>
+            <p class="text-xs text-gray-500">After saving, sync and map your template fields on the <span class="font-medium">Configure Mappings</span> screen (linked from the integrations page) so participant details fill in automatically.</p>
+          </div>
+        </div>
+      </div>
+    </label>
+
+    <label class="block bg-white border border-gray-200 rounded-lg p-5 cursor-pointer hover:border-[#ec3750] transition-colors has-[:checked]:border-[#ec3750] has-[:checked]:ring-1 has-[:checked]:ring-[#ec3750]">
+      <div class="flex items-start gap-3">
+        <%= radio_button_tag :waiver_mode, "skip", false, class: "mt-1 h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300", data: { wizard_reveal_target: "input", action: "change->wizard-reveal#update" } %>
+        <div>
+          <span class="text-sm font-semibold text-gray-900">Skip for now</span>
+          <p class="text-sm text-gray-500 mt-1">Set waivers up later from the integrations page. Participants can't complete onboarding until waivers are configured.</p>
+        </div>
+      </div>
+    </label>
+  </div>
+
+  <div class="flex flex-col sm:flex-row justify-between gap-3">
+    <% if return_to == "integrations" %>
+      <%= link_to "Cancel", admin_event_integrations_path(event), class: "w-full sm:w-auto text-center text-gray-500 hover:text-gray-700 font-medium py-2 px-4" %>
+    <% else %>
+      <%= link_to "Back", admin_event_setup_modules_path(event), class: "w-full sm:w-auto text-center text-gray-500 hover:text-gray-700 font-medium py-2 px-4" %>
+    <% end %>
+    <%= f.submit "Continue", class: "w-full sm:w-auto bg-[#ec3750] hover:bg-[#d63146] text-white font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer" %>
+  </div>
+<% end %>

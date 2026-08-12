@@ -1,0 +1,11 @@
+Hi,
+
+An Attend API token<%= @token_name.present? ? " (#{@token_name})" : "" %><%= (@token_kind == "event" && @event_name.present?) ? " for the event #{@event_name}" : "" %> was just REVOKED using the token revocation endpoint.
+
+This happens when someone submits the token's secret value to /api/v1/tokens/revoke -- typically because the token was leaked or exposed. The token no longer works, and any integration using it will stop functioning until you issue a replacement.
+
+If this was you, no further action is needed -- you can create a new token from the event's Integrations page (or the global API tokens page).
+
+If this was not you, your token secret may have been exposed. Revoking it was the right outcome, but you should review where the token was stored and rotate any related credentials.
+
+-- Attend

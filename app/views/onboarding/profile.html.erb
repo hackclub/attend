@@ -1,0 +1,138 @@
+<div class="w-full max-w-2xl mx-auto">
+  <%= render "wizard_nav" %>
+
+  <h1 class="text-2xl font-bold mb-2">Profile Information</h1>
+  <p class="text-sm text-gray-600 mb-6">Fields marked with <span class="text-red-500">*</span> are required.</p>
+
+  <%= form_with model: @participant, url: onboarding_step_path(step: @step, event_id: current_event.id), scope: :participant, method: :patch, local: true, multipart: true, data: { turbo: false, controller: "phone-input autosave", autosave_url_value: onboarding_step_path(step: @step, event_id: current_event.id), action: "input->autosave#input change->autosave#change" } do |f| %>
+    <%= render "autosave_status" %>
+    <div class="space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <%= f.label :legal_first_name, label_text("Legal First Name", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_field :legal_first_name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true %>
+        </div>
+
+        <div>
+          <%= f.label :legal_last_name, label_text("Legal Last Name", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_field :legal_last_name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true %>
+        </div>
+      </div>
+
+      <div>
+        <%= f.label :preferred_name, "Preferred Name", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.text_field :preferred_name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+        <p class="mt-1 text-sm text-gray-500">Leave blank if same as legal first name</p>
+      </div>
+
+      <div>
+        <%= f.label :date_of_birth, label_text("Date of Birth", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.date_field :date_of_birth, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true %>
+      </div>
+
+      <div>
+        <%= f.label :headshot, label_text("Headshot Photo", required: !@participant.headshot.attached?), class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <% if @participant.headshot.attached? && @participant.headshot.blob.persisted? %>
+          <div class="mb-3 flex items-center gap-4">
+            <%= image_tag @participant.headshot, class: "w-24 h-24 rounded-full object-cover border border-gray-300" %>
+            <span class="text-sm text-gray-600">Current headshot</span>
+          </div>
+        <% end %>
+        <%= f.file_field :headshot, accept: "image/jpeg,image/png,image/webp", class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100", required: !@participant.headshot.attached? %>
+        <div class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <p class="text-sm text-blue-800">
+            <strong>Why do we need this?</strong> Your headshot is required for safeguarding purposes to help event staff identify you. It is stored securely and only accessible to authorized event staff.
+          </p>
+        </div>
+        <p class="mt-1 text-sm text-gray-500">Upload a clear photo of your face. Accepted formats: JPEG, PNG, WebP. Maximum size: 10MB.</p>
+      </div>
+
+      <div>
+        <%= f.label :email, label_text("Email", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.email_field :email, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true %>
+      </div>
+
+      <div>
+        <%= f.label :phone, label_text("Phone Number", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.telephone_field :phone, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true %>
+      </div>
+
+      <div>
+        <%= f.label :pronouns, "Pronouns", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.text_field :pronouns, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", placeholder: "e.g., she/her, he/him, they/them" %>
+      </div>
+
+      <div data-controller="address-autocomplete" data-address-autocomplete-fill-components-value="true" class="space-y-4">
+        <div>
+          <%= f.label :address_line_1, label_text("Address Line 1", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_field :address_line_1, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true, data: { address_autocomplete_target: "input" } %>
+        </div>
+
+        <div>
+          <%= f.label :address_line_2, "Address Line 2", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_field :address_line_2, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+          <p class="mt-1 text-sm text-gray-500">Apartment, suite, unit, etc. (optional)</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <%= f.label :city, label_text("City", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_field :city, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true, data: { address_autocomplete_target: "city" } %>
+          </div>
+
+          <div>
+            <%= f.label :state, label_text("State / Province / Region", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_field :state, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true, data: { address_autocomplete_target: "state" } %>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <%= f.label :postal_code, label_text("Postal / ZIP Code", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_field :postal_code, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true, data: { address_autocomplete_target: "postalCode" } %>
+          </div>
+
+          <div>
+            <%= f.label :country_of_residence, label_text("Country", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.select :country_of_residence, country_options_for_select(@participant.country_of_residence), {}, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true, data: { address_autocomplete_target: "country" } %>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <%= f.label :tshirt_size, label_text("T-Shirt Size", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.select :tshirt_size, [["Select size", ""], "XS", "S", "M", "L", "XL", "XXL", "XXXL"], {}, required: true, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+      </div>
+
+      <div class="border-t pt-6 mt-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">About You</h2>
+        <p class="text-sm text-gray-600 mb-4">This helps organizers understand how you prefer to engage at events. Both fields are optional.</p>
+
+        <div class="space-y-4">
+          <div>
+            <%= f.label :engagement_preference, "How do you prefer to engage at events?", class: "block text-sm font-medium text-gray-700 mb-2" %>
+            <%= f.select :engagement_preference, [
+              ["Select your preference (optional)", ""],
+              ["Very social – I love group activities and meeting new people!", "very_social"],
+              ["Social with downtime – I enjoy group activities but need some quiet time", "social_with_downtime"],
+              ["Balanced – A mix of social time and focused work", "balanced"],
+              ["Mostly focused – I prefer to work on projects with occasional socializing", "mostly_focused"],
+              ["Very focused – I'm happiest heads-down on my projects", "very_focused"]
+            ], {}, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+          </div>
+
+          <div>
+            <%= f.label :engagement_notes, "Anything else you'd like us to know about how you engage?", class: "block text-sm font-medium text-gray-700 mb-2" %>
+            <%= f.text_area :engagement_notes, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", placeholder: "e.g., I need quiet time in the mornings, I'm shy at first but warm up quickly..." %>
+          </div>
+
+          <p class="text-sm text-gray-500">There's no right answer – this helps us make sure everyone has a great experience.</p>
+        </div>
+      </div>
+
+      <%= f.hidden_field :onboarding_step, value: "profile" %>
+
+      <%= render "step_navigation" %>
+    </div>
+  <% end %>
+</div>

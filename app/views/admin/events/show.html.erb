@@ -1,0 +1,285 @@
+<% content_for :title, "#{@event.name} – Attend" %>
+
+<div class="w-full max-w-4xl">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold"><%= @event.name %></h1>
+      <p class="text-gray-500"><%= @event.slug %></p>
+    </div>
+    <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+      <%= button_to "Select Event", select_admin_event_path(@event), method: :post, class: "w-full sm:w-auto text-center bg-[#ec3750] hover:bg-[#ec3750] text-white font-semibold py-2 px-4 rounded-lg transition-colors" %>
+      <%= link_to "Edit", edit_admin_event_path(@event), class: "w-full sm:w-auto text-center bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors" %>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <h2 class="text-lg font-semibold mb-4">Event Details</h2>
+      <dl class="space-y-3">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Status</dt>
+          <dd class="mt-1">
+            <% if @event.completed? %>
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Past</span>
+            <% elsif @event.active? %>
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+            <% elsif @event.starts_at && @event.starts_at > Time.current %>
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Upcoming</span>
+            <% else %>
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Dates</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <% if @event.starts_at && @event.ends_at %>
+              <%= @event.starts_at.strftime("%B %d, %Y %l:%M %p") %> -
+              <%= @event.ends_at.strftime("%B %d, %Y %l:%M %p") %>
+            <% else %>
+              <span class="text-gray-400">Not set</span>
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Location</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <% if @event.location_city.present? || @event.location_country.present? %>
+              <%= [@event.location_city, @event.location_country].compact.join(", ") %>
+            <% else %>
+              <span class="text-gray-400">Not set</span>
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Timezone</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @event.timezone %></dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <h2 class="text-lg font-semibold mb-4">Registration</h2>
+      <dl class="space-y-3">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Registration Status</dt>
+          <dd class="mt-1">
+            <% if @event.registration_open? %>
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Open</span>
+            <% else %>
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Closed</span>
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Registration Period</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <% if @event.registration_open_at && @event.registration_close_at %>
+              <%= @event.registration_open_at.strftime("%B %d, %Y") %> -
+              <%= @event.registration_close_at.strftime("%B %d, %Y") %>
+            <% else %>
+              <span class="text-gray-400">Not set</span>
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Participants</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @event.participants.count %></dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <h2 class="text-lg font-semibold mb-4">Integrations</h2>
+      <dl class="space-y-3">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">DocuSeal Waiver Template</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <%= @event.docuseal_waiver_template_id.presence || content_tag(:span, "Not configured", class: "text-gray-400") %>
+          </dd>
+        </div>
+        <div>
+          <dt class="text-sm font-medium text-gray-500">DocuSeal Freedom Waiver Template</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <%= @event.docuseal_freedom_waiver_template_id.presence || content_tag(:span, "Not configured", class: "text-gray-400") %>
+          </dd>
+        </div>
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Slack Channel ID</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <% if @event.slack_channel_id.present? %>
+              <code class="bg-gray-100 px-1.5 py-0.5 rounded"><%= @event.slack_channel_id %></code>
+            <% else %>
+              <span class="text-gray-400">Not configured</span>
+            <% end %>
+          </dd>
+        </div>
+        <div class="pt-2 border-t border-gray-100">
+          <%= link_to "Legacy Slack Blasts", admin_event_slack_blasts_path(@event), class: "text-sm text-gray-400 hover:text-gray-600" %>
+        </div>
+      </dl>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <h2 class="text-lg font-semibold mb-4">Event Options</h2>
+      <dl class="space-y-3">
+        <div class="flex items-center gap-2">
+          <% if @event.freedom_waivers_enabled? %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Enabled</span>
+          <% else %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Disabled</span>
+          <% end %>
+          <span class="text-sm text-gray-700">Freedom Waivers</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <% if @event.visa_options_enabled? %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Enabled</span>
+          <% else %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Disabled</span>
+          <% end %>
+          <span class="text-sm text-gray-700">Visa Options</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <% if @event.accommodation_enabled? %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Enabled</span>
+          <% else %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Disabled</span>
+          <% end %>
+          <span class="text-sm text-gray-700">Accommodation</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <% if @event.guardian_invites_locked? %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Locked</span>
+          <% else %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Unlocked</span>
+          <% end %>
+          <span class="text-sm text-gray-700">Guardian Invites</span>
+        </div>
+      </dl>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <h2 class="text-lg font-semibold mb-4">Quick Stats</h2>
+      <dl class="space-y-3">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Open Incidents</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @event.incidents.where(status: "open").count %></dd>
+        </div>
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Notes</dt>
+          <dd class="mt-1 text-sm text-gray-900"><%= @event.notes.count %></dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="mt-6 bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6 border-b border-gray-200">
+      <h2 class="text-lg font-semibold">Event Staff</h2>
+      <%= link_to "Manage Staff →", admin_event_staff_index_path(@event), class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
+    </div>
+    <% if @event_role_assignments.any? %>
+      <table class="min-w-full divide-y divide-gray-100">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Added</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-100">
+          <% @event_role_assignments.each do |assignment| %>
+            <tr>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900"><%= assignment.user.display_name_or_fallback %></div>
+                <div class="text-sm text-gray-500"><%= assignment.user.email %></div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                  <%= case assignment.role
+                      when 'event_admin' then 'bg-purple-100 text-purple-800'
+                      when 'ops' then 'bg-blue-100 text-blue-800'
+                      when 'safeguarding_lead' then 'bg-red-100 text-red-800'
+                      when 'read_only' then 'bg-gray-100 text-gray-800'
+                      end %>">
+                  <%= assignment.role.titleize %>
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <%= assignment.created_at.strftime("%B %d, %Y") %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <div class="px-6 py-12 text-center">
+        <p class="text-gray-500">No staff members assigned to this event yet.</p>
+        <%= link_to "Add Staff Member", new_admin_event_staff_path(@event), class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium mt-2 inline-block" %>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="mt-6 bg-white border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-semibold mb-4">API Access</h2>
+    <p class="text-sm text-gray-600 mb-4">
+      Use the API to programmatically add participants to this event. The API endpoint is:
+    </p>
+    <code class="block bg-gray-100 px-3 py-2 rounded text-sm mb-4">POST <%= api_v1_event_participants_url(@event) %></code>
+
+    <div class="border-2 border-dashed border-orange-400 rounded px-4 py-3 mb-4">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">API Key</dt>
+          <% if @event.api_key_set? %>
+            <% if flash[:api_key] %>
+              <dd class="mt-1">
+                <code class="bg-yellow-100 px-2 py-1 rounded text-sm font-mono"><%= flash[:api_key] %></code>
+                <p class="text-xs text-amber-600 mt-1">⚠️ Copy this key now. It won't be shown again.</p>
+              </dd>
+            <% else %>
+              <dd class="mt-1 text-sm text-gray-600">
+                <span class="font-mono">••••••••••••••••</span>
+                <span class="text-gray-400 ml-2">(hidden for security)</span>
+              </dd>
+            <% end %>
+          <% else %>
+            <dd class="mt-1 text-sm text-gray-400">No API key generated</dd>
+          <% end %>
+        </div>
+        <div>
+          <%= button_to @event.api_key_set? ? "Regenerate Key" : "Generate Key",
+              regenerate_api_key_admin_event_path(@event),
+              method: :post,
+              data: @event.api_key_set? ? { confirm: "This will invalidate the existing API key. Continue?" } : {},
+              class: "bg-[#ec3750] text-white px-4 py-2 rounded hover:bg-[#d42f46] text-sm" %>
+        </div>
+      </div>
+    </div>
+
+    <details class="text-sm">
+      <summary class="cursor-pointer text-[#ec3750] hover:text-blue-800 font-medium">API Usage Example</summary>
+      <div class="mt-3 bg-gray-50 rounded p-4">
+        <p class="font-medium mb-2">Request:</p>
+        <pre class="bg-gray-800 text-gray-100 p-3 rounded text-xs overflow-x-auto">curl -X POST <%= api_v1_event_participants_url(@event) %> \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "first_name": "Jane",
+    "last_name": "Doe",
+    "email": "jane@example.com"
+  }'</pre>
+        <p class="font-medium mt-4 mb-2">Response:</p>
+        <pre class="bg-gray-800 text-gray-100 p-3 rounded text-xs overflow-x-auto">{
+  "success": true,
+  "message": "Invitation sent to jane@example.com",
+  "event": "<%= @event.name %>"
+}</pre>
+      </div>
+    </details>
+  </div>
+
+  <div class="mt-6">
+    <%= link_to "← Back to Events", admin_events_path, class: "text-gray-600 hover:text-gray-900" %>
+  </div>
+</div>

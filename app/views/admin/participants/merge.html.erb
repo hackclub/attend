@@ -1,0 +1,80 @@
+<% content_for :title, "Merge Duplicate – #{@participant.display_name} – #{current_event.name} – Attend" %>
+
+<%= render "header" %>
+
+<div class="max-w-3xl">
+  <h2 class="text-xl font-bold mb-2">Merge a duplicate record into this one</h2>
+  <p class="text-gray-600 mb-6">
+    Use this when the same person has two participant records — usually from
+    registering under two different email addresses. Event registrations, the
+    Slack link, headshot, sign-in account, and missing profile details move
+    onto <strong><%= @participant.display_name %> (<%= @participant.email %>)</strong>,
+    then the duplicate record is deleted. This cannot be undone.
+  </p>
+
+  <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+    <%= form_with url: merge_admin_event_participant_path(current_event, @participant_event), method: :get, local: true do |f| %>
+      <label for="q" class="block text-sm font-medium text-gray-700 mb-2">Find the duplicate record</label>
+      <div class="flex gap-2">
+        <%= f.text_field :q, value: @query, placeholder: "Search by name or email…",
+            class: "flex-1 px-3 py-2 rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] text-sm" %>
+        <%= f.submit "Search", class: "text-sm font-medium text-white bg-[#ec3750] px-4 py-2 rounded-md hover:bg-[#d63146] cursor-pointer" %>
+      </div>
+    <% end %>
+
+    <% if @candidates %>
+      <% if @candidates.any? %>
+        <ul class="mt-4 divide-y divide-gray-100">
+          <% @candidates.each do |candidate| %>
+            <li class="py-3 flex items-center justify-between gap-4">
+              <div class="min-w-0">
+                <p class="font-medium truncate"><%= candidate.display_name %></p>
+                <p class="text-sm text-gray-600 truncate"><%= candidate.email %></p>
+                <p class="text-xs text-gray-500">
+                  <%= candidate.date_of_birth&.strftime("%b %-d, %Y") || "No DOB" %>
+                  · <%= candidate.slack_user_id.present? ? "Slack linked" : "No Slack" %>
+                  · <%= candidate.user_id.present? ? "Sign-in linked" : "No sign-in" %>
+                  <% if candidate.participant_events.any? %>
+                    · <%= candidate.participant_events.map { |pe| "#{pe.event.name}: #{pe.status}" }.join(", ") %>
+                  <% else %>
+                    · No event registrations
+                  <% end %>
+                </p>
+              </div>
+              <%= link_to "Select", merge_admin_event_participant_path(current_event, @participant_event, q: @query, duplicate_id: candidate.id),
+                  class: "shrink-0 text-sm font-medium text-gray-700 bg-white border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50" %>
+            </li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p class="mt-4 text-sm text-gray-500">No other participants match "<%= @query %>".</p>
+      <% end %>
+    <% end %>
+  </div>
+
+  <% if @duplicate %>
+    <div class="bg-white rounded-lg border border-red-200 p-6">
+      <h3 class="text-lg font-semibold mb-1">
+        Merge <%= @duplicate.display_name %> (<%= @duplicate.email %>) into this record?
+      </h3>
+      <p class="text-sm text-gray-600 mb-4">The duplicate record will be deleted after its data is transferred.</p>
+
+      <% if @merge_preview.any? %>
+        <ul class="list-disc list-inside text-sm text-gray-800 space-y-1 mb-4">
+          <% @merge_preview.each do |action| %>
+            <li><%= action %></li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p class="text-sm text-gray-800 mb-4">Nothing to transfer — the duplicate record will simply be deleted.</p>
+      <% end %>
+
+      <%= button_to "Merge & delete duplicate",
+          merge_duplicate_admin_event_participant_path(current_event, @participant_event),
+          method: :post,
+          params: { duplicate_id: @duplicate.id },
+          data: { turbo_confirm: "Merge #{@duplicate.display_name} (#{@duplicate.email}) into #{@participant.display_name} and delete the duplicate? This cannot be undone." },
+          class: "text-sm font-medium text-white bg-red-600 px-4 py-2 rounded-md hover:bg-red-700 cursor-pointer" %>
+    </div>
+  <% end %>
+</div>

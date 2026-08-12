@@ -1,0 +1,224 @@
+<% content_for :title, "Dashboard – Attend" %>
+
+<% upcoming = @participant_events
+     .select { |pe| pe.event.starts_at.present? && (pe.event.ends_at || pe.event.starts_at) >= Time.current }
+     .min_by { |pe| pe.event.starts_at } %>
+<% next_event = upcoming || @participant_events.max_by { |pe| pe.event.starts_at || Time.at(0) } %>
+<% next_event_is_upcoming = upcoming.present? %>
+
+<div class="w-full max-w-5xl mx-auto">
+  <!-- Greeting -->
+  <section class="mb-8 flex items-end justify-between gap-4">
+    <div class="min-w-0">
+      <p class="text-sm uppercase tracking-wide text-(--text-muted)">
+        <%= Time.current.hour < 12 ? "Good morning" : Time.current.hour < 18 ? "Good afternoon" : "Good evening" %>
+      </p>
+      <h1 class="text-3xl sm:text-4xl font-bold text-(--text-strong) truncate">
+        <%= @participant.display_name %>
+      </h1>
+    </div>
+    <%= link_to dashboard_profile_path,
+        class: "shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-(--border-card) bg-(--bg-elev) text-sm font-medium text-(--text) hover:text-(--text-strong) hover:bg-(--bg-elev-2) transition-colors",
+        aria: { label: "Profile settings" } do %>
+      <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+      </svg>
+      <span class="hidden sm:inline">Profile</span>
+    <% end %>
+  </section>
+
+  <!-- Pending invitations -->
+  <% if @pending_invitations.any? %>
+    <section class="mb-8">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-(--text-muted) mb-3">Action needed</h2>
+      <div class="space-y-3">
+        <% @pending_invitations.each do |invitation| %>
+          <div class="rounded-2xl border border-amber-300 bg-amber-50 p-5">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex items-center gap-3 min-w-0">
+                <%= render "admin/events/avatar", event: invitation.event, size: 48, rounded: "rounded-xl" %>
+                <div class="min-w-0">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Invitation pending</p>
+                  <h3 class="text-lg font-semibold text-amber-900 truncate"><%= invitation.event.name %></h3>
+                  <p class="text-sm text-amber-800">
+                    <%= invitation.event.starts_at&.strftime("%b %d") %> – <%= invitation.event.ends_at&.strftime("%b %d, %Y") %>
+                  </p>
+                </div>
+              </div>
+              <%= link_to "Complete registration", onboarding_url(invite: invitation.token),
+                  class: "shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700 transition-colors" %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
+  <% if @participant_events.any? %>
+    <!-- Featured / next event hero -->
+    <% if next_event %>
+      <% ev = next_event.event %>
+      <% ds = next_event.display_status %>
+      <% days_until = ev.starts_at.present? ? (ev.starts_at.to_date - Date.current).to_i : nil %>
+      <% progress = next_event.onboarding_progress %>
+      <% done_count = progress[:steps].count { |s| s[:done] } %>
+      <% total_count = progress[:steps].size %>
+      <% pct = total_count.positive? ? (done_count.to_f / total_count * 100).round : 0 %>
+
+      <section class="mb-10">
+        <div class="group relative isolate overflow-hidden rounded-3xl bg-(--bg-darker) text-(--text-on-dark) shadow-xl ring-1 ring-white/5">
+
+          <%= link_to dashboard_event_path(next_event),
+              class: "absolute inset-0 z-10",
+              aria: { label: "Open #{ev.name}" } do %><% end %>
+
+          <!-- subtle radial glow -->
+          <div class="absolute -top-32 -right-24 size-96 rounded-full bg-[#ec3750]/30 blur-3xl pointer-events-none"></div>
+          <div class="absolute -bottom-32 -left-20 size-80 rounded-full bg-[#338eda]/20 blur-3xl pointer-events-none"></div>
+
+          <div class="relative z-20 p-6 sm:p-8 pointer-events-none">
+            <div class="flex items-start justify-between gap-4 mb-6">
+              <div class="flex items-center gap-3 min-w-0">
+                <%= render "admin/events/avatar", event: ev, size: 56, rounded: "rounded-2xl" %>
+                <div class="min-w-0">
+                  <p class="text-xs uppercase tracking-wider text-(--text-on-dark)/60"><%= next_event_is_upcoming ? "Your next event" : "Your latest event" %></p>
+                  <h2 class="text-2xl sm:text-3xl font-bold truncate"><%= ev.name %></h2>
+                  <% if ev.location_city.present? %>
+                    <p class="text-sm text-(--text-on-dark)/70 truncate">
+                      <%= [ev.location_city, ev.location_country].compact.reject(&:blank?).join(", ") %>
+                    </p>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid gap-6 sm:grid-cols-2 sm:items-end">
+              <!-- countdown -->
+              <% if days_until.present? %>
+                <div>
+                  <p class="text-xs uppercase tracking-wider text-(--text-on-dark)/60 mb-1">
+                    <%= days_until > 0 ? "Starts in" : days_until == 0 ? "Starting" : "Ran" %>
+                  </p>
+                  <% if days_until > 0 %>
+                    <div class="flex items-baseline gap-2 tabular-nums">
+                      <span class="text-6xl font-bold leading-none"><%= days_until %></span>
+                      <span class="text-lg text-(--text-on-dark)/80"><%= days_until == 1 ? "day" : "days" %></span>
+                    </div>
+                  <% elsif days_until == 0 %>
+                    <p class="text-5xl font-bold leading-none text-[#33d6a6]">Today</p>
+                  <% else %>
+                    <p class="text-3xl font-bold leading-none text-(--text-on-dark)/80">
+                      <%= time_ago_in_words(ev.starts_at) %> ago
+                    </p>
+                  <% end %>
+                  <% if ev.starts_at.present? %>
+                    <p class="mt-2 text-sm text-(--text-on-dark)/70">
+                      <%= ev.starts_at.strftime("%A, %B %d") %>
+                    </p>
+                  <% end %>
+                </div>
+              <% end %>
+
+              <!-- readiness -->
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <p class="text-xs uppercase tracking-wider text-(--text-on-dark)/60">Registration</p>
+                  <span class="text-xs font-medium text-(--text-on-dark)/80 tabular-nums"><%= done_count %>/<%= total_count %></span>
+                </div>
+                <div class="h-1.5 rounded-full bg-(--text-on-dark)/10 overflow-hidden">
+                  <div class="h-full rounded-full bg-[#33d6a6] transition-all w-(--pct)" style="--pct: <%= pct %>%"></div>
+                </div>
+                <p class="mt-2 text-sm text-(--text-on-dark)/80 truncate">
+                  <% if ds == "Complete" %>
+                    ✓ All set — boarding pass ready
+                  <% elsif progress[:blocking_step] %>
+                    Next: <%= progress[:blocking_step].titleize %>
+                  <% else %>
+                    <%= ds %>
+                  <% end %>
+                </p>
+              </div>
+            </div>
+
+            <% if ds != "Complete" && next_event_is_upcoming %>
+              <div class="mt-6 flex flex-wrap gap-2 pointer-events-auto relative z-30">
+                <% waiver_consent = next_event.consents.find_by(consent_type: "waiver") %>
+                <% if waiver_consent&.guardian_signed? && !waiver_consent&.participant_signed? %>
+                  <%= link_to "Countersign waiver", onboarding_waiver_path(event_id: next_event.event_id),
+                      class: "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-(--text-on-dark) text-(--bg-darker) text-sm font-semibold hover:bg-(--text-on-dark)/90 transition-colors" %>
+                <% elsif ds == "Awaiting Participant" %>
+                  <%= link_to "Continue registration", onboarding_path(event_id: next_event.event_id),
+                      class: "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-(--text-on-dark) text-(--bg-darker) text-sm font-semibold hover:bg-(--text-on-dark)/90 transition-colors" %>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+
+          <svg class="absolute top-6 right-6 z-20 size-6 text-(--text-on-dark)/40 group-hover:text-(--text-on-dark) group-hover:translate-x-1 transition pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </section>
+    <% end %>
+
+    <!-- Other events list -->
+    <% other_events = @participant_events.reject { |pe| pe == next_event } %>
+    <% if other_events.any? %>
+      <section>
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-(--text-muted) mb-3">Other events</h2>
+        <div class="rounded-2xl border border-(--border-card) bg-(--bg-elev) divide-y divide-(--border-soft) overflow-hidden">
+          <% other_events.each do |participant_event| %>
+            <% ds = participant_event.display_status %>
+            <% ev = participant_event.event %>
+            <%= link_to dashboard_event_path(participant_event),
+                class: "group flex items-center gap-4 p-4 hover:bg-(--bg-elev-2) transition-colors" do %>
+              <%= render "admin/events/avatar", event: ev, size: 44, rounded: "rounded-xl" %>
+              <div class="flex-1 min-w-0">
+                <p class="font-semibold text-(--text-strong) truncate group-hover:text-[#ec3750] transition-colors">
+                  <%= ev.name %>
+                </p>
+                <p class="text-sm text-(--text-muted)">
+                  <%= ev.starts_at&.strftime("%b %d") %><%= " – #{ev.ends_at.strftime('%b %d, %Y')}" if ev.ends_at %>
+                </p>
+              </div>
+              <span class="hidden sm:inline-flex shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium <%= display_status_badge_class(ds) %>">
+                <%= ds %>
+              </span>
+              <svg class="size-5 text-(--text-faint) group-hover:text-[#ec3750] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            <% end %>
+          <% end %>
+        </div>
+      </section>
+    <% end %>
+  <% else %>
+    <!-- Empty state -->
+    <section class="rounded-2xl border border-dashed border-(--border-card) bg-(--bg-elev) p-10 text-center">
+      <div class="mx-auto size-14 rounded-2xl bg-(--bg-elev-2) flex items-center justify-center mb-4">
+        <svg class="size-7 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      </div>
+      <h2 class="text-lg font-semibold text-(--text-strong)">No events yet</h2>
+      <p class="mt-1 text-sm text-(--text-muted)">When organizers invite you to an event, it'll show up here.</p>
+    </section>
+  <% end %>
+
+  <!-- Mobile app -->
+  <section class="mt-8">
+    <div class="rounded-2xl border border-(--border-card) bg-(--bg-elev) p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div class="min-w-0">
+        <h2 class="text-sm font-semibold text-(--text-strong) flex items-center gap-2">
+          <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+          Get the Attend app
+        </h2>
+        <p class="mt-1 text-sm text-(--text-muted)">Keep your boarding pass and event info handy on your phone.</p>
+      </div>
+      <%= render "shared/app_download_badges" %>
+    </div>
+  </section>
+</div>

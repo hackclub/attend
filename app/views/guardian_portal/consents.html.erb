@@ -1,0 +1,223 @@
+<div class="w-full max-w-2xl mx-auto">
+  <%= render "step_nav" %>
+
+  <h1 class="text-2xl font-bold mb-2">Consents & Agreements</h1>
+  <p class="text-gray-600 mb-6">Review and sign the required consent documents for <%= @participant.legal_first_name %>'s participation.</p>
+
+  <div class="space-y-6">
+    <section class="bg-white border rounded-lg overflow-hidden">
+      <div class="p-4 border-b bg-gray-50">
+        <h2 class="text-lg font-semibold">Required Documents</h2>
+      </div>
+
+      <ul class="divide-y">
+        <%# Liability Waiver %>
+        <% waiver_consent = @consents.find(&:waiver?) %>
+        <% if waiver_consent %>
+          <% guardian_signed_awaiting_student = waiver_consent.guardian_signed? && !waiver_consent.signed? %>
+          <li class="p-4">
+            <div class="flex flex-col sm:flex-row items-start justify-between gap-3">
+              <div class="flex items-start gap-3">
+                <% status = consent_status_for_guardian(waiver_consent) %>
+                <% if status == :signed %>
+                  <div class="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                  </div>
+                <% else %>
+                  <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex-shrink-0 mt-0.5"></div>
+                <% end %>
+
+                <div>
+                  <h3 class="font-medium text-gray-900"><%= consent_type_label(waiver_consent.consent_type) %></h3>
+                  <p class="text-sm text-gray-600 mt-1"><%= consent_type_description(waiver_consent.consent_type) %></p>
+
+                  <% if guardian_signed_awaiting_student %>
+                    <p class="text-xs text-green-600 mt-2">
+                      ✓ You signed on <%= waiver_consent.guardian_signed_at&.strftime("%B %d, %Y at %l:%M %p") %>
+                    </p>
+                    <div class="bg-blue-50 border border-blue-200 rounded-md p-3 mt-3">
+                      <p class="text-sm text-blue-800">
+                        <strong><%= @participant.legal_first_name %></strong> also needs to sign this waiver.
+                        Please ask them to log into their onboarding portal to complete their signature.
+                      </p>
+                    </div>
+                  <% elsif status == :signed %>
+                    <p class="text-xs text-green-600 mt-2">
+                      Signed on <%= waiver_consent.guardian_signed_at&.strftime("%B %d, %Y at %l:%M %p") %>
+                    </p>
+                  <% elsif status == :preparing %>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 mt-2">
+                      Preparing...
+                    </span>
+                  <% else %>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 mt-2">
+                      Awaiting Signature
+                    </span>
+                  <% end %>
+                </div>
+              </div>
+
+              <div class="flex-shrink-0 sm:ml-4">
+                <% if guardian_signed_awaiting_student %>
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    Awaiting Student
+                  </span>
+                <% elsif status == :signed %>
+                  <% if waiver_consent.document_url.present? %>
+                    <%= link_to "View", waiver_consent.document_url, target: "_blank", class: "text-sm text-blue-600 hover:text-blue-700 font-medium" %>
+                  <% end %>
+                <% elsif status == :ready %>
+                  <%= link_to guardian_portal_waiver_path(token: @token), class: "inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700" do %>
+                    Sign Now
+                    <svg class="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                    </svg>
+                  <% end %>
+                <% elsif status == :preparing %>
+                  <span class="text-sm text-gray-500">Please wait...</span>
+                <% end %>
+              </div>
+            </div>
+          </li>
+        <% end %>
+
+        <%# Freedom Waiver - only shown if enabled for this event %>
+        <% freedom_consent = @consents.find(&:freedom_waiver?) %>
+        <% if freedom_consent && @event.freedom_waivers_enabled? %>
+          <li class="p-4">
+            <div class="flex flex-col sm:flex-row items-start justify-between gap-3">
+              <div class="flex items-start gap-3">
+                <% freedom_status = consent_status_for_guardian(freedom_consent) %>
+                <% if freedom_status == :signed %>
+                  <div class="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                  </div>
+                <% else %>
+                  <div class="w-6 h-6 border-2 border-gray-300 rounded-full flex-shrink-0 mt-0.5"></div>
+                <% end %>
+
+                <div>
+                  <h3 class="font-medium text-gray-900"><%= consent_type_label(freedom_consent.consent_type) %></h3>
+                  <p class="text-sm text-gray-600 mt-1"><%= consent_type_description(freedom_consent.consent_type) %></p>
+
+                  <% if freedom_status == :signed %>
+                    <p class="text-xs text-green-600 mt-2">
+                      Signed on <%= freedom_consent.signed_at&.strftime("%B %d, %Y at %l:%M %p") %>
+                    </p>
+                  <% elsif freedom_status == :preparing %>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 mt-2">
+                      Preparing...
+                    </span>
+                  <% else %>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 mt-2">
+                      Awaiting Completion
+                    </span>
+                  <% end %>
+                </div>
+              </div>
+
+              <div class="flex-shrink-0 sm:ml-4">
+                <% if freedom_status == :signed %>
+                  <% if freedom_consent.document_url.present? %>
+                    <%= link_to "View", freedom_consent.document_url, target: "_blank", class: "text-sm text-blue-600 hover:text-blue-700 font-medium" %>
+                  <% end %>
+                <% elsif freedom_status == :ready %>
+                  <%= link_to guardian_portal_freedom_waiver_path(token: @token), class: "inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700" do %>
+                    Complete Now
+                    <svg class="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                    </svg>
+                  <% end %>
+                <% elsif freedom_status == :preparing %>
+                  <span class="text-sm text-gray-500">Please wait...</span>
+                <% end %>
+              </div>
+            </div>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+
+    <section class="bg-white border rounded-lg overflow-hidden">
+      <div class="p-4 border-b bg-gray-50">
+        <h2 class="text-lg font-semibold">Review Documents</h2>
+      </div>
+
+      <div class="p-4 space-y-4">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-gray-50 rounded-md">
+          <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <span class="font-medium text-gray-900">Code of Conduct</span>
+          </div>
+          <%= link_to "View", "#code-of-conduct-modal", class: "text-sm text-blue-600 hover:text-blue-700 font-medium", data: { action: "click->modal#open", modal_target: "codeOfConduct" } %>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-gray-50 rounded-md">
+          <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+            <span class="font-medium text-gray-900">Safeguarding Policy</span>
+          </div>
+          <%= link_to "View", "https://hackclub.com/safeguarding", target: "_blank", class: "text-sm text-blue-600 hover:text-blue-700 font-medium" %>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-gray-50 rounded-md">
+          <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+            </svg>
+            <span class="font-medium text-gray-900">Privacy Notice</span>
+          </div>
+          <%= link_to "View", "#privacy-notice-modal", class: "text-sm text-blue-600 hover:text-blue-700 font-medium", data: { action: "click->modal#open", modal_target: "privacyNotice" } %>
+        </div>
+      </div>
+    </section>
+
+    <% waiver_consent = @consents.find(&:waiver?) %>
+    <% freedom_consent = @consents.find(&:freedom_waiver?) %>
+    <% waiver_signed = waiver_consent && consent_status_for_guardian(waiver_consent) == :signed %>
+    <% freedom_signed = !@event.freedom_waivers_enabled? || (freedom_consent && consent_status_for_guardian(freedom_consent) == :signed) %>
+    <% all_signed = waiver_signed && freedom_signed %>
+    
+    <div class="pt-4 flex flex-col sm:flex-row gap-3">
+      <%= link_to "Back", guardian_portal_step_path(token: @token, step: :permissions), class: "w-full sm:w-auto text-center px-6 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium" %>
+
+      <% if all_signed %>
+        <%= link_to guardian_portal_complete_path(token: @token), method: :post, class: "w-full sm:w-auto flex-1 bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium text-center" do %>
+          Complete Registration
+        <% end %>
+      <% else %>
+        <div class="w-full sm:w-auto flex-1 bg-gray-100 text-gray-500 px-6 py-3 rounded-md font-medium text-center cursor-not-allowed">
+          Sign all documents to continue
+        </div>
+      <% end %>
+    </div>
+
+    <% unless all_signed %>
+      <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+        <div class="flex items-start gap-3">
+          <svg class="w-5 h-5 text-yellow-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+          </svg>
+          <div>
+            <h3 class="font-medium text-yellow-800">Documents pending</h3>
+            <p class="text-sm text-yellow-700 mt-1">
+              Please complete all required documents above to continue. This page refreshes automatically to pick up new waivers.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        setInterval(function() { window.location.reload(); }, 2000);
+      </script>
+    <% end %>
+  </div>
+</div>

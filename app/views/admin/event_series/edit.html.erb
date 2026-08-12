@@ -1,0 +1,10 @@
+<% content_for :title, "Edit #{@series.name} – Attend" %>
+
+<div class="w-full max-w-3xl">
+  <div class="mb-8">
+    <h1 class="text-2xl font-bold mb-1">Series settings</h1>
+    <p class="text-gray-500">Branding here is inherited by every event in <%= @series.name %> that doesn't set its own.</p>
+  </div>
+
+  <%= render "form" %>
+</div>

@@ -1,0 +1,45 @@
+<% content_for :title, "Slack Invite – #{@participant_event.participant.display_name} – #{current_event.name} – Attend" %>
+
+<div>
+  <%= render "header" %>
+
+  <div class="max-w-2xl mx-auto">
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <h2 class="text-lg font-semibold mb-4">Slack OAuth Invite Link</h2>
+      
+      <p class="text-gray-600 mb-4">
+        Share this link with <strong><%= @participant_event.participant.display_name %></strong> to allow them to connect their Slack account.
+      </p>
+
+      <div class="bg-gray-50 rounded-lg p-4 mb-4">
+        <div class="flex items-center gap-2">
+          <input type="text" 
+                 id="slack-invite-url" 
+                 value="<%= @invite_url %>" 
+                 readonly 
+                 class="flex-1 block w-full rounded-md border-gray-300 bg-white  text-sm px-3 py-2">
+          <button type="button"
+                  data-controller="clipboard"
+                  data-clipboard-content-value="<%= @invite_url %>"
+                  data-action="click->clipboard#copy"
+                  class="inline-flex items-center px-4 py-2 border border-gray-300  text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+            Copy Link
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+        <p class="text-sm text-yellow-800">
+          <strong>Note:</strong> This link expires in 1 hour. The participant will be asked to authorize access to their Slack identity.
+          <% if @participant_event.event.slack_channel_id.present? %>
+            Once connected, they will automatically be invited to the event's Slack channel.
+          <% end %>
+        </p>
+      </div>
+
+      <div class="flex justify-end">
+        <%= link_to "Back to Participant", admin_event_participant_path(current_event, @participant_event), class: "text-sm text-[#ec3750] hover:text-blue-800" %>
+      </div>
+    </div>
+  </div>
+</div>

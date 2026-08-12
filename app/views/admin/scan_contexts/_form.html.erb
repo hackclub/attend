@@ -1,0 +1,73 @@
+<%= form_with model: [:admin, current_event, scan_context], local: true, class: "space-y-6" do |f| %>
+  <% if scan_context.errors.any? %>
+    <div class="bg-red-50 border border-red-200 rounded-md p-4">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+          </svg>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800">
+            <%= pluralize(scan_context.errors.count, "error") %> prohibited this context from being saved:
+          </h3>
+          <div class="mt-2 text-sm text-red-700">
+            <ul class="list-disc list-inside space-y-1">
+              <% scan_context.errors.full_messages.each do |message| %>
+                <li><%= message %></li>
+              <% end %>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div>
+    <%= f.label :name, "Location Name", class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <%= f.text_field :name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "e.g., Main Entrance, Airport Terminal, Registration Desk" %>
+    <p class="mt-1 text-sm text-gray-500">A descriptive name for this scanning location</p>
+  </div>
+
+  <div class="space-y-4">
+    <div class="flex items-start">
+      <%= f.check_box :checks_in, class: "mt-1 rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+      <div class="ml-3">
+        <%= f.label :checks_in, "Checks person in to event", class: "text-sm font-medium text-gray-700" %>
+        <p class="text-sm text-gray-500">When scanned at this location, mark the participant as checked in to the event</p>
+      </div>
+    </div>
+
+    <div class="flex items-start">
+      <%= f.check_box :is_airport, class: "mt-1 rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+      <div class="ml-3">
+        <%= f.label :is_airport, "Is an airport pickup location", class: "text-sm font-medium text-gray-700" %>
+        <p class="text-sm text-gray-500">When scanned at this location, mark the participant as picked up from airport</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div>
+      <%= f.label :starts_at, "Starts At", class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= f.datetime_local_field :starts_at, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+      <p class="mt-1 text-sm text-gray-500">Optional — when scanning at this location opens</p>
+    </div>
+    <div>
+      <%= f.label :ends_at, "Ends At", class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= f.datetime_local_field :ends_at, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+      <p class="mt-1 text-sm text-gray-500">Optional — when scanning at this location closes</p>
+    </div>
+  </div>
+
+  <div>
+    <%= f.label :position, "Display Order", class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <%= f.number_field :position, class: "w-32 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", min: 0 %>
+    <p class="mt-1 text-sm text-gray-500">Lower numbers appear first in the dropdown</p>
+  </div>
+
+  <div class="pt-4 flex flex-col sm:flex-row justify-end gap-3">
+    <%= link_to "Cancel", admin_event_scan_contexts_path(current_event), class: "w-full sm:w-auto text-center bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300" %>
+    <%= f.submit scan_context.persisted? ? "Update Context" : "Create Context", class: "w-full sm:w-auto bg-[#ec3750] text-white px-4 py-2 rounded-md hover:bg-[#d42f46] cursor-pointer" %>
+  </div>
+<% end %>

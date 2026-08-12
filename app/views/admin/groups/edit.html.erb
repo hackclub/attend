@@ -1,0 +1,81 @@
+<div class="w-full max-w-3xl">
+  <div class="flex items-center gap-3 mb-6">
+    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
+          style="background-color: <%= @group.normalized_color || "#e5e7eb" %>; color: <%= @group.color.present? ? "white" : "#1f2d3d" %>;">
+      <%= @group.name %>
+    </span>
+    <h1 class="text-2xl font-bold">Edit Group</h1>
+  </div>
+
+  <%= render "form", group: @group %>
+
+  <div class="mt-10">
+    <h2 class="text-lg font-semibold mb-3">Members (<%= @members.size %>)</h2>
+
+    <% if @members.any? %>
+      <div class="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100 mb-6">
+        <% @members.each do |pe| %>
+          <div class="flex items-center justify-between px-4 py-2">
+            <div>
+              <%= link_to pe.participant.display_name, admin_event_participant_path(current_event, pe.participant), class: "text-[#ec3750] hover:underline" %>
+              <span class="text-xs text-gray-500 ml-2"><%= pe.participant.email %></span>
+            </div>
+            <%= button_to "Remove", unassign_admin_event_group_path(current_event, @group, participant_event_ids: [pe.id]),
+                method: :post,
+                class: "text-sm text-red-600 hover:text-red-800",
+                data: { confirm: "Remove this participant from the group?" } %>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="text-sm text-gray-500 mb-4">No members yet.</p>
+    <% end %>
+
+    <h3 class="text-base font-semibold mb-2">Add members</h3>
+    <%= form_with url: assign_admin_event_group_path(current_event, @group), method: :post, local: true, class: "space-y-3" do %>
+      <div data-controller="multiselect">
+        <div class="border border-gray-300 rounded-lg overflow-hidden">
+          <div class="p-3 border-b border-gray-200 bg-gray-50">
+            <input type="text"
+                   data-multiselect-target="search"
+                   placeholder="Search participants..."
+                   class="w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] text-sm px-3 py-2"
+                   data-action="input->multiselect#filter">
+          </div>
+          <div class="px-3 py-2 bg-blue-50 border-b border-gray-200 flex items-center justify-between">
+            <span class="text-sm text-blue-800">
+              <strong data-multiselect-target="count">0</strong> participant<span data-multiselect-target="plural">s</span> selected
+            </span>
+            <button type="button"
+                    class="text-xs text-[#ec3750] hover:text-blue-800 font-medium"
+                    data-action="click->multiselect#clearAll">
+              Clear all
+            </button>
+          </div>
+          <div class="max-h-64 overflow-y-auto" data-multiselect-target="list">
+            <% if @available_participants.empty? %>
+              <div class="px-3 py-6 text-center text-sm text-gray-500">All participants are already in this group.</div>
+            <% else %>
+              <% @available_participants.each do |pe| %>
+                <label class="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0"
+                       data-name="<%= pe.participant.display_name.downcase %> <%= pe.participant.email.downcase %>">
+                  <input type="checkbox"
+                         name="participant_event_ids[]"
+                         value="<%= pe.id %>"
+                         class="rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]"
+                         data-multiselect-target="checkbox"
+                         data-action="change->multiselect#updateCount">
+                  <div class="ml-3 flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate"><%= pe.participant.display_name %></p>
+                    <p class="text-xs text-gray-500 truncate"><%= pe.participant.email %></p>
+                  </div>
+                </label>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+      </div>
+      <button type="submit" class="bg-[#ec3750] text-white px-4 py-2 rounded-md hover:bg-[#d42f46]">Add selected</button>
+    <% end %>
+  </div>
+</div>

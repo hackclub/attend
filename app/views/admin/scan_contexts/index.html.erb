@@ -1,0 +1,79 @@
+<div class="w-full">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold">Scan Contexts</h1>
+      <p class="text-sm text-gray-500 mt-1">Manage locations and contexts for QR code scanning</p>
+    </div>
+    <%= link_to "New Context", new_admin_event_scan_context_path(current_event), class: "bg-[#ec3750] text-white px-4 py-2 rounded-md hover:bg-[#d42f46]" %>
+  </div>
+
+  <% if @scan_contexts.any? %>
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div class="overflow-x-auto -mx-4 sm:mx-0">
+        <table class="min-w-full divide-y divide-gray-100">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Checks In</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Airport</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedule</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Scans</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-100 text-xs sm:text-sm">
+            <% @scan_contexts.each do |context| %>
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="font-medium text-gray-900"><%= context.name %></span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <% if context.checks_in? %>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Yes
+                    </span>
+                  <% else %>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      No
+                    </span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <% if context.is_airport? %>
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      ✈️ Airport
+                    </span>
+                  <% else %>
+                    <span class="text-gray-400">—</span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <% if context.starts_at? || context.ends_at? %>
+                    <%= [ context.starts_at&.strftime("%b %-d, %-l:%M %p"), context.ends_at&.strftime("%b %-d, %-l:%M %p") ].compact.join(" – ") %>
+                  <% else %>
+                    <span class="text-gray-400">—</span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <%= context.scans.count %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm space-x-3">
+                  <%= link_to "Edit", edit_admin_event_scan_context_path(current_event, context), class: "text-[#ec3750] hover:text-blue-800" %>
+                  <% if context.scans.none? %>
+                    <%= button_to "Delete", admin_event_scan_context_path(current_event, context), method: :delete, class: "text-red-600 hover:text-red-800", data: { confirm: "Are you sure you want to delete this context?" } %>
+                  <% else %>
+                    <span class="text-gray-400 cursor-not-allowed" title="Cannot delete: has associated scans">Delete</span>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% else %>
+    <div class="bg-white border border-gray-200 rounded-lg p-6 text-center text-gray-500">
+      No scan contexts configured for this event.
+    </div>
+  <% end %>
+</div>

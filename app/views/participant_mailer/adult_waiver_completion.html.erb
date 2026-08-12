@@ -1,0 +1,13 @@
+<p>Hi,</p>
+
+<p>Your waiver has been completed for <%= @event_name %>.</p>
+
+<% if @waiver_link.present? %>
+  <p><%= link_to "View Waiver", @waiver_link %></p>
+<% end %>
+
+<% if @freedom_waiver_link.present? %>
+  <p><%= link_to "View Freedom Waiver", @freedom_waiver_link %></p>
+<% end %>
+
+<p>If you have any questions, reach out to <%= mail_to @support_email %>.</p>

@@ -1,0 +1,25 @@
+#!/bin/bash
+
+echo "=== Docker Entrypoint Starting ==="
+echo "Command: $@"
+echo "RAILS_MASTER_KEY set: ${RAILS_MASTER_KEY:+yes}"
+echo "DATABASE_URL set: ${DATABASE_URL:+yes}"
+
+# Test credentials loading
+echo "=== Testing Rails boot ==="
+./bin/rails runner "puts 'Rails booted successfully'" 2>&1 || { 
+  echo "Rails boot failed with exit code $?"
+  echo "Sleeping for debugging..."
+  sleep 300
+  exit 1
+}
+
+# If running the rails server then create or migrate existing database
+if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
+  echo "=== Running db:prepare ==="
+  ./bin/rails db:prepare 2>&1 || { echo "db:prepare failed with exit code $?"; exit 1; }
+  echo "=== db:prepare complete ==="
+fi
+
+echo "=== Starting server ==="
+exec "${@}"

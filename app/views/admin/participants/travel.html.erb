@@ -1,0 +1,370 @@
+<% content_for :title, "Travel – #{@participant_event.participant.display_name} – #{current_event.name} – Attend" %>
+
+<div>
+  <%= render "header" %>
+
+  <% if @participant_event.unaccompanied_minor_declared? || !@participant_event.um_none? || @participant_event.um_proof.attached? %>
+    <section class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold">Unaccompanied Minor Verification</h2>
+        <% badge = {
+          "none" => ["Not reviewed", "bg-gray-100 text-gray-700"],
+          "pending" => ["Pending review", "bg-amber-100 text-amber-800"],
+          "approved" => ["Verified UM", "bg-green-100 text-green-800"],
+          "rejected" => ["Rejected", "bg-red-100 text-red-800"]
+        }[@participant_event.um_status] %>
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold <%= badge[1] %>"><%= badge[0] %></span>
+      </div>
+
+      <p class="text-sm text-gray-600 mb-4">
+        UM means the airline's formal (paid) unaccompanied minor chaperone service — not just an under-18 travelling alone.
+        Only approved participants show the UM badge in Airport Mode and admin views.
+      </p>
+
+      <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm mb-4">
+        <div>
+          <dt class="text-gray-500">Declared on</dt>
+          <dd class="font-medium">
+            <%= [("inbound flight" if @participant_event.travel_inbound&.plane? && @participant_event.travel_inbound.is_unaccompanied_minor?),
+                 ("outbound flight" if @participant_event.travel_outbound&.plane? && @participant_event.travel_outbound.is_unaccompanied_minor?)].compact.join(" and ").presence || "—" %>
+          </dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">Proof of UM booking</dt>
+          <dd class="font-medium">
+            <% if @participant_event.um_proof.attached? %>
+              <%= link_to @participant_event.um_proof.filename, um_proof_admin_event_participant_path(current_event, @participant_event), target: "_blank", rel: "noopener", class: "text-[#ec3750] hover:underline" %>
+            <% else %>
+              Not uploaded
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="text-gray-500">Guardian double-confirmed</dt>
+          <dd class="font-medium"><%= @participant_event.um_guardian_confirmed_at&.strftime("%b %d, %Y %H:%M") || "Not yet" %></dd>
+        </div>
+        <% if @participant_event.um_verified_at.present? %>
+          <div>
+            <dt class="text-gray-500">Reviewed</dt>
+            <dd class="font-medium"><%= @participant_event.um_verified_at.strftime("%b %d, %Y %H:%M") %><%= " by #{@participant_event.um_verified_by.name || @participant_event.um_verified_by.email}" if @participant_event.um_verified_by %></dd>
+          </div>
+        <% end %>
+      </dl>
+
+      <div class="flex gap-3">
+        <% unless @participant_event.um_approved? %>
+          <%= button_to "Approve UM status", approve_um_admin_event_participant_path(current_event, @participant_event), method: :post, class: "px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 cursor-pointer text-sm font-medium" %>
+        <% end %>
+        <% unless @participant_event.um_rejected? %>
+          <%= button_to "Reject UM status", reject_um_admin_event_participant_path(current_event, @participant_event), method: :post, class: "px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 cursor-pointer text-sm font-medium" %>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
+  <%= form_with url: travel_admin_event_participant_path(current_event, @participant_event), method: :patch, local: true, class: "space-y-6", data: { controller: "travel-form" } do |form| %>
+
+    <!-- Inbound Travel -->
+    <section class="bg-white rounded-lg border border-gray-200 p-6">
+      <h2 class="text-lg font-semibold mb-4">Inbound Travel (Arriving at Event)</h2>
+
+      <%= fields_for :travel_inbound, @travel_inbound do |f| %>
+        <div class="space-y-4">
+          <!-- Mode -->
+          <div>
+            <%= f.label :mode, "Travel Mode", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.select :mode, Travel.modes.keys.map { |m| [m.titleize, m] },
+                { include_blank: "Select mode..." },
+                class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2",
+                data: { action: "change->travel-form#toggleMode", travel_form_target: "inboundMode" } %>
+          </div>
+
+          <% if current_event.visa_options_enabled? %>
+          <!-- Visa Status -->
+          <div>
+            <%= f.label :visa_status, "Visa Status", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.select :visa_status, Travel.visa_statuses.keys.map { |s| [s.titleize.gsub("_", " "), s] },
+                { include_blank: "Select status..." },
+                class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+          </div>
+          <% end %>
+
+          <!-- Unaccompanied Minor -->
+          <div class="flex items-center gap-2">
+            <%= f.check_box :is_unaccompanied_minor, class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+            <%= f.label :is_unaccompanied_minor, "Travelling as unaccompanied minor", class: "text-sm text-gray-700" %>
+          </div>
+
+          <!-- Flight Legs (for plane mode) -->
+          <% if @travel_inbound.plane? || @travel_inbound.mode.nil? %>
+            <div class="border-t pt-4 mt-4" id="inbound-flight-legs">
+              <h3 class="text-sm font-medium text-gray-700 mb-3">Flight Legs</h3>
+              <div data-travel-form-target="inboundLegs" class="space-y-4">
+                <% @travel_inbound.travel_legs.order(:position).each_with_index do |leg, index| %>
+                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "inbound", show_remove: leg.persisted?, default_date: current_event.starts_at&.strftime('%Y-%m-%d'), refresh_url: refresh_flight_leg_admin_event_participant_path(current_event, @participant_event, leg_id: leg.id) %>
+                <% end %>
+              </div>
+              <button type="button" data-action="click->travel-form#addLeg" data-direction="inbound" class="mt-4 inline-flex items-center gap-1 text-sm text-[#ec3750] hover:text-blue-800">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Add Flight Leg
+              </button>
+            </div>
+          <% end %>
+
+          <!-- Train fields -->
+          <% if @travel_inbound.train? %>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 mt-4">
+              <div>
+                <%= f.label :train_departure_station, "Departure Station", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :train_departure_station, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+              <div>
+                <%= f.label :train_arrival_station, "Arrival Station", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :train_arrival_station, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+              <div>
+                <%= f.label :arrival_time, "Arrival Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.datetime_local_field :arrival_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+            </div>
+          <% end %>
+
+          <!-- Bus fields -->
+          <% if @travel_inbound.bus? %>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 mt-4">
+              <div>
+                <%= f.label :bus_departure_location, "Departure Location", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :bus_departure_location, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+              <div>
+                <%= f.label :bus_arrival_location, "Arrival Location", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :bus_arrival_location, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+              <div>
+                <%= f.label :departure_time, "Departure Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.datetime_local_field :departure_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+              <div>
+                <%= f.label :arrival_time, "Arrival Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.datetime_local_field :arrival_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+            </div>
+          <% end %>
+
+          <!-- Car fields -->
+          <% if @travel_inbound.car? %>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 mt-4">
+              <div data-controller="address-autocomplete">
+                <%= f.label :origin_address, "Travelling From", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :origin_address, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", data: { address_autocomplete_target: "input" } %>
+              </div>
+              <div>
+                <%= f.label :expected_arrival_time, "Expected Arrival Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.datetime_local_field :expected_arrival_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+            </div>
+          <% end %>
+
+          <!-- Other fields -->
+          <% if @travel_inbound.other? %>
+            <div class="border-t pt-4 mt-4">
+              <%= f.label :other_details, "Travel Details", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= f.text_area :other_details, rows: 3, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+            </div>
+          <% end %>
+
+          <!-- Notes -->
+          <div class="border-t pt-4 mt-4">
+            <%= f.label :notes, "Notes", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_area :notes, rows: 2, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "Any additional notes..." %>
+          </div>
+        </div>
+      <% end %>
+    </section>
+
+    <!-- Outbound Travel -->
+    <section class="bg-white rounded-lg border border-gray-200 p-6">
+      <h2 class="text-lg font-semibold mb-4">Outbound Travel (Leaving Event)</h2>
+
+      <%= fields_for :travel_outbound, @travel_outbound do |f| %>
+        <div class="space-y-4">
+          <!-- Mode -->
+          <div>
+            <%= f.label :mode, "Travel Mode", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.select :mode, Travel.modes.keys.map { |m| [m.titleize, m] },
+                { include_blank: "Select mode..." },
+                class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+          </div>
+
+          <!-- Unaccompanied Minor -->
+          <div class="flex items-center gap-2">
+            <%= f.check_box :is_unaccompanied_minor, class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+            <%= f.label :is_unaccompanied_minor, "Travelling as unaccompanied minor", class: "text-sm text-gray-700" %>
+          </div>
+
+          <!-- Flight Legs (for plane mode) -->
+          <% if @travel_outbound.plane? || @travel_outbound.mode.nil? %>
+            <div class="border-t pt-4 mt-4" id="outbound-flight-legs">
+              <h3 class="text-sm font-medium text-gray-700 mb-3">Flight Legs</h3>
+              <div data-travel-form-target="outboundLegs" class="space-y-4">
+                <% @travel_outbound.travel_legs.order(:position).each_with_index do |leg, index| %>
+                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "outbound", show_remove: leg.persisted?, default_date: current_event.ends_at&.strftime('%Y-%m-%d'), refresh_url: refresh_flight_leg_admin_event_participant_path(current_event, @participant_event, leg_id: leg.id) %>
+                <% end %>
+              </div>
+              <button type="button" data-action="click->travel-form#addLeg" data-direction="outbound" class="mt-4 inline-flex items-center gap-1 text-sm text-[#ec3750] hover:text-blue-800">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Add Flight Leg
+              </button>
+            </div>
+          <% end %>
+
+          <!-- Train fields -->
+          <% if @travel_outbound.train? %>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 mt-4">
+              <div>
+                <%= f.label :train_departure_station, "Departure Station", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :train_departure_station, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+              <div>
+                <%= f.label :train_arrival_station, "Arrival Station", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :train_arrival_station, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+              <div>
+                <%= f.label :departure_time, "Departure Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.datetime_local_field :departure_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+            </div>
+          <% end %>
+
+          <!-- Bus fields -->
+          <% if @travel_outbound.bus? %>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 mt-4">
+              <div>
+                <%= f.label :bus_departure_location, "Departure Location", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :bus_departure_location, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+              <div>
+                <%= f.label :bus_arrival_location, "Arrival Location", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :bus_arrival_location, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+              <div>
+                <%= f.label :departure_time, "Departure Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.datetime_local_field :departure_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+              <div>
+                <%= f.label :arrival_time, "Arrival Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.datetime_local_field :arrival_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+            </div>
+          <% end %>
+
+          <!-- Car fields -->
+          <% if @travel_outbound.car? %>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 mt-4">
+              <div data-controller="address-autocomplete">
+                <%= f.label :origin_address, "Travelling To", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :origin_address, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", data: { address_autocomplete_target: "input" } %>
+              </div>
+              <div>
+                <%= f.label :departure_time, "Departure Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.datetime_local_field :departure_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+              </div>
+            </div>
+          <% end %>
+
+          <!-- Other fields -->
+          <% if @travel_outbound.other? %>
+            <div class="border-t pt-4 mt-4">
+              <%= f.label :other_details, "Travel Details", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= f.text_area :other_details, rows: 3, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+            </div>
+          <% end %>
+
+          <!-- Notes -->
+          <div class="border-t pt-4 mt-4">
+            <%= f.label :notes, "Notes", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_area :notes, rows: 2, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "Any additional notes..." %>
+          </div>
+        </div>
+      <% end %>
+    </section>
+
+    <!-- Submit -->
+    <div class="flex justify-end gap-3">
+      <%= link_to "Cancel", admin_event_participant_path(current_event, @participant_event), class: "px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200" %>
+      <%= form.submit "Save Travel Information", class: "px-4 py-2 bg-[#ec3750] text-white rounded-md hover:bg-[#d42f46] cursor-pointer" %>
+    </div>
+  <% end %>
+</div>
+
+<!-- Template for adding new flight legs dynamically -->
+<template id="leg-template">
+  <div class="border border-gray-200 rounded-lg p-4 relative"
+       data-travel-form-target="legTemplate"
+       data-autosave-skip>
+    <button type="button" data-action="click->travel-form#removeLeg" class="absolute top-2 right-2 text-gray-400 hover:text-red-600">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+    <div class="text-sm font-medium text-gray-500 mb-3 leg-number">Leg 1</div>
+    <input type="hidden" class="leg-position" name="" value="">
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Flight Code <span class="text-red-500">*</span></label>
+        <input type="text"
+               class="leg-flight-code w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]"
+               name=""
+               placeholder="e.g. LH1234"
+               required>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Confirmation Code</label>
+        <input type="text" class="leg-confirmation-code w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" name="" placeholder="Booking reference">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div data-controller="airport-autocomplete" class="relative">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Departure Airport <span class="text-red-500">*</span></label>
+        <input type="text"
+               class="leg-departure-airport w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]"
+               name=""
+               placeholder="e.g. LHR"
+               required
+               autocomplete="off"
+               data-airport-autocomplete-target="input"
+               data-action="input->airport-autocomplete#search keydown->airport-autocomplete#onKeydown blur->airport-autocomplete#onBlur">
+        <div data-airport-autocomplete-target="dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+          <div data-airport-autocomplete-target="results"></div>
+        </div>
+      </div>
+      <div data-controller="airport-autocomplete" class="relative">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Arrival Airport <span class="text-red-500">*</span></label>
+        <input type="text"
+               class="leg-arrival-airport w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]"
+               name=""
+               placeholder="e.g. VIE"
+               required
+               autocomplete="off"
+               data-airport-autocomplete-target="input"
+               data-action="input->airport-autocomplete#search keydown->airport-autocomplete#onKeydown blur->airport-autocomplete#onBlur">
+        <div data-airport-autocomplete-target="dropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+          <div data-airport-autocomplete-target="results"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Departure Time <span class="text-red-500">*</span> <span class="font-normal text-gray-500">(local airport time)</span></label>
+        <input type="datetime-local" class="leg-departure-time w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" name="" required>
+        <select class="leg-departure-tz mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]" name=""><%= travel_leg_time_zone_options %></select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Arrival Time <span class="text-red-500">*</span> <span class="font-normal text-gray-500">(local airport time)</span></label>
+        <input type="datetime-local" class="leg-arrival-time w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" name="" required>
+        <select class="leg-arrival-tz mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]" name=""><%= travel_leg_time_zone_options %></select>
+      </div>
+    </div>
+  </div>
+</template>

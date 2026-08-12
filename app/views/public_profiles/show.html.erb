@@ -1,0 +1,144 @@
+<% content_for :title, "#{@participant.display_name} – Attend" %>
+<% content_for :head do %>
+  <%# Profiles are link-shareable but deliberately kept out of search engines. %>
+  <meta name="robots" content="noindex, nofollow">
+  <% if @show_map %>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <% end %>
+<% end %>
+
+<div class="w-full max-w-7xl mx-auto">
+  <!-- Identity -->
+  <section class="rounded-2xl border border-(--border-card) bg-(--bg-elev) p-6 mb-6">
+    <div class="flex flex-col sm:flex-row items-start gap-5">
+      <% display_photo = @participant.public_profile_show_photo? ? @participant.public_profile_display_photo : nil %>
+      <div class="relative size-24 rounded-full overflow-hidden ring-2 ring-(--border-card) bg-(--bg-elev-2) shrink-0">
+        <%# The initial sits behind the photo, so a missing/broken image file
+            degrades to the initial instead of a broken-image box. %>
+        <div class="absolute inset-0 flex items-center justify-center text-(--text-muted) text-3xl font-semibold" aria-hidden="true">
+          <%= @participant.display_name.to_s.first&.upcase %>
+        </div>
+        <% if display_photo %>
+          <%= image_tag display_photo, alt: "", class: "absolute inset-0 size-full object-cover" %>
+        <% end %>
+      </div>
+      <div class="min-w-0 pt-1 flex-1">
+        <div class="flex items-center gap-2 flex-wrap">
+          <h1 class="text-3xl font-bold text-(--text-strong)"><%= @participant.display_name %></h1>
+          <% if @participant.pronouns.present? %>
+            <span class="text-sm text-(--text-muted)">(<%= @participant.pronouns %>)</span>
+          <% end %>
+          <% if @participant.hca_verified? %>
+            <svg class="size-6 text-[#338eda] shrink-0" viewBox="0 0 24 24" fill="currentColor" role="img" aria-label="Verified with Hack Club">
+              <title>Verified with Hack Club</title>
+              <path fill-rule="evenodd" d="M8.603 3.799A4.49 4.49 0 0 1 12 2.25c1.357 0 2.573.6 3.397 1.549a4.49 4.49 0 0 1 3.498 1.307 4.491 4.491 0 0 1 1.307 3.497A4.49 4.49 0 0 1 21.75 12a4.49 4.49 0 0 1-1.549 3.397 4.491 4.491 0 0 1-1.307 3.497 4.491 4.491 0 0 1-3.497 1.307A4.49 4.49 0 0 1 12 21.75a4.49 4.49 0 0 1-3.397-1.549 4.49 4.49 0 0 1-3.498-1.306 4.491 4.491 0 0 1-1.307-3.498A4.49 4.49 0 0 1 2.25 12c0-1.357.6-2.573 1.549-3.397a4.49 4.49 0 0 1 1.307-3.497 4.49 4.49 0 0 1 3.497-1.307Zm7.007 6.387a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clip-rule="evenodd"/>
+            </svg>
+          <% end %>
+        </div>
+        <% if @participant.public_profile_bio.present? %>
+          <p class="mt-2 text-(--text) whitespace-pre-line"><%= @participant.public_profile_bio %></p>
+        <% end %>
+        <div class="mt-3 space-y-1.5">
+          <% if @participant.public_profile_location.present? %>
+            <p class="flex items-center gap-1.5 text-base sm:text-sm text-(--text-muted)">
+              <svg class="size-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
+              <%= @participant.public_profile_location %>
+            </p>
+          <% end %>
+          <% website_url = safe_external_url(@participant.public_profile_website) %>
+          <% if website_url %>
+            <p class="flex items-center gap-1.5 text-base sm:text-sm">
+              <svg class="size-4 shrink-0 text-(--text-muted)" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a9.004 9.004 0 0 1 8.716 6.747M12 3a9.004 9.004 0 0 0-8.716 6.747M21.75 12H2.25"/></svg>
+              <%= link_to website_url.sub(%r{\Ahttps?://}, "").delete_suffix("/"), website_url, target: "_blank", rel: "noopener nofollow", class: "text-(--text-strong) underline hover:no-underline break-all" %>
+            </p>
+          <% end %>
+        </div>
+        <% social_links = public_profile_social_links(@participant) %>
+        <% if social_links.any? %>
+          <div class="mt-3 flex items-center gap-2">
+            <% social_links.each do |link| %>
+              <%= link_to link[:url], target: "_blank", rel: "noopener nofollow", title: link[:label], "aria-label": link[:label], class: "size-9 rounded-full border border-(--border-card) bg-(--bg-elev-2) flex items-center justify-center text-(--text-strong) hover:bg-(--bg-elev-3) transition-colors" do %>
+                <%= render "public_profiles/social_icon", icon: link[:icon] %>
+              <% end %>
+            <% end %>
+          </div>
+        <% end %>
+        <p class="mt-3 text-base sm:text-sm text-(--text-muted)">
+          <% if @attended_count > 0 %>
+            <%= pluralize(@attended_count, "Hack Club event") %> attended<% if @staffed_count > 0 %> · <%= @staffed_count %> staffed<% end %>
+          <% elsif @staffed_count > 0 %>
+            <%= pluralize(@staffed_count, "Hack Club event") %> staffed
+          <% else %>
+            0 Hack Club events attended
+          <% end %>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Map of attended events -->
+  <% if @show_map %>
+    <section class="rounded-2xl border border-(--border-card) bg-(--bg-elev) overflow-hidden mb-6"
+             data-controller="public-profile-map"
+             data-public-profile-map-url-value="<%= public_profile_markers_path(slug: @participant.public_profile_slug) %>">
+      <header class="px-6 py-4 border-b border-(--border-soft)">
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-(--text-muted)">Event map</h2>
+      </header>
+      <div data-public-profile-map-target="map" class="h-80 lg:h-112 w-full z-0"></div>
+    </section>
+  <% end %>
+
+  <!-- Past events -->
+  <section class="mb-6">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-(--text-muted) mb-3">Past events</h2>
+    <% if @profile_events.any? %>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <% @profile_events.each do |profile_event| %>
+          <% event = profile_event.event %>
+          <div class="rounded-2xl border border-(--border-card) bg-(--bg-elev) overflow-hidden">
+            <% banner = event.effective_banner %>
+            <% logo = event.effective_logo %>
+            <% if banner&.attached? %>
+              <%= image_tag banner, alt: "", class: "h-32 w-full object-cover" %>
+            <% elsif logo&.attached? %>
+              <div class="h-32 w-full bg-gradient-to-br from-[#ec3750] to-[#ff8c37] flex items-center justify-center">
+                <%= image_tag logo, alt: "", class: "size-16 rounded-full object-cover ring-2 ring-[#ffffff]/80 shadow-lg" %>
+              </div>
+            <% else %>
+              <%# text-white is theme-remapped in themes.css, so hex keeps it white on the gradient %>
+              <div class="h-32 w-full bg-gradient-to-br from-[#ec3750] to-[#ff8c37] flex items-center justify-center">
+                <span class="text-3xl font-black text-[#ffffff]/90"><%= event.name.first&.upcase %></span>
+              </div>
+            <% end %>
+            <div class="p-4">
+              <div class="flex items-start justify-between gap-2">
+                <h3 class="font-bold text-(--text-strong) truncate"><%= event.name %></h3>
+                <% if profile_event.staffed %>
+                  <span class="shrink-0 mt-0.5 inline-flex items-center rounded-full bg-[#ec3750]/10 px-2 py-0.5 text-xs font-semibold text-[#ec3750]">Staff</span>
+                <% end %>
+              </div>
+              <% location = [ event.location_city, event.location_country ].compact_blank.join(", ") %>
+              <% if location.present? %>
+                <p class="text-base sm:text-sm text-(--text-muted) truncate"><%= location %></p>
+              <% end %>
+              <% if event.starts_at.present? %>
+                <p class="text-base sm:text-sm text-(--text-muted)">
+                  <%= event.starts_at.strftime("%b %-d") %><% if event.ends_at.present? && event.ends_at.to_date != event.starts_at.to_date %> – <%= event.ends_at.strftime("%b %-d") %><% end %>, <%= (event.ends_at || event.starts_at).year %>
+                </p>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <div class="rounded-2xl border border-(--border-card) bg-(--bg-elev) p-8 text-center text-(--text-muted)">
+        No past events to show yet.
+      </div>
+    <% end %>
+  </section>
+
+  <p class="text-xs text-(--text-faint) text-center mb-4">
+    This profile is shared voluntarily by the participant.
+    Something wrong? <a href="mailto:attend@hackclub.com" class="underline hover:no-underline">Let us know</a>.
+  </p>
+</div>

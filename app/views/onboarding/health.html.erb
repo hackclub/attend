@@ -1,0 +1,150 @@
+<div class="w-full max-w-2xl mx-auto">
+  <%= render "wizard_nav" %>
+
+  <h1 class="text-2xl font-bold mb-2">Health & Dietary Information</h1>
+  <p class="text-sm text-gray-600 mb-6">All fields are optional. Fill in what applies to you.</p>
+
+  <%= form_with url: onboarding_step_path(step: @step, event_id: current_event.id), method: :patch, local: true, data: { turbo: false, controller: "autosave", autosave_url_value: onboarding_step_path(step: @step, event_id: current_event.id), action: "input->autosave#input change->autosave#change" } do |f| %>
+    <%= render "autosave_status" %>
+    <div class="space-y-8">
+      <section>
+        <h2 class="text-lg font-semibold mb-4 pb-2 border-b">Medical Information</h2>
+
+        <div class="space-y-4">
+          <div>
+            <%= f.label :allergies, "Allergies", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_area :allergies, value: @medical&.allergies, rows: 2, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", placeholder: "List any allergies (medications, environmental, etc.)" %>
+          </div>
+
+          <div>
+            <%= f.label :medical_conditions, "Medical Conditions", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_area :medical_conditions, value: @medical&.medical_conditions, rows: 2, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", placeholder: "Any conditions we should be aware of" %>
+          </div>
+
+          <div>
+            <%= f.label :medications, "Current Medications", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_area :medications, value: @medical&.medications, rows: 2, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", placeholder: "List any medications you take regularly" %>
+          </div>
+
+          <div>
+            <%= f.label :has_anaphylaxis_risk, class: "flex items-center gap-2 cursor-pointer" do %>
+              <%= f.check_box :has_anaphylaxis_risk, { class: "w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500", checked: @medical&.has_anaphylaxis_risk }, "1", "0" %>
+              <span class="text-sm font-medium text-gray-700">I am at risk of anaphylaxis</span>
+            <% end %>
+          </div>
+
+          <div>
+            <%= f.label :requires_refrigeration, class: "flex items-center gap-2 cursor-pointer" do %>
+              <%= f.check_box :requires_refrigeration, { class: "w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500", checked: @medical&.requires_refrigeration }, "1", "0" %>
+              <span class="text-sm font-medium text-gray-700">I need refrigeration for medications</span>
+            <% end %>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="text-lg font-semibold mb-4 pb-2 border-b">Dietary Requirements</h2>
+
+        <div class="space-y-4">
+          <div>
+            <%= f.label :diet_type, "Diet Type", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.select :diet_type, [["No specific diet", ""], ["Vegetarian", "vegetarian"], ["Vegan", "vegan"], ["Halal", "halal"], ["Kosher", "kosher"], ["Other", "other"]], { selected: @dietary&.diet_type }, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+          </div>
+
+          <div>
+            <%= f.label :intolerances, "Food Intolerances", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_area :intolerances, value: @dietary&.intolerances, rows: 2, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", placeholder: "e.g., lactose, gluten, nuts" %>
+          </div>
+
+          <div>
+            <%= f.label :life_threatening_allergies, "Life-Threatening Food Allergies", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_area :life_threatening_allergies, value: @dietary&.life_threatening_allergies, rows: 2, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", placeholder: "List any severe food allergies" %>
+            <p class="mt-1 text-sm text-gray-500">This helps our catering team take extra precautions</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="text-lg font-semibold mb-4 pb-2 border-b">Learning & Cognitive Needs</h2>
+        <p class="text-sm text-gray-500 mb-4">This helps us provide appropriate support and accommodations during the event.</p>
+
+        <div class="space-y-4">
+          <fieldset>
+            <legend class="text-sm font-medium text-gray-700 mb-2">Do any of these apply to you?</legend>
+            <div class="space-y-2">
+              <%= f.label :has_adhd, class: "flex items-center gap-2 cursor-pointer" do %>
+                <%= f.check_box :has_adhd, { class: "w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500", checked: @accessibility&.has_adhd }, "1", "0" %>
+                <span class="text-sm text-gray-700">ADHD</span>
+              <% end %>
+
+              <%= f.label :has_dyslexia, class: "flex items-center gap-2 cursor-pointer" do %>
+                <%= f.check_box :has_dyslexia, { class: "w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500", checked: @accessibility&.has_dyslexia }, "1", "0" %>
+                <span class="text-sm text-gray-700">Dyslexia</span>
+              <% end %>
+
+              <%= f.label :has_autism, class: "flex items-center gap-2 cursor-pointer" do %>
+                <%= f.check_box :has_autism, { class: "w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500", checked: @accessibility&.has_autism }, "1", "0" %>
+                <span class="text-sm text-gray-700">Autism</span>
+              <% end %>
+            </div>
+          </fieldset>
+
+          <div>
+            <%= f.label :neurodivergent_notes, "Additional Notes", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_area :neurodivergent_notes, value: @accessibility&.neurodivergent_notes, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", placeholder: "Any specific accommodations or support that would help you (e.g., quiet space access, written instructions, extra time)" %>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="text-lg font-semibold mb-4 pb-2 border-b">Accessibility Needs</h2>
+
+        <div class="space-y-4">
+          <fieldset>
+            <legend class="text-sm font-medium text-gray-700 mb-2">Mobility Needs</legend>
+            <div class="space-y-2">
+              <%= f.label :uses_wheelchair, class: "flex items-center gap-2 cursor-pointer" do %>
+                <%= f.check_box :uses_wheelchair, { class: "w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500", checked: @accessibility&.uses_wheelchair }, "1", "0" %>
+                <span class="text-sm text-gray-700">Wheelchair accessible room/venue</span>
+              <% end %>
+
+              <%= f.label :step_free_required, class: "flex items-center gap-2 cursor-pointer" do %>
+                <%= f.check_box :step_free_required, { class: "w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500", checked: @accessibility&.step_free_required }, "1", "0" %>
+                <span class="text-sm text-gray-700">Step-free access required</span>
+              <% end %>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend class="text-sm font-medium text-gray-700 mb-2">Sensory Needs</legend>
+            <div class="space-y-2">
+              <%= f.label :needs_captioning, class: "flex items-center gap-2 cursor-pointer" do %>
+                <%= f.check_box :needs_captioning, { class: "w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500", checked: @accessibility&.needs_captioning }, "1", "0" %>
+                <span class="text-sm text-gray-700">Captioning/hearing assistance</span>
+              <% end %>
+
+              <%= f.label :needs_large_print, class: "flex items-center gap-2 cursor-pointer" do %>
+                <%= f.check_box :needs_large_print, { class: "w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500", checked: @accessibility&.needs_large_print }, "1", "0" %>
+                <span class="text-sm text-gray-700">Large print materials</span>
+              <% end %>
+
+              <%= f.label :needs_sign_language, class: "flex items-center gap-2 cursor-pointer" do %>
+                <%= f.check_box :needs_sign_language, { class: "w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500", checked: @accessibility&.needs_sign_language }, "1", "0" %>
+                <span class="text-sm text-gray-700">Sign language interpreter needed</span>
+              <% end %>
+            </div>
+          </fieldset>
+
+          <div>
+            <%= f.label :other_needs, "Other Accessibility or Communication Needs", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_area :other_needs, value: @accessibility&.other_needs, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", placeholder: "Please describe any additional needs" %>
+          </div>
+        </div>
+      </section>
+
+      <%= f.hidden_field :onboarding_step, value: "health" %>
+
+      <%= render "step_navigation" %>
+    </div>
+  <% end %>
+</div>

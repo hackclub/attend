@@ -1,0 +1,40 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+# pulled from repo
+name: "Rubocop"
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    # The branches below must be a subset of the branches above
+    branches: [ "main" ]
+  schedule:
+    - cron: '18 23 * * 0'
+
+permissions:
+  contents: read
+
+jobs:
+  rubocop:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Set up Ruby
+      # Matches ci.yml's unpinned `@v1`; reads Ruby/Bundler from .ruby-version + Gemfile.lock.
+      uses: ruby/setup-ruby@v1
+      with:
+        bundler-cache: true
+
+    - name: Rubocop run
+      run: bundle exec rubocop

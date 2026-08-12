@@ -1,0 +1,7 @@
+<div id="<%= dom_id(note) %>" class="bg-yellow-50 border border-yellow-200 rounded-md p-2 text-sm">
+  <p class="text-gray-900 whitespace-pre-wrap"><%= note.body %></p>
+  <div class="flex items-center justify-between mt-1 text-xs text-gray-500">
+    <span><%= note.author.display_name_or_fallback %></span>
+    <span><%= note.created_at.strftime("%b %d, %H:%M") %></span>
+  </div>
+</div>
