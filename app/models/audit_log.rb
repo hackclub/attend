@@ -60,7 +60,8 @@ class AuditLog < ApplicationRecord
     ticket_set_event: "set_event",
     ticket_set_subject: "set_subject",
     toggle_support_sms: "toggle_support_sms",
-    update_support_sms_numbers: "update_support_sms_numbers"
+    update_support_sms_numbers: "update_support_sms_numbers",
+    trigger_airtable_sync: "trigger_airtable_sync"
   }
 
   validates :record_type, presence: true

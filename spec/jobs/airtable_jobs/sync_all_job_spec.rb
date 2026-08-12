@@ -147,4 +147,155 @@ RSpec.describe AirtableJobs::SyncAllJob do
 
     expect(Airtable::SyncService).not_to have_received(:new)
   end
+
+  # The bug behind thousands of identical Sentry errors: saving the integrations
+  # form with the Airtable fields blank leaves empty strings behind, and the old
+  # `where.not(col: [nil, ""])` filter let them through because `normalizes`
+  # collapsed the "" in the query to nil.
+  it "skips events whose Airtable settings are stored as blank strings" do
+    event = create(:event)
+    event.update_columns(
+      airtable_sync_source_id: "",
+      airtable_sync_table_id: "",
+      config: event.config.merge("airtable_api_key" => "", "airtable_base_id" => "")
+    )
+    allow(Airtable::SyncService).to receive(:new)
+
+    described_class.perform_now
+
+    expect(Airtable::SyncService).not_to have_received(:new)
+    expect(Sentry).not_to have_received(:capture_exception)
+  end
+
+  it "skips events whose Airtable settings are only whitespace" do
+    event = create(:event)
+    event.update_columns(
+      airtable_sync_source_id: "  ",
+      airtable_sync_table_id: "  ",
+      config: event.config.merge("airtable_api_key" => " ", "airtable_base_id" => " ")
+    )
+    allow(Airtable::SyncService).to receive(:new)
+
+    described_class.perform_now
+
+    expect(Airtable::SyncService).not_to have_received(:new)
+  end
+
+  describe "pausing after a failure" do
+    it "pauses the event's sync on the first failure" do
+      broken = configured_event
+      stub_sync(broken, raising: not_found)
+
+      described_class.perform_now
+
+      expect(broken.reload.airtable_sync_paused?).to be(true)
+    end
+
+    it "does not touch a healthy event's pause state" do
+      healthy = configured_event
+      stub_sync(healthy)
+
+      described_class.perform_now
+
+      expect(healthy.reload.airtable_sync_paused?).to be(false)
+    end
+
+    it "stops attempting the event on later runs" do
+      broken = configured_event
+      service = stub_sync(broken, raising: not_found)
+
+      described_class.perform_now
+      described_class.perform_now
+      described_class.perform_now
+
+      expect(service).to have_received(:sync_via_api).once
+      expect(Sentry).to have_received(:capture_exception).once
+    end
+
+    it "flags the pause on the Sentry report" do
+      broken = configured_event
+      stub_sync(broken, raising: not_found)
+
+      described_class.perform_now
+
+      expect(Sentry).to have_received(:capture_exception) do |_exception, **options|
+        expect(options[:tags]).to include(airtable_sync_paused: true)
+        expect(options[:contexts][:airtable_sync][:paused_at]).to be_present
+      end
+    end
+  end
+
+  describe "notifying the config owner" do
+    it "emails whoever last saved the Airtable settings" do
+      owner = create(:user)
+      broken = configured_event(airtable_config_updated_by: owner)
+      stub_sync(broken, raising: not_found)
+
+      expect { described_class.perform_now }
+        .to have_enqueued_mail(AirtableMailer, :sync_paused)
+        .with(event: broken, recipient: owner, error_message: not_found.message)
+    end
+
+    it "emails only once, because the event stays paused" do
+      owner = create(:user)
+      broken = configured_event(airtable_config_updated_by: owner)
+      stub_sync(broken, raising: not_found)
+
+      expect do
+        described_class.perform_now
+        described_class.perform_now
+        described_class.perform_now
+      end.to have_enqueued_mail(AirtableMailer, :sync_paused).once
+    end
+
+    it "falls back to the last admin who saved the integrations form" do
+      saver = create(:user)
+      broken = configured_event
+      AuditLog.log!(action: :update_integrations, record: broken, event: broken, actor: saver)
+      stub_sync(broken, raising: not_found)
+
+      expect { described_class.perform_now }
+        .to have_enqueued_mail(AirtableMailer, :sync_paused)
+        .with(hash_including(recipient: saver))
+    end
+
+    it "prefers the recorded owner over the audit trail" do
+      owner = create(:user)
+      older_saver = create(:user)
+      broken = configured_event(airtable_config_updated_by: owner)
+      AuditLog.log!(action: :update_integrations, record: broken, event: broken, actor: older_saver)
+      stub_sync(broken, raising: not_found)
+
+      expect { described_class.perform_now }
+        .to have_enqueued_mail(AirtableMailer, :sync_paused)
+        .with(hash_including(recipient: owner))
+    end
+
+    it "still pauses and reports when nobody is known to email" do
+      broken = configured_event
+      stub_sync(broken, raising: not_found)
+
+      expect { described_class.perform_now }
+        .not_to have_enqueued_mail(AirtableMailer, :sync_paused)
+
+      expect(broken.reload.airtable_sync_paused?).to be(true)
+      expect(Sentry).to have_received(:capture_exception) do |_exception, **options|
+        expect(options[:contexts][:airtable_sync][:notified]).to match(/nobody/)
+      end
+    end
+
+    it "keeps syncing the other events when the notification blows up" do
+      owner = create(:user)
+      broken = configured_event(airtable_config_updated_by: owner)
+      healthy = configured_event
+      stub_sync(broken, raising: not_found)
+      healthy_service = stub_sync(healthy)
+      allow(AirtableMailer).to receive(:sync_paused).and_raise(StandardError, "smtp is down")
+
+      expect { described_class.perform_now }.not_to raise_error
+
+      expect(healthy_service).to have_received(:sync_via_api)
+      expect(broken.reload.airtable_sync_paused?).to be(true)
+    end
+  end
 end
