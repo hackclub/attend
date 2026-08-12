@@ -45,6 +45,10 @@ class Admin::DashboardController < Admin::BaseController
     @event = Event.find_by!(slug: params[:slug])
     authorize @event, :update?
 
+    # Without a current event the audit row lands with a null event_id, which
+    # hides it from every non-global admin's audit log.
+    set_current_event(@event)
+
     client = Vote::Client.new
 
     if @event.vote_event_linked?
