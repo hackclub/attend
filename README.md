@@ -11,7 +11,6 @@ A web application for onboarding under-18 participants for in-person Hack Club e
 - **Guardian portal** — Secure magic-link access for parents/guardians to complete consent forms
 - **Role-based access control** — Global Admin, Event Admin, Ops Staff, Safeguarding Lead roles
 - **Sensitive data encryption** — Medical and safeguarding information encrypted at rest
-- **External integrations** — Docuseal (e-signatures), Loops (transactional email)
 - **Mobile wallet passes** — Apple Wallet and Google Wallet support for event check-in
 - **Audit logging** — Full trail of admin actions with PaperTrail and console1984
 - **QR code check-in** — Scan participants at event venues
