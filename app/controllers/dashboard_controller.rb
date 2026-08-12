@@ -46,9 +46,11 @@ class DashboardController < ApplicationController
 
   def show
     @participant_event = @participant.participant_events
-      .includes(:event, :consents, :accommodation, :medical, :dietary, :accessibility,
-                :emergency_contacts, guardian_participant_events: :guardian,
-                travel_inbound: :travel_legs, travel_outbound: :travel_legs)
+      .includes(:consents, :accommodation, :medical, :dietary, :accessibility,
+                :emergency_contacts, :safeguarding_info,
+                guardian_participant_events: :guardian,
+                travel_inbound: :travel_legs, travel_outbound: :travel_legs,
+                event: [ :custom_documents, { logo_attachment: :blob, event_series: { logo_attachment: :blob } } ])
       .find(params[:id])
     authorize @participant_event
     @event = @participant_event.event
