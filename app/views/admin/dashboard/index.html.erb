@@ -5,21 +5,21 @@
     <h1 class="text-2xl font-semibold text-gray-900">Events</h1>
     <% if policy(Event).create? || policy(EventSeries).create? %>
       <div class="relative" data-controller="dropdown">
-        <button type="button" data-action="dropdown#toggle" class="inline-flex items-center gap-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium py-2 px-4 rounded-md transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        <button type="button" data-action="dropdown#toggle" aria-haspopup="true" aria-expanded="false" class="inline-flex items-center gap-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium py-2 px-4 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ec3750] transition-colors">
+          <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
           New
-          <svg class="w-4 h-4 -mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+          <svg class="w-4 h-4 -mr-1" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
         </button>
         <div class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 py-1" data-dropdown-target="menu">
           <% if policy(Event).create? %>
-            <%= link_to admin_new_event_path, class: "flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" do %>
-              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            <%= link_to admin_new_event_path, class: "flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:bg-gray-50 focus-visible:text-gray-900" do %>
+              <svg class="w-4 h-4 text-gray-400" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
               New Event
             <% end %>
           <% end %>
           <% if policy(EventSeries).create? %>
-            <%= link_to new_admin_series_path, class: "flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" do %>
-              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+            <%= link_to new_admin_series_path, class: "flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:bg-gray-50 focus-visible:text-gray-900" do %>
+              <svg class="w-4 h-4 text-gray-400" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
               New Series
             <% end %>
           <% end %>
@@ -28,60 +28,52 @@
     <% end %>
   </div>
 
-  <% if @events.any? %>
-    <% completed_events, current_events = @events.partition(&:completed?) %>
-    <% if current_events.any? %>
-      <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <%# Series events collapse into one expandable row, placed where the
-            series' first event would have appeared. %>
-        <% rendered_series_ids = Set.new %>
-        <% row_index = 0 %>
-        <% current_events.each do |event| %>
-          <% if event.event_series_id %>
-            <% next if rendered_series_ids.include?(event.event_series_id) %>
-            <% rendered_series_ids << event.event_series_id %>
-            <%= render "series_group",
-                  series: event.event_series,
-                  events: current_events.select { |e| e.event_series_id == event.event_series_id },
-                  first: row_index == 0 %>
-          <% else %>
-            <%= render "event_row", event: event, first: row_index == 0 %>
-          <% end %>
-          <% row_index += 1 %>
-        <% end %>
-        <div class="px-5 py-3 border-t border-gray-100 text-xs text-gray-500">
-          <%= current_events.count %> <%= "event".pluralize(current_events.count) %>
-        </div>
-      </div>
-    <% end %>
-
-    <% if completed_events.any? %>
-      <details class="mt-6 group">
-        <summary class="list-none cursor-pointer inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
-          <span>Looking for a completed event?</span>
-          <span class="transition-transform group-open:translate-x-0.5">→</span>
-        </summary>
-        <div class="mt-4 bg-white border border-gray-200 rounded-lg overflow-hidden">
-          <% completed_events.each_with_index do |event, i| %>
-            <%= render "event_row", event: event, first: i == 0 %>
-          <% end %>
-          <div class="px-5 py-3 border-t border-gray-100 text-xs text-gray-500">
-            <%= completed_events.count %> completed <%= "event".pluralize(completed_events.count) %>
-          </div>
-        </div>
-      </details>
-    <% end %>
-
-  <% else %>
+  <% if @current_events.any? %>
+    <%= render "event_list",
+          events: @current_events,
+          footer_label: pluralize(@current_events.count, "event") %>
+  <% elsif @completed_events.any? %>
+    <%# Every event this admin can see has already run. Without this the page
+        was just a heading and a one-line disclosure link. %>
     <div class="bg-white border border-gray-200 rounded-lg p-12 text-center">
       <div class="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-4">
-        <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+        <svg class="w-6 h-6 text-gray-400" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+      </div>
+      <h2 class="text-base font-medium text-gray-900 mb-1">Nothing running right now</h2>
+      <p class="text-sm text-gray-500 mb-6">Every event you have access to has wrapped up. Past events are listed below.</p>
+      <% if policy(Event).create? %>
+        <%= link_to admin_new_event_path, class: "inline-flex items-center gap-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium py-2 px-4 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ec3750] transition-colors" do %>
+          <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          Create Event
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if @completed_events.any? %>
+    <details class="mt-6 group" <%= "open" if @current_events.empty? %>>
+      <summary class="list-none [&::-webkit-details-marker]:hidden cursor-pointer inline-flex items-center gap-2 rounded-sm text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ec3750] transition-colors">
+        <span>Looking for a completed event?</span>
+        <svg class="w-4 h-4 transition-transform group-open:rotate-90" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+      </summary>
+      <div class="mt-4">
+        <%= render "event_list",
+              events: @completed_events,
+              footer_label: pluralize(@completed_events.count, "completed event") %>
+      </div>
+    </details>
+  <% end %>
+
+  <% if @events.empty? %>
+    <div class="bg-white border border-gray-200 rounded-lg p-12 text-center">
+      <div class="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-4">
+        <svg class="w-6 h-6 text-gray-400" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
       </div>
       <h2 class="text-base font-medium text-gray-900 mb-1">No events yet</h2>
-      <p class="text-sm text-gray-500 mb-6">Create your first event to get started.</p>
+      <p class="text-sm text-gray-500 mb-6">An event holds its own participants, staff, travel, and check-in — start one and the rest of the admin fills in around it.</p>
       <% if policy(Event).create? %>
-        <%= link_to admin_new_event_path, class: "inline-flex items-center gap-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        <%= link_to admin_new_event_path, class: "inline-flex items-center gap-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium py-2 px-4 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ec3750] transition-colors" do %>
+          <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
           Create Event
         <% end %>
       <% end %>

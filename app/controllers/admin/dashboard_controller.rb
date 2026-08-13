@@ -8,6 +8,16 @@ class Admin::DashboardController < Admin::BaseController
     @events = policy_scope(Event)
       .includes(logo_attachment: :blob, event_series: { logo_attachment: :blob })
       .order(starts_at: :desc)
+      .to_a
+
+    # A single `starts_at DESC` put the event furthest in the future at the top
+    # and buried the one running today at the bottom — and Postgres sorts NULLs
+    # first on DESC, so undated drafts led the whole page. Live and upcoming
+    # events read soonest-first; finished ones read most-recent-first.
+    @completed_events, @current_events = @events.partition(&:completed?)
+    @current_events.sort_by! { |event| [ event.starts_at ? 0 : 1, event.starts_at || Time.current ] }
+    @completed_events.sort_by! { |event| -(event.ends_at || event.starts_at).to_i }
+
     # One grouped COUNT for the whole page; each row previously ran its own
     # COUNT-with-JOIN via event.participants.count
     @event_participant_counts = ParticipantEvent.where(event: @events).group(:event_id).count
