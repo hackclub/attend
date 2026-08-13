@@ -1,68 +1,47 @@
+<% content_for :title, "Link expired – Attend" %>
+
 <div class="w-full max-w-lg mx-auto">
-  <div class="text-center py-12">
-    <div class="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
-      <svg class="w-10 h-10 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+  <%= render "shared/portal_masthead" %>
+
+  <div class="mb-8">
+    <span class="portal-medallion portal-medallion-warn mb-5">
+      <svg class="size-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
       </svg>
-    </div>
+    </span>
 
-    <h1 class="text-3xl font-bold text-gray-900 mb-4">Link Expired</h1>
-    <p class="text-lg text-gray-600 mb-8">
-      This guardian consent link has expired for security reasons.
+    <h1 class="portal-title text-2xl mb-3">This link has expired</h1>
+    <p class="portal-body text-lg">
+      Guardian links stop working after 7 days. Nothing you filled in is lost — you just need a fresh
+      way in.
     </p>
   </div>
 
-  <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
-    <h2 class="text-lg font-semibold text-gray-900 mb-2">Get a fresh link now</h2>
-    <p class="text-sm text-gray-600 mb-4">
-      Verify your email address or phone number in the portal center to see all of your portals and
-      open this one with a new, valid link — no need to wait for a new email.
+  <section class="portal-card p-5 sm:p-6 mb-6">
+    <h2 class="portal-heading text-base mb-1">Get back in now</h2>
+    <p class="portal-hint text-sm mb-4">
+      Verify your email address or phone number and we'll reopen this portal straight away — no need to
+      wait for another email.
     </p>
-    <%= link_to "Find my portals", guardian_portal_center_path,
-          class: "inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-lg transition-colors" %>
-  </div>
+    <%= link_to "Find my portals", guardian_portal_center_path, class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+  </section>
 
-  <div class="bg-white border rounded-lg p-6 mb-8">
-    <h2 class="text-lg font-semibold mb-4">Other options</h2>
+  <section class="portal-card p-5 sm:p-6 mb-6">
+    <h2 class="portal-heading text-base mb-3">Or, if you'd rather wait</h2>
+    <ul class="space-y-4">
+      <li>
+        <p class="portal-heading text-sm">Check for a newer email</p>
+        <p class="portal-hint text-sm mt-0.5">The most recent invitation link is always the valid one.</p>
+      </li>
+      <li>
+        <p class="portal-heading text-sm">Ask for a new invitation</p>
+        <p class="portal-hint text-sm mt-0.5">The participant or the event organizers can resend it to you.</p>
+      </li>
+    </ul>
+  </section>
 
-    <div class="space-y-4">
-      <div class="flex items-start gap-3">
-        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-          <span class="text-blue-600 font-semibold text-sm">1</span>
-        </div>
-        <div>
-          <h3 class="font-medium text-gray-900">Request a new link</h3>
-          <p class="text-sm text-gray-600 mt-1">
-            Contact the participant or event organizers to request a new consent invitation link.
-          </p>
-        </div>
-      </div>
-
-      <div class="flex items-start gap-3">
-        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-          <span class="text-blue-600 font-semibold text-sm">2</span>
-        </div>
-        <div>
-          <h3 class="font-medium text-gray-900">Check your email</h3>
-          <p class="text-sm text-gray-600 mt-1">
-            Look for a more recent email with an updated consent link. The newest link will always be valid.
-          </p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="bg-gray-50 rounded-lg p-6">
-    <h3 class="font-semibold text-gray-900 mb-2">Why do links expire?</h3>
-    <p class="text-sm text-gray-600">
-      For security purposes, guardian consent links expire after 7 days. This helps protect the privacy
-      of participants and ensures that consent is provided in a timely manner.
-    </p>
-  </div>
-
-  <div class="text-center mt-8">
-    <p class="text-sm text-gray-500">
-      If you continue to have issues, please contact the event organizers for assistance.
-    </p>
-  </div>
+  <p class="portal-hint text-sm">
+    Links expire so that a forwarded email can't give a stranger access to a participant's medical and
+    contact details.
+  </p>
 </div>

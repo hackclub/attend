@@ -1,1 +1,507 @@
 @import "tailwindcss";
+
+/* ====================================================================
+ * Portal surfaces — the pages a parent, guardian or participant sees
+ * outside the signed-in app shell (guardian portal, portal center,
+ * onboarding document upload).
+ *
+ * These read every colour from the semantic theme tokens declared in
+ * themes.css, so a single rule works across all eight themes. Hard-coded
+ * Hack Club hexes would look right in light and break everywhere else.
+ * ==================================================================== */
+@layer components {
+  :root {
+    --portal-r-control: 6px;
+    --portal-r-card: 8px;
+    --portal-ring: 0 0 0 2px color-mix(in oklab, var(--accent) 30%, transparent);
+  }
+
+  /* --- surfaces ---------------------------------------------------- */
+
+  .portal-card {
+    background-color: var(--bg-elev);
+    border: 1px solid var(--border-card);
+    border-radius: var(--portal-r-card);
+  }
+
+  .portal-panel {
+    background-color: var(--bg-elev-2);
+    border-radius: var(--portal-r-card);
+  }
+
+  /* A framed group inside a card — flat, never a second card. */
+  .portal-inset {
+    border-top: 1px solid var(--border);
+  }
+
+  .portal-inset-bottom {
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* --- type -------------------------------------------------------- */
+
+  .portal-title {
+    color: var(--text-strong);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+
+  .portal-heading {
+    color: var(--text-strong);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .portal-body {
+    color: var(--text);
+  }
+
+  /* Secondary copy still has to clear 4.5:1, so it reads --text-soft,
+   * not --text-muted. --text-muted is for bold or incidental meta only. */
+  .portal-hint {
+    color: var(--text-soft);
+  }
+
+  .portal-meta {
+    color: var(--text-muted);
+  }
+
+  /* --accent-strong, not --accent: Hack Club red on a white card is 4.02:1,
+   * which misses AA for body-size link text. Each theme's strong variant
+   * clears it in both directions (light deepens, dark lightens). */
+  .portal-link {
+    color: var(--accent-strong);
+    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+    text-decoration-color: color-mix(in oklab, var(--accent-strong) 40%, transparent);
+    transition: color 0.12s ease, text-decoration-color 0.12s ease;
+  }
+
+  .portal-link:hover {
+    color: var(--accent);
+    text-decoration-color: currentColor;
+  }
+
+  /* --- form controls ----------------------------------------------- */
+
+  .portal-label {
+    display: block;
+    color: var(--text-strong);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.4;
+    margin-bottom: 0.375rem;
+  }
+
+  .portal-input,
+  .portal-select,
+  .portal-textarea {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background-color: var(--bg-elev);
+    color: var(--text-strong);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--portal-r-control);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  .portal-textarea {
+    min-height: 4.5rem;
+    resize: vertical;
+  }
+
+  .portal-input::placeholder,
+  .portal-textarea::placeholder {
+    color: var(--text-faint);
+  }
+
+  .portal-input:hover,
+  .portal-select:hover,
+  .portal-textarea:hover {
+    border-color: var(--text-muted);
+  }
+
+  .portal-input:focus,
+  .portal-select:focus,
+  .portal-textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--portal-ring);
+  }
+
+  .portal-input:disabled,
+  .portal-select:disabled,
+  .portal-textarea:disabled {
+    background-color: var(--bg-elev-2);
+    color: var(--text-muted);
+    cursor: not-allowed;
+  }
+
+  .portal-check {
+    width: 1.15rem;
+    height: 1.15rem;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .portal-check:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* A whole-row checkbox target: comfortably tappable on a phone. */
+  .portal-check-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .portal-check-row:hover {
+    color: var(--text-strong);
+  }
+
+  .portal-file {
+    display: block;
+    width: 100%;
+    font-size: 0.875rem;
+    color: var(--text);
+  }
+
+  .portal-file::file-selector-button {
+    margin-right: 0.75rem;
+    padding: 0.5rem 0.875rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--portal-r-control);
+    background-color: var(--bg-elev-2);
+    color: var(--text-strong);
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background-color 0.12s ease, border-color 0.12s ease;
+  }
+
+  .portal-file::file-selector-button:hover {
+    background-color: var(--bg-elev-3);
+    border-color: var(--text-muted);
+  }
+
+  .portal-required {
+    color: var(--danger);
+    margin-left: 0.125rem;
+  }
+
+  /* --- buttons ------------------------------------------------------ */
+
+  .portal-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--portal-r-control);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    text-decoration: none;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background-color 0.12s ease, border-color 0.12s ease,
+      color 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  .portal-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* The Deepened Red Rule, applied in all eight themes rather than only in
+   * light. The rule names --accent-strong, but that token *lightens* in the
+   * dark themes (#ff5670), where white on it is 3.08:1 — worse than the red
+   * it replaces. PR #20 avoids this because themes.css maps its .bg-[#d42f46]
+   * utility back to --accent outside light; a CSS layer has no such escape.
+   * Deriving from --accent instead lands on #d43248 in light — one or two
+   * steps off the rule's #d42f46, indistinguishable — and clears AA (4.83:1)
+   * everywhere. Hover lands on the rule's --accent-deep (#b82840, 6.35:1). */
+  .portal-btn-primary {
+    background-color: color-mix(in oklab, var(--accent) 90%, black);
+    color: var(--accent-on);
+  }
+
+  .portal-btn-primary:hover {
+    background-color: color-mix(in oklab, var(--accent) 78%, black);
+  }
+
+  .portal-btn-secondary {
+    background-color: var(--bg-elev);
+    color: var(--text-strong);
+    border-color: var(--border-strong);
+  }
+
+  .portal-btn-secondary:hover {
+    background-color: var(--bg-elev-2);
+    border-color: var(--text-muted);
+  }
+
+  .portal-btn-quiet {
+    background-color: transparent;
+    color: var(--text-soft);
+    padding-inline: 0.75rem;
+  }
+
+  .portal-btn-quiet:hover {
+    background-color: var(--bg-elev-2);
+    color: var(--text-strong);
+  }
+
+  .portal-btn[disabled],
+  .portal-btn[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  /* --- status ------------------------------------------------------- */
+
+  .portal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.125rem 0.625rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.35;
+    white-space: nowrap;
+  }
+
+  /* The label is mostly --text-strong with a 30% cast of its own hue: tinted
+   * from the surface as the craft floor asks, but legible in every theme
+   * (mixing the other way lands mid-tone and fails AA in light mode). */
+  .portal-badge-done {
+    background-color: color-mix(in oklab, var(--success) 18%, var(--bg-elev));
+    color: color-mix(in oklab, var(--success) 30%, var(--text-strong));
+  }
+
+  .portal-badge-waiting {
+    background-color: color-mix(in oklab, var(--info) 18%, var(--bg-elev));
+    color: color-mix(in oklab, var(--info) 30%, var(--text-strong));
+  }
+
+  .portal-badge-pending {
+    background-color: color-mix(in oklab, var(--warning) 20%, var(--bg-elev));
+    color: color-mix(in oklab, var(--warning) 30%, var(--text-strong));
+  }
+
+  .portal-badge-neutral {
+    background-color: var(--bg-elev-2);
+    color: var(--text-soft);
+  }
+
+  /* Callouts. One hue each: info explains, warn blocks, success confirms. */
+  .portal-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-radius: var(--portal-r-card);
+    border: 1px solid transparent;
+  }
+
+  .portal-note-info {
+    background-color: color-mix(in oklab, var(--info) 10%, var(--bg-elev));
+    border-color: color-mix(in oklab, var(--info) 26%, var(--bg-elev));
+  }
+
+  .portal-note-warn {
+    background-color: color-mix(in oklab, var(--warning) 12%, var(--bg-elev));
+    border-color: color-mix(in oklab, var(--warning) 30%, var(--bg-elev));
+  }
+
+  .portal-note-success {
+    background-color: color-mix(in oklab, var(--success) 12%, var(--bg-elev));
+    border-color: color-mix(in oklab, var(--success) 28%, var(--bg-elev));
+  }
+
+  .portal-note-icon {
+    flex-shrink: 0;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-top: 0.1rem;
+  }
+
+  .portal-note-info .portal-note-icon {
+    color: var(--info);
+  }
+  .portal-note-warn .portal-note-icon {
+    color: var(--warning-strong);
+  }
+  .portal-note-success .portal-note-icon {
+    color: var(--success-strong);
+  }
+
+  /* Tinted medallion for a page's status icon. */
+  .portal-medallion {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--portal-r-card);
+    flex-shrink: 0;
+  }
+
+  .portal-medallion-accent {
+    background-color: var(--accent-soft);
+    color: var(--accent);
+  }
+  .portal-medallion-success {
+    background-color: color-mix(in oklab, var(--success) 16%, var(--bg-elev));
+    color: var(--success-strong);
+  }
+  .portal-medallion-warn {
+    background-color: color-mix(in oklab, var(--warning) 16%, var(--bg-elev));
+    color: var(--warning-strong);
+  }
+  .portal-medallion-danger {
+    background-color: color-mix(in oklab, var(--danger) 14%, var(--bg-elev));
+    color: var(--danger);
+  }
+  .portal-medallion-neutral {
+    background-color: var(--bg-elev-2);
+    color: var(--text-soft);
+  }
+
+  .portal-skeleton {
+    background-color: var(--bg-sunken);
+  }
+
+  .portal-skeleton-strong {
+    background-color: var(--border-strong);
+  }
+
+  .portal-dot {
+    background-color: var(--accent);
+    opacity: 0.25;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .portal-dot {
+      animation: portal-dot-pulse 1.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+    }
+  }
+
+  @keyframes portal-dot-pulse {
+    0%, 70%, 100% {
+      opacity: 0.25;
+      transform: scale(1);
+    }
+    35% {
+      opacity: 1;
+      transform: scale(1.25);
+    }
+  }
+
+  /* --- progress ----------------------------------------------------- */
+
+  .portal-progress {
+    height: 0.5rem;
+    border-radius: 999px;
+    background-color: var(--bg-sunken);
+    overflow: hidden;
+  }
+
+  /* Scales rather than resizes, so the fill never triggers layout. */
+  .portal-progress-fill {
+    width: 100%;
+    height: 100%;
+    border-radius: 999px;
+    background-color: var(--accent);
+    transform-origin: left center;
+    transform: scaleX(var(--portal-progress, 0));
+    transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+      background-color 0.3s ease;
+  }
+
+  .portal-progress-fill-done {
+    background-color: color-mix(in oklab, var(--success) 72%, black);
+  }
+
+  /* --- step list ---------------------------------------------------- */
+
+  .portal-step-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-radius: var(--portal-r-control);
+    background-color: var(--bg-elev-2);
+    transition: background-color 0.12s ease;
+  }
+
+  @media (min-width: 640px) {
+    .portal-step-row {
+      flex-direction: row;
+      align-items: center;
+    }
+  }
+
+  .portal-step-row-done {
+    background-color: color-mix(in oklab, var(--success) 10%, var(--bg-elev));
+  }
+
+  .portal-step-marker {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 999px;
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: 2px solid var(--border-strong);
+    color: var(--text-muted);
+  }
+
+  .portal-step-marker-done {
+    background-color: color-mix(in oklab, var(--success) 60%, black);
+    border-color: color-mix(in oklab, var(--success) 60%, black);
+    color: var(--text-on-dark);
+  }
+
+  /* Carries a white digit, so it takes the same deepened fill as a button. */
+  .portal-step-marker-current {
+    background-color: color-mix(in oklab, var(--accent) 90%, black);
+    border-color: color-mix(in oklab, var(--accent) 90%, black);
+    color: var(--accent-on);
+  }
+
+  /* The one authored moment on this surface: the overview checklist
+   * settles into place, so a returning parent's eye lands on the list
+   * that tells them what is left. Everything else stays still. */
+  @media (prefers-reduced-motion: no-preference) {
+    .portal-step-row {
+      animation: portal-settle 0.45s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    }
+  }
+
+  @keyframes portal-settle {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+}

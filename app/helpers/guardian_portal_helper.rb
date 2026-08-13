@@ -19,6 +19,29 @@ module GuardianPortalHelper
     "freedom_waiver" => "Permission for your child to leave the event venue unsupervised."
   }.freeze
 
+  # "Details" and "Participant Info" don't tell a parent whose details they
+  # are. These labels name the owner of each step instead.
+  STEP_LABELS = {
+    "participant_info" => "Participant details",
+    "details" => "Your details",
+    "emergency" => "Emergency contacts",
+    "consents" => "Consents & documents"
+  }.freeze
+
+  def guardian_step_label(step)
+    STEP_LABELS[step.to_s] || step.to_s.titleize
+  end
+
+  def guardian_step_description(step, participant_first_name)
+    case step.to_s
+    when "participant_info" then "Check what #{participant_first_name} told us, and fill in anything missing."
+    when "details"          then "How the event team reaches you."
+    when "emergency"        then "Who we call if we can't reach you."
+    when "consents"         then "Sign the forms this event requires."
+    else ""
+    end
+  end
+
   def consent_type_label(consent_type)
     CONSENT_TYPE_LABELS[consent_type.to_s] || consent_type.to_s.titleize
   end

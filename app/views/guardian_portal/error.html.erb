@@ -1,66 +1,52 @@
+<% content_for :title, "Something went wrong – Attend" %>
+
 <div class="w-full max-w-lg mx-auto">
-  <div class="text-center py-12">
-    <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-      <svg class="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+  <%= render "shared/portal_masthead" %>
+
+  <div class="mb-8">
+    <span class="portal-medallion portal-medallion-danger mb-5">
+      <svg class="size-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
       </svg>
-    </div>
+    </span>
 
-    <h1 class="text-3xl font-bold text-gray-900 mb-4">Something Went Wrong</h1>
-    <p class="text-lg text-gray-600 mb-8">
-      <%= @error_message || "We encountered an error while processing your request." %>
+    <h1 class="portal-title text-2xl mb-3">Something went wrong</h1>
+    <p class="portal-body text-lg">
+      <%= @error_message || "We couldn't open that portal link." %>
     </p>
   </div>
 
-  <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
-    <h2 class="text-lg font-semibold text-gray-900 mb-2">Is your link expired or broken?</h2>
-    <p class="text-sm text-gray-600 mb-4">
-      You can find all of your portals — and get a fresh link — by verifying your email address or
-      phone number in the portal center.
+  <section class="portal-card p-5 sm:p-6 mb-6">
+    <h2 class="portal-heading text-base mb-1">Most likely, your link expired</h2>
+    <p class="portal-hint text-sm mb-4">
+      Verify your email address or phone number and we'll show you every portal linked to you — with a
+      fresh link for each one.
     </p>
-    <%= link_to "Find my portals", guardian_portal_center_path,
-          class: "inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-lg transition-colors" %>
-  </div>
+    <%= link_to "Find my portals", guardian_portal_center_path, class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+  </section>
 
-  <div class="bg-white border rounded-lg p-6 mb-8">
-    <h2 class="text-lg font-semibold mb-4">What can you try?</h2>
-
+  <section class="portal-card p-5 sm:p-6 mb-6">
+    <h2 class="portal-heading text-base mb-3">Other things to try</h2>
     <ul class="space-y-3">
-      <li class="flex items-start gap-3">
-        <svg class="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-        </svg>
-        <span class="text-gray-700">Refresh the page and try again</span>
-      </li>
-      <li class="flex items-start gap-3">
-        <svg class="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
-        </svg>
-        <span class="text-gray-700">Check that you're using the correct link from your email</span>
-      </li>
-      <li class="flex items-start gap-3">
-        <svg class="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-        </svg>
-        <span class="text-gray-700">Contact the event organizers if the problem persists</span>
-      </li>
+      <% [
+           "Reload the page — it may have been a temporary hiccup.",
+           "Open the newest email we sent you; older links stop working.",
+           "Ask the event organizers to send you a new invitation."
+         ].each do |suggestion| %>
+        <li class="flex items-start gap-3">
+          <svg class="size-5 shrink-0 mt-0.5" style="color: var(--text-muted);" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+          </svg>
+          <span class="portal-body text-sm"><%= suggestion %></span>
+        </li>
+      <% end %>
     </ul>
-  </div>
+  </section>
 
   <% if @error_code.present? %>
-    <div class="bg-gray-50 rounded-lg p-4 mb-8">
-      <p class="text-xs text-gray-500 text-center">
-        Error reference: <code class="bg-gray-200 px-1 py-0.5 rounded"><%= @error_code %></code>
-      </p>
-    </div>
+    <p class="portal-meta text-xs text-center">
+      If you contact us, quote this reference:
+      <code class="portal-panel px-1.5 py-0.5 rounded"><%= @error_code %></code>
+    </p>
   <% end %>
-
-  <div class="text-center">
-    <a href="javascript:history.back()" class="inline-flex items-center text-blue-600 hover:text-blue-700 font-medium">
-      <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-      </svg>
-      Go Back
-    </a>
-  </div>
 </div>

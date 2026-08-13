@@ -1,0 +1,31 @@
+<%# Identity bar for signed-out portal pages. The app header only renders for
+    signed-in users, so without this a parent sees an unbranded form above a
+    Hack Club footer — which reads like a phishing page on the one screen where
+    they are handing over their child's medical details.
+
+    Locals (all optional):
+      subtitle: short line of context, e.g. the event name
+      back_to:  { label:, path: } rendered as a quiet link on the right %>
+<% subtitle = local_assigns[:subtitle] %>
+<% back_to = local_assigns[:back_to] %>
+
+<div class="mb-8 flex items-center justify-between gap-4 border-b pb-4" style="border-color: var(--border-card);">
+  <div class="flex items-center gap-3 min-w-0">
+    <img src="/icon-512.png" alt="" class="size-9 rounded-lg" width="36" height="36">
+    <div class="min-w-0">
+      <p class="portal-heading text-base leading-tight">Attend</p>
+      <p class="portal-meta text-xs leading-tight truncate">
+        <%= subtitle.presence || "by Hack Club" %>
+      </p>
+    </div>
+  </div>
+
+  <% if back_to %>
+    <%= link_to back_to[:path], class: "portal-btn portal-btn-quiet text-sm" do %>
+      <svg class="size-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
+      </svg>
+      <%= back_to[:label] %>
+    <% end %>
+  <% end %>
+</div>

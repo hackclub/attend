@@ -32,7 +32,7 @@ RSpec.describe "Guardian portal center", type: :request do
       get guardian_portal_center_path
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Parent &amp; Guardian Portal Center")
+      expect(response.body).to include("Find your portals")
     end
   end
 
@@ -175,7 +175,7 @@ RSpec.describe "Guardian portal center", type: :request do
       verify_as("parent@example.com")
       follow_redirect!
 
-      expect(response.body).to include("Action needed")
+      expect(response.body).to include("Needs you")
       expect(response.body).to include(gpe.participant_event.event.name)
       expect(response.body).to include("Completed")
       expect(response.body).to include(completed_gpe.participant_event.event.name)
@@ -187,7 +187,7 @@ RSpec.describe "Guardian portal center", type: :request do
       verify_as("parent@example.com")
       follow_redirect!
 
-      expect(response.body).to include("No portals found")
+      expect(response.body).to include("Nothing linked to this contact")
     end
 
     it "matches guardians by verified phone number" do
