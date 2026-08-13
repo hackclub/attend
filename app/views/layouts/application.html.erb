@@ -187,7 +187,9 @@
       </div>
     <% end %>
 
-    <main class="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <%# Pages that own their full width (the landing page) set :full_bleed and
+        lay out their own sections; everything else gets the standard container. %>
+    <main class="flex-1 <%= content_for?(:full_bleed) ? "w-full" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8" %>">
       <%= yield %>
     </main>
 
