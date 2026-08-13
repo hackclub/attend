@@ -37,7 +37,7 @@
       </div>
     <% end %>
     <% if user_signed_in? && user_needs_slack_link?(current_user) %>
-      <div class="text-white text-center py-2 text-sm" style="background-color: #4A154B;">
+      <div class="text-center py-2 text-sm" style="background-color: #4A154B; color: #ffffff;">
         Link your Slack ID to receive updates sent from the event organizers.
         <%= link_to "Connect Slack", slack_oauth_url_for_user(current_user), class: "underline hover:no-underline font-semibold ml-1" %>
       </div>
@@ -150,7 +150,7 @@
             Your email was updated from <strong><%= prev_email %></strong> to <strong><%= curr_email %></strong> to match your Hack Club Auth account.
           </p>
           <div class="flex items-center gap-2">
-            <%= link_to "Email attend@hackclub.com", "mailto:attend@hackclub.com?subject=#{ERB::Util.url_encode('Email change on Attend')}", class: "text-sm bg-[#338eda] hover:bg-[#2a7bc4] text-white font-medium px-3 py-1.5 rounded-lg transition-colors" %>
+            <%= link_to "Email attend@hackclub.com", "mailto:attend@hackclub.com?subject=#{ERB::Util.url_encode('Email change on Attend')}", class: "text-sm bg-[#2470b0] hover:bg-[#1c619b] text-white font-medium px-3 py-1.5 rounded-lg transition-colors" %>
             <button type="button" class="text-[#338eda] hover:text-[#2a7bc4]" data-action="flash#dismiss" aria-label="Dismiss">
               <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>

@@ -91,6 +91,10 @@
   --accent-strong: #ff5670;
   --accent-soft: rgba(236, 55, 80, 0.16);
   --accent-on: #ffffff;
+  /* --accent keeps the brand value, but #ffffff on it is only 4.02:1.
+   * --accent-fill is the fill to use under --accent-on text: 4.89 / 6.15. */
+  --accent-fill: #d42f46;
+  --accent-fill-hover: #b82840;
 
   --success: #33d6a6;
   --success-strong: #4ee2b4;
@@ -375,6 +379,10 @@
   --accent-strong: #e75452;
   --accent-soft: rgba(220, 50, 47, 0.14);
   --accent-on: #fdf6e3;
+  /* solarized red under solarized base3 is 4.29:1 — one step deeper clears
+   * AA (4.91 / 5.80) while staying inside the palette's red. */
+  --accent-fill: #cb2e2b;
+  --accent-fill-hover: #b82724;
 
   --success: #859900;
   --success-strong: #a3bd00;
@@ -561,9 +569,10 @@
   .bg-\[\#1a1d21\] { background-color: var(--bg-elev-2); }
   .bg-\[\#4A154B\] { background-color: var(--bg-darker); }
   .bg-\[\#ec3750\] { background-color: var(--accent); }
-  /* the resting fill under white text — #d42f46 clears WCAG AA where #ec3750
-   * does not. themed the same as --accent so non-light themes are unchanged. */
-  .bg-\[\#d42f46\] { background-color: var(--accent); }
+  /* the resting fill under white text. themes that clear AA on their own
+   * --accent fall through to it; dark and solarized-dark declare a deeper
+   * --accent-fill because theirs does not. */
+  .bg-\[\#d42f46\] { background-color: var(--accent-fill, var(--accent)); }
   .bg-\[\#ec3750\]\/10 { background-color: var(--accent-soft); }
   .bg-\[\#33d6a6\]\/10 { background-color: var(--success-soft); }
 
@@ -591,7 +600,7 @@
   .hover\:bg-\[\#252429\]:hover { background-color: var(--bg-elev-3); }
   .hover\:bg-\[\#3e1240\]:hover { background-color: var(--bg-darker); }
   .hover\:bg-\[\#d42f46\]:hover { background-color: var(--accent-strong); }
-  .hover\:bg-\[\#b82840\]:hover { background-color: var(--accent-strong); }
+  .hover\:bg-\[\#b82840\]:hover { background-color: var(--accent-fill-hover, var(--accent-strong)); }
   .hover\:bg-\[\#ec3750\]:hover { background-color: var(--accent); }
   .hover\:bg-\[\#f9fafc\]:hover { background-color: var(--bg-elev-2); }
   .hover\:border-\[\#ec3750\]:hover { border-color: var(--accent); }
@@ -604,6 +613,47 @@
   .focus\:border-\[\#ec3750\]:focus { border-color: var(--accent); }
   .focus\:ring-\[\#ec3750\]:focus { --tw-ring-color: var(--accent); }
   .focus\:ring-\[\#ec3750\]\/30:focus { --tw-ring-color: color-mix(in oklab, var(--accent) 30%, transparent); }
+}
+
+/* ====================================================================
+ * foreground on filled surfaces
+ *
+ * `text-white` compiles to `color: var(--color-white)`, and the block
+ * above remaps --color-white to var(--bg-elev) so `bg-white` re-skins.
+ * That remap is right for surfaces and wrong for text: it silently turns
+ * every white label into the theme's card colour, so a white button label
+ * lands on a red fill at 4.37:1 and white text on a near-black panel
+ * lands at ~1.2:1 — invisible.
+ *
+ * Each theme already declares the correct foreground for these fills, so
+ * pin it on the fill itself and on any `text-white` inside it. The
+ * descendant selector is what does the work: inheritance alone loses to a
+ * `.text-white` applied directly to the child.
+ * ==================================================================== */
+
+[data-theme]:not([data-theme="light"]) {
+  /* accent fills → the theme's on-accent colour */
+  .bg-\[\#ec3750\],
+  .bg-\[\#d42f46\],
+  .bg-\[\#ec3750\] .text-white,
+  .bg-\[\#d42f46\] .text-white { color: var(--accent-on); }
+
+  /* fills that resolve to --bg-dark / --bg-darker: dark in every theme,
+   * including the light-ish ones, so the on-dark foreground is correct */
+  .bg-\[\#17171d\], .bg-\[\#4A154B\],
+  .bg-\[\#17171d\] .text-white,
+  .bg-\[\#4A154B\] .text-white { color: var(--text-on-dark); }
+
+  /* fills that resolve to --bg-elev-2, which is a *light* surface under
+   * catppuccin latte — --text-strong is the foreground that holds in both */
+  .bg-\[\#252429\], .bg-\[\#1a1d21\],
+  .bg-\[\#252429\] .text-white,
+  .bg-\[\#1a1d21\] .text-white { color: var(--text-strong); }
+
+  /* literal fills with no theme remap above: they stay saturated in every
+   * theme, so their labels must stay white rather than following
+   * --color-white. */
+  .bg-\[\#2470b0\], .bg-\[\#2470b0\] .text-white { color: #ffffff; }
 }
 
 /* ====================================================================
