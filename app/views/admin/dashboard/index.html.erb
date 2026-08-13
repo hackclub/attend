@@ -51,10 +51,12 @@
   <% end %>
 
   <% if @completed_events.any? %>
-    <details class="mt-6 group" <%= "open" if @current_events.empty? %>>
+    <%# Named group: an unnamed one would also match the rows' `group-hover:`
+        utilities, so hovering any row would light up every row inside. %>
+    <details class="mt-6 group/completed" <%= "open" if @current_events.empty? %>>
       <summary class="list-none [&::-webkit-details-marker]:hidden cursor-pointer inline-flex items-center gap-2 rounded-sm text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ec3750]/30 transition-colors">
         <span>Looking for a completed event?</span>
-        <svg class="w-4 h-4 transition-transform group-open:rotate-90" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        <svg class="w-4 h-4 transition-transform group-open/completed:rotate-90" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
       </summary>
       <div class="mt-4">
         <%= render "event_list",
