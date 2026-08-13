@@ -113,7 +113,7 @@ module Admin
     def collect_journeys(direction)
       participant_events = current_event.participant_events
         .where(status: :complete)
-        .includes(participant: :headshot_attachment)
+        .includes(participant: { headshot_attachment: :blob })
         .includes(:groups, scans: :scan_context, travel_inbound: { travel_legs: :picked_up_by }, travel_outbound: { travel_legs: :picked_up_by })
 
       journeys = []
@@ -143,7 +143,7 @@ module Admin
           participant_event_id: pe.id,
           participant_name: pe.participant.display_name,
           participant_preferred_name: pe.participant.preferred_name,
-          participant_has_headshot: pe.participant.headshot.attached?,
+          participant_has_headshot: pe.participant.headshot_displayable?,
           direction: direction,
           legs: legs_data,
           final_leg: legs_data.last,

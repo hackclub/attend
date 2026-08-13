@@ -395,6 +395,13 @@ def admin_tool(class_name = "", element = "div", **options, &block)
     end
   end
 
+  # Whether an attachment can safely be handed to the variant processor. Use it
+  # wherever the attachment doesn't belong to the record in hand (e.g. a logo
+  # inherited from an event series) and there is no `*_displayable?` to call.
+  def variant_safe?(attachment)
+    DecodableImageAttachment.displayable?(attachment)
+  end
+
   # HEIC photos (iPhone default) don't render in most browsers — serve a JPEG
   # variant instead. Conversion happens lazily on first request and is cached
   # in the variant records.

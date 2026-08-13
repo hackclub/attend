@@ -108,6 +108,69 @@ RSpec.describe Participant, type: :model do
     end
   end
 
+  # A browser labels an upload from its extension, so bytes libvips can't decode
+  # arrive looking like a valid image/png — and blow up in the variant processor
+  # later, 500ing every page that shows the photo (ATTEND-9H).
+  describe "headshot decodability" do
+    let(:png) { file_fixture("headshot.png").binread }
+
+    it "accepts a real image" do
+      participant = create(:participant)
+      participant.headshot.attach(io: StringIO.new(png), filename: "headshot.png", content_type: "image/png")
+
+      expect(participant).to be_valid
+      expect(participant.headshot).to be_attached
+    end
+
+    it "rejects a file that isn't really an image" do
+      participant = create(:participant)
+      participant.headshot.attach(io: StringIO.new("not a png at all"), filename: "headshot.png", content_type: "image/png")
+
+      expect(participant).not_to be_valid
+      expect(participant.errors[:headshot].join).to include("could not be read as an image")
+    end
+
+    it "rejects an empty upload" do
+      participant = create(:participant)
+      participant.headshot.attach(io: StringIO.new(""), filename: "headshot.png", content_type: "image/png")
+
+      expect(participant).not_to be_valid
+    end
+
+    it "still validates when an existing headshot is left alone" do
+      participant = create(:participant)
+      participant.headshot.attach(io: StringIO.new(png), filename: "headshot.png", content_type: "image/png")
+
+      expect(participant.update(preferred_name: "Ada")).to be(true)
+    end
+  end
+
+  describe "#headshot_displayable?" do
+    let(:png) { file_fixture("headshot.png").binread }
+
+    it "is false without a headshot" do
+      expect(create(:participant).headshot_displayable?).to be(false)
+    end
+
+    it "is true for an attached image" do
+      participant = create(:participant)
+      participant.headshot.attach(io: StringIO.new(png), filename: "headshot.png", content_type: "image/png")
+
+      expect(participant.headshot_displayable?).to be(true)
+    end
+
+    # Analysis records no width for a blob Vips couldn't open. Those exist in
+    # production from before the upload validation, and asking for a variant of
+    # one is the 500.
+    it "is false for a blob analysis could not read" do
+      participant = create(:participant)
+      participant.headshot.attach(io: StringIO.new(png), filename: "headshot.png", content_type: "image/png")
+      participant.headshot.blob.update!(metadata: { "analyzed" => true })
+
+      expect(participant.headshot_displayable?).to be(false)
+    end
+  end
+
   describe "#public_profile_display_photo" do
     it "prefers the uploaded profile photo over the headshot" do
       png = Base64.decode64("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==")

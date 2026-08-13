@@ -197,8 +197,13 @@ RSpec.describe Event, type: :model do
   describe "banner validation" do
     let(:event) { create(:event) }
 
-    def attach_banner(content_type:, io: StringIO.new("fake image data"))
-      event.banner.attach(io: io, filename: "banner", content_type: content_type)
+    let(:png) { file_fixture("headshot.png").binread }
+    # Active Storage identifies the content type from the bytes, so a
+    # content-type test needs bytes that really are that type.
+    let(:gif) { Base64.decode64("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7") }
+
+    def attach_banner(content_type:, io: nil)
+      event.banner.attach(io: io || StringIO.new(png), filename: "banner", content_type: content_type)
     end
 
     it "accepts a PNG banner" do
@@ -212,9 +217,16 @@ RSpec.describe Event, type: :model do
     end
 
     it "rejects non-PNG/JPEG banners" do
-      attach_banner(content_type: "image/gif")
+      attach_banner(content_type: "image/gif", io: StringIO.new(gif))
       expect(event).not_to be_valid
       expect(event.errors[:banner]).to include("must be a PNG or JPEG image")
+    end
+
+    it "rejects a banner whose bytes aren't really an image" do
+      attach_banner(content_type: "image/png", io: StringIO.new("definitely not a png"))
+
+      expect(event).not_to be_valid
+      expect(event.errors[:banner].join).to include("could not be read as an image")
     end
 
     it "rejects banners over 5MB" do

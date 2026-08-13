@@ -1,5 +1,6 @@
 class Participant < ApplicationRecord
   include WalletPassUpdatable
+  include DecodableImageAttachment
 
   has_paper_trail
 
@@ -183,6 +184,12 @@ class Participant < ApplicationRecord
     user&.hca_verified? || false
   end
 
+  # Whether the headshot can safely be rendered as a variant. Attached is not
+  # enough: see DecodableImageAttachment.
+  def headshot_displayable?
+    displayable_image?(headshot)
+  end
+
   # The photo shown on the public profile: the participant's uploaded photo,
   # falling back to the official event headshot.
   def public_profile_display_photo
@@ -260,6 +267,8 @@ class Participant < ApplicationRecord
     if headshot.blob.byte_size > 10.megabytes
       errors.add(:headshot, "must be less than 10MB")
     end
+
+    validate_decodable_image(:headshot)
   end
 
   def public_profile_photo_content_type
@@ -272,5 +281,7 @@ class Participant < ApplicationRecord
     if public_profile_photo.blob.byte_size > 10.megabytes
       errors.add(:public_profile_photo, "must be less than 10MB")
     end
+
+    validate_decodable_image(:public_profile_photo)
   end
 end

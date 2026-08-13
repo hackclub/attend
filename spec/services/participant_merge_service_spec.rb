@@ -5,6 +5,8 @@ RSpec.describe ParticipantMergeService do
   let(:primary) { create(:participant, email: "real@example.com") }
   let(:duplicate) { create(:participant, email: "typo@example.com") }
 
+  let(:png) { file_fixture("headshot.png").binread }
+
   def merge!
     described_class.new(primary: primary, duplicate: duplicate).merge!
   end
@@ -122,7 +124,7 @@ RSpec.describe ParticipantMergeService do
 
   describe "headshot" do
     it "transfers the duplicate's headshot when the primary has none" do
-      duplicate.headshot.attach(io: StringIO.new("fake image data"), filename: "headshot.jpg", content_type: "image/jpeg")
+      duplicate.headshot.attach(io: StringIO.new(png), filename: "headshot.jpg", content_type: "image/jpeg")
 
       merge!
 
@@ -130,8 +132,8 @@ RSpec.describe ParticipantMergeService do
     end
 
     it "keeps the primary's headshot when both have one" do
-      primary.headshot.attach(io: StringIO.new("primary image"), filename: "primary.jpg", content_type: "image/jpeg")
-      duplicate.headshot.attach(io: StringIO.new("dup image"), filename: "dup.jpg", content_type: "image/jpeg")
+      primary.headshot.attach(io: StringIO.new(png), filename: "primary.jpg", content_type: "image/jpeg")
+      duplicate.headshot.attach(io: StringIO.new(png), filename: "dup.jpg", content_type: "image/jpeg")
       primary_blob_id = primary.headshot.blob.id
 
       merge!
