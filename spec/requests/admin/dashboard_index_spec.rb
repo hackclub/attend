@@ -59,7 +59,7 @@ RSpec.describe "Admin::Dashboard#index", type: :request do
       get admin_root_path
 
       expect(response.body).to include("Nothing running right now")
-      expect(response.body).to include('<details class="mt-6 group" open>')
+      expect(response.body).to include('<details class="mt-6 group/completed" open>')
     end
   end
 
