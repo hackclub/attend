@@ -1,5 +1,5 @@
 <div class="flex items-start gap-3">
-  <% if participant.headshot.attached? %>
+  <% if participant.headshot_displayable? %>
     <%= image_tag participant.headshot.variant(resize_to_fill: [48, 48]), class: "w-12 h-12 rounded-full object-cover" %>
   <% else %>
     <div class="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-sm font-medium">

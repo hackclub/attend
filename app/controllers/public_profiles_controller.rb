@@ -73,7 +73,7 @@ class PublicProfilesController < ApplicationController
     logo = event.effective_logo
     return nil unless logo&.attached?
 
-    if logo.variable?
+    if DecodableImageAttachment.displayable?(logo)
       rails_representation_path(logo.variant(resize_to_fill: [ 80, 80 ]), only_path: true)
     elsif logo.content_type == "image/svg+xml"
       rails_storage_proxy_path(logo, only_path: true)

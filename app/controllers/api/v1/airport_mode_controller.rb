@@ -67,7 +67,7 @@ module Api
       def collect_journeys(direction)
         participant_events = @event.participant_events
           .where(status: :complete)
-          .includes(participant: :headshot_attachment)
+          .includes(participant: { headshot_attachment: :blob })
           .includes(scans: :scan_context, travel_inbound: { travel_legs: :picked_up_by }, travel_outbound: { travel_legs: :picked_up_by })
 
         journeys = []
@@ -95,7 +95,7 @@ module Api
             participant_event_id: pe.id,
             participant_name: pe.participant.display_name,
             participant_preferred_name: pe.participant.preferred_name,
-            participant_has_headshot: pe.participant.headshot.attached?,
+            participant_has_headshot: pe.participant.headshot_displayable?,
             participant_headshot_url: headshot_url_for(pe.participant),
             direction: direction,
             legs: legs_data,
