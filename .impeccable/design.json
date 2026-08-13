@@ -222,6 +222,11 @@
         "section": "colors"
       },
       {
+        "name": "The Theme Foreground Rule",
+        "body": "text-white is not a colour outside the default theme. It compiles to var(--color-white), which themes.css remaps to var(--bg-elev) so bg-white re-skins — correct for surfaces, silently wrong for text. A filled surface therefore declares its own foreground in themes.css rather than trusting text-white: accent fills take --accent-on, fills that resolve to --bg-dark/--bg-darker take --text-on-dark, fills that resolve to --bg-elev-2 take --text-strong (it is a light surface under Catppuccin Latte), and unremapped literal fills pin #ffffff. Pin it with a descendant selector (.bg-x .text-white), not inheritance — a text-white on the child outranks a colour inherited from the parent.",
+        "section": "colors"
+      },
+      {
         "name": "The Deepened Red Rule",
         "body": "#ec3750 on white measures 4.02:1 — below WCAG AA's 4.5:1 for normal text. WCAG's large-text exemption (3:1) starts at 18.66px bold or 24px regular, which no button in Attend reaches, so the type cannot buy its way out. The colour moves instead: wherever white text sits on red, the fill is #d42f46 (4.89:1), hovering to #b82840. #ec3750 keeps every use that carries no text on it — dots, bars, icon fills, borders, tints, and the progress bar. The two reds are one perceptual step apart; nobody sees the difference, and every white label clears AA.",
         "section": "colors"
@@ -269,6 +274,7 @@
       "Don't introduce a webfont. The system stack is a deliberate performance choice for guardians on slow connections and old phones.",
       "Don't add a third container radius. 6px controls, 8px containers, full for state and identity.",
       "Don't use rounded-full on a plain action button. A pill in Attend means state or identity; the Hack Club brand pill is the one sanctioned exception.",
+      "Don't trust text-white to be white. Outside the default theme it resolves to a surface colour; a new filled surface needs its foreground declared in themes.css per The Theme Foreground Rule, or its label disappears.",
       "Don't suppress the focus ring. focus:outline-none is only acceptable when a focus:ring-2 replaces it in the same class list.",
       "Don't use text-faint for anything a user has to read. It is for placeholders and disabled states only."
     ]
