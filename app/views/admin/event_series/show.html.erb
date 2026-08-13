@@ -41,9 +41,11 @@
 
   <% if @events.any? %>
     <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
-      <% @events.each_with_index do |event, i| %>
-        <%= render "admin/dashboard/event_row", event: event, first: i == 0 %>
-      <% end %>
+      <ul>
+        <% @events.each_with_index do |event, i| %>
+          <%= render "admin/dashboard/event_row", event: event, first: i == 0 %>
+        <% end %>
+      </ul>
       <div class="px-5 py-3 border-t border-gray-100 text-xs text-gray-500">
         <%= @events.count %> <%= "event".pluralize(@events.count) %> in this series
       </div>

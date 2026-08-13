@@ -1,0 +1,24 @@
+<%# One card of event rows. Series events collapse into a single expandable
+    row placed where the series' first event would have appeared, so the live
+    and completed lists group identically. %>
+<%# Locals: events (in display order), footer_label %>
+<div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <ul>
+    <% rendered_series_ids = Set.new %>
+    <% first = true %>
+    <% events.each do |event| %>
+      <% if event.event_series_id %>
+        <% next if rendered_series_ids.include?(event.event_series_id) %>
+        <% rendered_series_ids << event.event_series_id %>
+        <%= render "series_group",
+              series: event.event_series,
+              events: events.select { |e| e.event_series_id == event.event_series_id },
+              first: first %>
+      <% else %>
+        <%= render "event_row", event: event, first: first %>
+      <% end %>
+      <% first = false %>
+    <% end %>
+  </ul>
+  <div class="px-5 py-3 border-t border-gray-100 text-xs text-gray-500"><%= footer_label %></div>
+</div>
