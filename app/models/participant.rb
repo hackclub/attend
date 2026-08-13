@@ -197,6 +197,18 @@ class Participant < ApplicationRecord
     participant_events.to_a
   end
 
+  # The only participant attributes rendered on wallet passes (see
+  # Passkit::EventTicket and GoogleWallet::EventTicket). Onboarding autosaves
+  # touch address/phone/etc constantly; those must not fan out a pass-update
+  # job per event.
+  WALLET_PASS_ATTRIBUTES = %w[
+    legal_first_name legal_last_name preferred_name email tshirt_size
+  ].freeze
+
+  def wallet_pass_relevant_change?
+    saved_changes.keys.intersect?(WALLET_PASS_ATTRIBUTES)
+  end
+
   def touch_participant_events
     participant_events.touch_all
   end

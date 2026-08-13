@@ -6,8 +6,17 @@ class DashboardController < ApplicationController
   before_action :require_participant
 
   def index
-    @participant_events = @participant.participant_events.includes(:event)
-    @pending_invitations = @participant.pending_invitations.includes(:event)
+    # display_status per row walks travel/health/guardian/consent/custom-doc
+    # associations, and the event avatars read logo attachments
+    @participant_events = @participant.participant_events.includes(
+      :consents, :travel_inbound, :travel_outbound, :accommodation,
+      :medical, :dietary, :accessibility, :emergency_contacts,
+      guardian_participant_events: :emergency_contacts,
+      event: [ :custom_documents, { logo_attachment: :blob, event_series: { logo_attachment: :blob } } ]
+    )
+    @pending_invitations = @participant.pending_invitations.includes(
+      event: [ { logo_attachment: :blob, event_series: { logo_attachment: :blob } } ]
+    )
   end
 
   def profile
@@ -37,9 +46,11 @@ class DashboardController < ApplicationController
 
   def show
     @participant_event = @participant.participant_events
-      .includes(:event, :consents, :accommodation, :medical, :dietary, :accessibility,
-                :emergency_contacts, guardian_participant_events: :guardian,
-                travel_inbound: :travel_legs, travel_outbound: :travel_legs)
+      .includes(:consents, :accommodation, :medical, :dietary, :accessibility,
+                :emergency_contacts, :safeguarding_info,
+                guardian_participant_events: :guardian,
+                travel_inbound: :travel_legs, travel_outbound: :travel_legs,
+                event: [ :custom_documents, { logo_attachment: :blob, event_series: { logo_attachment: :blob } } ])
       .find(params[:id])
     authorize @participant_event
     @event = @participant_event.event

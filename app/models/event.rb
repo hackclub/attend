@@ -340,6 +340,17 @@ class Event < ApplicationRecord
     logo.attached? && (logo.variable? || logo.content_type == "image/svg+xml")
   end
 
+  # Memoized because list views reach this once or twice per row via
+  # ParticipantEvent#applicable_custom_documents, and all rows share this
+  # instance when :event is preloaded.
+  def active_custom_documents
+    @active_custom_documents ||= if custom_documents.loaded?
+      custom_documents.select { |doc| doc.archived_at.nil? }.sort_by(&:created_at)
+    else
+      custom_documents.active.order(:created_at).to_a
+    end
+  end
+
   # Branding fallback: an event without its own logo/banner inherits its
   # series' assets. Used in the admin UI and wallet pass generation (banner).
   def effective_logo

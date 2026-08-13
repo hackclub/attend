@@ -1,17 +1,13 @@
 class MessageDeliveryJob < ApplicationJob
   queue_as :default
 
-  def perform(message_id:, retry_failed_only: false)
+  def perform(message_id:)
     message = Message.find(message_id)
 
-    deliveries = if retry_failed_only
-      message.message_deliveries.pending
-    else
-      message.message_deliveries.pending
+    jobs = message.message_deliveries.pending.pluck(:id).map do |delivery_id|
+      SingleDeliveryJob.new(delivery_id: delivery_id)
     end
 
-    deliveries.find_each do |delivery|
-      SingleDeliveryJob.perform_later(delivery_id: delivery.id)
-    end
+    ActiveJob.perform_all_later(jobs)
   end
 end

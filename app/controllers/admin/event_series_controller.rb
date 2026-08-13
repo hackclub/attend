@@ -9,7 +9,10 @@ module Admin
 
     def show
       authorize @series
-      @events = @series.events.order(starts_at: :desc)
+      @events = @series.events
+        .includes(logo_attachment: :blob, event_series: { logo_attachment: :blob })
+        .order(starts_at: :desc)
+      @event_participant_counts = ParticipantEvent.where(event: @events).group(:event_id).count
     end
 
     def new

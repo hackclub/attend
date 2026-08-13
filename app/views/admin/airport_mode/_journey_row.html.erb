@@ -1,5 +1,7 @@
 <%
-  participant = Participant.find(journey[:participant_id])
+  # Prefer the batch-loaded participant passed in from the show action;
+  # fall back to a lookup for render sites that can't supply it.
+  participant ||= Participant.find(journey[:participant_id])
   primary_leg = journey[:primary_leg]
   inbound = journey[:direction] == :inbound
 

@@ -5,7 +5,12 @@ class Admin::DashboardController < Admin::BaseController
     # The picker's "All events" link deselects the current event.
     set_current_event(nil) if params[:deselect].present?
 
-    @events = policy_scope(Event).includes(:event_series).order(starts_at: :desc)
+    @events = policy_scope(Event)
+      .includes(logo_attachment: :blob, event_series: { logo_attachment: :blob })
+      .order(starts_at: :desc)
+    # One grouped COUNT for the whole page; each row previously ran its own
+    # COUNT-with-JOIN via event.participants.count
+    @event_participant_counts = ParticipantEvent.where(event: @events).group(:event_id).count
     authorize Event, :index?
   end
 
@@ -214,11 +219,12 @@ class Admin::DashboardController < Admin::BaseController
       .order(created_at: :desc)
       .limit(5)
 
-    # High support participants
+    # High support participants (materialized: the view reads it five times)
     @high_support_participants = @participant_events
       .joins(:safeguarding_info)
       .where(safeguarding_infos: { high_support_flag: true })
       .includes(:participant)
+      .to_a
 
     # Recent activity
     @recent_activity = AuditLog
@@ -236,25 +242,29 @@ class Admin::DashboardController < Admin::BaseController
 
   def compute_display_status_counts
     counts = Hash.new(0)
-    @participant_events.includes(:consents, :event, :travel_inbound, :travel_outbound,
+    @participant_events.includes(:consents, :travel_inbound, :travel_outbound,
                                   :accommodation, :medical, :dietary, :accessibility, :safeguarding_info,
-                                  :emergency_contacts, participant: [], guardian_participant_events: :emergency_contacts).find_each do |pe|
+                                  :emergency_contacts, :participant, { event: :custom_documents },
+                                  guardian_participant_events: :emergency_contacts).find_each do |pe|
       counts[pe.display_status] += 1
     end
     counts
   end
 
   def compute_travel_stats
-    pe_ids = current_event.participant_events.pluck(:id)
+    travels = Travel.joins(:participant_event)
+      .where(participant_events: { event_id: current_event.id })
+    inbound_travels = travels.where(direction: :inbound)
+    outbound_travels = travels.where(direction: :outbound)
 
-    inbound_travels = Travel.where(participant_event_id: pe_ids, direction: :inbound)
-    outbound_travels = Travel.where(participant_event_id: pe_ids, direction: :outbound)
+    inbound_count = inbound_travels.count
+    outbound_count = outbound_travels.count
 
     {
-      inbound_complete: inbound_travels.count,
-      outbound_complete: outbound_travels.count,
-      missing_inbound: @total_participants - inbound_travels.count,
-      missing_outbound: @total_participants - outbound_travels.count,
+      inbound_complete: inbound_count,
+      outbound_complete: outbound_count,
+      missing_inbound: @total_participants - inbound_count,
+      missing_outbound: @total_participants - outbound_count,
       arriving_today: inbound_travels.joins(:travel_legs)
         .where("DATE(travel_legs.arrival_time) = ?", Date.current)
         .distinct.count,

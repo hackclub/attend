@@ -69,8 +69,13 @@ class IncidentReportsController < ApplicationController
       .order(starts_at: :desc)
   end
 
+  # Memoized (the view calls this more than once per render, and each call
+  # is otherwise a Setting SELECT). `defined?` rather than `||=` so the
+  # memo also holds if the list is ever falsy.
   def custom_events
-    Setting.incident_reports_custom_event_list
+    return @custom_events if defined?(@custom_events)
+
+    @custom_events = Setting.incident_reports_custom_event_list
   end
   helper_method :custom_events
 

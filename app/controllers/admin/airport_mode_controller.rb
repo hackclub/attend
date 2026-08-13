@@ -20,6 +20,14 @@ module Admin
         @journeys = @journeys.select { |j| j[:groups].any? { |g| g[:id] == sg_id } }
       end
 
+      # The journeys come from a cached hash, so the collect-time includes can't
+      # serve the view. Batch-load participants (with headshot blobs) once here
+      # instead of one Participant.find + attachment lookup per rendered row.
+      @participants_by_id = Participant
+        .where(id: @journeys.map { |j| j[:participant_id] }.compact.uniq)
+        .includes(headshot_attachment: :blob)
+        .index_by(&:id)
+
       @summary_counts = build_summary_counts(@inbound_journeys, :inbound)
       @outbound_summary_counts = build_summary_counts(@outbound_journeys, :outbound)
 

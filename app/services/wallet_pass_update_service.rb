@@ -22,6 +22,8 @@ class WalletPassUpdateService
       pass.touch
       notify_apple_devices(pass)
     end
+  ensure
+    close_apns_connection
   end
 
   def update_google_wallet
@@ -66,20 +68,32 @@ class WalletPassUpdateService
     end
   rescue StandardError => e
     Rails.logger.error("Apple Wallet push error: #{e.message}")
-  ensure
-    connection&.close
+    # A dead shared connection would fail every remaining push; rebuild on next use
+    close_apns_connection
   end
 
+  # One APNs connection per service run: Apnotic::Connection performs a full
+  # TLS handshake, so building one per device made pushes O(devices) handshakes
   def apns_connection
-    cert_path = ENV["PASSKIT_PRIVATE_P12_CERTIFICATE"]
-    cert_pass = ENV["PASSKIT_CERTIFICATE_KEY"]
+    @apns_connection ||= begin
+      cert_path = ENV["PASSKIT_PRIVATE_P12_CERTIFICATE"]
+      cert_pass = ENV["PASSKIT_CERTIFICATE_KEY"]
 
-    return nil unless cert_path.present? && File.exist?(cert_path)
+      if cert_path.present? && File.exist?(cert_path)
+        Apnotic::Connection.new(
+          cert_path: cert_path,
+          cert_pass: cert_pass
+        )
+      end
+    end
+  end
 
-    Apnotic::Connection.new(
-      cert_path: cert_path,
-      cert_pass: cert_pass
-    )
+  def close_apns_connection
+    @apns_connection&.close
+  rescue StandardError
+    nil
+  ensure
+    @apns_connection = nil
   end
 
   def apple_push_configured?

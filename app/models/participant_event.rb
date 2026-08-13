@@ -88,7 +88,11 @@ class ParticipantEvent < ApplicationRecord
 
 
   def primary_guardian
-    guardian_participant_events.find_by(is_primary_guardian: true)
+    if guardian_participant_events.loaded?
+      guardian_participant_events.find(&:is_primary_guardian)
+    else
+      guardian_participant_events.find_by(is_primary_guardian: true)
+    end
   end
 
   def onboarding_complete?
@@ -133,7 +137,7 @@ class ParticipantEvent < ApplicationRecord
   end
 
   def applicable_custom_documents
-    event.custom_documents.active.order(:created_at).select { |doc| doc.applies_to?(self) }
+    @applicable_custom_documents ||= event.active_custom_documents.select { |doc| doc.applies_to?(self) }
   end
 
   def pending_custom_documents
@@ -201,7 +205,13 @@ class ParticipantEvent < ApplicationRecord
 
   # Returns a hash describing exactly where this participant is in the onboarding process.
   # { steps: [{ name:, done: }], blocking_step: "waiver" | nil }
+  # Memoized: list views compute this several times per row. Reload the record
+  # if consents/travel/etc change mid-request and a fresh answer is needed.
   def onboarding_progress
+    @onboarding_progress ||= compute_onboarding_progress
+  end
+
+  def compute_onboarding_progress
     steps = []
 
     steps << { name: "profile", done: participant.legal_first_name.present? && participant.legal_last_name.present? && participant.date_of_birth.present? }

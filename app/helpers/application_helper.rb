@@ -293,9 +293,19 @@ def admin_tool(class_name = "", element = "div", **options, &block)
   # Flight-leg times are entered manually. The picker defaults to "Auto", which
   # derives the zone from the leg's airport at save time (see
   # TravelLegDateMerging). Travellers can override with an explicit zone.
+  #
+  # With nothing selected the ~150 option tags are identical, and travel forms
+  # render this select twice per leg, so that markup is built once per request.
+  # A present `selected` value changes the markup and is never cached.
   def travel_leg_time_zone_options(selected = nil)
-    options_for_select([ [ "Auto (airport timezone)", "" ] ], selected.to_s) +
-      time_zone_options_for_select(selected.presence)
+    if selected.present?
+      options_for_select([ [ "Auto (airport timezone)", "" ] ], selected.to_s) +
+        time_zone_options_for_select(selected)
+    else
+      @travel_leg_time_zone_options ||=
+        options_for_select([ [ "Auto (airport timezone)", "" ] ], "") +
+        time_zone_options_for_select(nil)
+    end
   end
 
   # Wall-clock value (YYYY-MM-DDThh:mm) for a stored-UTC leg time, rendered in

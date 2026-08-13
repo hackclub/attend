@@ -112,7 +112,7 @@
   </td>
   <td class="px-2 py-1.5 text-gray-500 whitespace-nowrap" data-column="roommate">
     <% if pe.room.present? %>
-      <% roommates = pe.room.participant_events.where.not(id: pe.id).includes(:participant) %>
+      <% roommates = pe.room.participant_events.reject { |r| r.id == pe.id } %>
       <% if roommates.any? %>
         <% roommates.each_with_index do |r, i| %>
           <%= link_to (r.participant.preferred_name.presence || r.participant.legal_first_name), admin_event_participant_path(current_event, r), class: "text-[#ec3750] hover:text-blue-800" %><%= ", " unless i == roommates.size - 1 %>
