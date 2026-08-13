@@ -8,6 +8,8 @@ export default class extends Controller {
 
   connect() {
     this.timeout = null
+    this.inFlight = false
+    this.queued = false
     this.statusEl = document.getElementById("save-status")
   }
 
@@ -66,11 +68,26 @@ export default class extends Controller {
 
     if (!this.shouldSave()) return
 
+    // Only one save on the wire at a time. On a slow connection two overlapping
+    // PATCHes write the same rows concurrently and can deadlock each other, so
+    // coalesce anything that happens mid-flight into a single follow-up save.
+    if (this.inFlight) {
+      this.queued = true
+      return
+    }
+
     const persisted = this.isPersisted()
     const form = this.element
     const formData = new FormData(form)
     formData.append('autosave', 'true')
 
+    // File inputs only matter on a real submit — resending them on every
+    // autosave re-uploads the whole file and churns Active Storage records.
+    form.querySelectorAll('input[type="file"]').forEach((input) => {
+      if (input.name) formData.delete(input.name)
+    })
+
+    this.inFlight = true
     this.updateStatus("Saving...")
 
     fetch(persisted ? this.urlValue : this.createUrlValue, {
@@ -96,6 +113,13 @@ export default class extends Controller {
     .catch(error => {
       console.error("Autosave error:", error)
       this.updateStatus("Save failed", true)
+    })
+    .finally(() => {
+      this.inFlight = false
+      if (this.queued) {
+        this.queued = false
+        this.save()
+      }
     })
   }
 

@@ -31,7 +31,7 @@
         <% end %>
       <% end %>
       <% if policy(Event.new(event_series_id: @series.id)).create? %>
-        <%= link_to admin_new_event_path(series: @series.slug), class: "inline-flex items-center gap-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
+        <%= link_to admin_new_event_path(series: @series.slug), class: "inline-flex items-center gap-2 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
           New Event
         <% end %>
@@ -41,9 +41,11 @@
 
   <% if @events.any? %>
     <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
-      <% @events.each_with_index do |event, i| %>
-        <%= render "admin/dashboard/event_row", event: event, first: i == 0 %>
-      <% end %>
+      <ul>
+        <% @events.each_with_index do |event, i| %>
+          <%= render "admin/dashboard/event_row", event: event, first: i == 0 %>
+        <% end %>
+      </ul>
       <div class="px-5 py-3 border-t border-gray-100 text-xs text-gray-500">
         <%= @events.count %> <%= "event".pluralize(@events.count) %> in this series
       </div>
@@ -56,7 +58,7 @@
       <h2 class="text-base font-medium text-gray-900 mb-1">No events in this series yet</h2>
       <p class="text-sm text-gray-500 mb-6">Create the first event — it'll inherit this series' branding automatically.</p>
       <% if policy(Event.new(event_series_id: @series.id)).create? %>
-        <%= link_to admin_new_event_path(series: @series.slug), class: "inline-flex items-center gap-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
+        <%= link_to admin_new_event_path(series: @series.slug), class: "inline-flex items-center gap-2 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
           Create Event
         <% end %>

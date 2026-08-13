@@ -4,14 +4,12 @@
 <% size ||= 24 %>
 <% rounded ||= "rounded-full" %>
 <% logo = event.effective_logo %>
-<% if logo %>
-  <% if logo.content_type == "image/svg+xml" %>
-    <%= image_tag logo, class: "#{rounded} object-cover flex-shrink-0 bg-white", style: "height: #{size}px; width: #{size}px;" %>
-  <% else %>
-    <%= image_tag logo.variant(resize_to_fill: [size * 2, size * 2]), class: "#{rounded} object-cover flex-shrink-0", style: "height: #{size}px; width: #{size}px;" %>
-  <% end %>
+<% if logo&.content_type == "image/svg+xml" %>
+  <%= image_tag logo, class: "#{rounded} object-cover flex-shrink-0 bg-white", style: "height: #{size}px; width: #{size}px;" %>
+<% elsif variant_safe?(logo) %>
+  <%= image_tag logo.variant(resize_to_fill: [size * 2, size * 2]), class: "#{rounded} object-cover flex-shrink-0", style: "height: #{size}px; width: #{size}px;" %>
 <% else %>
-  <span class="<%= rounded %> bg-[#ec3750] flex items-center justify-center font-bold text-white flex-shrink-0" style="height: <%= size %>px; width: <%= size %>px; font-size: <%= (size * 0.42).round %>px;">
+  <span class="<%= rounded %> bg-[#d42f46] flex items-center justify-center font-bold text-white flex-shrink-0" style="height: <%= size %>px; width: <%= size %>px; font-size: <%= (size * 0.42).round %>px;">
     <%= event.name.first.upcase %>
   </span>
 <% end %>

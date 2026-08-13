@@ -63,7 +63,7 @@
           </h2>
           <div class="bg-[#1a1d21] rounded-lg p-4 text-white">
             <div class="flex items-start gap-3">
-              <div class="w-9 h-9 rounded bg-[#ec3750] flex items-center justify-center flex-shrink-0">
+              <div class="w-9 h-9 rounded bg-[#d42f46] flex items-center justify-center flex-shrink-0">
                 <span class="text-white font-bold text-sm">HC</span>
               </div>
               <div class="flex-1 min-w-0">
@@ -157,7 +157,7 @@
           <%= button_to "Send Now", send_now_admin_event_message_path(current_event, @message), 
               method: :post,
               data: { confirm: "Send this message to #{@total_count} recipients now?" },
-              class: "bg-[#ec3750] hover:bg-[#d42f46] text-white font-semibold py-2 px-6 rounded-lg",
+              class: "bg-[#d42f46] hover:bg-[#b82840] text-white font-semibold py-2 px-6 rounded-lg",
               disabled: @total_count == 0 %>
         <% end %>
       </div>

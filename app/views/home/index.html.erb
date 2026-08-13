@@ -5,7 +5,7 @@
     <h1 class="text-2xl font-semibold mb-4">Welcome back</h1>
     <p class="text-[#5a6473] mb-8">You're signed in as <%= current_user.email %></p>
     <%= link_to "Go to Dashboard", dashboard_path,
-          class: "bg-[#ec3750] hover:bg-[#d42f46] text-[var(--accent-on)] font-medium py-2.5 px-6 rounded-md transition-colors" %>
+          class: "bg-[#d42f46] hover:bg-[#b82840] text-[var(--accent-on)] font-medium py-2.5 px-6 rounded-md transition-colors" %>
   </div>
 <% else %>
   <% content_for :full_bleed, true %>
@@ -51,7 +51,7 @@
               <%= button_to user_hack_club_omniauth_authorize_path,
                     method: :post,
                     data: { turbo: false },
-                    class: "inline-flex items-center gap-3 rounded-xl bg-[#ec3750] px-7 py-4 text-xl font-bold text-[var(--accent-on)] shadow-[var(--shadow-md)] hover:bg-[#d42f46] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ec3750] transition-colors" do %>
+                    class: "inline-flex items-center gap-3 rounded-xl bg-[#d42f46] px-7 py-4 text-xl font-bold text-[var(--accent-on)] shadow-[var(--shadow-md)] hover:bg-[#b82840] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ec3750] transition-colors" do %>
                 <img src="https://assets.hackclub.com/icon-rounded.svg" alt="" width="24" height="24" class="size-6">
                 Continue with Hack Club
               <% end %>
@@ -127,7 +127,7 @@
 
               <!-- Participant pass -->
               <div class="absolute right-0 top-32 w-[62%] overflow-hidden rounded-xl border border-[#e0e6ed] bg-white shadow-[var(--shadow-lg)]">
-                <div class="bg-[#ec3750] px-4 py-2.5">
+                <div class="bg-[#d42f46] px-4 py-2.5">
                   <p class="text-xs font-semibold uppercase tracking-widest text-[var(--accent-on)]">Attend · Pass</p>
                 </div>
                 <div class="p-4">

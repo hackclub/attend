@@ -4,7 +4,7 @@
       <div class="flex items-start gap-3">
         <%= radio_button_tag :waiver_mode, "auto", true, class: "mt-1 h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300", data: { wizard_reveal_target: "input", action: "change->wizard-reveal#update" } %>
         <div>
-          <span class="text-sm font-semibold text-gray-900">Use the standard Hack Club waivers <span class="ml-1 text-xs font-medium text-white bg-[#ec3750] rounded-full px-2 py-0.5">Recommended</span></span>
+          <span class="text-sm font-semibold text-gray-900">Use the standard Hack Club waivers <span class="ml-1 text-xs font-medium text-white bg-[#d42f46] rounded-full px-2 py-0.5">Recommended</span></span>
           <p class="text-sm text-gray-500 mt-1">
             We'll create <%= event.freedom_waivers_enabled? ? "waiver and freedom waiver templates" : "a waiver template" %> for this event on DocuSeal and wire up all the field mappings automatically. Nothing else to configure.
           </p>
@@ -55,6 +55,6 @@
     <% else %>
       <%= link_to "Back", admin_event_setup_modules_path(event), class: "w-full sm:w-auto text-center text-gray-500 hover:text-gray-700 font-medium py-2 px-4" %>
     <% end %>
-    <%= f.submit "Continue", class: "w-full sm:w-auto bg-[#ec3750] hover:bg-[#d63146] text-white font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer" %>
+    <%= f.submit "Continue", class: "w-full sm:w-auto bg-[#d42f46] hover:bg-[#b82840] text-white font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer" %>
   </div>
 <% end %>

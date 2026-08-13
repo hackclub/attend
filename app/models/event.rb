@@ -1,6 +1,7 @@
 class Event < ApplicationRecord
   include WalletPassUpdatable
   include RasterizesSvgLogo
+  include DecodableImageAttachment
 
   has_paper_trail
 
@@ -337,7 +338,9 @@ class Event < ApplicationRecord
   end
 
   def logo_displayable?
-    logo.attached? && (logo.variable? || logo.content_type == "image/svg+xml")
+    return true if logo.attached? && logo.content_type == "image/svg+xml"
+
+    displayable_image?(logo)
   end
 
   # Memoized because list views reach this once or twice per row via
@@ -404,6 +407,8 @@ class Event < ApplicationRecord
     if logo.byte_size && logo.byte_size > MAX_LOGO_BYTE_SIZE
       errors.add(:logo, "must be smaller than 5MB")
     end
+
+    validate_decodable_image(:logo)
   end
 
   def acceptable_banner
@@ -416,6 +421,8 @@ class Event < ApplicationRecord
     if banner.byte_size && banner.byte_size > MAX_BANNER_BYTE_SIZE
       errors.add(:banner, "must be smaller than 5MB")
     end
+
+    validate_decodable_image(:banner)
   end
 
   def participant_events_to_update
