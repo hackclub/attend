@@ -2,20 +2,20 @@
 <%# Locals: event, first (suppresses the top divider) %>
 <% phase_label, phase_class = event_phase_badge(event) %>
 <li class="<%= "border-t border-gray-100" unless first %>">
-  <%= link_to admin_event_dashboard_path(event.slug), class: "flex items-center justify-between px-5 py-4 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#ec3750] transition-colors group" do %>
+  <%= link_to admin_event_dashboard_path(event.slug), class: "flex items-center justify-between px-5 py-4 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#ec3750]/30 transition-colors group" do %>
     <div class="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
       <%= render "admin/events/avatar", event: event, size: 36, rounded: "rounded-lg" %>
       <div class="flex-1 min-w-0">
         <div class="flex flex-wrap items-center gap-x-2 gap-y-1 sm:gap-3">
           <span class="text-sm font-medium text-gray-900 group-hover:text-[#ec3750] transition-colors"><%= event.name %></span>
-          <span class="px-2 py-0.5 text-[11px] font-medium rounded-full whitespace-nowrap <%= phase_class %>"><%= phase_label %></span>
+          <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap <%= phase_class %>"><%= phase_label %></span>
           <% if event.registration_open? %>
-            <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-amber-50 text-amber-700 whitespace-nowrap">Registration Open</span>
+            <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-50 text-amber-700 whitespace-nowrap">Registration Open</span>
           <% end %>
           <%# A finished event is never going to have its setup completed, so
               the nag only belongs on events still ahead of the team. %>
           <% if !event.completed? && !event.setup_complete? %>
-            <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">Setup incomplete</span>
+            <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">Setup incomplete</span>
           <% end %>
         </div>
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-4 mt-1 text-xs text-gray-500">

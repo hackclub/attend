@@ -29,7 +29,7 @@
                 <span class="text-xs text-gray-500 ml-2"><%= pluralize(template.columns.size, "column") %><%= ", #{pluralize(template.filters.size, 'filter')}" if template.filters.any? %></span>
               </div>
               <div class="flex items-center gap-2 shrink-0">
-                <%= button_to "Download", admin_event_exports_path(current_event, template_id: template.id), method: :post, data: { turbo: false }, class: "px-3 py-1 bg-[#ec3750] text-white rounded-md hover:bg-[#d42f46] text-xs" %>
+                <%= button_to "Download", admin_event_exports_path(current_event, template_id: template.id), method: :post, data: { turbo: false }, class: "px-3 py-1 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] text-xs" %>
                 <%= link_to "Load", admin_event_exports_path(current_event, template_id: template.id), class: "px-3 py-1 border border-gray-300 rounded-md text-xs text-gray-700 hover:bg-gray-100" %>
                 <%= button_to "Delete", admin_event_export_template_path(current_event, template), method: :delete, data: { turbo_confirm: "Delete template \"#{template.name}\"?" }, class: "px-3 py-1 border border-gray-300 rounded-md text-xs text-gray-500 hover:text-[#ec3750]" %>
               </div>
@@ -143,7 +143,7 @@
     </div>
 
     <div class="bg-white rounded-lg border border-gray-200 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-      <%= button_tag "Download CSV", type: "submit", class: "px-6 py-2 bg-[#ec3750] text-white rounded-md hover:bg-[#d42f46] text-sm font-medium cursor-pointer" %>
+      <%= button_tag "Download CSV", type: "submit", class: "px-6 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] text-sm font-medium cursor-pointer" %>
       <div class="flex items-center gap-2">
         <%= text_field_tag :template_name, nil, placeholder: "Template name", class: "rounded-md border-gray-300 text-sm" %>
         <%= button_tag "Save as template", type: "submit", formaction: admin_event_export_templates_path(current_event), formmethod: "post",

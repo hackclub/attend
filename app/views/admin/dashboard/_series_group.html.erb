@@ -6,17 +6,17 @@
 <% live_count = events.count(&:active?) %>
 <li class="<%= "border-t border-gray-100" unless first %>">
   <details class="group/series">
-    <summary class="list-none [&::-webkit-details-marker]:hidden cursor-pointer flex items-center justify-between px-5 py-4 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#ec3750] transition-colors">
+    <summary class="list-none [&::-webkit-details-marker]:hidden cursor-pointer flex items-center justify-between px-5 py-4 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#ec3750]/30 transition-colors">
       <div class="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
         <%= render "admin/events/avatar", event: series, size: 36, rounded: "rounded-lg" %>
         <div class="flex-1 min-w-0">
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span class="text-sm font-medium text-gray-900"><%= series.name %></span>
-            <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">Series</span>
+            <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-600 whitespace-nowrap">Series</span>
             <%# A collapsed group hides its rows' own pills, so surface the one
                 thing worth interrupting for: an event running right now. %>
             <% if live_count.positive? %>
-              <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-green-50 text-green-700 whitespace-nowrap"><%= live_count %> active</span>
+              <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-green-50 text-green-700 whitespace-nowrap"><%= live_count %> active</span>
             <% end %>
           </div>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-4 mt-1 text-xs text-gray-500">
@@ -43,7 +43,7 @@
         <% end %>
       </ul>
       <% if policy(series).show? %>
-        <%= link_to admin_series_path(series), class: "flex items-center gap-1.5 px-5 py-3 border-t border-gray-100 text-xs font-medium text-gray-500 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#ec3750] transition-colors" do %>
+        <%= link_to admin_series_path(series), class: "flex items-center gap-1.5 px-5 py-3 border-t border-gray-100 text-xs font-medium text-gray-500 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#ec3750]/30 transition-colors" do %>
           View series
           <svg class="w-3.5 h-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
         <% end %>

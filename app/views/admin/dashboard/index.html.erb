@@ -5,7 +5,7 @@
     <h1 class="text-2xl font-semibold text-gray-900">Events</h1>
     <% if policy(Event).create? || policy(EventSeries).create? %>
       <div class="relative" data-controller="dropdown">
-        <button type="button" data-action="dropdown#toggle" aria-haspopup="true" aria-expanded="false" class="inline-flex items-center gap-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium py-2 px-4 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ec3750] transition-colors">
+        <button type="button" data-action="dropdown#toggle" aria-haspopup="true" aria-expanded="false" class="inline-flex items-center gap-2 cursor-pointer bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ec3750]/30 transition-colors">
           <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
           New
           <svg class="w-4 h-4 -mr-1" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -42,7 +42,7 @@
       <h2 class="text-base font-medium text-gray-900 mb-1">Nothing running right now</h2>
       <p class="text-sm text-gray-500 mb-6">Every event you have access to has wrapped up. Past events are listed below.</p>
       <% if policy(Event).create? %>
-        <%= link_to admin_new_event_path, class: "inline-flex items-center gap-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium py-2 px-4 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ec3750] transition-colors" do %>
+        <%= link_to admin_new_event_path, class: "inline-flex items-center gap-2 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ec3750]/30 transition-colors" do %>
           <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
           Create Event
         <% end %>
@@ -52,7 +52,7 @@
 
   <% if @completed_events.any? %>
     <details class="mt-6 group" <%= "open" if @current_events.empty? %>>
-      <summary class="list-none [&::-webkit-details-marker]:hidden cursor-pointer inline-flex items-center gap-2 rounded-sm text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ec3750] transition-colors">
+      <summary class="list-none [&::-webkit-details-marker]:hidden cursor-pointer inline-flex items-center gap-2 rounded-sm text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ec3750]/30 transition-colors">
         <span>Looking for a completed event?</span>
         <svg class="w-4 h-4 transition-transform group-open:rotate-90" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
       </summary>
@@ -72,7 +72,7 @@
       <h2 class="text-base font-medium text-gray-900 mb-1">No events yet</h2>
       <p class="text-sm text-gray-500 mb-6">An event holds its own participants, staff, travel, and check-in — start one and the rest of the admin fills in around it.</p>
       <% if policy(Event).create? %>
-        <%= link_to admin_new_event_path, class: "inline-flex items-center gap-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium py-2 px-4 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ec3750] transition-colors" do %>
+        <%= link_to admin_new_event_path, class: "inline-flex items-center gap-2 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ec3750]/30 transition-colors" do %>
           <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
           Create Event
         <% end %>
