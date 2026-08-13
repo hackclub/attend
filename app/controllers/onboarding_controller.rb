@@ -416,7 +416,11 @@ class OnboardingController < ApplicationController
   def autosave_step_data
     case @step
     when "profile"
-      @participant_event.participant.update(profile_params)
+      # Never re-attach the headshot on autosave. The browser resends the file
+      # field on every save, so attaching here would purge and recreate the
+      # attachment each time — two overlapping autosaves then deadlock deleting
+      # the same active_storage_attachments row. The photo is attached on submit.
+      @participant_event.participant.update(profile_params.except(:headshot))
     when "travel"
       autosave_travel_data
     when "accommodation"
