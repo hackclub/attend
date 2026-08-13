@@ -10,7 +10,7 @@ class Admin::DashboardController < Admin::BaseController
       .order(starts_at: :desc)
     # One grouped COUNT for the whole page; each row previously ran its own
     # COUNT-with-JOIN via event.participants.count
-    @event_participant_counts = ParticipantEvent.group(:event_id).count
+    @event_participant_counts = ParticipantEvent.where(event: @events).group(:event_id).count
     authorize Event, :index?
   end
 
