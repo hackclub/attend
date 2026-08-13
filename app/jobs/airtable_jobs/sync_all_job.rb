@@ -7,21 +7,14 @@ module AirtableJobs
     # Client#initialize), and an unrescued error kills the run for every event
     # after it while recording nothing on the one that broke.
     def perform
-      events_with_sync_configured.find_each do |event|
+      Event.with_airtable_sync_active.find_each do |event|
         sync_event(event)
       rescue StandardError => e
-        report_failure(event, e)
+        handle_failure(event, e)
       end
     end
 
     private
-
-    def events_with_sync_configured
-      Event.where.not(airtable_sync_source_id: [ nil, "" ])
-           .where.not(airtable_sync_table_id: [ nil, "" ])
-           .where("config->>'airtable_api_key' IS NOT NULL")
-           .where("config->>'airtable_base_id' IS NOT NULL")
-    end
 
     def sync_event(event)
       service = Airtable::SyncService.new(event)
@@ -29,14 +22,39 @@ module AirtableJobs
       event.update_columns(airtable_synced_at: Time.current, airtable_sync_error: nil, airtable_sync_error_at: nil)
     end
 
-    # One event failing must not stop the rest of the run, but a rescue that only
-    # logs makes a permanently broken sync (stale ids, revoked token) look
-    # identical to a healthy one. Fingerprint per event so each broken event is
-    # its own Sentry issue that stays open until someone fixes the config.
-    def report_failure(event, error)
-      Rails.logger.error("[AirtableSyncAll] Event #{event.id}: #{error.message}")
-      event.update_columns(airtable_sync_error: error.message, airtable_sync_error_at: Time.current)
+    # One event failing must not stop the rest of the run. Pause this event's
+    # sync on the first failure and tell whoever last saved its credentials:
+    # every failure mode we've seen here (stale sync ids, revoked token, blank
+    # key) needs a human to fix the config, so re-running every 5 minutes only
+    # produces thousands of identical errors while nobody is told.
+    def handle_failure(event, error)
+      Rails.logger.error("[AirtableSyncAll] Paused event #{event.id}: #{error.message}")
+      event.pause_airtable_sync!(error.message)
 
+      recipient = notify_config_owner(event, error)
+      report_to_sentry(event, error, recipient)
+    end
+
+    # A broken mailer must not take the rest of the run down with it — this
+    # method is already running inside the loop's rescue.
+    def notify_config_owner(event, error)
+      recipient = event.airtable_config_last_saved_by
+      return nil if recipient&.email.blank?
+
+      AirtableMailer.sync_paused(
+        event: event,
+        recipient: recipient,
+        error_message: error.message
+      ).deliver_later
+
+      recipient
+    rescue StandardError => e
+      Rails.logger.error("[AirtableSyncAll] Could not notify owner of event #{event.id}: #{e.message}")
+      Sentry.capture_exception(e) if defined?(Sentry)
+      nil
+    end
+
+    def report_to_sentry(event, error, recipient)
       return unless defined?(Sentry)
 
       Sentry.capture_exception(
@@ -44,7 +62,8 @@ module AirtableJobs
         tags: {
           job: "airtable_sync_all",
           event_slug: event.slug,
-          airtable_status: error.respond_to?(:status) ? error.status : nil
+          airtable_status: error.respond_to?(:status) ? error.status : nil,
+          airtable_sync_paused: true
         },
         contexts: {
           airtable_sync: {
@@ -53,7 +72,9 @@ module AirtableJobs
             table_id: event.airtable_sync_table_id,
             sync_source_id: event.airtable_sync_source_id,
             base_id: event.airtable_base_id,
-            last_synced_at: event.airtable_synced_at&.iso8601
+            last_synced_at: event.airtable_synced_at&.iso8601,
+            paused_at: event.airtable_sync_paused_at&.iso8601,
+            notified: recipient&.email || "nobody (no known config owner)"
           }
         },
         fingerprint: fingerprint_for(event, error)

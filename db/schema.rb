@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_12_141250) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_12_142500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -381,8 +381,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_141250) do
   end
 
   create_table "events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "airtable_config_updated_by_id"
     t.text "airtable_sync_error"
     t.datetime "airtable_sync_error_at"
+    t.datetime "airtable_sync_paused_at"
     t.string "airtable_sync_source_id"
     t.string "airtable_sync_table_id"
     t.datetime "airtable_synced_at"
@@ -417,6 +419,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_141250) do
     t.string "timezone", default: "UTC"
     t.datetime "updated_at", null: false
     t.string "venue_name"
+    t.index ["airtable_config_updated_by_id"], name: "index_events_on_airtable_config_updated_by_id"
     t.index ["event_series_id"], name: "index_events_on_event_series_id"
     t.index ["hotel_scan_context_id"], name: "index_events_on_hotel_scan_context_id"
     t.index ["slug"], name: "index_events_on_slug", unique: true
@@ -1305,6 +1308,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_141250) do
   add_foreign_key "event_role_assignments", "users"
   add_foreign_key "events", "event_series"
   add_foreign_key "events", "scan_contexts", column: "hotel_scan_context_id"
+  add_foreign_key "events", "users", column: "airtable_config_updated_by_id"
   add_foreign_key "export_templates", "events"
   add_foreign_key "export_templates", "users", column: "created_by_id"
   add_foreign_key "global_api_tokens", "users"

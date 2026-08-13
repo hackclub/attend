@@ -1,0 +1,31 @@
+Hi <%= @first_name %>,
+
+The Airtable sync for <%= @event.name %> failed, so Attend has PAUSED it. Nothing
+will be pushed to Airtable until you fix the settings and save them again.
+
+You're getting this because you were the last person to save the Airtable
+settings for this event.
+
+What Airtable said:
+
+<%= @error_message %>
+
+Worth checking:
+
+- The personal access token hasn't expired or been revoked, and can still see the base
+- The Base ID, Sync Table and Sync Source ID all still exist in Airtable
+- The sync source hasn't been deleted and recreated -- that changes its ID
+
+Once the settings are saved again, syncing resumes straight away and runs every
+5 minutes as usual.
+
+<%= @integrations_url %>
+
+Paused <%= @paused_at&.strftime("%b %-d, %Y at %-I:%M %p %Z") || "just now" %>.
+<% if @last_synced_at %>
+Last successful sync was <%= @last_synced_at.strftime("%b %-d, %Y at %-I:%M %p %Z") %> -- Airtable still shows that data.
+<% else %>
+This integration has never synced successfully.
+<% end %>
+
+If you're not the right person for this any more, just reply and we'll sort it out.

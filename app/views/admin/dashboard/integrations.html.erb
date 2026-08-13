@@ -157,7 +157,11 @@
           <h2 class="font-semibold text-gray-900">Airtable Sync</h2>
           <p class="text-sm text-gray-500">Read-only mirror of participant data via the Sync API</p>
         </div>
-        <% if @airtable_sync_stale %>
+        <% if @airtable_sync_paused %>
+          <span class="ml-auto inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+            Paused
+          </span>
+        <% elsif @airtable_sync_stale %>
           <span class="ml-auto inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
             Stale
           </span>
@@ -202,12 +206,34 @@
 
         <% if @airtable_sync_configured %>
           <!-- Sync Status -->
-          <div class="border <%= @airtable_sync_stale ? "border-red-300 bg-red-50" : "border-gray-200 bg-gray-50" %> rounded-lg p-4">
-            <div class="flex items-center justify-between">
+          <div class="border <%= @airtable_sync_paused ? "border-amber-300 bg-amber-50" : (@airtable_sync_stale ? "border-red-300 bg-red-50" : "border-gray-200 bg-gray-50") %> rounded-lg p-4">
+            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div>
                 <h3 class="font-medium text-gray-900 text-sm">Sync Status</h3>
                 <div class="mt-1 space-y-1">
-                  <% if @airtable_sync_stale %>
+                  <% if @airtable_sync_paused %>
+                    <p class="text-sm text-amber-800 font-medium">
+                      Sync paused after a failure<%= " #{time_ago_in_words(@airtable_sync_paused_at)} ago" if @airtable_sync_paused_at %>
+                    </p>
+                    <p class="text-sm text-amber-700">
+                      Attend stops syncing an event as soon as it fails, rather than retrying
+                      broken settings every 5 minutes.
+                      <% if @airtable_config_owner %>
+                        <%= @airtable_config_owner.name.presence || @airtable_config_owner.email %> was emailed
+                        because they last saved these settings.
+                      <% end %>
+                      Fix the settings above and save, or hit Resume &amp; Sync Now to try again as-is.
+                    </p>
+                    <% if @airtable_synced_at %>
+                      <p class="text-sm text-amber-700">
+                        Airtable still shows the snapshot from
+                        <strong><%= time_ago_in_words(@airtable_synced_at) %> ago</strong>
+                        <span class="font-normal">(<%= @airtable_synced_at.strftime("%b %-d, %Y at %-I:%M %p %Z") %>)</span>.
+                      </p>
+                    <% else %>
+                      <p class="text-sm text-amber-700">This integration has never synced successfully.</p>
+                    <% end %>
+                  <% elsif @airtable_sync_stale %>
                     <p class="text-sm text-red-700 font-medium">
                       <% if @airtable_synced_at %>
                         Sync is failing — last successful sync was <%= time_ago_in_words(@airtable_synced_at) %> ago
@@ -236,13 +262,19 @@
                     </div>
                   <% end %>
                   <p class="text-sm text-gray-500"><%= @airtable_participant_count %> participant records will be synced</p>
-                  <p class="text-xs text-gray-400">Syncs automatically every 5 minutes and whenever these settings are saved</p>
+                  <p class="text-xs text-gray-400">
+                    <% if @airtable_sync_paused %>
+                      Automatic syncing is stopped until these settings are saved again
+                    <% else %>
+                      Syncs automatically every 5 minutes and whenever these settings are saved. A failed sync pauses automatically.
+                    <% end %>
+                  </p>
                 </div>
               </div>
-              <%= button_to "Sync Now",
+              <%= button_to @airtable_sync_paused ? "Resume & Sync Now" : "Sync Now",
                   admin_event_trigger_airtable_sync_path(current_event),
                   method: :post,
-                  class: "bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors" %>
+                  class: "bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors whitespace-nowrap shrink-0 self-start" %>
             </div>
           </div>
         <% end %>

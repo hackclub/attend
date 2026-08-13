@@ -31,6 +31,35 @@ RSpec.describe "Admin::Integrations", type: :request do
       expect(response.body).to include("Last synced")
       expect(response.body).not_to include("Last sync attempt failed")
     end
+
+    it "says the sync is paused rather than silently showing nothing" do
+      event.pause_airtable_sync!("HTTP 403: INVALID_PERMISSIONS")
+
+      get admin_event_integrations_path(event)
+
+      expect(response.body).to include("Paused")
+      expect(response.body).to include("Sync paused after a failure")
+      expect(response.body).to include("Resume &amp; Sync Now")
+    end
+
+    it "names the person who was emailed about the pause" do
+      saver = create(:user, name: "Sam Rivers")
+      event.update!(airtable_config_updated_by: saver)
+      event.pause_airtable_sync!("HTTP 403: INVALID_PERMISSIONS")
+
+      get admin_event_integrations_path(event)
+
+      expect(response.body).to include("Sam Rivers was emailed")
+    end
+
+    it "does not call a paused sync stale" do
+      event.update_columns(airtable_synced_at: 3.hours.ago)
+      event.pause_airtable_sync!("HTTP 403: INVALID_PERMISSIONS")
+
+      get admin_event_integrations_path(event)
+
+      expect(response.body).not_to include("Stale")
+    end
   end
 
   describe "PATCH /admin/:slug/integrations" do
@@ -74,6 +103,91 @@ RSpec.describe "Admin::Integrations", type: :request do
       }.not_to have_enqueued_job(AirtableJobs::SyncAllJob)
 
       expect(flash[:notice]).to eq("Integration settings updated.")
+    end
+
+    it "records who saved the Airtable settings, so they can be emailed on failure" do
+      patch admin_event_integrations_path(event), params: {
+        event: { airtable_api_key: "key-rotated" }
+      }
+
+      expect(event.reload.airtable_config_updated_by).to eq(admin)
+    end
+
+    it "leaves the recorded owner alone when only non-Airtable settings change" do
+      previous = create(:user)
+      event.update!(airtable_config_updated_by: previous)
+
+      patch admin_event_integrations_path(event), params: {
+        event: { slack_channel_id: "C123456" }
+      }
+
+      expect(event.reload.airtable_config_updated_by).to eq(previous)
+    end
+
+    it "resumes a paused sync when the settings are saved again" do
+      event.pause_airtable_sync!("HTTP 403: INVALID_PERMISSIONS")
+
+      patch admin_event_integrations_path(event), params: {
+        event: { airtable_sync_source_id: "syncfixed" }
+      }
+
+      event.reload
+      expect(event.airtable_sync_paused?).to be(false)
+      expect(event.airtable_sync_error).to be_nil
+    end
+  end
+
+  describe "POST /admin/:slug/integrations/airtable_sync" do
+    include ActiveJob::TestHelper
+
+    it "resumes a paused sync so the button isn't a no-op" do
+      event.pause_airtable_sync!("HTTP 403: INVALID_PERMISSIONS")
+
+      expect {
+        post admin_event_trigger_airtable_sync_path(event)
+      }.to have_enqueued_job(AirtableJobs::SyncAllJob)
+
+      expect(event.reload.airtable_sync_paused?).to be(false)
+      expect(flash[:notice]).to eq("Airtable sync resumed and triggered. It will complete shortly.")
+    end
+
+    it "just triggers a sync when nothing is paused" do
+      expect {
+        post admin_event_trigger_airtable_sync_path(event)
+      }.to have_enqueued_job(AirtableJobs::SyncAllJob)
+
+      expect(flash[:notice]).to eq("Airtable sync triggered. It will complete shortly.")
+    end
+  end
+
+  describe "POST /admin/:slug/integrations/vote_event" do
+    let(:vote_client) { instance_double(Vote::Client, configured?: true) }
+
+    before do
+      allow(Vote::Client).to receive(:new).and_return(vote_client)
+      allow(vote_client).to receive(:find_event).with(event.slug).and_return(
+        "id" => "vote-evt-1",
+        "slug" => event.slug,
+        "adminUrl" => "https://vote.hackclub.com/admin/vote-evt-1",
+        "galleryUrl" => "https://vote.hackclub.com/vote-evt-1"
+      )
+
+      # Consume Devise trackable's sign-in columns on a throwaway request so the
+      # event, not the user, is the changed record log_admin_action picks up.
+      get admin_event_integrations_path(event)
+    end
+
+    it "audit-logs the linkage" do
+      expect {
+        post admin_event_create_vote_event_path(event)
+      }.to change(AuditLog, :count).by(1)
+
+      log = AuditLog.order(:created_at).last
+      expect(log.action).to eq("create_vote_event")
+      expect(log.record).to eq(event)
+      expect(log.actor).to eq(admin)
+      expect(log.event).to eq(event)
+      expect(event.reload.vote_event_id).to eq("vote-evt-1")
     end
   end
 end

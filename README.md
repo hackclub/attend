@@ -58,34 +58,7 @@ rails db:create db:migrate db:seed
 bin/dev
 ```
 
-The app will be available at `https://attend.local`.
-
-### SSL Setup (Required)
-
-This app requires HTTPS in development. Follow these steps:
-
-1. **Add to `/etc/hosts`:**
-   ```
-   127.0.0.1 attend.local
-   ```
-
-2. **Trust the SSL certificate:**
-   ```bash
-   sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain config/ssl/attend.local.crt
-   ```
-
-3. **Enable port forwarding (443 → 3000):**
-   ```bash
-   echo "rdr pass on lo0 inet proto tcp from any to 127.0.0.1 port 443 -> 127.0.0.1 port 3000" | sudo pfctl -ef -
-   ```
-   > Note: This resets on reboot. Run again after restart.
-
-4. **Start the server:**
-   ```bash
-   bin/dev
-   ```
-
-5. **Access the app at `https://attend.local`**
+The app will be available at `https://localhost:3000`.
 
 ### Test Users (Development)
 
@@ -118,7 +91,6 @@ Key variables:
 | `DATABASE_URL` | PostgreSQL connection string |
 | `HACK_CLUB_CLIENT_ID` / `HACK_CLUB_CLIENT_SECRET` | OAuth credentials |
 | `DOCUSEAL_API_KEY` / `DOCUSEAL_WEBHOOK_SECRET` | E-signature integration |
-| `LOOPS_API_KEY` | Transactional email |
 | `SENTRY_DSN` | Error monitoring |
 
 ### Rails Credentials
@@ -212,8 +184,6 @@ Event
 | Service | Purpose |
 |---------|---------|
 | **Docuseal** | Embedded consent forms with webhook status updates |
-| **Loops** | Transactional emails (invites, reminders) |
-| **FlightAware / Amadeus** | Flight status tracking |
 
 ---
 
@@ -330,7 +300,7 @@ Add flight tracking integration with FlightAware
 
 - Never commit secrets or credentials
 - Use Rails credentials for sensitive configuration
-- Report security issues privately to the maintainers
+- Report security issues via [security.hackclub.com](security.hackclub.com)
 
 ---
 
