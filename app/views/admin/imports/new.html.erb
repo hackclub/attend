@@ -43,7 +43,7 @@
             <h3 class="font-semibold text-blue-800">Need a template?</h3>
             <p class="text-sm text-blue-700">Download a CSV template with all supported columns.</p>
           </div>
-          <%= link_to template_admin_event_imports_path(current_event), class: "px-4 py-2 bg-[#ec3750] text-white rounded-md hover:bg-[#d42f46] text-sm" do %>
+          <%= link_to template_admin_event_imports_path(current_event), class: "px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] text-sm" do %>
             Download Template
           <% end %>
         </div>
@@ -73,7 +73,7 @@
 
       <div class="flex justify-end gap-4">
         <%= link_to "Cancel", admin_event_participants_path(current_event), class: "px-4 py-2 text-gray-700 hover:text-gray-900" %>
-        <%= submit_tag "Upload & Preview", class: "px-6 py-2 bg-[#ec3750] text-white rounded-md hover:bg-[#d42f46] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed", id: "submit-btn", data: { dropzone_target: "submit" }, disabled: true %>
+        <%= submit_tag "Upload & Preview", class: "px-6 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed", id: "submit-btn", data: { dropzone_target: "submit" }, disabled: true %>
       </div>
     <% end %>
   </div>

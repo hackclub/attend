@@ -72,7 +72,7 @@
           </p>
         </div>
         <%= link_to "Continue registration", onboarding_path(event_id: @event.id),
-            class: "shrink-0 inline-flex items-center justify-center px-5 py-2.5 bg-[#ec3750] hover:bg-[#d42f46] text-white font-medium rounded-lg transition-colors" %>
+            class: "shrink-0 inline-flex items-center justify-center px-5 py-2.5 bg-[#d42f46] hover:bg-[#b82840] text-white font-medium rounded-lg transition-colors" %>
       </div>
     </section>
   <% end %>
@@ -88,7 +88,7 @@
       </h2>
 
       <div class="max-w-md bg-white rounded-2xl shadow-lg overflow-hidden border border-[#e0e6ed]">
-        <div class="bg-[#ec3750] text-white px-4 py-3 flex justify-between items-center">
+        <div class="bg-[#d42f46] text-white px-4 py-3 flex justify-between items-center">
           <span class="font-bold tracking-wider text-sm">BOARDING PASS</span>
           <img src="/flag.png" alt="Hack Club" class="h-5 opacity-90">
         </div>
@@ -274,7 +274,7 @@
           <%= button_to gpe.invite_token_sent_at ? "Resend invitation" : "Send invitation",
               dashboard_resend_guardian_invite_path(@participant_event),
               method: :post,
-              class: "shrink-0 inline-flex items-center px-4 py-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium rounded-lg transition-colors cursor-pointer" %>
+              class: "shrink-0 inline-flex items-center px-4 py-2 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium rounded-lg transition-colors cursor-pointer" %>
         <% end %>
       </div>
     </section>
@@ -320,7 +320,7 @@
               <span class="text-sm text-(--text-muted)">Pending guardian</span>
             <% elsif doc.participant_signs? %>
               <%= link_to doc.physical? ? "Sign & upload" : "Sign now", dashboard_sign_document_path(@participant_event, doc),
-                  class: "inline-flex items-center px-3 py-1.5 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium rounded-lg transition-colors" %>
+                  class: "inline-flex items-center px-3 py-1.5 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium rounded-lg transition-colors" %>
             <% elsif consent.nil? || consent.pending? %>
               <span class="text-sm text-(--text-muted)">Pending guardian</span>
             <% else %>

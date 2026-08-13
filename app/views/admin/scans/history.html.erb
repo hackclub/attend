@@ -53,7 +53,7 @@
         <% end %>
 
         <div>
-          <%= submit_tag "Filter", class: "bg-[#ec3750] text-white px-4 py-2 rounded-md hover:bg-[#d42f46] cursor-pointer" %>
+          <%= submit_tag "Filter", class: "bg-[#d42f46] text-white px-4 py-2 rounded-md hover:bg-[#b82840] cursor-pointer" %>
           <% if params[:search].present? || params[:scan_context_id].present? || params[:user_id].present? || params[:date].present? || params[:group_id].present? %>
             <%= link_to "Clear", history_admin_event_scans_path(current_event), class: "ml-2 text-gray-600 hover:text-gray-900" %>
           <% end %>
@@ -186,7 +186,7 @@
         </div>
         
         <div class="mt-6 flex gap-3">
-          <button type="submit" class="flex-1 bg-[#ec3750] text-white px-4 py-2 rounded-lg hover:bg-[#d42f46] font-medium">
+          <button type="submit" class="flex-1 bg-[#d42f46] text-white px-4 py-2 rounded-lg hover:bg-[#b82840] font-medium">
             Save Changes
           </button>
           <button type="button" onclick="closeEditModal()" class="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 font-medium">

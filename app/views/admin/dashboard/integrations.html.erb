@@ -60,7 +60,7 @@
               <%= link_to "Use default template",
                   admin_event_docuseal_template_use_default_path(current_event, "waiver"),
                   data: { turbo_method: :post },
-                  class: "inline-flex items-center px-3 py-1.5 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium rounded-lg transition-colors cursor-pointer" %>
+                  class: "inline-flex items-center px-3 py-1.5 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium rounded-lg transition-colors cursor-pointer" %>
             <% end %>
           </div>
         </div>
@@ -88,7 +88,7 @@
                 <%= link_to "Use default template",
                     admin_event_docuseal_template_use_default_path(current_event, "freedom_waiver"),
                     data: { turbo_method: :post },
-                    class: "inline-flex items-center px-3 py-1.5 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium rounded-lg transition-colors cursor-pointer" %>
+                    class: "inline-flex items-center px-3 py-1.5 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium rounded-lg transition-colors cursor-pointer" %>
               <% end %>
             </div>
           </div>
@@ -283,7 +283,7 @@
 
     <!-- Save Button -->
     <div class="flex justify-end">
-      <%= f.submit "Save Integration Settings", class: "bg-[#ec3750] hover:bg-[#d42f46] text-white font-medium py-2 px-4 rounded-lg transition-colors cursor-pointer" %>
+      <%= f.submit "Save Integration Settings", class: "bg-[#d42f46] hover:bg-[#b82840] text-white font-medium py-2 px-4 rounded-lg transition-colors cursor-pointer" %>
     </div>
   <% end %>
 
@@ -502,7 +502,7 @@
             <%= f.text_field :name, placeholder: "attend-integration-name", required: true,
                 class: "flex-1 bg-transparent px-1 py-2 text-sm font-mono focus:outline-none" %>
           </div>
-          <%= f.submit "Create token", class: "bg-[#ec3750] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#d42f46] cursor-pointer" %>
+          <%= f.submit "Create token", class: "bg-[#d42f46] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#b82840] cursor-pointer" %>
         <% end %>
       </div>
 
@@ -571,7 +571,7 @@
         <div class="flex items-center gap-3">
           <% if current_event.vote_event_admin_url.present? %>
             <%= link_to "Manage on vote.hackclub.com", current_event.vote_event_admin_url, target: "_blank", rel: "noopener",
-                class: "bg-[#ec3750] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#d42f46]" %>
+                class: "bg-[#d42f46] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#b82840]" %>
           <% end %>
           <% if current_event.vote_event_gallery_url.present? %>
             <%= link_to "View gallery", current_event.vote_event_gallery_url, target: "_blank", rel: "noopener",
@@ -597,7 +597,7 @@
               method: :post,
               disabled: !vote_ready,
               data: { confirm: "Create a new DRAFT event on vote.hackclub.com for \"#{current_event.name}\"?" },
-              class: "bg-[#ec3750] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#d42f46] disabled:opacity-50 disabled:cursor-not-allowed" %>
+              class: "bg-[#d42f46] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#b82840] disabled:opacity-50 disabled:cursor-not-allowed" %>
         </div>
       <% end %>
     </div>

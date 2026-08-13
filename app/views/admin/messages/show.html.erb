@@ -101,7 +101,7 @@
         <%= button_to "Send Now", send_now_admin_event_message_path(current_event, @message), 
             method: :post,
             data: { confirm: "Are you sure you want to send this message now?" },
-            class: "bg-[#ec3750] hover:bg-[#d42f46] text-white font-semibold py-2 px-4 rounded-lg" %>
+            class: "bg-[#d42f46] hover:bg-[#b82840] text-white font-semibold py-2 px-4 rounded-lg" %>
       <% end %>
 
       <% if @message.scheduled? %>
