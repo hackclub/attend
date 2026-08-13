@@ -18,7 +18,7 @@
         <% end %>
         <% step_content = capture do %>
           <span class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold
-            <%= index == current_index ? 'bg-[#ec3750] text-white' : (index < current_index ? 'bg-[#ec3750]/10 text-[#ec3750]' : 'bg-gray-100 text-gray-500 group-hover:bg-gray-200') %>">
+            <%= index == current_index ? 'bg-[#d42f46] text-white' : (index < current_index ? 'bg-[#ec3750]/10 text-[#ec3750]' : 'bg-gray-100 text-gray-500 group-hover:bg-gray-200') %>">
             <%= index + 1 %>
           </span>
           <span class="hidden sm:inline <%= index == current_index ? 'font-semibold text-gray-900' : 'text-gray-500 group-hover:text-gray-700' %>">

@@ -5,7 +5,7 @@
     <h1 class="text-2xl font-semibold text-gray-900">Events</h1>
     <% if policy(Event).create? || policy(EventSeries).create? %>
       <div class="relative" data-controller="dropdown">
-        <button type="button" data-action="dropdown#toggle" class="inline-flex items-center gap-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium py-2 px-4 rounded-md transition-colors">
+        <button type="button" data-action="dropdown#toggle" class="inline-flex items-center gap-2 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium py-2 px-4 rounded-md transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
           New
           <svg class="w-4 h-4 -mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -80,7 +80,7 @@
       <h2 class="text-base font-medium text-gray-900 mb-1">No events yet</h2>
       <p class="text-sm text-gray-500 mb-6">Create your first event to get started.</p>
       <% if policy(Event).create? %>
-        <%= link_to admin_new_event_path, class: "inline-flex items-center gap-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
+        <%= link_to admin_new_event_path, class: "inline-flex items-center gap-2 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
           Create Event
         <% end %>

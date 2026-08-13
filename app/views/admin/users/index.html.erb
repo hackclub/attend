@@ -4,7 +4,7 @@
       <h1 class="text-2xl font-bold text-gray-900">Users</h1>
       <p class="text-sm text-gray-500"><%= pluralize(@total_count, "user") %> total</p>
     </div>
-    <%= link_to "Add User", new_admin_user_path, class: "px-4 py-2 bg-[#ec3750] text-white rounded-md hover:bg-[#d42f46] transition-colors" %>
+    <%= link_to "Add User", new_admin_user_path, class: "px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] transition-colors" %>
   </div>
 
   <div class="bg-white border border-gray-200 rounded-lg">
@@ -16,7 +16,7 @@
         <div>
           <%= f.select :role, [["All Roles", ""], ["Global Admin", "global_admin"], ["Read Only", "read_only"], ["No Role", "none"]], { selected: params[:role] }, class: "px-3 py-2 rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750]" %>
         </div>
-        <%= f.submit "Search", class: "px-4 py-2 bg-[#ec3750] text-white rounded-md hover:bg-[#d42f46] transition-colors cursor-pointer" %>
+        <%= f.submit "Search", class: "px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] transition-colors cursor-pointer" %>
       <% end %>
     </div>
 

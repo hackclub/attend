@@ -11,7 +11,7 @@
     <%= image_tag logo.variant(resize_to_fill: [size * 2, size * 2]), class: "#{rounded} object-cover flex-shrink-0", style: "height: #{size}px; width: #{size}px;" %>
   <% end %>
 <% else %>
-  <span class="<%= rounded %> bg-[#ec3750] flex items-center justify-center font-bold text-white flex-shrink-0" style="height: <%= size %>px; width: <%= size %>px; font-size: <%= (size * 0.42).round %>px;">
+  <span class="<%= rounded %> bg-[#d42f46] flex items-center justify-center font-bold text-white flex-shrink-0" style="height: <%= size %>px; width: <%= size %>px; font-size: <%= (size * 0.42).round %>px;">
     <%= event.name.first.upcase %>
   </span>
 <% end %>
