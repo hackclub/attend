@@ -1,27 +1,42 @@
-<div class="w-full max-w-3xl mx-auto">
-  <div class="mb-4">
-    <%= link_to guardian_portal_confirmed_path(token: @token), class: "inline-flex items-center text-sm text-gray-600 hover:text-gray-900" do %>
-      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-      </svg>
-      Back
-    <% end %>
-  </div>
+<% content_for :title, "#{@custom_document.name} – Attend" %>
+<% first_name = @participant.legal_first_name %>
+<% full_name = "#{@participant.legal_first_name} #{@participant.legal_last_name}" %>
 
-  <h1 class="text-2xl font-bold mb-4"><%= @custom_document.name %></h1>
+<div class="w-full max-w-3xl mx-auto">
+  <%= render "shared/portal_masthead",
+        subtitle: @event.name,
+        back_to: { label: "Back", path: guardian_portal_confirmed_path(token: @token) } %>
+
+  <h1 class="portal-title text-2xl mb-4"><%= @custom_document.name %></h1>
 
   <% if @consent.signed? %>
-    <div class="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-      <p class="text-gray-700 text-lg">This document has already been signed. Thank you!</p>
+    <div class="portal-note portal-note-success">
+      <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+      </svg>
+      <p class="portal-body">This document is signed. Nothing more to do here.</p>
     </div>
+
   <% elsif @custom_document.physical? && @awaiting_participant %>
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-      <p class="text-gray-700 text-lg mb-2"><%= @participant.legal_first_name %> needs to upload the signed document first.</p>
-      <p class="text-gray-500">This document is signed on paper. Once <%= @participant.legal_first_name %> uploads a photo of the signed form, you'll be able to review and confirm it here.</p>
+    <div class="portal-note portal-note-info">
+      <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.852l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/>
+      </svg>
+      <div>
+        <h2 class="portal-heading">Waiting on <%= first_name %></h2>
+        <p class="portal-body text-sm mt-1">
+          This document is signed on paper. Once <%= first_name %> uploads a photo of the signed form,
+          you'll review and confirm it here.
+        </p>
+      </div>
     </div>
+
   <% elsif @custom_document.physical? && @custom_document.signed_by_guardian? %>
-    <p class="text-gray-600 mb-6">
-      This document needs to be signed physically for <strong><%= @participant.legal_first_name %> <%= @participant.legal_last_name %></strong>'s participation in <strong><%= @event.name %></strong>. Download it, print and sign it, then upload a photo of the signed form.
+    <p class="portal-body mb-6 max-w-prose">
+      This one is signed on paper for
+      <strong class="portal-heading"><%= full_name %></strong>'s participation in
+      <strong class="portal-heading"><%= @event.name %></strong>. Download it, print and sign it, then upload
+      a photo of the signed form.
     </p>
     <%= render "shared/physical_document_upload",
         custom_document: @custom_document,
@@ -29,29 +44,31 @@
         participant_event: @participant_event,
         upload_url: guardian_portal_upload_physical_document_path(token: @token, custom_document_id: @custom_document.id),
         remove_url_for: ->(upload) { guardian_portal_remove_physical_upload_path(token: @token, custom_document_id: @custom_document.id, upload_id: upload.id) } %>
+
   <% elsif @custom_document.physical? %>
-    <p class="text-gray-600 mb-6">
-      <%= @participant.legal_first_name %> uploaded a photo of the physically signed
-      <strong><%= @custom_document.name %></strong>. Please review it below and confirm the document
-      is accurate and complete.
+    <p class="portal-body mb-6 max-w-prose">
+      <%= first_name %> uploaded a photo of the signed <strong class="portal-heading"><%= @custom_document.name %></strong>.
+      Check it below, then confirm it's complete and accurate.
     </p>
 
     <% if @custom_document.description.present? %>
-      <div class="mb-6"><%= simple_format(@custom_document.description, class: "text-sm text-gray-600") %></div>
+      <div class="portal-panel p-4 mb-6">
+        <%= simple_format(@custom_document.description, class: "portal-body text-sm") %>
+      </div>
     <% end %>
 
     <div class="space-y-4 mb-6">
       <% @consent.physical_uploads.each do |upload| %>
-        <div class="border rounded-lg overflow-hidden bg-white shadow-sm">
+        <div class="portal-card overflow-hidden">
           <% if upload.image? %>
-            <%= link_to viewable_upload_path(upload), target: "_blank" do %>
-              <%= image_tag viewable_upload_path(upload), class: "w-full h-auto", alt: "Photo of signed #{@custom_document.name}" %>
+            <%= link_to viewable_upload_path(upload), target: "_blank", rel: "noopener", class: "block" do %>
+              <%= image_tag viewable_upload_path(upload), class: "w-full h-auto", loading: "lazy",
+                    alt: "Photo of the signed #{@custom_document.name}" %>
             <% end %>
           <% else %>
-            <div class="p-4">
-              <%= link_to "View #{upload.filename}", viewable_upload_path(upload), target: "_blank",
-                  class: "text-blue-600 hover:underline font-medium" %>
-              <span class="text-gray-400 text-sm">· <%= number_to_human_size(upload.byte_size) %></span>
+            <div class="p-4 flex flex-wrap items-baseline gap-x-2">
+              <%= link_to upload.filename, viewable_upload_path(upload), target: "_blank", rel: "noopener", class: "portal-link" %>
+              <span class="portal-meta text-sm"><%= number_to_human_size(upload.byte_size) %></span>
             </div>
           <% end %>
         </div>
@@ -59,74 +76,83 @@
     </div>
 
     <% if @custom_document.template_pdf.attached? %>
-      <p class="text-sm text-gray-500 mb-6">
-        Compare against the blank form:
-        <%= link_to "download the original #{@custom_document.name}", rails_blob_path(@custom_document.template_pdf, disposition: "attachment"),
-            class: "text-blue-600 hover:underline" %>
+      <p class="portal-hint text-sm mb-6">
+        Not sure it's the right form?
+        <%= link_to "Download the blank #{@custom_document.name}", rails_blob_path(@custom_document.template_pdf, disposition: "attachment"), class: "portal-link" %>
+        to compare.
       </p>
     <% end %>
 
     <%= form_with url: guardian_portal_verify_physical_document_path(token: @token, custom_document_id: @custom_document.id),
-        method: :post, data: { turbo: false }, class: "bg-white border border-gray-200 rounded-lg p-5" do %>
-      <label class="flex items-start gap-3 cursor-pointer">
-        <input type="checkbox" name="confirm_accurate" value="1" required
-               class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-        <span class="text-sm text-gray-700">
-          I confirm that I have reviewed the uploaded document, that it is the
-          <strong><%= @custom_document.name %></strong> for
-          <strong><%= @participant.legal_first_name %> <%= @participant.legal_last_name %></strong>,
-          and that it has been fully completed and physically signed by everyone required.
+        method: :post, data: { turbo: false }, class: "portal-card p-5 sm:p-6" do %>
+      <label class="portal-check-row" for="confirm_accurate">
+        <input type="checkbox" name="confirm_accurate" id="confirm_accurate" value="1" required class="portal-check mt-0.5">
+        <span class="text-sm">
+          I've reviewed the upload. It is the <strong class="portal-heading"><%= @custom_document.name %></strong>
+          for <strong class="portal-heading"><%= full_name %></strong>, and it has been fully completed and
+          physically signed by everyone required.
         </span>
       </label>
-      <button type="submit" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors cursor-pointer">
-        Confirm Document
+      <button type="submit" class="portal-btn portal-btn-primary mt-4 w-full sm:w-auto">
+        Confirm this document
       </button>
     <% end %>
 
-    <p class="text-sm text-gray-500 mt-4">
-      Something wrong with the upload? Ask <%= @participant.legal_first_name %> to upload a clearer photo — you'll be able to confirm it here afterwards.
-    </p>
-  <% elsif @awaiting_participant %>
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-      <p class="text-gray-700 text-lg mb-2"><%= @participant.legal_first_name %> needs to sign first.</p>
-      <p class="text-gray-500">Once they've signed their portion, you'll be able to sign yours — we'll also email you a link.</p>
-    </div>
-  <% else %>
-    <p class="text-gray-600 mb-6">
-      Please review and sign the document below for <strong><%= @participant.legal_first_name %> <%= @participant.legal_last_name %></strong>'s participation in <strong><%= @event.name %></strong>.
+    <p class="portal-hint text-sm mt-4">
+      Photo unreadable or a page missing? Ask <%= first_name %> to upload a clearer one — you can confirm
+      it here afterwards.
     </p>
 
-    <div class="border rounded-lg overflow-hidden bg-white shadow-sm mb-6">
+  <% elsif @awaiting_participant %>
+    <div class="portal-note portal-note-info">
+      <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.852l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/>
+      </svg>
+      <div>
+        <h2 class="portal-heading">Waiting on <%= first_name %></h2>
+        <p class="portal-body text-sm mt-1">
+          Once they've signed their portion you'll be able to sign yours — we'll email you a link too.
+        </p>
+      </div>
+    </div>
+
+  <% else %>
+    <p class="portal-body mb-6 max-w-prose">
+      Review and sign the document below for
+      <strong class="portal-heading"><%= full_name %></strong>'s participation in
+      <strong class="portal-heading"><%= @event.name %></strong>.
+    </p>
+
+    <div class="portal-card overflow-hidden mb-6">
       <docuseal-form
         id="docusealForm"
         data-src="<%= @signing_url %>"
-        style="height: 500px; overflow: auto;">
+        style="height: 70vh; min-height: 480px; overflow: auto;">
       </docuseal-form>
     </div>
 
-    <div class="text-center text-sm text-gray-500">
-      <p>Having trouble? <a href="<%= @signing_url %>" target="_blank" class="text-blue-600 hover:underline">Open in a new tab</a></p>
-    </div>
+    <p class="portal-hint text-sm text-center">
+      Having trouble? <%= link_to "Open the document in a new tab", @signing_url, target: "_blank", rel: "noopener", class: "portal-link" %>.
+    </p>
   <% end %>
 </div>
 
 <% if !@consent.signed? && !@awaiting_participant && !@custom_document.physical? %>
-<script src="https://<%= @consent.docuseal_host %>/js/form.js"></script>
-<script nonce="<%= content_security_policy_nonce %>">
-  document.getElementById('docusealForm').addEventListener('completed', function(e) {
-    var form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '<%= guardian_portal_custom_document_complete_path(token: @token, custom_document_id: @custom_document.id) %>';
+  <script src="https://<%= @consent.docuseal_host %>/js/form.js"></script>
+  <script nonce="<%= content_security_policy_nonce %>">
+    document.getElementById('docusealForm').addEventListener('completed', function() {
+      var form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '<%= guardian_portal_custom_document_complete_path(token: @token, custom_document_id: @custom_document.id) %>';
 
-    var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-    var csrfInput = document.createElement('input');
-    csrfInput.type = 'hidden';
-    csrfInput.name = 'authenticity_token';
-    csrfInput.value = csrfToken;
-    form.appendChild(csrfInput);
+      var csrfInput = document.createElement('input');
+      csrfInput.type = 'hidden';
+      csrfInput.name = 'authenticity_token';
+      csrfInput.value = document.querySelector('meta[name="csrf-token"]').content;
+      form.appendChild(csrfInput);
 
-    document.body.appendChild(form);
-    form.submit();
-  });
-</script>
+      document.body.appendChild(form);
+      form.submit();
+    });
+  </script>
 <% end %>

@@ -96,7 +96,7 @@ RSpec.describe "Physical custom documents", type: :request do
         .and not_have_enqueued_job(DocusealJobs::CreateCustomDocumentJob)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Download and print the document")
+      expect(response.body).to include("Download and print it")
       expect(response.body).to include("Upload photo(s) of the signed document")
     end
 
@@ -268,7 +268,7 @@ RSpec.describe "Physical custom documents", type: :request do
 
         get dashboard_sign_document_path(participant_event, doc)
         expect(response.body).to include("Remove")
-        expect(response.body).to include("1 of 1 file uploaded")
+        expect(response.body).to include("1 of 1 file")
 
         delete dashboard_remove_physical_upload_path(participant_event, doc, upload_id: upload.id)
 
@@ -323,7 +323,7 @@ RSpec.describe "Physical custom documents", type: :request do
       }.not_to have_enqueued_job(DocusealJobs::CreateCustomDocumentJob)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("needs to upload the signed document first")
+      expect(response.body).to include("uploads a photo of the signed form")
     end
 
     it "shows the uploaded photo and confirms it via the checkbox" do
@@ -333,7 +333,7 @@ RSpec.describe "Physical custom documents", type: :request do
       consent.physical_uploads.attach(io: StringIO.new("fake-jpeg-bytes"), filename: "signed.jpg", content_type: "image/jpeg")
 
       get guardian_portal_custom_document_path(token: token, custom_document_id: doc.id)
-      expect(response.body).to include("review it below and confirm")
+      expect(response.body).to include("Check it below, then confirm")
 
       post guardian_portal_verify_physical_document_path(token: token, custom_document_id: doc.id),
         params: { confirm_accurate: "1" }
@@ -372,7 +372,7 @@ RSpec.describe "Physical custom documents", type: :request do
       get guardian_portal_custom_document_path(token: token, custom_document_id: doc.id)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("needs to sign first")
+      expect(response.body).to include("Waiting on")
       expect(response.body).not_to include("docuseal-form")
     end
 
@@ -508,16 +508,16 @@ RSpec.describe "Physical custom documents", type: :request do
 
       get guardian_portal_path(token: token)
 
-      expect(response.body).to include("Your Part Is Done")
+      expect(response.body).to include("Your part is done")
       expect(response.body).to include("still needs to upload")
       expect(response.body).to include("Entry Authorization")
-      expect(response.body).not_to include("All Steps Complete!")
+      expect(response.body).not_to include("Everything's filled in")
     end
 
     it "claims all steps complete when no physical document is awaiting the participant" do
       get guardian_portal_path(token: token)
 
-      expect(response.body).to include("All Steps Complete!")
+      expect(response.body).to include("Everything's filled in")
       expect(response.body).not_to include("still needs to upload")
     end
 
@@ -532,7 +532,7 @@ RSpec.describe "Physical custom documents", type: :request do
       # The doc now blocks the consents step outright, so the overview drops
       # back to "complete all steps" rather than the awaiting-participant note.
       expect(response.body).not_to include("still needs to upload")
-      expect(response.body).not_to include("All Steps Complete!")
+      expect(response.body).not_to include("Everything's filled in")
     end
   end
 
@@ -561,7 +561,7 @@ RSpec.describe "Physical custom documents", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Immigration Form")
       expect(response.body).to include("Upload below")
-      expect(response.body).to include("Download and print the document")
+      expect(response.body).to include("Download and print it")
       expect(response.body).not_to include("Getting your documents ready to sign")
     end
 

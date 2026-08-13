@@ -1,34 +1,60 @@
-<nav class="mb-8 overflow-x-auto">
-  <ol class="flex items-center w-full min-w-max">
+<%# Position indicator for the guardian wizard. Completed steps are links back;
+    the current step is marked with aria-current; steps not yet reached stay
+    inert so nobody tabs into a dead end.
+
+    On phones the rail would need horizontal scrolling to stay legible, so we
+    show a compact "step N of M" line instead and keep the rail for sm and up. %>
+<nav class="mb-8" aria-label="Progress">
+  <p class="sm:hidden portal-hint text-sm font-medium mb-2">
+    Step <%= @steps.index(@current_step) + 1 %> of <%= @steps.length %> ·
+    <span class="portal-heading"><%= guardian_step_label(@current_step) %></span>
+  </p>
+
+  <div class="portal-progress sm:hidden">
+    <div class="portal-progress-fill"
+         style="--portal-progress: <%= ((@steps.index(@current_step) + 1).to_f / @steps.length).round(3) %>"></div>
+  </div>
+
+  <ol class="hidden sm:flex items-start w-full">
     <% @steps.each_with_index do |step, index| %>
-      <% step_number = index + 1 %>
       <% is_completed = @completed_steps.include?(step) %>
       <% is_current = step == @current_step %>
+      <% is_last = index == @steps.length - 1 %>
 
-      <li class="flex items-center <%= 'flex-1' unless index == @steps.length - 1 %>">
-        <div class="flex flex-col items-center">
-          <% if is_completed %>
-            <%= link_to guardian_step_path(@guardian_participant_event.invite_token, step), class: "flex items-center justify-center w-10 h-10 rounded-full bg-green-600 border-2 border-green-600 text-white hover:bg-green-700 transition-colors" do %>
-              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+      <li class="flex items-start <%= "flex-1" unless is_last %>">
+        <div class="flex flex-col items-center gap-2 w-24 shrink-0">
+<%# Colour tracks where you are; the tick tracks what's finished. %>
+          <% marker_class = is_current ? "portal-step-marker-current" : (is_completed ? "portal-step-marker-done" : "") %>
+          <% marker = capture do %>
+            <% if is_completed %>
+              <svg class="size-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
               </svg>
+            <% else %>
+              <%= index + 1 %>
             <% end %>
-          <% elsif is_current %>
-            <div class="flex items-center justify-center w-10 h-10 rounded-full bg-blue-600 border-2 border-blue-600 text-white">
-              <%= step_number %>
-            </div>
-          <% else %>
-            <div class="flex items-center justify-center w-10 h-10 rounded-full bg-white border-2 border-gray-300 text-gray-500">
-              <%= step_number %>
-            </div>
           <% end %>
-          <span class="mt-2 text-xs font-medium whitespace-nowrap <%= is_current ? 'text-blue-600' : (is_completed ? 'text-green-600' : 'text-gray-500') %>">
-            <%= step.to_s.titleize %>
+
+          <% if is_completed && !is_current %>
+            <%= link_to guardian_portal_step_path(token: @token, step: step),
+                  class: "portal-step-marker #{marker_class} transition-transform hover:scale-110",
+                  aria: { label: "Back to #{guardian_step_label(step)}" } do %>
+              <%= marker %>
+            <% end %>
+          <% else %>
+            <span class="portal-step-marker <%= marker_class %>" <%= "aria-current=step".html_safe if is_current %>>
+              <%= marker %>
+            </span>
+          <% end %>
+
+          <span class="text-xs font-medium text-center leading-tight <%= is_current ? "portal-heading" : (is_completed ? "portal-hint" : "portal-meta") %>">
+            <%= guardian_step_label(step) %>
           </span>
         </div>
 
-        <% unless index == @steps.length - 1 %>
-          <div class="flex-1 h-0.5 mx-4 <%= is_completed ? 'bg-green-600' : 'bg-gray-300' %>"></div>
+        <% unless is_last %>
+          <div class="flex-1 h-0.5 mt-[0.6875rem] rounded-full"
+               style="background-color: <%= is_completed ? "var(--success)" : "var(--border)" %>"></div>
         <% end %>
       </li>
     <% end %>

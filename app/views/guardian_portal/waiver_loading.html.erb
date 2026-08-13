@@ -1,15 +1,20 @@
-<div class="w-full max-w-3xl mx-auto py-8">
+<% content_for :title, "Preparing your document – Attend" %>
+
+<div class="w-full max-w-3xl mx-auto">
+  <%= render "shared/portal_masthead", subtitle: @event.name %>
+
   <div class="mb-6 text-center">
-    <h1 class="text-2xl font-bold">Preparing the Document</h1>
-    <p class="text-gray-600 mt-2">
-      We're preparing the document for <strong><%= @participant.legal_first_name %> <%= @participant.legal_last_name %></strong>.
+    <h1 class="portal-title text-2xl">Preparing the document</h1>
+    <p class="portal-body mt-2">
+      We're getting the document ready for
+      <strong class="portal-heading"><%= @participant.legal_first_name %> <%= @participant.legal_last_name %></strong>.
     </p>
   </div>
 
   <%= render "shared/document_preparing", title: "Almost there" %>
 
-  <p class="mt-6 text-sm text-gray-500 text-center">
-    If the page doesn't refresh, <a href="" class="text-blue-600 hover:underline">click here</a>.
+  <p class="portal-hint text-sm text-center mt-6">
+    Not refreshing on its own? <%= link_to "Reload the page", request.fullpath, class: "portal-link" %>.
   </p>
 </div>
 
