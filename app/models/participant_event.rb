@@ -27,6 +27,10 @@ class ParticipantEvent < ApplicationRecord
   has_one :room, through: :room_assignment
   has_many :roommate_preferences, dependent: :destroy
   has_many :roommate_exclusions, dependent: :destroy
+  # The other side of the pairing — someone else naming this participant as a
+  # preferred or excluded roommate also holds a foreign key to us.
+  has_many :inbound_roommate_preferences, class_name: "RoommatePreference", foreign_key: :preferred_participant_event_id, dependent: :destroy, inverse_of: :preferred_participant_event
+  has_many :inbound_roommate_exclusions, class_name: "RoommateExclusion", foreign_key: :excluded_participant_event_id, dependent: :destroy, inverse_of: :excluded_participant_event
   has_one :dietary, dependent: :destroy
   has_one :accessibility, dependent: :destroy
   has_one :safeguarding_info, dependent: :destroy
@@ -35,9 +39,13 @@ class ParticipantEvent < ApplicationRecord
   accepts_nested_attributes_for :emergency_contacts, allow_destroy: true, reject_if: :all_blank
 
   has_many :consents, dependent: :destroy
-  has_many :incidents
-  has_many :notes
+  # Incidents and notes outlive the participant's enrolment — they stay on the
+  # event as a safeguarding record — but the join rows pointing at us can't.
+  has_many :incidents, dependent: :nullify
+  has_many :notes, dependent: :nullify
+  has_many :incident_participants, dependent: :destroy
   has_many :scans, dependent: :destroy
+  has_many :slack_blast_recipients, dependent: :destroy
   has_many :message_deliveries, dependent: :destroy
   has_many :group_memberships, dependent: :destroy
   has_many :groups, through: :group_memberships
