@@ -57,8 +57,17 @@ RUN echo "${GIT_REVISION}" > REVISION
 # -j 1 disable parallel compilation to avoid a QEMU bug: https://github.com/rails/bootsnap/issues/495
 RUN bundle exec bootsnap precompile -j 1 app/ lib/
 
-# Precompiling assets for production without requiring secret RAILS_MASTER_KEY
-RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
+# Precompiling assets for production without requiring secret RAILS_MASTER_KEY.
+#
+# RAILS_MASTER_KEY is dropped for this step rather than merely left unset: the
+# platform injects a deployment's env vars into the build, so the staging
+# deployment's build would otherwise try to decrypt config/credentials.yml.enc —
+# production's file, because RAILS_ENV is production here — with staging's key
+# and fail with ActiveSupport::MessageEncryptor::InvalidMessage. Loading the
+# production environment reads credentials (mailer settings, config.hosts), and
+# none of those values affect the compiled assets. With no key at all the reads
+# return nil, which is what a local or CI build has always done.
+RUN env -u RAILS_MASTER_KEY SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
 
 
 
