@@ -99,3 +99,21 @@ production:
   cable:
     <<: *primary_production
     migrations_paths: db/cable_migrate
+
+# Staging points at its own Orchard database. DATABASE_URL is always set on the
+# deployment; there is deliberately no credentials fallback here, so a staging
+# box with a mis-set DATABASE_URL fails to boot instead of quietly connecting to
+# whatever database the credentials file names.
+staging:
+  primary: &primary_staging
+    <<: *default
+    url: <%= ENV["DATABASE_URL"] %>
+  cache:
+    <<: *primary_staging
+    migrations_paths: db/cache_migrate
+  queue:
+    <<: *primary_staging
+    migrations_paths: db/queue_migrate
+  cable:
+    <<: *primary_staging
+    migrations_paths: db/cable_migrate

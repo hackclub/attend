@@ -161,7 +161,7 @@ class ParticipantMailer < ApplicationMailer
   end
 
   def default_protocol
-    Rails.env.production? ? "https" : "http"
+    Rails.env.local? ? "http" : "https"
   end
 
   def waiver_page_url
