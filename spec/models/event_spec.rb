@@ -235,4 +235,30 @@ RSpec.describe Event, type: :model do
       expect(event.errors[:banner]).to include("must be smaller than 5MB")
     end
   end
+
+  describe "#destroy" do
+    let(:event) { create(:event) }
+    let(:reporter) { create(:user) }
+    let(:participant_event) { create(:participant_event, event: event) }
+    let(:other_participant_event) { create(:participant_event, event: event) }
+
+    # Participant events are destroyed before the event's own incidents and
+    # notes, so anything still pointing at a participant event at that moment
+    # used to blow up with a foreign key violation.
+    it "tears down records that point at its participant events" do
+      incident = Incident.create!(event: event, reported_by: reporter, category: :other, severity: :low)
+      incident.incident_participants.create!(participant_event: participant_event)
+      Note.create!(event: event, participant_event: participant_event, author: reporter, body: "note")
+      RoommatePreference.create!(participant_event: other_participant_event, preferred_participant_event: participant_event)
+      RoommateExclusion.create!(participant_event: other_participant_event, excluded_participant_event: participant_event)
+      blast = event.slack_blasts.create!(sent_by_user: reporter, message: "hi")
+      blast.slack_blast_recipients.create!(participant_event: participant_event)
+
+      expect { event.destroy! }.not_to raise_error
+      expect(Event.exists?(event.id)).to be false
+      expect(IncidentParticipant.count).to eq 0
+      expect(Incident.count).to eq 0
+      expect(RoommatePreference.count).to eq 0
+    end
+  end
 end
