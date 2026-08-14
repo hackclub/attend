@@ -181,7 +181,9 @@
       </div>
 
       <% if TurnstileVerifier.site_key.present? && !user_signed_in? %>
-        <div class="cf-turnstile" data-sitekey="<%= TurnstileVerifier.site_key %>"></div>
+        <div class="cf-turnstile"
+             data-sitekey="<%= TurnstileVerifier.site_key %>"
+             data-action="<%= IncidentReportsController::TURNSTILE_ACTION %>"></div>
       <% end %>
 
       <div>

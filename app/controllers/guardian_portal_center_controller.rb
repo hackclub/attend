@@ -5,6 +5,10 @@ class GuardianPortalCenterController < ApplicationController
   SESSION_VALIDITY = 1.hour
   MAX_ATTEMPTS = 5
 
+  # Pinned in the widget's data-action and checked against siteverify's response,
+  # so a token solved on another Turnstile form cannot be replayed here.
+  TURNSTILE_ACTION = "guardian_portal_code".freeze
+
   rate_limit to: 5, within: 15.minutes, only: :request_code,
              with: -> { redirect_to guardian_portal_center_path, alert: "Too many codes requested. Please wait a few minutes and try again." }
   rate_limit to: 10, within: 15.minutes, only: :verify,
@@ -195,6 +199,10 @@ class GuardianPortalCenterController < ApplicationController
   def passed_turnstile?
     return true if session[:gpc_verification].present?
 
-    TurnstileVerifier.verify(params["cf-turnstile-response"], remote_ip: request.remote_ip)
+    TurnstileVerifier.verify(
+      params["cf-turnstile-response"],
+      remote_ip: request.remote_ip,
+      action: TURNSTILE_ACTION
+    )
   end
 end

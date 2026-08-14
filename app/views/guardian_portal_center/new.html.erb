@@ -24,7 +24,9 @@
             class: "portal-input" %>
 
       <% if TurnstileVerifier.site_key.present? && !user_signed_in? %>
-        <div class="cf-turnstile mt-4" data-sitekey="<%= TurnstileVerifier.site_key %>"></div>
+        <div class="cf-turnstile mt-4"
+             data-sitekey="<%= TurnstileVerifier.site_key %>"
+             data-action="<%= GuardianPortalCenterController::TURNSTILE_ACTION %>"></div>
       <% end %>
 
       <button type="submit" class="portal-btn portal-btn-primary w-full sm:w-auto mt-4">
