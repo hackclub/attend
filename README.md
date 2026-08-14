@@ -262,6 +262,47 @@ docker run -d -p 80:80 \
 
 Set `RAILS_MASTER_KEY` as an environment variable on your production server. Hack Club's production instance builds this Dockerfile and deploys it on every merge to `main`.
 
+### Staging
+
+`RAILS_ENV=staging` loads `config/environments/production.rb` verbatim and then overrides
+only the host, the Active Storage bucket, and the outbound-email guard, so staging
+exercises the same code paths as production.
+
+What keeps staging from touching production's data:
+
+- **Credentials.** Staging reads `config/credentials/staging.yml.enc`, unlocked by its own
+  `RAILS_MASTER_KEY`. Those credentials must name staging Postmark/Twilio/Airtable/Slack
+  accounts. The app refuses to boot if that file is missing, because Rails would otherwise
+  silently fall back to production's `config/credentials.yml.enc`. Open it with
+  `bin/rails credentials:edit --environment staging` — it ships as an annotated template
+  with every integration the app reads, so filling in the `REPLACE_ME`s is the whole job.
+  `secret_key_base` and the `active_record_encryption` keys are already generated and
+  deliberately differ from production's, so a staging session cookie is not valid on
+  attend.hackclub.com.
+- **Email.** Every outbound message is rewritten to `STAGING_MAIL_RECIPIENT`, or dropped
+  if that variable is unset. See `app/mailers/staging_mail_interceptor.rb`.
+- **SMS and voice.** Off until someone flips the `twilio_enabled` setting, which defaults
+  to false on a fresh database.
+- **Airtable.** `config/recurring.yml` deliberately omits `airtable_sync` in staging —
+  it writes back to the base it reads, so a second box running it every five minutes
+  would fight production over the same records. Run it by hand when you need it.
+- **Uploads.** A separate `hackclub-attend-staging` R2 bucket (`config/storage.yml`).
+
+Required environment variables on the staging deployment:
+
+| Variable | Value |
+| --- | --- |
+| `RAILS_ENV` | `staging` |
+| `RAILS_MASTER_KEY` | contents of `config/credentials/staging.key` |
+| `DATABASE_URL` | the staging Postgres URL (no credentials fallback — a wrong value fails to boot) |
+| `APP_HOST` | the staging hostname, e.g. `staging.attend.hackclub.com` |
+| `STAGING_MAIL_RECIPIENT` | where redirected email should go; unset means email is dropped |
+| `SOLID_QUEUE_IN_PUMA` | `true` |
+
+Also needs doing outside the app: a Hack Club Auth redirect URI for the staging host, a
+Turnstile widget scoped to it, and the `hackclub-attend-staging` R2 bucket. Webhooks (Postmark,
+HelpScout, DocuSeal, Twilio) stay pointed at production, so staging never receives them.
+
 ---
 
 ## Contributing

@@ -2,7 +2,9 @@
 
 data_sources:
   main:
-    url: <%= Rails.application.credentials.dig(:database_url) %>
+    # Same precedence as config/database.yml — otherwise Blazer on a non-production
+    # deployment would query whichever database the credentials file names.
+    url: <%= ENV["DATABASE_URL"] || Rails.application.credentials.dig(:database_url) %>
 
     # statement timeout, in seconds
     # none by default

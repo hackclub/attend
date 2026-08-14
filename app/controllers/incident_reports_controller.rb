@@ -1,6 +1,10 @@
 class IncidentReportsController < ApplicationController
   skip_before_action :set_current_attributes
 
+  # Pinned in the widget's data-action and checked against siteverify's response,
+  # so a token solved on another Turnstile form cannot be replayed here.
+  TURNSTILE_ACTION = "incident_report".freeze
+
   def new
     @incident_report = IncidentReport.new
     prefill_from_user
@@ -91,6 +95,10 @@ class IncidentReportsController < ApplicationController
   end
 
   def verify_turnstile
-    TurnstileVerifier.verify(params["cf-turnstile-response"], remote_ip: request.remote_ip)
+    TurnstileVerifier.verify(
+      params["cf-turnstile-response"],
+      remote_ip: request.remote_ip,
+      action: TURNSTILE_ACTION
+    )
   end
 end

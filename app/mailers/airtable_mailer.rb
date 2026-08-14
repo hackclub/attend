@@ -31,6 +31,6 @@ class AirtableMailer < ApplicationMailer
   end
 
   def default_protocol
-    Rails.env.production? ? "https" : "http"
+    Rails.env.local? ? "http" : "https"
   end
 end
