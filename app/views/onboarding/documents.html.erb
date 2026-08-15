@@ -123,6 +123,56 @@
       <% end %>
     <% end %>
 
+    <!-- Optional extras: waivers for activities you choose to take part in.
+         Nothing here is required, and until you add one nobody is asked to
+         sign it — your parent/guardian included. -->
+    <% if @optional_documents.present? %>
+      <div class="bg-white border border-gray-200 rounded-lg mt-6">
+        <div class="p-4 border-b border-gray-100">
+          <h2 class="font-semibold text-gray-900">Optional extras</h2>
+          <p class="text-sm text-gray-500 mt-0.5">
+            Only for activities you want to take part in. Skip anything you're not doing — you can add it later from your dashboard.
+          </p>
+        </div>
+        <div class="divide-y divide-gray-100">
+          <% @optional_documents.each do |doc| %>
+            <% added = @participant_event.opted_into_custom_document?(doc) %>
+            <div class="p-4 flex flex-wrap items-center justify-between gap-3">
+              <div class="min-w-0">
+                <p class="font-medium text-gray-900"><%= doc.name %></p>
+                <p class="text-xs text-gray-500 mt-0.5">
+                  <% if added && doc.participant_signs? %>
+                    Added — sign it in the list above.
+                  <% elsif added %>
+                    Added — your parent/guardian will be asked to sign it.
+                  <% elsif doc.description.present? %>
+                    <%= doc.description %>
+                  <% elsif doc.guardian_signs? && @participant_event.requires_guardian? %>
+                    Your parent/guardian is only asked to sign this if you add it.
+                  <% else %>
+                    Only add this if you want to take part.
+                  <% end %>
+                </p>
+              </div>
+              <% if added %>
+                <%= button_to onboarding_withdraw_optional_document_path(custom_document_id: doc.id, event_id: current_event.id),
+                    method: :delete, data: { turbo_confirm: "Remove \"#{doc.name}\"? You can add it back any time." },
+                    class: "text-sm text-gray-500 hover:text-gray-700 underline underline-offset-2 cursor-pointer shrink-0" do %>
+                  Remove<span class="sr-only"> <%= doc.name %></span>
+                <% end %>
+              <% else %>
+                <%= button_to onboarding_add_optional_document_path(custom_document_id: doc.id, event_id: current_event.id),
+                    method: :post,
+                    class: "bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-4 rounded-lg transition-colors cursor-pointer shrink-0" do %>
+                  Add and sign<span class="sr-only"> <%= doc.name %></span>
+                <% end %>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
     <!-- Continue -->
     <div class="flex items-center justify-between mt-6">
       <span class="text-sm text-gray-500">

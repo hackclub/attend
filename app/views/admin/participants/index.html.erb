@@ -104,8 +104,21 @@
             ),
             class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
       <% end %>
+      <% if @optional_documents.any? %>
+        <%# Opt-in activities: who's doing each one, and who still owes a signature. %>
+        <%= select_tag :optional_document,
+            options_for_select(
+              [ [ "All Optional Docs", "" ] ] + @optional_documents.flat_map { |doc|
+                [ [ "#{doc.name}: added", "#{doc.id}:added" ],
+                  [ "#{doc.name}: awaiting signature", "#{doc.id}:awaiting" ],
+                  [ "#{doc.name}: not added", "#{doc.id}:not_added" ] ]
+              },
+              params[:optional_document]
+            ),
+            class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
+      <% end %>
       <%= submit_tag "Filter", class: "text-sm font-medium bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 cursor-pointer" %>
-      <% if params[:search].present? || params[:status].present? || params[:flag].present? || params[:checked_in].present? || params[:group_id].present? %>
+      <% if params[:search].present? || params[:status].present? || params[:flag].present? || params[:checked_in].present? || params[:group_id].present? || params[:optional_document].present? %>
         <%= link_to "Clear", admin_event_participants_path(current_event), class: "text-sm text-gray-500 hover:text-gray-700" %>
       <% end %>
       <div class="ml-auto flex items-center gap-1">

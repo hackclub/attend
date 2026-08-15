@@ -54,11 +54,23 @@ class CustomDocument < ApplicationRecord
     signed_by_guardian? || signed_by_participant_and_guardian? || signed_by_minor_and_guardian?
   end
 
-  # Guardian-only documents only make sense for participants who have a
-  # guardian, and minor_and_guardian documents are skipped entirely for
+  # Whether this document is live for a participant — the single gate every
+  # surface goes through (wizard, dashboard, guardian portal, completion,
+  # reopen job). An optional document doesn't exist for anyone until that
+  # participant adds it, which is what keeps an opt-in activity's waiver off
+  # the guardian's portal entirely.
+  def applies_to?(participant_event)
+    return false if optional? && !participant_event.opted_into_custom_document?(self)
+
+    relevant_to?(participant_event)
+  end
+
+  # Whether the document is meant for this participant at all, ignoring
+  # opt-in. Guardian-only documents only make sense for participants who have
+  # a guardian, and minor_and_guardian documents are skipped entirely for
   # adults; every other document applies to everyone (adults sign
   # participant_and_guardian documents alone).
-  def applies_to?(participant_event)
+  def relevant_to?(participant_event)
     if signed_by_guardian? || signed_by_minor_and_guardian?
       return participant_event.requires_guardian?
     end
@@ -78,6 +90,9 @@ class CustomDocument < ApplicationRecord
   # guardian invites are locked, documents aren't signable, so the reopen
   # waits for unlock (Event#send_pending_guardian_invites re-enqueues it).
   def reopen_completed_participants
+    # Optional documents block nobody until they're added, so adding one to
+    # the event must not disturb participants who already finished.
+    return if optional?
     return if event.guardian_invites_locked?
 
     ReopenParticipantsForCustomDocumentsJob.perform_later(event_id)
