@@ -16,7 +16,12 @@ Rails.application.configure do
   staging_host = ENV.fetch("APP_HOST", "staging.attend.hackclub.com")
 
   config.action_mailer.default_url_options = { host: staging_host, protocol: "https" }
-  config.hosts |= [ staging_host ]
+  # staging_host covers the public ingress. The other two are how the cluster
+  # itself reaches the app: kubelet probes and in-cluster traffic arrive with the
+  # service's internal name, and Orchard also serves an auto-generated
+  # *.k.hackclub.dev ingress alongside the real hostname. Without them those
+  # requests are rejected by host authorization.
+  config.hosts |= [ staging_host, ".svc.cluster.local", ".k.hackclub.dev" ]
 
   # Staging uploads must not land in production's R2 bucket.
   config.active_storage.service = :cloudflare_r2_staging
