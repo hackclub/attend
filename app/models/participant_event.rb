@@ -168,6 +168,19 @@ class ParticipantEvent < ApplicationRecord
     consent.present? && !consent.withdrawn?
   end
 
+  # Where this participant stands on one optional document, for the admin
+  # table's column, filter, sort and grouping. Reads the consent row that
+  # records the opt-in, so it costs no extra query when consents are
+  # eager-loaded. Keep in sync with Admin::ParticipantsController's SQL
+  # equivalents, which have to answer the same question in the database.
+  def optional_document_state(custom_document)
+    consent = custom_document_consent(custom_document)
+    return :not_added if consent.nil?
+    return :withdrawn if consent.withdrawn?
+
+    consent.signed? ? :signed : :awaiting
+  end
+
   def custom_document_consent(custom_document)
     if consents.loaded?
       consents.find { |c| c.custom_document_id == custom_document.id }

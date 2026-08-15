@@ -375,6 +375,205 @@ RSpec.describe "Optional custom documents", type: :request do
     end
   end
 
+  describe "the admin participants table" do
+    let(:admin) { User.create!(email: "admin-table@example.com", name: "Admin", global_role: "global_admin") }
+    let!(:doc) { create(:custom_document, :optional, event: event, name: "Zip Lining Waiver") }
+
+    # One participant per state, named so the rendered table can be read back.
+    let!(:signed_pe) { participant_named("Signa", "Signed") }
+    let!(:awaiting_pe) { participant_named("Awaita", "Awaiting") }
+    let!(:withdrawn_pe) { participant_named("Withda", "Withdrawn") }
+    let!(:absent_pe) { participant_named("Absenta", "Absent") }
+
+    def participant_named(first, last)
+      create(:participant_event, event: event,
+        participant: create(:participant, legal_first_name: first, legal_last_name: last))
+    end
+
+    before do
+      sign_in admin
+      create(:consent, :signed, participant_event: signed_pe, consent_type: :custom_document,
+        custom_document: doc, opted_in_at: Time.current)
+      create(:consent, participant_event: awaiting_pe, consent_type: :custom_document,
+        custom_document: doc, opted_in_at: Time.current)
+      create(:consent, participant_event: withdrawn_pe, consent_type: :custom_document,
+        custom_document: doc, opted_in_at: 1.day.ago, withdrawn_at: Time.current)
+    end
+
+    def table_get(params = {})
+      get table_admin_event_participants_path(event.slug), params: params
+    end
+
+    def filter_params(operator, value = doc.id)
+      { filters: { "0" => { field: "optional_document", operator: operator, value: value } } }
+    end
+
+    it "gives each optional document its own sortable column" do
+      table_get
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Zip Lining Waiver")
+      expect(response.body).to include("optional_document:#{doc.id}")
+      expect(response.body).to include("Awaiting signature")
+      expect(response.body).to include("Not added")
+    end
+
+    it "filters to participants who added it" do
+      table_get(filter_params("added"))
+
+      expect(response.body).to include("Signa", "Awaita")
+      expect(response.body).not_to include("Absenta")
+      # Withdrawn is not "added" — that's the whole point of keeping the row.
+      expect(response.body).not_to include("Withda")
+    end
+
+    it "filters to participants who have not added it" do
+      table_get(filter_params("not_added"))
+
+      expect(response.body).to include("Absenta", "Withda")
+      expect(response.body).not_to include("Signa")
+      expect(response.body).not_to include("Awaita")
+    end
+
+    it "filters to those still owing a signature" do
+      table_get(filter_params("awaiting"))
+
+      expect(response.body).to include("Awaita")
+      expect(response.body).not_to include("Signa")
+      expect(response.body).not_to include("Absenta")
+    end
+
+    it "filters to those who have signed" do
+      table_get(filter_params("signed"))
+
+      expect(response.body).to include("Signa")
+      expect(response.body).not_to include("Awaita")
+    end
+
+    it "filters to those who backed out" do
+      table_get(filter_params("withdrawn"))
+
+      expect(response.body).to include("Withda")
+      expect(response.body).not_to include("Signa")
+      expect(response.body).not_to include("Absenta")
+    end
+
+    it "ignores a document belonging to another event" do
+      other_doc = create(:custom_document, :optional, event: create(:event), name: "Someone Else's Waiver")
+
+      table_get(filter_params("added", other_doc.id))
+
+      # Unresolvable document: the filter is dropped rather than silently
+      # matching across events.
+      expect(response.body).to include("Signa", "Absenta")
+    end
+
+    it "sorts signed first, then awaiting, then withdrawn, then not added" do
+      table_get(sort: "optional_document:#{doc.id}", direction: "asc")
+
+      body = response.body
+      expect(body.index("Signa")).to be < body.index("Awaita")
+      expect(body.index("Awaita")).to be < body.index("Withda")
+      expect(body.index("Withda")).to be < body.index("Absenta")
+    end
+
+    it "reverses that order on a descending sort" do
+      table_get(sort: "optional_document:#{doc.id}", direction: "desc")
+
+      body = response.body
+      expect(body.index("Absenta")).to be < body.index("Signa")
+    end
+
+    it "groups participants by where they stand on it" do
+      table_get(group_by: "optional_document:#{doc.id}")
+
+      expect(response).to have_http_status(:ok)
+      # Assert on the group header rows, not the cell badges, which carry the
+      # same words.
+      expect(response.body).to include('data-group-id="signed"')
+      expect(response.body).to include('data-group-id="awaiting-signature"')
+      expect(response.body).to include('data-group-id="removed"')
+      expect(response.body).to include('data-group-id="not-added"')
+      # The dropdown labels the current grouping by name, not a raw UUID.
+      expect(response.body).to include("Zip Lining Waiver")
+      expect(response.body).not_to include("Optional Document:#{doc.id}".titleize)
+    end
+
+    it "falls back to the default sort for an unknown document key" do
+      table_get(sort: "optional_document:#{SecureRandom.uuid}")
+
+      expect(response).to have_http_status(:ok)
+    end
+  end
+
+  describe "the admin participants list" do
+    let(:admin) { User.create!(email: "admin-list@example.com", name: "Admin", global_role: "global_admin") }
+    let!(:doc) { create(:custom_document, :optional, event: event, name: "Zip Lining Waiver") }
+    let!(:added_pe) do
+      create(:participant_event, event: event,
+        participant: create(:participant, legal_first_name: "Addy", legal_last_name: "Added"))
+    end
+    let!(:absent_pe) do
+      create(:participant_event, event: event,
+        participant: create(:participant, legal_first_name: "Absenta", legal_last_name: "Absent"))
+    end
+
+    before do
+      sign_in admin
+      create(:consent, participant_event: added_pe, consent_type: :custom_document,
+        custom_document: doc, opted_in_at: Time.current)
+    end
+
+    it "offers an optional-document filter only when the event has one" do
+      get admin_event_participants_path(event.slug)
+
+      expect(response.body).to include("All Optional Docs")
+      expect(response.body).to include("Zip Lining Waiver: added")
+    end
+
+    it "filters the list down to participants who added it" do
+      get admin_event_participants_path(event.slug), params: { optional_document: "#{doc.id}:added" }
+
+      expect(response.body).to include("Addy")
+      expect(response.body).not_to include("Absenta")
+    end
+
+    it "filters the list down to participants who did not" do
+      get admin_event_participants_path(event.slug), params: { optional_document: "#{doc.id}:not_added" }
+
+      expect(response.body).to include("Absenta")
+      expect(response.body).not_to include("Addy")
+    end
+  end
+
+  describe "exports" do
+    it "reports which optional documents a participant took up" do
+      doc = create(:custom_document, :optional, event: event, name: "Zip Lining Waiver")
+      other = create(:custom_document, :optional, event: event, name: "Hiking Waiver")
+      required = create(:custom_document, event: event, name: "Hotel Waiver")
+      pe = create(:participant_event, event: event)
+      create(:consent, :signed, participant_event: pe, consent_type: :custom_document, custom_document: doc)
+      create(:consent, participant_event: pe, consent_type: :custom_document, custom_document: other)
+      create(:consent, participant_event: pe, consent_type: :custom_document, custom_document: required)
+
+      added = Exports::FieldRegistry::FIELDS.fetch("participant_event.optional_documents_added")
+      pending = Exports::FieldRegistry::FIELDS.fetch("participant_event.optional_documents_pending")
+
+      expect(added.extractor.call(pe.reload)).to eq("Hiking Waiver, Zip Lining Waiver")
+      # The required document is not an opt-in and never belongs in this column.
+      expect(pending.extractor.call(pe)).to eq("Hiking Waiver")
+    end
+
+    it "leaves the columns empty for a participant who added nothing" do
+      create(:custom_document, :optional, event: event)
+      pe = create(:participant_event, event: event)
+
+      added = Exports::FieldRegistry::FIELDS.fetch("participant_event.optional_documents_added")
+
+      expect(added.extractor.call(pe)).to be_nil
+    end
+  end
+
   describe "completion" do
     let(:participant_event) do
       create(:participant_event, event: event, code_of_conduct_accepted_at: Time.current)

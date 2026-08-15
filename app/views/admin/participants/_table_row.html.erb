@@ -185,6 +185,11 @@
       <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-yellow-100 text-yellow-700">Pending</span>
     <% end %>
   </td>
+  <% Array(local_assigns[:optional_documents]).each do |doc| %>
+    <td class="px-2 py-1.5 whitespace-nowrap" data-column="optional_doc_<%= doc.id %>">
+      <%= render_optional_document_badge(pe, doc) %>
+    </td>
+  <% end %>
   <td class="px-2 py-1.5 text-gray-500 max-w-[120px] truncate whitespace-nowrap" data-column="guardian">
     <% primary = pe.primary_guardian %>
     <% if primary %>

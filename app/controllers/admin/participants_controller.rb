@@ -11,6 +11,7 @@ module Admin
       authorize ParticipantEvent
 
       @show_pending_invitations = params[:status] == "pending_invitations"
+      @optional_documents = current_event.active_custom_documents.select(&:optional?)
 
       if @show_pending_invitations
         @pending_invitations = current_event.invitations.pending.order(created_at: :desc)
@@ -61,6 +62,13 @@ module Admin
         when "anaphylaxis"
           @participant_events = @participant_events.joins(:medical).where(medicals: { has_anaphylaxis_risk: true })
         end
+      end
+
+      # "<document id>:<state>" from the optional-document dropdown, which is
+      # only rendered when the event has opt-in activities to filter by.
+      if params[:optional_document].present? && @participant_events.is_a?(ActiveRecord::Relation)
+        doc_id, state = params[:optional_document].to_s.split(":", 2)
+        @participant_events = apply_optional_document_filter(@participant_events, state, doc_id)
       end
 
       if current_event.groups_enabled? && params[:group_id].present?
@@ -118,6 +126,9 @@ module Admin
       @group_by = params[:group_by].presence || "status"
 
       @scan_contexts = current_event.scan_contexts.to_a
+      # One column, sort key and grouping per optional document — an event can
+      # run several opt-in activities, and each is its own question.
+      @optional_documents = current_event.active_custom_documents.select(&:optional?)
 
       @participant_events = apply_table_filters(@participant_events)
       @participant_events = apply_table_sorting(@participant_events)
@@ -941,6 +952,34 @@ module Admin
         apply_scan_context_filter(scope, operator, value)
       when "group"
         apply_group_filter(scope, operator, value)
+      when "optional_document"
+        apply_optional_document_filter(scope, operator, value)
+      else
+        scope
+      end
+    end
+
+    # Optional documents are per-event rows, so the document is the filter's
+    # value and the operator carries the state — same shape as scan_context.
+    # Looking the document up through the event's own list is what stops an
+    # id from another event being filtered on.
+    def apply_optional_document_filter(scope, operator, value)
+      doc = optional_document_by_id(value)
+      return scope unless doc
+
+      live = Consent.where(custom_document_id: doc.id, withdrawn_at: nil).select(:participant_event_id)
+
+      case operator
+      when "added"
+        scope.where(id: live)
+      when "not_added"
+        scope.where.not(id: live)
+      when "signed"
+        scope.where(id: Consent.where(custom_document_id: doc.id, withdrawn_at: nil, status: "signed").select(:participant_event_id))
+      when "awaiting"
+        scope.where(id: Consent.where(custom_document_id: doc.id, withdrawn_at: nil).where.not(status: "signed").select(:participant_event_id))
+      when "withdrawn"
+        scope.where(id: Consent.where(custom_document_id: doc.id).where.not(withdrawn_at: nil).select(:participant_event_id))
       else
         scope
       end
@@ -1154,9 +1193,49 @@ module Admin
       ))
     SQL
 
+    OPTIONAL_DOCUMENT_KEY_PREFIX = "optional_document:".freeze
+
+    # Sort and group need to name one document, and neither UI has a value
+    # slot of its own — hence the compound key. Resolving it against the
+    # event's own document list keeps another event's id out.
+    def optional_document_for_key(key)
+      return nil unless key.to_s.start_with?(OPTIONAL_DOCUMENT_KEY_PREFIX)
+
+      optional_document_by_id(key.to_s.delete_prefix(OPTIONAL_DOCUMENT_KEY_PREFIX))
+    end
+
+    def optional_document_by_id(id)
+      return nil if id.blank?
+
+      current_event.active_custom_documents.find { |doc| doc.optional? && doc.id == id }
+    end
+
+    # Ranks a participant by where they stand on one optional document, in the
+    # order an organiser wants to read: done, chasing, backed out, not doing
+    # it. Mirrors ParticipantEvent#optional_document_state.
+    OPTIONAL_DOCUMENT_RANK_SQL = <<~SQL.squish
+      CASE
+        WHEN EXISTS (SELECT 1 FROM consents c WHERE c.participant_event_id = participant_events.id
+                     AND c.custom_document_id = :id AND c.withdrawn_at IS NULL AND c.status = 'signed') THEN 0
+        WHEN EXISTS (SELECT 1 FROM consents c WHERE c.participant_event_id = participant_events.id
+                     AND c.custom_document_id = :id AND c.withdrawn_at IS NULL) THEN 1
+        WHEN EXISTS (SELECT 1 FROM consents c WHERE c.participant_event_id = participant_events.id
+                     AND c.custom_document_id = :id) THEN 2
+        ELSE 3
+      END
+    SQL
+
+    def optional_document_rank_sql(doc)
+      ActiveRecord::Base.sanitize_sql_array([ OPTIONAL_DOCUMENT_RANK_SQL, { id: doc.id } ])
+    end
+
     def apply_table_sorting(scope)
       direction = @sort_direction == "desc" ? :desc : :asc
       nulls_last = direction == :desc ? "DESC NULLS LAST" : "ASC NULLS LAST"
+
+      if (doc = optional_document_for_key(@sort_field))
+        return scope.order(Arel.sql("#{optional_document_rank_sql(doc)} #{direction.to_s.upcase}"))
+      end
 
       case @sort_field
       when *ALLOWED_PARTICIPANT_SORT_FIELDS
@@ -1180,6 +1259,10 @@ module Admin
     end
 
     def group_participants(scope)
+      if (doc = optional_document_for_key(@group_by))
+        return scope.group_by { |pe| helpers.optional_document_state_label(pe.optional_document_state(doc)) }
+      end
+
       case @group_by
       when "status"
         scope.group_by(&:display_status)
