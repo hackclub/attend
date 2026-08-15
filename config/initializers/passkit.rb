@@ -33,14 +33,19 @@ if passkit_config.present? && !ENV["SECRET_KEY_BASE_DUMMY"]
   Passkit.configure do |config|
     # config.available_passes['Passkit::YourPass'] = -> { User.create }
   end
-elsif !ENV["SECRET_KEY_BASE_DUMMY"]
+else
   # Passkit::Generator resolves these paths when the class is loaded
   # (Rails.root.join(ENV[...]) at the class body), so leaving them nil turns a
   # missing passkit config into a boot failure instead of just an app without
   # wallet passes. Point them at paths that do not exist: booting works, and
   # generating a pass raises with a readable Errno::ENOENT.
+  #
+  # This must run during asset precompilation too. Zeitwerk eager-loads the
+  # class then as well, so gating this branch on SECRET_KEY_BASE_DUMMY — as the
+  # branch above is, because it has real certificates to write — left the paths
+  # nil in exactly the case that has no credentials to fall back on.
   ENV["PASSKIT_PRIVATE_P12_CERTIFICATE"] ||= "tmp/certs/missing-certificate.p12"
   ENV["PASSKIT_APPLE_INTERMEDIATE_CERTIFICATE"] ||= "tmp/certs/missing-WWDR.cer"
 
-  Rails.logger&.warn("[passkit] no :passkit credentials — wallet passes are disabled")
+  Rails.logger&.warn("[passkit] no :passkit credentials — wallet passes are disabled") unless ENV["SECRET_KEY_BASE_DUMMY"]
 end
