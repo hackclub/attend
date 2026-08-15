@@ -115,6 +115,10 @@
                 <div class="font-medium text-gray-900"><%= consent.display_name %></div>
                 <% if Consent::REQUIRED_CONSENT_TYPES.include?(consent.consent_type) %>
                   <span class="text-xs text-gray-500">Required</span>
+                <% elsif consent.withdrawn? %>
+                  <span class="text-xs text-gray-500">
+                    Optional — removed by participant <%= consent.withdrawn_at.strftime("%B %d, %Y") %>
+                  </span>
                 <% end %>
               </td>
               <td class="px-6 py-4">
@@ -212,10 +216,18 @@
                end %>
             <tr>
               <td class="px-6 py-4">
-                <div class="font-medium text-gray-900"><%= doc.name %></div>
+                <div class="font-medium text-gray-900">
+                  <%= doc.name %>
+                  <% if doc.optional? %>
+                    <span class="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-700">Optional</span>
+                  <% end %>
+                </div>
                 <span class="text-xs text-gray-500">
                   <%= doc.physical? ? "Signed on paper" : "DocuSeal" %>
                   · <%= doc.signer_type.to_s.delete_prefix("signed_by_").humanize %>
+                  <% if doc.optional? && consent&.opted_in_at %>
+                    · Added <%= consent.opted_in_at.strftime("%B %d, %Y") %>
+                  <% end %>
                 </span>
               </td>
               <td class="px-6 py-4">
@@ -267,6 +279,24 @@
           <% end %>
         </tbody>
       </table>
+    </div>
+  <% end %>
+
+  <% if @unadded_optional_documents.any? %>
+    <div class="mt-6 bg-gray-50 rounded-lg p-4">
+      <h3 class="font-medium text-gray-900 mb-1">Optional Documents Not Added</h3>
+      <p class="text-xs text-gray-500 mb-3">
+        Offered for opt-in activities. This participant hasn't taken these up, so no signature is
+        expected and nothing has been sent to their parent/guardian.
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <% @unadded_optional_documents.each do |doc| %>
+          <div class="flex items-center gap-2 bg-white px-3 py-2 rounded border">
+            <span class="w-3 h-3 rounded-full bg-gray-300"></span>
+            <span class="text-sm"><%= doc.name %></span>
+          </div>
+        <% end %>
+      </div>
     </div>
   <% end %>
 

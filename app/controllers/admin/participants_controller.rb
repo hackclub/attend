@@ -327,6 +327,10 @@ module Admin
       # document, so a doc nobody has touched would otherwise be invisible here).
       @custom_documents = @participant_event.applicable_custom_documents
       @custom_document_consents = @consents.select { |c| c.custom_document_id.present? }.index_by(&:custom_document_id)
+      # Optional documents on offer that this participant hasn't taken up.
+      # Listed separately so "no waiver on file" reads as "not doing the
+      # activity" rather than as a chase-up.
+      @unadded_optional_documents = @participant_event.available_optional_custom_documents
     end
 
     def reset_waiver

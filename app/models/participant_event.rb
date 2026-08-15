@@ -148,6 +148,42 @@ class ParticipantEvent < ApplicationRecord
     @applicable_custom_documents ||= event.active_custom_documents.select { |doc| doc.applies_to?(self) }
   end
 
+  # Every optional document on offer to this participant, added or not.
+  # Relevance still applies, so an adult is never offered an under-18s-only
+  # document.
+  def relevant_optional_custom_documents
+    event.active_custom_documents.select { |doc| doc.optional? && doc.relevant_to?(self) }
+  end
+
+  # The "Add and sign" list — on offer but not taken up.
+  def available_optional_custom_documents
+    relevant_optional_custom_documents.reject { |doc| opted_into_custom_document?(doc) }
+  end
+
+  # Whether the participant has taken this optional document up. Once they
+  # have, it behaves exactly like any other document: signable, visible to
+  # their guardian, and blocking until signed.
+  def opted_into_custom_document?(custom_document)
+    consent = custom_document_consent(custom_document)
+    consent.present? && !consent.withdrawn?
+  end
+
+  def custom_document_consent(custom_document)
+    if consents.loaded?
+      consents.find { |c| c.custom_document_id == custom_document.id }
+    else
+      consents.find_by(custom_document_id: custom_document.id)
+    end
+  end
+
+  # Adding or withdrawing a document mid-request invalidates everything
+  # derived from the consent set, none of which #reload touches.
+  def reset_document_memoisation!
+    @applicable_custom_documents = nil
+    @onboarding_progress = nil
+    self
+  end
+
   def pending_custom_documents
     applicable_custom_documents.reject { |doc| custom_document_signed?(doc) }
   end

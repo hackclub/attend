@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_13_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_15_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -215,6 +215,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_13_120000) do
     t.string "failure_reason"
     t.uuid "guardian_participant_event_id"
     t.datetime "guardian_signed_at"
+    t.datetime "opted_in_at"
     t.uuid "participant_event_id", null: false
     t.datetime "participant_signed_at"
     t.string "pending_on"
@@ -223,6 +224,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_13_120000) do
     t.datetime "signed_at"
     t.string "status", default: "pending"
     t.datetime "updated_at", null: false
+    t.datetime "withdrawn_at"
     t.index ["custom_document_id"], name: "index_consents_on_custom_document_id"
     t.index ["docuseal_envelope_id"], name: "index_consents_on_docuseal_envelope_id"
     t.index ["guardian_participant_event_id"], name: "index_consents_on_guardian_participant_event_id"
@@ -272,6 +274,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_13_120000) do
     t.string "docuseal_template_id"
     t.uuid "event_id", null: false
     t.string "name", null: false
+    t.boolean "optional", default: false, null: false
     t.string "signer_type", default: "participant", null: false
     t.integer "template_page_count"
     t.datetime "updated_at", null: false
