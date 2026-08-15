@@ -87,12 +87,19 @@ class GuardianMailer < ApplicationMailer
     @event = @participant_event.event
     @emailable = @guardian
 
+    # Now that expiry is measured purely from invite_token_sent_at, a reset sent
+    # more than INVITE_VALIDITY after the original invite would email a link that
+    # 404s on arrival. Stamping the send here restarts the window, matching what
+    # #invitation and #waiver_completion already do.
+    token = guardian_participant_event.generate_invite_token!
+    guardian_participant_event.update!(invite_token_sent_at: Time.current)
+
     @first_name = @guardian.legal_first_name
     @child_first_name = @participant.preferred_name.presence || @participant.legal_first_name
     @event_name = @event.name
     @waiver_type = waiver_type
     @waiver_type_name = waiver_type == :freedom_waiver ? "Freedom Waiver" : "Waiver"
-    @portal_url = guardian_portal_url(guardian_participant_event.generate_invite_token!)
+    @portal_url = guardian_portal_url(token)
     @support_email = @event.effective_support_email
 
     mail(
