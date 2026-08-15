@@ -96,6 +96,36 @@ RSpec.describe CustomDocument, type: :model do
       expect(minors_doc.applies_to?(minor_pe)).to be true
       expect(minors_doc.applies_to?(adult_pe)).to be false
     end
+
+    context "when the document is optional" do
+      let!(:doc) { create(:custom_document, :optional, :minors_only, event: event) }
+
+      it "applies to nobody until the participant adds it" do
+        expect(doc.applies_to?(minor_pe)).to be false
+        expect(minor_pe.available_optional_custom_documents).to include(doc)
+      end
+
+      it "applies once the participant has added it" do
+        create(:consent, participant_event: minor_pe, consent_type: :custom_document,
+          custom_document: doc, opted_in_at: Time.current)
+
+        expect(doc.applies_to?(minor_pe.reload)).to be true
+        expect(minor_pe.available_optional_custom_documents).not_to include(doc)
+      end
+
+      it "stops applying again once the participant withdraws" do
+        create(:consent, participant_event: minor_pe, consent_type: :custom_document,
+          custom_document: doc, opted_in_at: 1.day.ago, withdrawn_at: Time.current)
+
+        expect(doc.applies_to?(minor_pe.reload)).to be false
+      end
+
+      it "is still never offered to someone it was never meant for" do
+        expect(doc.relevant_to?(minor_pe)).to be true
+        expect(doc.relevant_to?(adult_pe)).to be false
+        expect(adult_pe.available_optional_custom_documents).to be_empty
+      end
+    end
   end
 
   describe "completion gating on ParticipantEvent" do

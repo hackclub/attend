@@ -6,7 +6,9 @@ module Admin
       custom_document = @event.custom_documents.build(custom_document_params)
 
       if custom_document.save
-        notice = if custom_document.physical?
+        notice = if custom_document.optional?
+          "\"#{custom_document.name}\" added as optional. Nobody is asked to sign it until a participant adds it themselves."
+        elsif custom_document.physical?
           "\"#{custom_document.name}\" added. Participants will download it, sign it physically, and upload a photo."
         else
           "\"#{custom_document.name}\" added. Sync its fields to configure pre-fill mappings."
@@ -50,7 +52,7 @@ module Admin
 
     def custom_document_params
       params.require(:custom_document)
-            .permit(:name, :document_kind, :description, :docuseal_template_id, :signer_type, :template_pdf)
+            .permit(:name, :document_kind, :description, :docuseal_template_id, :signer_type, :template_pdf, :optional)
     end
 
     def remove_field_mappings(custom_document)

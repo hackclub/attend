@@ -40,5 +40,9 @@ FactoryBot.define do
     trait :archived do
       archived_at { Time.current }
     end
+
+    trait :optional do
+      optional { true }
+    end
   end
 end

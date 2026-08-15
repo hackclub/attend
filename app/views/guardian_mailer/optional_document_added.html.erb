@@ -1,0 +1,31 @@
+<p>Dear <%= @first_name %>,</p>
+
+<p>
+  <%= @child_first_name %> has signed up for an optional activity at <%= @event_name %>, and it comes
+  with its own form: <strong><%= @document_name %></strong>.
+</p>
+
+<p>
+  This one is optional — <%= @child_first_name %> chose to take part, which is why it's coming to you
+  now rather than with the rest of the paperwork. If they'd rather not do the activity after all,
+  they can remove it from their dashboard and you can ignore this email.
+</p>
+
+<% if @participant_uploads_first %>
+<p>
+  <%= @child_first_name %> signs this one on paper and uploads a photo of it. Once they have,
+  you'll be asked to check the photo and confirm it's complete.
+</p>
+<% elsif @physical %>
+<p>
+  This one is signed on paper: download it, print and sign it, then upload a photo of the signed form.
+</p>
+<% end %>
+
+<p style="margin: 24px 0;">
+  <%= mail_button "Open #{@document_name}", @document_url %>
+</p>
+
+<p>Everything else you completed earlier is saved — this is the only outstanding item.</p>
+
+<p>If you have any questions, don't hesitate to email us at <%= mail_to @support_email %>, or just hit reply to this email!</p>

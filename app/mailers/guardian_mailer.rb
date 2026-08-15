@@ -79,6 +79,42 @@ class GuardianMailer < ApplicationMailer
     )
   end
 
+  # Their child opted into an activity after the guardian had already finished
+  # the portal. Nothing brings them back on their own, so this is the only
+  # thing that gets the activity's waiver signed.
+  def optional_document_added(guardian_participant_event:, custom_document:)
+    @guardian_participant_event = guardian_participant_event
+    @guardian = guardian_participant_event.guardian
+    @participant_event = guardian_participant_event.participant_event
+    @participant = @participant_event.participant
+    @event = @participant_event.event
+    @emailable = @guardian
+
+    if @event.guardian_invites_locked?
+      Rails.logger.info("[GuardianMailer] optional_document_added skipped for GPE #{guardian_participant_event.id}: guardian invites locked for event #{@event.id}")
+      return
+    end
+
+    token = guardian_participant_event.generate_invite_token!
+    guardian_participant_event.update!(invite_token_sent_at: Time.current)
+
+    @first_name = @guardian.legal_first_name
+    @child_first_name = @participant.preferred_name.presence || @participant.legal_first_name
+    @event_name = @event.name
+    @document_name = custom_document.name
+    @physical = custom_document.physical?
+    @participant_uploads_first = custom_document.physical? && custom_document.participant_signs?
+    @document_url = guardian_portal_document_url(token, custom_document)
+    @support_email = @event.effective_support_email
+
+    mail(
+      to: @guardian.email,
+      from: "Hack Club #{@event_name} <#{@support_email}>",
+      subject: "#{@child_first_name} signed up for an optional activity at #{@event_name} - your signature needed",
+      reply_to: @support_email
+    )
+  end
+
   def waiver_reset(guardian_participant_event:, waiver_type:)
     @guardian_participant_event = guardian_participant_event
     @guardian = guardian_participant_event.guardian
@@ -133,6 +169,15 @@ class GuardianMailer < ApplicationMailer
   def guardian_portal_url(token)
     Rails.application.routes.url_helpers.guardian_portal_url(
       token: token,
+      host: default_host,
+      protocol: default_protocol
+    )
+  end
+
+  def guardian_portal_document_url(token, custom_document)
+    Rails.application.routes.url_helpers.guardian_portal_custom_document_url(
+      token: token,
+      custom_document_id: custom_document.id,
       host: default_host,
       protocol: default_protocol
     )

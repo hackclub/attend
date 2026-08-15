@@ -21,7 +21,8 @@ export default class extends Controller {
     hiddenColumns: { type: Array, default: [] },
     filterLogic: { type: String, default: "and" },
     scanContexts: { type: Array, default: [] },
-    groups: { type: Array, default: [] }
+    groups: { type: Array, default: [] },
+    optionalDocuments: { type: Array, default: [] }
   }
 
   connect() {
@@ -88,6 +89,7 @@ export default class extends Controller {
             <option value="scan_context">Scan Context</option>
           </optgroup>
           ${this.groupsValue.length ? `<optgroup label="Groups"><option value="group">Group</option></optgroup>` : ""}
+          ${this.optionalDocumentsValue.length ? `<optgroup label="Optional Documents"><option value="optional_document">Optional Document</option></optgroup>` : ""}
         </select>
         <select class="border border-gray-300 rounded px-2 py-1 text-sm" data-operator>
           <option value="is">is</option>
@@ -149,6 +151,27 @@ export default class extends Controller {
         const option = document.createElement("option")
         option.value = g.id
         option.textContent = g.name
+        select.appendChild(option)
+      })
+      valueContainer.replaceChildren(select)
+    } else if (field === "optional_document") {
+      // The operator carries the state and the value names the document, so
+      // one filter row answers "who is doing X, and where are they with it".
+      operatorSelect.innerHTML = `
+        <option value="added">added</option>
+        <option value="not_added">not added</option>
+        <option value="signed">added &amp; signed</option>
+        <option value="awaiting">added, awaiting signature</option>
+        <option value="withdrawn">removed after adding</option>
+      `
+
+      const select = document.createElement("select")
+      select.className = "border border-gray-300 rounded px-2 py-1 text-sm"
+      select.setAttribute("data-value", "")
+      this.optionalDocumentsValue.forEach((doc) => {
+        const option = document.createElement("option")
+        option.value = doc.id
+        option.textContent = doc.name
         select.appendChild(option)
       })
       valueContainer.replaceChildren(select)
