@@ -1,6 +1,7 @@
 class Event < ApplicationRecord
   include WalletPassUpdatable
   include RasterizesSvgLogo
+  include DecodableImageAttachment
 
   has_paper_trail
 
@@ -77,6 +78,7 @@ class Event < ApplicationRecord
   has_many :tickets, dependent: :nullify
   has_one :rooming_plan, dependent: :destroy
   belongs_to :hotel_scan_context, class_name: "ScanContext", optional: true
+  belongs_to :airtable_config_updated_by, class_name: "User", optional: true
 
   # events.hotel_scan_context_id references scan_contexts, which are destroyed
   # before the event row is deleted — clear it first or the FK rejects the delete
@@ -264,6 +266,25 @@ class Event < ApplicationRecord
       airtable_sync_table_id.present?
   end
 
+  # The SQL counterpart of #airtable_sync_configured?, for the scheduled sync.
+  #
+  # Written as raw SQL on purpose. `where.not(airtable_sync_source_id: [nil, ""])`
+  # looks equivalent but isn't: `normalizes` above rewrites query values too, so
+  # the "" collapses to nil and the predicate degrades to `IS NOT NULL` — which
+  # matches every event that has an empty string stored (any event whose
+  # integrations form was ever saved blank). Those events then reach
+  # Airtable::Client, which raises on the blank key, once per event per run.
+  scope :with_airtable_sync_configured, -> {
+    where("NULLIF(BTRIM(events.airtable_sync_source_id), '') IS NOT NULL")
+      .where("NULLIF(BTRIM(events.airtable_sync_table_id), '') IS NOT NULL")
+      .where("NULLIF(BTRIM(events.config ->> 'airtable_api_key'), '') IS NOT NULL")
+      .where("NULLIF(BTRIM(events.config ->> 'airtable_base_id'), '') IS NOT NULL")
+  }
+
+  scope :with_airtable_sync_active, -> {
+    with_airtable_sync_configured.where(airtable_sync_paused_at: nil)
+  }
+
   # AirtableJobs::SyncAllJob runs every 5 minutes and only advances
   # airtable_synced_at on success, so anything older than this means the sync
   # has been failing — the job rescues per event, so nothing else surfaces it.
@@ -271,8 +292,44 @@ class Event < ApplicationRecord
 
   def airtable_sync_stale?
     return false unless airtable_sync_configured?
+    # A paused sync isn't drifting silently — it has its own explicit state, an
+    # error message, and an email already sent to whoever can fix it.
+    return false if airtable_sync_paused?
 
     airtable_synced_at.nil? || airtable_synced_at < AIRTABLE_SYNC_STALE_AFTER.ago
+  end
+
+  def airtable_sync_paused?
+    airtable_sync_paused_at.present?
+  end
+
+  # One failure stops the schedule. Retrying broken credentials every 5 minutes
+  # never fixes them; it just buries the real signal under thousands of
+  # identical errors. A human re-saving the config (or hitting "Sync Now") is
+  # the only thing that resumes it.
+  def pause_airtable_sync!(error_message)
+    update_columns(
+      airtable_sync_paused_at: Time.current,
+      airtable_sync_error: error_message,
+      airtable_sync_error_at: Time.current
+    )
+  end
+
+  def resume_airtable_sync!
+    update_columns(
+      airtable_sync_paused_at: nil,
+      airtable_sync_error: nil,
+      airtable_sync_error_at: nil
+    )
+  end
+
+  # Whoever last saved the Airtable credentials — the only person who can
+  # actually fix them, so the one we email when the sync pauses. Events
+  # configured before airtable_config_updated_by_id existed still have an audit
+  # trail (the integrations form writes an `update_integrations` log), so fall
+  # back to that rather than leaving them with nobody to notify.
+  def airtable_config_last_saved_by
+    airtable_config_updated_by || last_integrations_saver
   end
 
   def venue_coordinates
@@ -281,7 +338,20 @@ class Event < ApplicationRecord
   end
 
   def logo_displayable?
-    logo.attached? && (logo.variable? || logo.content_type == "image/svg+xml")
+    return true if logo.attached? && logo.content_type == "image/svg+xml"
+
+    displayable_image?(logo)
+  end
+
+  # Memoized because list views reach this once or twice per row via
+  # ParticipantEvent#applicable_custom_documents, and all rows share this
+  # instance when :event is preloaded.
+  def active_custom_documents
+    @active_custom_documents ||= if custom_documents.loaded?
+      custom_documents.select { |doc| doc.archived_at.nil? }.sort_by(&:created_at)
+    else
+      custom_documents.active.order(:created_at).to_a
+    end
   end
 
   # Branding fallback: an event without its own logo/banner inherits its
@@ -337,6 +407,8 @@ class Event < ApplicationRecord
     if logo.byte_size && logo.byte_size > MAX_LOGO_BYTE_SIZE
       errors.add(:logo, "must be smaller than 5MB")
     end
+
+    validate_decodable_image(:logo)
   end
 
   def acceptable_banner
@@ -349,6 +421,8 @@ class Event < ApplicationRecord
     if banner.byte_size && banner.byte_size > MAX_BANNER_BYTE_SIZE
       errors.add(:banner, "must be smaller than 5MB")
     end
+
+    validate_decodable_image(:banner)
   end
 
   def participant_events_to_update
@@ -357,6 +431,13 @@ class Event < ApplicationRecord
 
   def generate_slug_from_name
     self.slug = name.downcase.gsub(/\s+/, "-").gsub(/[^a-z0-9-]/, "")
+  end
+
+  def last_integrations_saver
+    audit_logs.where(action: :update_integrations)
+              .where.not(actor_user_id: nil)
+              .order(created_at: :desc)
+              .first&.actor
   end
 
   def set_default_config

@@ -1,0 +1,282 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-13T16:43:40Z",
+  "title": "Design System: Attend",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Hack Club Red",
+        "canonical": "#ec3750",
+        "note": "Contrast vs white is 4.02:1 — below WCAG AA for normal text, and below the 18.66px-bold threshold for the large-text exemption. Never carries white text; see The Deepened Red Rule.",
+        "tonalRamp": ["#2e0a10", "#5c1420", "#8a1e30", "#b82840", "#ec3750", "#f2707f", "#f8a8b1", "#fde9ec"]
+      },
+      "accent-strong": {
+        "role": "primary",
+        "displayName": "Deepened Red",
+        "canonical": "#d42f46",
+        "note": "4.89:1 on white — the resting fill of every red surface that carries white text.",
+        "tonalRamp": ["#2a0910", "#54121f", "#7e1b2f", "#a8243e", "#d42f46", "#e26a7b", "#eda5b0", "#f9e0e4"]
+      },
+      "accent-deep": {
+        "role": "primary",
+        "displayName": "Pressed Red",
+        "canonical": "#b82840",
+        "note": "Hover and pressed state under Deepened Red.",
+        "tonalRamp": ["#240811", "#491021", "#6d1832", "#922042", "#b82840", "#cd6377", "#e19fab", "#f6dce1"]
+      },
+      "bg-app": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#f9fafc",
+        "tonalRamp": ["#191b1f", "#31353d", "#4a4f5c", "#62697a", "#7b8399", "#a3a9b8", "#cbcfd8", "#f9fafc"]
+      },
+      "bg-elev": {
+        "role": "neutral",
+        "displayName": "Card White",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#1a1a1a", "#333333", "#4d4d4d", "#666666", "#808080", "#aaaaaa", "#d5d5d5", "#ffffff"]
+      },
+      "bg-sunken": {
+        "role": "neutral",
+        "displayName": "Sunken Grey",
+        "canonical": "#e6e6ea",
+        "tonalRamp": ["#171718", "#2e2e31", "#454549", "#5c5c62", "#73737a", "#9a9aa1", "#c0c0c6", "#e6e6ea"]
+      },
+      "text-strong": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#1f2d3d",
+        "tonalRamp": ["#0a0f14", "#141d28", "#1f2d3d", "#33485f", "#4c6883", "#7f97ac", "#b3c2d0", "#e6ebf0"]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Slate",
+        "canonical": "#3c4858",
+        "tonalRamp": ["#0c0f12", "#181e24", "#252d36", "#313b48", "#3c4858", "#6c7c92", "#a3aebc", "#dae0e7"]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "Muted Steel",
+        "canonical": "#8492a6",
+        "tonalRamp": ["#1a1e24", "#343b47", "#4e586b", "#68758e", "#8492a6", "#a6b1c0", "#c8d0da", "#eaeef3"]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#e5e7eb",
+        "tonalRamp": ["#171718", "#2e2f31", "#454749", "#5c5f62", "#74777b", "#9b9ea3", "#c0c3c7", "#e5e7eb"]
+      },
+      "success": {
+        "role": "tertiary",
+        "displayName": "Mint",
+        "canonical": "#33d6a6",
+        "tonalRamp": ["#0a2b21", "#125542", "#1b8063", "#24aa84", "#33d6a6", "#68e2bd", "#9dedd4", "#e6faf3"]
+      },
+      "warning": {
+        "role": "tertiary",
+        "displayName": "Amber",
+        "canonical": "#ff8c37",
+        "tonalRamp": ["#33190a", "#663214", "#994b1e", "#cc6428", "#ff8c37", "#ffab6d", "#ffc9a3", "#ffeede"]
+      },
+      "info": {
+        "role": "tertiary",
+        "displayName": "Sky",
+        "canonical": "#338eda",
+        "tonalRamp": ["#0a1c2c", "#143857", "#1e5583", "#2871ae", "#338eda", "#6cade5", "#a5ccef", "#e4f0fa"]
+      },
+      "text-link": {
+        "role": "tertiary",
+        "displayName": "Link Blue",
+        "canonical": "#2563eb",
+        "tonalRamp": ["#07142f", "#0f285e", "#163c8d", "#1e50bc", "#2563eb", "#5d8bf1", "#95b3f6", "#e0e9fd"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page titles on marketing-adjacent surfaces — home, public profiles, docs. Rare." },
+      "headline": { "displayName": "Headline", "purpose": "The title of a screen or major panel. The normal top of a page inside the app." },
+      "title": { "displayName": "Title", "purpose": "Card and section headings. Also the minimum size for white text on a red fill." },
+      "body": { "displayName": "Body", "purpose": "The workhorse at 14px/500 — form labels, table cells, button text, nav items." },
+      "label": { "displayName": "Label", "purpose": "Status badges, helper text, metadata, timestamps." },
+      "eyebrow": { "displayName": "Eyebrow", "purpose": "Uppercase sidebar section headers only." }
+    },
+    "shadows": [
+      { "name": "hairline-lift", "value": "0 1px 2px rgba(0, 0, 0, 0.06)", "purpose": "Sticky headers and the app bar, where a border alone disappears against a scrolling surface." },
+      { "name": "overlay", "value": "0 8px 24px rgba(15, 23, 42, 0.10)", "purpose": "Dropdowns, command palette, modals, mobile drawers — things that genuinely float." },
+      { "name": "card-lift", "value": "0 4px 8px rgba(0, 0, 0, 0.125)", "purpose": "The legacy Hack Club card and pill button only; part of the brand component, not the layout system." },
+      { "name": "card-elevated", "value": "0 1px 2px rgba(0, 0, 0, 0.0625), 0 8px 12px rgba(0, 0, 0, 0.125)", "purpose": "Hover state of the Hack Club interactive card and pill button." },
+      { "name": "overlay-dark", "value": "0 12px 32px rgba(0, 0, 0, 0.6)", "purpose": "The overlay role under dark themes; light-theme opacity vanishes on #0f1115." }
+    ],
+    "motion": [
+      { "name": "state-transition", "value": "150ms ease", "purpose": "The default. transition-colors on buttons, nav items, inputs, icon buttons." },
+      { "name": "brand-lift", "value": "125ms ease-in-out", "purpose": "The Hack Club pill button and interactive card scale(1.0625) lift. The only scaling motion in the system." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px", "purpose": "The dominant breakpoint — where full-width mobile actions shrink to auto width." },
+      { "name": "md", "value": "768px", "purpose": "Participant header expands from hamburger to inline nav." },
+      { "name": "lg", "value": "1024px", "purpose": "Admin sidebar becomes a persistent 256px column instead of an overlay drawer." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one red action per screen. Filled with the deepened red so white text clears WCAG AA at 14px.",
+      "html": "<button class=\"ds-btn-primary\">Continue</button>",
+      "css": ".ds-btn-primary { background: var(--accent-strong, #d42f46); color: var(--accent-on, #fff); font-size: 0.875rem; font-weight: 600; line-height: 1.5; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; transition: background-color 150ms ease; } .ds-btn-primary:hover { background: #b82840; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent, #ec3750) 30%, transparent); } .ds-btn-primary:active { transform: translateY(1px); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Back, Cancel, and the second action in any pair. Hairline border, no fill until hover.",
+      "html": "<button class=\"ds-btn-secondary\">Back</button>",
+      "css": ".ds-btn-secondary { background: var(--bg-elev, #fff); color: var(--text, #3c4858); font-size: 0.875rem; font-weight: 500; line-height: 1.5; padding: 8px 16px; border: 1px solid var(--border-strong, #d1d5db); border-radius: 6px; cursor: pointer; transition: background-color 150ms ease, color 150ms ease; } .ds-btn-secondary:hover { background: var(--bg-elev-3, #f3f4f6); color: var(--text-strong, #1f2d3d); } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent, #ec3750) 30%, transparent); }"
+    },
+    {
+      "name": "Hack Club Pill Button",
+      "kind": "button",
+      "refersTo": "button-hc-pill",
+      "description": "The brand call to action. Full-round, bold, and the only component allowed to scale on hover.",
+      "html": "<button class=\"ds-btn-pill\">Get started</button>",
+      "css": ".ds-btn-pill { background: var(--accent-strong, #d42f46); color: #fff; font-size: 1rem; font-weight: 700; padding: 12px 24px; border: none; border-radius: 99999px; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.125); display: inline-flex; align-items: center; justify-content: center; transition: transform 125ms ease-in-out, box-shadow 125ms ease-in-out; } .ds-btn-pill:hover, .ds-btn-pill:focus-visible { outline: none; transform: scale(1.0625); box-shadow: 0 1px 2px rgba(0,0,0,0.0625), 0 8px 12px rgba(0,0,0,0.125); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Every form field in the onboarding wizard and guardian portal. The focus ring is the only focus indicator.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Legal first name\" />",
+      "css": ".ds-input { width: 100%; background: var(--bg-elev, #fff); color: var(--text-strong, #1f2d3d); font-size: 0.875rem; font-weight: 500; line-height: 1.5; padding: 8px 12px; border: 1px solid var(--border-strong, #d1d5db); border-radius: 6px; transition: border-color 150ms ease, box-shadow 150ms ease; } .ds-input::placeholder { color: var(--text-faint, #9ca3af); } .ds-input:focus { outline: none; border-color: var(--accent, #ec3750); box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent, #ec3750) 30%, transparent); } .ds-input:disabled { background: var(--bg-elev-2, #f7f7f9); color: var(--text-faint, #9ca3af); cursor: not-allowed; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The default container. Flat at rest — a hairline border and a tonal step do the work a shadow would.",
+      "html": "<div class=\"ds-card\"><h3 class=\"ds-card-title\">Travel</h3><p class=\"ds-card-body\">Inbound flight confirmed. Outbound leg still needs a booking reference.</p></div>",
+      "css": ".ds-card { background: var(--bg-elev, #fff); border: 1px solid var(--border-card, #e0e6ed); border-radius: 8px; padding: 24px; } .ds-card-title { margin: 0 0 8px; font-size: 1.125rem; font-weight: 600; line-height: 1.4; color: var(--text-strong, #1f2d3d); } .ds-card-body { margin: 0; font-size: 0.875rem; font-weight: 500; line-height: 1.5; color: var(--text, #3c4858); }"
+    },
+    {
+      "name": "Interactive Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A card that is itself a link. Lifts and scales on hover — reserved for cards that navigate.",
+      "html": "<a class=\"ds-card-interactive\" href=\"#\"><h3 class=\"ds-card-interactive-title\">Hack Club Summit 2026</h3><p class=\"ds-card-interactive-meta\">12–15 August · Vermont</p></a>",
+      "css": ".ds-card-interactive { display: block; text-decoration: none; background: var(--bg-elev, #fff); border-radius: 12px; padding: 24px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.125); transition: transform 125ms ease-in-out, box-shadow 125ms ease-in-out; } .ds-card-interactive:hover, .ds-card-interactive:focus-visible { outline: none; transform: scale(1.0625); box-shadow: 0 1px 2px rgba(0,0,0,0.0625), 0 8px 12px rgba(0,0,0,0.125); } .ds-card-interactive-title { margin: 0 0 4px; font-size: 1.125rem; font-weight: 600; color: var(--text-strong, #1f2d3d); } .ds-card-interactive-meta { margin: 0; font-size: 0.75rem; font-weight: 600; color: var(--text-muted, #8492a6); }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge-status",
+      "description": "Attend's signature pattern. Tinted pill with same-hue dark text — the tint is never the only signal.",
+      "html": "<span class=\"ds-badge ds-badge-complete\">Complete</span> <span class=\"ds-badge ds-badge-awaiting-parent\">Awaiting Parent</span> <span class=\"ds-badge ds-badge-withdrawn\">Withdrawn</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; padding: 2px 10px; font-size: 0.75rem; font-weight: 600; line-height: 1.4; border-radius: 99999px; } .ds-badge-complete { background: #dcfce7; color: #166534; } .ds-badge-awaiting-participant { background: #dbeafe; color: #1e40af; } .ds-badge-awaiting-parent { background: #fef3c7; color: #92400e; } .ds-badge-withdrawn { background: #fee2e2; color: #991b1b; }"
+    },
+    {
+      "name": "Sidebar Nav Item",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "The admin sidebar row at 13px/500 with a muted 20px icon; active state deepens to the sunken grey.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item\" href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3\"/></svg>Overview</a><a class=\"ds-nav-item ds-nav-item-active\" href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z\"/></svg>Participants</a></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 2px; width: 256px; padding: 8px; background: var(--bg-elev-2, #f7f7f9); } .ds-nav-item { display: flex; align-items: center; padding: 6px 10px; font-size: 0.8125rem; font-weight: 500; line-height: 1.4; border-radius: 6px; color: var(--text, #3c4858); text-decoration: none; transition: background-color 150ms ease, color 150ms ease; } .ds-nav-item svg { width: 20px; height: 20px; margin-right: 10px; flex-shrink: 0; color: var(--text-muted, #6b7280); } .ds-nav-item:hover { background: rgba(0,0,0,0.04); color: var(--text-strong, #1f2d3d); } .ds-nav-item-active { background: var(--bg-sunken, #e6e6ea); color: var(--text-strong, #1f2d3d); font-weight: 600; } .ds-nav-item-active svg { color: var(--text-strong, #1f2d3d); }"
+    },
+    {
+      "name": "Search Trigger",
+      "kind": "custom",
+      "refersTo": "input-field",
+      "description": "A faux input in the admin header that opens the command palette. Looks like a field, behaves like a button.",
+      "html": "<button class=\"ds-search-trigger\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z\"/></svg>Search participants, events…<kbd>⌘K</kbd></button>",
+      "css": ".ds-search-trigger { display: flex; align-items: center; gap: 8px; min-width: 240px; padding: 6px 12px; font-size: 0.875rem; color: var(--text-faint, #9ca3af); background: var(--bg-elev-2, #f9fafb); border: 1px solid var(--border, #e5e7eb); border-radius: 8px; cursor: pointer; transition: border-color 150ms ease, box-shadow 150ms ease; } .ds-search-trigger svg { width: 16px; height: 16px; flex-shrink: 0; } .ds-search-trigger:hover { border-color: var(--border-strong, #d1d5db); box-shadow: 0 1px 2px rgba(0,0,0,0.05); } .ds-search-trigger kbd { margin-left: auto; padding: 2px 6px; font-size: 0.6875rem; font-weight: 500; color: var(--text-faint, #9ca3af); background: var(--border, #e5e7eb); border-radius: 4px; }"
+    },
+    {
+      "name": "Sidebar Selector Pill",
+      "kind": "custom",
+      "refersTo": "nav-item",
+      "description": "The user and event selectors at the top of the admin sidebar. Full-round because it carries identity, not action.",
+      "html": "<button class=\"ds-sidebar-pill\"><span class=\"ds-sidebar-pill-avatar\">LW</span><span class=\"ds-sidebar-pill-label\">Summit 2026</span><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M19 9l-7 7-7-7\"/></svg></button>",
+      "css": ".ds-sidebar-pill { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 10px 6px 6px; background: var(--bg-elev, #fff); border: 1px solid var(--border, #e5e7eb); border-radius: 9999px; cursor: pointer; text-align: left; transition: border-color 150ms ease, box-shadow 150ms ease; } .ds-sidebar-pill:hover { border-color: var(--border-strong, #d1d5db); box-shadow: 0 1px 2px rgba(0,0,0,0.04); } .ds-sidebar-pill-avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 9999px; background: var(--accent, #ec3750); color: #fff; font-size: 0.6875rem; font-weight: 700; flex-shrink: 0; } .ds-sidebar-pill-label { font-size: 0.8125rem; font-weight: 500; color: var(--text-strong, #1f2d3d); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ds-sidebar-pill svg { width: 14px; height: 14px; margin-left: auto; flex-shrink: 0; color: var(--text-muted, #8492a6); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Clipboard",
+    "overview": "Attend is the binder a good event organiser carries: tabbed, legible at arm's length, nothing on it that isn't doing a job. Every surface is a checklist in some form — an onboarding step, a consent form, a participant row, a rooming plan — and the interface's whole job is to make the state of that checklist unmistakable. Structure comes from hairline rules and tonal surfaces, not from decoration. The page is mostly quiet greys and whites; Hack Club red appears where something is actionable or wrong, and nowhere else.\n\nThe density is deliberately administrative. Body copy runs at 14px and labels at 12px because most screens carry more information than they carry prose, and the people reading them are scanning for one changed value. Type does the hierarchy work — five weights of grey across a small size range — so the layout never needs a colour to explain itself. Components are tactile where touching them matters: buttons deepen on hover, interactive cards lift and scale slightly, and the Hack Club pill button keeps its bouncy scale(1.0625) because a teenager pressing \"Continue\" on their onboarding should feel it respond.\n\nThe system carries eight themes on one semantic palette. Every colour resolves through a CSS custom property (--accent, --text-strong, --bg-elev), and Tailwind's own --color-* tokens are remapped inside each theme scope so ordinary utilities re-skin for free. That indirection is the system's spine: a hardcoded hex is not a shortcut, it's a theme that breaks.\n\nTwo things Attend must not look like. Not a generic Tailwind starter — undifferentiated blue-600 buttons, indigo gradients, default shadow-lg cards, the look of no decision having been made. And not a consumer event app — gradients, hero imagery, and marketing energy inside a tool people use to do a job.",
+    "keyCharacteristics": [
+      "Flat surfaces, hairline borders, tonal layering instead of shadows",
+      "One loud colour (Hack Club red) held to actions, alerts, and active state",
+      "Dense administrative type scale: 14px body, 12px labels, weight over size for hierarchy",
+      "Every colour semantic and themed; eight themes on one palette contract",
+      "Mobile-first single column that widens into a 256px-sidebar shell on lg",
+      "Motion is confined to transition-colors at ~150ms, plus a small lift on genuinely interactive cards"
+    ],
+    "rules": [
+      {
+        "name": "The One Voice Rule",
+        "body": "Hack Club red covers ≤10% of any screen. If two things on a page are red, at most one of them is a button. Its rarity is what makes a red thing mean \"act on me\".",
+        "section": "colors"
+      },
+      {
+        "name": "The No Literal Hex Rule",
+        "body": "Every colour resolves through a semantic custom property or a Tailwind token remapped in themes.css. A raw hex in a template is a theme bug: it renders correctly in light and wrong in the other seven. New work uses var(--accent), not #ec3750.",
+        "section": "colors"
+      },
+      {
+        "name": "The Theme Foreground Rule",
+        "body": "text-white is not a colour outside the default theme. It compiles to var(--color-white), which themes.css remaps to var(--bg-elev) so bg-white re-skins — correct for surfaces, silently wrong for text. A filled surface therefore declares its own foreground in themes.css rather than trusting text-white: accent fills take --accent-on, fills that resolve to --bg-dark/--bg-darker take --text-on-dark, fills that resolve to --bg-elev-2 take --text-strong (it is a light surface under Catppuccin Latte), and unremapped literal fills pin #ffffff. Pin it with a descendant selector (.bg-x .text-white), not inheritance — a text-white on the child outranks a colour inherited from the parent.",
+        "section": "colors"
+      },
+      {
+        "name": "The Deepened Red Rule",
+        "body": "#ec3750 on white measures 4.02:1 — below WCAG AA's 4.5:1 for normal text. WCAG's large-text exemption (3:1) starts at 18.66px bold or 24px regular, which no button in Attend reaches, so the type cannot buy its way out. The colour moves instead: wherever white text sits on red, the fill is #d42f46 (4.89:1), hovering to #b82840. #ec3750 keeps every use that carries no text on it — dots, bars, icon fills, borders, tints, and the progress bar. The two reds are one perceptual step apart; nobody sees the difference, and every white label clears AA.",
+        "section": "colors"
+      },
+      {
+        "name": "The Weight-Before-Size Rule",
+        "body": "Hierarchy is built by moving 500 → 600 → 700 at the same size before reaching for a larger size. Attend has more levels of meaning than it has room for type sizes.",
+        "section": "typography"
+      },
+      {
+        "name": "The Fourteen Rule",
+        "body": "Body copy is 14px, not 16px, everywhere inside the app shell — including on red fills, which is why The Deepened Red Rule moves the colour rather than the type. The one exception is long-form prose on the docs and public-profile surfaces, which may run at 16px with a 65–75ch measure.",
+        "section": "typography"
+      },
+      {
+        "name": "The Full-Width-Then-Auto Rule",
+        "body": "Every primary action is w-full sm:w-auto. On a phone a button is a full-width target; on a desktop it shrinks to its content. This pattern appears on essentially every form in the app and is not optional on guardian or participant surfaces.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "A surface is flat at rest. If you reach for a shadow, first ask whether the element actually floats. If it doesn't, it gets a border and a tonal step instead.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Two-Radius Rule",
+        "body": "6px for controls, 8px for containers, full for state and identity. A third value needs a reason.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do resolve every colour through a semantic custom property (var(--accent), var(--text-strong)) or a Tailwind token that themes.css remaps. There are eight themes; a literal hex serves one.",
+      "Do fill any red surface that carries white text with accent-strong (#d42f46), not accent (#ec3750). The Deepened Red Rule is an accessibility floor, not a preference, and no type size in Attend is large enough to opt out of it.",
+      "Do make every primary action w-full sm:w-auto. Guardians and participants are on phones.",
+      "Do build depth from tonal surfaces and 1px hairlines. Reach for a shadow only when the element genuinely floats.",
+      "Do pair every status colour with its word. A green pill without \"Complete\" in it is a colour-only signal.",
+      "Do verify new UI in a dark theme as well as light — themes.css overrides bare input, select, and textarea elements, and remaps --color-white away from white.",
+      "Do rebuild Tailwind before judging any visual change; the compiled CSS is the thing the browser sees.",
+      "Do add cursor-pointer to every button and clickable element."
+    ],
+    "donts": [
+      "Don't add new bg-blue-600 buttons or ring-blue-500 focus rings. The blue running through the onboarding wizard and guardian portal (35 blue fills, 277 blue rings) is drift from a Tailwind default, not a decision. Red is the accent everywhere; converge on it when touching those files.",
+      "Don't let Hack Club red occupy area. It fills buttons, badges, and 1px borders. Large red panels, red page headers, and red backgrounds behind body copy are out — use accent-soft if a red-tinted region is genuinely needed.",
+      "Don't ship gradients, hero imagery, or marketing motion inside the app shell. Attend is a tool someone uses to do a job, not a consumer event app.",
+      "Don't introduce a webfont. The system stack is a deliberate performance choice for guardians on slow connections and old phones.",
+      "Don't add a third container radius. 6px controls, 8px containers, full for state and identity.",
+      "Don't use rounded-full on a plain action button. A pill in Attend means state or identity; the Hack Club brand pill is the one sanctioned exception.",
+      "Don't trust text-white to be white. Outside the default theme it resolves to a surface colour; a new filled surface needs its foreground declared in themes.css per The Theme Foreground Rule, or its label disappears.",
+      "Don't suppress the focus ring. focus:outline-none is only acceptable when a focus:ring-2 replaces it in the same class list.",
+      "Don't use text-faint for anything a user has to read. It is for placeholders and disabled states only."
+    ]
+  }
+}

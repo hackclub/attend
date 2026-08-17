@@ -167,7 +167,7 @@ module Admin
       @message.message_deliveries.failed.update_all(status: "pending", error_message: nil)
       @message.update!(status: :sending)
 
-      MessageDeliveryJob.perform_later(message_id: @message.id, retry_failed_only: true)
+      MessageDeliveryJob.perform_later(message_id: @message.id)
 
       redirect_to admin_event_message_path(current_event, @message),
         notice: "Retrying #{failed_count} failed deliveries..."

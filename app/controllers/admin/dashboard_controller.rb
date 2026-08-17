@@ -5,7 +5,22 @@ class Admin::DashboardController < Admin::BaseController
     # The picker's "All events" link deselects the current event.
     set_current_event(nil) if params[:deselect].present?
 
-    @events = policy_scope(Event).includes(:event_series).order(starts_at: :desc)
+    @events = policy_scope(Event)
+      .includes(logo_attachment: :blob, event_series: { logo_attachment: :blob })
+      .order(starts_at: :desc)
+      .to_a
+
+    # A single `starts_at DESC` put the event furthest in the future at the top
+    # and buried the one running today at the bottom — and Postgres sorts NULLs
+    # first on DESC, so undated drafts led the whole page. Live and upcoming
+    # events read soonest-first; finished ones read most-recent-first.
+    @completed_events, @current_events = @events.partition(&:completed?)
+    @current_events.sort_by! { |event| [ event.starts_at ? 0 : 1, event.starts_at || Time.current ] }
+    @completed_events.sort_by! { |event| -(event.ends_at || event.starts_at).to_i }
+
+    # One grouped COUNT for the whole page; each row previously ran its own
+    # COUNT-with-JOIN via event.participants.count
+    @event_participant_counts = ParticipantEvent.where(event: @events).group(:event_id).count
     authorize Event, :index?
   end
 
@@ -34,8 +49,19 @@ class Admin::DashboardController < Admin::BaseController
     authorize @event, :update?
 
     if @event.airtable_sync_configured?
+      # "Sync Now" is a deliberate retry, so it also lifts a pause left by an
+      # earlier failure — otherwise the scheduled job would skip this event and
+      # the button would look like it did nothing.
+      was_paused = @event.airtable_sync_paused?
+      @event.resume_airtable_sync!
       AirtableJobs::SyncAllJob.perform_later
-      redirect_to admin_event_integrations_path(@event), notice: "Airtable sync triggered. It will complete shortly."
+
+      notice = if was_paused
+        "Airtable sync resumed and triggered. It will complete shortly."
+      else
+        "Airtable sync triggered. It will complete shortly."
+      end
+      redirect_to admin_event_integrations_path(@event), notice: notice
     else
       redirect_to admin_event_integrations_path(@event), alert: "Airtable sync is not fully configured."
     end
@@ -44,6 +70,10 @@ class Admin::DashboardController < Admin::BaseController
   def create_vote_event
     @event = Event.find_by!(slug: params[:slug])
     authorize @event, :update?
+
+    # Without a current event the audit row lands with a null event_id, which
+    # hides it from every non-global admin's audit log.
+    set_current_event(@event)
 
     client = Vote::Client.new
 
@@ -104,6 +134,13 @@ class Admin::DashboardController < Admin::BaseController
     set_current_event(@event)
 
     if @event.update(integration_params)
+      if airtable_settings_saved?
+        # Whoever last touched the credentials is who we email if the sync
+        # later fails and pauses itself.
+        @event.update_column(:airtable_config_updated_by_id, current_user.id)
+        @event.resume_airtable_sync!
+      end
+
       if airtable_settings_saved? && @event.airtable_sync_configured?
         AirtableJobs::SyncAllJob.perform_later
         redirect_to admin_event_integrations_path(@event), notice: "Integration settings updated. Airtable sync started."
@@ -153,6 +190,9 @@ class Admin::DashboardController < Admin::BaseController
     @airtable_sync_error = current_event.airtable_sync_error
     @airtable_sync_error_at = current_event.airtable_sync_error_at
     @airtable_sync_stale = current_event.airtable_sync_stale?
+    @airtable_sync_paused = current_event.airtable_sync_paused?
+    @airtable_sync_paused_at = current_event.airtable_sync_paused_at
+    @airtable_config_owner = current_event.airtable_config_last_saved_by if @airtable_sync_paused
     @airtable_participant_count = current_event.participant_events.count if @airtable_sync_configured
   end
 
@@ -189,11 +229,12 @@ class Admin::DashboardController < Admin::BaseController
       .order(created_at: :desc)
       .limit(5)
 
-    # High support participants
+    # High support participants (materialized: the view reads it five times)
     @high_support_participants = @participant_events
       .joins(:safeguarding_info)
       .where(safeguarding_infos: { high_support_flag: true })
       .includes(:participant)
+      .to_a
 
     # Recent activity
     @recent_activity = AuditLog
@@ -211,25 +252,29 @@ class Admin::DashboardController < Admin::BaseController
 
   def compute_display_status_counts
     counts = Hash.new(0)
-    @participant_events.includes(:consents, :event, :travel_inbound, :travel_outbound,
+    @participant_events.includes(:consents, :travel_inbound, :travel_outbound,
                                   :accommodation, :medical, :dietary, :accessibility, :safeguarding_info,
-                                  :emergency_contacts, participant: [], guardian_participant_events: :emergency_contacts).find_each do |pe|
+                                  :emergency_contacts, :participant, { event: :custom_documents },
+                                  guardian_participant_events: :emergency_contacts).find_each do |pe|
       counts[pe.display_status] += 1
     end
     counts
   end
 
   def compute_travel_stats
-    pe_ids = current_event.participant_events.pluck(:id)
+    travels = Travel.joins(:participant_event)
+      .where(participant_events: { event_id: current_event.id })
+    inbound_travels = travels.where(direction: :inbound)
+    outbound_travels = travels.where(direction: :outbound)
 
-    inbound_travels = Travel.where(participant_event_id: pe_ids, direction: :inbound)
-    outbound_travels = Travel.where(participant_event_id: pe_ids, direction: :outbound)
+    inbound_count = inbound_travels.count
+    outbound_count = outbound_travels.count
 
     {
-      inbound_complete: inbound_travels.count,
-      outbound_complete: outbound_travels.count,
-      missing_inbound: @total_participants - inbound_travels.count,
-      missing_outbound: @total_participants - outbound_travels.count,
+      inbound_complete: inbound_count,
+      outbound_complete: outbound_count,
+      missing_inbound: @total_participants - inbound_count,
+      missing_outbound: @total_participants - outbound_count,
       arriving_today: inbound_travels.joins(:travel_legs)
         .where("DATE(travel_legs.arrival_time) = ?", Date.current)
         .distinct.count,

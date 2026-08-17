@@ -20,6 +20,43 @@ module Admin::ParticipantsHelper
     "custom_documents" => "Awaiting documents"
   }.freeze
 
+  # Optional documents only apply to participants who opted in, so "not
+  # added" is a legitimate end state rather than something to chase.
+  OPTIONAL_DOCUMENT_STATE_LABELS = {
+    signed: "Signed",
+    awaiting: "Awaiting signature",
+    withdrawn: "Removed",
+    not_added: "Not added"
+  }.freeze
+
+  OPTIONAL_DOCUMENT_STATE_STYLES = {
+    signed: "bg-green-100 text-green-700",
+    awaiting: "bg-yellow-100 text-yellow-700",
+    withdrawn: "bg-gray-100 text-gray-600",
+    not_added: "text-gray-400"
+  }.freeze
+
+  def optional_document_state_label(state)
+    OPTIONAL_DOCUMENT_STATE_LABELS.fetch(state, state.to_s.humanize)
+  end
+
+  def render_optional_document_badge(participant_event, custom_document)
+    state = participant_event.optional_document_state(custom_document)
+    label = optional_document_state_label(state)
+    style = OPTIONAL_DOCUMENT_STATE_STYLES.fetch(state, "bg-gray-100 text-gray-800")
+
+    return content_tag(:span, label, class: style) if state == :not_added
+
+    content_tag(:span, label, class: "inline-flex items-center px-1.5 py-0.5 rounded text-xs #{style}")
+  end
+
+  # The group dropdown shows the current grouping back to the admin; a
+  # compound optional-document key would otherwise titleize into a raw UUID.
+  def group_by_label(group_by, optional_documents)
+    doc = optional_documents.find { |d| group_by == "optional_document:#{d.id}" }
+    doc ? doc.name : group_by.titleize
+  end
+
   def render_display_status_badge(participant_event)
     ds = participant_event.display_status
     css_class = DISPLAY_STATUS_STYLES[ds] || "bg-gray-100 text-gray-800"

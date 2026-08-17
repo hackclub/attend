@@ -14,14 +14,14 @@ RSpec.describe "Guardian invites locked", type: :request do
       get guardian_portal_waiver_path(token: token)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("not available to sign yet")
+      expect(response.body).to include("isn't open yet")
     end
 
     it "pauses the freedom waiver signing page" do
       get guardian_portal_freedom_waiver_path(token: token)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("not available to sign yet")
+      expect(response.body).to include("isn't open yet")
     end
 
     it "does not create waiver consents on the consents step" do
@@ -29,7 +29,7 @@ RSpec.describe "Guardian invites locked", type: :request do
         get guardian_portal_step_path(token: token, step: "consents")
       }.not_to change(Consent, :count)
 
-      expect(response.body).to include("Waivers are not ready yet")
+      expect(response.body).to include("Waivers aren't open yet")
     end
 
     it "does not enqueue DocuSeal submissions on the consents step" do
@@ -45,7 +45,7 @@ RSpec.describe "Guardian invites locked", type: :request do
       get guardian_portal_step_path(token: token, step: "consents")
 
       expect(response.body).not_to include(guardian_portal_waiver_path(token: token))
-      expect(response.body).to include("Not ready to sign yet")
+      expect(response.body).to include("Not open for signing yet")
     end
 
     context "when the event is not locked" do

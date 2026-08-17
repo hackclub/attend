@@ -29,7 +29,7 @@ module Admin
       end
 
       @recent_scans = all_scans
-        .includes(:user, :scan_context, participant_event: :participant)
+        .includes(:user, :scan_context, :participant, participant_event: :participant)
         .recent
         .limit(10)
 
@@ -44,7 +44,7 @@ module Admin
     def scanner
       @recent_scans = Scan.for_event(current_event)
         .today
-        .includes(:user, :scan_context, participant_event: :participant)
+        .includes(:user, :scan_context, :participant, participant_event: :participant)
         .recent
         .limit(50)
 
@@ -193,7 +193,7 @@ module Admin
 
     def history
       @scans = Scan.for_event(current_event)
-        .includes(:user, :scan_context, participant_event: :participant)
+        .includes(:user, :scan_context, :participant, participant_event: :participant)
         .recent
 
       if params[:search].present?

@@ -27,7 +27,7 @@
         </svg>
         Import
       <% end %>
-      <%= link_to new_invite_admin_event_participants_path(current_event), class: "text-sm font-medium text-white bg-[#ec3750] px-3 py-1.5 rounded-md hover:bg-[#d42f46] transition-colors inline-flex items-center gap-1.5" do %>
+      <%= link_to new_invite_admin_event_participants_path(current_event), class: "text-sm font-medium text-white bg-[#d42f46] px-3 py-1.5 rounded-md hover:bg-[#b82840] transition-colors inline-flex items-center gap-1.5" do %>
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
         </svg>
@@ -48,7 +48,7 @@
         </span>
       <% else %>
         <span class="py-2.5 border-b-2 border-[#ec3750] text-sm font-medium text-[#ec3750]">
-          All <span class="ml-1 text-xs"><%= @participant_events.count %></span>
+          All <span class="ml-1 text-xs"><%= @participant_events.size %></span>
         </span>
         <%= link_to admin_event_participants_path(current_event, status: "pending_invitations"), class: "py-2.5 border-b-2 border-transparent text-sm font-medium text-gray-500 hover:text-gray-700" do %>
           Pending invitations
@@ -104,8 +104,21 @@
             ),
             class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
       <% end %>
+      <% if @optional_documents.any? %>
+        <%# Opt-in activities: who's doing each one, and who still owes a signature. %>
+        <%= select_tag :optional_document,
+            options_for_select(
+              [ [ "All Optional Docs", "" ] ] + @optional_documents.flat_map { |doc|
+                [ [ "#{doc.name}: added", "#{doc.id}:added" ],
+                  [ "#{doc.name}: awaiting signature", "#{doc.id}:awaiting" ],
+                  [ "#{doc.name}: not added", "#{doc.id}:not_added" ] ]
+              },
+              params[:optional_document]
+            ),
+            class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
+      <% end %>
       <%= submit_tag "Filter", class: "text-sm font-medium bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 cursor-pointer" %>
-      <% if params[:search].present? || params[:status].present? || params[:flag].present? || params[:checked_in].present? || params[:group_id].present? %>
+      <% if params[:search].present? || params[:status].present? || params[:flag].present? || params[:checked_in].present? || params[:group_id].present? || params[:optional_document].present? %>
         <%= link_to "Clear", admin_event_participants_path(current_event), class: "text-sm text-gray-500 hover:text-gray-700" %>
       <% end %>
       <div class="ml-auto flex items-center gap-1">
@@ -201,7 +214,7 @@
                   <span class="w-2 h-2 rounded-full <%= pe.accommodation ? 'bg-green-500' : 'bg-gray-200' %>" title="Accommodation"></span>
                 <% end %>
                 <span class="w-2 h-2 rounded-full <%= pe.medical ? 'bg-green-500' : 'bg-gray-200' %>" title="Medical"></span>
-                <span class="w-2 h-2 rounded-full <%= pe.consents.signed.any? ? 'bg-green-500' : 'bg-gray-200' %>" title="Consents"></span>
+                <span class="w-2 h-2 rounded-full <%= pe.consents.any?(&:signed?) ? 'bg-green-500' : 'bg-gray-200' %>" title="Consents"></span>
               </div>
               <div class="text-[11px] text-gray-400 mt-0.5">
                 <%= pe.onboarding_complete? ? "Complete" : "In progress" %>
@@ -235,7 +248,7 @@
         </tbody>
       </table>
       <% if @participant_events.any? %>
-        <div class="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-500"><%= @participant_events.count %> <%= "participant".pluralize(@participant_events.count) %></div>
+        <div class="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-500"><%= @participant_events.size %> <%= "participant".pluralize(@participant_events.size) %></div>
       <% end %>
     <% end %>
   </div>

@@ -324,7 +324,7 @@
             </h2>
           </div>
           <div class="p-2 max-h-64 overflow-y-auto">
-            <% @high_support_participants.limit(10).each do |pe| %>
+            <% @high_support_participants.first(10).each do |pe| %>
               <%= link_to safeguarding_admin_event_participant_path(@event, pe), class: "block p-2 rounded hover:bg-amber-100 transition-colors" do %>
                 <p class="font-medium text-amber-900 text-sm"><%= pe.participant.display_name %></p>
                 <p class="text-xs text-amber-700"><%= pe.status.titleize %></p>

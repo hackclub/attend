@@ -17,6 +17,18 @@ default: &default
     class: AirtableJobs::SyncAllJob
     schedule: every 5 minutes
 
+# Deliberately does not inherit *default: airtable_sync writes back to the
+# Airtable base it reads, so a staging box running it every 5 minutes would
+# fight production over the same records. Run AirtableJobs::SyncAllJob by hand
+# on staging once its credentials name a scratch base.
+staging:
+  process_scheduled_messages:
+    class: ProcessScheduledMessagesJob
+    schedule: every minute
+  clear_solid_queue_finished_jobs:
+    command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
+    schedule: every hour at minute 12
+
 production:
   <<: *default
   clear_solid_queue_finished_jobs:

@@ -1,13 +1,23 @@
 class DashboardController < ApplicationController
   include TravelLegDateMerging
   include PhysicalDocumentUploads
+  include OptionalDocumentEnrolment
 
   before_action :authenticate_user!
   before_action :require_participant
 
   def index
-    @participant_events = @participant.participant_events.includes(:event)
-    @pending_invitations = @participant.pending_invitations.includes(:event)
+    # display_status per row walks travel/health/guardian/consent/custom-doc
+    # associations, and the event avatars read logo attachments
+    @participant_events = @participant.participant_events.includes(
+      :consents, :travel_inbound, :travel_outbound, :accommodation,
+      :medical, :dietary, :accessibility, :emergency_contacts,
+      guardian_participant_events: :emergency_contacts,
+      event: [ :custom_documents, { logo_attachment: :blob, event_series: { logo_attachment: :blob } } ]
+    )
+    @pending_invitations = @participant.pending_invitations.includes(
+      event: [ { logo_attachment: :blob, event_series: { logo_attachment: :blob } } ]
+    )
   end
 
   def profile
@@ -37,9 +47,11 @@ class DashboardController < ApplicationController
 
   def show
     @participant_event = @participant.participant_events
-      .includes(:event, :consents, :accommodation, :medical, :dietary, :accessibility,
-                :emergency_contacts, guardian_participant_events: :guardian,
-                travel_inbound: :travel_legs, travel_outbound: :travel_legs)
+      .includes(:consents, :accommodation, :medical, :dietary, :accessibility,
+                :emergency_contacts, :safeguarding_info,
+                guardian_participant_events: :guardian,
+                travel_inbound: :travel_legs, travel_outbound: :travel_legs,
+                event: [ :custom_documents, { logo_attachment: :blob, event_series: { logo_attachment: :blob } } ])
       .find(params[:id])
     authorize @participant_event
     @event = @participant_event.event
@@ -51,6 +63,13 @@ class DashboardController < ApplicationController
       .limit(20)
 
     @custom_documents = @participant_event.applicable_custom_documents
+    @optional_documents = @participant_event.relevant_optional_custom_documents
+    # Documents live in the wizard while the participant is still filling it
+    # in for the first time, and on the dashboard once they've submitted.
+    # Adding an optional document reopens a completed participant, so
+    # "in_progress" on its own no longer means "still in the wizard".
+    @show_documents_section = @custom_documents.any? && !@participant_event.invited? &&
+      (!@participant_event.in_progress? || @participant_event.onboarding_completed_at.present?)
     @custom_document_consents = @participant_event.consents
       .select(&:custom_document_id)
       .index_by(&:custom_document_id)
@@ -99,6 +118,52 @@ class DashboardController < ApplicationController
 
     @signing_url = @consent.participant_signing_url if @custom_document.participant_signs?
     @preparing = @consent.docuseal_envelope_id.blank? && @consent.requires_signature?
+  end
+
+  # Opting into an activity's waiver. Until this happens the document doesn't
+  # exist for this participant — nobody, guardian included, is shown it.
+  def add_optional_document
+    @participant_event = @participant.participant_events.includes(:event, :consents).find(params[:id])
+    authorize @participant_event, :update?
+    @event = @participant_event.event
+    @custom_document = @event.custom_documents.active.find(params[:custom_document_id])
+
+    unless @custom_document.optional? && @custom_document.relevant_to?(@participant_event)
+      redirect_to dashboard_event_path(@participant_event), alert: "That document isn't available to add."
+      return
+    end
+
+    enrol_in_optional_document(@participant_event, @custom_document)
+
+    if @custom_document.participant_signs?
+      redirect_to dashboard_sign_document_path(@participant_event, @custom_document),
+                  notice: "\"#{@custom_document.name}\" added."
+    else
+      redirect_to dashboard_event_path(@participant_event),
+                  notice: "\"#{@custom_document.name}\" added — we've asked your parent/guardian to sign it."
+    end
+  end
+
+  # Changing their mind. The consent is withdrawn rather than deleted, so a
+  # signature already collected stays on file.
+  def withdraw_optional_document
+    @participant_event = @participant.participant_events.includes(:event, :consents).find(params[:id])
+    authorize @participant_event, :update?
+    @event = @participant_event.event
+    @custom_document = @event.custom_documents.active.find(params[:custom_document_id])
+
+    unless @custom_document.optional?
+      redirect_to dashboard_event_path(@participant_event), alert: "That document can't be removed."
+      return
+    end
+
+    if withdraw_from_optional_document(@participant_event, @custom_document).nil?
+      redirect_to dashboard_event_path(@participant_event), alert: "You haven't added \"#{@custom_document.name}\"."
+      return
+    end
+
+    redirect_to dashboard_event_path(@participant_event),
+                notice: "\"#{@custom_document.name}\" removed. You can add it again any time."
   end
 
   def upload_physical_document

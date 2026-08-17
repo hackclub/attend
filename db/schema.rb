@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_12_111500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_15_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -215,6 +215,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_111500) do
     t.string "failure_reason"
     t.uuid "guardian_participant_event_id"
     t.datetime "guardian_signed_at"
+    t.datetime "opted_in_at"
     t.uuid "participant_event_id", null: false
     t.datetime "participant_signed_at"
     t.string "pending_on"
@@ -223,7 +224,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_111500) do
     t.datetime "signed_at"
     t.string "status", default: "pending"
     t.datetime "updated_at", null: false
+    t.datetime "withdrawn_at"
     t.index ["custom_document_id"], name: "index_consents_on_custom_document_id"
+    t.index ["docuseal_envelope_id"], name: "index_consents_on_docuseal_envelope_id"
     t.index ["guardian_participant_event_id"], name: "index_consents_on_guardian_participant_event_id"
     t.index ["participant_event_id", "custom_document_id"], name: "index_consents_on_pe_and_custom_document", unique: true, where: "(custom_document_id IS NOT NULL)"
     t.index ["participant_event_id"], name: "index_consents_on_participant_event_id"
@@ -271,6 +274,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_111500) do
     t.string "docuseal_template_id"
     t.uuid "event_id", null: false
     t.string "name", null: false
+    t.boolean "optional", default: false, null: false
     t.string "signer_type", default: "participant", null: false
     t.integer "template_page_count"
     t.datetime "updated_at", null: false
@@ -380,8 +384,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_111500) do
   end
 
   create_table "events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "airtable_config_updated_by_id"
     t.text "airtable_sync_error"
     t.datetime "airtable_sync_error_at"
+    t.datetime "airtable_sync_paused_at"
     t.string "airtable_sync_source_id"
     t.string "airtable_sync_table_id"
     t.datetime "airtable_synced_at"
@@ -416,6 +422,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_111500) do
     t.string "timezone", default: "UTC"
     t.datetime "updated_at", null: false
     t.string "venue_name"
+    t.index ["airtable_config_updated_by_id"], name: "index_events_on_airtable_config_updated_by_id"
     t.index ["event_series_id"], name: "index_events_on_event_series_id"
     t.index ["hotel_scan_context_id"], name: "index_events_on_hotel_scan_context_id"
     t.index ["slug"], name: "index_events_on_slug", unique: true
@@ -433,22 +440,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_111500) do
     t.index ["created_by_id"], name: "index_export_templates_on_created_by_id"
     t.index ["event_id", "name"], name: "index_export_templates_on_event_id_and_name", unique: true
     t.index ["event_id"], name: "index_export_templates_on_event_id"
-  end
-
-  create_table "flipper_features", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.string "key", null: false
-    t.datetime "updated_at", null: false
-    t.index ["key"], name: "index_flipper_features_on_key", unique: true
-  end
-
-  create_table "flipper_gates", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.string "feature_key", null: false
-    t.string "key", null: false
-    t.datetime "updated_at", null: false
-    t.text "value"
-    t.index ["feature_key", "key", "value"], name: "index_flipper_gates_on_feature_key_and_key_and_value", unique: true
   end
 
   create_table "global_api_tokens", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1304,6 +1295,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_111500) do
   add_foreign_key "event_role_assignments", "users"
   add_foreign_key "events", "event_series"
   add_foreign_key "events", "scan_contexts", column: "hotel_scan_context_id"
+  add_foreign_key "events", "users", column: "airtable_config_updated_by_id"
   add_foreign_key "export_templates", "events"
   add_foreign_key "export_templates", "users", column: "created_by_id"
   add_foreign_key "global_api_tokens", "users"

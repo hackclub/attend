@@ -20,6 +20,14 @@ module Admin
         @journeys = @journeys.select { |j| j[:groups].any? { |g| g[:id] == sg_id } }
       end
 
+      # The journeys come from a cached hash, so the collect-time includes can't
+      # serve the view. Batch-load participants (with headshot blobs) once here
+      # instead of one Participant.find + attachment lookup per rendered row.
+      @participants_by_id = Participant
+        .where(id: @journeys.map { |j| j[:participant_id] }.compact.uniq)
+        .includes(headshot_attachment: :blob)
+        .index_by(&:id)
+
       @summary_counts = build_summary_counts(@inbound_journeys, :inbound)
       @outbound_summary_counts = build_summary_counts(@outbound_journeys, :outbound)
 
@@ -105,7 +113,7 @@ module Admin
     def collect_journeys(direction)
       participant_events = current_event.participant_events
         .where(status: :complete)
-        .includes(participant: :headshot_attachment)
+        .includes(participant: { headshot_attachment: :blob })
         .includes(:groups, scans: :scan_context, travel_inbound: { travel_legs: :picked_up_by }, travel_outbound: { travel_legs: :picked_up_by })
 
       journeys = []
@@ -135,7 +143,7 @@ module Admin
           participant_event_id: pe.id,
           participant_name: pe.participant.display_name,
           participant_preferred_name: pe.participant.preferred_name,
-          participant_has_headshot: pe.participant.headshot.attached?,
+          participant_has_headshot: pe.participant.headshot_displayable?,
           direction: direction,
           legs: legs_data,
           final_leg: legs_data.last,

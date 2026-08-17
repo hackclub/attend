@@ -11,7 +11,6 @@ A web application for onboarding under-18 participants for in-person Hack Club e
 - **Guardian portal** — Secure magic-link access for parents/guardians to complete consent forms
 - **Role-based access control** — Global Admin, Event Admin, Ops Staff, Safeguarding Lead roles
 - **Sensitive data encryption** — Medical and safeguarding information encrypted at rest
-- **External integrations** — Docuseal (e-signatures), Loops (transactional email)
 - **Mobile wallet passes** — Apple Wallet and Google Wallet support for event check-in
 - **Audit logging** — Full trail of admin actions with PaperTrail and console1984
 - **QR code check-in** — Scan participants at event venues
@@ -59,34 +58,7 @@ rails db:create db:migrate db:seed
 bin/dev
 ```
 
-The app will be available at `https://attend.local`.
-
-### SSL Setup (Required)
-
-This app requires HTTPS in development. Follow these steps:
-
-1. **Add to `/etc/hosts`:**
-   ```
-   127.0.0.1 attend.local
-   ```
-
-2. **Trust the SSL certificate:**
-   ```bash
-   sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain config/ssl/attend.local.crt
-   ```
-
-3. **Enable port forwarding (443 → 3000):**
-   ```bash
-   echo "rdr pass on lo0 inet proto tcp from any to 127.0.0.1 port 443 -> 127.0.0.1 port 3000" | sudo pfctl -ef -
-   ```
-   > Note: This resets on reboot. Run again after restart.
-
-4. **Start the server:**
-   ```bash
-   bin/dev
-   ```
-
-5. **Access the app at `https://attend.local`**
+The app will be available at `https://localhost:3000`.
 
 ### Test Users (Development)
 
@@ -119,7 +91,6 @@ Key variables:
 | `DATABASE_URL` | PostgreSQL connection string |
 | `HACK_CLUB_CLIENT_ID` / `HACK_CLUB_CLIENT_SECRET` | OAuth credentials |
 | `DOCUSEAL_API_KEY` / `DOCUSEAL_WEBHOOK_SECRET` | E-signature integration |
-| `LOOPS_API_KEY` | Transactional email |
 | `SENTRY_DSN` | Error monitoring |
 
 ### Rails Credentials
@@ -213,8 +184,6 @@ Event
 | Service | Purpose |
 |---------|---------|
 | **Docuseal** | Embedded consent forms with webhook status updates |
-| **Loops** | Transactional emails (invites, reminders) |
-| **FlightAware / Amadeus** | Flight status tracking |
 
 ---
 
@@ -293,6 +262,47 @@ docker run -d -p 80:80 \
 
 Set `RAILS_MASTER_KEY` as an environment variable on your production server. Hack Club's production instance builds this Dockerfile and deploys it on every merge to `main`.
 
+### Staging
+
+`RAILS_ENV=staging` loads `config/environments/production.rb` verbatim and then overrides
+only the host, the Active Storage bucket, and the outbound-email guard, so staging
+exercises the same code paths as production.
+
+What keeps staging from touching production's data:
+
+- **Credentials.** Staging reads `config/credentials/staging.yml.enc`, unlocked by its own
+  `RAILS_MASTER_KEY`. Those credentials must name staging Postmark/Twilio/Airtable/Slack
+  accounts. The app refuses to boot if that file is missing, because Rails would otherwise
+  silently fall back to production's `config/credentials.yml.enc`. Open it with
+  `bin/rails credentials:edit --environment staging` — it ships as an annotated template
+  with every integration the app reads, so filling in the `REPLACE_ME`s is the whole job.
+  `secret_key_base` and the `active_record_encryption` keys are already generated and
+  deliberately differ from production's, so a staging session cookie is not valid on
+  attend.hackclub.com.
+- **Email.** Every outbound message is rewritten to `STAGING_MAIL_RECIPIENT`, or dropped
+  if that variable is unset. See `app/mailers/staging_mail_interceptor.rb`.
+- **SMS and voice.** Off until someone flips the `twilio_enabled` setting, which defaults
+  to false on a fresh database.
+- **Airtable.** `config/recurring.yml` deliberately omits `airtable_sync` in staging —
+  it writes back to the base it reads, so a second box running it every five minutes
+  would fight production over the same records. Run it by hand when you need it.
+- **Uploads.** A separate `hackclub-attend-staging` R2 bucket (`config/storage.yml`).
+
+Required environment variables on the staging deployment:
+
+| Variable | Value |
+| --- | --- |
+| `RAILS_ENV` | `staging` |
+| `RAILS_MASTER_KEY` | contents of `config/credentials/staging.key` |
+| `DATABASE_URL` | the staging Postgres URL (no credentials fallback — a wrong value fails to boot) |
+| `APP_HOST` | the staging hostname, e.g. `staging.attend.hackclub.com` |
+| `STAGING_MAIL_RECIPIENT` | where redirected email should go; unset means email is dropped |
+| `SOLID_QUEUE_IN_PUMA` | `true` |
+
+Also needs doing outside the app: a Hack Club Auth redirect URI for the staging host, a
+Turnstile widget scoped to it, and the `hackclub-attend-staging` R2 bucket. Webhooks (Postmark,
+HelpScout, DocuSeal, Twilio) stay pointed at production, so staging never receives them.
+
 ---
 
 ## Contributing
@@ -331,7 +341,7 @@ Add flight tracking integration with FlightAware
 
 - Never commit secrets or credentials
 - Use Rails credentials for sensitive configuration
-- Report security issues privately to the maintainers
+- Report security issues via [security.hackclub.com](security.hackclub.com)
 
 ---
 

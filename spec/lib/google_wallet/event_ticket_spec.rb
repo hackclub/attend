@@ -1,6 +1,11 @@
 require "rails_helper"
 
 RSpec.describe GoogleWallet::EventTicket do
+  # Banners are validated as real images, so dummy bytes won't attach.
+  ONE_PIXEL_PNG = Base64.decode64(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+  ).freeze
+
   let(:participant_event) { create(:participant_event) }
   let(:event) { participant_event.event }
   let(:ticket) { described_class.new(participant_event) }
@@ -34,7 +39,7 @@ RSpec.describe GoogleWallet::EventTicket do
 
     it "uses a public proxy URL for the event banner when attached" do
       event.banner.attach(
-        io: StringIO.new("fake image data"),
+        io: StringIO.new(ONE_PIXEL_PNG),
         filename: "banner.png",
         content_type: "image/png"
       )
@@ -47,7 +52,7 @@ RSpec.describe GoogleWallet::EventTicket do
     it "falls back to the series banner when the event has none" do
       series = create(:event_series)
       series.banner.attach(
-        io: StringIO.new("fake image data"),
+        io: StringIO.new(ONE_PIXEL_PNG),
         filename: "series-banner.png",
         content_type: "image/png"
       )

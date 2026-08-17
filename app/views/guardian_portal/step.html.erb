@@ -1,9 +1,18 @@
-<div class="w-full max-w-2xl mx-auto">
-  <div class="mb-6">
-    <%= link_to "← Back to Overview", guardian_portal_path(token: @token), class: "text-blue-600 hover:text-blue-800" %>
-  </div>
+<% content_for :title, "#{guardian_step_label(@step)} – Guardian portal – Attend" %>
 
-  <h1 class="text-2xl font-bold mb-6"><%= @step.titleize %></h1>
+<div class="w-full max-w-2xl mx-auto">
+  <%= render "shared/portal_masthead",
+        subtitle: @event.name,
+        back_to: { label: "Overview", path: guardian_portal_path(token: @token) } %>
+
+  <%= render "step_nav" %>
+
+  <header class="mb-6">
+    <h1 class="portal-title text-2xl"><%= guardian_step_label(@step) %></h1>
+    <p class="portal-body mt-2 max-w-prose">
+      <%= guardian_step_description(@step, @participant.legal_first_name) %>
+    </p>
+  </header>
 
   <%= render "guardian_portal/steps/#{@step}" %>
 </div>

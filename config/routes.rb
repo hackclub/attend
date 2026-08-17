@@ -86,6 +86,8 @@ Rails.application.routes.draw do
   get "dashboard/events/:id/download_ticket", to: "dashboard#download_ticket", as: :dashboard_download_ticket
   get "dashboard/events/:id/download_excuse_letter", to: "dashboard#download_excuse_letter", as: :dashboard_download_excuse_letter
   get "dashboard/events/:id/documents/:custom_document_id", to: "dashboard#sign_document", as: :dashboard_sign_document
+  post "dashboard/events/:id/documents/:custom_document_id/add", to: "dashboard#add_optional_document", as: :dashboard_add_optional_document
+  delete "dashboard/events/:id/documents/:custom_document_id/add", to: "dashboard#withdraw_optional_document", as: :dashboard_withdraw_optional_document
   post "dashboard/events/:id/documents/:custom_document_id/upload", to: "dashboard#upload_physical_document", as: :dashboard_upload_physical_document
   delete "dashboard/events/:id/documents/:custom_document_id/uploads/:upload_id", to: "dashboard#remove_physical_upload", as: :dashboard_remove_physical_upload
   post "dashboard/events/:id/resend_guardian_invite", to: "dashboard#resend_guardian_invite", as: :dashboard_resend_guardian_invite
@@ -101,6 +103,8 @@ Rails.application.routes.draw do
     get "/waiver", to: "onboarding#waiver", as: :onboarding_waiver
     post "/waiver/complete", to: "onboarding#waiver_complete", as: :onboarding_waiver_complete
     post "/documents/:consent_id/signed", to: "onboarding#document_signed", as: :onboarding_document_signed
+    post "/optional_documents/:custom_document_id", to: "onboarding#add_optional_document", as: :onboarding_add_optional_document
+    delete "/optional_documents/:custom_document_id", to: "onboarding#withdraw_optional_document", as: :onboarding_withdraw_optional_document
     post "/documents/:consent_id/physical_upload", to: "onboarding#physical_document_upload", as: :onboarding_physical_document_upload
     delete "/documents/:consent_id/physical_uploads/:upload_id", to: "onboarding#remove_physical_upload", as: :onboarding_remove_physical_upload
     get "/:step", to: "onboarding#show", as: :onboarding_step
@@ -187,6 +191,8 @@ Rails.application.routes.draw do
           delete :reset_waiver
           delete :reset_freedom_waiver
           post :resend_waiver_completion_email
+          post :resend_custom_document
+          delete :reset_custom_document
           get :notes
           get :history
           post :resync_airtable
@@ -378,6 +384,8 @@ Rails.application.routes.draw do
     # Custom documents (per-event DocuSeal templates beyond the built-in waivers)
     scope ":slug", constraints: { slug: /[a-z0-9-]+/ } do
       post "custom_documents", to: "custom_documents#create", as: :event_custom_documents
+      get "custom_documents/:id/edit", to: "custom_documents#edit", as: :event_custom_document_edit
+      patch "custom_documents/:id", to: "custom_documents#update"
       delete "custom_documents/:id", to: "custom_documents#destroy", as: :event_custom_document
     end
   end

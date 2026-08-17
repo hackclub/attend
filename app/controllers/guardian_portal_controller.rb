@@ -38,6 +38,7 @@ class GuardianPortalController < ApplicationController
     end
 
     @step_index = STEPS.index(@step)
+    load_wizard_position
     load_step_data
   end
 
@@ -58,6 +59,7 @@ class GuardianPortalController < ApplicationController
         redirect_to guardian_portal_path(token: @token), notice: "Progress saved."
       end
     else
+      load_wizard_position
       load_step_data
       render :step, status: :unprocessable_entity
     end
@@ -466,6 +468,13 @@ class GuardianPortalController < ApplicationController
 
   def participant_info_complete?
     @guardian_participant_event.participant_info_reviewed_at.present?
+  end
+
+  # Data the wizard's position indicator needs on every step render.
+  def load_wizard_position
+    @steps = STEPS
+    @current_step = @step
+    @completed_steps = completed_steps
   end
 
   def load_step_data

@@ -1,5 +1,7 @@
 <%
-  participant = Participant.find(journey[:participant_id])
+  # Prefer the batch-loaded participant passed in from the show action;
+  # fall back to a lookup for render sites that can't supply it.
+  participant ||= Participant.find(journey[:participant_id])
   inbound = journey[:direction] == :inbound
 
   status_pill_classes = {

@@ -1,4 +1,6 @@
 class User < ApplicationRecord
+  include DecodableImageAttachment
+
   self.implicit_order_column = "created_at"
 
   has_paper_trail ignore: [
@@ -355,15 +357,19 @@ class User < ApplicationRecord
   end
 
   def avatar_displayable?
-    avatar.attached? && avatar.variable?
+    displayable_image?(avatar)
   end
 
   private
 
   def acceptable_avatar
     return unless attachment_changes["avatar"].present?
-    return if ALLOWED_AVATAR_CONTENT_TYPES.include?(avatar.content_type)
 
-    errors.add(:avatar, "must be a JPEG, PNG, GIF, or WebP image")
+    unless ALLOWED_AVATAR_CONTENT_TYPES.include?(avatar.content_type)
+      errors.add(:avatar, "must be a JPEG, PNG, GIF, or WebP image")
+      return
+    end
+
+    validate_decodable_image(:avatar)
   end
 end

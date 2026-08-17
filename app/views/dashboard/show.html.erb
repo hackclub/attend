@@ -72,7 +72,7 @@
           </p>
         </div>
         <%= link_to "Continue registration", onboarding_path(event_id: @event.id),
-            class: "shrink-0 inline-flex items-center justify-center px-5 py-2.5 bg-[#ec3750] hover:bg-[#d42f46] text-white font-medium rounded-lg transition-colors" %>
+            class: "shrink-0 inline-flex items-center justify-center px-5 py-2.5 bg-[#d42f46] hover:bg-[#b82840] text-white font-medium rounded-lg transition-colors" %>
       </div>
     </section>
   <% end %>
@@ -88,7 +88,7 @@
       </h2>
 
       <div class="max-w-md bg-white rounded-2xl shadow-lg overflow-hidden border border-[#e0e6ed]">
-        <div class="bg-[#ec3750] text-white px-4 py-3 flex justify-between items-center">
+        <div class="bg-[#d42f46] text-white px-4 py-3 flex justify-between items-center">
           <span class="font-bold tracking-wider text-sm">BOARDING PASS</span>
           <img src="/flag.png" alt="Hack Club" class="h-5 opacity-90">
         </div>
@@ -274,14 +274,14 @@
           <%= button_to gpe.invite_token_sent_at ? "Resend invitation" : "Send invitation",
               dashboard_resend_guardian_invite_path(@participant_event),
               method: :post,
-              class: "shrink-0 inline-flex items-center px-4 py-2 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium rounded-lg transition-colors cursor-pointer" %>
+              class: "shrink-0 inline-flex items-center px-4 py-2 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium rounded-lg transition-colors cursor-pointer" %>
         <% end %>
       </div>
     </section>
   <% end %>
 
   <!-- Documents to sign (pre-submit signing lives in the wizard's documents step) -->
-  <% if @custom_documents.any? && !@participant_event.invited? && !@participant_event.in_progress? %>
+  <% if @show_documents_section %>
   <section class="mb-8">
     <h2 class="text-sm font-semibold uppercase tracking-wide text-(--text-muted) mb-3 flex items-center gap-2">
       <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -295,7 +295,12 @@
         <% guardian_handling = consent&.docuseal_envelope_id.present? && consent.docuseal_participant_slug.blank? %>
         <div class="p-4 flex items-center justify-between gap-4">
           <div class="min-w-0">
-            <p class="font-medium text-(--text-strong) truncate"><%= doc.name %></p>
+            <p class="font-medium text-(--text-strong) truncate">
+              <%= doc.name %>
+              <% if doc.optional? %>
+                <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide border border-(--border-card) text-(--text-muted) align-middle">Optional</span>
+              <% end %>
+            </p>
             <p class="text-xs text-(--text-muted) mt-0.5">
               <% if consent&.signed? %>
                 Signed <%= consent.signed_at&.strftime("%b %d, %Y") %>
@@ -307,6 +312,14 @@
                 Needs your signature
               <% end %>
             </p>
+            <% if doc.optional? %>
+              <%= button_to dashboard_withdraw_optional_document_path(@participant_event, doc), method: :delete,
+                  form_class: "mt-1",
+                  data: { turbo_confirm: "Remove \"#{doc.name}\"? You're saying you don't want to take part — you can add it back any time." },
+                  class: "text-xs text-(--text-muted) underline underline-offset-2 hover:text-(--text-strong) cursor-pointer" do %>
+                Not taking part any more<span class="sr-only"> — remove <%= doc.name %></span>
+              <% end %>
+            <% end %>
           </div>
           <div class="shrink-0">
             <% if consent&.signed? %>
@@ -320,13 +333,49 @@
               <span class="text-sm text-(--text-muted)">Pending guardian</span>
             <% elsif doc.participant_signs? %>
               <%= link_to doc.physical? ? "Sign & upload" : "Sign now", dashboard_sign_document_path(@participant_event, doc),
-                  class: "inline-flex items-center px-3 py-1.5 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium rounded-lg transition-colors" %>
+                  class: "inline-flex items-center px-3 py-1.5 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium rounded-lg transition-colors" %>
             <% elsif consent.nil? || consent.pending? %>
               <span class="text-sm text-(--text-muted)">Pending guardian</span>
             <% else %>
               <span class="text-sm text-(--text-muted)"><%= consent.status.titleize %></span>
             <% end %>
           </div>
+        </div>
+      <% end %>
+    </div>
+  </section>
+  <% end %>
+
+  <!-- Optional extras: activities you can opt into. Nobody — your guardian
+       included — is asked to sign these until you add them. -->
+  <% available_optional = @optional_documents.reject { |doc| @participant_event.opted_into_custom_document?(doc) } %>
+  <% if available_optional.any? && !@participant_event.invited? %>
+  <section class="mb-8">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-(--text-muted) mb-3 flex items-center gap-2">
+      <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6"/>
+      </svg>
+      Optional extras
+    </h2>
+    <div class="rounded-2xl border border-(--border-card) bg-(--bg-elev) divide-y divide-(--border-card)">
+      <% available_optional.each do |doc| %>
+        <div class="p-4 flex flex-wrap items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="font-medium text-(--text-strong)"><%= doc.name %></p>
+            <p class="text-xs text-(--text-muted) mt-0.5">
+              <% if doc.description.present? %>
+                <%= doc.description %>
+              <% elsif doc.guardian_signs? && @participant_event.requires_guardian? %>
+                Only add this if you want to take part — your parent/guardian is only asked to sign once you do.
+              <% else %>
+                Only add this if you want to take part.
+              <% end %>
+            </p>
+          </div>
+          <%= button_to dashboard_add_optional_document_path(@participant_event, doc), method: :post,
+              class: "inline-flex items-center px-3 py-1.5 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium rounded-lg transition-colors cursor-pointer shrink-0" do %>
+            Add and sign<span class="sr-only"> <%= doc.name %></span>
+          <% end %>
         </div>
       <% end %>
     </div>

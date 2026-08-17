@@ -1,98 +1,110 @@
+<% content_for :title, "Guardian portal – Attend" %>
+<% first_name = @participant.legal_first_name %>
+<% overall_complete = @completed_steps.length == @steps.length %>
+<% next_step = @steps.find { |s| !@completed_steps.include?(s) } %>
+
 <div class="w-full max-w-2xl mx-auto">
-  <div class="bg-white rounded-lg shadow-sm border p-6 mb-8">
-    <div class="flex items-center gap-3 mb-4">
-      <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-        </svg>
-      </div>
+  <%= render "shared/portal_masthead", subtitle: @event.name %>
+
+  <header class="mb-8">
+    <h1 class="portal-title text-2xl mb-3">
+      <%= @guardian.full_name.presence || "Welcome" %>, here's what <%= first_name %> needs from you
+    </h1>
+    <p class="portal-body text-lg">
+      <%= overall_complete ? "Everything is filled in." : "#{pluralize(@steps.length - @completed_steps.length, 'section')} left." %>
+      You can stop and come back to this link at any time — nothing is lost.
+    </p>
+  </header>
+
+  <div class="portal-card p-5 sm:p-6 mb-6">
+    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">Welcome, <%= @guardian.full_name %>!</h1>
-        <p class="text-gray-600">Guardian Portal</p>
-      </div>
-    </div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-        <div class="flex items-center gap-2 mb-2">
-          <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-          </svg>
-          <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">Participant</p>
-        </div>
-        <p class="text-lg font-semibold text-gray-900"><%= @participant.full_name %></p>
-        <p class="text-sm text-gray-600 mt-1"><%= @participant.email %></p>
-      </div>
-
-      <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-        <div class="flex items-center gap-2 mb-2">
-          <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-          </svg>
-          <p class="text-sm font-medium text-gray-500 uppercase tracking-wide">Event</p>
-        </div>
-        <p class="text-lg font-semibold text-gray-900"><%= @event.name %></p>
-        <% if @event.starts_at.present? && @event.ends_at.present? %>
-          <p class="text-sm text-gray-600 mt-1">
-            <%= @event.starts_at.strftime("%B %d") %> – <%= @event.ends_at.strftime("%B %d, %Y") %>
-          </p>
+        <dt class="portal-meta text-xs font-semibold uppercase tracking-wider mb-1">Participant</dt>
+        <dd class="portal-heading text-base"><%= @participant.full_name %></dd>
+        <% if @participant.email.present? %>
+          <dd class="portal-hint text-sm mt-0.5 break-words"><%= @participant.email %></dd>
         <% end %>
       </div>
-    </div>
+      <div>
+        <dt class="portal-meta text-xs font-semibold uppercase tracking-wider mb-1">Event</dt>
+        <dd class="portal-heading text-base"><%= @event.name %></dd>
+        <% if @event.starts_at.present? && @event.ends_at.present? %>
+          <dd class="portal-hint text-sm mt-0.5">
+            <%= @event.starts_at.strftime("%B %-d") %> – <%= @event.ends_at.strftime("%B %-d, %Y") %>
+          </dd>
+        <% end %>
+      </div>
+    </dl>
   </div>
 
-  <div class="bg-white rounded-lg shadow-sm border p-6 mb-8">
-    <h2 class="text-lg font-semibold mb-4">Completion Progress</h2>
+  <% waiver_consent = @participant_event.consents.find_by(consent_type: "waiver") %>
+  <% guardian_signed_awaiting_participant = waiver_consent&.guardian_signed? && !waiver_consent&.signed? %>
 
-    <% overall_complete = @completed_steps.length == @steps.length %>
-    <div class="mb-4">
-      <div class="flex justify-between text-sm mb-1">
-        <span class="text-gray-600">Overall Progress</span>
-        <span class="font-medium"><%= @completed_steps.length %>/<%= @steps.length %> complete</span>
-      </div>
-      <div class="w-full bg-gray-200 rounded-full h-2.5">
-        <div class="<%= overall_complete ? 'bg-green-600' : 'bg-blue-600' %> h-2.5 rounded-full transition-all" style="width: <%= (@completed_steps.length.to_f / @steps.length * 100).round %>%"></div>
-      </div>
+  <section class="portal-card p-5 sm:p-6 mb-6" aria-labelledby="progress-heading">
+    <div class="flex items-baseline justify-between gap-4 mb-2">
+      <h2 id="progress-heading" class="portal-heading text-lg">Your sections</h2>
+      <p class="portal-hint text-sm font-medium tabular-nums">
+        <%= @completed_steps.length %> of <%= @steps.length %> done
+      </p>
     </div>
 
-    <% waiver_consent = @participant_event.consents.find_by(consent_type: "waiver") %>
-    <% guardian_signed_awaiting_participant = waiver_consent&.guardian_signed? && !waiver_consent&.signed? %>
+    <div class="portal-progress mb-5"
+         role="progressbar"
+         aria-labelledby="progress-heading"
+         aria-valuenow="<%= @completed_steps.length %>"
+         aria-valuemin="0"
+         aria-valuemax="<%= @steps.length %>">
+      <div class="portal-progress-fill <%= "portal-progress-fill-done" if overall_complete %>"
+           style="--portal-progress: <%= (@completed_steps.length.to_f / @steps.length).round(3) %>"></div>
+    </div>
 
-    <ul class="space-y-3">
-      <% @steps.each do |step| %>
+    <ul class="space-y-2">
+      <% @steps.each_with_index do |step, index| %>
         <% is_completed = @completed_steps.include?(step) %>
-        <li class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-md <%= is_completed ? 'bg-green-50' : 'bg-gray-50' %>">
-          <div class="flex items-center gap-3">
-            <% if is_completed %>
-              <div class="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
-                <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+        <li class="portal-step-row <%= "portal-step-row-done" if is_completed %>"
+            style="animation-delay: <%= index * 55 %>ms">
+          <div class="flex items-start gap-3 min-w-0">
+            <span class="portal-step-marker <%= is_completed ? "portal-step-marker-done" : (step == next_step ? "portal-step-marker-current" : "") %>">
+              <% if is_completed %>
+                <svg class="size-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
                 </svg>
-              </div>
-            <% else %>
-              <div class="w-6 h-6 border-2 border-gray-300 rounded-full"></div>
-            <% end %>
-            <span class="font-medium <%= is_completed ? 'text-green-800' : 'text-gray-700' %>">
-              <%= step.titleize %>
+                <span class="sr-only">Completed:</span>
+              <% else %>
+                <%= index + 1 %>
+              <% end %>
             </span>
+            <div class="min-w-0">
+              <p class="portal-heading text-sm sm:text-base"><%= guardian_step_label(step) %></p>
+              <p class="portal-hint text-sm mt-0.5"><%= guardian_step_description(step, first_name) %></p>
+            </div>
           </div>
-          <%= link_to guardian_portal_step_path(token: @token, step: step), class: "text-sm font-medium #{ is_completed ? 'text-green-700 hover:text-green-800' : 'text-blue-600 hover:text-blue-700' }" do %>
-            <%= is_completed ? 'Edit' : 'Complete' %>
-            <span aria-hidden="true"> →</span>
+          <%= link_to guardian_portal_step_path(token: @token, step: step),
+                class: "portal-btn #{is_completed ? 'portal-btn-quiet' : 'portal-btn-secondary'} shrink-0 self-stretch sm:self-auto" do %>
+            <%= is_completed ? "Review" : "Fill in" %>
+            <span class="sr-only"><%= guardian_step_label(step) %></span>
           <% end %>
         </li>
+
         <% if step == "consents" && guardian_signed_awaiting_participant %>
-          <li class="bg-blue-50 border border-blue-200 rounded-md p-3">
-            <p class="text-sm text-blue-800">
-              <strong><%= @participant.legal_first_name %></strong> also needs to sign this waiver.
-              They can complete their signature by logging into their onboarding portal.
+          <li class="portal-note portal-note-info">
+            <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.852l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/>
+            </svg>
+            <p class="portal-body text-sm">
+              <strong class="portal-heading"><%= first_name %></strong> also needs to sign this waiver.
+              They can do that from their own onboarding portal.
             </p>
           </li>
         <% end %>
+
         <% if step == "consents" && @docs_awaiting_participant_upload.any? %>
-          <li class="bg-blue-50 border border-blue-200 rounded-md p-3">
-            <p class="text-sm text-blue-800">
-              <strong><%= @participant.legal_first_name %></strong> still needs to upload a photo of the signed
+          <li class="portal-note portal-note-info">
+            <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.852l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/>
+            </svg>
+            <p class="portal-body text-sm">
+              <strong class="portal-heading"><%= first_name %></strong> still needs to upload a photo of the signed
               <%= @docs_awaiting_participant_upload.map(&:name).to_sentence %>.
               Once they do, you'll review and confirm it here.
             </p>
@@ -100,56 +112,55 @@
         <% end %>
       <% end %>
     </ul>
-  </div>
+  </section>
 
-  <% if @completed_steps.length == @steps.length %>
-    <div class="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-      <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-        <svg class="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+  <% if overall_complete %>
+    <section class="portal-card p-6 sm:p-8 text-center">
+      <span class="portal-medallion portal-medallion-success mx-auto mb-4">
+        <svg class="size-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
         </svg>
-      </div>
+      </span>
+
       <% if @docs_awaiting_participant_upload.any? %>
-        <h3 class="text-lg font-semibold text-green-800 mb-2">Your Part Is Done — For Now!</h3>
-        <p class="text-green-700 mb-4">
-          You've provided all required information and consents.
-          <strong><%= @participant.legal_first_name %></strong> still needs to upload a photo of the signed
-          <%= @docs_awaiting_participant_upload.map(&:name).to_sentence %> — once they do, we'll ask you to
-          come back and confirm it.
+        <h2 class="portal-heading text-xl mb-2">Your part is done — for now</h2>
+        <p class="portal-body mb-6 mx-auto max-w-prose">
+          You've given us everything we need from you.
+          <strong class="portal-heading"><%= first_name %></strong> still needs to upload a photo of the signed
+          <%= @docs_awaiting_participant_upload.map(&:name).to_sentence %> — once they do, we'll ask you to come
+          back and confirm it.
         </p>
       <% else %>
-        <h3 class="text-lg font-semibold text-green-800 mb-2">All Steps Complete!</h3>
-        <p class="text-green-700 mb-4">You've provided all required information and consents.</p>
+        <h2 class="portal-heading text-xl mb-2">Everything's filled in</h2>
+        <p class="portal-body mb-6 mx-auto max-w-prose">
+          You've given us all the information and consents we need for <%= first_name %>.
+        </p>
       <% end %>
-      <% unless @guardian_participant_event.completed? %>
-        <%= button_to "Submit & Finish", guardian_portal_complete_path(token: @token), method: :post, class: "inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2" %>
-      <% else %>
-        <p class="text-sm text-green-600">Submitted on <%= @guardian_participant_event.completed_at&.strftime("%B %d, %Y at %l:%M %p") %></p>
-      <% end %>
-    </div>
-  <% else %>
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
-      <div class="flex items-start gap-3">
-        <svg class="w-5 h-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
-        </svg>
-        <div>
-          <h3 class="font-medium text-blue-800">Complete all steps to finish</h3>
-          <p class="text-sm text-blue-700 mt-1">Please complete all sections above to submit your consent for <%= @participant.legal_first_name %>'s participation.</p>
-        </div>
-      </div>
 
-      <% next_step = @steps.find { |s| !@completed_steps.include?(s) } %>
-      <% if next_step %>
-        <div class="mt-4">
-          <%= link_to guardian_portal_step_path(token: @token, step: next_step), class: "inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2" do %>
-            Continue to <%= next_step.titleize %>
-            <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-            </svg>
-          <% end %>
-        </div>
+      <% unless @guardian_participant_event.completed? %>
+        <%= button_to "Submit and finish", guardian_portal_complete_path(token: @token),
+              method: :post, class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+      <% else %>
+        <p class="portal-hint text-sm">
+          Submitted <%= @guardian_participant_event.completed_at&.strftime("%B %-d, %Y at %l:%M %p")&.squish %>
+        </p>
       <% end %>
-    </div>
+    </section>
+  <% elsif next_step %>
+    <section class="portal-card p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
+        <h2 class="portal-heading text-base">Up next: <%= guardian_step_label(next_step) %></h2>
+        <p class="portal-hint text-sm mt-0.5">
+          <%= guardian_step_description(next_step, first_name) %>
+        </p>
+      </div>
+      <%= link_to guardian_portal_step_path(token: @token, step: next_step),
+            class: "portal-btn portal-btn-primary shrink-0" do %>
+        Continue
+        <svg class="size-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/>
+        </svg>
+      <% end %>
+    </section>
   <% end %>
 </div>

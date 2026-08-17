@@ -3,11 +3,12 @@
 <div data-controller="data-table"
      data-data-table-base-url-value="<%= table_admin_event_participants_path(current_event) %>"
      data-data-table-scan-contexts-value="<%= @scan_contexts.map { |sc| { id: sc.id, name: sc.name } }.to_json %>"
-     data-data-table-groups-value="<%= (current_event.groups_enabled? ? current_event.groups.ordered.map { |g| { id: g.id, name: g.name } } : []).to_json %>">
+     data-data-table-groups-value="<%= (current_event.groups_enabled? ? current_event.groups.ordered.map { |g| { id: g.id, name: g.name } } : []).to_json %>"
+     data-data-table-optional-documents-value="<%= @optional_documents.map { |d| { id: d.id, name: d.name } }.to_json %>">
   <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
     <div class="flex items-center gap-4">
       <h1 class="text-2xl font-bold">Participants</h1>
-      <span class="text-gray-500 text-sm"><%= @participant_events.count %> total</span>
+      <span class="text-gray-500 text-sm"><%= @participant_events.size %> total</span>
     </div>
     <div class="flex items-center gap-2">
       <%= link_to admin_event_participants_path(current_event), class: "px-3 py-1.5 text-gray-600 hover:text-gray-900 text-sm flex items-center gap-1" do %>
@@ -51,7 +52,7 @@
         </svg>
         Filter
         <% if params[:filters].present? %>
-          <span class="bg-[#ec3750] text-white text-xs px-1.5 py-0.5 rounded-full"><%= params[:filters].keys.count %></span>
+          <span class="bg-[#d42f46] text-white text-xs px-1.5 py-0.5 rounded-full"><%= params[:filters].keys.count %></span>
         <% end %>
       </button>
 
@@ -65,7 +66,7 @@
           </svg>
           Group
           <% if @group_by.present? && @group_by != "none" %>
-            <span class="text-[#ec3750]"><%= @group_by.titleize %></span>
+            <span class="text-[#ec3750]"><%= group_by_label(@group_by, @optional_documents) %></span>
           <% end %>
         </button>
         <div class="hidden absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg ring-1 ring-gray-200 z-20"
@@ -78,6 +79,7 @@
             <hr class="my-1">
             <% group_by_options = [ ["status", "Status"], *(current_event.travel_enabled? ? [["travel_mode", "Travel Mode"]] : []), ["tshirt_size", "T-Shirt Size"], ["is_minor", "Minor/Adult"], ["onboarding_complete", "Onboarding"], ["waiver_signed", "Waiver"], ["freedom_waiver_granted", "Freedom Waiver"], ["has_anaphylaxis", "Anaphylaxis Risk"], ["high_support", "High Support"], ["diet_type", "Diet Type"] ] %>
             <% group_by_options << ["group", "Group"] if current_event.groups_enabled? %>
+            <% @optional_documents.each { |doc| group_by_options << ["optional_document:#{doc.id}", doc.name] } %>
             <% group_by_options.each do |value, label| %>
               <button type="button"
                       data-action="click->data-table#groupBy"
@@ -131,6 +133,7 @@
               ["high_support", "High Support"],
               ["freedom", "Freedom Waiver"],
               ["waiver", "Waiver Status"],
+              *@optional_documents.map { |doc| [ "optional_doc_#{doc.id}", doc.name ] },
               ["guardian", "Guardian"],
               ["slack", "Slack"],
               ["onboarding", "Onboarding"],
@@ -174,7 +177,7 @@
           Clear all
         </button>
         <button type="button"
-                class="px-3 py-1.5 bg-[#ec3750] text-white text-sm rounded hover:bg-[#d42f46]"
+                class="px-3 py-1.5 bg-[#d42f46] text-white text-sm rounded hover:bg-[#b82840]"
                 data-action="click->data-table#applyFilters">
           Apply Filters
         </button>
@@ -262,6 +265,12 @@
             <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="high_support">High Sup.</th>
             <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="freedom">Freedom</th>
             <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="waiver">Waiver</th>
+            <% @optional_documents.each do |doc| %>
+              <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap"
+                  data-column="optional_doc_<%= doc.id %>" data-action="click->data-table#sort" data-sort-field="optional_document:<%= doc.id %>">
+                <div class="flex items-center gap-1"><%= doc.name %> <%= render_sort_icon("optional_document:#{doc.id}", @sort_field, @sort_direction) %></div>
+              </th>
+            <% end %>
             <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="guardian">Guardian</th>
             <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="slack">Slack</th>
             <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="onboarding">Onboard.</th>
@@ -278,7 +287,7 @@
           <% if @grouped_participants.present? %>
             <% @grouped_participants.each do |group_name, participants| %>
               <tr class="bg-gray-100 cursor-pointer" data-action="click->data-table#collapseGroup" data-group-id="<%= group_name.to_s.parameterize %>">
-                <td colspan="35" class="px-2 py-2">
+                <td colspan="<%= 35 + @optional_documents.size %>" class="px-2 py-2">
                   <div class="flex items-center gap-2 font-medium text-gray-700">
                     <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -289,12 +298,12 @@
                 </td>
               </tr>
               <% participants.each do |pe| %>
-                <%= render partial: "table_row", locals: { pe: pe, group_id: group_name.to_s.parameterize } %>
+                <%= render partial: "table_row", locals: { pe: pe, group_id: group_name.to_s.parameterize, optional_documents: @optional_documents } %>
               <% end %>
             <% end %>
           <% else %>
             <% @participant_events.each do |pe| %>
-              <%= render partial: "table_row", locals: { pe: pe, group_id: nil } %>
+              <%= render partial: "table_row", locals: { pe: pe, group_id: nil, optional_documents: @optional_documents } %>
             <% end %>
           <% end %>
 

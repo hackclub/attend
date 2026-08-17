@@ -70,7 +70,12 @@ class GuardianParticipantEvent < ApplicationRecord
 
   def self.find_by_invite_token!(token)
     digest = Digest::SHA256.hexdigest(token)
-    record = find_by!(invite_token_digest: digest)
+    # The guardian portal reads guardian, participant_event, participant, and
+    # event on every request. eager_load fetches the whole chain in a single
+    # joined query instead of five sequential lookups; every association is
+    # singular, so the LIMIT 1 stays on the one joined query.
+    record = eager_load(:guardian, participant_event: [ :participant, :event ])
+      .find_by!(invite_token_digest: digest)
     raise ActiveRecord::RecordNotFound, "Invite has expired" if record.invite_expired?
     record
   end

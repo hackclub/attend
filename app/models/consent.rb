@@ -124,6 +124,26 @@ class Consent < ApplicationRecord
     custom_document&.physical? || false
   end
 
+  # Opt-in bookkeeping for optional custom documents. The consent row itself
+  # is the opt-in — a participant who never added the document has no row —
+  # and backing out sets withdrawn_at rather than destroying the row, so a
+  # signature already collected stays on file as a record.
+  def withdrawn?
+    withdrawn_at.present?
+  end
+
+  def withdraw!
+    return if withdrawn?
+
+    update!(withdrawn_at: Time.current)
+  end
+
+  # Re-adding a document the participant previously backed out of. Anything
+  # already signed still counts — there's no reason to make them sign twice.
+  def reinstate!
+    update!(withdrawn_at: nil, opted_in_at: opted_in_at || Time.current)
+  end
+
   def physical_uploaded?
     physical_uploads.attached?
   end

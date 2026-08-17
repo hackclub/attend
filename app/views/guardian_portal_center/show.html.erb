@@ -1,97 +1,99 @@
 <% content_for :title, "Your portals – Attend" %>
 
 <div class="w-full max-w-2xl mx-auto">
-  <div class="bg-white rounded-lg shadow-sm border p-6 mb-8">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      <div class="flex items-center gap-3">
-        <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-          <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-          </svg>
-        </div>
-        <div>
-          <h1 class="text-2xl font-bold text-gray-900">Your portals</h1>
-          <p class="text-gray-600 text-sm">Verified as <%= verified_contact["contact_value"] %></p>
-        </div>
-      </div>
-      <%= button_to "Sign out", guardian_portal_center_session_path, method: :delete,
-            class: "text-sm text-gray-500 hover:text-gray-700 font-medium bg-transparent border border-gray-300 rounded-lg px-3 py-1.5 cursor-pointer" %>
+  <%= render "shared/portal_masthead" %>
+
+  <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+    <div class="min-w-0">
+      <h1 class="portal-title text-2xl mb-2">Your portals</h1>
+      <p class="portal-hint text-sm break-words">
+        Verified as <%= verified_contact["contact_value"] %>
+      </p>
     </div>
+    <%= button_to "Sign out", guardian_portal_center_session_path, method: :delete,
+          class: "portal-btn portal-btn-secondary shrink-0" %>
   </div>
 
   <% if @pending_portals.empty? && @completed_portals.empty? %>
-    <div class="bg-white border rounded-lg p-8 text-center">
-      <h2 class="text-lg font-semibold text-gray-900 mb-2">No portals found</h2>
-      <p class="text-gray-600">
-        We couldn't find any parent or guardian portals linked to this contact. If you were expecting
-        one, the event organizers may have a different email or phone number on file for you — try
-        another, or contact them for help.
+    <div class="portal-card p-6 sm:p-8 text-center">
+      <span class="portal-medallion portal-medallion-neutral mx-auto mb-4">
+        <svg class="size-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/>
+        </svg>
+      </span>
+      <h2 class="portal-heading text-lg mb-2">Nothing linked to this contact</h2>
+      <p class="portal-body mb-6 mx-auto max-w-prose">
+        The event organizers may have a different email or phone number on file for you. Try another, or
+        ask them which one they used.
       </p>
-      <p class="mt-4">
-        <%= link_to "Try a different email or phone number", guardian_portal_center_path, class: "text-blue-600 hover:text-blue-700 font-medium" %>
-      </p>
+      <%= link_to "Try a different email or phone number", guardian_portal_center_path,
+            class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
     </div>
   <% end %>
 
   <% if @pending_portals.any? %>
-    <h2 class="text-lg font-semibold text-gray-900 mb-3">Action needed</h2>
-    <div class="space-y-4 mb-8">
-      <% @pending_portals.each do |gpe| %>
-        <% participant_event = gpe.participant_event %>
-        <% event = participant_event.event %>
-        <div class="bg-white border rounded-lg p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div class="flex items-center gap-2 mb-1">
-              <p class="font-semibold text-gray-900"><%= event.name %></p>
-              <% if gpe.status == "in_progress" %>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">In progress</span>
-              <% else %>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Not started</span>
+    <section class="mb-8" aria-labelledby="pending-heading">
+      <h2 id="pending-heading" class="portal-heading text-lg mb-3">Needs you</h2>
+      <ul class="space-y-3">
+        <% @pending_portals.each do |gpe| %>
+          <% participant_event = gpe.participant_event %>
+          <% event = participant_event.event %>
+          <li class="portal-card p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2 mb-1">
+                <p class="portal-heading text-base"><%= event.name %></p>
+                <% if gpe.status == "in_progress" %>
+                  <span class="portal-badge portal-badge-waiting">In progress</span>
+                <% else %>
+                  <span class="portal-badge portal-badge-pending">Not started</span>
+                <% end %>
+              </div>
+              <p class="portal-body text-sm">For <%= participant_event.participant.full_name %></p>
+              <% if event.starts_at.present? && event.ends_at.present? %>
+                <p class="portal-hint text-sm mt-0.5">
+                  <%= event.starts_at.strftime("%B %-d") %> – <%= event.ends_at.strftime("%B %-d, %Y") %>
+                </p>
               <% end %>
             </div>
-            <p class="text-sm text-gray-600">For <%= participant_event.participant.full_name %></p>
-            <% if event.starts_at.present? && event.ends_at.present? %>
-              <p class="text-sm text-gray-500 mt-0.5">
-                <%= event.starts_at.strftime("%B %-d") %> – <%= event.ends_at.strftime("%B %-d, %Y") %>
-              </p>
-            <% end %>
-          </div>
-          <%= button_to "Open portal", guardian_portal_center_open_path(id: gpe.id),
-                class: "bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap" %>
-        </div>
-      <% end %>
-    </div>
+            <%= button_to "Open portal", guardian_portal_center_open_path(id: gpe.id),
+                  class: "portal-btn portal-btn-primary shrink-0 w-full sm:w-auto" %>
+          </li>
+        <% end %>
+      </ul>
+    </section>
   <% end %>
 
   <% if @completed_portals.any? %>
-    <h2 class="text-lg font-semibold text-gray-900 mb-3">Completed</h2>
-    <div class="space-y-4">
-      <% @completed_portals.each do |gpe| %>
-        <% participant_event = gpe.participant_event %>
-        <% event = participant_event.event %>
-        <div class="bg-white border rounded-lg p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div class="flex items-center gap-2 mb-1">
-              <p class="font-semibold text-gray-900"><%= event.name %></p>
-              <% if participant_event.withdrawn? %>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Withdrawn</span>
-              <% else %>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Complete</span>
+    <section aria-labelledby="completed-heading">
+      <h2 id="completed-heading" class="portal-heading text-lg mb-3">Done</h2>
+      <ul class="space-y-3">
+        <% @completed_portals.each do |gpe| %>
+          <% participant_event = gpe.participant_event %>
+          <% event = participant_event.event %>
+          <li class="portal-card p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2 mb-1">
+                <p class="portal-heading text-base"><%= event.name %></p>
+                <% if participant_event.withdrawn? %>
+                  <span class="portal-badge portal-badge-neutral">Withdrawn</span>
+                <% else %>
+                  <span class="portal-badge portal-badge-done">Complete</span>
+                <% end %>
+              </div>
+              <p class="portal-body text-sm">For <%= participant_event.participant.full_name %></p>
+              <% if gpe.completed_at.present? %>
+                <p class="portal-hint text-sm mt-0.5">Completed <%= gpe.completed_at.strftime("%B %-d, %Y") %></p>
               <% end %>
             </div>
-            <p class="text-sm text-gray-600">For <%= participant_event.participant.full_name %></p>
-            <% if gpe.completed_at.present? %>
-              <p class="text-sm text-gray-500 mt-0.5">Completed <%= gpe.completed_at.strftime("%B %-d, %Y") %></p>
-            <% end %>
-          </div>
-          <%= button_to "View", guardian_portal_center_open_path(id: gpe.id),
-                class: "border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold px-5 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap" %>
-        </div>
-      <% end %>
-    </div>
+            <%= button_to "View", guardian_portal_center_open_path(id: gpe.id),
+                  class: "portal-btn portal-btn-secondary shrink-0 w-full sm:w-auto" %>
+          </li>
+        <% end %>
+      </ul>
+    </section>
   <% end %>
 
-  <p class="text-center text-sm text-gray-500 mt-8">
-    Your verified session lasts one hour. If you have any questions, contact the event organizers.
+  <p class="portal-hint text-sm text-center mt-8">
+    This verified session lasts one hour. Questions? Contact the event organizers.
   </p>
 </div>

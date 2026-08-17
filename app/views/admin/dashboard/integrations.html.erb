@@ -60,7 +60,7 @@
               <%= link_to "Use default template",
                   admin_event_docuseal_template_use_default_path(current_event, "waiver"),
                   data: { turbo_method: :post },
-                  class: "inline-flex items-center px-3 py-1.5 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium rounded-lg transition-colors cursor-pointer" %>
+                  class: "inline-flex items-center px-3 py-1.5 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium rounded-lg transition-colors cursor-pointer" %>
             <% end %>
           </div>
         </div>
@@ -88,7 +88,7 @@
                 <%= link_to "Use default template",
                     admin_event_docuseal_template_use_default_path(current_event, "freedom_waiver"),
                     data: { turbo_method: :post },
-                    class: "inline-flex items-center px-3 py-1.5 bg-[#ec3750] hover:bg-[#d42f46] text-white text-sm font-medium rounded-lg transition-colors cursor-pointer" %>
+                    class: "inline-flex items-center px-3 py-1.5 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium rounded-lg transition-colors cursor-pointer" %>
               <% end %>
             </div>
           </div>
@@ -157,7 +157,11 @@
           <h2 class="font-semibold text-gray-900">Airtable Sync</h2>
           <p class="text-sm text-gray-500">Read-only mirror of participant data via the Sync API</p>
         </div>
-        <% if @airtable_sync_stale %>
+        <% if @airtable_sync_paused %>
+          <span class="ml-auto inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+            Paused
+          </span>
+        <% elsif @airtable_sync_stale %>
           <span class="ml-auto inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
             Stale
           </span>
@@ -202,12 +206,34 @@
 
         <% if @airtable_sync_configured %>
           <!-- Sync Status -->
-          <div class="border <%= @airtable_sync_stale ? "border-red-300 bg-red-50" : "border-gray-200 bg-gray-50" %> rounded-lg p-4">
-            <div class="flex items-center justify-between">
+          <div class="border <%= @airtable_sync_paused ? "border-amber-300 bg-amber-50" : (@airtable_sync_stale ? "border-red-300 bg-red-50" : "border-gray-200 bg-gray-50") %> rounded-lg p-4">
+            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div>
                 <h3 class="font-medium text-gray-900 text-sm">Sync Status</h3>
                 <div class="mt-1 space-y-1">
-                  <% if @airtable_sync_stale %>
+                  <% if @airtable_sync_paused %>
+                    <p class="text-sm text-amber-800 font-medium">
+                      Sync paused after a failure<%= " #{time_ago_in_words(@airtable_sync_paused_at)} ago" if @airtable_sync_paused_at %>
+                    </p>
+                    <p class="text-sm text-amber-700">
+                      Attend stops syncing an event as soon as it fails, rather than retrying
+                      broken settings every 5 minutes.
+                      <% if @airtable_config_owner %>
+                        <%= @airtable_config_owner.name.presence || @airtable_config_owner.email %> was emailed
+                        because they last saved these settings.
+                      <% end %>
+                      Fix the settings above and save, or hit Resume &amp; Sync Now to try again as-is.
+                    </p>
+                    <% if @airtable_synced_at %>
+                      <p class="text-sm text-amber-700">
+                        Airtable still shows the snapshot from
+                        <strong><%= time_ago_in_words(@airtable_synced_at) %> ago</strong>
+                        <span class="font-normal">(<%= @airtable_synced_at.strftime("%b %-d, %Y at %-I:%M %p %Z") %>)</span>.
+                      </p>
+                    <% else %>
+                      <p class="text-sm text-amber-700">This integration has never synced successfully.</p>
+                    <% end %>
+                  <% elsif @airtable_sync_stale %>
                     <p class="text-sm text-red-700 font-medium">
                       <% if @airtable_synced_at %>
                         Sync is failing — last successful sync was <%= time_ago_in_words(@airtable_synced_at) %> ago
@@ -236,13 +262,19 @@
                     </div>
                   <% end %>
                   <p class="text-sm text-gray-500"><%= @airtable_participant_count %> participant records will be synced</p>
-                  <p class="text-xs text-gray-400">Syncs automatically every 5 minutes and whenever these settings are saved</p>
+                  <p class="text-xs text-gray-400">
+                    <% if @airtable_sync_paused %>
+                      Automatic syncing is stopped until these settings are saved again
+                    <% else %>
+                      Syncs automatically every 5 minutes and whenever these settings are saved. A failed sync pauses automatically.
+                    <% end %>
+                  </p>
                 </div>
               </div>
-              <%= button_to "Sync Now",
+              <%= button_to @airtable_sync_paused ? "Resume & Sync Now" : "Sync Now",
                   admin_event_trigger_airtable_sync_path(current_event),
                   method: :post,
-                  class: "bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors" %>
+                  class: "bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors whitespace-nowrap shrink-0 self-start" %>
             </div>
           </div>
         <% end %>
@@ -251,7 +283,7 @@
 
     <!-- Save Button -->
     <div class="flex justify-end">
-      <%= f.submit "Save Integration Settings", class: "bg-[#ec3750] hover:bg-[#d42f46] text-white font-medium py-2 px-4 rounded-lg transition-colors cursor-pointer" %>
+      <%= f.submit "Save Integration Settings", class: "bg-[#d42f46] hover:bg-[#b82840] text-white font-medium py-2 px-4 rounded-lg transition-colors cursor-pointer" %>
     </div>
   <% end %>
 
@@ -280,6 +312,11 @@
                       Physical
                     </span>
                   <% end %>
+                  <% if doc.optional? %>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-700">
+                      Optional
+                    </span>
+                  <% end %>
                   <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
                     <%= doc.signer_type.humanize %>
                   </span>
@@ -293,6 +330,9 @@
                       · <span class="text-green-600">Pre-fill configured</span>
                     <% end %>
                   <% end %>
+                  <% if doc.optional? %>
+                    · <span>Hidden until a participant adds it — <%= pluralize(doc.consents.where(withdrawn_at: nil).count, "participant") %> so far</span>
+                  <% end %>
                 </div>
               </div>
               <div class="flex items-center gap-3 shrink-0">
@@ -305,6 +345,8 @@
                   <%= link_to "Configure Mappings", admin_event_docuseal_template_mappings_path(current_event, doc.mapping_key),
                       class: "text-sm text-indigo-600 hover:text-indigo-800 font-medium" %>
                 <% end %>
+                <%= link_to "Edit", admin_event_custom_document_edit_path(current_event, doc),
+                    class: "text-sm text-indigo-600 hover:text-indigo-800 font-medium" %>
                 <%= button_to "Remove", admin_event_custom_document_path(current_event, doc),
                     method: :delete,
                     data: { turbo_confirm: "Remove \"#{doc.name}\"? Participants will no longer be asked to sign it. Existing signatures are kept." },
@@ -380,16 +422,30 @@
             <p class="text-xs text-gray-500 mt-1">Guardian roles only apply to under-18s — adults sign by themselves, and guardian-only or under-18s-only documents are skipped for them.</p>
           </div>
         </div>
-        <div data-document-kind-target="physical" class="hidden mt-4">
+        <div class="mt-4">
+          <label class="flex items-start gap-3 bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-teal-500 transition-colors has-[:checked]:border-teal-500 has-[:checked]:ring-1 has-[:checked]:ring-teal-500">
+            <%= cd.check_box :optional, class: "mt-0.5 h-4 w-4 rounded accent-teal-600 text-teal-600 focus:ring-teal-500 border-gray-300" %>
+            <span>
+              <span class="block text-sm font-semibold text-gray-900">Optional — participants choose whether to add it</span>
+              <span class="block text-sm text-gray-500 mt-0.5">
+                For opt-in activities like zip lining or a hike. The document stays hidden — including from
+                parents/guardians — until the participant adds it themselves, so nobody is handed a waiver for
+                something their child isn't doing. Once added it must be signed like any other document, and
+                the participant can remove it again if they change their mind.
+              </span>
+            </span>
+          </label>
+        </div>
+        <div class="mt-4">
           <%= cd.label :description, "Description (optional)", class: "block text-sm font-medium text-gray-700 mb-1" %>
           <%= cd.text_area :description, rows: 2,
               class: "block w-full rounded-md border-gray-300 focus:border-teal-500 focus:ring-teal-500 px-3 py-2 text-sm",
-              placeholder: "Shown to participants — e.g. instructions on which sections to fill in" %>
+              placeholder: "Shown to participants — which activity it's for, or which sections to fill in" %>
         </div>
         <div class="flex flex-col sm:flex-row sm:items-center gap-3 mt-4">
           <%= cd.button "Add Document", type: :submit, class: "bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors cursor-pointer shrink-0" %>
           <p class="text-xs text-gray-500">
-            Participants can't complete registration until it's signed.
+            Participants can't complete registration until it's signed — optional ones only once they've added it.
             <span data-document-kind-target="electronic">After adding, use <strong>Configure Mappings</strong> to set up pre-fill.</span>
             <span data-document-kind-target="physical" class="hidden">Participants download the PDF, sign it on paper, and
             upload a photo of the signed form. For under-18s, the parent/guardian then reviews the photo and confirms it's
@@ -470,7 +526,7 @@
             <%= f.text_field :name, placeholder: "attend-integration-name", required: true,
                 class: "flex-1 bg-transparent px-1 py-2 text-sm font-mono focus:outline-none" %>
           </div>
-          <%= f.submit "Create token", class: "bg-[#ec3750] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#d42f46] cursor-pointer" %>
+          <%= f.submit "Create token", class: "bg-[#d42f46] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#b82840] cursor-pointer" %>
         <% end %>
       </div>
 
@@ -539,7 +595,7 @@
         <div class="flex items-center gap-3">
           <% if current_event.vote_event_admin_url.present? %>
             <%= link_to "Manage on vote.hackclub.com", current_event.vote_event_admin_url, target: "_blank", rel: "noopener",
-                class: "bg-[#ec3750] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#d42f46]" %>
+                class: "bg-[#d42f46] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#b82840]" %>
           <% end %>
           <% if current_event.vote_event_gallery_url.present? %>
             <%= link_to "View gallery", current_event.vote_event_gallery_url, target: "_blank", rel: "noopener",
@@ -565,7 +621,7 @@
               method: :post,
               disabled: !vote_ready,
               data: { confirm: "Create a new DRAFT event on vote.hackclub.com for \"#{current_event.name}\"?" },
-              class: "bg-[#ec3750] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#d42f46] disabled:opacity-50 disabled:cursor-not-allowed" %>
+              class: "bg-[#d42f46] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#b82840] disabled:opacity-50 disabled:cursor-not-allowed" %>
         </div>
       <% end %>
     </div>

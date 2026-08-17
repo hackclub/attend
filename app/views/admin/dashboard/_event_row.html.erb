@@ -1,46 +1,41 @@
-<%= link_to admin_event_dashboard_path(event.slug), class: "flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors group #{'border-t border-gray-100' unless first}" do %>
-  <div class="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-    <%= render "admin/events/avatar", event: event, size: 36, rounded: "rounded-lg" %>
-    <div class="flex-1 min-w-0">
-      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 sm:gap-3">
-        <span class="text-sm font-medium text-gray-900 group-hover:text-[#ec3750] transition-colors"><%= event.name %></span>
-        <% if event.completed? %>
-          <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-gray-100 text-gray-500 whitespace-nowrap">Past</span>
-        <% elsif event.active? %>
-          <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-green-50 text-green-700 whitespace-nowrap">Active</span>
-        <% elsif event.starts_at && event.starts_at > Time.current %>
-          <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-blue-50 text-blue-700 whitespace-nowrap">Upcoming</span>
-        <% else %>
-          <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-green-50 text-green-700 whitespace-nowrap">Active</span>
-        <% end %>
-        <% if event.registration_open? %>
-          <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-amber-50 text-amber-700 whitespace-nowrap">Registration Open</span>
-        <% end %>
-        <% unless event.setup_complete? %>
-          <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">Setup incomplete</span>
-        <% end %>
-      </div>
-      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-4 mt-1 text-xs text-gray-500">
-        <span class="flex items-center gap-1 whitespace-nowrap">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-          <% if event.starts_at && event.ends_at %>
-            <%= event.starts_at.strftime("%b %d") %> - <%= event.ends_at.strftime("%b %d, %Y") %>
-          <% else %>
-            Dates not set
+<%# One event inside an events card. Expects an enclosing <ul>. %>
+<%# Locals: event, first (suppresses the top divider) %>
+<% phase_label, phase_class = event_phase_badge(event) %>
+<li class="<%= "border-t border-gray-100" unless first %>">
+  <%= link_to admin_event_dashboard_path(event.slug), class: "flex items-center justify-between px-5 py-4 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#ec3750]/30 transition-colors group" do %>
+    <div class="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+      <%= render "admin/events/avatar", event: event, size: 36, rounded: "rounded-lg" %>
+      <div class="flex-1 min-w-0">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 sm:gap-3">
+          <span class="text-sm font-medium text-gray-900 group-hover:text-[#ec3750] transition-colors"><%= event.name %></span>
+          <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap <%= phase_class %>"><%= phase_label %></span>
+          <% if event.registration_open? %>
+            <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-50 text-amber-700 whitespace-nowrap">Registration Open</span>
           <% end %>
-        </span>
-        <span class="flex items-center gap-1 whitespace-nowrap">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-          <%= event.participants.count %> participants
-        </span>
-        <% if event.location_city.present? %>
-          <span class="flex items-center gap-1 min-w-0">
-            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-            <span class="truncate"><%= [event.location_city, event.location_country].compact.join(", ") %></span>
+          <%# A finished event is never going to have its setup completed, so
+              the nag only belongs on events still ahead of the team. %>
+          <% if !event.completed? && !event.setup_complete? %>
+            <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">Setup incomplete</span>
+          <% end %>
+        </div>
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-4 mt-1 text-xs text-gray-500">
+          <span class="flex items-center gap-1 whitespace-nowrap">
+            <svg class="w-3.5 h-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            <%= event_date_range(event.starts_at, event.ends_at) %>
           </span>
-        <% end %>
+          <span class="flex items-center gap-1 whitespace-nowrap">
+            <svg class="w-3.5 h-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            <%= pluralize(event_participant_count(event), "participant") %>
+          </span>
+          <% if event.location_city.present? %>
+            <span class="flex items-center gap-1 min-w-0">
+              <svg class="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+              <span class="truncate"><%= [ event.location_city, event.location_country ].compact.join(", ") %></span>
+            </span>
+          <% end %>
+        </div>
       </div>
     </div>
-  </div>
-  <svg class="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-<% end %>
+    <svg class="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0 ml-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+  <% end %>
+</li>

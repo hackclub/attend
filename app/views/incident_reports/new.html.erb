@@ -181,13 +181,15 @@
       </div>
 
       <% if TurnstileVerifier.site_key.present? && !user_signed_in? %>
-        <div class="cf-turnstile" data-sitekey="<%= TurnstileVerifier.site_key %>"></div>
+        <div class="cf-turnstile"
+             data-sitekey="<%= TurnstileVerifier.site_key %>"
+             data-action="<%= IncidentReportsController::TURNSTILE_ACTION %>"></div>
       <% end %>
 
       <div>
         <%= f.submit "Submit report",
               data: { incident_report_target: "submit" },
-              class: "w-full sm:w-auto bg-[#ec3750] hover:bg-[#d42f46] text-white font-semibold px-6 py-2.5 rounded-lg transition-colors cursor-pointer" %>
+              class: "w-full sm:w-auto bg-[#d42f46] hover:bg-[#b82840] text-white font-semibold px-6 py-2.5 rounded-lg transition-colors cursor-pointer" %>
       </div>
     </div>
   <% end %>

@@ -293,9 +293,19 @@ def admin_tool(class_name = "", element = "div", **options, &block)
   # Flight-leg times are entered manually. The picker defaults to "Auto", which
   # derives the zone from the leg's airport at save time (see
   # TravelLegDateMerging). Travellers can override with an explicit zone.
+  #
+  # With nothing selected the ~150 option tags are identical, and travel forms
+  # render this select twice per leg, so that markup is built once per request.
+  # A present `selected` value changes the markup and is never cached.
   def travel_leg_time_zone_options(selected = nil)
-    options_for_select([ [ "Auto (airport timezone)", "" ] ], selected.to_s) +
-      time_zone_options_for_select(selected.presence)
+    if selected.present?
+      options_for_select([ [ "Auto (airport timezone)", "" ] ], selected.to_s) +
+        time_zone_options_for_select(selected)
+    else
+      @travel_leg_time_zone_options ||=
+        options_for_select([ [ "Auto (airport timezone)", "" ] ], "") +
+        time_zone_options_for_select(nil)
+    end
   end
 
   # Wall-clock value (YYYY-MM-DDThh:mm) for a stored-UTC leg time, rendered in
@@ -383,6 +393,13 @@ def admin_tool(class_name = "", element = "div", **options, &block)
                   class: "#{dimension_classes} #{base_classes} bg-gray-200 #{text_class} font-medium text-gray-600",
                   title: user.display_name_or_fallback
     end
+  end
+
+  # Whether an attachment can safely be handed to the variant processor. Use it
+  # wherever the attachment doesn't belong to the record in hand (e.g. a logo
+  # inherited from an event series) and there is no `*_displayable?` to call.
+  def variant_safe?(attachment)
+    DecodableImageAttachment.displayable?(attachment)
   end
 
   # HEIC photos (iPhone default) don't render in most browsers — serve a JPEG

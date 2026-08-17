@@ -143,7 +143,7 @@
 
             <% if ds != "Complete" && next_event_is_upcoming %>
               <div class="mt-6 flex flex-wrap gap-2 pointer-events-auto relative z-30">
-                <% waiver_consent = next_event.consents.find_by(consent_type: "waiver") %>
+                <% waiver_consent = next_event.consents.find { |c| c.consent_type == "waiver" } %>
                 <% if waiver_consent&.guardian_signed? && !waiver_consent&.participant_signed? %>
                   <%= link_to "Countersign waiver", onboarding_waiver_path(event_id: next_event.event_id),
                       class: "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-(--text-on-dark) text-(--bg-darker) text-sm font-semibold hover:bg-(--text-on-dark)/90 transition-colors" %>

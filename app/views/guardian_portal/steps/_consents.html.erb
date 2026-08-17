@@ -1,154 +1,151 @@
-<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-  <p class="text-gray-600 mb-6">
-    Please review and sign the following consent forms for <%= @participant.legal_first_name %>'s participation.
-  </p>
+<% first_name = @participant.legal_first_name %>
 
-  <% if @waivers_paused %>
-    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-      <div class="flex items-start gap-3">
-        <svg class="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-        </svg>
-        <div>
-          <h3 class="font-medium text-yellow-800">Waivers are not ready yet</h3>
-          <p class="text-sm text-yellow-700 mt-1">
-            Waiver signing isn't open for this event yet. Everything else you've filled in is saved —
-            we'll email you when the waivers are ready to sign.
-          </p>
-        </div>
-      </div>
+<% if @waivers_paused %>
+  <div class="portal-note portal-note-warn mb-6">
+    <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+    </svg>
+    <div>
+      <h2 class="portal-heading text-sm">Waivers aren't open yet</h2>
+      <p class="portal-body text-sm mt-1">
+        Signing isn't open for this event yet. Everything else you've filled in is saved — we'll email
+        you the moment the waivers are ready.
+      </p>
     </div>
-  <% end %>
+  </div>
+<% end %>
 
-  <% if @required_consent_types.empty? %>
-    <div class="text-center py-8">
-      <svg class="mx-auto h-12 w-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+<% if @required_consent_types.empty? %>
+  <div class="portal-card p-8 text-center">
+    <span class="portal-medallion portal-medallion-success mx-auto mb-4">
+      <svg class="size-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
       </svg>
-      <h3 class="mt-4 text-lg font-medium text-gray-900">No Additional Consents Required</h3>
-      <p class="mt-2 text-gray-500">All required consents have been completed or none are required for this event.</p>
-      <div class="mt-6">
-        <%= link_to "Return to Overview", guardian_portal_path(token: @token), class: "bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium" %>
-      </div>
-    </div>
-  <% else %>
-    <div class="space-y-6">
+    </span>
+    <h2 class="portal-heading text-lg mb-2">Nothing to sign</h2>
+    <p class="portal-body mb-6 mx-auto max-w-prose">
+      This event doesn't need any consent forms from you, or they're already done.
+    </p>
+    <%= link_to "Back to overview", guardian_portal_path(token: @token), class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+  </div>
+<% else %>
+  <section class="portal-card p-5 sm:p-6" aria-labelledby="consents-heading">
+    <h2 id="consents-heading" class="portal-heading text-base mb-1">Forms for this event</h2>
+    <p class="portal-hint text-sm mb-2">
+      Review and sign each one for <%= first_name %>'s participation.
+    </p>
+
+    <ul class="divide-y" style="border-color: var(--border);">
       <% @required_consent_types.each do |consent_type| %>
         <% existing_consent = @consents.find { |c| c.consent_type == consent_type } %>
         <% is_waiver = consent_type == "waiver" %>
         <% is_freedom_waiver = consent_type == "freedom_waiver" %>
         <% is_code_of_conduct = consent_type == "code_of_conduct" %>
         <% is_docuseal = is_waiver || is_freedom_waiver %>
-        <% if is_waiver %>
-          <% is_complete = existing_consent&.signed? %>
-        <% elsif is_freedom_waiver %>
-          <% is_complete = existing_consent&.signed? %>
-        <% elsif is_code_of_conduct %>
-          <% is_complete = @participant_event.code_of_conduct_accepted_at.present? %>
-        <% else %>
-          <% is_complete = existing_consent&.agreed? %>
-        <% end %>
+        <% is_complete = if is_docuseal
+             existing_consent&.signed?
+           elsif is_code_of_conduct
+             @participant_event.code_of_conduct_accepted_at.present?
+           else
+             existing_consent&.agreed?
+           end %>
         <% guardian_signed_waiver = is_waiver && existing_consent&.guardian_signed? && !existing_consent&.signed? %>
-        <div class="border border-gray-200 rounded-lg p-4">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="font-medium text-gray-900"><%= is_code_of_conduct ? "Code of Conduct & Safeguarding" : consent_type.titleize %></h3>
+        <% dom_id = consent_type.parameterize(separator: "_") %>
+
+        <li class="py-5 first:pt-4 last:pb-0">
+          <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 mb-1">
+            <h3 class="portal-heading text-base">
+              <%= is_code_of_conduct ? "Code of Conduct & Safeguarding" : consent_type_label(consent_type) %>
+            </h3>
             <% if is_complete %>
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                Signed
-              </span>
+              <span class="portal-badge portal-badge-done">Signed</span>
             <% elsif guardian_signed_waiver %>
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                Awaiting Student
-              </span>
+              <span class="portal-badge portal-badge-waiting">Waiting on <%= first_name %></span>
             <% else %>
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                Pending
-              </span>
+              <span class="portal-badge portal-badge-pending">Needs you</span>
             <% end %>
           </div>
 
+          <% description = consent_type_description(consent_type) %>
+          <% if description.present? && !is_code_of_conduct %>
+            <p class="portal-hint text-sm mb-3"><%= description %></p>
+          <% end %>
+
           <% if is_code_of_conduct %>
-            <p class="text-sm text-gray-600 mt-2">
-              <%= link_to "Read the Hack Club Code of Conduct", "https://hackclub.com/conduct", target: "_blank", class: "text-blue-600 hover:underline" %>
+            <p class="portal-hint text-sm mb-3">
+              <%= link_to "Read the Hack Club Code of Conduct", "https://hackclub.com/conduct", target: "_blank", rel: "noopener", class: "portal-link" %>
               ·
-              <%= link_to "Safeguarding Policy", "https://hackclub.com/safeguarding", target: "_blank", class: "text-blue-600 hover:underline" %>
+              <%= link_to "Safeguarding Policy", "https://hackclub.com/safeguarding", target: "_blank", rel: "noopener", class: "portal-link" %>
             </p>
             <% if is_complete %>
-              <p class="text-sm text-green-600 mt-2">
-                ✓ <%= @participant.legal_first_name %> agreed to the Code of Conduct &amp; Safeguarding Policy on <%= @participant_event.code_of_conduct_accepted_at.strftime("%B %d, %Y at %I:%M %p") %>
+              <p class="portal-hint text-sm">
+                <%= first_name %> agreed on <%= @participant_event.code_of_conduct_accepted_at.strftime("%B %-d, %Y at %-I:%M %p") %>.
               </p>
             <% else %>
-              <p class="text-sm text-yellow-700 mt-2">
-                Awaiting agreement from <%= @participant.legal_first_name %> during their onboarding.
+              <p class="portal-hint text-sm">
+                <%= first_name %> agrees to this during their own onboarding — nothing for you to do here.
               </p>
             <% end %>
+
           <% elsif is_docuseal %>
             <% if is_complete %>
-              <p class="text-sm text-gray-500 mt-2">
-                <% signed_at = is_waiver ? existing_consent.guardian_signed_at : existing_consent.signed_at %>
-                Signed on <%= signed_at&.strftime("%B %d, %Y at %I:%M %p") %>
-              </p>
+              <% signed_at = is_waiver ? existing_consent.guardian_signed_at : existing_consent.signed_at %>
+              <p class="portal-hint text-sm">Signed on <%= signed_at&.strftime("%B %-d, %Y at %-I:%M %p") %>.</p>
             <% elsif is_waiver && existing_consent&.guardian_signed? %>
-              <%# Guardian signed but waiting for participant %>
-              <p class="text-sm text-green-600 mt-2">
-                ✓ You signed this waiver on <%= existing_consent.guardian_signed_at&.strftime("%B %d, %Y at %I:%M %p") %>
+              <p class="portal-hint text-sm mb-3">
+                You signed on <%= existing_consent.guardian_signed_at&.strftime("%B %-d, %Y at %-I:%M %p") %>.
               </p>
-              <div class="bg-blue-50 border border-blue-200 rounded-md p-3 mt-3">
-                <p class="text-sm text-blue-800">
-                  <strong><%= @participant.legal_first_name %></strong> also needs to sign this waiver.
-                  They can complete their signature by logging into their onboarding portal.
+              <div class="portal-note portal-note-info">
+                <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.852l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/>
+                </svg>
+                <p class="portal-body text-sm">
+                  <strong class="portal-heading"><%= first_name %></strong> also needs to sign this waiver, from
+                  their own onboarding portal.
                 </p>
               </div>
             <% elsif @waivers_paused %>
-              <p class="text-sm text-gray-500 mt-2">Not ready to sign yet — we'll email you when this is available.</p>
+              <p class="portal-hint text-sm">Not open for signing yet — we'll email you when it is.</p>
             <% elsif existing_consent&.docuseal_guardian_slug.present? %>
-              <p class="text-sm text-gray-600 mt-2 mb-4">
-                <% if is_freedom_waiver %>
-                  Decide whether to grant or deny permission for <%= @participant.legal_first_name %> to leave the venue unsupervised.
-                <% else %>
-                  Please sign the waiver form for <%= @participant.legal_first_name %>'s participation.
-                <% end %>
-              </p>
               <% sign_path = is_freedom_waiver ? guardian_portal_freedom_waiver_path(token: @token) : guardian_portal_waiver_path(token: @token) %>
-              <%= link_to (is_freedom_waiver ? "Complete Freedom Waiver" : "Sign Waiver"), sign_path, class: "bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium" %>
+              <%= link_to (is_freedom_waiver ? "Complete the freedom waiver" : "Sign the waiver"), sign_path,
+                    class: "portal-btn portal-btn-primary w-full sm:w-auto mt-1" %>
             <% else %>
-              <p class="text-sm text-gray-500 mt-2">Preparing document...</p>
+              <p class="portal-hint text-sm">Preparing this document — check back in a moment.</p>
             <% end %>
+
           <% elsif !is_complete %>
             <%= form_with url: guardian_portal_update_step_path(token: @token, step: "consents"), method: :patch, local: true, data: { turbo: false } do |f| %>
-              <%= hidden_field_tag "consent[consent_type]", consent_type %>
+              <%= hidden_field_tag "consent[consent_type]", consent_type, id: "consent_type_#{dom_id}" %>
 
-              <div class="mt-4">
-                <div class="flex items-start">
-                  <%= check_box_tag "consent[agreed]", true, false, class: "h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-0.5", required: true %>
-                  <label for="consent_agreed" class="ml-3 text-sm text-gray-700">
-                    I have read and agree to the terms of this consent form.
-                  </label>
+              <div class="space-y-4 mt-3">
+                <label class="portal-check-row" for="agreed_<%= dom_id %>">
+                  <%= check_box_tag "consent[agreed]", true, false, id: "agreed_#{dom_id}", class: "portal-check mt-0.5", required: true %>
+                  <span class="text-sm">I have read and agree to the terms of this form.</span>
+                </label>
+
+                <div>
+                  <%= label_tag "signature_#{dom_id}", label_text("Type your full legal name to sign", required: true), class: "portal-label" %>
+                  <%= text_field_tag "consent[signature]", nil, id: "signature_#{dom_id}", class: "portal-input", required: true, autocomplete: "name", placeholder: @guardian.full_name.presence || "Your full legal name" %>
                 </div>
-              </div>
 
-              <div class="mt-4">
-                <%= label_tag "consent[signature]", "Digital Signature (type your full name)", class: "block text-sm font-medium text-gray-700 mb-1" %>
-                <%= text_field_tag "consent[signature]", nil, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true, placeholder: "Type your full legal name" %>
-              </div>
-
-              <div class="mt-4">
-                <%= submit_tag "Sign Consent", class: "bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium cursor-pointer" %>
+                <button type="submit" class="portal-btn portal-btn-primary w-full sm:w-auto">Sign this form</button>
               </div>
             <% end %>
+
           <% else %>
-            <p class="text-sm text-gray-500 mt-2">
-              Signed by <%= existing_consent.signature %> on <%= existing_consent.created_at.strftime("%B %d, %Y at %I:%M %p") %>
+            <p class="portal-hint text-sm">
+              Signed by <%= existing_consent.signature %> on <%= existing_consent.created_at.strftime("%B %-d, %Y at %-I:%M %p") %>.
             </p>
           <% end %>
-        </div>
+        </li>
       <% end %>
-    </div>
-
-    <div class="pt-6">
-      <%= link_to "Return to Overview", guardian_portal_path(token: @token), class: "bg-gray-200 text-gray-800 px-6 py-2 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 font-medium" %>
-    </div>
-  <% end %>
+    </ul>
+  </section>
 
   <%= render "guardian_portal/custom_documents" %>
-</div>
+
+  <div class="mt-6">
+    <%= link_to "Back to overview", guardian_portal_path(token: @token), class: "portal-btn portal-btn-secondary w-full sm:w-auto" %>
+  </div>
+<% end %>

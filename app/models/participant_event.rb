@@ -27,6 +27,10 @@ class ParticipantEvent < ApplicationRecord
   has_one :room, through: :room_assignment
   has_many :roommate_preferences, dependent: :destroy
   has_many :roommate_exclusions, dependent: :destroy
+  # The other side of the pairing — someone else naming this participant as a
+  # preferred or excluded roommate also holds a foreign key to us.
+  has_many :inbound_roommate_preferences, class_name: "RoommatePreference", foreign_key: :preferred_participant_event_id, dependent: :destroy, inverse_of: :preferred_participant_event
+  has_many :inbound_roommate_exclusions, class_name: "RoommateExclusion", foreign_key: :excluded_participant_event_id, dependent: :destroy, inverse_of: :excluded_participant_event
   has_one :dietary, dependent: :destroy
   has_one :accessibility, dependent: :destroy
   has_one :safeguarding_info, dependent: :destroy
@@ -35,9 +39,13 @@ class ParticipantEvent < ApplicationRecord
   accepts_nested_attributes_for :emergency_contacts, allow_destroy: true, reject_if: :all_blank
 
   has_many :consents, dependent: :destroy
-  has_many :incidents
-  has_many :notes
+  # Incidents and notes outlive the participant's enrolment — they stay on the
+  # event as a safeguarding record — but the join rows pointing at us can't.
+  has_many :incidents, dependent: :nullify
+  has_many :notes, dependent: :nullify
+  has_many :incident_participants, dependent: :destroy
   has_many :scans, dependent: :destroy
+  has_many :slack_blast_recipients, dependent: :destroy
   has_many :message_deliveries, dependent: :destroy
   has_many :group_memberships, dependent: :destroy
   has_many :groups, through: :group_memberships
@@ -88,7 +96,11 @@ class ParticipantEvent < ApplicationRecord
 
 
   def primary_guardian
-    guardian_participant_events.find_by(is_primary_guardian: true)
+    if guardian_participant_events.loaded?
+      guardian_participant_events.find(&:is_primary_guardian)
+    else
+      guardian_participant_events.find_by(is_primary_guardian: true)
+    end
   end
 
   def onboarding_complete?
@@ -133,7 +145,56 @@ class ParticipantEvent < ApplicationRecord
   end
 
   def applicable_custom_documents
-    event.custom_documents.active.order(:created_at).select { |doc| doc.applies_to?(self) }
+    @applicable_custom_documents ||= event.active_custom_documents.select { |doc| doc.applies_to?(self) }
+  end
+
+  # Every optional document on offer to this participant, added or not.
+  # Relevance still applies, so an adult is never offered an under-18s-only
+  # document.
+  def relevant_optional_custom_documents
+    event.active_custom_documents.select { |doc| doc.optional? && doc.relevant_to?(self) }
+  end
+
+  # The "Add and sign" list — on offer but not taken up.
+  def available_optional_custom_documents
+    relevant_optional_custom_documents.reject { |doc| opted_into_custom_document?(doc) }
+  end
+
+  # Whether the participant has taken this optional document up. Once they
+  # have, it behaves exactly like any other document: signable, visible to
+  # their guardian, and blocking until signed.
+  def opted_into_custom_document?(custom_document)
+    consent = custom_document_consent(custom_document)
+    consent.present? && !consent.withdrawn?
+  end
+
+  # Where this participant stands on one optional document, for the admin
+  # table's column, filter, sort and grouping. Reads the consent row that
+  # records the opt-in, so it costs no extra query when consents are
+  # eager-loaded. Keep in sync with Admin::ParticipantsController's SQL
+  # equivalents, which have to answer the same question in the database.
+  def optional_document_state(custom_document)
+    consent = custom_document_consent(custom_document)
+    return :not_added if consent.nil?
+    return :withdrawn if consent.withdrawn?
+
+    consent.signed? ? :signed : :awaiting
+  end
+
+  def custom_document_consent(custom_document)
+    if consents.loaded?
+      consents.find { |c| c.custom_document_id == custom_document.id }
+    else
+      consents.find_by(custom_document_id: custom_document.id)
+    end
+  end
+
+  # Adding or withdrawing a document mid-request invalidates everything
+  # derived from the consent set, none of which #reload touches.
+  def reset_document_memoisation!
+    @applicable_custom_documents = nil
+    @onboarding_progress = nil
+    self
   end
 
   def pending_custom_documents
@@ -201,7 +262,13 @@ class ParticipantEvent < ApplicationRecord
 
   # Returns a hash describing exactly where this participant is in the onboarding process.
   # { steps: [{ name:, done: }], blocking_step: "waiver" | nil }
+  # Memoized: list views compute this several times per row. Reload the record
+  # if consents/travel/etc change mid-request and a fresh answer is needed.
   def onboarding_progress
+    @onboarding_progress ||= compute_onboarding_progress
+  end
+
+  def compute_onboarding_progress
     steps = []
 
     steps << { name: "profile", done: participant.legal_first_name.present? && participant.legal_last_name.present? && participant.date_of_birth.present? }

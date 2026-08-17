@@ -8,7 +8,7 @@ development:
 test:
   adapter: test
 
-production:
+production: &production
   adapter: solid_cable
   connects_to:
     database:
@@ -18,3 +18,6 @@ production:
   # baseline polling load 2.5x vs the previous 0.1s.
   polling_interval: 0.25.seconds
   message_retention: 1.day
+
+staging:
+  <<: *production

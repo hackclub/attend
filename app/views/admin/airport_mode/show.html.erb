@@ -94,7 +94,7 @@
       <div class="flex flex-wrap gap-2 mb-3 items-center text-sm">
         <span class="text-gray-500">Group:</span>
         <%= link_to "All", url_for(request.params.except(:group_id).merge(only_path: true)),
-            class: "px-2.5 py-1 rounded-full border #{@selected_group.nil? ? 'bg-[#ec3750] text-white border-[#ec3750]' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}" %>
+            class: "px-2.5 py-1 rounded-full border #{@selected_group.nil? ? 'bg-[#d42f46] text-white border-[#ec3750]' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}" %>
         <% current_event.groups.ordered.each do |g| %>
           <%= link_to g.name, url_for(request.params.merge(group_id: g.id, only_path: true)),
               class: "px-2.5 py-1 rounded-full border #{@selected_group&.id == g.id ? 'border-transparent text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}",
@@ -178,7 +178,7 @@
     <%# Flat grid sorted earliest → latest %>
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
       <% @journeys.each do |journey| %>
-        <%= render partial: "journey_card", locals: { journey: journey } %>
+        <%= render partial: "journey_card", locals: { journey: journey, participant: @participants_by_id[journey[:participant_id]] } %>
       <% end %>
     </div>
   <% else %>
@@ -198,7 +198,7 @@
           </header>
           <ul class="divide-y divide-gray-100">
             <% journeys.each do |journey| %>
-              <%= render partial: "journey_row", locals: { journey: journey } %>
+              <%= render partial: "journey_row", locals: { journey: journey, participant: @participants_by_id[journey[:participant_id]] } %>
             <% end %>
           </ul>
         </section>

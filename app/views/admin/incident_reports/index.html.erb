@@ -18,7 +18,7 @@
   <div class="flex flex-wrap gap-2 mb-6 text-sm">
     <% nav_link = ->(label, params_hash) {
          active = params_hash.all? { |k, v| params[k].to_s == v.to_s } && (params_hash.any? || params[:priority].blank?)
-         link_to label, admin_incidents_path(params_hash), class: "px-3 py-1.5 rounded-md border #{active ? 'bg-[#ec3750] text-white border-[#ec3750]' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'}"
+         link_to label, admin_incidents_path(params_hash), class: "px-3 py-1.5 rounded-md border #{active ? 'bg-[#d42f46] text-white border-[#ec3750]' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'}"
        } %>
     <%= nav_link.("All priorities", {}) %>
     <%= nav_link.("Emergency only", { priority: "emergency" }) %>
