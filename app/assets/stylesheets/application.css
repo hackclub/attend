@@ -19,3 +19,15 @@
   cursor: pointer !important;
   pointer-events: auto !important;
 }
+
+/* Staging-only chrome. Fixed rather than a border on <body> so it never shifts
+   layout or scrolls away, and pointer-events: none so it cannot swallow clicks
+   at the edges of the viewport. The z-index sits above the Places dropdown
+   (10000) and hackclub.css's stacking (30) so nothing paints over the frame. */
+.staging-frame {
+  position: fixed;
+  inset: 0;
+  border: 3px dashed #ff8c37;
+  pointer-events: none;
+  z-index: 2147483647;
+}
