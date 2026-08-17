@@ -191,6 +191,8 @@ Rails.application.routes.draw do
           delete :reset_waiver
           delete :reset_freedom_waiver
           post :resend_waiver_completion_email
+          post :resend_custom_document
+          delete :reset_custom_document
           get :notes
           get :history
           post :resync_airtable

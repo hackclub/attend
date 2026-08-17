@@ -443,6 +443,49 @@ module Admin
       end
     end
 
+    # Re-issue an electronic custom document: void the stale DocuSeal
+    # submission, put the consent back to pending, and let the normal job build
+    # a fresh one so whoever must sign gets a link that works.
+    def resend_custom_document
+      authorize @participant_event, :reset_waiver?
+
+      custom_document, consent = custom_document_and_consent
+
+      if (error = custom_document_resend_error(custom_document, consent))
+        redirect_to consents_admin_event_participant_path(current_event, @participant_event), alert: error
+        return
+      end
+
+      reissue_custom_document(custom_document, consent)
+
+      redirect_to consents_admin_event_participant_path(current_event, @participant_event),
+        notice: custom_document_resend_notice(custom_document)
+    end
+
+    # The destructive counterpart: throw away an existing signature and issue a
+    # fresh document. Separate from resend so the signature can only ever be
+    # discarded on purpose.
+    def reset_custom_document
+      authorize @participant_event, :reset_waiver?
+
+      custom_document, consent = custom_document_and_consent
+
+      if (error = custom_document_reset_error(custom_document, consent))
+        redirect_to consents_admin_event_participant_path(current_event, @participant_event), alert: error
+        return
+      end
+
+      reissue_custom_document(custom_document, consent)
+
+      # A signature just vanished, so the participant isn't done any more and a
+      # guardian who had finished needs their portal back to sign again.
+      reopen_guardian_portal_access
+      @participant_event.update!(status: :in_progress) if @participant_event.complete?
+
+      redirect_to consents_admin_event_participant_path(current_event, @participant_event),
+        notice: "The previous signature has been discarded. #{custom_document_resend_notice(custom_document)}"
+    end
+
     def notes
       authorize @participant_event, :view_notes?
       @notes = @participant_event.notes.includes(:author).order(created_at: :desc)
@@ -1306,6 +1349,127 @@ module Admin
       else
         ParticipantMailer.waiver_ready(participant_event: @participant_event).deliver_later
       end
+    end
+
+    def custom_document_and_consent
+      custom_document = current_event.custom_documents.find_by(id: params[:custom_document_id])
+      consent = custom_document && @participant_event.consents.find_by(custom_document_id: custom_document.id)
+
+      [ custom_document, consent ]
+    end
+
+    # Void the stale DocuSeal submission, put the consent back to pending, and
+    # let the normal job build a fresh one so whoever must sign gets a working
+    # link. Shared by resend and reset — they differ only in what state they
+    # accept beforehand and what they clean up afterwards.
+    def reissue_custom_document(custom_document, consent)
+      if consent
+        void_docuseal_submission(consent)
+        consent.update!(
+          status: :pending,
+          docuseal_envelope_id: nil,
+          docuseal_participant_slug: nil,
+          docuseal_guardian_slug: nil,
+          docuseal_template_id: nil,
+          participant_signed_at: nil,
+          guardian_signed_at: nil,
+          signed_at: nil,
+          document_url: nil,
+          failure_reason: nil,
+          pending_on: nil,
+          sent_at: nil
+        )
+      else
+        consent = @participant_event.consents.create!(
+          consent_type: :custom_document,
+          custom_document: custom_document
+        )
+      end
+
+      DocusealJobs::CreateCustomDocumentJob.perform_later(consent.id)
+
+      # DocuSeal emails the guardian their link, but participants sign embedded
+      # in Attend and are never emailed by DocuSeal — they need Attend's nudge.
+      if custom_document.participant_signs?
+        ParticipantMailer.new_document_ready(participant_event: @participant_event).deliver_later
+      end
+
+      consent
+    end
+
+    # Everything that makes a resend pointless or harmful, in the order an
+    # admin would hit it. A signed document is a legal record, so discarding
+    # the signature is the separate, explicit reset action.
+    def custom_document_resend_error(custom_document, consent)
+      return "#{quoted(custom_document)} is already signed. Use Reset to discard the signature and issue a new one." if consent&.signed?
+
+      custom_document_sendable_error(custom_document)
+    end
+
+    def custom_document_reset_error(custom_document, consent)
+      return "Document not found for this event." if custom_document.nil?
+
+      unless consent&.signed?
+        return "#{quoted(custom_document)} isn't signed, so there's nothing to reset — use Resend instead."
+      end
+
+      custom_document_sendable_error(custom_document)
+    end
+
+    # Reasons a fresh DocuSeal submission can't be built at all.
+    def custom_document_sendable_error(custom_document)
+      return "Document not found for this event." if custom_document.nil?
+
+      name = quoted(custom_document)
+
+      unless custom_document.electronic?
+        return "#{name} is signed on paper, so it doesn't go through DocuSeal."
+      end
+
+      unless custom_document.applies_to?(@participant_event)
+        return "#{name} doesn't apply to this participant."
+      end
+
+      if custom_document.guardian_signs? && @participant_event.requires_guardian?
+        return "#{name} needs a guardian, and none is on file yet." if resend_guardian.nil?
+        if current_event.guardian_invites_locked?
+          return "Guardian invites are still locked for this event, so #{name} can't be sent yet."
+        end
+      end
+
+      nil
+    end
+
+    def quoted(custom_document)
+      "\"#{custom_document.name}\""
+    end
+
+    def resend_guardian
+      @participant_event.guardian_participant_events.first&.guardian
+    end
+
+    def custom_document_resend_notice(custom_document)
+      name = quoted(custom_document)
+
+      if custom_document.signed_by_guardian?
+        "#{name} has been re-sent — the guardian will be emailed a new signing link."
+      elsif custom_document.guardian_signs? && @participant_event.requires_guardian?
+        "#{name} has been re-sent — the participant has been emailed, and their guardian is emailed their link once the participant signs."
+      else
+        "#{name} has been re-sent — the participant has been emailed a link to sign it."
+      end
+    end
+
+    # Best effort: the point is to stop the old link working, but a DocuSeal
+    # failure mustn't block re-issuing the document.
+    def void_docuseal_submission(consent)
+      return if consent.docuseal_envelope_id.blank?
+
+      Docuseal::Client.for(consent).archive_submission(consent.docuseal_envelope_id)
+    rescue Docuseal::Error => e
+      Rails.logger.warn(
+        "Couldn't archive DocuSeal submission #{consent.docuseal_envelope_id} for consent #{consent.id}: #{e.message}"
+      )
     end
 
     def reopen_guardian_portal_access
