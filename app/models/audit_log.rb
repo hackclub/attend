@@ -29,6 +29,8 @@ class AuditLog < ApplicationRecord
     withdraw: "withdraw",
     unwithdraw: "unwithdraw",
     resend_waiver_completion_email: "resend_waiver_completion_email",
+    resend_custom_document: "resend_custom_document",
+    reset_custom_document: "reset_custom_document",
     update_medical: "update_medical",
     undo_check_in: "undo_check_in",
     update_safeguarding: "update_safeguarding",
