@@ -33,6 +33,104 @@ RSpec.describe "Custom documents", type: :request do
       expect(response).to redirect_to(admin_event_integrations_path(event))
     end
 
+    it "links to the edit page from the integrations list" do
+      doc = create(:custom_document, event: event, name: "Hotel Waiver")
+
+      get admin_event_integrations_path(event)
+
+      expect(response.body).to include(admin_event_custom_document_edit_path(event, doc))
+    end
+
+    it "renders the edit form" do
+      doc = create(:custom_document, event: event, name: "Hotel Waiver")
+
+      get admin_event_custom_document_edit_path(event, doc)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Edit Hotel Waiver")
+      expect(response.body).to include("Who signs?")
+    end
+
+    it "updates the name, description and signer type when nobody has signed" do
+      doc = create(:custom_document, event: event, name: "Hotel Waiver", signer_type: "participant")
+
+      patch admin_event_custom_document_path(event, doc), params: {
+        custom_document: { name: "Hotel Indemnity", description: "Sign page 2", signer_type: "participant_and_guardian" }
+      }
+
+      expect(response).to redirect_to(admin_event_integrations_path(event))
+      expect(doc.reload).to have_attributes(
+        name: "Hotel Indemnity",
+        description: "Sign page 2",
+        signer_type: "participant_and_guardian"
+      )
+    end
+
+    it "keeps the signing setup but still renames once a consent exists" do
+      doc = create(:custom_document, event: event, name: "Hotel Waiver", signer_type: "participant",
+        docuseal_template_id: "1234")
+      create(:consent, :custom_document, custom_document: doc,
+        participant_event: create(:participant_event, event: event))
+
+      patch admin_event_custom_document_path(event, doc), params: {
+        custom_document: { name: "Hotel Waiver (2026)", signer_type: "guardian", docuseal_template_id: "9999" }
+      }
+
+      expect(doc.reload).to have_attributes(
+        name: "Hotel Waiver (2026)",
+        signer_type: "participant",
+        docuseal_template_id: "1234"
+      )
+    end
+
+    it "shows the edit form without the signing fields once a consent exists" do
+      doc = create(:custom_document, event: event)
+      create(:consent, :custom_document, custom_document: doc,
+        participant_event: create(:participant_event, event: event))
+
+      get admin_event_custom_document_edit_path(event, doc)
+
+      expect(response.body).to include("Signing setup is locked")
+      expect(response.body).not_to include("Who signs?")
+    end
+
+    it "drops stale field mappings when the template changes" do
+      doc = create(:custom_document, event: event, docuseal_template_id: "1234")
+      event.update!(docuseal_field_mappings: {
+        doc.mapping_key => { "mappings" => [ { "field_name" => "Name", "source_key" => "participant.full_name" } ] }
+      })
+
+      patch admin_event_custom_document_path(event, doc), params: {
+        custom_document: { name: doc.name, docuseal_template_id: "5678" }
+      }
+
+      expect(doc.reload.docuseal_template_id).to eq("5678")
+      expect(event.reload.docuseal_field_mappings).not_to have_key(doc.mapping_key)
+    end
+
+    it "reopens completed participants when an optional document becomes required" do
+      doc = create(:custom_document, event: event, optional: true)
+
+      expect {
+        patch admin_event_custom_document_path(event, doc), params: {
+          custom_document: { name: doc.name, docuseal_template_id: doc.docuseal_template_id, optional: "0" }
+        }
+      }.to have_enqueued_job(ReopenParticipantsForCustomDocumentsJob).with(event.id)
+
+      expect(doc.reload).not_to be_optional
+    end
+
+    it "rejects an invalid update instead of saving it" do
+      doc = create(:custom_document, event: event, name: "Hotel Waiver")
+
+      patch admin_event_custom_document_path(event, doc), params: {
+        custom_document: { name: "", docuseal_template_id: doc.docuseal_template_id }
+      }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(doc.reload.name).to eq("Hotel Waiver")
+    end
+
     it "destroys a document without consents but archives one with consents" do
       unused = create(:custom_document, event: event)
       used = create(:custom_document, event: event)

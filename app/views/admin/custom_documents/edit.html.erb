@@ -1,0 +1,155 @@
+<% content_for :title, "Edit #{@custom_document.name} – #{current_event.name} – Attend" %>
+<% locked = @custom_document.consents.exists? %>
+
+<div class="max-w-3xl mx-auto px-4 py-6">
+  <!-- Header -->
+  <div class="flex items-center gap-3 mb-1">
+    <%= link_to admin_event_integrations_path(current_event), class: "text-gray-400 hover:text-gray-600" do %>
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+    <% end %>
+    <h1 class="text-2xl font-bold text-gray-900">Edit <%= @custom_document.name %></h1>
+  </div>
+  <p class="text-sm text-gray-500 mb-6">Custom document for <%= current_event.name %></p>
+
+  <%= form_with url: admin_event_custom_document_path(current_event, @custom_document), scope: :custom_document,
+      model: @custom_document, method: :patch, multipart: true,
+      data: { controller: "document-kind" }, class: "bg-white border border-gray-200 rounded-lg p-4" do |cd| %>
+
+    <div>
+      <%= cd.label :name, "Name", class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= cd.text_field :name, required: true,
+          class: "block w-full rounded-md border-gray-300 focus:border-teal-500 focus:ring-teal-500 px-3 py-2 text-sm" %>
+    </div>
+
+    <div class="mt-4">
+      <%= cd.label :description, "Description (optional)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= cd.text_area :description, rows: 2,
+          class: "block w-full rounded-md border-gray-300 focus:border-teal-500 focus:ring-teal-500 px-3 py-2 text-sm",
+          placeholder: "Shown to participants — which activity it's for, or which sections to fill in" %>
+    </div>
+
+    <% if locked %>
+      <!-- Signatures exist: the shape of the document is now a legal record -->
+      <div class="mt-6 border-t border-gray-100 pt-4">
+        <div class="rounded-lg bg-amber-50 border border-amber-200 p-4">
+          <p class="text-sm font-semibold text-amber-800">Signing setup is locked</p>
+          <p class="text-sm text-amber-700 mt-0.5">
+            <%= pluralize(@custom_document.consents.count, "participant") %> already
+            <%= @custom_document.consents.count == 1 ? "has" : "have" %> this document, and their DocuSeal
+            submissions were created against the current setup. Changing who signs it, or which template it
+            uses, would leave those signatures pointing at a document that no longer matches what was signed.
+            Remove this document and add a replacement if the setup itself needs to change — existing
+            signatures are kept.
+          </p>
+        </div>
+        <dl class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+          <div>
+            <dt class="text-gray-500">Type</dt>
+            <dd class="text-gray-900 font-medium mt-0.5"><%= @custom_document.document_kind.humanize %></dd>
+          </div>
+          <div>
+            <dt class="text-gray-500">Who signs</dt>
+            <dd class="text-gray-900 font-medium mt-0.5"><%= @custom_document.signer_type.humanize %></dd>
+          </div>
+          <div>
+            <dt class="text-gray-500"><%= @custom_document.physical? ? "PDF" : "DocuSeal template" %></dt>
+            <dd class="text-gray-900 font-medium mt-0.5">
+              <% if @custom_document.physical? %>
+                <% if @custom_document.template_pdf.attached? %>
+                  <%= link_to "Download", rails_blob_path(@custom_document.template_pdf, disposition: "attachment"),
+                      class: "text-indigo-600 hover:text-indigo-800" %>
+                <% else %>
+                  —
+                <% end %>
+              <% else %>
+                <span class="font-mono">#<%= @custom_document.docuseal_template_id %></span>
+              <% end %>
+            </dd>
+          </div>
+        </dl>
+      </div>
+    <% else %>
+      <fieldset class="mt-6 border-t border-gray-100 pt-4">
+        <legend class="text-sm font-semibold text-gray-900">Document type</legend>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+          <label class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-teal-500 transition-colors has-[:checked]:border-teal-500 has-[:checked]:ring-1 has-[:checked]:ring-teal-500">
+            <div class="flex items-start gap-3">
+              <%= cd.radio_button :document_kind, "electronic",
+                  data: { action: "document-kind#toggle" },
+                  class: "mt-0.5 h-4 w-4 accent-teal-600 text-teal-600 focus:ring-teal-500 border-gray-300" %>
+              <div>
+                <p class="text-sm font-semibold text-gray-900">Electronic</p>
+                <p class="text-sm text-gray-500 mt-0.5">Signed online through DocuSeal, with participant details pre-filled.</p>
+              </div>
+            </div>
+          </label>
+          <label class="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-teal-500 transition-colors has-[:checked]:border-teal-500 has-[:checked]:ring-1 has-[:checked]:ring-teal-500">
+            <div class="flex items-start gap-3">
+              <%= cd.radio_button :document_kind, "physical",
+                  data: { action: "document-kind#toggle" },
+                  class: "mt-0.5 h-4 w-4 accent-teal-600 text-teal-600 focus:ring-teal-500 border-gray-300" %>
+              <div>
+                <p class="text-sm font-semibold text-gray-900">Physical</p>
+                <p class="text-sm text-gray-500 mt-0.5">Downloaded as a PDF, signed on paper, and uploaded as a photo.</p>
+              </div>
+            </div>
+          </label>
+        </div>
+      </fieldset>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+        <div data-document-kind-target="electronic">
+          <%= cd.label :docuseal_template_id, "DocuSeal Template ID", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= cd.text_field :docuseal_template_id, required: true,
+              class: "block w-full rounded-md border-gray-300 focus:border-teal-500 focus:ring-teal-500 px-3 py-2 font-mono text-sm",
+              placeholder: "1234" %>
+          <p class="text-xs text-gray-500 mt-1">Changing this clears the pre-fill mappings — sync the new template's fields afterwards.</p>
+        </div>
+        <div data-document-kind-target="physical" class="hidden">
+          <%= cd.label :template_pdf, "PDF document", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= cd.file_field :template_pdf, accept: "application/pdf", required: !@custom_document.template_pdf.attached?,
+              class: "block w-full text-sm text-gray-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100" %>
+          <p class="text-xs text-gray-500 mt-1">
+            <% if @custom_document.template_pdf.attached? %>
+              Leave empty to keep the
+              <%= link_to "current PDF", rails_blob_path(@custom_document.template_pdf, disposition: "attachment"),
+                  class: "text-indigo-600 hover:text-indigo-800" %>.
+            <% else %>
+              Required for a physical document.
+            <% end %>
+          </p>
+        </div>
+        <div>
+          <%= cd.label :signer_type, "Who signs?", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= cd.select :signer_type,
+              [ [ "Participant", "participant" ], [ "Guardian", "guardian" ],
+                [ "Participant + Guardian", "participant_and_guardian" ],
+                [ "Participant + Guardian, under-18s only", "minor_and_guardian" ] ],
+              {},
+              class: "block w-full rounded-md border-gray-300 focus:border-teal-500 focus:ring-teal-500 px-3 py-2 text-sm" %>
+          <p class="text-xs text-gray-500 mt-1">Guardian roles only apply to under-18s — adults sign by themselves, and guardian-only or under-18s-only documents are skipped for them.</p>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <label class="flex items-start gap-3 bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-teal-500 transition-colors has-[:checked]:border-teal-500 has-[:checked]:ring-1 has-[:checked]:ring-teal-500">
+          <%= cd.check_box :optional, class: "mt-0.5 h-4 w-4 rounded accent-teal-600 text-teal-600 focus:ring-teal-500 border-gray-300" %>
+          <span>
+            <span class="block text-sm font-semibold text-gray-900">Optional — participants choose whether to add it</span>
+            <span class="block text-sm text-gray-500 mt-0.5">
+              The document stays hidden — including from parents/guardians — until the participant adds it
+              themselves. Turning this off makes it required for everyone, which reopens participants who
+              already finished registering.
+            </span>
+          </span>
+        </label>
+      </div>
+    <% end %>
+
+    <div class="flex items-center gap-3 mt-6">
+      <%= cd.button "Save changes", type: :submit, class: "bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors cursor-pointer" %>
+      <%= link_to "Cancel", admin_event_integrations_path(current_event),
+          class: "text-sm text-gray-500 hover:text-gray-700 font-medium" %>
+    </div>
+  <% end %>
+</div>
