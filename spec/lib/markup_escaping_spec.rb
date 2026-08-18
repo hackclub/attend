@@ -164,11 +164,17 @@ RSpec.describe "markup built in JavaScript" do
     path.read(encoding: "UTF-8")
   end
 
-  # Every JS module, plus the inline <script> blocks in ERB views.
+  # Third-party bundles we don't author and can't sensibly rewrite.
+  VENDORED = %r{/vendor/|\Aapp/assets/javascripts/}
+
+  # Every JS file we write — anywhere under app/, not just app/javascript, so a
+  # script parked somewhere else is still covered — plus the inline <script>
+  # blocks in ERB views.
   def self.sources(root)
-    modules = root.glob("app/javascript/**/*.js")
-                  .reject { |path| path.to_s.include?("/vendor/") }
-                  .map { |path| [ path.relative_path_from(root).to_s, read_utf8(path), 0 ] }
+    modules = root.glob("app/**/*.js")
+                  .map { |path| [ path.relative_path_from(root).to_s, path ] }
+                  .reject { |relative_path, _| relative_path.match?(VENDORED) }
+                  .map { |relative_path, path| [ relative_path, read_utf8(path), 0 ] }
 
     inline = root.glob("app/views/**/*.erb").flat_map do |path|
       source = read_utf8(path)
