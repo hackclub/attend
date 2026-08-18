@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { html } from "utils/html"
 
 export default class extends Controller {
   static targets = ["flightCode", "departureDate", "departureAirport", "arrivalAirport", "departureTimeHidden", "arrivalTimeHidden", "timesDisplay", "timesText", "status", "flightPicker"]
@@ -81,7 +82,7 @@ export default class extends Controller {
 
     const airline = data.airline || {}
     const logoHtml = airline.logo_url 
-      ? `<img src="${airline.logo_url}" alt="${airline.name || ''}" class="h-5 inline-block mr-1" onerror="this.style.display='none'">`
+      ? html`<img src="${airline.logo_url}" alt="${airline.name || ''}" class="h-5 inline-block mr-1" onerror="this.style.display='none'">`
       : ""
     const airlineName = airline.name || data.carrier || ""
 
@@ -105,7 +106,7 @@ export default class extends Controller {
             this.hidePicker()
             this.applyFlightData(matchingFlight)
             
-            this.statusTarget.innerHTML = `
+            this.statusTarget.innerHTML = html`
               <div class="flex items-center gap-2 text-green-600">
                 ${logoHtml}
                 <span>✓ <strong>${airlineName}</strong> ${matchingFlight.departure_airport} → ${matchingFlight.arrival_airport}</span>
@@ -124,7 +125,7 @@ export default class extends Controller {
         this.hidePicker()
         this.applyFlightData(data.flights[0] || data)
         
-        this.statusTarget.innerHTML = `
+        this.statusTarget.innerHTML = html`
           <div class="flex items-center gap-2 text-green-600">
             ${logoHtml}
             <span>✓ <strong>${airlineName}</strong> ${data.departure_airport} → ${data.arrival_airport}</span>
@@ -135,7 +136,7 @@ export default class extends Controller {
       }
     } else if (airline.name) {
       this.hidePicker()
-      this.statusTarget.innerHTML = `
+      this.statusTarget.innerHTML = html`
         <div class="flex items-center gap-2 text-blue-600">
           ${logoHtml}
           <span><strong>${airlineName}</strong></span>
@@ -164,7 +165,7 @@ export default class extends Controller {
       this.createPickerElement()
     }
 
-    const pickerHtml = `
+    const pickerHtml = html`
       <div class="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
         <div class="flex items-center gap-2 mb-2 text-amber-700">
           ${logoHtml}
@@ -172,7 +173,7 @@ export default class extends Controller {
         </div>
         <p class="text-sm text-amber-600 mb-3">Which flight are you on?</p>
         <div class="space-y-2">
-          ${flights.map((flight, index) => `
+          ${flights.map((flight, index) => html`
             <button type="button" 
                     class="w-full text-left p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
                     data-action="click->flight-validation#selectFlight"
@@ -190,12 +191,12 @@ export default class extends Controller {
                 </div>
               </div>
             </button>
-          `).join('')}
+          `)}
         </div>
       </div>
     `
 
-    this.flightPickerTarget.innerHTML = pickerHtml
+    this.flightPickerTarget.innerHTML = pickerHtml.toString()
     this.flightPickerTarget.classList.remove("hidden")
 
     // Show a brief status message
@@ -224,7 +225,7 @@ export default class extends Controller {
       this.applyFlightData(flight)
       this.hidePicker()
       
-      this.statusTarget.innerHTML = `
+      this.statusTarget.innerHTML = html`
         <div class="flex items-center gap-2 text-green-600">
           <span>✓ Selected: <strong>${flight.departure_airport} → ${flight.arrival_airport}</strong></span>
         </div>
@@ -288,7 +289,7 @@ export default class extends Controller {
       warning: "text-yellow-600"
     }
 
-    this.statusTarget.innerHTML = message
+    this.statusTarget.textContent = message
     this.statusTarget.className = `text-sm mt-2 ${colors[type] || "text-gray-500"}`
     this.statusTarget.classList.remove("hidden")
   }

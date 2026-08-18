@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { html } from "utils/html"
 
 export default class extends Controller {
   static targets = [
@@ -56,7 +57,7 @@ export default class extends Controller {
   }
 
   addFilter() {
-    const filterHtml = `
+    const filterHtml = html`
       <div class="flex items-center gap-2 p-2 bg-gray-50 rounded-lg filter-row" data-data-table-target="filterRow">
         <select class="border border-gray-300 rounded px-2 py-1 text-sm" data-field data-action="change->data-table#updateFilterOptions">
           <option value="">Select field...</option>
@@ -88,8 +89,8 @@ export default class extends Controller {
           <optgroup label="Check-In">
             <option value="scan_context">Scan Context</option>
           </optgroup>
-          ${this.groupsValue.length ? `<optgroup label="Groups"><option value="group">Group</option></optgroup>` : ""}
-          ${this.optionalDocumentsValue.length ? `<optgroup label="Optional Documents"><option value="optional_document">Optional Document</option></optgroup>` : ""}
+          ${this.groupsValue.length ? html`<optgroup label="Groups"><option value="group">Group</option></optgroup>` : ""}
+          ${this.optionalDocumentsValue.length ? html`<optgroup label="Optional Documents"><option value="optional_document">Optional Document</option></optgroup>` : ""}
         </select>
         <select class="border border-gray-300 rounded px-2 py-1 text-sm" data-operator>
           <option value="is">is</option>
@@ -106,7 +107,7 @@ export default class extends Controller {
         </button>
       </div>
     `
-    this.filterListTarget.insertAdjacentHTML("beforeend", filterHtml)
+    this.filterListTarget.insertAdjacentHTML("beforeend", filterHtml.toString())
   }
 
   updateFilterOptions(event) {
@@ -200,8 +201,8 @@ export default class extends Controller {
       `
     } else if (selectFields[field]) {
       operatorSelect.innerHTML = '<option value="is">is</option><option value="is_not">is not</option>'
-      const options = selectFields[field].map(([val, label]) => `<option value="${val}">${label}</option>`).join("")
-      valueContainer.innerHTML = `
+      const options = selectFields[field].map(([val, label]) => html`<option value="${val}">${label}</option>`)
+      valueContainer.innerHTML = html`
         <select class="border border-gray-300 rounded px-2 py-1 text-sm" data-value>
           ${options}
         </select>

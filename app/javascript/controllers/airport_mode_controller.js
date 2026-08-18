@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { html } from "utils/html"
 
 export default class extends Controller {
   static targets = ["map"]
@@ -54,7 +55,7 @@ export default class extends Controller {
 
       L.marker([eventLocation.lat, eventLocation.lon], { icon: venueIcon })
         .addTo(this.map)
-        .bindPopup(`<strong>${eventName}</strong><br>Event Venue`)
+        .bindPopup(html`<strong>${eventName}</strong><br>Event Venue`.toString())
 
       allCoords.push([eventLocation.lat, eventLocation.lon])
     }
@@ -116,32 +117,34 @@ export default class extends Controller {
     }, 100)
   }
 
+  // Leaflet parses popup content as HTML, so everything here has to be escaped
+  // — the flight code and participant name are participant-supplied.
   buildFlightPopup(flight) {
-    let html = `<div style="min-width: 160px;">`
-    html += `<strong>${flight.flight_code}</strong>`
+    let markup = `<div style="min-width: 160px;">`
+    markup += html`<strong>${flight.flight_code}</strong>`
 
     if (flight.status_label) {
-      html += ` <span style="font-size: 11px; color: #666;">${flight.status_label}</span>`
+      markup += html` <span style="font-size: 11px; color: #666;">${flight.status_label}</span>`
     }
 
-    html += `<br><span style="color: #666; font-size: 12px;">${flight.participant_name}</span>`
+    markup += html`<br><span style="color: #666; font-size: 12px;">${flight.participant_name}</span>`
 
-    html += `<div style="margin-top: 6px; font-size: 12px;">`
-    html += `${flight.departure_airport} → ${flight.arrival_airport}`
-    html += `</div>`
+    markup += `<div style="margin-top: 6px; font-size: 12px;">`
+    markup += html`${flight.departure_airport} → ${flight.arrival_airport}`
+    markup += `</div>`
 
     if (flight.predicted_arrival || flight.scheduled_arrival) {
       const time = flight.predicted_arrival || flight.scheduled_arrival
       const label = flight.status?.includes?.("Arrived") ? "Arrived" : "ETA"
       try {
         const formatted = new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-        html += `<div style="margin-top: 4px; font-size: 11px; color: #666;">${label}: ${formatted}</div>`
+        markup += html`<div style="margin-top: 4px; font-size: 11px; color: #666;">${label}: ${formatted}</div>`
       } catch (e) {
         // ignore
       }
     }
 
-    html += `</div>`
-    return html
+    markup += `</div>`
+    return markup
   }
 }

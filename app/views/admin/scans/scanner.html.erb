@@ -222,6 +222,46 @@
 </div>
 
 <script>
+// Mirror of app/javascript/utils/html.js, inlined because this is a classic
+// script and can't import from the importmap. Participant names, group labels
+// and scan context names are all user-controlled, so every template literal
+// that becomes markup here is tagged `html` and escapes its interpolations.
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/[&<>"'`=]/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+    "'": '&#39;', '`': '&#96;', '=': '&#61;'
+  })[char]);
+}
+
+// Marks a string as markup we built ourselves, so `html` inlines it as-is.
+function safeMarkup(value) {
+  return Object.assign(Object.create(safeMarkup.prototype), { value: String(value) });
+}
+safeMarkup.prototype.toString = function() { return this.value; };
+
+function html(strings, ...values) {
+  return safeMarkup(values.reduce((out, value, i) => {
+    let piece;
+    if (value instanceof safeMarkup) piece = value.value;
+    else if (Array.isArray(value)) piece = value.map((v) => html`${v}`.value).join('');
+    else if (value === null || value === undefined || value === false) piece = '';
+    else piece = escapeHtml(value);
+    return out + piece + strings[i + 1];
+  }, strings[0]));
+}
+
+// Groups are admin-created but their colour still lands in a style attribute,
+// so only accept the 6-digit hex the model validates and fall back otherwise.
+function safeHexColor(value) {
+  return /^#?[0-9a-fA-F]{6}$/.test(String(value || '')) ? String(value) : null;
+}
+
+function groupBadgeHtml(group, fallbackColor) {
+  const color = safeHexColor(group.color);
+  return html`<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium" style="background-color: ${color || fallbackColor}; color: ${color ? 'white' : '#1f2d3d'};">${group.name}</span>`;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   const scanUrl = '<%= admin_event_scans_path(current_event) %>';
   const searchUrl = '<%= search_admin_event_scans_path(current_event) %>';
@@ -410,7 +450,7 @@ document.addEventListener('DOMContentLoaded', function() {
       // Populate the camera picker
       const select = document.getElementById('camera-select');
       select.innerHTML = cameras
-        .map((c, i) => `<option value="${c.deviceId}">${c.label || `Camera ${i + 1}`}</option>`)
+        .map((c, i) => html`<option value="${c.deviceId}">${c.label || `Camera ${i + 1}`}</option>`)
         .join('');
 
       // Pick a sensible default: remembered choice, else a back/rear camera, else last device
@@ -488,14 +528,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (data.results.length === 0) {
           searchResults.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500">No participants found</div>';
         } else {
-          searchResults.innerHTML = data.results.map(p => `
+          searchResults.innerHTML = data.results.map(p => html`
             <div class="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0 search-result" 
                  data-participant-id="${p.id}">
               <div class="flex justify-between items-center">
                 <div>
                   <p class="font-medium text-sm">${p.display_name}</p>
                   <p class="text-xs text-gray-500">ID: ${p.short_id}</p>
-                  ${(p.groups && p.groups.length) ? `<div class="flex flex-wrap gap-1 mt-1">${p.groups.map(g => `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium" style="background-color: ${g.color || '#e5e7eb'}; color: ${g.color ? 'white' : '#1f2d3d'};">${g.name}</span>`).join('')}</div>` : ''}
+                  ${(p.groups && p.groups.length) ? html`<div class="flex flex-wrap gap-1 mt-1">${p.groups.map(g => groupBadgeHtml(g, '#e5e7eb'))}</div>` : ''}
                 </div>
                 <span class="text-xs px-2 py-1 rounded-full ${p.status === 'complete' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
                   ${p.status.replace('_', ' ')}
@@ -564,7 +604,7 @@ function showParticipantModal(data, scanContext, firstScan) {
   const groupsEl = document.getElementById('modal-groups');
   if (groupsEl) {
     groupsEl.innerHTML = (data.groups && data.groups.length)
-      ? data.groups.map(g => `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium" style="background-color: ${g.color || '#ffffff'}; color: ${g.color ? 'white' : '#1f2d3d'};">${g.name}</span>`).join('')
+      ? data.groups.map(g => groupBadgeHtml(g, '#ffffff')).join('')
       : '';
   }
   document.getElementById('modal-status').textContent = data.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -664,8 +704,8 @@ function addToRecentScans(participant, scanContext, scannedBy) {
   const emptyMessage = container.querySelector('.text-center.py-8');
   if (emptyMessage) emptyMessage.remove();
 
-  const contextInfo = scanContext?.name ? `<span class="text-gray-400">@ ${scanContext.name}</span>` : '';
-  const scanHtml = `
+  const contextInfo = scanContext?.name ? html`<span class="text-gray-400">@ ${scanContext.name}</span>` : '';
+  const scanHtml = html`
     <div class="flex items-center justify-between border-b border-gray-100 pb-3 bg-green-50 -mx-2 px-2 rounded transition-colors">
       <div class="min-w-0 flex-1 mr-2">
         <p class="font-medium text-sm truncate">${participant.display_name}</p>
@@ -675,7 +715,7 @@ function addToRecentScans(participant, scanContext, scannedBy) {
       <a href="${participant.show_url}" class="text-xs text-[#ec3750] hover:text-blue-800">View</a>
     </div>
   `;
-  container.insertAdjacentHTML('afterbegin', scanHtml);
+  container.insertAdjacentHTML('afterbegin', scanHtml.toString());
 
   setTimeout(() => {
     const firstChild = container.firstElementChild;

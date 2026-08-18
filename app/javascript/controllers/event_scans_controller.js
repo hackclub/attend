@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import consumer from "channels/consumer"
+import { html } from "utils/html"
 
 export default class extends Controller {
   static values = { eventId: String }
@@ -25,7 +26,7 @@ export default class extends Controller {
       this.emptyTarget.remove()
     }
 
-    const scanHtml = `
+    const scanHtml = html`
       <div class="flex items-center justify-between border-b border-gray-100 pb-3 bg-green-50 -mx-2 px-2 rounded transition-colors" data-scan-id="${data.scan_id}">
         <div>
           <p class="font-medium text-sm">${data.participant.display_name}</p>
@@ -35,10 +36,10 @@ export default class extends Controller {
       </div>
     `
 
-    this.scansTarget.insertAdjacentHTML("afterbegin", scanHtml)
+    this.scansTarget.insertAdjacentHTML("afterbegin", scanHtml.toString())
 
     setTimeout(() => {
-      const newScan = this.scansTarget.querySelector(`[data-scan-id="${data.scan_id}"]`)
+      const newScan = this.scansTarget.querySelector(`[data-scan-id="${CSS.escape(data.scan_id)}"]`)
       if (newScan) newScan.classList.remove("bg-green-50")
     }, 2000)
 

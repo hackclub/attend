@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { html } from "utils/html"
 
 export default class extends Controller {
   static targets = ["input", "city", "state", "postalCode", "country"]
@@ -131,7 +132,7 @@ export default class extends Controller {
     this.predictions = predictions
     this.selectedIndex = -1
 
-    this.dropdown.innerHTML = predictions.map((p, i) => `
+    this.dropdown.innerHTML = predictions.map((p, i) => html`
       <div class="px-3 py-2 cursor-pointer hover:bg-blue-50 text-sm" data-index="${i}">
         ${p.description}
       </div>
