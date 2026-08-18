@@ -23,11 +23,18 @@ Rails.application.configure do
     policy.form_action :self, *docuseal_origins
   end
 
-  # Generate session nonces for permitted importmap and inline scripts.
-  config.content_security_policy_nonce_generator = ->(request) { request.session.id.to_s }
+  # A fresh nonce per response for the importmap and our inline scripts. Not
+  # the session id: that's stable for the life of the session, so it would be
+  # reusable by an injected script and would sit in the page markup on every
+  # render. Nothing here caches HTML, so per-response costs us nothing.
+  config.content_security_policy_nonce_generator = ->(_request) { SecureRandom.base64(16) }
   config.content_security_policy_nonce_directives = %w[script-src]
 
-  # Report violations without enforcing the policy initially.
-  # Set to false once you've verified the policy works correctly.
-  config.content_security_policy_report_only = true
+  # Enforced, not report-only. script-src has no `unsafe-inline`, so injected
+  # markup can't run: an <img onerror=...> smuggled into a participant's name
+  # is inert even if some future template forgets to escape it. Keeping this
+  # true means no inline <script> without a nonce and no inline event
+  # handlers anywhere — spec/requests/content_security_policy_spec.rb checks
+  # both on every render.
+  config.content_security_policy_report_only = false
 end

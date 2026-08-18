@@ -164,7 +164,7 @@
           <div id="modal-groups" class="flex flex-wrap gap-1 mt-1"></div>
           <p class="text-blue-200 text-xs mt-1" id="modal-context-name"></p>
         </div>
-        <button onclick="closeModal()" class="text-white/70 hover:text-white text-2xl leading-none min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2">&times;</button>
+        <button data-close-participant-modal class="text-white/70 hover:text-white text-2xl leading-none min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2">&times;</button>
       </div>
     </div>
     
@@ -204,13 +204,13 @@
         <a id="modal-view-link" href="#" class="flex-1 bg-[#d42f46] text-white px-4 py-3 sm:py-2 rounded-lg text-center hover:bg-[#b82840] font-medium min-h-[44px] flex items-center justify-center">
           View Full Profile
         </a>
-        <button onclick="closeModal()" class="flex-1 bg-gray-100 text-gray-700 px-4 py-3 sm:py-2 rounded-lg hover:bg-gray-200 font-medium min-h-[44px]">
+        <button data-close-participant-modal class="flex-1 bg-gray-100 text-gray-700 px-4 py-3 sm:py-2 rounded-lg hover:bg-gray-200 font-medium min-h-[44px]">
           Scan Next
         </button>
       </div>
       <% if current_event.nfc_badges_enabled? %>
       <div id="modal-nfc-section" class="mt-4 pt-4 border-t border-gray-200 hidden">
-        <button id="modal-write-nfc-btn" onclick="triggerNfcWriteFromModal()" class="w-full bg-purple-600 text-white px-4 py-3 sm:py-2 rounded-lg hover:bg-purple-700 font-medium min-h-[44px] flex items-center justify-center gap-2">
+        <button id="modal-write-nfc-btn" class="w-full bg-purple-600 text-white px-4 py-3 sm:py-2 rounded-lg hover:bg-purple-700 font-medium min-h-[44px] flex items-center justify-center gap-2">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
           <span id="modal-nfc-btn-text">Write NFC Badge</span>
         </button>
@@ -221,7 +221,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="<%= content_security_policy_nonce %>">
 // Mirror of app/javascript/utils/html.js, inlined because this is a classic
 // script and can't import from the importmap. Participant names, group labels
 // and scan context names are all user-controlled, so every template literal
@@ -730,6 +730,16 @@ function updateScanCount() {
 
 document.getElementById('participant-modal').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
+});
+
+document.querySelectorAll('[data-close-participant-modal]').forEach((el) => {
+  el.addEventListener('click', closeModal);
+});
+
+// triggerNfcWriteFromModal is defined further down, inside the NFC block that
+// only renders when the event has badges enabled — so bind at click time.
+document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => {
+  triggerNfcWriteFromModal();
 });
 
 // NFC Bridge Integration

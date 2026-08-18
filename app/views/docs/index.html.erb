@@ -12,7 +12,7 @@
     <%# Scalar reads the OpenAPI document from data-url and renders the whole page.
         The reference bundle is vendored (app/assets/javascripts) and served
         same-origin rather than from a CDN. %>
-    <script
+    <script nonce="<%= content_security_policy_nonce %>"
       id="api-reference"
       data-url="<%= docs_openapi_path(format: :json) %>"
       data-configuration='<%= { theme: "default", layout: "modern" }.to_json %>'></script>

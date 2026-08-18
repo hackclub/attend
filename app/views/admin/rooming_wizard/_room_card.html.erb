@@ -12,7 +12,6 @@
           </h3>
         <% else %>
           <h3 class="font-medium text-gray-900 truncate hover:bg-white hover:px-1 hover:rounded cursor-text room-name-display"
-              onclick="startEditRoomName(event, '<%= room.id %>')"
               title="Click to rename">
             <%= room.display_name %>
           </h3>
@@ -20,9 +19,7 @@
                  class="hidden border border-gray-300 rounded px-2 py-0.5 text-sm font-medium room-name-input"
                  value="<%= room.name %>"
                  placeholder="Room name"
-                 onblur="saveRoomName('<%= room.id %>', this.value)"
-                 onkeydown="handleRoomNameKey(event, '<%= room.id %>')"
-                 onclick="event.stopPropagation()">
+                 >
         <% end %>
         <span class="text-sm text-gray-500">
           (<%= room.total_occupancy %>/<%= room.capacity %>)
@@ -50,7 +47,7 @@
           <% end %>
         <% end %>
         <% unless @rooming_plan.locked? %>
-          <button type="button" onclick="if(confirm('Delete this room?')) { deleteRoom('<%= room.id %>') }" class="text-red-500 hover:text-red-700 text-sm">
+          <button type="button" data-delete-room="<%= room.id %>" class="text-red-500 hover:text-red-700 text-sm">
             &times;
           </button>
         <% end %>
@@ -73,7 +70,7 @@
           </div>
           <% unless @rooming_plan.locked? %>
             <button type="button" 
-                    onclick="removeStaff('<%= room.id %>', '<%= j(staff_name) %>')"
+                    data-remove-staff="<%= room.id %>" data-staff-name="<%= staff_name %>"
                     class="text-orange-500 hover:text-orange-700 text-sm">
               &times;
             </button>
@@ -122,7 +119,7 @@
         <% if assignment.trans_nb_flagged? && !assignment.trans_nb_acknowledged && room.room_assignments.size >= 2 %>
           <div class="mt-2 p-2 bg-purple-50 rounded text-xs">
             <p class="text-purple-700 mb-1">Trans/NB pairing requires acknowledgment</p>
-            <button type="button" onclick="acknowledgeTransNb('<%= assignment.id %>')" class="text-purple-600 hover:text-purple-800 underline">
+            <button type="button" data-acknowledge-trans-nb="<%= assignment.id %>" class="text-purple-600 hover:text-purple-800 underline">
               Mark as acknowledged
             </button>
           </div>
@@ -137,7 +134,7 @@
         <% unless @rooming_plan.locked? %>
           <p class="text-xs text-gray-400">or</p>
           <button type="button" 
-                  onclick="showAddStaffModal('<%= room.id %>')"
+                  data-add-staff-room="<%= room.id %>"
                   class="inline-flex items-center px-3 py-1.5 border border-orange-300 text-sm font-medium rounded-md text-orange-700 bg-orange-50 hover:bg-orange-100">
             + Add Staff
           </button>
@@ -145,7 +142,7 @@
       </div>
     <% elsif room.has_staff? && room.remaining_capacity > 0 && !@rooming_plan.locked? %>
       <button type="button" 
-              onclick="showAddStaffModal('<%= room.id %>')"
+              data-add-staff-room="<%= room.id %>"
               class="w-full inline-flex items-center justify-center px-3 py-1.5 border border-dashed border-orange-300 text-sm font-medium rounded-md text-orange-600 hover:bg-orange-50">
         + Add Another Staff (<%= room.remaining_capacity %> spots left)
       </button>
@@ -153,7 +150,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="<%= content_security_policy_nonce %>">
 async function deleteRoom(roomId) {
   await fetch('<%= destroy_room_admin_event_rooming_wizard_path(@event.slug) %>', {
     method: 'DELETE',
@@ -247,5 +244,54 @@ async function saveRoomName(roomId, name) {
   } else {
     alert('Failed to rename room');
   }
+}
+
+// This partial renders once per room, so the script block repeats. Delegate
+// from document and install only once, which also survives the Turbo Stream
+// re-renders above replacing the cards.
+if (!window.roomCardHandlersInstalled) {
+  window.roomCardHandlersInstalled = true;
+
+  const roomIdOf = (el) => el.closest('[data-room-id]')?.dataset.roomId;
+
+  document.addEventListener('click', (event) => {
+    const deleteButton = event.target.closest('[data-delete-room]');
+    if (deleteButton) {
+      if (confirm('Delete this room?')) deleteRoom(deleteButton.dataset.deleteRoom);
+      return;
+    }
+
+    const removeStaffButton = event.target.closest('[data-remove-staff]');
+    if (removeStaffButton) {
+      removeStaff(removeStaffButton.dataset.removeStaff, removeStaffButton.dataset.staffName);
+      return;
+    }
+
+    const acknowledgeButton = event.target.closest('[data-acknowledge-trans-nb]');
+    if (acknowledgeButton) {
+      acknowledgeTransNb(acknowledgeButton.dataset.acknowledgeTransNb);
+      return;
+    }
+
+    const addStaffButton = event.target.closest('[data-add-staff-room]');
+    if (addStaffButton) {
+      showAddStaffModal(addStaffButton.dataset.addStaffRoom);
+      return;
+    }
+
+    const nameDisplay = event.target.closest('.room-name-display');
+    if (nameDisplay) startEditRoomName(event, roomIdOf(nameDisplay));
+  });
+
+  // focusout rather than blur: blur doesn't bubble, so it never reaches document.
+  document.addEventListener('focusout', (event) => {
+    const input = event.target.closest('.room-name-input');
+    if (input) saveRoomName(roomIdOf(input), input.value);
+  });
+
+  document.addEventListener('keydown', (event) => {
+    const input = event.target.closest('.room-name-input');
+    if (input) handleRoomNameKey(event, roomIdOf(input));
+  });
 }
 </script>

@@ -420,7 +420,7 @@
                           src="https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/<%= iata_code %>.svg"
                           alt="<%= iata_code %>"
                           class="size-10 object-contain bg-white rounded-lg p-1"
-                          onerror="this.style.display='none'"
+                          data-controller="image-fallback"
                         >
                       <% end %>
                     <% end %>

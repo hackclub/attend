@@ -81,8 +81,10 @@ export default class extends Controller {
     if (!this.hasStatusTarget) return
 
     const airline = data.airline || {}
+    // data-controller rather than onerror="...": inline handlers are blocked by
+    // the Content-Security-Policy, and this markup goes through innerHTML.
     const logoHtml = airline.logo_url 
-      ? html`<img src="${airline.logo_url}" alt="${airline.name || ''}" class="h-5 inline-block mr-1" onerror="this.style.display='none'">`
+      ? html`<img src="${airline.logo_url}" alt="${airline.name || ''}" class="h-5 inline-block mr-1" data-controller="image-fallback">`
       : ""
     const airlineName = airline.name || data.carrier || ""
 
