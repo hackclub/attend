@@ -87,6 +87,17 @@ RSpec.describe "Content Security Policy", type: :request do
     it "the sign-in page is clean" do
       expect_csp_clean(root_path, inline_scripts: LAYOUT_INLINE_SCRIPTS)
     end
+
+    # The sign-in button posts to /users/auth/hack_club, which redirects to
+    # HCA. form-action is enforced across the redirect, so dropping the OAuth
+    # host here blocks sign-in entirely with nothing on the server side to show
+    # for it.
+    it "allows the HCA OAuth host in form-action" do
+      get root_path
+
+      form_action = response.headers["Content-Security-Policy"][/form-action[^;]*/]
+      expect(form_action).to include("https://auth.hackclub.com")
+    end
   end
 
   describe "admin pages" do
