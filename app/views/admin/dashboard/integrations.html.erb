@@ -345,6 +345,8 @@
                   <%= link_to "Configure Mappings", admin_event_docuseal_template_mappings_path(current_event, doc.mapping_key),
                       class: "text-sm text-indigo-600 hover:text-indigo-800 font-medium" %>
                 <% end %>
+                <%= link_to "Edit", admin_event_custom_document_edit_path(current_event, doc),
+                    class: "text-sm text-indigo-600 hover:text-indigo-800 font-medium" %>
                 <%= button_to "Remove", admin_event_custom_document_path(current_event, doc),
                     method: :delete,
                     data: { turbo_confirm: "Remove \"#{doc.name}\"? Participants will no longer be asked to sign it. Existing signatures are kept." },
