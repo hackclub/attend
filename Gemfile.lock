@@ -85,7 +85,7 @@ GEM
       base64
       connection_pool (>= 2, < 4)
       net-http2 (>= 0.18.3, < 2)
-    appsignal (4.9.0)
+    appsignal (4.9.1)
       logger
       rack (>= 2.0.0)
     ast (2.4.3)
