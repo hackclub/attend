@@ -80,7 +80,7 @@
                    value="<%= room.name %>" 
                    placeholder="Room #"
                    class="block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] text-sm"
-                   onchange="updateRoomName('<%= room.id %>', this.value)">
+                   data-update-room-name="<%= room.id %>">
           </div>
           <div class="flex-1">
             <div class="flex flex-wrap gap-2">
@@ -132,7 +132,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="<%= content_security_policy_nonce %>">
 async function updateRoomName(roomId, name) {
   const formData = new FormData();
   formData.append('room_id', roomId);
@@ -146,4 +146,8 @@ async function updateRoomName(roomId, name) {
     body: formData
   });
 }
+
+document.querySelectorAll('[data-update-room-name]').forEach((input) => {
+  input.addEventListener('change', () => updateRoomName(input.dataset.updateRoomName, input.value));
+});
 </script>

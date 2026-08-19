@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import consumer from "channels/consumer"
+import { html } from "utils/html"
 
 export default class extends Controller {
   static values = { importBatchId: String }
@@ -79,9 +80,9 @@ export default class extends Controller {
         this.errorsListTarget.innerHTML = data.errors.map(error => {
           if (error.row) {
             const emailPart = error.email ? ` (${error.email})` : ""
-            return `<li>Row ${error.row}${emailPart}: ${error.error}</li>`
+            return html`<li>Row ${error.row}${emailPart}: ${error.error}</li>`
           } else {
-            return `<li>${error.email}: ${error.error}</li>`
+            return html`<li>${error.email}: ${error.error}</li>`
           }
         }).join("")
       }

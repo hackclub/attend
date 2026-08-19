@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { html } from "utils/html"
 
 export default class extends Controller {
   static targets = ["content", "chevron"]
@@ -18,7 +19,7 @@ export default class extends Controller {
   expand() {
     this.expandedValue = true
     const journey = this.journeyValue
-    this.contentTarget.innerHTML = this.buildExpandedContent(journey)
+    this.contentTarget.innerHTML = this.buildExpandedContent(journey).toString()
     this.contentTarget.classList.remove("hidden")
     if (this.hasChevronTarget) {
       this.chevronTarget.querySelector('svg').classList.add('rotate-180')
@@ -38,9 +39,9 @@ export default class extends Controller {
     const legs = journey.legs || []
     const isUM = journey.is_unaccompanied_minor
 
-    return `
+    return html`
       <div class="border-t border-gray-200 bg-gray-50 p-4">
-        ${isUM ? `
+        ${isUM ? html`
           <div class="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg flex items-center gap-2 text-red-800 font-bold">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
             Unaccompanied minor — requires special handling
@@ -48,7 +49,7 @@ export default class extends Controller {
         ` : ''}
 
         <div class="space-y-2">
-          ${legs.map((leg, idx) => this.buildLegCard(leg, idx, legs, journey)).join('')}
+          ${legs.map((leg, idx) => this.buildLegCard(leg, idx, legs, journey))}
         </div>
 
         ${this.buildSummary(journey, legs)}
@@ -68,18 +69,18 @@ export default class extends Controller {
     const depTime = this.formatTime(leg.etd_iso || leg.departure_time, leg.departure_tz)
     const arrTime = this.formatTime(leg.eta_iso  || leg.arrival_time, leg.arrival_tz)
     const tzNote = (tz, iata) => tz
-      ? `<div class="text-[10px] text-gray-400">local ${iata}</div>`
-      : `<div class="text-[10px] text-amber-600">tz unknown</div>`
+      ? html`<div class="text-[10px] text-gray-400">local ${iata}</div>`
+      : html`<div class="text-[10px] text-amber-600">tz unknown</div>`
     const depTzNote = tzNote(leg.departure_tz, leg.departure_airport)
     const arrTzNote = tzNote(leg.arrival_tz, leg.arrival_airport)
     const delayBadge = leg.is_delayed
-      ? `<span class="px-1.5 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-700">+${leg.delay_minutes}m</span>`
+      ? html`<span class="px-1.5 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-700">+${leg.delay_minutes}m</span>`
       : ''
     const scheduledStrike = leg.is_delayed && leg.scheduled_arrival_iso
-      ? `<div class="text-[11px] text-gray-400 line-through">was ${this.formatTime(leg.scheduled_arrival_iso, leg.arrival_tz)}</div>`
+      ? html`<div class="text-[11px] text-gray-400 line-through">was ${this.formatTime(leg.scheduled_arrival_iso, leg.arrival_tz)}</div>`
       : ''
     const statusBadge = leg.status_label
-      ? `<span class="px-2 py-0.5 rounded-full text-xs font-medium ${this.statusClass(leg.status_color)}">${leg.status_label}</span>`
+      ? html`<span class="px-2 py-0.5 rounded-full text-xs font-medium ${this.statusClass(leg.status_color)}">${leg.status_label}</span>`
       : ''
 
     let connectionHtml = ''
@@ -90,15 +91,15 @@ export default class extends Controller {
         const h = Math.floor(mins / 60), m = mins % 60
         const txt = h > 0 ? `${h}h ${m}m` : `${m}m`
         const tight = mins < 60
-        connectionHtml = `
+        connectionHtml = html`
           <div class="flex items-center justify-center py-1 text-xs ${tight ? 'text-orange-600 font-medium' : 'text-gray-500'}">
             ${txt} connection at ${leg.arrival_airport}
-            ${tight ? '<span class="ml-2 bg-orange-100 text-orange-700 px-1.5 rounded text-[11px]">Tight</span>' : ''}
+            ${tight ? html`<span class="ml-2 bg-orange-100 text-orange-700 px-1.5 rounded text-[11px]">Tight</span>` : ''}
           </div>`
       }
     }
 
-    return `
+    return html`
       <div class="bg-white rounded-lg border border-gray-200 p-3">
         <div class="flex items-center justify-between gap-3 flex-wrap">
           <div class="flex items-center gap-2">
@@ -111,7 +112,7 @@ export default class extends Controller {
               <div class="font-bold">${leg.departure_airport}</div>
               <div class="text-gray-600">${depTime}</div>
               ${depTzNote}
-              ${leg.departure_terminal ? `<div class="text-[11px] text-gray-400">T${leg.departure_terminal}${leg.departure_gate ? ' · ' + leg.departure_gate : ''}</div>` : ''}
+              ${leg.departure_terminal ? html`<div class="text-[11px] text-gray-400">T${leg.departure_terminal}${leg.departure_gate ? ' · ' + leg.departure_gate : ''}</div>` : ''}
             </div>
             <span class="text-gray-300">→</span>
             <div class="text-center">
@@ -119,10 +120,10 @@ export default class extends Controller {
               <div class="text-gray-600">${arrTime}</div>
               ${arrTzNote}
               ${scheduledStrike}
-              ${leg.arrival_terminal ? `<div class="text-[11px] text-gray-400">T${leg.arrival_terminal}${leg.arrival_gate ? ' · ' + leg.arrival_gate : ''}</div>` : ''}
+              ${leg.arrival_terminal ? html`<div class="text-[11px] text-gray-400">T${leg.arrival_terminal}${leg.arrival_gate ? ' · ' + leg.arrival_gate : ''}</div>` : ''}
             </div>
           </div>
-          ${leg.aircraft_type ? `<div class="text-[11px] text-gray-400">${leg.aircraft_type}${leg.registration ? ' · ' + leg.registration : ''}</div>` : ''}
+          ${leg.aircraft_type ? html`<div class="text-[11px] text-gray-400">${leg.aircraft_type}${leg.registration ? ' · ' + leg.registration : ''}</div>` : ''}
         </div>
         <div class="mt-2 flex items-center justify-end gap-3">
           <span data-controller="flight-leg-refresh"
@@ -133,7 +134,7 @@ export default class extends Controller {
               Refresh status
             </button>
           </span>
-          ${leg.report_url ? `
+          ${leg.report_url ? html`
             <a href="${leg.report_url}" target="_blank" rel="noopener" class="text-[11px] text-gray-400 hover:text-red-600 underline">
               Report bad data
             </a>
@@ -150,7 +151,7 @@ export default class extends Controller {
     if (totalMin == null) return ''
     const h = Math.floor(totalMin / 60), m = totalMin % 60
     const txt = h > 0 ? `${h}h ${m}m` : `${m}m`
-    return `
+    return html`
       <div class="mt-3 p-2 bg-white rounded-lg border border-gray-200 flex items-center justify-between text-sm">
         <span class="text-gray-600"><span class="font-medium">${legs[0].departure_airport} → ${legs[legs.length-1].arrival_airport}</span> · ${legs.length - 1} stop${legs.length - 1 > 1 ? 's' : ''}</span>
         <span class="font-bold">Total: ${txt}</span>
@@ -164,7 +165,7 @@ export default class extends Controller {
 
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || ''
     const url = `/admin/events/${this.eventSlugValue}/airport_mode/dismiss_pickup?travel_id=${journey.id}`
-    return `
+    return html`
       <form action="${url}" method="post" class="inline">
         <input type="hidden" name="authenticity_token" value="${csrfToken}">
         <button type="submit" class="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">

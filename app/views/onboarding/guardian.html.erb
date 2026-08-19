@@ -51,7 +51,7 @@
 
       <%= f.hidden_field :onboarding_step, value: "guardian" %>
 
-      <script>
+      <script nonce="<%= content_security_policy_nonce %>">
         document.addEventListener('DOMContentLoaded', function() {
           const relationshipSelect = document.querySelector('[name="guardian_relationship"]');
           const otherDetails = document.getElementById('other-relationship-details');
