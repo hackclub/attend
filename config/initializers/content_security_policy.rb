@@ -20,7 +20,11 @@ Rails.application.configure do
     policy.frame_src   :self, *docuseal_origins, "https://challenges.cloudflare.com"
     policy.frame_ancestors :self
     policy.base_uri    :self
-    policy.form_action :self, *docuseal_origins
+    # HCA sign-in: the button posts to /users/auth/hack_club (self), which then
+    # 302s to auth.hackclub.com/oauth/authorize. Browsers enforce form-action
+    # across the whole redirect chain, so the OAuth host has to be listed here
+    # or the POST is blocked before it ever leaves the page.
+    policy.form_action :self, *docuseal_origins, "https://auth.hackclub.com"
   end
 
   # A fresh nonce per response for the importmap and our inline scripts. Not
