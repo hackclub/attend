@@ -1,0 +1,7 @@
+<%# A permanent dashed frame around staging, so a staging tab is never mistaken
+    for production — the two look identical otherwise, and staging holds scratch
+    data that people should not act on. Rendered from every human-facing layout;
+    deliberately not from the mailer layout. %>
+<% if Rails.env.staging? %>
+  <div class="staging-frame" aria-hidden="true"></div>
+<% end %>

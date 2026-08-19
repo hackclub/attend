@@ -191,6 +191,8 @@ Rails.application.routes.draw do
           delete :reset_waiver
           delete :reset_freedom_waiver
           post :resend_waiver_completion_email
+          post :resend_custom_document
+          delete :reset_custom_document
           get :notes
           get :history
           post :resync_airtable
@@ -382,6 +384,8 @@ Rails.application.routes.draw do
     # Custom documents (per-event DocuSeal templates beyond the built-in waivers)
     scope ":slug", constraints: { slug: /[a-z0-9-]+/ } do
       post "custom_documents", to: "custom_documents#create", as: :event_custom_documents
+      get "custom_documents/:id/edit", to: "custom_documents#edit", as: :event_custom_document_edit
+      patch "custom_documents/:id", to: "custom_documents#update"
       delete "custom_documents/:id", to: "custom_documents#destroy", as: :event_custom_document
     end
   end

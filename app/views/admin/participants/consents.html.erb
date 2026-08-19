@@ -186,6 +186,7 @@
   </div>
 
   <% if @custom_documents.any? %>
+    <% can_resend_custom_documents = policy(@participant_event).reset_waiver? %>
     <h2 class="text-lg font-semibold mt-8 mb-4">Additional Documents</h2>
     <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <table class="min-w-full divide-y divide-gray-100">
@@ -196,6 +197,9 @@
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Signed By</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Document</th>
+            <% if can_resend_custom_documents %>
+              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            <% end %>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-100">
@@ -275,6 +279,28 @@
                   —
                 <% end %>
               </td>
+              <% if can_resend_custom_documents %>
+                <td class="px-6 py-4 text-right text-sm">
+                  <% # Paper documents never touch DocuSeal. Signed ones can only
+                     # be re-issued through Reset, which says out loud that the
+                     # signature is being discarded. %>
+                  <% if !doc.electronic? %>
+                    <span class="text-gray-300">—</span>
+                  <% elsif consent&.signed? %>
+                    <%= button_to "Reset", reset_custom_document_admin_event_participant_path(current_event, @participant_event),
+                        method: :delete,
+                        params: { custom_document_id: doc.id },
+                        class: "text-sm text-red-600 hover:text-red-800 font-medium",
+                        data: { turbo_confirm: "Reset this document? The existing signature is discarded, a new one is issued, and this participant goes back to in progress. Are you sure?" } %>
+                  <% else %>
+                    <%= button_to "Resend", resend_custom_document_admin_event_participant_path(current_event, @participant_event),
+                        method: :post,
+                        params: { custom_document_id: doc.id },
+                        class: "text-sm text-[#ec3750] hover:text-[#d42f46] font-medium",
+                        data: { turbo_confirm: "Re-send this document? Any existing DocuSeal link stops working and a new one is issued." } %>
+                  <% end %>
+                </td>
+              <% end %>
             </tr>
           <% end %>
         </tbody>

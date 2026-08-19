@@ -24,6 +24,11 @@ class CustomDocument < ApplicationRecord
   validate :template_pdf_required_for_physical
 
   after_create_commit :reopen_completed_participants
+  # Editing who signs can hand a new blocking document to people who already
+  # finished — same problem as adding one, same fix.
+  # Distinct method name on purpose: registering the same symbol twice in the
+  # after_commit chain replaces the create callback instead of adding to it.
+  after_update_commit :reopen_completed_participants_after_edit
 
   scope :active, -> { where(archived_at: nil) }
 
@@ -84,6 +89,16 @@ class CustomDocument < ApplicationRecord
   end
 
   private
+
+  # Only signer_type and optional decide who the document applies to; renaming
+  # it or swapping the template doesn't change the audience.
+  # reopen_completed_participants ignores optional documents itself, so a
+  # required → optional flip stops short of the job.
+  def reopen_completed_participants_after_edit
+    return unless saved_change_to_signer_type? || saved_change_to_optional?
+
+    reopen_completed_participants
+  end
 
   # Participants who finished onboarding before this document existed now have
   # a new blocking step — reopen them so their db status matches. While
