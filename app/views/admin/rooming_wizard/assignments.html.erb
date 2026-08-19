@@ -37,7 +37,7 @@
 <!-- Add Room Modal -->
 <div id="add-room-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true">
   <div class="flex min-h-screen items-center justify-center p-4">
-    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="document.getElementById('add-room-modal').classList.add('hidden')"></div>
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-hide="add-room-modal"></div>
     
     <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
       <h3 class="text-lg font-medium text-gray-900 mb-4">Add Room</h3>
@@ -59,7 +59,7 @@
         </div>
         
         <div class="mt-6 flex justify-end gap-3">
-          <button type="button" onclick="document.getElementById('add-room-modal').classList.add('hidden')" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md">
+          <button type="button" data-hide="add-room-modal" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md">
             Cancel
           </button>
           <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-[#d42f46] hover:bg-[#b82840] rounded-md">
@@ -71,7 +71,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="<%= content_security_policy_nonce %>">
 document.addEventListener('DOMContentLoaded', function() {
   initDragAndDrop();
   initRoomReorder();
@@ -268,17 +268,23 @@ async function addStaff(e) {
     alert(data.error || 'Failed to add staff');
   }
 }
+
+// Delegated because the form markup comes after this script in the page, and
+// submit bubbles, so ordering doesn't matter.
+document.addEventListener('submit', (event) => {
+  if (event.target.id === 'add-staff-form') addStaff(event);
+});
 </script>
 
 <!-- Add Staff Modal -->
 <div id="add-staff-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true">
   <div class="flex min-h-screen items-center justify-center p-4">
-    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="document.getElementById('add-staff-modal').classList.add('hidden')"></div>
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-hide="add-staff-modal"></div>
     
     <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
       <h3 class="text-lg font-medium text-gray-900 mb-4">Add Staff Member</h3>
       
-      <form onsubmit="addStaff(event)">
+      <form id="add-staff-form">
         <input type="hidden" id="add-staff-room-id">
         
         <div class="space-y-4">
@@ -293,7 +299,7 @@ async function addStaff(e) {
         </div>
         
         <div class="mt-6 flex justify-end gap-3">
-          <button type="button" onclick="document.getElementById('add-staff-modal').classList.add('hidden')" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md">
+          <button type="button" data-hide="add-staff-modal" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md">
             Cancel
           </button>
           <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-md">

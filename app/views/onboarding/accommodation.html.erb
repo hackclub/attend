@@ -4,7 +4,7 @@
   <h1 class="text-2xl font-bold mb-2">Accommodation</h1>
   <p class="text-sm text-gray-600 mb-6">Fields marked with <span class="text-red-500">*</span> are required.</p>
 
-  <script>
+  <script nonce="<%= content_security_policy_nonce %>">
     document.addEventListener("DOMContentLoaded", function() {
       const genderBaseRadios = document.querySelectorAll('input[name="accommodation[gender_base]"]');
       const isTransgenderCheckbox = document.getElementById("is_transgender_checkbox");

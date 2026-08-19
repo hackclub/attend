@@ -108,7 +108,7 @@
     <%= f.hidden_field :location_longitude, id: "venue-longitude" %>
   </div>
 
-  <script>
+  <script nonce="<%= content_security_policy_nonce %>">
     (function() {
       var script = document.createElement('script');
       script.src = 'https://maps.googleapis.com/maps/api/js?key=<%= Rails.application.credentials.dig(:google, :key) %>&libraries=places&callback=initPlacesAutocomplete';

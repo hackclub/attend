@@ -164,7 +164,7 @@
           <div id="modal-groups" class="flex flex-wrap gap-1 mt-1"></div>
           <p class="text-blue-200 text-xs mt-1" id="modal-context-name"></p>
         </div>
-        <button onclick="closeModal()" class="text-white/70 hover:text-white text-2xl leading-none min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2">&times;</button>
+        <button data-close-participant-modal class="text-white/70 hover:text-white text-2xl leading-none min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2">&times;</button>
       </div>
     </div>
     
@@ -204,13 +204,13 @@
         <a id="modal-view-link" href="#" class="flex-1 bg-[#d42f46] text-white px-4 py-3 sm:py-2 rounded-lg text-center hover:bg-[#b82840] font-medium min-h-[44px] flex items-center justify-center">
           View Full Profile
         </a>
-        <button onclick="closeModal()" class="flex-1 bg-gray-100 text-gray-700 px-4 py-3 sm:py-2 rounded-lg hover:bg-gray-200 font-medium min-h-[44px]">
+        <button data-close-participant-modal class="flex-1 bg-gray-100 text-gray-700 px-4 py-3 sm:py-2 rounded-lg hover:bg-gray-200 font-medium min-h-[44px]">
           Scan Next
         </button>
       </div>
       <% if current_event.nfc_badges_enabled? %>
       <div id="modal-nfc-section" class="mt-4 pt-4 border-t border-gray-200 hidden">
-        <button id="modal-write-nfc-btn" onclick="triggerNfcWriteFromModal()" class="w-full bg-purple-600 text-white px-4 py-3 sm:py-2 rounded-lg hover:bg-purple-700 font-medium min-h-[44px] flex items-center justify-center gap-2">
+        <button id="modal-write-nfc-btn" class="w-full bg-purple-600 text-white px-4 py-3 sm:py-2 rounded-lg hover:bg-purple-700 font-medium min-h-[44px] flex items-center justify-center gap-2">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
           <span id="modal-nfc-btn-text">Write NFC Badge</span>
         </button>
@@ -221,7 +221,47 @@
   </div>
 </div>
 
-<script>
+<script nonce="<%= content_security_policy_nonce %>">
+// Mirror of app/javascript/utils/html.js, inlined because this is a classic
+// script and can't import from the importmap. Participant names, group labels
+// and scan context names are all user-controlled, so every template literal
+// that becomes markup here is tagged `html` and escapes its interpolations.
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/[&<>"'`=]/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+    "'": '&#39;', '`': '&#96;', '=': '&#61;'
+  })[char]);
+}
+
+// Marks a string as markup we built ourselves, so `html` inlines it as-is.
+function safeMarkup(value) {
+  return Object.assign(Object.create(safeMarkup.prototype), { value: String(value) });
+}
+safeMarkup.prototype.toString = function() { return this.value; };
+
+function html(strings, ...values) {
+  return safeMarkup(values.reduce((out, value, i) => {
+    let piece;
+    if (value instanceof safeMarkup) piece = value.value;
+    else if (Array.isArray(value)) piece = value.map((v) => html`${v}`.value).join('');
+    else if (value === null || value === undefined || value === false) piece = '';
+    else piece = escapeHtml(value);
+    return out + piece + strings[i + 1];
+  }, strings[0]));
+}
+
+// Groups are admin-created but their colour still lands in a style attribute,
+// so only accept the 6-digit hex the model validates and fall back otherwise.
+function safeHexColor(value) {
+  return /^#?[0-9a-fA-F]{6}$/.test(String(value || '')) ? String(value) : null;
+}
+
+function groupBadgeHtml(group, fallbackColor) {
+  const color = safeHexColor(group.color);
+  return html`<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium" style="background-color: ${color || fallbackColor}; color: ${color ? 'white' : '#1f2d3d'};">${group.name}</span>`;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   const scanUrl = '<%= admin_event_scans_path(current_event) %>';
   const searchUrl = '<%= search_admin_event_scans_path(current_event) %>';
@@ -410,7 +450,7 @@ document.addEventListener('DOMContentLoaded', function() {
       // Populate the camera picker
       const select = document.getElementById('camera-select');
       select.innerHTML = cameras
-        .map((c, i) => `<option value="${c.deviceId}">${c.label || `Camera ${i + 1}`}</option>`)
+        .map((c, i) => html`<option value="${c.deviceId}">${c.label || `Camera ${i + 1}`}</option>`)
         .join('');
 
       // Pick a sensible default: remembered choice, else a back/rear camera, else last device
@@ -488,14 +528,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (data.results.length === 0) {
           searchResults.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500">No participants found</div>';
         } else {
-          searchResults.innerHTML = data.results.map(p => `
+          searchResults.innerHTML = data.results.map(p => html`
             <div class="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0 search-result" 
                  data-participant-id="${p.id}">
               <div class="flex justify-between items-center">
                 <div>
                   <p class="font-medium text-sm">${p.display_name}</p>
                   <p class="text-xs text-gray-500">ID: ${p.short_id}</p>
-                  ${(p.groups && p.groups.length) ? `<div class="flex flex-wrap gap-1 mt-1">${p.groups.map(g => `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium" style="background-color: ${g.color || '#e5e7eb'}; color: ${g.color ? 'white' : '#1f2d3d'};">${g.name}</span>`).join('')}</div>` : ''}
+                  ${(p.groups && p.groups.length) ? html`<div class="flex flex-wrap gap-1 mt-1">${p.groups.map(g => groupBadgeHtml(g, '#e5e7eb'))}</div>` : ''}
                 </div>
                 <span class="text-xs px-2 py-1 rounded-full ${p.status === 'complete' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
                   ${p.status.replace('_', ' ')}
@@ -564,7 +604,7 @@ function showParticipantModal(data, scanContext, firstScan) {
   const groupsEl = document.getElementById('modal-groups');
   if (groupsEl) {
     groupsEl.innerHTML = (data.groups && data.groups.length)
-      ? data.groups.map(g => `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium" style="background-color: ${g.color || '#ffffff'}; color: ${g.color ? 'white' : '#1f2d3d'};">${g.name}</span>`).join('')
+      ? data.groups.map(g => groupBadgeHtml(g, '#ffffff')).join('')
       : '';
   }
   document.getElementById('modal-status').textContent = data.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -664,8 +704,8 @@ function addToRecentScans(participant, scanContext, scannedBy) {
   const emptyMessage = container.querySelector('.text-center.py-8');
   if (emptyMessage) emptyMessage.remove();
 
-  const contextInfo = scanContext?.name ? `<span class="text-gray-400">@ ${scanContext.name}</span>` : '';
-  const scanHtml = `
+  const contextInfo = scanContext?.name ? html`<span class="text-gray-400">@ ${scanContext.name}</span>` : '';
+  const scanHtml = html`
     <div class="flex items-center justify-between border-b border-gray-100 pb-3 bg-green-50 -mx-2 px-2 rounded transition-colors">
       <div class="min-w-0 flex-1 mr-2">
         <p class="font-medium text-sm truncate">${participant.display_name}</p>
@@ -675,7 +715,7 @@ function addToRecentScans(participant, scanContext, scannedBy) {
       <a href="${participant.show_url}" class="text-xs text-[#ec3750] hover:text-blue-800">View</a>
     </div>
   `;
-  container.insertAdjacentHTML('afterbegin', scanHtml);
+  container.insertAdjacentHTML('afterbegin', scanHtml.toString());
 
   setTimeout(() => {
     const firstChild = container.firstElementChild;
@@ -690,6 +730,16 @@ function updateScanCount() {
 
 document.getElementById('participant-modal').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
+});
+
+document.querySelectorAll('[data-close-participant-modal]').forEach((el) => {
+  el.addEventListener('click', closeModal);
+});
+
+// triggerNfcWriteFromModal is defined further down, inside the NFC block that
+// only renders when the event has badges enabled — so bind at click time.
+document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => {
+  triggerNfcWriteFromModal();
 });
 
 // NFC Bridge Integration
