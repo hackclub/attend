@@ -72,6 +72,13 @@
     <% if @current_document %>
       <% consent = @current_document[:consent] %>
       <% signing_url = Docuseal.signing_url(consent.docuseal_participant_slug, host: consent.docuseal_host) %>
+      <%# The "completed" callback below is the fast path out of this step, but
+          it isn't guaranteed to reach us (signed in the new-tab fallback, a
+          dropped postMessage). Poll alongside it so a signature that lands
+          some other way still moves the page on. %>
+      <div data-controller="document-status"
+           data-document-status-url-value="<%= onboarding_documents_status_path(event_id: current_event.id) %>"
+           data-document-status-signed-ids-value="<%= @documents.filter_map { |d| d[:consent]&.id.to_s if d[:consent]&.participant_portion_signed? }.sort.to_json %>"></div>
       <h2 class="text-lg font-semibold text-gray-900 mb-3">Now signing: <%= @current_document[:name] %></h2>
       <div class="border rounded-lg overflow-hidden bg-white shadow-sm mb-4">
         <docuseal-form
