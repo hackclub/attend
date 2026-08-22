@@ -103,6 +103,7 @@ Rails.application.routes.draw do
     get "/waiver", to: "onboarding#waiver", as: :onboarding_waiver
     post "/waiver/complete", to: "onboarding#waiver_complete", as: :onboarding_waiver_complete
     post "/documents/:consent_id/signed", to: "onboarding#document_signed", as: :onboarding_document_signed
+    get "/documents/status", to: "onboarding#documents_status", as: :onboarding_documents_status
     post "/optional_documents/:custom_document_id", to: "onboarding#add_optional_document", as: :onboarding_add_optional_document
     delete "/optional_documents/:custom_document_id", to: "onboarding#withdraw_optional_document", as: :onboarding_withdraw_optional_document
     post "/documents/:consent_id/physical_upload", to: "onboarding#physical_document_upload", as: :onboarding_physical_document_upload

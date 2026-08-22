@@ -3,7 +3,7 @@ class OnboardingController < ApplicationController
   include PhysicalDocumentUploads
   include OptionalDocumentEnrolment
 
-  before_action :force_html_format
+  before_action :force_html_format, except: [ :documents_status ]
   before_action :store_invitation_token
   before_action :authenticate_user!
   before_action :process_invitation
@@ -161,6 +161,24 @@ class OnboardingController < ApplicationController
     end
 
     redirect_to onboarding_step_path(step: DOCUMENTS_STEP, event_id: current_event.id)
+  end
+
+  # Polled by the documents step while a document is still outstanding.
+  #
+  # The embedded form's "completed" event is the fast path, but it's a single
+  # point of failure: if it never reaches us — the participant signed in the
+  # "open in a new tab" window, the iframe's postMessage was dropped, the
+  # signature landed while the tab was backgrounded — the page keeps showing
+  # "0 of 1 signed" and a dead Continue button until they think to reload.
+  # The webhook has usually already updated the consent by then; nothing was
+  # telling the open page about it. This lets the page find out on its own.
+  def documents_status
+    consents = pollable_document_consents
+    consents.each { |c| sync_from_docuseal_throttled(c) }
+
+    render json: {
+      signed_consent_ids: consents.select(&:participant_portion_signed?).map { |c| c.id.to_s }.sort
+    }
   end
 
   # Optional documents — waivers for opt-in activities. Adding one is what
@@ -955,6 +973,39 @@ class OnboardingController < ApplicationController
 
   def waiver_participant_portion_signed?
     @participant_event.consents.any? { |c| c.consent_type == "waiver" && c.participant_portion_signed? }
+  end
+
+  # Exactly the consents the documents step renders a row for — the same set,
+  # in the same order, as the @documents it builds. It has to match: the page
+  # reloads as soon as this answer differs from what it was rendered with, so
+  # a consent the page never showed (a withdrawn optional document, say)
+  # would otherwise put it in a reload loop.
+  def pollable_document_consents
+    consents = @participant_event.consents.reload
+    document_ids = @participant_event.applicable_custom_documents.select(&:participant_signs?).map(&:id)
+
+    [
+      consents.find { |c| c.consent_type == "waiver" },
+      *document_ids.map { |id| consents.find { |c| c.custom_document_id == id } }
+    ].compact
+  end
+
+  # Poll interval is a few seconds; hitting the DocuSeal API that often for
+  # every outstanding document would be rude, and the webhook usually gets
+  # there first anyway. Sync at most once per consent per window — the plain
+  # DB read on every poll is what actually carries the webhook's update
+  # through to the page.
+  DOCUSEAL_POLL_THROTTLE = 15.seconds
+
+  def sync_from_docuseal_throttled(consent)
+    return if consent.participant_portion_signed?
+    return if consent.docuseal_envelope_id.blank?
+
+    key = "docuseal_status_poll/#{consent.id}"
+    return if Rails.cache.read(key)
+    Rails.cache.write(key, true, expires_in: DOCUSEAL_POLL_THROTTLE)
+
+    consent.sync_from_docuseal!
   end
 
   def load_documents_step_data
