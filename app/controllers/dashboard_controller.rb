@@ -31,6 +31,23 @@ class DashboardController < ApplicationController
       .map { |assignments| [ assignments.first.event, assignments.all?(&:hidden_from_public_profile) ] }
       .sort_by { |event, _hidden| event.starts_at || Time.current }
       .reverse
+    @mcp_connections = mcp_connections
+  end
+
+  # Disconnect an MCP client: revoke every live token and pending grant this
+  # user holds for the application. The application row itself stays (it's a
+  # global client registration, not per-user).
+  def revoke_mcp_connection
+    application = Toolchest::OauthApplication.find_by(id: params[:id])
+
+    if application
+      Toolchest::OauthAccessToken.revoke_all_for(application, current_user.id)
+      Toolchest::OauthAccessGrant.revoke_all_for(application, current_user.id)
+      redirect_to dashboard_profile_path(anchor: "connections"),
+        notice: "#{application.name} has been disconnected."
+    else
+      redirect_to dashboard_profile_path(anchor: "connections"), alert: "Connection not found."
+    end
   end
 
   def update_public_profile
@@ -365,6 +382,27 @@ class DashboardController < ApplicationController
       .update_all(hidden_from_public_profile: false)
     eligible_scope.where(event_id: eligible_event_ids - visible_event_ids)
       .update_all(hidden_from_public_profile: true)
+  end
+
+  # Live MCP connections for the signed-in user, one row per client
+  # application. Mirrors toolchest's own authorized-applications semantics:
+  # a connection counts as live while any token for the app is unrevoked
+  # (access tokens expire in hours, but the client keeps refreshing them).
+  def mcp_connections
+    tokens = Toolchest::OauthAccessToken
+      .where(resource_owner_id: current_user.id.to_s, revoked_at: nil)
+      .includes(:application)
+
+    tokens.group_by(&:application).filter_map do |application, app_tokens|
+      next unless application
+
+      {
+        application: application,
+        scopes: app_tokens.flat_map(&:scopes_array).uniq.sort,
+        connected_at: app_tokens.map(&:created_at).min,
+        last_used_at: app_tokens.map(&:updated_at).max
+      }
+    end.sort_by { |connection| connection[:connected_at] }.reverse
   end
 
   def require_participant
