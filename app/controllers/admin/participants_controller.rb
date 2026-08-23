@@ -52,7 +52,7 @@ module Admin
       if params[:flag].present?
         case params[:flag]
         when "incomplete_onboarding"
-          @participant_events = @participant_events.missing_onboarding_data(accommodation_required: current_event.accommodation_enabled?)
+          @participant_events = @participant_events.missing_onboarding_data(accommodation_required: current_event.accommodation_enabled?, travel_required: current_event.travel_enabled?)
         when "missing_travel"
           @participant_events = @participant_events.left_joins(:travel_inbound).where(travels: { id: nil })
         when "missing_medical"
@@ -1168,7 +1168,7 @@ module Admin
 
     def apply_onboarding_filter(scope, operator, value)
       complete = value == "true"
-      incomplete = current_event.participant_events.missing_onboarding_data(accommodation_required: current_event.accommodation_enabled?)
+      incomplete = current_event.participant_events.missing_onboarding_data(accommodation_required: current_event.accommodation_enabled?, travel_required: current_event.travel_enabled?)
 
       if complete
         scope.where.not(id: incomplete.select(:id))

@@ -77,16 +77,18 @@ class ParticipantEvent < ApplicationRecord
 
   # SQL mirror of !onboarding_complete? so list filters don't have to load
   # every row into Ruby. Keep in sync with #onboarding_complete?.
-  scope :missing_onboarding_data, ->(accommodation_required:) {
+  scope :missing_onboarding_data, ->(accommodation_required:, travel_required: true) {
     clauses = [
-      "NOT EXISTS (SELECT 1 FROM travels t WHERE t.participant_event_id = participant_events.id AND t.direction = 'inbound')",
-      "NOT EXISTS (SELECT 1 FROM travels t WHERE t.participant_event_id = participant_events.id AND t.direction = 'outbound')",
       "NOT EXISTS (SELECT 1 FROM medicals m WHERE m.participant_event_id = participant_events.id)",
       "NOT EXISTS (SELECT 1 FROM dietaries d WHERE d.participant_event_id = participant_events.id)",
       "NOT EXISTS (SELECT 1 FROM accessibilities a WHERE a.participant_event_id = participant_events.id)",
       "NOT EXISTS (SELECT 1 FROM safeguarding_infos si WHERE si.participant_event_id = participant_events.id)",
       "NOT EXISTS (SELECT 1 FROM consents c WHERE c.participant_event_id = participant_events.id)"
     ]
+    if travel_required
+      clauses << "NOT EXISTS (SELECT 1 FROM travels t WHERE t.participant_event_id = participant_events.id AND t.direction = 'inbound')"
+      clauses << "NOT EXISTS (SELECT 1 FROM travels t WHERE t.participant_event_id = participant_events.id AND t.direction = 'outbound')"
+    end
     if accommodation_required
       clauses << "NOT EXISTS (SELECT 1 FROM accommodations ac WHERE ac.participant_event_id = participant_events.id)"
     end
@@ -104,8 +106,8 @@ class ParticipantEvent < ApplicationRecord
   end
 
   def onboarding_complete?
-    travel_inbound.present? &&
-      travel_outbound.present? &&
+    (travel_inbound.present? || !event.travel_enabled?) &&
+      (travel_outbound.present? || !event.travel_enabled?) &&
       (accommodation.present? || !event.accommodation_enabled?) &&
       medical.present? &&
       dietary.present? &&
@@ -272,7 +274,7 @@ class ParticipantEvent < ApplicationRecord
     steps = []
 
     steps << { name: "profile", done: participant.legal_first_name.present? && participant.legal_last_name.present? && participant.date_of_birth.present? }
-    steps << { name: "travel", done: travel_inbound.present? && travel_outbound.present? }
+    steps << { name: "travel", done: travel_inbound.present? && travel_outbound.present? } if event.travel_enabled?
     steps << { name: "accommodation", done: accommodation.present? } if event.accommodation_enabled?
     steps << { name: "health", done: medical.present? && dietary.present? && accessibility.present? }
 

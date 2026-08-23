@@ -35,25 +35,45 @@ RSpec.describe ParticipantEvent, type: :model do
     end
 
     [ true, false ].each do |accommodation_enabled|
-      context "with accommodation_enabled=#{accommodation_enabled}" do
-        let(:event) { create(:event, accommodation_enabled: accommodation_enabled) }
+      [ true, false ].each do |travel_enabled|
+        context "with accommodation_enabled=#{accommodation_enabled}, travel_enabled=#{travel_enabled}" do
+          let(:event) { create(:event, accommodation_enabled: accommodation_enabled, travel_enabled: travel_enabled) }
 
-        it "matches exactly the records where onboarding_complete? is false" do
-          all_on = { travel_in: true, travel_out: true, medical: true, dietary: true,
-                     accessibility: true, safeguarding: true, consent: true, accommodation: true }
+          it "matches exactly the records where onboarding_complete? is false" do
+            all_on = { travel_in: true, travel_out: true, medical: true, dietary: true,
+                       accessibility: true, safeguarding: true, consent: true, accommodation: true }
 
-          pes = [ build_pe(event, **all_on), build_pe(event) ]
-          all_on.each_key do |flag|
-            pes << build_pe(event, **all_on.merge(flag => false))
+            pes = [ build_pe(event, **all_on), build_pe(event) ]
+            all_on.each_key do |flag|
+              pes << build_pe(event, **all_on.merge(flag => false))
+            end
+
+            scope_ids = event.participant_events
+              .missing_onboarding_data(accommodation_required: event.accommodation_enabled?,
+                                       travel_required: event.travel_enabled?)
+              .pluck(:id).sort
+            ruby_ids = pes.reject { |pe| pe.reload.onboarding_complete? }.map(&:id).sort
+
+            expect(scope_ids).to eq(ruby_ids)
           end
-
-          scope_ids = event.participant_events
-            .missing_onboarding_data(accommodation_required: event.accommodation_enabled?)
-            .pluck(:id).sort
-          ruby_ids = pes.reject { |pe| pe.reload.onboarding_complete? }.map(&:id).sort
-
-          expect(scope_ids).to eq(ruby_ids)
         end
+      end
+    end
+  end
+
+  describe "#onboarding_progress" do
+    # Every optional event module must gate its onboarding step, otherwise
+    # participants get stuck on a step that doesn't exist in the wizard.
+    { travel_enabled: "travel", accommodation_enabled: "accommodation" }.each do |flag, step|
+      it "includes the #{step} step when #{flag} is on" do
+        pe = create(:participant_event, event: create(:event, flag => true))
+        expect(pe.onboarding_progress[:steps].map { |s| s[:name] }).to include(step)
+      end
+
+      it "omits the #{step} step when #{flag} is off" do
+        pe = create(:participant_event, event: create(:event, flag => false))
+        expect(pe.onboarding_progress[:steps].map { |s| s[:name] }).not_to include(step)
+        expect(pe.onboarding_progress[:blocking_step]).not_to eq(step)
       end
     end
   end
