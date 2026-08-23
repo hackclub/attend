@@ -81,7 +81,7 @@
               <% end %>
               <%= link_to dashboard_profile_path, class: "group flex items-center gap-2 rounded-full border border-[#e0e6ed] py-1 pl-1 pr-3 hover:border-[#ec3750] transition-colors", aria: { label: "Profile settings" } do %>
                 <% if current_user.avatar_displayable? %>
-                  <%= image_tag current_user.avatar.variant(resize_to_fill: [ 48, 48 ]), alt: "", class: "size-6 rounded-full object-cover" %>
+                  <%= image_tag main_app.url_for(current_user.avatar.variant(resize_to_fill: [ 48, 48 ])), alt: "", class: "size-6 rounded-full object-cover" %>
                 <% else %>
                   <span class="flex size-6 items-center justify-center rounded-full bg-[#ec3750]/10 text-xs font-semibold text-[#ec3750]"><%= current_user.initials %></span>
                 <% end %>
@@ -126,7 +126,7 @@
           <div class="border-t border-[#e0e6ed] px-4 py-3 space-y-1">
             <%= link_to dashboard_profile_path, class: "flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[#f9fafc]" do %>
               <% if current_user.avatar_displayable? %>
-                <%= image_tag current_user.avatar.variant(resize_to_fill: [ 64, 64 ]), alt: "", class: "size-8 rounded-full object-cover" %>
+                <%= image_tag main_app.url_for(current_user.avatar.variant(resize_to_fill: [ 64, 64 ])), alt: "", class: "size-8 rounded-full object-cover" %>
               <% else %>
                 <span class="flex size-8 items-center justify-center rounded-full bg-[#ec3750]/10 text-sm font-semibold text-[#ec3750]"><%= current_user.initials %></span>
               <% end %>
