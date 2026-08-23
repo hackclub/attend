@@ -80,6 +80,7 @@ Rails.application.routes.draw do
   get "dashboard", to: "dashboard#index"
   get "dashboard/profile", to: "dashboard#profile", as: :dashboard_profile
   patch "dashboard/public_profile", to: "dashboard#update_public_profile", as: :dashboard_public_profile
+  delete "dashboard/mcp_connections/:id", to: "dashboard#revoke_mcp_connection", as: :dashboard_mcp_connection
   post "theme", to: "themes#update", as: :update_theme
   get "dashboard/events/:id", to: "dashboard#show", as: :dashboard_event
   get "dashboard/events/:id/google_wallet", to: "dashboard#google_wallet", as: :dashboard_google_wallet

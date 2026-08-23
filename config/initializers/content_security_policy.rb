@@ -34,6 +34,16 @@ Rails.application.configure do
   config.content_security_policy_nonce_generator = ->(_request) { SecureRandom.base64(16) }
   config.content_security_policy_nonce_directives = %w[script-src]
 
+  # The MCP OAuth consent screen needs form-action to also cover the client's
+  # registered redirect_uri — same redirect-chain enforcement as the HCA note
+  # above, but the hosts are per-client, so it's appended per request instead
+  # of listed here. See ToolchestRedirectFormAction.
+  config.to_prepare do
+    unless Toolchest::Oauth::AuthorizationsController < ToolchestRedirectFormAction
+      Toolchest::Oauth::AuthorizationsController.include(ToolchestRedirectFormAction)
+    end
+  end
+
   # Enforced, not report-only. script-src has no `unsafe-inline`, so injected
   # markup can't run: an <img onerror=...> smuggled into a participant's name
   # is inert even if some future template forgets to escape it. Keeping this
