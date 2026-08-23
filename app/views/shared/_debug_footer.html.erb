@@ -3,7 +3,11 @@
     <% if info[:commit].present? && info[:built_at].present? %>
       <div class="mt-1 text-[10px] text-[#5a6473]">
         Built <%= time_ago_in_words(info[:built_at]) %> ago
-        <span class="font-mono">(<%= info[:commit] %>)</span>
+        <% if info[:commit_url] %>
+          <a href="<%= info[:commit_url] %>" target="_blank" rel="noopener" class="font-mono hover:underline">(<%= info[:commit] %>)</a>
+        <% else %>
+          <span class="font-mono">(<%= info[:commit] %>)</span>
+        <% end %>
       </div>
     <% end %>
   </div>

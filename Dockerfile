@@ -43,15 +43,17 @@ RUN bundle install && \
     # -j 1 disable parallel compilation to avoid a QEMU bug: https://github.com/rails/bootsnap/issues/495
     bundle exec bootsnap precompile -j 1 --gemfile
 
-# Git revision for debug footer (passed as build arg since .git is excluded)
+# Fallback revision for builds whose context has no .git directory
 ARG GIT_REVISION=unknown
 ENV GIT_REVISION=${GIT_REVISION}
 
 # Copy application code
 COPY . .
 
-# Write git revision for debug footer
-RUN echo "${GIT_REVISION}" > REVISION
+# Write git revision for debug footer, then drop .git so it never reaches the
+# final image
+RUN if [ -d .git ]; then git rev-parse HEAD > REVISION; else echo "${GIT_REVISION}" > REVISION; fi && \
+    rm -rf .git
 
 # Precompile bootsnap code for faster boot times.
 # -j 1 disable parallel compilation to avoid a QEMU bug: https://github.com/rails/bootsnap/issues/495
