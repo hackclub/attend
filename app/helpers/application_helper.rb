@@ -36,16 +36,19 @@ module ApplicationHelper
       rails_version: rails_version,
       ruby_version: ruby_version,
       commit: build_info[:commit],
+      commit_url: build_info[:commit_url],
       built_at: build_info[:built_at]
     }
   end
 
+  GITHUB_REPO_URL = "https://github.com/hackclub/attend"
+
   def git_build_info
     revision_file = Rails.root.join("REVISION")
-    commit = if revision_file.exist?
-      revision_file.read.strip[0, 7]
+    revision = if revision_file.exist?
+      revision_file.read.strip.presence
     elsif Rails.env.development?
-      `git rev-parse --short HEAD 2>/dev/null`.strip.presence
+      `git rev-parse HEAD 2>/dev/null`.strip.presence
     end
 
     built_at = if revision_file.exist?
@@ -54,7 +57,13 @@ module ApplicationHelper
       Time.current
     end
 
-    { commit: commit, built_at: built_at }
+    sha = revision if revision&.match?(/\A\h{7,40}\z/)
+
+    {
+      commit: sha ? sha[0, 7] : revision,
+      commit_url: sha && "#{GITHUB_REPO_URL}/commit/#{sha}",
+      built_at: built_at
+    }
   end
 
   def google_maps_api_key
