@@ -80,6 +80,8 @@ Rails.application.routes.draw do
   get "dashboard", to: "dashboard#index"
   get "dashboard/profile", to: "dashboard#profile", as: :dashboard_profile
   patch "dashboard/public_profile", to: "dashboard#update_public_profile", as: :dashboard_public_profile
+  patch "dashboard/staff_profile", to: "dashboard#update_staff_profile", as: :dashboard_staff_profile
+  delete "dashboard/staff_profile/avatar", to: "dashboard#destroy_staff_avatar", as: :dashboard_staff_profile_avatar
   delete "dashboard/mcp_connections/:id", to: "dashboard#revoke_mcp_connection", as: :dashboard_mcp_connection
   post "theme", to: "themes#update", as: :update_theme
   get "dashboard/events/:id", to: "dashboard#show", as: :dashboard_event
@@ -151,9 +153,8 @@ Rails.application.routes.draw do
 
     get "search", to: "search#index"
 
-    resource :profile, only: [ :edit, :update ], controller: "profile" do
-      delete :avatar, to: "profile#destroy_avatar", as: :avatar
-    end
+    # The staff profile form now lives on the participant-facing settings page.
+    get "profile/edit", to: redirect("/dashboard/profile#staff-settings")
 
     # /admin/new → new event form
     get "new", to: "events#new", as: :new_event

@@ -3,8 +3,14 @@ class DashboardController < ApplicationController
   include PhysicalDocumentUploads
   include OptionalDocumentEnrolment
 
+  PROFILE_ACTIONS = %w[profile update_staff_profile destroy_staff_avatar].freeze
+
   before_action :authenticate_user!
-  before_action :require_participant
+  before_action :require_participant, except: PROFILE_ACTIONS
+  # Admins without a participant record still need the profile page — it's
+  # where their staff settings (display name, avatar, contact info) live now.
+  before_action :require_participant_or_admin, only: PROFILE_ACTIONS
+  before_action :require_admin, only: [ :update_staff_profile, :destroy_staff_avatar ]
 
   def index
     # display_status per row walks travel/health/guardian/consent/custom-doc
@@ -21,17 +27,33 @@ class DashboardController < ApplicationController
   end
 
   def profile
-    @public_profile_events = @participant.public_profile_eligible_participant_events.preload(:event)
-    # One [event, hidden] pair per staffed event — a user can hold several
-    # roles on an event, and it's hidden only when every assignment is.
-    @public_profile_staff_events = @participant.public_profile_eligible_staff_role_assignments
-      .preload(:event)
-      .group_by(&:event_id)
-      .values
-      .map { |assignments| [ assignments.first.event, assignments.all?(&:hidden_from_public_profile) ] }
-      .sort_by { |event, _hidden| event.starts_at || Time.current }
-      .reverse
+    if @participant
+      @public_profile_events = @participant.public_profile_eligible_participant_events.preload(:event)
+      # One [event, hidden] pair per staffed event — a user can hold several
+      # roles on an event, and it's hidden only when every assignment is.
+      @public_profile_staff_events = @participant.public_profile_eligible_staff_role_assignments
+        .preload(:event)
+        .group_by(&:event_id)
+        .values
+        .map { |assignments| [ assignments.first.event, assignments.all?(&:hidden_from_public_profile) ] }
+        .sort_by { |event, _hidden| event.starts_at || Time.current }
+        .reverse
+    end
     @mcp_connections = mcp_connections
+  end
+
+  def update_staff_profile
+    if current_user.update(staff_profile_params)
+      redirect_to dashboard_profile_path(anchor: "staff-settings"), notice: "Staff settings updated."
+    else
+      redirect_to dashboard_profile_path(anchor: "staff-settings"),
+        alert: current_user.errors.full_messages.to_sentence
+    end
+  end
+
+  def destroy_staff_avatar
+    current_user.avatar.purge_later
+    redirect_to dashboard_profile_path(anchor: "staff-settings"), notice: "Profile picture removed."
   end
 
   # Disconnect an MCP client: revoke every live token and pending grant this
@@ -411,6 +433,22 @@ class DashboardController < ApplicationController
     if @participant.nil?
       redirect_to onboarding_path, alert: "Please complete your profile first."
     end
+  end
+
+  def require_participant_or_admin
+    @participant = current_user.participant
+
+    if @participant.nil? && !current_user.admin?
+      redirect_to onboarding_path, alert: "Please complete your profile first."
+    end
+  end
+
+  def require_admin
+    redirect_to dashboard_profile_path unless current_user.admin?
+  end
+
+  def staff_profile_params
+    params.require(:user).permit(:display_name, :avatar, :phone_number, :slack_user_id)
   end
 
   def travel_params(direction)

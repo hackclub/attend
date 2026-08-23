@@ -2,18 +2,20 @@
 
 <div class="w-full max-w-6xl mx-auto">
   <!-- Account header -->
+  <% header_name = @participant&.display_name.presence || current_user.display_name_or_fallback %>
+  <% header_email = @participant&.email.presence || current_user.email %>
   <div class="mb-8 flex items-center gap-4">
-    <% if @participant.headshot.attached? && @participant.headshot.blob.persisted? %>
+    <% if @participant&.headshot&.attached? && @participant.headshot.blob.persisted? %>
       <%= image_tag @participant.headshot, class: "size-14 rounded-full object-cover ring-2 ring-(--border-card)" %>
     <% else %>
       <div class="flex size-14 items-center justify-center rounded-full bg-(--bg-elev-2) text-xl font-semibold text-(--text-muted)">
-        <%= @participant.display_name.to_s.first&.upcase %>
+        <%= header_name.to_s.first&.upcase %>
       </div>
     <% end %>
     <div class="min-w-0">
       <h1 class="text-xl font-bold text-(--text-strong) truncate">
-        <%= @participant.display_name %>
-        <span class="font-normal text-(--text-muted)">(<%= @participant.email %>)</span>
+        <%= header_name %>
+        <span class="font-normal text-(--text-muted)">(<%= header_email %>)</span>
       </h1>
       <p class="text-sm text-(--text-muted)">Your personal account</p>
     </div>
@@ -22,18 +24,29 @@
   <div class="grid items-start gap-x-8 gap-y-8 lg:grid-cols-[220px_minmax(0,1fr)]">
     <!-- Settings nav -->
     <nav class="flex gap-1 overflow-x-auto max-lg:border-b max-lg:border-(--border-soft) max-lg:pb-3 lg:sticky lg:top-8 lg:flex-col" aria-label="Settings">
-      <a href="#account" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
-        <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-        </svg>
-        Account
-      </a>
-      <a href="#public-profile" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
-        <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM3.6 9h16.8M3.6 15h16.8M12 3a15.3 15.3 0 010 18M12 3a15.3 15.3 0 000 18"/>
-        </svg>
-        Public profile
-      </a>
+      <% if @participant %>
+        <a href="#account" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
+          <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+          </svg>
+          Account
+        </a>
+        <a href="#public-profile" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
+          <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM3.6 9h16.8M3.6 15h16.8M12 3a15.3 15.3 0 010 18M12 3a15.3 15.3 0 000 18"/>
+          </svg>
+          Public profile
+        </a>
+      <% end %>
+      <% if current_user.admin? %>
+        <a href="#staff-settings" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
+          <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+          Staff settings
+        </a>
+      <% end %>
       <a href="#connections" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
         <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5"/>
@@ -49,6 +62,7 @@
     </nav>
 
     <div class="min-w-0 space-y-10">
+      <% if @participant %>
       <!-- Account -->
       <section id="account" class="scroll-mt-8">
         <h2 class="border-b border-(--border-soft) pb-3 text-xl font-semibold text-(--text-strong)">Account</h2>
@@ -271,6 +285,82 @@
           <% end %>
         </div>
       </section>
+      <% end %>
+
+      <% if current_user.admin? %>
+        <!-- Staff settings (User record: shown on comments, audit logs, incident calls) -->
+        <section id="staff-settings" class="scroll-mt-8">
+          <h2 class="border-b border-(--border-soft) pb-3 text-xl font-semibold text-(--text-strong)">Staff settings</h2>
+          <p class="mt-3 text-sm text-(--text-muted)">
+            How you appear to other organizers — on comments, audit logs, and other admin activity — and how Attend reaches you for incidents.
+          </p>
+          <div class="mt-4 overflow-hidden rounded-2xl border border-(--border-card) bg-(--bg-elev)">
+            <%= form_with model: current_user, url: dashboard_staff_profile_path, method: :patch, class: "px-6 py-5 space-y-5", data: { controller: "avatar-preview" } do |f| %>
+              <div class="flex items-center gap-5">
+                <div class="relative shrink-0" data-avatar-preview-target="container">
+                  <% if current_user.avatar_displayable? %>
+                    <%= image_tag current_user.avatar.variant(resize_to_fill: [ 96, 96 ]), class: "size-16 rounded-full object-cover ring-2 ring-(--border-card)", data: { avatar_preview_target: "image" } %>
+                  <% else %>
+                    <div class="flex size-16 items-center justify-center rounded-full bg-(--bg-elev-2)" data-avatar-preview-target="placeholder">
+                      <span class="text-xl font-semibold text-(--text-muted)"><%= current_user.initials %></span>
+                    </div>
+                    <img src="" class="size-16 rounded-full object-cover hidden" data-avatar-preview-target="image">
+                  <% end %>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <label class="block text-sm font-medium text-(--text-strong) mb-1">Profile picture</label>
+                  <%= f.file_field :avatar, accept: "image/jpeg,image/png,image/gif,image/webp", class: "block w-full text-sm text-(--text-muted) file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-(--bg-elev-2) file:text-(--text-strong) file:text-sm file:font-medium file:cursor-pointer", data: { action: "change->avatar-preview#preview", avatar_preview_target: "input" } %>
+                  <p class="text-xs text-(--text-faint) mt-1">JPG, PNG, GIF, or WebP up to 5MB</p>
+                </div>
+              </div>
+
+              <div>
+                <%= f.label :display_name, "Display name", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+                <%= f.text_field :display_name, placeholder: current_user.name || current_user.email, class: "w-full rounded-lg border border-(--border-card) bg-(--bg-app) px-3 py-2 text-sm text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-[#ec3750]/40" %>
+                <p class="text-xs text-(--text-faint) mt-1">If left blank, your Hack Club Auth name (<%= current_user.name || "not set" %>) or email is used.</p>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <%= f.label :phone_number, "Phone number", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+                  <%= f.telephone_field :phone_number,
+                        placeholder: current_user.oidc_claims&.dig("phone_number").presence || "+15551234567",
+                        class: "w-full rounded-lg border border-(--border-card) bg-(--bg-app) px-3 py-2 text-sm text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-[#ec3750]/40" %>
+                  <p class="text-xs text-(--text-faint) mt-1">
+                    Used for emergency incident calls.
+                    <%= current_user.oidc_claims&.dig("phone_number").present? ? "Defaults to your Hack Club account number; override here." : "Not provided by Hack Club login — set it here." %>
+                  </p>
+                </div>
+                <div>
+                  <%= f.label :slack_user_id, "Slack member ID", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+                  <%= f.text_field :slack_user_id,
+                        placeholder: current_user.oidc_claims&.dig("slack_id").presence || "U01ABCDEF",
+                        class: "w-full rounded-lg border border-(--border-card) bg-(--bg-app) px-3 py-2 text-sm text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-[#ec3750]/40" %>
+                  <p class="text-xs text-(--text-faint) mt-1">
+                    Used for Slack DM alerts.
+                    <%= current_user.oidc_claims&.dig("slack_id").present? ? "Defaults to your Hack Club account; override here." : "Set it here." %>
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between gap-4 border-t border-(--border-soft) pt-4 text-sm">
+                <div class="text-(--text-muted)">
+                  Role: <span class="text-(--text-strong)"><%= current_user.global_role.titleize %></span>
+                </div>
+                <%# f.button (not f.submit): themes.css themes every `input` element in dark
+                    modes with an unlayered rule that beats Tailwind's utility layer. %>
+                <%= f.button "Save staff settings", class: "inline-flex items-center px-4 py-2 bg-[#d42f46] hover:bg-[#b82840] text-[#ffffff] text-sm font-semibold rounded-lg transition-colors cursor-pointer" %>
+              </div>
+            <% end %>
+
+            <% if current_user.avatar.attached? %>
+              <div class="px-6 pb-5 -mt-2">
+                <%= button_to "Remove profile picture", dashboard_staff_profile_avatar_path, method: :delete, form: { data: { turbo_confirm: "Are you sure you want to remove your profile picture?" } }, class: "text-sm text-(--danger) hover:underline cursor-pointer" %>
+              </div>
+            <% end %>
+          </div>
+        </section>
+      <% end %>
 
       <!-- Connections -->
       <section id="connections" class="scroll-mt-8">
