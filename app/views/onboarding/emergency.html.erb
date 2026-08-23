@@ -1,43 +1,45 @@
 <div class="w-full max-w-2xl mx-auto">
   <%= render "wizard_nav" %>
 
-  <h1 class="text-2xl font-bold mb-2">Emergency Information</h1>
-  <p class="text-gray-600 mb-2">Please provide one emergency contact who can be reached during the event.</p>
-  <p class="text-sm text-gray-600 mb-6">Fields marked with <span class="text-red-500">*</span> are required.</p>
+  <header class="mb-6">
+    <h1 class="portal-title text-2xl">Emergency Information</h1>
+    <p class="portal-body mt-2">Please provide one emergency contact who can be reached during the event.</p>
+    <p class="portal-hint text-sm mt-2">Fields marked with <span class="portal-required" aria-hidden="true">*</span> are required.</p>
+  </header>
 
   <%= form_with url: onboarding_step_path(step: @step, event_id: current_event.id), method: :patch, local: true, data: { turbo: false, controller: "phone-input autosave", autosave_notify_only_value: "true", action: "input->autosave#input change->autosave#change" } do |f| %>
     <%= render "autosave_status" %>
-    <div class="space-y-8">
-      <section>
-        <h2 class="text-lg font-semibold mb-4 pb-2 border-b">Primary Emergency Contact</h2>
+    <div class="space-y-6">
+      <section class="portal-card p-5 sm:p-6">
+        <h2 class="portal-heading text-base mb-4">Primary Emergency Contact</h2>
 
         <% primary_contact = @emergency_contacts.find { |c| c.priority == 1 } || @participant_event.emergency_contacts.build(priority: 1) %>
-        <div class="space-y-4 bg-gray-50 rounded-md p-4">
+        <div class="space-y-4">
           <%= f.fields_for :emergency_contacts, primary_contact, index: 0 do |ec| %>
             <%= ec.hidden_field :priority, value: 1 %>
             <%= ec.hidden_field :id if primary_contact.persisted? %>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <%= ec.label :name, label_text("Full Name", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
-                <%= ec.text_field :name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true %>
+                <%= ec.label :name, label_text("Full Name", required: true), class: "portal-label" %>
+                <%= ec.text_field :name, class: "portal-input", required: true %>
               </div>
 
               <div>
-                <%= ec.label :relationship, label_text("Relationship", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
-                <%= ec.select :relationship, [["Select relationship", ""], "Parent", "Spouse/Partner", "Sibling", "Friend", "Colleague", "Other"], {}, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true %>
+                <%= ec.label :relationship, label_text("Relationship", required: true), class: "portal-label" %>
+                <%= ec.select :relationship, [["Select relationship", ""], "Parent", "Spouse/Partner", "Sibling", "Friend", "Colleague", "Other"], {}, class: "portal-select", required: true %>
               </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <%= ec.label :phone, label_text("Phone Number", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
-                <%= ec.telephone_field :phone, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true %>
+                <%= ec.label :phone, label_text("Phone Number", required: true), class: "portal-label" %>
+                <%= ec.telephone_field :phone, class: "portal-input", required: true %>
               </div>
 
               <div>
-                <%= ec.label :email, "Email", class: "block text-sm font-medium text-gray-700 mb-1" %>
-                <%= ec.email_field :email, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+                <%= ec.label :email, "Email", class: "portal-label" %>
+                <%= ec.email_field :email, class: "portal-input" %>
               </div>
             </div>
           <% end %>

@@ -271,6 +271,32 @@
     box-shadow: none;
   }
 
+  /* --- tabs ---------------------------------------------------------- */
+
+  .portal-tab {
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-soft);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color 0.12s ease, border-color 0.12s ease;
+  }
+
+  .portal-tab:hover {
+    color: var(--text-strong);
+  }
+
+  .portal-tab:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  .portal-tab-active {
+    color: var(--text-strong);
+    border-bottom-color: var(--accent);
+  }
+
   /* --- status ------------------------------------------------------- */
 
   .portal-badge {
