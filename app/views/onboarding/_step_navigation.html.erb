@@ -1,7 +1,7 @@
-<div class="pt-4 flex gap-3">
+<div class="pt-4 flex flex-col sm:flex-row gap-3">
   <% if @step_index && @step_index > 0 %>
-    <%= link_to "Back", onboarding_step_path(step: @steps[@step_index - 1], event_id: current_event.id), 
-        class: "w-1/4 bg-white text-gray-700 border border-gray-300 px-6 py-3 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium text-center" %>
+    <%= link_to "Back", onboarding_step_path(step: @steps[@step_index - 1], event_id: current_event.id),
+        class: "portal-btn portal-btn-secondary w-full sm:w-auto sm:min-w-28" %>
   <% end %>
-  <%= submit_tag "Save & Continue", class: "flex-1 bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-medium cursor-pointer" %>
+  <%= submit_tag "Save & Continue", class: "portal-btn portal-btn-primary flex-1" %>
 </div>
