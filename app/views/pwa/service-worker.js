@@ -1,3 +1,9 @@
+// Deliberately no fetch handler: every request goes straight to the network,
+// so Turbo pages can never go stale behind a cache. This worker exists so the
+// app is installable and ready for Web Push later.
+self.addEventListener("install", () => self.skipWaiting())
+self.addEventListener("activate", (event) => event.waitUntil(clients.claim()))
+
 // Add a service worker for processing Web Push notifications:
 //
 // self.addEventListener("push", async (event) => {
