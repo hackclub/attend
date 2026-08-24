@@ -15,7 +15,13 @@
               <p class="text-sm font-medium text-gray-900"><%= assignment.user.email %></p>
               <p class="text-xs text-gray-500"><%= EventRoleAssignment::ROLE_DETAILS.dig(assignment.role, :label) || assignment.role.humanize %></p>
             </div>
-            <%= button_to "Remove", admin_event_setup_team_member_path(@event, assignment), method: :delete, class: "text-sm text-gray-400 hover:text-red-600 font-medium cursor-pointer", form: { data: { turbo_confirm: "Remove #{assignment.user.email} from #{@event.name}?" } } %>
+            <% if assignment.inherited_from_series? %>
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800" title="Series <%= assignment.series_role %>s act as event admins on every event in the series. Manage them from the series members page.">
+                Inherited from series
+              </span>
+            <% else %>
+              <%= button_to "Remove", admin_event_setup_team_member_path(@event, assignment), method: :delete, class: "text-sm text-gray-400 hover:text-red-600 font-medium cursor-pointer", form: { data: { turbo_confirm: "Remove #{assignment.user.email} from #{@event.name}?" } } %>
+            <% end %>
           </div>
         <% end %>
       </div>

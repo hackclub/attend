@@ -41,4 +41,49 @@ RSpec.describe "Admin::EventStaff", type: :request do
       }.not_to have_enqueued_mail(EventStaffMailer, :added_to_event)
     end
   end
+
+  describe "DELETE destroy" do
+    let(:staff_user) { create(:user) }
+
+    it "removes a regular staff member" do
+      assignment = create(:event_role_assignment, event: event, user: staff_user, role: "event_admin")
+
+      expect {
+        delete admin_event_staff_path(event_slug: event.slug, id: assignment.id)
+      }.to change(EventRoleAssignment, :count).by(-1)
+    end
+
+    context "when the staff member is a series owner or organizer" do
+      let(:series) { create(:event_series) }
+      let(:event) { create(:event, event_series: series) }
+
+      %w[owner organizer].each do |series_role|
+        it "refuses to remove a series #{series_role} whose access is inherited" do
+          create(:series_role_assignment, user: staff_user, event_series: series, role: series_role)
+          assignment = create(:event_role_assignment, event: event, user: staff_user, role: "event_admin")
+
+          expect {
+            delete admin_event_staff_path(event_slug: event.slug, id: assignment.id)
+          }.not_to change(EventRoleAssignment, :count)
+
+          expect(response).to redirect_to(admin_event_staff_index_path(event_slug: event.slug))
+          expect(flash[:alert]).to include("inherited from the series")
+        end
+      end
+    end
+  end
+
+  describe "GET index" do
+    it "shows an inherited badge instead of a remove button for series members" do
+      series = create(:event_series)
+      event.update!(event_series: series)
+      member = create(:user)
+      create(:series_role_assignment, user: member, event_series: series, role: "owner")
+      create(:event_role_assignment, event: event, user: member, role: "event_admin")
+
+      get admin_event_staff_index_path(event_slug: event.slug)
+
+      expect(response.body).to include("Inherited from series")
+    end
+  end
 end

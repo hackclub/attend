@@ -172,6 +172,31 @@ RSpec.describe "Admin::EventSetup", type: :request do
     end
   end
 
+  describe "DELETE remove_team_member" do
+    let(:staff_user) { create(:user) }
+
+    it "removes a regular staff member" do
+      assignment = create(:event_role_assignment, event: event, user: staff_user, role: "event_admin")
+
+      expect {
+        delete admin_event_setup_team_member_path(event, assignment)
+      }.to change(EventRoleAssignment, :count).by(-1)
+    end
+
+    it "refuses to remove a series member whose access is inherited" do
+      series = create(:event_series)
+      event.update!(event_series: series)
+      create(:series_role_assignment, user: staff_user, event_series: series, role: "organizer")
+      assignment = create(:event_role_assignment, event: event, user: staff_user, role: "event_admin")
+
+      expect {
+        delete admin_event_setup_team_member_path(event, assignment)
+      }.not_to change(EventRoleAssignment, :count)
+
+      expect(flash[:alert]).to include("inherited from the series")
+    end
+  end
+
   describe "POST complete" do
     it "marks setup complete and lands on the event dashboard" do
       post admin_event_setup_complete_path(event)

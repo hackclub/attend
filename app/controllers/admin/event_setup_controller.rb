@@ -81,6 +81,13 @@ module Admin
 
     def remove_team_member
       @event_role_assignment = @event.event_role_assignments.find(params[:assignment_id])
+
+      if @event_role_assignment.inherited_from_series?
+        redirect_to admin_event_setup_team_path(@event),
+          alert: "#{@event_role_assignment.user.email} is a series #{@event_role_assignment.series_role} — their access is inherited from the series, so they can't be removed here."
+        return
+      end
+
       @event_role_assignment.destroy
       redirect_to admin_event_setup_team_path(@event), notice: "Staff member removed."
     end
