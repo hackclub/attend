@@ -30,6 +30,7 @@ module Admin
     def show
       @event_role_assignments = @user.event_role_assignments.includes(:event).order("events.starts_at DESC")
       @participant_events = @user.participant&.participant_events&.includes(:event)&.order("events.starts_at DESC") || []
+      @passports = @user.passports.includes(:paired_by, :revoked_by).order(created_at: :desc)
     end
 
     def new

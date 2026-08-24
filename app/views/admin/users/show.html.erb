@@ -86,6 +86,96 @@
     </dl>
   </div>
 
+  <div class="bg-white border-2 border-dashed border-orange-400 rounded-lg overflow-hidden"
+       data-controller="passport-pairing"
+       data-passport-pairing-create-url-value="<%= admin_user_passports_path(@user) %>">
+    <div class="px-6 py-4 border-b border-orange-200 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 class="text-lg font-medium text-gray-900">Hack Club Passports</h2>
+        <p class="mt-1 text-sm text-gray-500">Pair an event-agnostic NFC passport to this user.</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="inline-flex items-center gap-2 text-xs text-gray-500">
+          <span class="size-2 rounded-full bg-gray-400" data-passport-pairing-target="statusDot"></span>
+          <span data-passport-pairing-target="statusText">Not connected</span>
+        </span>
+        <button type="button"
+                class="px-3 py-2 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                data-passport-pairing-target="connectButton"
+                data-action="passport-pairing#toggleConnection">
+          Connect
+        </button>
+        <button type="button"
+                class="px-3 py-2 text-sm bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] disabled:cursor-not-allowed disabled:opacity-50"
+                data-passport-pairing-target="pairButton"
+                data-action="passport-pairing#pair"
+                disabled>
+          Pair passport
+        </button>
+      </div>
+    </div>
+
+    <div class="px-6 py-3 border-b border-orange-100">
+      <p class="text-sm text-gray-600" data-passport-pairing-target="progress">
+        Connect the Attend NFC Bridge to pair a passport.
+      </p>
+    </div>
+
+    <% if @passports.any? %>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-100">
+          <thead class="bg-orange-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serial</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Paired</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-100">
+            <% @passports.each do |passport| %>
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900"><%= passport.serial_number %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <% if passport.revoked? %>
+                    <span class="inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Revoked</span>
+                  <% elsif passport.active? %>
+                    <span class="inline-flex rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Active</span>
+                  <% else %>
+                    <span class="inline-flex rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">Pending</span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <% if passport.paired_at? %>
+                    <%= passport.paired_at.strftime("%B %d, %Y") %>
+                    <% if passport.paired_by %>
+                      <span class="block text-xs">by <%= passport.paired_by.display_name_or_fallback %></span>
+                    <% end %>
+                  <% else %>
+                    Not yet paired
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
+                  <% if passport.active? %>
+                    <%= button_to "Revoke",
+                      admin_user_passport_path(@user, passport),
+                      method: :delete,
+                      class: "text-red-600 hover:text-red-800",
+                      data: { turbo_confirm: "Revoke passport #{passport.serial_number}?" } %>
+                  <% elsif passport.revoked? %>
+                    <span class="text-xs text-gray-400"><%= passport.revoked_at.strftime("%B %d, %Y") %></span>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <p class="px-6 py-5 text-sm text-gray-500">No passports have been paired with this user.</p>
+    <% end %>
+  </div>
+
   <% if @event_role_assignments.any? %>
     <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
       <div class="px-6 py-4 border-b border-gray-200">
