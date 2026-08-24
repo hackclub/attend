@@ -95,6 +95,10 @@ RSpec.describe "Api::V1::Scans", type: :request do
         headers: auth_headers.merge("Content-Type" => "application/json")
 
       expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body).dig("scan", "scan_context")).to include(
+        "is_travel_pickup" => true,
+        "is_airport" => true
+      )
       expect(leg.reload).to be_travel_picked_up
     end
 

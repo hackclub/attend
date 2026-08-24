@@ -34,8 +34,8 @@ RSpec.describe Scan, type: :model do
         scanned_at: Time.current
       )
 
-      expect(Scan.for_airport).to contain_exactly(travel_pickup_scan)
-      expect(Scan.for_airport_or_check_in).to contain_exactly(travel_pickup_scan, check_in_scan)
+      expect(Scan.for_travel_pickup).to contain_exactly(travel_pickup_scan)
+      expect(Scan.for_travel_pickup_or_check_in).to contain_exactly(travel_pickup_scan, check_in_scan)
     end
   end
 end

@@ -106,7 +106,7 @@ export default class extends Controller {
         { type: "navigation", label: "Participants", url: `/admin/events/${currentEventSlug}/participants`, icon: "users", category: "Current Event" },
         { type: "navigation", label: "Incidents", url: `/admin/events/${currentEventSlug}/incidents`, icon: "alert", category: "Current Event" },
         { type: "navigation", label: "QR Scanner", url: `/admin/events/${currentEventSlug}/scans`, icon: "qr", category: "Current Event" },
-        { type: "navigation", label: "Airport Mode", url: `/admin/events/${currentEventSlug}/airport_mode`, icon: "plane", category: "Current Event" },
+        { type: "navigation", label: "Travel Calendar", url: `/admin/events/${currentEventSlug}/travel`, icon: "calendar", category: "Current Event" },
         { type: "navigation", label: "Messages", url: `/admin/events/${currentEventSlug}/messages`, icon: "message", category: "Current Event" },
         { type: "navigation", label: "New Message", url: `/admin/events/${currentEventSlug}/messages/new`, icon: "message", category: "Current Event" },
         { type: "navigation", label: "Staff", url: `/admin/events/${currentEventSlug}/staff`, icon: "staff", category: "Current Event" },

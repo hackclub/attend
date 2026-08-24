@@ -228,14 +228,14 @@ module Admin
     def approve_um
       authorize @participant_event, :update_travel?
       @participant_event.approve_um!(user: current_user)
-      Rails.cache.delete("airport_mode/#{current_event.id}/journeys/v3")
+      TravelCalendar::JourneyCache.clear(current_event)
       redirect_to travel_admin_event_participant_path(current_event, @participant_event), notice: "Unaccompanied minor status approved."
     end
 
     def reject_um
       authorize @participant_event, :update_travel?
       @participant_event.reject_um!(user: current_user)
-      Rails.cache.delete("airport_mode/#{current_event.id}/journeys/v3")
+      TravelCalendar::JourneyCache.clear(current_event)
       redirect_to travel_admin_event_participant_path(current_event, @participant_event), notice: "Unaccompanied minor status rejected."
     end
 

@@ -88,11 +88,11 @@
       <% end %>
 
       <% if current_event.travel_enabled? %>
-        <%= link_to admin_event_airport_mode_path(current_event), class: "nav-item #{request.path.include?('/airport_mode') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+        <%= link_to admin_event_travel_path(current_event), class: "nav-item #{request.path.include?('/travel') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
           </svg>
-          Airport Mode
+          Travel Calendar
         <% end %>
       <% end %>
 

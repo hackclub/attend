@@ -40,7 +40,7 @@ module AttendUrls
 
   def event_scanner_url(event) = attend_url(routes.scanner_admin_event_scans_path(event_slug: event.slug))
 
-  def event_airport_mode_url(event) = attend_url(routes.admin_event_airport_mode_path(event_slug: event.slug))
+  def event_travel_url(event) = attend_url(routes.admin_event_travel_path(event_slug: event.slug))
 
   # The admin participant page is keyed by participant_event id, not participant
   # id — a person has one page per event they're registered for.

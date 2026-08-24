@@ -26,7 +26,8 @@ info:
       owner is still a global admin. Sets the current user.
     - **Event API key** — per-event key (`Event#api_key`). Does **not** set a
       current user, so it only works on the subset of endpoints that don't
-      require one (participant `lookup`, `roster`, `create`, and `airport_mode`).
+      require one (participant `lookup`, `roster`, `create`, and the travel
+      calendar).
 
     Missing or invalid credentials return `401 { "error": "Unauthorized" }`.
 
@@ -63,8 +64,8 @@ tags:
     description: QR / NFC / manual scans and check-in.
   - name: Scan Contexts
     description: The scan stations configured for an event.
-  - name: Airport Mode
-    description: Live flight-tracking dashboard for participant air travel.
+  - name: Travel Calendar
+    description: Chronological participant travel and pickup operations.
   - name: Slack Blasts
     description: Broadcast Slack messages to an event's participants.
   - name: NFC Badges
@@ -667,27 +668,40 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
-  /events/{event_id}/airport_mode:
+  /events/{event_id}/travel:
     get:
-      tags: [Airport Mode]
-      summary: Flight-tracking dashboard
+      tags: [Travel Calendar]
+      summary: Show the travel calendar
       description: >-
-        Live inbound/outbound air-travel journeys for participants with
-        completed registrations, with per-leg tracking, status counts, and
-        airport/terminal lists. Journeys are cached for 5 minutes. Accepts an
-        event API key.
+        Day-grouped inbound and outbound travel for participants with completed
+        registrations, across all transport modes. Includes pickup-state
+        summaries and accepts an event API key.
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
-        - name: tab
-          in: query
-          required: false
-          schema: { type: string, enum: [inbound, outbound], default: inbound }
       responses:
         "200":
-          description: Airport-mode dashboard.
+          description: Travel calendar.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/AirportModeResponse" }
+              schema: { $ref: "#/components/schemas/TravelCalendarResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/airport_mode:
+    get:
+      tags: [Travel Calendar]
+      summary: Show the travel calendar (legacy path)
+      description: Deprecated alias for `/events/{event_id}/travel`.
+      deprecated: true
+      parameters:
+        - $ref: "#/components/parameters/EventIdNumeric"
+      responses:
+        "200":
+          description: Travel calendar.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TravelCalendarResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -1040,8 +1054,14 @@ components:
         id: { type: integer, example: 4 }
         name: { type: string, example: Check-in }
         checks_in: { type: boolean }
-        is_airport: { type: boolean }
+        is_travel_pickup: { type: boolean }
+        is_airport:
+          type: boolean
+          deprecated: true
+          description: Deprecated alias for `is_travel_pickup`.
         position: { type: integer }
+        starts_at: { type: string, format: date-time, nullable: true }
+        ends_at: { type: string, format: date-time, nullable: true }
 
     Scan:
       type: object
@@ -1234,7 +1254,13 @@ components:
         live_status: { type: string, nullable: true }
         live_departure_time: { type: string, format: date-time, nullable: true }
         live_arrival_time: { type: string, format: date-time, nullable: true }
-        airport_picked_up_at: { type: string, format: date-time, nullable: true }
+        travel_picked_up_at: { type: string, format: date-time, nullable: true }
+        airport_picked_up_at:
+          type: string
+          format: date-time
+          nullable: true
+          deprecated: true
+          description: Deprecated alias for `travel_picked_up_at`.
 
     ScansByContext:
       type: object
@@ -1242,7 +1268,11 @@ components:
         scan_context_id: { type: integer }
         scan_context_name: { type: string }
         checks_in: { type: boolean }
-        is_airport: { type: boolean }
+        is_travel_pickup: { type: boolean }
+        is_airport:
+          type: boolean
+          deprecated: true
+          description: Deprecated alias for `is_travel_pickup`.
         scan_count: { type: integer }
         first_scanned_at: { type: string, format: date-time, nullable: true }
         last_scanned_at: { type: string, format: date-time, nullable: true }
@@ -1435,43 +1465,33 @@ components:
                 curfew_acknowledged: { type: boolean }
                 overnight_rules_acknowledged: { type: boolean }
 
-    AirportModeResponse:
+    TravelCalendarResponse:
       type: object
       properties:
-        tab: { type: string, enum: [inbound, outbound] }
-        last_refreshed_at: { type: string, format: date-time, nullable: true }
-        event_timezone: { type: string }
+        eventTimezone: { type: string, example: America/New_York }
+        dates:
+          type: array
+          items: { type: string, format: date }
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/TravelCalendarEntry" }
         counts:
-          type: object
-          properties:
-            inbound: { $ref: "#/components/schemas/AirportCounts" }
-            outbound: { $ref: "#/components/schemas/AirportCounts" }
-        airports:
-          type: array
-          items: { type: string }
-        terminals:
-          type: array
-          items: { type: string }
-        journeys:
-          type: array
-          items: { $ref: "#/components/schemas/AirportJourney" }
+          $ref: "#/components/schemas/TravelCalendarCounts"
 
-    AirportCounts:
+    TravelCalendarCounts:
       type: object
       properties:
         total: { type: integer }
-        cancelled: { type: integer }
-        diverted: { type: integer }
-        landed_waiting: { type: integer }
-        picked_up: { type: integer }
-        in_flight: { type: integer }
+        inbound: { type: integer }
+        outbound: { type: integer }
         scheduled: { type: integer }
-        delayed: { type: integer }
-        ums: { type: integer }
-        arriving_now: { type: integer }
-        alerts: { type: integer }
+        unscheduled: { type: integer }
+        awaitingPickup: { type: integer }
+        collected: { type: integer }
+        checkedIn: { type: integer }
+        pickupNotNeeded: { type: integer }
 
-    AirportJourney:
+    TravelCalendarEntry:
       type: object
       description: camelCase keys, as returned by the serializer.
       properties:
@@ -1479,57 +1499,19 @@ components:
         participantId: { type: string }
         participantEventId: { type: string }
         participantName: { type: string }
-        participantFullName: { type: string }
-        participantHasHeadshot: { type: boolean }
-        participantHeadshotUrl: { type: string, nullable: true }
-        direction: { type: string }
-        status: { type: string, enum: [scheduled, in_flight, landed, picked_up, cancelled, diverted] }
-        statusLabel: { type: string }
-        statusColor: { type: string }
-        isDelayed: { type: boolean }
-        delayMinutes: { type: integer }
+        participantPreferredName: { type: string }
+        direction: { type: string, enum: [inbound, outbound] }
+        mode: { type: string, enum: [plane, train, bus, car, other] }
+        primaryTimeAt: { type: string, format: date-time, nullable: true }
+        agendaDate: { type: string, format: date, nullable: true }
+        route: { type: string }
+        reference: { type: string, nullable: true }
+        details: { type: string, nullable: true }
+        pickupState:
+          type: string
+          nullable: true
+          enum: [awaiting_pickup, collected, checked_in, pickup_not_needed]
         isUnaccompaniedMinor: { type: boolean }
-        arrivingNow: { type: boolean }
-        isAlert: { type: boolean }
-        scannedIn: { type: boolean }
-        scannedAt: { type: string, format: date-time, nullable: true }
-        legCount: { type: integer }
-        primaryAirport: { type: string, nullable: true }
-        primaryTerminal: { type: string, nullable: true }
-        primaryGate: { type: string, nullable: true }
-        primaryTimezone: { type: string, nullable: true }
-        primaryTimeIso: { type: string, nullable: true }
-        primaryScheduledIso: { type: string, nullable: true }
-        progress: { type: number, nullable: true }
-        lastTrackedAt: { type: string, format: date-time, nullable: true }
-        legs:
+        groups:
           type: array
-          items: { $ref: "#/components/schemas/AirportLeg" }
-
-    AirportLeg:
-      type: object
-      description: camelCase keys, as returned by the serializer.
-      properties:
-        id: { type: string }
-        flightCode: { type: string }
-        origin: { type: string }
-        destination: { type: string }
-        departureTime: { type: string, format: date-time, nullable: true }
-        arrivalTime: { type: string, format: date-time, nullable: true }
-        status: { type: string }
-        statusLabel: { type: string }
-        statusColor: { type: string }
-        departureTerminal: { type: string, nullable: true }
-        departureGate: { type: string, nullable: true }
-        arrivalTerminal: { type: string, nullable: true }
-        arrivalGate: { type: string, nullable: true }
-        departureTimezone: { type: string, nullable: true }
-        arrivalTimezone: { type: string, nullable: true }
-        scheduledDepartureIso: { type: string, nullable: true }
-        scheduledArrivalIso: { type: string, nullable: true }
-        progress: { type: number, nullable: true }
-        departureCoordinates: { type: object, nullable: true, additionalProperties: true }
-        arrivalCoordinates: { type: object, nullable: true, additionalProperties: true }
-        currentCoordinates: { type: object, nullable: true, additionalProperties: true }
-        delayMinutes: { type: integer }
-        isDelayed: { type: boolean }
+          items: { type: string }

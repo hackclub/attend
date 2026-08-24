@@ -213,7 +213,8 @@ module Api
             id: scan.scan_context_id,
             name: scan.scan_context.name,
             checks_in: scan.scan_context.checks_in,
-            is_travel_pickup: scan.scan_context.is_travel_pickup
+            is_travel_pickup: scan.scan_context.is_travel_pickup,
+            is_airport: scan.scan_context.is_travel_pickup
           } : nil,
           created_at: scan.created_at.iso8601
         }

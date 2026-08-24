@@ -451,7 +451,8 @@ module Api
             scan_context_id: context.id,
             scan_context_name: context.name,
             checks_in: context.checks_in,
-            is_airport: context.is_airport,
+            is_travel_pickup: context.is_travel_pickup,
+            is_airport: context.is_travel_pickup,
             scan_count: context_scans.size,
             first_scanned_at: context_scans.first&.scanned_at&.iso8601,
             last_scanned_at: context_scans.last&.scanned_at&.iso8601
@@ -505,7 +506,8 @@ module Api
           live_status: leg.live_status,
           live_departure_time: leg.live_departure_time&.iso8601,
           live_arrival_time: leg.live_arrival_time&.iso8601,
-          airport_picked_up_at: leg.airport_picked_up_at&.iso8601
+          travel_picked_up_at: leg.travel_picked_up_at&.iso8601,
+          airport_picked_up_at: leg.travel_picked_up_at&.iso8601
         }
       end
 

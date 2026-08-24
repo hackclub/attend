@@ -34,5 +34,18 @@ RSpec.describe "Api::V1::ScanContexts", type: :request do
       expect(anytime["starts_at"]).to be_nil
       expect(anytime["ends_at"]).to be_nil
     end
+
+    it "returns canonical and deprecated travel pickup fields" do
+      event.scan_contexts.create!(name: "Station pickup", is_travel_pickup: true)
+
+      get "/api/v1/events/#{event.id}/scan_contexts", headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      pickup = JSON.parse(response.body)["scan_contexts"].find { |context| context["name"] == "Station pickup" }
+      expect(pickup).to include(
+        "is_travel_pickup" => true,
+        "is_airport" => true
+      )
+    end
   end
 end
