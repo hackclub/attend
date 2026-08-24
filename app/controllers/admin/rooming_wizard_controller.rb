@@ -6,7 +6,7 @@ module Admin
     before_action :require_event_selected
     before_action :authorize_rooming!
     before_action :set_rooming_plan
-    before_action :require_unlocked!, only: %i[auto_assign move_assignment create_room update_room destroy_room add_staff remove_staff toggle_exempt reorder_rooms]
+    before_action :require_unlocked!, only: %i[manual_assign auto_assign move_assignment create_room update_room destroy_room add_staff remove_staff toggle_exempt reorder_rooms]
 
     def show
       redirect_to latest_wizard_step_path
@@ -128,6 +128,13 @@ module Admin
 
       redirect_to assignments_admin_event_rooming_wizard_path(@event.slug),
         notice: "Auto-assignment complete. #{result[:assigned]} participants assigned, #{result[:unassigned]} unassigned."
+    end
+
+    def manual_assign
+      @rooming_plan.update!(status: :preferences_linked)
+
+      redirect_to assignments_admin_event_rooming_wizard_path(@event.slug),
+        notice: "Manual assignment ready. Drag participants into rooms to assign them."
     end
 
     def assignments

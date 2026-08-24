@@ -122,12 +122,13 @@ module Admin
         scan_source = "nfc" if participant_event
       end
 
-      # Fall back to participant_id lookup (QR code flow)
+      # Fall back to participant identifier lookup (QR code flow)
       if participant_event.nil? && params[:participant_id].present?
-        participant_event = current_event.participant_events
-          .joins(:participant)
-          .includes(:medical, :dietary)
-          .find_by(participants: { id: params[:participant_id] })
+        participant_event = ScanParticipantResolver.call(
+          event: current_event,
+          identifier: params[:participant_id],
+          includes: [ :participant, :medical, :dietary ]
+        )
       end
 
       unless participant_event
