@@ -50,6 +50,40 @@ RSpec.describe "Api::V1::Scans", type: :request do
   end
 
   describe "POST /api/v1/events/:event_id/scans" do
+    it "invalidates the journey cache after an explicit travel pickup scan" do
+      memory_store = ActiveSupport::Cache::MemoryStore.new
+      allow(Rails).to receive(:cache).and_return(memory_store)
+      participant_event = create(:participant_event, event: event, status: :complete)
+      pickup = event.scan_contexts.create!(name: "Station pickup", checks_in: false, is_travel_pickup: true)
+      travel = Travel.create!(participant_event: participant_event, direction: "inbound", mode: "train")
+
+      expect(TravelCalendar::JourneyCache.fetch(event).sole[:pickup_state]).to eq(:awaiting_pickup)
+
+      post "/api/v1/events/#{event.id}/scans",
+        params: { participant_id: participant_event.id, scan_context_id: pickup.id }.to_json,
+        headers: auth_headers.merge("Content-Type" => "application/json")
+
+      expect(response).to have_http_status(:ok)
+      expect(TravelCalendar::JourneyCache.fetch(event).sole).to include(id: travel.id, pickup_state: :collected)
+    end
+
+    it "invalidates the journey cache after venue check-in" do
+      memory_store = ActiveSupport::Cache::MemoryStore.new
+      allow(Rails).to receive(:cache).and_return(memory_store)
+      participant_event = create(:participant_event, event: event, status: :complete)
+      check_in = event.scan_contexts.find_by!(checks_in: true)
+      travel = Travel.create!(participant_event: participant_event, direction: "inbound", mode: "bus")
+
+      expect(TravelCalendar::JourneyCache.fetch(event).sole[:pickup_state]).to eq(:awaiting_pickup)
+
+      post "/api/v1/events/#{event.id}/scans",
+        params: { participant_id: participant_event.id, scan_context_id: check_in.id }.to_json,
+        headers: auth_headers.merge("Content-Type" => "application/json")
+
+      expect(response).to have_http_status(:ok)
+      expect(TravelCalendar::JourneyCache.fetch(event).sole).to include(id: travel.id, pickup_state: :checked_in)
+    end
+
     it "marks the final inbound flight leg for an explicit travel pickup scan" do
       participant_event = create(:participant_event, event: event)
       pickup = event.scan_contexts.create!(name: "Station pickup", checks_in: false, is_travel_pickup: true)

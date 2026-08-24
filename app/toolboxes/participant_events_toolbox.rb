@@ -95,6 +95,8 @@ class ParticipantEventsToolbox < ApplicationToolbox
       @participant_event.ensure_nfc_badge_token! if event.nfc_badges_enabled?
     end
 
+    TravelCalendar::JourneyCache.clear(event)
+
     # An earlier scan wins on time, so report what #show would.
     render json: serialize_registration(@participant_event).merge(
       checked_in_at: @participant_event.check_in_time,

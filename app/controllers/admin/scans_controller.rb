@@ -150,6 +150,10 @@ module Admin
         mark_travel_pickup(participant_event, current_user)
       end
 
+      if scan_context.is_travel_pickup? || scan_context.checks_in?
+        TravelCalendar::JourneyCache.clear(current_event)
+      end
+
       # Auto-generate NFC badge token on first check-in if NFC is enabled
       if current_event.nfc_badges_enabled? && scan_context.checks_in? && first_scan_in_context
         participant_event.ensure_nfc_badge_token!
