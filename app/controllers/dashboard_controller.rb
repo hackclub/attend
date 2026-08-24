@@ -3,7 +3,10 @@ class DashboardController < ApplicationController
   include PhysicalDocumentUploads
   include OptionalDocumentEnrolment
 
-  PROFILE_ACTIONS = %w[profile update_staff_profile destroy_staff_avatar].freeze
+  # MCP connections are managed from the profile page, so they follow the same
+  # rule as the rest of it: admins without a participant record still get in.
+  PROFILE_ACTIONS = %w[profile update_staff_profile destroy_staff_avatar
+                       revoke_mcp_connection update_mcp_connection].freeze
 
   before_action :authenticate_user!
   before_action :require_participant, except: PROFILE_ACTIONS
@@ -54,6 +57,39 @@ class DashboardController < ApplicationController
   def destroy_staff_avatar
     current_user.avatar.purge_later
     redirect_to dashboard_profile_path(anchor: "staff-settings"), notice: "Profile picture removed."
+  end
+
+  # Tighten an MCP connection in place: narrow it to specific events, or turn on
+  # anonymisation. Both directions of loosening are deliberately missing —
+  # widening access means disconnecting the client and authorising it again, so
+  # a wider grant always passes back through the consent screen.
+  def update_mcp_connection
+    application = Toolchest::OauthApplication.find_by(id: params[:id])
+    return redirect_to(dashboard_profile_path(anchor: "connections"), alert: "Connection not found.") if application.nil?
+
+    settings = McpConnectionSetting.find_or_create_by!(
+      application_id: application.id, resource_owner_id: current_user.id.to_s
+    )
+    notices = []
+
+    if params[:mcp_anonymize] == "1" && !settings.anonymize?
+      settings.anonymize!(:dashboard)
+      notices << "#{application.name} is now anonymised and read-only"
+    end
+
+    if params[:event_scope] == "selected"
+      requested = mcp_scopable_events(settings).where(id: Array(params[:mcp_event_ids]).compact_blank).pluck(:id)
+      if requested.empty?
+        return redirect_to dashboard_profile_path(anchor: "connections"),
+          alert: "Pick at least one event to limit #{application.name} to."
+      end
+      if settings.narrow_events!(requested)
+        notices << "#{application.name} is now limited to #{settings.events.reload.order(:name).pluck(:name).to_sentence}"
+      end
+    end
+
+    redirect_to dashboard_profile_path(anchor: "connections"),
+      notice: notices.any? ? "#{notices.to_sentence}." : "Nothing changed."
   end
 
   # Disconnect an MCP client: revoke every live token and pending grant this
@@ -415,16 +451,31 @@ class DashboardController < ApplicationController
       .where(resource_owner_id: current_user.id.to_s, revoked_at: nil)
       .includes(:application)
 
+    settings = McpConnectionSetting.for_user(current_user).includes(:events).index_by(&:application_id)
+
     tokens.group_by(&:application).filter_map do |application, app_tokens|
       next unless application
 
+      setting = settings[application.id]
       {
         application: application,
         scopes: app_tokens.flat_map(&:scopes_array).uniq.sort,
         connected_at: app_tokens.map(&:created_at).min,
-        last_used_at: app_tokens.map(&:updated_at).max
+        last_used_at: app_tokens.map(&:updated_at).max,
+        settings: setting,
+        anonymized: setting&.anonymize? || false,
+        events: setting&.restricted_to_events? ? setting.events.sort_by { |e| e.name.to_s } : nil,
+        scopable_events: mcp_scopable_events(setting)
       }
     end.sort_by { |connection| connection[:connected_at] }.reverse
+  end
+
+  # The events a connection could be narrowed to: what the user can reach, and
+  # never wider than the connection already is.
+  def mcp_scopable_events(setting)
+    scope = current_user.global_admin? ? Event.all : current_user.assigned_events
+    scope = scope.where(id: setting.permitted_event_ids) if setting&.restricted_to_events?
+    scope.order(Arel.sql("starts_at DESC NULLS LAST"), :name)
   end
 
   def require_participant

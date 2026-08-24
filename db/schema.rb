@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -703,6 +703,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_090000) do
     t.index ["token"], name: "index_invitations_on_token", unique: true
   end
 
+  create_table "mcp_connection_events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "event_id", null: false
+    t.uuid "mcp_connection_setting_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["event_id"], name: "index_mcp_connection_events_on_event_id"
+    t.index ["mcp_connection_setting_id", "event_id"], name: "index_mcp_connection_events_on_setting_and_event", unique: true
+  end
+
+  create_table "mcp_connection_settings", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.boolean "all_events", default: true, null: false
+    t.boolean "anonymize", default: false, null: false
+    t.datetime "anonymize_enabled_at"
+    t.string "anonymize_enabled_by", comment: "consent | dashboard | mcp"
+    t.bigint "application_id", null: false
+    t.datetime "created_at", null: false
+    t.string "resource_owner_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["application_id", "resource_owner_id"], name: "index_mcp_connection_settings_on_application_and_owner", unique: true
+  end
+
   create_table "medicals", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.text "additional_notes"
     t.text "allergies"
@@ -1327,6 +1348,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_090000) do
   add_foreign_key "incidents", "participant_events"
   add_foreign_key "incidents", "users", column: "reported_by_user_id"
   add_foreign_key "invitations", "events"
+  add_foreign_key "mcp_connection_events", "events"
+  add_foreign_key "mcp_connection_events", "mcp_connection_settings"
+  add_foreign_key "mcp_connection_settings", "toolchest_oauth_applications", column: "application_id"
   add_foreign_key "medicals", "participant_events"
   add_foreign_key "medicals", "users", column: "last_updated_by_user_id"
   add_foreign_key "message_deliveries", "guardians"

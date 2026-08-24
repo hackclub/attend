@@ -228,8 +228,6 @@ class RoomingToolbox < ApplicationToolbox
 
   def serialize_person(pe)
     p = pe.participant
-    { participant_event_id: pe.id,
-      name: [ p.preferred_name.presence || p.legal_first_name, p.legal_last_name ].join(" "),
-      status: pe.status }
+    { participant_event_id: pe.id, name: participant_name(p), status: pe.status }
   end
 end

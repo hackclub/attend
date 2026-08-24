@@ -39,7 +39,7 @@ class ParticipantEventsToolbox < ApplicationToolbox
       onboarding_step: pe.onboarding_step,
       checked_in_at: pe.check_in_time,
       guardians: pe.guardian_participant_events.includes(:guardian).map { |gpe|
-        { name: gpe.guardian&.full_name, primary: gpe.is_primary_guardian, status: gpe.status }
+        { name: person_name(gpe.guardian&.full_name), primary: gpe.is_primary_guardian, status: gpe.status }
       },
       data_on_file: {
         travel_inbound: pe.travel_inbound.present?,
@@ -151,7 +151,7 @@ class ParticipantEventsToolbox < ApplicationToolbox
     {
       participant_event_id: pe.id,
       participant_id: pe.participant_id,
-      name: [ p.preferred_name.presence || p.legal_first_name, p.legal_last_name ].join(" "),
+      name: participant_name(p),
       email: p.email,
       event: pe.event.name,
       status: pe.status,

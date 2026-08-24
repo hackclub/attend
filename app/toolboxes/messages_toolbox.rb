@@ -71,6 +71,7 @@ class MessagesToolbox < ApplicationToolbox
   def load_message!
     Message.find(params[:message_id]).tap do |m|
       halt error: "You don't have access to that event." unless current_user.can_access_event?(m.event)
+      halt error: out_of_connection_scope(m.event) unless connection_permits_event?(m.event)
     end
   end
 

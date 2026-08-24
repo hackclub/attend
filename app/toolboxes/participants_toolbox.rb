@@ -53,11 +53,11 @@ class ParticipantsToolbox < ApplicationToolbox
 
   private
 
-  # Participants reachable through the events the user can access.
+  # Participants reachable through the events this connection can access.
   def accessible_participants
-    return Participant.all if current_user.global_admin?
+    return Participant.all if current_user.global_admin? && permitted_event_ids.nil?
 
-    Participant.where(id: ParticipantEvent.where(event_id: current_user.assigned_events.select(:id))
+    Participant.where(id: ParticipantEvent.where(event_id: accessible_events.select(:id))
                                           .select(:participant_id))
   end
 
@@ -66,14 +66,15 @@ class ParticipantsToolbox < ApplicationToolbox
 
     event = current_event
     halt error: "You don't have access to that event." unless event && current_user.can_access_event?(event)
+    halt error: out_of_connection_scope(event) unless connection_permits_event?(event)
     event
   end
 
   def serialize_participant(p, full: false)
     base = {
       id: p.id,
-      name: [ p.preferred_name.presence || p.legal_first_name, p.legal_last_name ].join(" "),
-      legal_name: [ p.legal_first_name, p.legal_last_name ].join(" "),
+      name: participant_name(p),
+      legal_name: person_name([ p.legal_first_name, p.legal_last_name ].join(" ")),
       email: p.email,
       pronouns: p.pronouns
     }
@@ -88,7 +89,7 @@ class ParticipantsToolbox < ApplicationToolbox
       country_of_residence: p.country_of_residence,
       tshirt_size: p.tshirt_size,
       registrations: p.participant_events
-        .where(current_user.global_admin? ? {} : { event_id: current_user.assigned_events.select(:id) })
+        .where(current_user.global_admin? && permitted_event_ids.nil? ? {} : { event_id: accessible_events.select(:id) })
         .includes(:event).map { |pe|
           { participant_event_id: pe.id, event: pe.event.name, event_slug: pe.event.slug, status: pe.status }
         }
