@@ -346,7 +346,7 @@ class ParticipantEvent < ApplicationRecord
       (travel_outbound&.plane? && travel_outbound.is_unaccompanied_minor?))
   end
 
-  # Only verified UMs are surfaced to event admins and airport mode.
+  # Only verified UMs are surfaced to event admins and the Travel Calendar.
   def verified_unaccompanied_minor?
     unaccompanied_minor_declared? && um_approved?
   end

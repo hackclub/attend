@@ -58,5 +58,33 @@ RSpec.describe "Docs", type: :request do
       expect(doc.dig("info", "title")).to eq("Attend API")
       expect(doc["paths"]).to include("/me", "/events/{event_id}/participants")
     end
+
+    it "documents the UUID travel paths and nullable group-object entry contract" do
+      sign_in global_admin
+      get docs_openapi_path(format: :json)
+
+      doc = JSON.parse(response.body)
+      canonical = doc.dig("paths", "/events/{event_id}/travel", "get")
+      legacy = doc.dig("paths", "/events/{event_id}/airport_mode", "get")
+      entry = doc.dig("components", "schemas", "TravelCalendarEntry", "properties")
+
+      expect(canonical.fetch("parameters").sole).to eq("$ref" => "#/components/parameters/EventIdUuid")
+      expect(legacy.fetch("parameters").sole).to eq("$ref" => "#/components/parameters/EventIdUuid")
+      expect(legacy["deprecated"]).to be(true)
+      expect(doc.dig("components", "parameters", "EventIdUuid", "schema")).to eq(
+        "type" => "string",
+        "format" => "uuid"
+      )
+      expect(entry.values_at("participantPreferredName", "mode", "route")).to all(include("nullable" => true))
+      expect(entry.dig("groups", "items")).to eq(
+        "type" => "object",
+        "required" => %w[id name color],
+        "properties" => {
+          "id" => { "type" => "string", "format" => "uuid" },
+          "name" => { "type" => "string" },
+          "color" => { "type" => "string", "nullable" => true }
+        }
+      )
+    end
   end
 end

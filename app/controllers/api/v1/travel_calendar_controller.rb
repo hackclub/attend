@@ -22,7 +22,13 @@ module Api
       end
 
       def authorize_event
-        require_event_access!(@event) if current_user
+        if current_event_from_api_key
+          unless current_event_from_api_key.id == @event.id
+            render json: { error: "API key is not valid for this event" }, status: :forbidden
+          end
+        else
+          require_event_access!(@event)
+        end
       end
 
       def event_timezone

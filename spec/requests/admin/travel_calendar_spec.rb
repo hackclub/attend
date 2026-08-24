@@ -161,6 +161,21 @@ RSpec.describe "Admin::TravelCalendar", type: :request do
 
       expect(response).to redirect_to(admin_event_travel_path(event, direction: "inbound"))
     end
+
+    it "marks the sidebar link active only on the canonical travel calendar path" do
+      get admin_event_travel_path(event)
+
+      calendar_links = Nokogiri::HTML(response.body).css("a").select { |link| link.text.strip == "Travel Calendar" }
+      expect(calendar_links).not_to be_empty
+      expect(calendar_links).to all(satisfy { |link| link["class"].split.include?("nav-item-active") })
+
+      participant_event = create(:participant_event, event: event)
+      get travel_admin_event_participant_path(event, participant_event)
+
+      calendar_links = Nokogiri::HTML(response.body).css("a").select { |link| link.text.strip == "Travel Calendar" }
+      expect(calendar_links).not_to be_empty
+      expect(calendar_links).to all(satisfy { |link| link["class"].split.exclude?("nav-item-active") })
+    end
   end
 
   describe "POST /admin/events/:slug/travel/dismiss_pickup" do

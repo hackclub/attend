@@ -82,4 +82,36 @@ RSpec.describe "Api::V1::TravelCalendar", type: :request do
     expect(response).to have_http_status(:ok)
     expect(legacy_json.fetch("entries").pluck("id")).to eq(canonical_ids)
   end
+
+  it "returns group objects and nullable fields from a UUID event path" do
+    event.update!(groups_enabled: true)
+    participant = create(:participant, preferred_name: nil)
+    participant_event = create(:participant_event, participant: participant, event: event, status: :complete)
+    group = create(:group, event: event, name: "Blue Team", color: nil)
+    create(:group_membership, group: group, participant_event: participant_event)
+    travel = Travel.create!(participant_event: participant_event, direction: "inbound", mode: nil)
+
+    get "/api/v1/events/#{event.id}/travel", headers: auth_headers
+
+    expect(response).to have_http_status(:ok)
+    entry = JSON.parse(response.body).fetch("entries").sole
+    expect(entry).to include(
+      "id" => travel.id,
+      "participantPreferredName" => nil,
+      "mode" => nil,
+      "route" => nil,
+      "groups" => [ { "id" => group.id, "name" => "Blue Team", "color" => nil } ]
+    )
+  end
+
+  %w[travel airport_mode].each do |endpoint|
+    it "rejects an event API key used for another event's #{endpoint} endpoint" do
+      other_event = create(:event)
+
+      get "/api/v1/events/#{other_event.id}/#{endpoint}", headers: auth_headers
+
+      expect(response).to have_http_status(:forbidden)
+      expect(JSON.parse(response.body)).to eq("error" => "API key is not valid for this event")
+    end
+  end
 end

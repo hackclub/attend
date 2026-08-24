@@ -677,7 +677,7 @@ paths:
         registrations, across all transport modes. Includes pickup-state
         summaries and accepts an event API key.
       parameters:
-        - $ref: "#/components/parameters/EventIdNumeric"
+        - $ref: "#/components/parameters/EventIdUuid"
       responses:
         "200":
           description: Travel calendar.
@@ -695,7 +695,7 @@ paths:
       description: Deprecated alias for `/events/{event_id}/travel`.
       deprecated: true
       parameters:
-        - $ref: "#/components/parameters/EventIdNumeric"
+        - $ref: "#/components/parameters/EventIdUuid"
       responses:
         "200":
           description: Travel calendar.
@@ -945,6 +945,12 @@ components:
       required: true
       schema: { type: integer }
       description: Event id.
+    EventIdUuid:
+      name: event_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+      description: Event UUID.
     ParticipantId:
       name: participant_id
       in: path
@@ -1499,12 +1505,12 @@ components:
         participantId: { type: string }
         participantEventId: { type: string }
         participantName: { type: string }
-        participantPreferredName: { type: string }
+        participantPreferredName: { type: string, nullable: true }
         direction: { type: string, enum: [inbound, outbound] }
-        mode: { type: string, enum: [plane, train, bus, car, other] }
+        mode: { type: string, enum: [plane, train, bus, car, other], nullable: true }
         primaryTimeAt: { type: string, format: date-time, nullable: true }
         agendaDate: { type: string, format: date, nullable: true }
-        route: { type: string }
+        route: { type: string, nullable: true }
         reference: { type: string, nullable: true }
         details: { type: string, nullable: true }
         pickupState:
@@ -1514,4 +1520,10 @@ components:
         isUnaccompaniedMinor: { type: boolean }
         groups:
           type: array
-          items: { type: string }
+          items:
+            type: object
+            required: [id, name, color]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              color: { type: string, nullable: true }
