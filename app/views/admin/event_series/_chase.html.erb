@@ -1,0 +1,119 @@
+<%# The chase list. Rows only exist when there is something to chase, so an
+    all-clear series collapses to one line instead of a wall of zeroes — the
+    page is meant to open with work, not with reassurance. %>
+<% invite_rows = event_rows.select { |row| row[:pending_invitations].positive? } %>
+<% incident_rows = event_rows.select { |row| row[:open_incidents].to_i.positive? } %>
+<% nothing_to_chase = chase_rows.empty? && invite_rows.empty? && incident_rows.empty? %>
+<%# SeriesDashboard#open_incidents returns nil, not zero, for an event whose
+    incidents this viewer has no role to see. Counting those as zero would hand
+    an organizer a chase list that is quietly short, so the gap is stated. %>
+<% hidden_incident_events = event_rows.count { |row| row[:open_incidents].nil? } %>
+
+<section>
+  <%# The heaviest heading on the page: this list is what the page is for. %>
+  <h2 class="text-base font-semibold text-(--text-strong) mb-2">Needs chasing</h2>
+
+  <div class="bg-(--bg-elev) border border-(--border-card) rounded-lg overflow-hidden">
+    <% if nothing_to_chase %>
+      <div class="flex items-center gap-3 px-4 py-4">
+        <svg class="w-5 h-5 text-(--success-strong) flex-shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <p class="text-sm text-(--text)">
+          Nothing needs chasing across <%= pluralize(totals[:events], "event") %>.
+          <% if totals[:active].positive? %>Every participant is cleared.<% end %>
+        </p>
+      </div>
+    <% else %>
+      <% chase_rows.each do |row| %>
+        <details class="series-disclosure series-row">
+          <summary class="flex items-start gap-3 px-4 py-3">
+            <svg class="series-chevron w-4 h-4 mt-0.5 text-(--text-muted) flex-shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            <span class="text-sm font-bold text-(--text-strong) tabular-nums w-8 text-right flex-shrink-0"><%= row[:stalled] %></span>
+            <span class="text-sm text-(--text) min-w-0">
+              <%= "participant".pluralize(row[:stalled]) %> <%= row[:stage].chase %>
+            </span>
+            <span class="ml-auto text-xs text-(--text-soft) whitespace-nowrap pl-3 hidden sm:inline">
+              <%= pluralize(row[:by_event].length, "event") %>
+            </span>
+          </summary>
+          <ul class="pb-2">
+            <% row[:by_event].each do |entry| %>
+              <li>
+                <%= link_to series_chase_path(entry[:event], row[:stage]),
+                      class: "series-row-link flex items-center gap-3 pl-15 pr-4 py-3 min-h-11 cursor-pointer" do %>
+                  <span class="text-xs font-semibold text-(--text-strong) tabular-nums w-8 text-right flex-shrink-0"><%= entry[:count] %></span>
+                  <span class="text-xs text-(--text-soft) truncate"><%= entry[:event].name %></span>
+                  <span class="ml-auto text-xs text-(--text-link) whitespace-nowrap">Open list →</span>
+                <% end %>
+              </li>
+            <% end %>
+          </ul>
+        </details>
+      <% end %>
+
+      <% if invite_rows.any? %>
+        <% invite_total = invite_rows.sum { |row| row[:pending_invitations] } %>
+        <details class="series-disclosure series-row">
+          <summary class="flex items-start gap-3 px-4 py-3">
+            <svg class="series-chevron w-4 h-4 mt-0.5 text-(--text-muted) flex-shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            <span class="text-sm font-bold text-(--text-strong) tabular-nums w-8 text-right flex-shrink-0"><%= invite_total %></span>
+            <span class="text-sm text-(--text) min-w-0">
+              <%= "invitation".pluralize(invite_total) %> haven't been accepted yet
+            </span>
+            <span class="ml-auto text-xs text-(--text-soft) whitespace-nowrap pl-3 hidden sm:inline">
+              <%= pluralize(invite_rows.length, "event") %>
+            </span>
+          </summary>
+          <ul class="pb-2">
+            <% invite_rows.sort_by { |row| -row[:pending_invitations] }.each do |row| %>
+              <li>
+                <%= link_to admin_event_participants_path(row[:event].slug, status: "pending_invitations"),
+                      class: "series-row-link flex items-center gap-3 pl-15 pr-4 py-3 min-h-11 cursor-pointer" do %>
+                  <span class="text-xs font-semibold text-(--text-strong) tabular-nums w-8 text-right flex-shrink-0"><%= row[:pending_invitations] %></span>
+                  <span class="text-xs text-(--text-soft) truncate"><%= row[:event].name %></span>
+                  <span class="ml-auto text-xs text-(--text-link) whitespace-nowrap">Open list →</span>
+                <% end %>
+              </li>
+            <% end %>
+          </ul>
+        </details>
+      <% end %>
+
+      <%# Incidents are counted per event under IncidentPolicy's own rules, so an
+          event the viewer cannot see incidents on contributes nothing here
+          rather than a misleading zero. %>
+      <% if incident_rows.any? %>
+        <% incident_total = incident_rows.sum { |row| row[:open_incidents] } %>
+        <details class="series-disclosure series-row">
+          <summary class="flex items-start gap-3 px-4 py-3">
+            <svg class="series-chevron w-4 h-4 mt-0.5 text-(--text-muted) flex-shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            <span class="text-sm font-bold text-(--accent-strong) tabular-nums w-8 text-right flex-shrink-0"><%= incident_total %></span>
+            <span class="text-sm text-(--text) min-w-0">
+              open <%= "incident".pluralize(incident_total) %> need a decision
+            </span>
+            <span class="ml-auto text-xs text-(--text-soft) whitespace-nowrap pl-3 hidden sm:inline">
+              <%= pluralize(incident_rows.length, "event") %>
+            </span>
+          </summary>
+          <ul class="pb-2">
+            <% incident_rows.sort_by { |row| -row[:open_incidents] }.each do |row| %>
+              <li>
+                <%= link_to admin_event_incidents_path(row[:event].slug),
+                      class: "series-row-link flex items-center gap-3 pl-15 pr-4 py-3 min-h-11 cursor-pointer" do %>
+                  <span class="text-xs font-semibold text-(--text-strong) tabular-nums w-8 text-right flex-shrink-0"><%= row[:open_incidents] %></span>
+                  <span class="text-xs text-(--text-soft) truncate"><%= row[:event].name %></span>
+                  <span class="ml-auto text-xs text-(--text-link) whitespace-nowrap">Open list →</span>
+                <% end %>
+              </li>
+            <% end %>
+          </ul>
+        </details>
+      <% end %>
+    <% end %>
+
+    <% if hidden_incident_events.positive? %>
+      <p class="px-4 py-2.5 border-t border-(--border) text-xs text-(--text-soft)">
+        Incidents on <%= pluralize(hidden_incident_events, "event") %> aren't visible to you, so none of them are counted above.
+      </p>
+    <% end %>
+  </div>
+</section>

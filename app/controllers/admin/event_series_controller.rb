@@ -9,10 +9,18 @@ module Admin
 
     def show
       authorize @series
-      @events = @series.events
-        .includes(logo_attachment: :blob, event_series: { logo_attachment: :blob })
-        .order(starts_at: :desc)
-      @event_participant_counts = ParticipantEvent.where(event: @events).group(:event_id).count
+
+      # scan_contexts and custom_documents are preloaded because the dashboard's
+      # single pass over participants asks every event whether it records
+      # check-ins and which documents apply — per event, not per participant.
+      @events = SeriesDashboard.order_events(
+        @series.events
+          .includes(:scan_contexts, :custom_documents, logo_attachment: :blob, event_series: { logo_attachment: :blob })
+          .to_a
+      )
+
+      @dashboard = SeriesDashboard.new(@series, events: @events, user: current_user)
+      @event_rows = @dashboard.event_rows
     end
 
     def new

@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* The text-safe state colours from themes.css. Safelisted because the tokens
+ * are the accessible replacement for text-(--warning-strong) /
+ * text-(--success-strong) — those sit at 2.80:1 and 2.51:1 on --bg-elev in
+ * the light theme and are for fills only — so the utilities have to exist
+ * whether or not a template currently references them. */
+@source inline("text-(--warning-text) text-(--success-text)");
+
 /* ====================================================================
  * Portal surfaces — the pages a parent, guardian or participant sees
  * outside the signed-in app shell (guardian portal, portal center,
@@ -502,6 +509,187 @@
     from {
       opacity: 0;
       transform: translateY(6px);
+    }
+  }
+}
+
+/* ====================================================================
+ * Series dashboard — the cross-event ops view at /admin/series/:slug.
+ *
+ * The marks here (funnel bars, per-event completion bars, map markers)
+ * are data, so they get their own component layer rather than a pile of
+ * arbitrary utilities: the geometry has to stay identical between the
+ * funnel and the event table for the two to be comparable at a glance.
+ * Every colour resolves through themes.css, so one rule covers all
+ * twenty-two themes.
+ * ==================================================================== */
+@layer components {
+  :root {
+    --series-track: var(--bg-sunken);
+    --series-fill: color-mix(in oklab, var(--accent) 82%, black);
+    /* The map's own corner radius. It matches the portal card today but is a
+     * separate token on purpose: retuning the portal component layer must not
+     * silently move the geometry of a chart. */
+    --series-r-map: 8px;
+  }
+
+  /* --- funnel ------------------------------------------------------- */
+
+  /* The track is the whole active population; the fill is how many
+   * cleared this stage. One hue, because this is a magnitude — a second
+   * colour here would imply a second series that does not exist. */
+  .series-bar-track {
+    position: relative;
+    height: 0.625rem;
+    border-radius: 4px;
+    background-color: var(--series-track);
+    overflow: hidden;
+  }
+
+  .series-bar-fill {
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    border-radius: 4px;
+    background-color: var(--series-fill);
+    transform-origin: left center;
+  }
+
+  /* --- funnel ribbon ----------------------------------------------- */
+
+  /* One flat fill, not the gradient this chart form usually ships with:
+   * DESIGN.md keeps gradients out of the app shell, and a single hue is
+   * correct anyway — the ribbon encodes one magnitude, not a stack of
+   * categories that would each need their own colour. */
+  .series-ribbon-fill {
+    fill: var(--series-fill);
+  }
+
+  /* --- per-event completion bar ------------------------------------ */
+
+  /* Deliberately the same radius and fill as the funnel, two steps
+   * shorter: a row in the table and a stage in the funnel are the same
+   * kind of measurement and must not look like different charts. */
+  .series-microbar {
+    position: relative;
+    height: 0.375rem;
+    border-radius: 4px;
+    background-color: var(--series-track);
+    overflow: hidden;
+  }
+
+  .series-microbar-fill {
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    border-radius: 4px;
+    background-color: var(--series-fill);
+  }
+
+  /* --- rows --------------------------------------------------------- */
+
+  .series-row {
+    border-top: 1px solid var(--border);
+  }
+
+  .series-row:first-child {
+    border-top: 0;
+  }
+
+  .series-row-link {
+    display: block;
+    transition: background-color 0.12s ease;
+  }
+
+  .series-row-link:hover {
+    background-color: color-mix(in oklab, var(--text-strong) 4%, transparent);
+  }
+
+  /* A real, full-opacity outline, not the 30%-alpha inset ring used
+   * elsewhere: that mix lands at 1.53:1 on --bg-elev and fails WCAG 1.4.11,
+   * and an inset ring on a four-line block element reads as a border rather
+   * than a cursor. The offset is negative because the enclosing card clips
+   * with overflow: hidden, so a positive offset would be cut off.
+   *
+   * --focus-ring rather than --accent: solarized-dark's brand red is only
+   * 2.81:1 on its own --bg-elev, so themes.css lifts the value there. */
+  .series-row-link:focus-visible {
+    outline: 2px solid var(--focus-ring, var(--accent));
+    outline-offset: -2px;
+  }
+
+  /* A stage the viewer can expand. The marker is replaced by our own
+   * chevron so it matches the icon set instead of the platform triangle. */
+  .series-disclosure > summary {
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .series-disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .series-disclosure > summary:focus-visible {
+    outline: 2px solid var(--focus-ring, var(--accent));
+    outline-offset: -2px;
+  }
+
+  .series-disclosure[open] > summary .series-chevron {
+    transform: rotate(90deg);
+  }
+
+  .series-chevron {
+    transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* --- map ---------------------------------------------------------- */
+
+  .series-map {
+    height: 20rem;
+    border-radius: var(--series-r-map);
+    z-index: 0;
+  }
+
+  @media (min-width: 1024px) {
+    .series-map {
+      height: 26rem;
+    }
+  }
+
+  /* Leaflet paints its own light chrome; these keep the popup inside the
+   * theme instead of shipping a white box onto a dark page. */
+  .series-map .leaflet-popup-content-wrapper,
+  .series-map .leaflet-popup-tip {
+    background-color: var(--bg-elev);
+    color: var(--text);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  }
+
+  .series-map .leaflet-popup-content {
+    margin: 0.625rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .series-marker-dot {
+    border-radius: 999px;
+    border: 2px solid #ffffff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  }
+
+  /* The one authored moment: the ribbon draws left to right, so the eye
+   * travels the sequence in the order a participant actually clears it and
+   * arrives at the figure that matters. Nothing else on the page animates. */
+  @media (prefers-reduced-motion: no-preference) {
+    .series-ribbon {
+      /* No fill mode: there is no delay, and the keyframes only declare a
+       * from-state, so both `backwards` and `forwards` were no-ops. */
+      animation: series-ribbon-draw 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+  }
+
+  @keyframes series-ribbon-draw {
+    from {
+      clip-path: inset(0 100% 0 0);
     }
   }
 }
