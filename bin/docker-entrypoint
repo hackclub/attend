@@ -1,6 +1,6 @@
 #!/bin/bash
 
-case "${PROCESS_TYPE:-web}" in
+case "${PROCESS_TYPE-web}" in
   web)
     ;;
   worker)

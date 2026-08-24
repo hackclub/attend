@@ -140,13 +140,13 @@ Call Orchard's GitHub deployment operation with exactly:
 
 `env` above means the exact in-memory array from Task 2, including `PROCESS_TYPE=worker`, not a serialized string. Capture the returned deployment ID as `staging_worker_id`.
 
-- [ ] **Step 2: Wait for the build and pod to become healthy**
-
-Poll Orchard deployment state until the build is `succeeded`, deployment state is `running`, one replica is available, and restart count is zero. On build or startup failure, inspect build logs and pod logs; do not change staging web.
-
-- [ ] **Step 3: Remove the auto-generated ingress**
+- [ ] **Step 2: Remove the auto-generated ingress**
 
 Read the deployment's ingress list, delete every ingress attached to `staging_worker_id`, then require the deployment to have no ingress and no publicly enabled service port.
+
+- [ ] **Step 3: Wait for the build and pod to become healthy**
+
+Poll Orchard deployment state until the build is `succeeded`, deployment state is `running`, one replica is available, and restart count is zero. On build or startup failure, inspect build logs and pod logs; do not change staging web.
 
 - [ ] **Step 4: Verify the worker process tree**
 

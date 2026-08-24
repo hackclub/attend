@@ -44,6 +44,14 @@ if grep -q '^rails:db:prepare$' "$calls_file"; then
   echo "worker process ran db:prepare" >&2
   exit 1
 fi
+if grep -q '^rails:db:ensure_secondary_schemas$' "$calls_file"; then
+  echo "worker process ensured secondary schemas" >&2
+  exit 1
+fi
+if grep -q '^rails:server$' "$calls_file"; then
+  echo "worker process started Rails directly" >&2
+  exit 1
+fi
 if grep -q '^thrust:' "$calls_file"; then
   echo "worker process started the web server" >&2
   exit 1
@@ -60,8 +68,8 @@ set +e
 invalid_status=$?
 set -e
 
-if [ "$invalid_status" -eq 0 ]; then
-  echo "invalid process type did not fail" >&2
+if [ "$invalid_status" -ne 64 ]; then
+  echo "invalid process type exited $invalid_status instead of 64" >&2
   exit 1
 fi
 if [ -s "$calls_file" ]; then
@@ -71,9 +79,41 @@ fi
 
 : > "$calls_file"
 
+set +e
+(
+  cd "$test_root"
+  CALLS_FILE="$calls_file" PROCESS_TYPE= \
+    "$repo_root/bin/docker-entrypoint" ./bin/thrust ./bin/rails server >/dev/null 2>&1
+)
+empty_status=$?
+set -e
+
+if [ "$empty_status" -ne 64 ]; then
+  echo "empty process type exited $empty_status instead of 64" >&2
+  exit 1
+fi
+if [ -s "$calls_file" ]; then
+  echo "empty process type started a container process" >&2
+  exit 1
+fi
+
+: > "$calls_file"
+
 (
   cd "$test_root"
   CALLS_FILE="$calls_file" \
+    "$repo_root/bin/docker-entrypoint" ./bin/thrust ./bin/rails server >/dev/null
+)
+
+grep -qx 'rails:db:prepare' "$calls_file"
+grep -qx 'rails:db:ensure_secondary_schemas' "$calls_file"
+grep -qx 'thrust:./bin/rails server' "$calls_file"
+
+: > "$calls_file"
+
+(
+  cd "$test_root"
+  CALLS_FILE="$calls_file" PROCESS_TYPE=web \
     "$repo_root/bin/docker-entrypoint" ./bin/thrust ./bin/rails server >/dev/null
 )
 
