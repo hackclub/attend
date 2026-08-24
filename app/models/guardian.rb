@@ -1,4 +1,6 @@
 class Guardian < ApplicationRecord
+  include EmailDeliverability
+
   has_paper_trail
 
   self.implicit_order_column = "created_at"

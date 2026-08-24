@@ -60,6 +60,13 @@ class SendPendingGuardianInvitesJob < ApplicationJob
     Rails.logger.info("[SendPendingGuardianInvitesJob] Sending #{pending_gpes.count} guardian invites for event #{event.id}")
 
     pending_gpes.find_each do |gpe|
+      # Postmark suppresses hard-bounced addresses; re-sending every run just
+      # raises InactiveRecipientError. Needs the email corrected in admin.
+      if gpe.guardian.email_undeliverable?
+        Rails.logger.warn("[SendPendingGuardianInvitesJob] Skipping GPE #{gpe.id}: guardian email is undeliverable")
+        next
+      end
+
       GuardianMailer.invitation(guardian_participant_event: gpe).deliver_later
       Rails.logger.info("[SendPendingGuardianInvitesJob] Sent invite for GPE #{gpe.id}")
     end

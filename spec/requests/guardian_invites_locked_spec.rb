@@ -95,7 +95,7 @@ RSpec.describe "Guardian invites locked", type: :request do
 
       expect {
         post dashboard_resend_guardian_invite_path(participant_event)
-      }.not_to have_enqueued_job(ActionMailer::MailDeliveryJob)
+      }.not_to have_enqueued_job(ActionMailer::Base.delivery_job)
 
       expect(response).to redirect_to(dashboard_event_path(participant_event))
       expect(flash[:alert]).to include("aren't open for this event yet")
@@ -125,7 +125,7 @@ RSpec.describe "Guardian invites locked", type: :request do
         expect {
           SendPendingGuardianInvitesJob.perform_now(event.id)
         }.not_to change(Consent, :count)
-      }.not_to have_enqueued_job(ActionMailer::MailDeliveryJob)
+      }.not_to have_enqueued_job(ActionMailer::Base.delivery_job)
     end
   end
 end

@@ -559,6 +559,12 @@ module Admin
     def send_travel_update_reminder
       authorize @participant_event, :update_travel?
 
+      if @participant_event.participant.email_undeliverable?
+        redirect_to admin_event_participant_path(current_event, @participant_event),
+          alert: "#{@participant_event.participant.email} is bouncing — correct the participant's email before sending."
+        return
+      end
+
       ParticipantMailer.travel_update_reminder(participant_event: @participant_event).deliver_later
       redirect_to admin_event_participant_path(current_event, @participant_event),
         notice: "Travel update reminder sent to #{@participant_event.participant.email}."
@@ -649,6 +655,13 @@ module Admin
       end
 
       gpe = @participant_event.guardian_participant_events.find(params[:guardian_participant_event_id])
+
+      if gpe.guardian.email_undeliverable?
+        redirect_to admin_event_participant_path(current_event, @participant_event),
+          alert: "#{gpe.guardian.email} is bouncing — correct the guardian's email before resending."
+        return
+      end
+
       gpe.update!(invite_token_sent_at: nil)
 
       GuardianMailer.invitation(guardian_participant_event: gpe).deliver_later

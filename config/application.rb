@@ -38,5 +38,8 @@ module Attend
 
     # Don't generate system test files.
     config.generators.system_tests = nil
+
+    # Discards sends to Postmark-suppressed addresses instead of erroring.
+    config.action_mailer.delivery_job = "MailDeliveryJob"
   end
 end

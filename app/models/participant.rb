@@ -1,6 +1,7 @@
 class Participant < ApplicationRecord
   include WalletPassUpdatable
   include DecodableImageAttachment
+  include EmailDeliverability
 
   has_paper_trail
 
