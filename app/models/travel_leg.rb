@@ -122,16 +122,16 @@ class TravelLeg < ApplicationRecord
     FlightTrackingService.status_label(live_status)
   end
 
-  def picked_up?
-    airport_picked_up_at.present?
+  def travel_picked_up?
+    travel_picked_up_at.present?
   end
 
-  def mark_picked_up!(user)
-    update!(airport_picked_up_at: Time.current, picked_up_by: user)
+  def mark_travel_picked_up!(user)
+    update!(travel_picked_up_at: Time.current, picked_up_by: user)
   end
 
-  def unmark_picked_up!
-    update!(airport_picked_up_at: nil, picked_up_by: nil)
+  def unmark_travel_picked_up!
+    update!(travel_picked_up_at: nil, picked_up_by: nil)
   end
 
   private

@@ -1,6 +1,18 @@
 require "rails_helper"
 
 RSpec.describe ScanContext, type: :model do
+  describe "travel pickup contexts" do
+    it "supports travel pickup contexts" do
+      context = create(:event).scan_contexts.create!(
+        name: "Central Station",
+        checks_in: false,
+        is_travel_pickup: true
+      )
+
+      expect(context).to be_is_travel_pickup
+    end
+  end
+
   describe "schedule validation" do
     let(:event) { create(:event) }
 

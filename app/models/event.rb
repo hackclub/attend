@@ -516,7 +516,7 @@ class Event < ApplicationRecord
     scan_contexts.create!(
       name: "Event check-in",
       checks_in: true,
-      is_airport: false,
+      is_travel_pickup: false,
       position: 0
     )
   end

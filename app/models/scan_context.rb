@@ -6,7 +6,7 @@ class ScanContext < ApplicationRecord
 
   validates :name, presence: true
   validates :checks_in, inclusion: { in: [ true, false ] }
-  validates :is_airport, inclusion: { in: [ true, false ] }
+  validates :is_travel_pickup, inclusion: { in: [ true, false ] }
   validate :ends_at_after_starts_at
 
   default_scope { order(:position, :created_at) }
