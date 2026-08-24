@@ -1,7 +1,7 @@
 class Scan < ApplicationRecord
   self.implicit_order_column = "created_at"
 
-  belongs_to :participant_event
+  belongs_to :participant_event, touch: true
   belongs_to :user
   belongs_to :scan_context
 
