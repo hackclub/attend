@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -489,6 +489,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_090000) do
     t.integer "emergency_contact_priority"
     t.boolean "emergency_medical_consent"
     t.uuid "guardian_id", null: false
+    t.datetime "invite_last_used_at"
     t.string "invite_token_ciphertext"
     t.string "invite_token_digest"
     t.datetime "invite_token_sent_at"
