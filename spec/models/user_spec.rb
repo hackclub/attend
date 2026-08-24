@@ -1,6 +1,26 @@
 require "rails_helper"
 
 RSpec.describe User, type: :model do
+  describe "Flipper actor identity" do
+    it "uses a stable type-qualified id" do
+      user = create(:user)
+
+      expect(user.flipper_id).to eq("User;#{user.id}")
+    end
+
+    it "persists per-user enablement in Active Record" do
+      user = create(:user)
+      other = create(:user)
+
+      Flipper.enable_actor(:personal_nfc_token, user)
+
+      expect(Flipper.enabled?(:personal_nfc_token, user)).to be(true)
+      expect(Flipper.enabled?(:personal_nfc_token, other)).to be(false)
+    ensure
+      Flipper.disable(:personal_nfc_token)
+    end
+  end
+
   describe "encryption of Hack Club Auth PII" do
     let(:claims) do
       {

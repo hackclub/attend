@@ -43,6 +43,10 @@ class User < ApplicationRecord
 
   validates :email, presence: true, uniqueness: true
 
+  def flipper_id
+    "User;#{id}"
+  end
+
   def global_admin?
     global_role == "global_admin"
   end

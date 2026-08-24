@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_130001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -442,6 +442,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_130000) do
     t.index ["event_id"], name: "index_export_templates_on_event_id"
   end
 
+  create_table "flipper_features", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "key", null: false
+    t.datetime "updated_at", null: false
+    t.index ["key"], name: "index_flipper_features_on_key", unique: true
+  end
+
+  create_table "flipper_gates", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "feature_key", null: false
+    t.string "key", null: false
+    t.datetime "updated_at", null: false
+    t.text "value"
+    t.index ["feature_key", "key", "value"], name: "index_flipper_gates_on_feature_key_and_key_and_value", unique: true
+  end
+
   create_table "global_api_tokens", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "expires_at"
@@ -489,7 +505,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_130000) do
     t.integer "emergency_contact_priority"
     t.boolean "emergency_medical_consent"
     t.uuid "guardian_id", null: false
-    t.datetime "invite_last_used_at"
     t.string "invite_token_ciphertext"
     t.string "invite_token_digest"
     t.datetime "invite_token_sent_at"
@@ -1021,7 +1036,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_130000) do
     t.datetime "created_at", null: false
     t.datetime "ends_at"
     t.uuid "event_id", null: false
-    t.boolean "is_airport", default: false, null: false
+    t.boolean "is_travel_pickup", default: false, null: false
     t.string "name", null: false
     t.integer "position", default: 0, null: false
     t.datetime "starts_at"
@@ -1200,7 +1215,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_130000) do
   end
 
   create_table "travel_legs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.datetime "airport_picked_up_at"
     t.string "arrival_airport"
     t.datetime "arrival_time"
     t.string "confirmation_code"
@@ -1218,6 +1232,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_130000) do
     t.uuid "picked_up_by_user_id"
     t.integer "position", default: 0
     t.uuid "travel_id", null: false
+    t.datetime "travel_picked_up_at"
     t.datetime "updated_at", null: false
     t.index ["picked_up_by_user_id"], name: "index_travel_legs_on_picked_up_by_user_id"
     t.index ["travel_id"], name: "index_travel_legs_on_travel_id"
