@@ -75,4 +75,18 @@ class EventRoleAssignment < ApplicationRecord
   validates :user_id, presence: true
   validates :event_id, presence: true
   validates :role, presence: true, uniqueness: { scope: %i[user_id event_id] }
+
+  # Series owners and organizers act as event admins on every event in their
+  # series, so their access to this event is inherited from the series rather
+  # than granted by this row. Inherited members are managed from the series
+  # members page and can't be removed at the event level.
+  def inherited_from_series?
+    series_role.present?
+  end
+
+  def series_role
+    return nil if event.event_series_id.blank?
+
+    SeriesRoleAssignment.find_by(user_id: user_id, event_series_id: event.event_series_id)&.role
+  end
 end

@@ -37,7 +37,13 @@
                 <%= assignment.created_at.strftime("%B %d, %Y") %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <%= button_to "Remove", admin_event_staff_path(current_event, assignment), method: :delete, class: "text-red-600 hover:text-red-900", data: { turbo_confirm: "Are you sure you want to remove #{assignment.user.email} from this event?" } %>
+                <% if assignment.inherited_from_series? %>
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800" title="Series <%= assignment.series_role %>s act as event admins on every event in the series. Manage them from the series members page.">
+                    Inherited from series
+                  </span>
+                <% else %>
+                  <%= button_to "Remove", admin_event_staff_path(current_event, assignment), method: :delete, class: "text-red-600 hover:text-red-900", data: { turbo_confirm: "Are you sure you want to remove #{assignment.user.email} from this event?" } %>
+                <% end %>
               </td>
             </tr>
           <% end %>

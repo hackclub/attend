@@ -41,6 +41,12 @@ module Admin
     end
 
     def destroy
+      if @event_role_assignment.inherited_from_series?
+        redirect_to admin_event_staff_index_path(current_event),
+          alert: "#{@event_role_assignment.user.email} is a series #{@event_role_assignment.series_role} — their access is inherited from the series, so they can't be removed here. Manage them from the series members page."
+        return
+      end
+
       @event_role_assignment.destroy
       redirect_to admin_event_staff_index_path(current_event), notice: "Staff member removed."
     end
