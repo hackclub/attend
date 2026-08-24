@@ -48,4 +48,20 @@ RSpec.describe "Api::V1::Scans", type: :request do
       expect(json["has_more"]).to be(false)
     end
   end
+
+  describe "POST /api/v1/events/:event_id/scans" do
+    it "marks the final inbound flight leg for an explicit travel pickup scan" do
+      participant_event = create(:participant_event, event: event)
+      pickup = event.scan_contexts.create!(name: "Station pickup", checks_in: false, is_travel_pickup: true)
+      travel = Travel.create!(participant_event: participant_event, direction: "inbound", mode: "plane")
+      leg = create(:travel_leg, travel: travel, departure_airport: "SFO", arrival_airport: "BOS")
+
+      post "/api/v1/events/#{event.id}/scans",
+        params: { participant_id: participant_event.id, scan_context_id: pickup.id }.to_json,
+        headers: auth_headers.merge("Content-Type" => "application/json")
+
+      expect(response).to have_http_status(:ok)
+      expect(leg.reload).to be_travel_picked_up
+    end
+  end
 end
