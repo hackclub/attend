@@ -1,0 +1,118 @@
+<%
+  mode_label = entry[:mode] == "plane" ? "Flight" : entry[:mode].titleize
+  direction_label = entry[:direction].titleize
+  pickup_label = entry[:pickup_state]&.to_s&.humanize
+  pickup_label = "Checked in" if entry[:pickup_state] == :checked_in
+  search_text = [
+    entry[:participant_name],
+    entry[:participant_preferred_name],
+    entry[:direction],
+    mode_label,
+    entry[:route],
+    entry[:reference],
+    pickup_label,
+    entry[:groups].map { |group| group[:name] }
+  ].flatten.compact.join(" ").downcase
+  group_ids = entry[:groups].map { |group| group[:id] }.join(" ")
+  awaiting_pickup = entry[:pickup_state] == :awaiting_pickup
+%>
+
+<li data-travel-calendar-filter-target="entry"
+    data-travel-calendar-filter-search-value="<%= search_text %>"
+    data-travel-calendar-filter-direction-value="<%= entry[:direction] %>"
+    data-travel-calendar-filter-mode-value="<%= entry[:mode] %>"
+    data-travel-calendar-filter-pickup-value="<%= entry[:pickup_state] %>"
+    data-travel-calendar-filter-groups-value="<%= group_ids %>"
+    class="border-b border-(--border) last:border-b-0 <%= awaiting_pickup ? "bg-(--accent-soft)" : "bg-(--bg-elev)" %>">
+  <div class="grid gap-3 px-4 py-4 sm:grid-cols-[5rem_minmax(0,1fr)_auto] sm:items-start">
+    <div>
+      <p class="text-lg font-bold tabular-nums text-(--text-strong)">
+        <%= entry[:primary_time_at]&.in_time_zone(current_event.event_time_zone)&.strftime("%H:%M") || "No time" %>
+      </p>
+    </div>
+
+    <div class="min-w-0">
+      <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <%= link_to(entry[:participant_preferred_name].presence || entry[:participant_name],
+                    admin_event_participant_path(current_event, entry[:participant_event_id]),
+                    class: "font-semibold text-(--text-strong) hover:text-(--accent) focus:rounded-sm focus:outline-none focus:ring-2 focus:ring-(--accent)/30") %>
+        <% if entry[:participant_preferred_name].present? %>
+          <span class="text-xs font-medium text-(--text-muted)"><%= entry[:participant_name] %></span>
+        <% end %>
+      </div>
+
+      <p class="mt-1 text-sm font-medium text-(--text)">
+        <span class="font-semibold"><%= direction_label %> · <%= mode_label %></span>
+        <% if entry[:route].present? %>
+          <span class="text-(--text-muted)"> · </span><%= entry[:route] %>
+        <% end %>
+        <% if entry[:reference].present? %>
+          <span class="text-(--text-muted)"> · </span><span class="text-(--text-soft)"><%= entry[:reference] %></span>
+        <% end %>
+      </p>
+
+      <div class="mt-2 flex flex-wrap gap-1.5">
+        <% if entry[:is_unaccompanied_minor] %>
+          <span class="rounded-full bg-(--bg-elev-3) px-2.5 py-0.5 text-xs font-semibold text-(--text-strong)">Unaccompanied minor</span>
+        <% end %>
+        <% entry[:groups].each do |group| %>
+          <span class="rounded-full bg-(--bg-elev-3) px-2.5 py-0.5 text-xs font-semibold text-(--text-soft)"><%= group[:name] %></span>
+        <% end %>
+      </div>
+    </div>
+
+    <% if entry[:direction] == "inbound" %>
+      <div class="flex flex-wrap items-center gap-2 sm:max-w-44 sm:justify-end">
+        <span class="rounded-full px-2.5 py-1 text-xs font-semibold <%= awaiting_pickup ? "text-(--accent-on)" : "bg-(--bg-elev-3) text-(--text-soft)" %>"
+              <% if awaiting_pickup %>style="background-color: var(--accent-fill, var(--accent-strong));"<% end %>>
+          <%= pickup_label %>
+        </span>
+        <% if awaiting_pickup %>
+          <%= button_to "Pickup not needed",
+                        dismiss_pickup_admin_event_travel_path(current_event),
+                        method: :post,
+                        params: { travel_id: entry[:id] },
+                        class: "cursor-pointer rounded-md border border-(--accent) bg-(--bg-elev) px-2.5 py-1 text-xs font-semibold text-(--accent-strong) transition-colors hover:bg-(--accent-soft) focus:outline-none focus:ring-2 focus:ring-(--accent)/30" %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <details class="group border-t border-(--border-soft)">
+    <summary class="flex min-h-10 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 text-xs font-semibold text-(--text-soft) transition-colors hover:bg-(--bg-elev-2) hover:text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-inset focus:ring-(--accent)/30">
+      View travel details
+      <svg class="size-4 shrink-0 transition-transform group-open:rotate-180" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
+        <path d="m5 7.5 5 5 5-5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
+      </svg>
+    </summary>
+    <div class="border-t border-(--border-soft) bg-(--bg-elev-2) px-4 py-4">
+      <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <dt class="text-xs font-semibold text-(--text-muted)">Direction</dt>
+          <dd class="mt-0.5 font-medium text-(--text-strong)"><%= direction_label %></dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold text-(--text-muted)">Mode</dt>
+          <dd class="mt-0.5 font-medium text-(--text-strong)"><%= mode_label %></dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold text-(--text-muted)">Route</dt>
+          <dd class="mt-0.5 font-medium text-(--text-strong)"><%= entry[:route].presence || "Not provided" %></dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold text-(--text-muted)">Reference</dt>
+          <dd class="mt-0.5 font-medium text-(--text-strong)"><%= entry[:reference].presence || "Not provided" %></dd>
+        </div>
+        <% if entry[:details].present? %>
+          <div class="sm:col-span-2 lg:col-span-4">
+            <dt class="text-xs font-semibold text-(--text-muted)">Notes</dt>
+            <dd class="mt-0.5 whitespace-pre-wrap font-medium text-(--text-strong)"><%= entry[:details] %></dd>
+          </div>
+        <% end %>
+      </dl>
+      <%= link_to "Open participant travel",
+                  travel_admin_event_participant_path(current_event, entry[:participant_event_id]),
+                  class: "mt-4 inline-flex min-h-10 items-center rounded-md text-sm font-semibold text-(--accent-strong) hover:underline focus:outline-none focus:ring-2 focus:ring-(--accent)/30" %>
+    </div>
+  </details>
+</li>

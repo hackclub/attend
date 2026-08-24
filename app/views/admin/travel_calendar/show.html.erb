@@ -1,2 +1,121 @@
-<h1 class="text-2xl font-bold text-(--text-strong)">Travel Calendar</h1>
-<p class="text-sm text-(--text-muted)"><%= current_event.name %></p>
+<% content_for :title, "Travel Calendar – #{current_event.name} – Attend" %>
+
+<div class="space-y-8" data-controller="travel-calendar-filter">
+  <header class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-(--text-strong)">Travel Calendar</h1>
+      <p class="mt-1 text-sm font-medium text-(--text-muted)"><%= current_event.name %> · times in <%= current_event.timezone_identifier %></p>
+    </div>
+    <% if @journeys.any? %>
+      <p class="text-xs font-semibold text-(--text-soft)">
+        <%= pluralize(@summary_counts[:total], "journey") %> · <%= @summary_counts[:inbound] %> inbound · <%= @summary_counts[:outbound] %> outbound
+      </p>
+    <% end %>
+  </header>
+
+  <% if @journeys.any? %>
+    <nav aria-label="Travel filters" class="grid gap-3 rounded-lg border border-(--border-card) bg-(--bg-elev-2) p-4 sm:grid-cols-2 lg:grid-cols-6">
+      <label class="block text-xs font-semibold text-(--text-soft)">
+        Search
+        <input type="search"
+               placeholder="Name, route, or reference"
+               autocomplete="off"
+               data-travel-calendar-filter-target="search"
+               data-action="input->travel-calendar-filter#apply"
+               class="mt-1 w-full rounded-md border border-(--border) bg-(--bg-elev) px-3 py-2 text-sm font-medium text-(--text-strong) placeholder:text-(--text-faint) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent)/30">
+      </label>
+
+      <label class="block text-xs font-semibold text-(--text-soft)">
+        Direction
+        <select data-travel-calendar-filter-target="direction"
+                data-action="change->travel-calendar-filter#apply"
+                class="mt-1 w-full rounded-md border border-(--border) bg-(--bg-elev) px-3 py-2 text-sm font-medium text-(--text-strong) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent)/30">
+          <option value="">All directions</option>
+          <option value="inbound">Inbound</option>
+          <option value="outbound">Outbound</option>
+        </select>
+      </label>
+
+      <label class="block text-xs font-semibold text-(--text-soft)">
+        Mode
+        <select data-travel-calendar-filter-target="mode"
+                data-action="change->travel-calendar-filter#apply"
+                class="mt-1 w-full rounded-md border border-(--border) bg-(--bg-elev) px-3 py-2 text-sm font-medium text-(--text-strong) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent)/30">
+          <option value="">All modes</option>
+          <% @filter_choices[:modes].each do |mode| %>
+            <option value="<%= mode %>"><%= mode == "plane" ? "Flight" : mode.titleize %></option>
+          <% end %>
+        </select>
+      </label>
+
+      <label class="block text-xs font-semibold text-(--text-soft)">
+        Pickup
+        <select data-travel-calendar-filter-target="pickup"
+                data-action="change->travel-calendar-filter#apply"
+                class="mt-1 w-full rounded-md border border-(--border) bg-(--bg-elev) px-3 py-2 text-sm font-medium text-(--text-strong) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent)/30">
+          <option value="">All pickup states</option>
+          <option value="awaiting_pickup">Awaiting pickup</option>
+          <option value="collected">Collected</option>
+          <option value="checked_in">Checked in</option>
+          <option value="pickup_not_needed">Pickup not needed</option>
+        </select>
+      </label>
+
+      <% if current_event.groups_enabled? %>
+        <label class="block text-xs font-semibold text-(--text-soft)">
+          Group
+          <select data-travel-calendar-filter-target="group"
+                  data-action="change->travel-calendar-filter#apply"
+                  class="mt-1 w-full rounded-md border border-(--border) bg-(--bg-elev) px-3 py-2 text-sm font-medium text-(--text-strong) focus:border-(--accent) focus:outline-none focus:ring-2 focus:ring-(--accent)/30">
+            <option value="">All groups</option>
+            <%= options_from_collection_for_select(@filter_choices[:groups], :id, :name) %>
+          </select>
+        </label>
+      <% end %>
+
+      <button type="button"
+              data-action="travel-calendar-filter#reset"
+              class="min-h-10 cursor-pointer self-end rounded-md border border-(--border) bg-(--bg-elev) px-4 py-2 text-sm font-semibold text-(--text) transition-colors hover:bg-(--bg-elev-3) hover:text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-(--accent)/30">
+        Clear filters
+      </button>
+    </nav>
+
+    <div class="space-y-8">
+      <% @journeys_by_date.each do |date, entries| %>
+        <section data-travel-calendar-filter-target="day" aria-labelledby="travel-day-<%= date.iso8601 %>">
+          <div class="mb-3 flex items-baseline justify-between gap-4 border-b border-(--border-strong) pb-2">
+            <h2 id="travel-day-<%= date.iso8601 %>" class="text-lg font-semibold text-(--text-strong)"><%= date.strftime("%A %-d %B") %></h2>
+            <span class="text-xs font-semibold text-(--text-muted)"><%= pluralize(entries.size, "journey") %></span>
+          </div>
+          <ol class="overflow-hidden rounded-lg border border-(--border-card) bg-(--bg-elev)">
+            <%= render partial: "entry", collection: entries, as: :entry %>
+          </ol>
+        </section>
+      <% end %>
+
+      <% if @unscheduled_journeys.any? %>
+        <section data-travel-calendar-filter-target="day" aria-labelledby="travel-unscheduled">
+          <div class="mb-3 flex items-baseline justify-between gap-4 border-b border-(--border-strong) pb-2">
+            <div>
+              <h2 id="travel-unscheduled" class="text-lg font-semibold text-(--text-strong)">Unscheduled</h2>
+              <p class="mt-1 text-xs font-medium text-(--text-muted)">Journeys without a date or time</p>
+            </div>
+            <span class="text-xs font-semibold text-(--text-muted)"><%= pluralize(@unscheduled_journeys.size, "journey") %></span>
+          </div>
+          <ol class="overflow-hidden rounded-lg border border-(--border-card) bg-(--bg-elev)">
+            <%= render partial: "entry", collection: @unscheduled_journeys, as: :entry %>
+          </ol>
+        </section>
+      <% end %>
+    </div>
+
+    <p hidden data-travel-calendar-filter-target="empty" class="rounded-lg border border-(--border) bg-(--bg-elev-2) px-4 py-8 text-center text-sm font-medium text-(--text-muted)">
+      No journeys match these filters.
+    </p>
+  <% else %>
+    <div class="rounded-lg border border-(--border-card) bg-(--bg-elev) px-4 py-10 text-center sm:px-6">
+      <h2 class="text-lg font-semibold text-(--text-strong)">No travel has been scheduled yet.</h2>
+      <p class="mx-auto mt-2 max-w-prose text-sm font-medium text-(--text-muted)">Journeys will appear here once completed participants add travel information.</p>
+    </div>
+  <% end %>
+</div>
