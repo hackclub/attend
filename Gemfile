@@ -36,10 +36,12 @@ gem "pundit"
 
 # MCP server — Rails-native (toolboxes are controllers, tools are actions)
 gem "toolchest", "~> 0.3.7"
-# toolchest 0.3.x overrides MCP::Server#call_tool with the mcp 0.11 signature and
-# predates mcp's DNS-rebinding host check; newer mcp releases break both. Pin to
-# match (same as hackclub/operations).
-gem "mcp", "~> 0.11.0"
+# mcp 0.23.0 is the first release with fixes for the five 2026 transport
+# advisories (unbounded request body, SSE session poisoning, DNS rebinding,
+# unbounded stdio line buffer, unbounded session retention). toolchest 0.3.x
+# still targets the 0.11 signatures, so config/initializers/toolchest_mcp_compat.rb
+# bridges the two — read it before bumping either gem.
+gem "mcp", "~> 0.23.0"
 gem "jb" # JSON view layer for toolbox actions
 
 # Audit logging

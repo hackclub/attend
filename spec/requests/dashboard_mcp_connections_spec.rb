@@ -6,8 +6,12 @@ require "rails_helper"
 RSpec.describe "Dashboard MCP connections", type: :request do
   include Devise::Test::IntegrationHelpers
 
+  # The Connections section is staff-only (non-staff only see it to clean up a
+  # connection made before they lost the role).
   let(:user) { create(:user) }
   let!(:participant) { create(:participant, user: user) }
+  let!(:staff_event) { create(:event) }
+  let!(:staff_role) { create(:event_role_assignment, user: user, event: staff_event, role: "event_admin") }
 
   let(:application) do
     Toolchest::OauthApplication.create!(
@@ -49,6 +53,19 @@ RSpec.describe "Dashboard MCP connections", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Nothing is connected to your account.")
+    end
+
+    it "only lets former staff with a legacy connection disconnect it" do
+      create_token(scopes: "events:read")
+      user.event_role_assignments.destroy_all
+
+      get dashboard_profile_path
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("MCP is only available to Attend staff")
+      expect(response.body).to include("Disconnect")
+      expect(response.body).not_to include('value="Anonymise"')
+      expect(response.body).not_to include(">Limit to specific events<")
     end
   end
 
@@ -150,6 +167,15 @@ RSpec.describe "Dashboard MCP connections", type: :request do
       patch update_dashboard_mcp_connection_path(id: 999_999), params: { mcp_anonymize: "1" }
 
       expect(flash[:alert]).to eq("Connection not found.")
+    end
+
+    it "does not let former staff tighten a legacy connection" do
+      user.event_role_assignments.destroy_all
+
+      patch update_dashboard_mcp_connection_path(application), params: { mcp_anonymize: "1" }
+
+      expect(response).to redirect_to(dashboard_profile_path)
+      expect(settings).to be_nil
     end
   end
 

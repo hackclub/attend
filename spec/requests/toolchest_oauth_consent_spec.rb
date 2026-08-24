@@ -9,6 +9,7 @@ require "rails_helper"
 RSpec.describe "Toolchest OAuth consent screen", type: :request do
   include Devise::Test::IntegrationHelpers
 
+  # MCP is staff-only, so the consent screen only renders for staff.
   let(:user) do
     create(:user).tap do |u|
       u.avatar.attach(
@@ -19,6 +20,8 @@ RSpec.describe "Toolchest OAuth consent screen", type: :request do
       u.save!
     end
   end
+  let!(:staff_event) { create(:event) }
+  let!(:staff_role) { create(:event_role_assignment, user: user, event: staff_event, role: "event_admin") }
 
   let(:application) do
     Toolchest::OauthApplication.create!(

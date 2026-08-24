@@ -32,10 +32,18 @@ Toolchest.configure do |config|
     request.env["warden"]&.user
   end
 
+  # MCP is staff-only. Anyone who isn't staff (participants, guardians, signed-up
+  # users with no role) can't reach the consent screen: toolchest bounces them back
+  # to the client with an access_denied error on both GET and POST /oauth/authorize.
+  config.authorize_link { |user| user.present? && user.admin? }
+
   # Resolve an access token back to the Attend user it was issued for. Everything a
-  # toolbox does runs as this user, with this user's real permissions.
+  # toolbox does runs as this user, with this user's real permissions. Tokens issued
+  # before a user lost their staff roles stop resolving here, so demoting someone
+  # kills their MCP access without anyone having to revoke tokens by hand.
   config.authenticate do |token|
-    User.find_by(id: token.resource_owner_id)
+    user = User.find_by(id: token.resource_owner_id)
+    user if user&.admin?
   end
 
   # Scopes the user consents to when connecting a client. These gate which tools are
@@ -63,6 +71,9 @@ Toolchest.configure do |config|
   # Never hand a client more than the account itself could ever use. Fine-grained,
   # per-event enforcement still happens inside the toolboxes via the event roles.
   config.allowed_scopes_for do |user, requested_scopes|
+    # Belt and braces with authorize_link above — a non-staff account gets nothing.
+    next [] unless user&.admin?
+
     allowed = requested_scopes
 
     # Global read-only accounts can never write anything.

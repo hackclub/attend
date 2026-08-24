@@ -1,14 +1,4 @@
 # Audit all gems listed in the Gemfile for known security problems by running bin/bundler-audit.
 # CVEs that are not relevant to the application can be enumerated on the ignore list below.
 
-ignore:
-  # mcp is pinned to ~> 0.11.0 because toolchest 0.3.7 (latest) overrides
-  # MCP::Server#call_tool with the 0.11 signature and breaks on newer mcp (see
-  # Gemfile). The fix for all five advisories below is mcp >= 0.23.0, which we
-  # can't take until toolchest supports it. Accepted temporarily (Leo,
-  # 2026-07-20) — remove these once toolchest is updated and mcp is bumped.
-  - GHSA-52jp-gj8w-j6xh # mcp: unbounded session retention in StreamableHTTPTransport
-  - GHSA-5p9g-j988-pcwv # mcp: SSE session poisoning
-  - GHSA-7683-3w9x-ch42 # mcp: unbounded line buffer in stdio transports (stdio unused here)
-  - GHSA-h669-8m4g-r2hc # mcp: unbounded JSON-RPC request body memory allocation (High)
-  - GHSA-rjr6-rcgv-9m7m # mcp: streamable HTTP transport lacks DNS-rebinding protection
+ignore: []
