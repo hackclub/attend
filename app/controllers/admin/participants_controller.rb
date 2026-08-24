@@ -96,6 +96,10 @@ module Admin
         end
       end
 
+      if params[:blocked_on].present? && @participant_events.is_a?(ActiveRecord::Relation)
+        @participant_events = filter_by_blocking_stage(@participant_events, params[:blocked_on])
+      end
+
       @participant_events = @participant_events.joins(:participant).order("participants.legal_last_name ASC") if @participant_events.is_a?(ActiveRecord::Relation)
     end
 
@@ -823,6 +827,62 @@ module Admin
     end
 
     private
+
+    # `blocked_on=<stage key>` — the series dashboard's chase links. A stage's
+    # count is "whose *first* uncleared onboarding step maps to this stage", so
+    # nothing else selects the same people: `awaiting_participant` is shared by
+    # three stages, and `flag=missing_travel` also matches someone still stuck on
+    # their profile. Withdrawn and rejected participants are excluded, exactly as
+    # SeriesDashboard excludes them, so the link's list and the number on it agree.
+    #
+    # onboarding_progress is Ruby, not SQL (CustomDocument#applies_to? and
+    # Participant#minor_on? both branch there), so this evaluates it over the
+    # already-preloaded rows and hands the ids back to SQL — keeping the result a
+    # relation, so the ordering and any count downstream still work. A parallel
+    # SQL reimplementation would drift; see SeriesDashboard's header comment.
+    def filter_by_blocking_stage(scope, stage_key)
+      key = stage_key.to_s
+
+      if key == SeriesDashboard::ARRIVAL_STAGE.key.to_s
+        return scope.where(id: awaiting_check_in_ids(scope))
+      end
+
+      return scope.none unless SeriesDashboard::STAGE_INDEX.key?(key.to_sym)
+
+      scope.where(id: blocked_at_stage_ids(scope, key.to_sym))
+    end
+
+    def blocked_at_stage_ids(scope, stage_key)
+      active_participant_events(scope).filter_map do |pe|
+        blocking = pe.onboarding_progress[:blocking_step]
+        pe.id if blocking && SeriesDashboard::STEP_TO_STAGE[blocking] == stage_key
+      end
+    end
+
+    # Check-in sits after onboarding, not inside it: these are people who have
+    # finished everything and still haven't walked through the door.
+    def awaiting_check_in_ids(scope)
+      return [] unless SeriesDashboard.arrivals_expected?(current_event)
+
+      checked_in = Scan.for_check_in.joins(:participant_event)
+        .where(participant_events: { event_id: current_event.id })
+        .distinct.pluck(:participant_event_id).to_set
+
+      active_participant_events(scope).filter_map do |pe|
+        next if checked_in.include?(pe.id) || pe.onboarding_progress[:blocking_step]
+
+        pe.id
+      end
+    end
+
+    def active_participant_events(scope)
+      scope.to_a.reject { |pe| SeriesDashboard::INACTIVE_STATUSES.include?(pe.status) }.each do |pe|
+        # onboarding_progress asks the event about accommodation, freedom waivers
+        # and custom documents; pointing every row at the instance we already hold
+        # memoizes active_custom_documents once instead of once per participant.
+        pe.association(:event).target = current_event
+      end
+    end
 
     def set_participant_event
       @participant_event = current_event.participant_events.find(params[:id])

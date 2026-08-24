@@ -1,68 +1,101 @@
 <% content_for :title, "#{@series.name} – Attend" %>
+<% content_for :head do %>
+  <% if @dashboard.mappable_events.any? %>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <% end %>
+<% end %>
 
-<div class="max-w-5xl mx-auto">
+<% totals = @dashboard.totals %>
+<% chase_rows = @dashboard.chase_rows %>
+<% stage_rows = @dashboard.stage_rows %>
+<% arrival_row = @dashboard.arrival_row %>
+
+<div class="max-w-7xl mx-auto px-4 py-6">
   <% if @series.banner.attached? %>
-    <div class="mb-6 rounded-lg overflow-hidden border border-gray-200">
-      <%= image_tag @series.banner, class: "w-full h-40 object-cover" %>
+    <div class="mb-6 rounded-lg overflow-hidden border border-(--border-card)">
+      <%= image_tag @series.banner, class: "w-full h-32 sm:h-40 object-cover" %>
     </div>
   <% end %>
 
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
     <div class="flex items-center gap-4 min-w-0">
       <%= render "admin/events/avatar", event: @series, size: 48, rounded: "rounded-lg" %>
       <div class="min-w-0">
-        <h1 class="text-2xl font-semibold text-gray-900 truncate"><%= @series.name %></h1>
+        <h1 class="text-2xl font-bold text-(--text-strong) truncate tracking-[-0.01em]"><%= @series.name %></h1>
+        <%# Identity only. Every participant figure lives in the funnel and the
+            chase list, so nothing here repeats a number those two already own —
+            this line answers "which series, how big, is anything running". %>
+        <% if @events.any? %>
+          <% live_events = @dashboard.live_events %>
+          <p class="text-[13px] text-(--text-soft) mt-0.5 flex flex-wrap items-center gap-x-1.5">
+            <span><%= pluralize(totals[:events], "event") %></span>
+            <% if live_events.any? %>
+              <span aria-hidden="true">·</span>
+              <% if live_events.one? %>
+                <%= link_to "1 live", admin_event_dashboard_path(live_events.first.slug),
+                      class: "font-medium text-(--text-link) hover:underline" %>
+              <% else %>
+                <span class="font-medium text-(--text)"><%= live_events.length %> live</span>
+              <% end %>
+            <% elsif @dashboard.next_event %>
+              <span aria-hidden="true">·</span>
+              <span>next in <%= distance_of_time_in_words(Time.current, @dashboard.next_event.starts_at) %></span>
+            <% end %>
+            <% if totals[:inactive].positive? %>
+              <span aria-hidden="true">·</span>
+              <span><%= totals[:inactive] %> withdrawn</span>
+            <% end %>
+          </p>
+        <% end %>
         <% if @series.description.present? %>
-          <p class="text-sm text-gray-500 mt-0.5"><%= @series.description %></p>
+          <p class="text-sm text-(--text-soft) mt-0.5"><%= @series.description %></p>
         <% end %>
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-2">
       <% if policy(@series).manage_members? %>
-        <%= link_to admin_series_members_path(@series), class: "inline-flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+        <%= link_to admin_series_members_path(@series), class: "inline-flex items-center gap-2 cursor-pointer border border-(--border-strong) bg-(--bg-elev) text-(--text) hover:bg-(--bg-elev-3) hover:text-(--text-strong) text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
+          <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
           Members
         <% end %>
       <% end %>
       <% if policy(@series).update? %>
-        <%= link_to edit_admin_series_path(@series), class: "inline-flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+        <%= link_to edit_admin_series_path(@series), class: "inline-flex items-center gap-2 cursor-pointer border border-(--border-strong) bg-(--bg-elev) text-(--text) hover:bg-(--bg-elev-3) hover:text-(--text-strong) text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
+          <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
           Settings
         <% end %>
       <% end %>
       <% if policy(Event.new(event_series_id: @series.id)).create? %>
-        <%= link_to admin_new_event_path(series: @series.slug), class: "inline-flex items-center gap-2 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        <%# Secondary, like its neighbours: this is a cleanup page, and the work
+            it opens with is chasing people, not adding another event. %>
+        <%= link_to admin_new_event_path(series: @series.slug), class: "inline-flex items-center gap-2 cursor-pointer border border-(--border-strong) bg-(--bg-elev) text-(--text) hover:bg-(--bg-elev-3) hover:text-(--text-strong) text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
+          <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
           New Event
         <% end %>
       <% end %>
     </div>
   </div>
 
-  <% if @events.any? %>
-    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
-      <ul>
-        <% @events.each_with_index do |event, i| %>
-          <%= render "admin/dashboard/event_row", event: event, first: i == 0 %>
-        <% end %>
-      </ul>
-      <div class="px-5 py-3 border-t border-gray-100 text-xs text-gray-500">
-        <%= @events.count %> <%= "event".pluralize(@events.count) %> in this series
-      </div>
-    </div>
+  <% if @events.empty? %>
+    <%= render "admin/event_series/empty" %>
   <% else %>
-    <div class="bg-white border border-gray-200 rounded-lg p-12 text-center">
-      <div class="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-4">
-        <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+    <%# The chase list leads: it is the page's point of view, so it opens the
+        page rather than sitting under a row of figures the funnel already owns. %>
+    <%= render "admin/event_series/chase", chase_rows: chase_rows, totals: totals, event_rows: @event_rows %>
+
+    <%# The ribbon needs the full width to hold nine stages, so the map moves
+        down beside the events table it indexes. %>
+    <div class="mt-6">
+      <%= render "admin/event_series/funnel", stage_rows: stage_rows, arrival_row: arrival_row, totals: totals %>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+      <div class="lg:col-span-3 min-w-0">
+        <%= render "admin/event_series/events", event_rows: @event_rows %>
       </div>
-      <h2 class="text-base font-medium text-gray-900 mb-1">No events in this series yet</h2>
-      <p class="text-sm text-gray-500 mb-6">Create the first event — it'll inherit this series' branding automatically.</p>
-      <% if policy(Event.new(event_series_id: @series.id)).create? %>
-        <%= link_to admin_new_event_path(series: @series.slug), class: "inline-flex items-center gap-2 bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-          Create Event
-        <% end %>
-      <% end %>
+      <div class="lg:col-span-2 min-w-0">
+        <%= render "admin/event_series/map", dashboard: @dashboard, event_rows: @event_rows %>
+      </div>
     </div>
   <% end %>
 </div>

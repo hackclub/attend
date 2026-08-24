@@ -1,0 +1,13 @@
+<div class="bg-(--bg-elev) border border-(--border-card) rounded-lg p-12 text-center">
+  <div class="w-12 h-12 rounded-full bg-(--bg-elev-3) flex items-center justify-center mx-auto mb-4">
+    <svg class="w-6 h-6 text-(--text-muted)" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+  </div>
+  <h2 class="text-base font-semibold text-(--text-strong) mb-1">No events in this series yet</h2>
+  <p class="text-sm text-(--text-soft) mb-6">Create the first event — it'll inherit this series' branding automatically.</p>
+  <% if policy(Event.new(event_series_id: @series.id)).create? %>
+    <%= link_to admin_new_event_path(series: @series.slug), class: "inline-flex items-center gap-2 cursor-pointer bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-semibold py-2 px-4 rounded-md transition-colors" do %>
+      <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+      Create Event
+    <% end %>
+  <% end %>
+</div>
