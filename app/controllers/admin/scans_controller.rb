@@ -118,9 +118,7 @@ module Admin
 
       # First, try NFC badge token lookup if provided
       if params[:badge_token].present?
-        participant_event = current_event.participant_events
-          .includes(:participant, :medical, :dietary)
-          .find_by(nfc_badge_token: params[:badge_token])
+        participant_event = NfcTokenResolver.call(event: current_event, token: params[:badge_token])
         scan_source = "nfc" if participant_event
       end
 

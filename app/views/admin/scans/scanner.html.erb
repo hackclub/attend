@@ -402,12 +402,16 @@ function groupBadgeHtml(group, fallbackColor) {
             data.participant.nfc_badge_token &&
             !data.participant.nfc_badge_assigned) {
           
-          window.nfcBridge.showWritePanel(
-            data.participant.display_name,
-            data.participant.participant_event_id,
-            data.participant.nfc_badge_token,
-            data.participant.slack_user_id
-          );
+          if (!data.participant.slack_user_id) {
+            console.warn('NFC write skipped: participant missing slack_user_id', data.participant.display_name);
+          } else {
+            window.nfcBridge.showWritePanel(
+              data.participant.display_name,
+              data.participant.participant_event_id,
+              data.participant.nfc_badge_token,
+              data.participant.slack_user_id
+            );
+          }
         }
       } else {
         showResult(data.error || 'Participant not found', true);
@@ -694,7 +698,7 @@ function showParticipantModal(data, scanContext, firstScan) {
         nfcStatus.textContent = 'Badge already assigned - rewrite will update the badge';
       } else {
         nfcBtnText.textContent = 'Write NFC Badge';
-        nfcStatus.textContent = data.slack_user_id ? '' : 'This token will contain Attend check-in data only';
+        nfcStatus.textContent = data.slack_user_id ? '' : 'Missing Slack ID - badge URL will be limited';
       }
     } else {
       nfcSection.classList.add('hidden');
@@ -1006,12 +1010,11 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
     
     // Send write command to bridge with both payloads
     if (nfcBridge && nfcBridge.readyState === WebSocket.OPEN) {
-      const writePayload = {
+      nfcBridge.send(JSON.stringify({
         action: 'write',
+        badge_url: 'https://badge.hackclub.com/t/' + slackUserId,
         attend_token: token
-      };
-      if (slackUserId) writePayload.badge_url = 'https://badge.hackclub.com/t/' + slackUserId;
-      nfcBridge.send(JSON.stringify(writePayload));
+      }));
     } else {
       nfcWriteStatus.textContent = 'NFC bridge not connected';
     }
