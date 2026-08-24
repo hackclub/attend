@@ -251,11 +251,15 @@ module Admin
 
     def accommodation
       authorize @participant_event, :view_accommodation?
+      return redirect_to admin_event_participant_path(current_event, @participant_event), alert: "Accommodation is disabled for this event." unless current_event.accommodation_enabled?
+
       @accommodation = @participant_event.accommodation || @participant_event.build_accommodation
     end
 
     def update_accommodation
       authorize @participant_event, :update_accommodation?
+      return redirect_to admin_event_participant_path(current_event, @participant_event), alert: "Accommodation is disabled for this event." unless current_event.accommodation_enabled?
+
       @accommodation = @participant_event.accommodation || @participant_event.build_accommodation
 
       if @accommodation.update(accommodation_params)
