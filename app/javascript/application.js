@@ -4,3 +4,7 @@ import "controllers"
 import { startToggleHidden } from "utils/toggle_hidden"
 
 startToggleHidden()
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/service-worker", { scope: "/" })
+}

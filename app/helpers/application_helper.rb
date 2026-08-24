@@ -11,6 +11,24 @@ module ApplicationHelper
     "solarized-dark"         => "Solarized Dark"
   }.freeze
 
+  # Mirrors --bg-app in themes.css; <meta name="theme-color"> can't read CSS
+  # variables, so the browser-chrome color has to be rendered server-side.
+  THEME_COLORS = {
+    "light"                  => "#f9fafc",
+    "dark"                   => "#0f1115",
+    "catppuccin-latte"       => "#eff1f5",
+    "catppuccin-frappe"      => "#303446",
+    "catppuccin-macchiato"   => "#24273a",
+    "catppuccin-mocha"       => "#1e1e2e",
+    "dracula"                => "#282a36",
+    "nord"                   => "#2e3440",
+    "solarized-dark"         => "#002b36"
+  }.freeze
+
+  def current_theme_color
+    THEME_COLORS.fetch(current_theme, "#f9fafc")
+  end
+
   def current_theme
     raw = current_user.respond_to?(:theme) && current_user&.theme.presence
     raw ||= cookies[:attend_theme].presence
