@@ -38,6 +38,14 @@
           Public profile
         </a>
       <% end %>
+      <% if @passports.any? %>
+        <a href="#passport" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
+          <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 1.105-.895 2-2 2s-2-.895-2-2 .895-2 2-2 2 .895 2 2zm0 0h8m-3 0v3m0 3v.01M4 5h16a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V7a2 2 0 012-2z"/>
+          </svg>
+          Hack Club Passport
+        </a>
+      <% end %>
       <% if current_user.admin? %>
         <a href="#staff-settings" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
           <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -64,6 +72,31 @@
     </nav>
 
     <div class="min-w-0 space-y-10">
+      <% if @passports.any? %>
+        <section id="passport" class="scroll-mt-8">
+          <h2 class="border-b border-(--border-soft) pb-3 text-xl font-semibold text-(--text-strong)">Hack Club Passport</h2>
+          <p class="mt-3 text-sm text-(--text-muted)">Your passport identifies you when you check in at Hack Club events.</p>
+
+          <div class="mt-4 overflow-hidden rounded-2xl border border-(--border-card) bg-(--bg-elev)">
+            <dl class="divide-y divide-(--border-soft)">
+              <% @passports.each do |passport| %>
+                <div class="px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div>
+                    <dt class="font-mono text-sm font-semibold text-(--text-strong)"><%= passport.serial_number %></dt>
+                    <dd class="mt-1 text-sm text-(--text-muted)">Paired <%= passport.paired_at.strftime("%B %d, %Y") %></dd>
+                  </div>
+                  <% if passport.active? %>
+                    <span class="inline-flex w-fit rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Active</span>
+                  <% else %>
+                    <span class="inline-flex w-fit rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Revoked</span>
+                  <% end %>
+                </div>
+              <% end %>
+            </dl>
+          </div>
+        </section>
+      <% end %>
+
       <% if @participant %>
       <!-- Account -->
       <section id="account" class="scroll-mt-8">

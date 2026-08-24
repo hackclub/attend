@@ -30,6 +30,8 @@ class DashboardController < ApplicationController
   end
 
   def profile
+    @passports = current_user.passports.where.not(paired_at: nil).order(created_at: :desc)
+
     if @participant
       @public_profile_events = @participant.public_profile_eligible_participant_events.preload(:event)
       # One [event, hidden] pair per staffed event — a user can hold several
