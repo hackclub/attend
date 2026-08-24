@@ -63,5 +63,39 @@ RSpec.describe "Api::V1::Scans", type: :request do
       expect(response).to have_http_status(:ok)
       expect(leg.reload).to be_travel_picked_up
     end
+
+    it "preserves the original pickup timestamp on a duplicate explicit pickup scan" do
+      participant_event = create(:participant_event, event: event)
+      pickup = event.scan_contexts.create!(name: "Station pickup", checks_in: false, is_travel_pickup: true)
+      travel = Travel.create!(participant_event: participant_event, direction: "inbound", mode: "plane")
+      leg = create(:travel_leg, travel: travel, departure_airport: "SFO", arrival_airport: "BOS")
+
+      post "/api/v1/events/#{event.id}/scans",
+        params: { participant_id: participant_event.id, scan_context_id: pickup.id }.to_json,
+        headers: auth_headers.merge("Content-Type" => "application/json")
+
+      original_pickup_time = leg.reload.travel_picked_up_at
+
+      post "/api/v1/events/#{event.id}/scans",
+        params: { participant_id: participant_event.id, scan_context_id: pickup.id }.to_json,
+        headers: auth_headers.merge("Content-Type" => "application/json")
+
+      expect(response).to have_http_status(:ok)
+      expect(leg.reload.travel_picked_up_at).to eq(original_pickup_time)
+    end
+
+    it "records a non-plane pickup scan without marking a legacy travel leg" do
+      participant_event = create(:participant_event, event: event)
+      pickup = event.scan_contexts.create!(name: "Station pickup", checks_in: false, is_travel_pickup: true)
+      travel = Travel.create!(participant_event: participant_event, direction: "inbound", mode: "train")
+      legacy_leg = create(:travel_leg, travel: travel, departure_airport: "SFO", arrival_airport: "BOS")
+
+      post "/api/v1/events/#{event.id}/scans",
+        params: { participant_id: participant_event.id, scan_context_id: pickup.id }.to_json,
+        headers: auth_headers.merge("Content-Type" => "application/json")
+
+      expect(response).to have_http_status(:ok)
+      expect(legacy_leg.reload).not_to be_travel_picked_up
+    end
   end
 end
