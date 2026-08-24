@@ -1,54 +1,61 @@
-# User-Owned NFC Tokens Design
+# Hack Club Passports Design
 
 ## Summary
 
-Attend currently provisions NFC badge tokens on `ParticipantEvent`. That makes a physical badge valid for one participation at one event. This change introduces durable NFC tokens owned by `User`, so the same physical token can identify its owner at every event where that user has a participation.
+Attend supports two deliberately different kinds of NFC hardware:
 
-Every event accepts existing user-owned NFC tokens. The existing `Event#nfc_badges_enabled?` setting remains, but its meaning narrows to whether the event issues and writes NFC hardware. An event with issuance disabled can still read an existing personal token and check its owner in.
+1. An event badge belongs to one `ParticipantEvent` and is valid only at that event.
+2. A Hack Club passport belongs to one `User` and may identify that user at every event where they have a participation.
 
-The design borrows the durable-artifact lifecycle from the Ruby Passport: a physical artifact is paired once, then carried between events. Attend continues to record check-in against the participation in the scanner's selected event.
+This change adds passports without changing the ownership or issuance semantics of event badges. Global administrators pair passports from the target user's admin profile. A user with a successfully paired passport sees a basic Hack Club Passport section on `/dashboard/profile` containing its public serial number, status, and pairing date.
+
+Every event scanner accepts active passports. The existing `Event#nfc_badges_enabled?` setting continues to control only whether that event issues and writes its own event-scoped NFC badges.
 
 ## Goals
 
-- Pair NFC hardware with a user rather than a participation.
-- Let every event accept a paired personal token.
-- Resolve a scanned token to the user's participation in the scanner's current event.
-- Preserve every existing assigned NFC token without silently invalidating hardware.
-- Keep event-issued badge provisioning behind `Event#nfc_badges_enabled?`.
-- Install Flipper with PostgreSQL persistence and support the per-user `:personal_nfc_token` actor flag.
-- Retain the existing web and mobile API shapes where practical.
+- Keep every existing and newly issued event NFC badge scoped to its `ParticipantEvent`.
+- Add durable Hack Club passports owned by `User`.
+- Pair and revoke passports from the global admin user profile.
+- Resolve an active passport to its owner's participation in the scanner's selected event.
+- Let every event accept passports regardless of `event.nfc_badges_enabled?`.
+- Show paired passport information to its owner on the dashboard profile.
+- Give each passport a public serial number separate from its private NFC bearer token.
+- Preserve current event badge web, mobile API, and bridge behavior.
 
 ## Non-Goals
 
-- No participant-facing NFC or passport UI is added in this change.
-- No Flipper administration UI is mounted. Flags are managed through Rails console initially.
-- No native mobile pairing UI is added.
-- No public or unauthenticated token lookup endpoint is added.
-- Legacy `ParticipantEvent` NFC columns are not dropped in this rollout.
-- A second event-level setting for accepting personal tokens is not added. Acceptance is universal.
+- No participant self-service pairing or revocation.
+- No event scanner control for creating or pairing passports.
+- No native mobile pairing UI.
+- No public or unauthenticated passport lookup.
+- No visual passport artwork, achievements, stamps, or rich passport history.
+- No migration of event badges into passports.
+- No feature flag framework or Flipper installation.
 
 ## Product Semantics
 
-There are two distinct capabilities:
+### Event NFC badges
 
-1. **Personal token acceptance**: every event scanner may read an existing user-owned NFC token. This is not controlled by an event flag.
-2. **NFC hardware issuance**: only events with `nfc_badges_enabled?` may generate, write, confirm, replace, or revoke event-issued hardware.
+Event badges remain stored on `ParticipantEvent` using the existing `nfc_badge_token`, `nfc_badge_assigned_at`, and `nfc_badge_assigned_by_id` columns. The existing scanner write flow and nested event badge endpoints continue to create, write, confirm, and reset these values.
 
-The scanner's NFC reader connection and read status are visible to staff at every event. Badge-writing and pairing controls are rendered only when `current_event.nfc_badges_enabled?` is true.
+An assigned event badge is accepted only when scanning its owning event. It must never resolve the same participant at another event.
 
-The per-user Flipper flag is `:personal_nfc_token`. It is intended to gate participant-facing references to the feature. Since this change adds no participant-facing UI, the flag does not gate staff pairing or check-in. All Flipper features remain disabled by default, and a user can later be enabled with:
+`event.nfc_badges_enabled?` retains its current meaning: this event issues NFC badges. It gates event badge token generation, write controls, confirmation, and reset.
 
-```ruby
-Flipper.enable_actor(:personal_nfc_token, user)
-```
+### Hack Club passports
+
+A passport belongs to a `User`, independently of any event or participation. Global administrators pair it from `/admin/users/:id`. An active passport is accepted at every event, but check-in still requires the owner to have a `ParticipantEvent` for the scanner's selected event.
+
+Passport pairing does not depend on an event or event flag. Passport visibility is data-driven, with no feature flag. The participant-facing profile shows the passport section only after at least one passport has been successfully paired. A cancelled pending write does not create a participant-facing indication.
 
 ## Data Model
 
-Add `NfcToken` with a UUID primary key and the following fields:
+Add `Passport` with a UUID primary key and these fields:
 
-- `token: uuid`, non-null, database-generated, globally unique
+- `token: uuid`, non-null, globally unique, private bearer identifier written to NFC
+- `serial_number: string`, non-null, globally unique, public identifier such as `HCP-A1B2C3D4`
 - `user_id: uuid`, non-null foreign key to `users`
-- `paired_at: datetime`, nullable while a write is pending
+- `paired_at: datetime`, nullable while the hardware write is pending
 - `paired_by_id: uuid`, nullable foreign key to `users`
 - `revoked_at: datetime`, nullable
 - `revoked_by_id: uuid`, nullable foreign key to `users`
@@ -58,175 +65,176 @@ Associations:
 
 ```ruby
 class User < ApplicationRecord
-  has_many :nfc_tokens, dependent: :destroy
+  has_many :passports, dependent: :destroy
 end
 
-class NfcToken < ApplicationRecord
+class Passport < ApplicationRecord
   belongs_to :user
   belongs_to :paired_by, class_name: "User", optional: true
   belongs_to :revoked_by, class_name: "User", optional: true
 end
 ```
 
-A user may own multiple tokens. This is required to preserve badges previously issued for different events and permits hardware replacement without conflating the hardware records. A token is usable only when `paired_at` is present and `revoked_at` is absent.
+A user may have multiple passports so lost hardware can be replaced without rewriting history. A passport is:
 
-The token value is a bearer identifier written to the NFC tag's Attend record. It remains directly queryable because scanner lookup is its purpose. Raw token values must not be added to audit metadata, logs, participant-facing HTML, or URLs. Audit records reference the `NfcToken` record and user instead.
+- pending when `paired_at` and `revoked_at` are both null
+- active when `paired_at` is present and `revoked_at` is null
+- revoked when `revoked_at` is present
 
-## Flipper Installation
+The serial number is generated when the pending record is created and protected by a unique database index. It is safe to display. The raw `token` is never displayed on user-facing pages, included in URLs, audit metadata, or logged.
 
-Add the official `flipper` and `flipper-active_record` gems. Recreate `flipper_features` and `flipper_gates` with the current generator schema, including a text gate value and the unique indexes required by the Active Record adapter. Configure Flipper to use `Flipper::Adapters::ActiveRecord` rather than its in-memory default.
+## Passport Pairing Lifecycle
 
-`User#flipper_id` returns a stable type-qualified identifier:
+The admin user show page lists the user's passports and provides a `Pair passport` control. The page is already restricted to global administrators.
 
-```ruby
-def flipper_id
-  "User;#{id}"
-end
-```
+Pairing uses the Attend NFC Bridge:
 
-The explicit method prevents an actor identifier from depending on display attributes or object serialization.
+1. The administrator connects the bridge from the user profile.
+2. `POST /admin/users/:user_id/passports` returns the user's latest pending passport or creates one.
+3. The browser sends the passport's private token to the bridge as the Attend NFC token.
+4. The administrator taps the hardware so the bridge writes it.
+5. The bridge requests a second tap and reads the written token back.
+6. `POST /admin/users/:user_id/passports/:id/confirm` confirms only an exact match with that pending passport.
+7. Confirmation records `paired_at` and `paired_by`.
 
-## Pairing Lifecycle
+A failed or cancelled write leaves a pending record that a later pairing attempt may reuse. Pairing another passport does not revoke existing active passports.
 
-Pairing reuses the existing authenticated staff scanner and local NFC bridge:
+`DELETE /admin/users/:user_id/passports/:id` revokes one passport, recording `revoked_at` and `revoked_by`. Revoked passports remain visible in admin history and on the owner's passport section with a revoked status, but they can no longer check anyone in.
 
-1. Staff select or check in a participant in an event with NFC issuance enabled.
-2. Attend verifies that the participant is linked to a `User`. An unlinked participant cannot receive a personal token.
-3. The ensure endpoint returns that user's latest unconfirmed, unrevoked token or creates a pending `NfcToken`.
-4. The staff bridge writes the UUID token value into the hardware's Attend NFC record.
-5. The bridge reads the value back and sends it to the confirm endpoint.
-6. Confirmation succeeds only when the supplied value matches the pending record. It sets `paired_at` and `paired_by`.
-7. Cancelling or failing a write leaves an unusable pending record. A later ensure request may reuse it.
+Audit logs reference the `Passport` record and target user. They do not include the private token.
 
-Pairing endpoints remain nested under event and participation routes for authorization and mobile compatibility, but they operate on `participant_event.participant.user.nfc_tokens`. They require both staff access to the event and `event.nfc_badges_enabled?`.
+## NFC Scan Resolution
 
-Re-pairing creates or confirms another hardware record; it does not invalidate other tokens belonging to the same user. Explicit revocation targets one `NfcToken` and records the staff actor. The existing reset compatibility endpoint returns a fresh pending user token and must not silently revoke all of a user's hardware.
-
-## Scan Resolution
-
-Both browser and API scan controllers use one resolver with this interface:
+Browser and API scan controllers share an NFC resolver:
 
 ```ruby
 NfcTokenResolver.call(event:, token:)
 # => ParticipantEvent or nil
 ```
 
-The resolver performs these steps:
+Resolution order is intentional:
 
-1. Find an active `NfcToken` by exact UUID value.
-2. Follow `nfc_token.user.participant`.
-3. Find that participant's `ParticipantEvent` for the supplied event.
-4. Return `nil` if the token is unknown, pending, revoked, the user has no linked participant, or the participant is not enrolled in the event.
+1. Find an assigned `ParticipantEvent` badge matching the token within the selected event.
+2. If no current-event badge matches, find an active `Passport` by exact token.
+3. Follow `passport.user.participant`.
+4. Find that participant's `ParticipantEvent` for the selected event.
+5. Return nil if the token is unknown, the passport is pending or revoked, the user has no linked participant, or the participant is not enrolled in the selected event.
 
-The controllers continue to create `Scan` rows against the returned `ParticipantEvent`, using the selected `ScanContext` and `source: "nfc"`. Existing scan deduplication and first-scan check-in behavior remain unchanged.
+The selected event always owns the resulting `Scan`. Scan context, source, deduplication, and check-in behavior remain unchanged.
 
-NFC token reads do not depend on `event.nfc_badges_enabled?`. QR and manual lookup behavior remain unchanged.
+An event badge is never looked up globally. Existing event badges therefore remain event-scoped. Passport reads do not depend on `event.nfc_badges_enabled?`.
 
-## Legacy Migration and Compatibility
+## Event Scanner UI
 
-Existing assigned `ParticipantEvent` tokens are physical hardware and must remain valid.
+The NFC reader connection and read status render at every event so any event can accept a passport.
 
-The data migration copies every row with all of the following into `nfc_tokens`:
+The existing event badge write panel, automatic write-on-check-in behavior, and participant modal controls retain their current behavior and remain conditional on `current_event.nfc_badges_enabled?`. They operate only on `ParticipantEvent` badge fields.
 
-- `nfc_badge_token` is present
-- `nfc_badge_assigned_at` is present
-- `participant.user_id` is present
+The event scanner has no `Pair passport` action and does not create `Passport` records.
 
-It preserves the token UUID, pairing timestamp, and assigning staff member. The globally unique token index makes the backfill idempotent and prevents one token from being assigned to two users.
+## Admin User Profile UI
 
-Assigned tokens on participants without linked users cannot yet have a user owner. Their legacy columns remain untouched. The resolver therefore has a read-only compatibility fallback:
+`/admin/users/:id` gains a dashed orange global-admin section for Hack Club Passports. It contains:
 
-1. Find a legacy `ParticipantEvent` globally by `nfc_badge_token` and require `nfc_badge_assigned_at`.
-2. If its participant is now linked to a user, resolve that user's participation in the scanner's current event.
-3. If it is still unlinked, accept the token only for that original `ParticipantEvent` and only when scanning its original event.
+- bridge connection status and connect/disconnect control
+- `Pair passport` button
+- pending write and verification status
+- a list of passport serial numbers, status, pairing date, pairing administrator, and revocation date
+- a revoke action for active passports
 
-No new flow generates, writes, confirms, or resets `ParticipantEvent#nfc_badge_token`. Existing columns and model methods are marked deprecated and retained only for compatibility. They can be removed in a later migration after production data confirms that no assigned unlinked legacy tokens remain.
+The private NFC token is present only in the authenticated pairing response and transient browser-to-bridge write message. It is not rendered into the initial HTML.
 
-The existing nested NFC badge API routes remain available. Their response keys stay compatible, while the backing record changes to `NfcToken`. Participant list/detail responses expose only the token needed by authenticated staff issuance flows and must not create records during reads.
+## Participant Profile UI
+
+`/dashboard/profile` gains a `Hack Club Passport` navigation item and section only when `current_user.passports.where.not(paired_at: nil).exists?`.
+
+The baseline section lists successfully paired passports with:
+
+- serial number
+- active or revoked status
+- pairing date
+
+It does not show the private token, pairing administrator, administrative controls, or pending writes. The section is informational only.
+
+## Existing Event Badge Compatibility
+
+The original event badge lifecycle is restored in full:
+
+- `ParticipantEvent#ensure_nfc_badge_token!`
+- `ParticipantEvent#assign_nfc_badge!`
+- `ParticipantEvent#reset_nfc_badge!`
+- browser and API event badge controllers
+- mobile participant and scan response fields
+- scanner write-on-check-in provisioning
+- toolbox check-in provisioning
+
+There is no event-badge-to-passport backfill. Existing assigned badges remain valid only at their original events.
+
+The unmerged PR's Flipper installation, `NfcToken` model, global event badge backfill, and user-owned behavior in the event badge endpoints are removed before the PR is allowed to merge.
 
 ## Authorization and Security
 
-- Scan creation keeps its current event-access requirements.
-- Personal tokens are accepted only through authenticated staff scanner/API requests.
-- Issuance endpoints additionally require `event.nfc_badges_enabled?`.
-- Pairing requires a target participation in the staff member's accessible event.
-- Pairing fails for an unlinked participant rather than creating or guessing an account.
-- Confirmation requires an exact match with a pending token owned by the target user.
-- Unknown, pending, revoked, and mismatched tokens do not create scans.
-- Raw UUID values are excluded from audit metadata and application logs.
-- Database uniqueness is the final guard against duplicate token ownership.
+- Passport pairing and revocation require the existing global-admin authorization on admin user management.
+- Passport scanning requires the existing authenticated event access used by scan creation.
+- Confirmation requires an exact token match against the selected pending passport.
+- Unknown, malformed, pending, and revoked passport tokens do not create scans.
+- A valid passport reveals nothing when its owner is not enrolled in the selected event.
+- Raw passport tokens are filtered from Rails parameter logs and omitted from audit metadata.
+- Unique database indexes protect both bearer tokens and public serial numbers.
+- Participant-facing pages never receive the private token.
 
-## Errors and Staff Feedback
+## Errors and Feedback
 
-- Unknown, pending, revoked, or out-of-event token: `Participant not found for this event`.
-- Pairing at a non-issuing event: `NFC badge issuance is not enabled for this event`.
-- Pairing an unlinked participant: `Participant must have a linked Attend account before pairing a personal NFC token`.
-- Confirmation mismatch: `Badge token mismatch`.
-- Missing pending token: `No pending NFC token exists for this user`.
-- Reader or bridge failures remain client-side connection/write errors and do not activate the pending record.
+- Bridge unavailable: show a connection error on the admin user page.
+- Write failed: leave the passport pending and allow retry.
+- Verification mismatch: do not pair; ask the administrator to retry.
+- Revoked or unknown scan token: return the existing participant-not-found response.
+- Passport owner not enrolled in the event: return the same participant-not-found response.
 
-Messages do not reveal whether a token belongs to a user registered elsewhere.
-
-## UI Changes
-
-The staff scanner changes in two ways:
-
-- The NFC connection/read section renders for every event.
-- NFC write, pair, and rewrite controls render only for events with `nfc_badges_enabled?`.
-
-The participant result modal reports whether the linked user has active or pending tokens, not whether the current `ParticipantEvent` has a token. The pairing button is unavailable with a clear explanation when the participant has no linked user.
-
-No dashboard, profile, onboarding, ticket, email, wallet pass, or participant-facing copy mentions personal NFC tokens in this change. Future user-visible work must use:
-
-```ruby
-Flipper.enabled?(:personal_nfc_token, current_user)
-```
+Error messages do not reveal passport ownership to event staff outside their selected event.
 
 ## API and Documentation
 
-The OpenAPI document keeps `badge_token` as the scan input and retains the current issuance route paths. NFC badge schemas are updated so their ownership and lifecycle descriptions refer to the user's token rather than the participation's token.
+The existing event badge API remains documented as participation-owned and event-scoped.
 
-The mobile app does not need a route migration for existing scan calls. A future native pairing interface can use the retained ensure/confirm routes until a dedicated user-token API is justified.
+Passport pairing routes are authenticated web-session admin routes rather than mobile API routes. The mobile scan endpoint needs no new input: `badge_token` can contain either a current-event badge token or a passport token, and the server performs scoped resolution.
+
+OpenAPI scan documentation states that event badges work only at their event while active passports work across events.
 
 ## Testing Strategy
 
 Model specs cover:
 
-- globally unique token values
+- unique private tokens and serial numbers
 - pending, active, and revoked states
-- multiple active tokens for one user
-- confirmation and revocation actor/timestamp behavior
-- stable `User#flipper_id`
+- exact-match confirmation and staff attribution
+- revocation of one passport without affecting another
+- multiple passports per user
 
 Resolver specs cover:
 
-- resolving one token to the same user across two events
-- rejecting a user without participation in the selected event
-- rejecting unknown, pending, and revoked tokens
-- resolving migrated legacy tokens across events
-- limiting unlinked legacy tokens to their original event
+- current-event badge resolution
+- rejection of an event badge at another event
+- active passport resolution across events
+- no participation in the selected event
+- unknown, malformed, pending, and revoked passports
+- current-event badge precedence
 
-Request specs cover both admin browser and API scan creation:
+Request and view specs cover:
 
-- NFC acceptance when `nfc_badges_enabled?` is false
-- unchanged QR/manual behavior
-- correct scan source and current-event participation
-- issuance rejected when the event flag is false
-- issuance rejected for an unlinked participant
-- ensure and confirm operating on `NfcToken`
-- confirmation mismatch and missing pending token
-- retained response keys for mobile compatibility
+- global-admin-only passport creation, confirmation, and revocation
+- admin user profile pairing controls and passport history
+- participant profile visibility only after successful pairing
+- participant profile serial/status/date output without the bearer token
+- NFC reading at events with badge issuance disabled
+- unchanged event badge issuance and mobile response behavior
+- unchanged QR and manual scanning behavior
 
-View/request specs cover universal reader visibility and issuance-only controls. Migration verification covers preservation of token UUIDs, pairing timestamps, and assigning staff for linked legacy rows, with unlinked rows left intact for fallback.
-
-The focused specs run first, followed by the complete RSpec suite and RuboCop.
+The focused suite runs first, followed by RuboCop, OpenAPI parsing, and the complete RSpec suite with existing baseline failures reported separately.
 
 ## Rollout
 
-1. Deploy Flipper tables, `nfc_tokens`, and the legacy backfill.
-2. Deploy universal token resolution and the updated staff scanner.
-3. Verify legacy fallback use and the count of assigned legacy tokens without linked users.
-4. Enable `:personal_nfc_token` for internal test users in environments where future user-facing work is being developed. This flag has no visible effect in the current change.
-5. Add native mobile pairing in a later change.
-6. Remove legacy participation token columns only after no assigned unlinked tokens remain and all supported clients use user-owned tokens.
-
+1. Deploy the `passports` table, admin pairing flow, profile section, and dual resolver.
+2. Pair internal passports from the admin user profile and verify scanning at multiple events.
+3. Monitor unknown-token and revoked-token scan behavior without logging token values.
+4. Add native mobile passport administration or richer passport presentation in later changes.
