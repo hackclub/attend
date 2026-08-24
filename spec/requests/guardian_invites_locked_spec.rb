@@ -104,11 +104,15 @@ RSpec.describe "Guardian invites locked", type: :request do
 
   describe "GuardianMailer.invitation" do
     it "refuses to send while locked" do
+      # Needs an invite that has genuinely never gone out, so the nil send
+      # stamp below proves the lock suppressed it.
+      unsent = create(:guardian_participant_event, :never_sent, participant_event: participant_event)
+
       expect {
-        GuardianMailer.invitation(guardian_participant_event: gpe).deliver_now
+        GuardianMailer.invitation(guardian_participant_event: unsent).deliver_now
       }.not_to change { ActionMailer::Base.deliveries.count }
 
-      expect(gpe.reload.invite_token_sent_at).to be_nil
+      expect(unsent.reload.invite_token_sent_at).to be_nil
     end
   end
 
