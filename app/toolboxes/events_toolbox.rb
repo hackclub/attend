@@ -110,7 +110,7 @@ class EventsToolbox < ApplicationToolbox
         groups: event_groups_url(e),
         rooming: event_rooming_url(e),
         scanner: event_scanner_url(e),
-        airport_mode: event_airport_mode_url(e)
+        travel: event_travel_url(e)
       }
     )
   end

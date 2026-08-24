@@ -1,4 +1,6 @@
 class Scan < ApplicationRecord
+  include TravelCalendarCacheInvalidatable
+
   self.implicit_order_column = "created_at"
 
   belongs_to :participant_event
@@ -15,13 +17,18 @@ class Scan < ApplicationRecord
   scope :for_event, ->(event) { joins(:participant_event).where(participant_events: { event_id: event.id }) }
   scope :today, -> { where(scanned_at: Time.current.beginning_of_day..Time.current.end_of_day) }
   scope :for_check_in, -> { joins(:scan_context).where(scan_contexts: { checks_in: true }) }
-  scope :for_airport, -> { joins(:scan_context).where(scan_contexts: { is_airport: true }) }
-  scope :for_airport_or_check_in, -> { joins(:scan_context).where(scan_contexts: { is_airport: true }).or(joins(:scan_context).where(scan_contexts: { checks_in: true })) }
+  scope :for_travel_pickup, -> { joins(:scan_context).where(scan_contexts: { is_travel_pickup: true }) }
+  scope :for_travel_pickup_or_check_in, -> { joins(:scan_context).where(scan_contexts: { is_travel_pickup: true }).or(joins(:scan_context).where(scan_contexts: { checks_in: true })) }
   scope :for_context, ->(context) { where(scan_context: context) }
 
   after_create_commit :broadcast_scan
 
   private
+
+  def travel_calendar_event_ids
+    participant_event_ids = [ participant_event_id, saved_change_to_participant_event_id&.first ].compact
+    ParticipantEvent.where(id: participant_event_ids).distinct.pluck(:event_id)
+  end
 
   def broadcast_scan
     medical = participant_event.medical

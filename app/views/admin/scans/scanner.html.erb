@@ -35,7 +35,7 @@
             <select id="scan-context" class="border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]">
               <% @scan_contexts.each do |context| %>
                 <option value="<%= context.id %>" <%= "selected" if context == @default_scan_context %>>
-                  <%= context.name %><% if context.is_airport? %> ✈️<% end %><% if context.checks_in? %> ✓<% end %>
+                  <%= context.name %><%= " — Travel pickup" if context.is_travel_pickup? %><% if context.checks_in? %> ✓<% end %>
                 </option>
               <% end %>
             </select>

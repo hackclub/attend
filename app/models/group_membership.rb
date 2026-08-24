@@ -1,4 +1,6 @@
 class GroupMembership < ApplicationRecord
+  include TravelCalendarCacheInvalidatable
+
   self.implicit_order_column = "created_at"
 
   has_paper_trail
@@ -10,6 +12,11 @@ class GroupMembership < ApplicationRecord
   validate :same_event
 
   private
+
+  def travel_calendar_event_ids
+    participant_event_ids = [ participant_event_id, saved_change_to_participant_event_id&.first ].compact
+    ParticipantEvent.where(id: participant_event_ids).distinct.pluck(:event_id)
+  end
 
   def same_event
     return unless group && participant_event

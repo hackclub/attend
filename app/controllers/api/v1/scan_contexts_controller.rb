@@ -27,7 +27,8 @@ module Api
           id: context.id,
           name: context.name,
           checks_in: context.checks_in,
-          is_airport: context.is_airport,
+          is_travel_pickup: context.is_travel_pickup,
+          is_airport: context.is_travel_pickup,
           position: context.position,
           starts_at: context.starts_at&.in_time_zone(@event.event_time_zone)&.iso8601,
           ends_at: context.ends_at&.in_time_zone(@event.event_time_zone)&.iso8601

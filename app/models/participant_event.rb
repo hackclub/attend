@@ -1,5 +1,6 @@
 class ParticipantEvent < ApplicationRecord
   include WalletPassUpdatable
+  include TravelCalendarCacheInvalidatable
 
   self.implicit_order_column = "created_at"
 
@@ -346,7 +347,7 @@ class ParticipantEvent < ApplicationRecord
       (travel_outbound&.plane? && travel_outbound.is_unaccompanied_minor?))
   end
 
-  # Only verified UMs are surfaced to event admins and airport mode.
+  # Only verified UMs are surfaced to event admins and the Travel Calendar.
   def verified_unaccompanied_minor?
     unaccompanied_minor_declared? && um_approved?
   end
@@ -385,6 +386,10 @@ class ParticipantEvent < ApplicationRecord
   end
 
   private
+
+  def travel_calendar_event_ids
+    [ event_id, saved_change_to_event_id&.first ]
+  end
 
   # Uses the already-loaded consents when eager-loaded so per-row status
   # checks in list views don't issue a query each.

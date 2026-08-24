@@ -1,6 +1,32 @@
 require 'rails_helper'
 
 RSpec.describe TravelLeg, type: :model do
+  describe "travel pickup" do
+    it "records and clears travel pickup on a flight leg" do
+      user = create(:user)
+      leg = create(
+        :travel_leg,
+        travel: Travel.create!(
+          participant_event: create(:participant_event),
+          direction: "inbound",
+          mode: "plane"
+        ),
+        departure_airport: "JFK",
+        arrival_airport: "LHR"
+      )
+
+      leg.mark_travel_picked_up!(user)
+      expect(leg.reload.travel_picked_up_at).to be_present
+      expect(leg.picked_up_by).to eq(user)
+      expect(leg).to be_travel_picked_up
+
+      leg.unmark_travel_picked_up!
+      expect(leg.reload.travel_picked_up_at).to be_nil
+      expect(leg.picked_up_by).to be_nil
+      expect(leg).not_to be_travel_picked_up
+    end
+  end
+
   describe "#fetch_known_flight_data!" do
     let(:participant_event) { create(:participant_event) }
     let(:travel) { Travel.create!(participant_event: participant_event, direction: "inbound", mode: "plane") }

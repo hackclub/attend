@@ -1,6 +1,7 @@
 class Participant < ApplicationRecord
   include WalletPassUpdatable
   include DecodableImageAttachment
+  include TravelCalendarCacheInvalidatable
   include EmailDeliverability
 
   has_paper_trail
@@ -200,6 +201,10 @@ class Participant < ApplicationRecord
   end
 
   private
+
+  def travel_calendar_event_ids
+    ParticipantEvent.where(participant_id: id).distinct.pluck(:event_id)
+  end
 
   def participant_events_to_update
     participant_events.to_a

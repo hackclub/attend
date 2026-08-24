@@ -54,7 +54,7 @@ module Admin
     end
 
     def scan_context_params
-      params.require(:scan_context).permit(:name, :checks_in, :is_airport, :position, :starts_at, :ends_at)
+      params.require(:scan_context).permit(:name, :checks_in, :is_travel_pickup, :position, :starts_at, :ends_at)
     end
   end
 end

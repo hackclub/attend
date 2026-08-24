@@ -25,7 +25,7 @@
 
   <div>
     <%= f.label :name, "Location Name", class: "block text-sm font-medium text-gray-700 mb-1" %>
-    <%= f.text_field :name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "e.g., Main Entrance, Airport Terminal, Registration Desk" %>
+    <%= f.text_field :name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "e.g., Main Entrance, Central Station, Registration Desk" %>
     <p class="mt-1 text-sm text-gray-500">A descriptive name for this scanning location</p>
   </div>
 
@@ -39,10 +39,10 @@
     </div>
 
     <div class="flex items-start">
-      <%= f.check_box :is_airport, class: "mt-1 rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+      <%= f.check_box :is_travel_pickup, class: "mt-1 rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
       <div class="ml-3">
-        <%= f.label :is_airport, "Is an airport pickup location", class: "text-sm font-medium text-gray-700" %>
-        <p class="text-sm text-gray-500">When scanned at this location, mark the participant as picked up from airport</p>
+        <%= f.label :is_travel_pickup, "Travel pickup location", class: "text-sm font-medium text-gray-700" %>
+        <p class="text-sm text-gray-500">When scanned at this location, mark the participant as collected from their travel arrival point</p>
       </div>
     </div>
   </div>

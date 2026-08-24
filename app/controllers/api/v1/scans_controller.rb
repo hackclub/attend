@@ -1,7 +1,7 @@
 module Api
   module V1
     class ScansController < BaseController
-      include AirportPickupMarkable
+      include TravelPickupMarkable
       before_action :set_event
       before_action :require_event_access
 
@@ -160,9 +160,12 @@ module Api
           source: scan_source
         )
 
-        # Mark airport pickup for airport or check-in contexts on first scan in that context
-        if (scan_context.is_airport? || scan_context.checks_in?) && first_scan_in_context
-          mark_airport_pickup(participant_event, current_user)
+        if scan_context.is_travel_pickup? && first_scan_in_context
+          mark_travel_pickup(participant_event, current_user)
+        end
+
+        if scan_context.is_travel_pickup? || scan_context.checks_in?
+          TravelCalendar::JourneyCache.clear(@event)
         end
 
         # Auto-generate NFC badge token on first check-in if NFC is enabled
@@ -203,7 +206,8 @@ module Api
             id: scan.scan_context_id,
             name: scan.scan_context.name,
             checks_in: scan.scan_context.checks_in,
-            is_airport: scan.scan_context.is_airport
+            is_travel_pickup: scan.scan_context.is_travel_pickup,
+            is_airport: scan.scan_context.is_travel_pickup
           } : nil,
           created_at: scan.created_at.iso8601
         }

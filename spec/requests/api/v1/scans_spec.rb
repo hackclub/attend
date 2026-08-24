@@ -105,4 +105,112 @@ RSpec.describe "Api::V1::Scans", type: :request do
       expect(json["has_more"]).to be(false)
     end
   end
+
+  describe "POST /api/v1/events/:event_id/scans" do
+    it "invalidates the journey cache after an explicit travel pickup scan" do
+      memory_store = ActiveSupport::Cache::MemoryStore.new
+      allow(Rails).to receive(:cache).and_return(memory_store)
+      participant_event = create(:participant_event, event: event, status: :complete)
+      pickup = event.scan_contexts.create!(name: "Station pickup", checks_in: false, is_travel_pickup: true)
+      travel = Travel.create!(participant_event: participant_event, direction: "inbound", mode: "train")
+
+      expect(TravelCalendar::JourneyCache.fetch(event).sole[:pickup_state]).to eq(:awaiting_pickup)
+
+      post "/api/v1/events/#{event.id}/scans",
+        params: { participant_id: participant_event.id, scan_context_id: pickup.id }.to_json,
+        headers: auth_headers.merge("Content-Type" => "application/json")
+
+      expect(response).to have_http_status(:ok)
+      expect(TravelCalendar::JourneyCache.fetch(event).sole).to include(id: travel.id, pickup_state: :collected)
+    end
+
+    it "invalidates the journey cache after venue check-in" do
+      memory_store = ActiveSupport::Cache::MemoryStore.new
+      allow(Rails).to receive(:cache).and_return(memory_store)
+      participant_event = create(:participant_event, event: event, status: :complete)
+      check_in = event.scan_contexts.find_by!(checks_in: true)
+      travel = Travel.create!(participant_event: participant_event, direction: "inbound", mode: "bus")
+
+      expect(TravelCalendar::JourneyCache.fetch(event).sole[:pickup_state]).to eq(:awaiting_pickup)
+
+      post "/api/v1/events/#{event.id}/scans",
+        params: { participant_id: participant_event.id, scan_context_id: check_in.id }.to_json,
+        headers: auth_headers.merge("Content-Type" => "application/json")
+
+      expect(response).to have_http_status(:ok)
+      expect(TravelCalendar::JourneyCache.fetch(event).sole).to include(id: travel.id, pickup_state: :checked_in)
+    end
+
+    it "marks the final inbound flight leg for an explicit travel pickup scan" do
+      participant_event = create(:participant_event, event: event)
+      pickup = event.scan_contexts.create!(name: "Station pickup", checks_in: false, is_travel_pickup: true)
+      travel = Travel.create!(participant_event: participant_event, direction: "inbound", mode: "plane")
+      leg = create(:travel_leg, travel: travel, departure_airport: "SFO", arrival_airport: "BOS")
+
+      post "/api/v1/events/#{event.id}/scans",
+        params: { participant_id: participant_event.id, scan_context_id: pickup.id }.to_json,
+        headers: auth_headers.merge("Content-Type" => "application/json")
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body).dig("scan", "scan_context")).to include(
+        "is_travel_pickup" => true,
+        "is_airport" => true
+      )
+      expect(leg.reload).to be_travel_picked_up
+    end
+
+    it "preserves the original pickup timestamp on a duplicate explicit pickup scan" do
+      participant_event = create(:participant_event, event: event)
+      pickup = event.scan_contexts.create!(name: "Station pickup", checks_in: false, is_travel_pickup: true)
+      travel = Travel.create!(participant_event: participant_event, direction: "inbound", mode: "plane")
+      leg = create(:travel_leg, travel: travel, departure_airport: "SFO", arrival_airport: "BOS")
+
+      post "/api/v1/events/#{event.id}/scans",
+        params: { participant_id: participant_event.id, scan_context_id: pickup.id }.to_json,
+        headers: auth_headers.merge("Content-Type" => "application/json")
+
+      original_pickup_time = leg.reload.travel_picked_up_at
+
+      post "/api/v1/events/#{event.id}/scans",
+        params: { participant_id: participant_event.id, scan_context_id: pickup.id }.to_json,
+        headers: auth_headers.merge("Content-Type" => "application/json")
+
+      expect(response).to have_http_status(:ok)
+      expect(leg.reload.travel_picked_up_at).to eq(original_pickup_time)
+    end
+
+    it "records a non-plane pickup scan without marking a legacy travel leg" do
+      participant_event = create(:participant_event, event: event)
+      pickup = event.scan_contexts.create!(name: "Station pickup", checks_in: false, is_travel_pickup: true)
+      travel = Travel.create!(participant_event: participant_event, direction: "inbound", mode: "train")
+      legacy_leg = create(:travel_leg, travel: travel, departure_airport: "SFO", arrival_airport: "BOS")
+
+      post "/api/v1/events/#{event.id}/scans",
+        params: { participant_id: participant_event.id, scan_context_id: pickup.id }.to_json,
+        headers: auth_headers.merge("Content-Type" => "application/json")
+
+      expect(response).to have_http_status(:ok)
+      expect(legacy_leg.reload).not_to be_travel_picked_up
+    end
+  end
+
+  describe "DELETE /api/v1/events/:event_id/scans/:id" do
+    it "invalidates the journey cache when undoing a pickup scan" do
+      memory_store = ActiveSupport::Cache::MemoryStore.new
+      allow(Rails).to receive(:cache).and_return(memory_store)
+      participant_event = create(:participant_event, event: event, status: :complete)
+      pickup = event.scan_contexts.create!(name: "Station pickup", checks_in: false, is_travel_pickup: true)
+      travel = Travel.create!(participant_event: participant_event, direction: "inbound", mode: "train")
+      participant_event.scans.create!(scan_context: pickup, user: admin, scanned_at: Time.current)
+
+      expect(TravelCalendar::JourneyCache.fetch(event).sole).to include(id: travel.id, pickup_state: :collected)
+
+      delete "/api/v1/events/#{event.id}/scans/#{participant_event.id}",
+        params: { scan_context_id: pickup.id }, headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)).to include("deleted_scans" => 1)
+      expect(TravelCalendar::JourneyCache.fetch(event).sole).to include(id: travel.id, pickup_state: :awaiting_pickup)
+    end
+  end
 end

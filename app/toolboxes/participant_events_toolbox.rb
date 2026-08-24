@@ -2,8 +2,6 @@ class ParticipantEventsToolbox < ApplicationToolbox
   # A participant_event is one person's registration for one event. This is where
   # status, check-in, travel, accommodation, and medical data all hang.
 
-  include AirportPickupMarkable
-
   tool "List registrations for an event, optionally filtered by status.",
     access: :read, scope: "participants:read" do
     param :event_id, :string, "Event ID", optional: true
@@ -82,8 +80,8 @@ class ParticipantEventsToolbox < ApplicationToolbox
     end
 
     # Check-in is a scan, so this goes through the same path the scanners use:
-    # first scan in the context marks the airport pickup and mints an NFC badge
-    # token, and Scan's after_create_commit puts it on the live scan feed.
+    # first scan in the context mints an NFC badge token, and Scan's
+    # after_create_commit puts it on the live scan feed.
     first_scan_in_context = @participant_event.scans.where(scan_context: scan_context).none?
     # @record makes the audit log point at the scan rather than guessing.
     @record = @participant_event.scans.create!(
@@ -94,9 +92,10 @@ class ParticipantEventsToolbox < ApplicationToolbox
     )
 
     if first_scan_in_context
-      mark_airport_pickup(@participant_event, current_user)
       @participant_event.ensure_nfc_badge_token! if event.nfc_badges_enabled?
     end
+
+    TravelCalendar::JourneyCache.clear(event)
 
     # An earlier scan wins on time, so report what #show would.
     render json: serialize_registration(@participant_event).merge(

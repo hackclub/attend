@@ -42,7 +42,7 @@ class LinksToolbox < ApplicationToolbox
     "event groups" => { template: "/admin/events/{event_slug}/groups", notes: nil },
     "rooming wizard" => { template: "/admin/events/{event_slug}/rooming_wizard", notes: nil },
     "check-in scanner" => { template: "/admin/events/{event_slug}/scans/scanner", notes: nil },
-    "airport mode" => { template: "/admin/events/{event_slug}/airport_mode", notes: nil },
+    "travel calendar" => { template: "/admin/events/{event_slug}/travel", notes: nil },
     "support ticket" => { template: "/support/tickets/{ticket_id}", notes: "Not event-scoped." },
     "participant's own dashboard" => {
       template: "/dashboard",

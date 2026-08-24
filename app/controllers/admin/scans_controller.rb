@@ -1,6 +1,6 @@
 module Admin
   class ScansController < BaseController
-    include AirportPickupMarkable
+    include TravelPickupMarkable
     before_action :require_event_selected
     before_action :set_scan, only: [ :update ]
     before_action :require_global_admin, only: [ :update ]
@@ -145,9 +145,12 @@ module Admin
         source: scan_source
       )
 
-      # Mark airport pickup for airport or check-in contexts on first scan in that context
-      if (scan_context.is_airport? || scan_context.checks_in?) && first_scan_in_context
-        mark_airport_pickup(participant_event, current_user)
+      if scan_context.is_travel_pickup? && first_scan_in_context
+        mark_travel_pickup(participant_event, current_user)
+      end
+
+      if scan_context.is_travel_pickup? || scan_context.checks_in?
+        TravelCalendar::JourneyCache.clear(current_event)
       end
 
       # Auto-generate NFC badge token on first check-in if NFC is enabled
@@ -166,7 +169,7 @@ module Admin
           id: scan_context.id,
           name: scan_context.name,
           checks_in: scan_context.checks_in,
-          is_airport: scan_context.is_airport
+          is_travel_pickup: scan_context.is_travel_pickup
         },
         participant: {
           id: participant.id,

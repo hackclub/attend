@@ -263,12 +263,10 @@ Rails.application.routes.draw do
         end
       end
       resources :scan_contexts, except: [ :show ]
-      resource :airport_mode, only: [ :show ], controller: "airport_mode" do
-        post :refresh_all
-        get :flights_json
-        get :refresh_status
+      resource :travel, only: [ :show ], controller: "travel_calendar" do
         post :dismiss_pickup
       end
+      resource :airport_mode, only: [ :show ], controller: "airport_mode"
       resource :rooming_wizard, only: [ :show ], controller: "rooming_wizard" do
         get :setup
         post :setup, action: :create_setup
@@ -444,6 +442,7 @@ Rails.application.routes.draw do
         end
         resources :scan_contexts, only: [ :index ]
         resources :scans, only: [ :index, :create, :destroy ]
+        resource :travel, only: [ :show ], controller: "travel_calendar"
         resource :airport_mode, only: [ :show ], controller: "airport_mode"
         resources :slack_blasts, only: [ :index, :show, :create ]
 
