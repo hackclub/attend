@@ -20,6 +20,14 @@ default: &default
   # (The key must be `pool:` — Active Record silently ignores unknown keys
   # like max_connections, leaving the pool at its default.)
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  # Production runs on a CloudNativePG cluster whose -rw service repoints to a
+  # new primary during failover. While that happens, established connections
+  # drop and new connects find no ready endpoint. Retry idempotent statements
+  # on a fresh connection (bounded to 10s) rather than failing the request, and
+  # cap connect attempts so a request thread doesn't hang on a dead endpoint.
+  connection_retries: 3
+  retry_deadline: 10
+  connect_timeout: 5
 
 
 development:
@@ -90,6 +98,18 @@ production:
   primary: &primary_production
     <<: *default
     url: <%= ENV["DATABASE_URL"] || Rails.application.credentials.dig(:database_url) %>
+<% if ENV["REPLICA_DATABASE_URL"] %>
+  # Hot-standby reads via the CNPG -ro service. Only defined when the env var
+  # is set so environments without replicas (and ApplicationRecord.connects_to,
+  # which keys off this config existing) are unaffected. Deliberately the -ro
+  # service rather than -r: -r includes the primary, so an accidental write on
+  # the reading role would succeed intermittently instead of failing every time.
+  primary_replica:
+    <<: *primary_production
+    url: <%= ENV["REPLICA_DATABASE_URL"] %>
+    replica: true
+    database_tasks: false
+<% end %>
   cache:
     <<: *primary_production
     migrations_paths: db/cache_migrate
@@ -108,6 +128,13 @@ staging:
   primary: &primary_staging
     <<: *default
     url: <%= ENV["DATABASE_URL"] %>
+<% if ENV["REPLICA_DATABASE_URL"] %>
+  primary_replica:
+    <<: *primary_staging
+    url: <%= ENV["REPLICA_DATABASE_URL"] %>
+    replica: true
+    database_tasks: false
+<% end %>
   cache:
     <<: *primary_staging
     migrations_paths: db/cache_migrate
