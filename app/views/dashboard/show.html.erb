@@ -162,7 +162,9 @@
               <% end %>
             </div>
             <p class="text-xs text-[#8492a6] uppercase tracking-wide mb-2">Scan to Check In</p>
-            <div class="bg-white p-2 rounded-lg shadow-sm border border-[#e0e6ed]">
+            <%# literal white, not bg-white — themes.css remaps --color-white to the theme
+    surface, which would put black QR modules on a dark tile %>
+            <div class="bg-[#ffffff] p-2 rounded-lg shadow-sm border border-[#e0e6ed]">
               <%= qr_code_svg(attend_deep_link(@participant_event.participant_id), size: 100) %>
             </div>
             <p class="text-xs text-[#8492a6] mt-2 font-mono"><%= @participant_event.participant_id[0..7].upcase %></p>
