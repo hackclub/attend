@@ -71,9 +71,27 @@ module PasskitPassesControllerExtensions
   end
 end
 
+# Concurrent registrations for the same device race find_or_create_by!:
+# the loser fails Passkit::Device's uniqueness validation with RecordInvalid,
+# which find_or_create_by! doesn't recover from (it only rescues the
+# db-level RecordNotUnique). Retrying once finds the winner's row. (ATTEND-7R)
+module PasskitRegistrationsControllerExtensions
+  def register_device
+    retried = false
+    begin
+      super
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
+      raise if retried
+      retried = true
+      retry
+    end
+  end
+end
+
 Rails.application.config.after_initialize do
   next if ENV["SECRET_KEY_BASE_DUMMY"]
 
   Passkit::Generator.prepend(PasskitGeneratorExtensions)
   Passkit::Api::V1::PassesController.prepend(PasskitPassesControllerExtensions)
+  Passkit::Api::V1::RegistrationsController.prepend(PasskitRegistrationsControllerExtensions)
 end
