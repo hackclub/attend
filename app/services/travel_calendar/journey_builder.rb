@@ -9,8 +9,8 @@ module TravelCalendar
         participant_event.travels.map { |travel| build_entry(participant_event, travel) }
       }.partition { |entry| entry[:primary_time_at].present? }
 
-      scheduled.sort_by { |entry| [ entry[:primary_time_at], participant_sort_name(entry) ] } +
-        unscheduled.sort_by { |entry| participant_sort_name(entry) }
+      scheduled.sort_by { |entry| [ entry[:primary_time_at], participant_sort_name(entry), entry[:id].to_s ] } +
+        unscheduled.sort_by { |entry| [ participant_sort_name(entry), entry[:id].to_s ] }
     end
 
     private

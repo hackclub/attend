@@ -84,6 +84,21 @@ RSpec.describe TravelCalendar::JourneyBuilder do
     expect(entries_by_id.fetch(plane.id)).to include(route: nil, reference: nil, primary_time_at: nil, agenda_date: nil)
   end
 
+  it "keeps a partial plane route available" do
+    plane, = create_travel(mode: "plane", direction: "inbound")
+    leg = TravelLeg.create!(travel: plane, position: 1)
+    leg.update_columns(arrival_airport: "LHR")
+
+    expect(entries.first).to include(route: "LHR", reference: nil)
+  end
+
+  it "uses the first leg departure for outbound planes" do
+    plane, = create_plane_travel(departure_time: Time.utc(2026, 8, 24, 9), direction: "outbound")
+    create(:travel_leg, travel: plane, position: 2, departure_time: Time.utc(2026, 8, 24, 11), arrival_time: Time.utc(2026, 8, 24, 13), departure_airport: "LHR", arrival_airport: "CDG", flight_code: "BA304")
+
+    expect(entries.first).to include(primary_time_at: Time.utc(2026, 8, 24, 9))
+  end
+
   it "includes only complete registrations" do
     complete, = create_travel(mode: "train", direction: "inbound", arrival_time: Time.utc(2026, 8, 24, 10))
     incomplete = create(:participant_event, event: event, status: :in_progress)
@@ -104,6 +119,26 @@ RSpec.describe TravelCalendar::JourneyBuilder do
     create_travel(mode: "car", direction: "outbound", participant: ada)
 
     expect(entries.map { |entry| entry[:participant_name] }).to eq([ "Amy Aardvark", "Zoe Zebra", "Ada Absent", "Noah Null" ])
+  end
+
+  it "uses journey id to break same-time participant-name ties" do
+    participant = create(:participant, legal_first_name: "Same", legal_last_name: "Name")
+    later_id, = create_travel(
+      mode: "train",
+      direction: "inbound",
+      participant: participant,
+      id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+      arrival_time: Time.utc(2026, 8, 24, 10)
+    )
+    earlier_id, = create_travel(
+      mode: "bus",
+      direction: "inbound",
+      participant: create(:participant, legal_first_name: "Same", legal_last_name: "Name"),
+      id: "00000000-0000-4000-8000-000000000001",
+      arrival_time: Time.utc(2026, 8, 24, 10)
+    )
+
+    expect(entries.map { |entry| entry[:id] }).to eq([ earlier_id.id, later_id.id ])
   end
 
   it "includes participant and group presentation data" do
