@@ -39,7 +39,11 @@ class DashboardController < ApplicationController
         .sort_by { |event, _hidden| event.starts_at || Time.current }
         .reverse
     end
+    # MCP is staff-only, so the Connections section is too — except for someone who
+    # connected a client while they were staff and has since lost the role, who still
+    # needs a way to clear the (now dead) connection out.
     @mcp_connections = mcp_connections
+    @show_mcp_connections = current_user.admin? || @mcp_connections.any?
   end
 
   def update_staff_profile

@@ -8,6 +8,7 @@ class ApplicationToolbox < Toolchest::Toolbox
 
   helper_method :current_user, :current_event, :global_admin?
 
+  before_action :require_staff!
   before_action :establish_current_context
   after_action :audit_write!
 
@@ -45,6 +46,15 @@ class ApplicationToolbox < Toolchest::Toolbox
   end
 
   private
+
+  # MCP is a staff-only surface. The consent screen and token resolution already
+  # gate on this (config/initializers/toolchest.rb), so getting here without a
+  # staff user means a token outlived its owner's roles — refuse every tool call.
+  def require_staff!
+    return if current_user&.admin?
+
+    halt error: "MCP access is limited to Attend staff."
+  end
 
   # Mirror ApplicationController#set_current_attributes so PaperTrail versions and
   # anything reading Current.* are attributed to the acting user, not a null actor.
