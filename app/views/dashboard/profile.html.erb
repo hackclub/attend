@@ -374,6 +374,11 @@
             <a href="https://attend.hackclub.com/mcp" class="font-medium text-(--text-link) hover:underline">MCP</a>.
             They act as you, limited to the scopes you approved. Disconnecting one signs it out immediately.
           </p>
+          <p class="mt-2 text-sm text-(--text-muted)">
+            You can tighten a connection here at any time. Giving one <em>more</em> access — more events, or
+            turning anonymising off — means disconnecting it and connecting it again, so the change goes
+            back through the approval screen.
+          </p>
         <% else %>
           <p class="mt-3 text-sm text-(--text-muted)">
             MCP is only available to Attend staff, so these apps can no longer reach your
@@ -402,6 +407,72 @@
                             <span class="inline-flex rounded-md px-1.5 py-0.5 font-mono text-[11px] <%= sensitive ? "bg-(--warning)/15 text-(--warning)" : "bg-(--bg-elev-2) text-(--text-muted)" %>">
                               <%= scope %>
                             </span>
+                          <% end %>
+                        </div>
+                      <% end %>
+
+                      <dl class="mt-3 space-y-1 text-xs">
+                        <div class="flex flex-wrap gap-x-2">
+                          <dt class="text-(--text-muted)">Events</dt>
+                          <dd class="text-(--text)">
+                            <% if connection[:events].nil? %>
+                              Every event you can access
+                            <% else %>
+                              <%= connection[:events].map(&:name).to_sentence %>
+                            <% end %>
+                          </dd>
+                        </div>
+                        <div class="flex flex-wrap gap-x-2">
+                          <dt class="text-(--text-muted)">Anonymised</dt>
+                          <dd class="<%= connection[:anonymized] ? "text-(--success)" : "text-(--text)" %>">
+                            <% if connection[:anonymized] %>
+                              Yes — initials only, no contact details, read-only
+                            <% else %>
+                              No — full names and contact details
+                            <% end %>
+                          </dd>
+                        </div>
+                      </dl>
+
+                      <% if current_user.admin? %>
+                        <div class="mt-3 flex flex-wrap items-center gap-2">
+                          <% unless connection[:anonymized] %>
+                            <%= form_with url: update_dashboard_mcp_connection_path(connection[:application]), method: :patch, class: "contents" do |f| %>
+                              <%= f.hidden_field :mcp_anonymize, value: "1" %>
+                              <%= f.submit "Anonymise",
+                                  data: { turbo_confirm: "Anonymise #{connection[:application].name}? It will only see initials, lose access to emails, phone numbers and addresses, and become read-only. Undoing this means disconnecting and reconnecting it." },
+                                  class: "cursor-pointer rounded-lg border border-(--border-card) px-2.5 py-1 text-xs font-medium text-(--text) hover:bg-(--bg-elev-2) transition-colors" %>
+                            <% end %>
+                          <% end %>
+
+                          <% if connection[:scopable_events].many? || connection[:events].nil? && connection[:scopable_events].any? %>
+                            <details class="w-full">
+                              <summary class="inline-flex cursor-pointer rounded-lg border border-(--border-card) px-2.5 py-1 text-xs font-medium text-(--text) hover:bg-(--bg-elev-2) transition-colors">
+                                Limit to specific events
+                              </summary>
+                              <%= form_with url: update_dashboard_mcp_connection_path(connection[:application]), method: :patch, class: "mt-2 rounded-xl border border-(--border-card) bg-(--bg-elev-2) p-3" do |f| %>
+                                <%= f.hidden_field :event_scope, value: "selected" %>
+                                <p class="text-xs text-(--text-muted)">
+                                  Untick an event to take it away from this app. You can't add events back here.
+                                </p>
+                                <div class="mt-2 max-h-52 space-y-1 overflow-y-auto">
+                                  <% current_ids = connection[:events]&.map(&:id) %>
+                                  <% connection[:scopable_events].each do |event| %>
+                                    <label class="flex items-center gap-2 rounded-md px-1 py-1 text-xs text-(--text) hover:bg-(--bg-elev-3)">
+                                      <%= check_box_tag "mcp_event_ids[]", event.id, current_ids.nil? || current_ids.include?(event.id),
+                                            id: "mcp_event_#{connection[:application].id}_#{event.id}",
+                                            class: "size-3.5 accent-(--brand)" %>
+                                      <span><%= event.name %></span>
+                                      <% if event.starts_at %>
+                                        <span class="ml-auto text-[11px] text-(--text-muted)"><%= event.starts_at.strftime("%b %Y") %></span>
+                                      <% end %>
+                                    </label>
+                                  <% end %>
+                                </div>
+                                <%= f.submit "Save event limits",
+                                    class: "mt-2 cursor-pointer rounded-lg border border-(--border-card) px-2.5 py-1 text-xs font-medium text-(--text) hover:bg-(--bg-elev) transition-colors" %>
+                              <% end %>
+                            </details>
                           <% end %>
                         </div>
                       <% end %>
