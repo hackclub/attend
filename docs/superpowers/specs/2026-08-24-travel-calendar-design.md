@@ -74,10 +74,10 @@ The API exposes the same combined entry model and canonical terminology. Existin
 
 ## Routes and Compatibility
 
-Canonical routes use `travel_calendar`:
+Canonical routes use the concise `travel` slug:
 
-- admin HTML: `/admin/events/:event_slug/travel_calendar`
-- API JSON: `/api/v1/events/:event_id/travel_calendar`
+- admin HTML: `/admin/events/:event_slug/travel`
+- API JSON: `/api/v1/events/:event_id/travel`
 
 Existing `airport_mode` web routes redirect to the canonical admin page while retaining relevant query parameters. Existing `airport_mode` API routes invoke the canonical endpoint behavior directly so API clients continue receiving JSON rather than redirects.
 
