@@ -40,6 +40,7 @@ class User < ApplicationRecord
   has_many :authored_notes, class_name: "Note", foreign_key: "author_user_id"
   has_many :mobile_tokens, dependent: :destroy
   has_many :push_tokens, dependent: :destroy
+  has_many :nfc_tokens, dependent: :destroy
 
   validates :email, presence: true, uniqueness: true
 

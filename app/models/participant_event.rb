@@ -315,7 +315,19 @@ class ParticipantEvent < ApplicationRecord
   end
 
   def nfc_badge_assigned?
-    nfc_badge_token.present? && nfc_badge_assigned_at.present?
+    active_nfc_token.present? || (nfc_badge_token.present? && nfc_badge_assigned_at.present?)
+  end
+
+  def active_nfc_token
+    participant.user&.nfc_tokens&.active&.order(created_at: :desc)&.first
+  end
+
+  def pending_nfc_token
+    participant.user&.nfc_tokens&.pending&.order(created_at: :desc)&.first
+  end
+
+  def nfc_pairing_available?
+    participant.user.present?
   end
 
   def ensure_nfc_badge_token!
