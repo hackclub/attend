@@ -167,13 +167,26 @@ Enable auto-deploy for `staging_worker_id` on branch `main`, then read the deplo
 
 - [ ] **Step 1: Disable embedded workers**
 
-Delete only `SOLID_QUEUE_IN_PUMA` from staging web deployment `61d39961-8f55-438a-a13b-3e223b7969e7` through Orchard. This intentionally starts a rolling web restart.
+Record the current UTC timestamp as `staging_cutover_started_at`, then delete only `SOLID_QUEUE_IN_PUMA` from staging web deployment `61d39961-8f55-438a-a13b-3e223b7969e7` through Orchard. This intentionally starts a rolling web restart.
 
 - [ ] **Step 2: Verify the staging web rollout**
 
 Require two available staging web replicas with zero unexpected restarts. Confirm the staging health endpoint from inside a pod and inspect startup logs for Rails boot or migration errors.
 
-- [ ] **Step 3: Verify standalone job execution**
+- [ ] **Step 3: Verify the standalone scheduler and worker together**
+
+After embedded processes have disappeared, wait up to three minutes for a naturally scheduled job matching all of these conditions:
+
+```ruby
+SolidQueue::Job
+  .where(class_name: "ProcessScheduledMessagesJob")
+  .where("created_at > ?", staging_cutover_started_at)
+  .where.not(finished_at: nil)
+```
+
+Require a matching job and its execution log in the standalone worker pod. This job is configured by `config/recurring.yml` to run every minute, so the check verifies both the standalone scheduler and worker rather than directly invoking the scheduler's internal job class.
+
+- [ ] **Step 4: Verify a harmless marker job**
 
 Enqueue a harmless marker job from a staging web pod:
 
@@ -185,13 +198,13 @@ puts token
 
 Read the marker token from stdout, then require the same token to appear in the standalone worker pod logs and require the job to leave ready/claimed state.
 
-- [ ] **Step 4: Verify process ownership and database connections**
+- [ ] **Step 5: Verify process ownership and database connections**
 
 Require fresh Solid Queue process heartbeats only from the standalone worker pod, with no Solid Queue supervisor process registered for either staging web pod. Query PostgreSQL connection count and require it to remain below 100.
 
-- [ ] **Step 5: Apply the staging rollback if any check fails**
+- [ ] **Step 6: Apply the staging rollback if any check fails**
 
-If Steps 2 through 4 fail, add `SOLID_QUEUE_IN_PUMA=true` back to staging web, wait for healthy embedded-worker heartbeats, then scale `staging_worker_id` to zero. Do not proceed to production.
+If Steps 2 through 5 fail, add `SOLID_QUEUE_IN_PUMA=true` back to staging web, wait for healthy embedded-worker heartbeats, then scale `staging_worker_id` to zero. Do not proceed to production.
 
 ### Task 5: Capture the Production Baseline
 
@@ -271,25 +284,29 @@ Enable auto-deploy for `production_worker_id` on `main`, then read the deploymen
 
 - [ ] **Step 1: Disable embedded production workers**
 
-Delete only `SOLID_QUEUE_IN_PUMA` from production web deployment `79b6905f-3928-4969-beaa-a95423b6a650` through Orchard.
+Record the current UTC timestamp as `production_cutover_started_at`, then delete only `SOLID_QUEUE_IN_PUMA` from production web deployment `79b6905f-3928-4969-beaa-a95423b6a650` through Orchard.
 
 - [ ] **Step 2: Verify the production web rollout**
 
 Require three available web replicas with zero unexpected restarts. Require `https://attend.hackclub.com/up` to return HTTP 200 and inspect pod logs for Rails boot or migration errors.
 
-- [ ] **Step 3: Verify standalone production job execution**
+- [ ] **Step 3: Verify the standalone production scheduler and worker together**
+
+After embedded processes have disappeared, wait up to three minutes for a finished `ProcessScheduledMessagesJob` created after `production_cutover_started_at`, using the query from Task 4 with the production timestamp. Require the execution log in a standalone production worker pod.
+
+- [ ] **Step 4: Verify a harmless production marker job**
 
 Enqueue the marker job from Task 4 in a production web pod. Require the marker token in one standalone worker pod's logs and require the job to leave ready/claimed state.
 
-- [ ] **Step 4: Verify final ownership and capacity**
+- [ ] **Step 5: Verify final ownership and capacity**
 
 Require no Solid Queue supervisors in production web pods. Require fresh worker, dispatcher, scheduler, and supervisor heartbeats from both standalone worker pods. Require database connections below 100 and no new unexplained growth in ready, scheduled, claimed, blocked, or failed jobs.
 
-- [ ] **Step 5: Apply the production rollback if any check fails**
+- [ ] **Step 6: Apply the production rollback if any check fails**
 
-If Steps 2 through 4 fail, add `SOLID_QUEUE_IN_PUMA=true` back to production web, wait for healthy embedded-worker heartbeats, then scale `production_worker_id` to zero.
+If Steps 2 through 5 fail, add `SOLID_QUEUE_IN_PUMA=true` back to production web, wait for healthy embedded-worker heartbeats, then scale `production_worker_id` to zero.
 
-- [ ] **Step 6: Record completion**
+- [ ] **Step 7: Record completion**
 
 Mark every completed checkbox in this plan, append a short results section containing deployment IDs, replica counts, non-secret queue counts, connection counts, and verification outcome, then commit only this plan file:
 
