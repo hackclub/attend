@@ -118,6 +118,7 @@
         <% end %>
       </section>
 
+      <% if current_event.accommodation_enabled? %>
       <section class="bg-white rounded-lg border border-gray-200 p-6">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-lg font-semibold">Accommodation</h2>
@@ -162,6 +163,7 @@
           <p class="text-gray-500">No accommodation information provided.</p>
         <% end %>
       </section>
+      <% end %>
 
       <% if policy(@medical || Medical.new(participant_event: @participant_event)).show? %>
         <section class="bg-white rounded-lg border border-gray-200 p-6">
@@ -382,10 +384,12 @@
             <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @travel_outbound ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
             <span class="text-sm">Outbound Travel</span>
           </li>
-          <li class="flex items-center gap-2">
-            <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @accommodation ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
-            <span class="text-sm">Accommodation</span>
-          </li>
+          <% if current_event.accommodation_enabled? %>
+            <li class="flex items-center gap-2">
+              <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @accommodation ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
+              <span class="text-sm">Accommodation</span>
+            </li>
+          <% end %>
           <li class="flex items-center gap-2">
             <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @medical ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
             <span class="text-sm">Medical</span>
