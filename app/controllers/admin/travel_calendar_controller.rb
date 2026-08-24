@@ -11,6 +11,10 @@ module Admin
       @journeys_by_date = @journeys.select { |journey| journey[:agenda_date].present? }.group_by { |journey| journey[:agenda_date] }
       @unscheduled_journeys = @journeys.select { |journey| journey[:agenda_date].nil? }
       @summary_counts = summary_counts(@journeys)
+      @participants_by_id = Participant
+        .where(id: @journeys.filter_map { |journey| journey[:participant_id] }.uniq)
+        .with_attached_headshot
+        .index_by(&:id)
       @groups = current_event.groups_enabled? ? current_event.groups.ordered : Group.none
       @directions = Travel.directions.keys
       @modes = Travel.modes.keys

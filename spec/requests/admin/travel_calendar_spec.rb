@@ -37,8 +37,17 @@ RSpec.describe "Admin::TravelCalendar", type: :request do
 
       document = Nokogiri::HTML(response.body)
       expect(document.css("nav[aria-label='Travel filters']").size).to eq(1)
-      expect(document.css("section[data-travel-calendar-filter-target~='day'] ol > li[data-travel-calendar-filter-target~='entry']").size).to eq(5)
+      rows = document.css("section[data-travel-calendar-filter-target~='day'] ol > li[data-travel-calendar-filter-target~='entry']")
+      expect(rows.size).to eq(5)
       expect(document.css("li[data-travel-calendar-filter-target~='entry'] > details").size).to eq(5)
+
+      rows_by_mode = rows.index_by { |row| row["data-travel-calendar-filter-mode-value"] }
+      expect(rows_by_mode.fetch("train").attributes).to include(
+        "data-travel-calendar-filter-direction-value" => have_attributes(value: "inbound"),
+        "data-travel-calendar-filter-pickup-value" => have_attributes(value: "checked_in")
+      )
+      expect(rows_by_mode.fetch("bus")["data-travel-calendar-filter-pickup-value"]).to eq("")
+      expect(rows_by_mode.fetch("plane")["data-travel-calendar-filter-search-value"]).to include("ua123", "jfk", "sfo")
     end
 
     it "renders an empty-calendar explanation" do
@@ -46,6 +55,95 @@ RSpec.describe "Admin::TravelCalendar", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("No travel has been scheduled yet.")
+    end
+
+    it "renders a neutral fallback when travel mode is not provided" do
+      create_journey(mode: nil, direction: "inbound", arrival_time: Time.utc(2026, 8, 24, 17))
+
+      get "/admin/events/#{event.slug}/travel"
+
+      expect(response).to have_http_status(:ok)
+      row = Nokogiri::HTML(response.body).at_css("li[data-travel-calendar-filter-target~='entry']")
+      expect(row.text).to include("Mode not provided")
+      expect(row["data-travel-calendar-filter-mode-value"]).to eq("")
+    end
+
+    it "renders participant headshots without per-row attachment queries" do
+      png = file_fixture("headshot.png").binread
+      participant_events = 2.times.map do |index|
+        participant = create(:participant, legal_first_name: "Photo#{index}", legal_last_name: "Person")
+        participant.headshot.attach(io: StringIO.new(png), filename: "headshot-#{index}.png", content_type: "image/png")
+        create(:participant_event, event: event, participant: participant, status: :complete)
+      end
+      participant_events.each_with_index do |participant_event, index|
+        create_journey(mode: "train", direction: "inbound", participant_event: participant_event, arrival_time: Time.utc(2026, 8, 24, 17 + index))
+      end
+      headshot_blob_ids = participant_events.map { |participant_event| participant_event.participant.headshot.blob_id }
+
+      active_storage_queries = []
+      subscriber = lambda do |*, payload|
+        sql = payload[:sql]
+        if sql.include?("active_storage_attachments") || sql.include?("active_storage_blobs")
+          active_storage_queries << [ sql, payload[:binds].map { |bind| bind.value_for_database } ]
+        end
+      end
+
+      ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+        get "/admin/events/#{event.slug}/travel"
+      end
+
+      expect(response).to have_http_status(:ok)
+      rows = Nokogiri::HTML(response.body).css("li[data-travel-calendar-filter-target~='entry']")
+      expect(rows.map { |row| row.at_css("img")&.[]("alt") }).to eq([ "", "" ])
+      headshot_attachment_queries = active_storage_queries.select { |sql, binds| sql.include?("active_storage_attachments") && binds.include?("headshot") }
+      headshot_blob_queries = active_storage_queries.select { |sql, binds| sql.include?("active_storage_blobs") && (headshot_blob_ids - binds).empty? }
+      expect(headshot_attachment_queries.size).to eq(1), active_storage_queries.inspect
+      expect(headshot_blob_queries.size).to eq(1), active_storage_queries.inspect
+    end
+
+    it "keeps the filters below the mobile admin header while scrolling" do
+      create_journey(mode: "train", direction: "inbound", arrival_time: Time.utc(2026, 8, 24, 17))
+
+      get "/admin/events/#{event.slug}/travel"
+
+      nav = Nokogiri::HTML(response.body).at_css("nav[aria-label='Travel filters']")
+      expect(nav["class"].split).to include("sticky", "top-12", "lg:top-0", "z-20", "bg-(--bg-elev-2)")
+    end
+
+    it "indexes free-form travel details for client-side search" do
+      create_journey(mode: "train", direction: "inbound", arrival_time: Time.utc(2026, 8, 24, 17), notes: "Call the midnight duty phone")
+
+      get "/admin/events/#{event.slug}/travel"
+
+      row = Nokogiri::HTML(response.body).at_css("li[data-travel-calendar-filter-target~='entry']")
+      expect(row["data-travel-calendar-filter-search-value"]).to include("call the midnight duty phone")
+    end
+
+    it "keeps a plane journey without legs informative while collapsed" do
+      create_journey(mode: "plane", direction: "outbound")
+
+      get "/admin/events/#{event.slug}/travel"
+
+      expect(response).to have_http_status(:ok)
+      row = Nokogiri::HTML(response.body).at_css("li[data-travel-calendar-filter-mode-value='plane']")
+      collapsed_content = row.xpath("./div").first
+      expect(collapsed_content.text).to include("Flight", "Details not provided")
+    end
+
+    it "uses mode-specific labels for travel references" do
+      plane = create_journey(mode: "plane", direction: "inbound")
+      create(:travel_leg, travel: plane, departure_time: Time.utc(2026, 8, 24, 15), arrival_time: Time.utc(2026, 8, 24, 19), departure_airport: "JFK", arrival_airport: "SFO", flight_code: "UA123")
+      create_journey(mode: "train", direction: "inbound", arrival_time: Time.utc(2026, 8, 24, 17), train_departure_station: "Oakland", train_arrival_station: "San Francisco", carrier: "Amtrak")
+
+      get "/admin/events/#{event.slug}/travel"
+
+      rows_by_mode = Nokogiri::HTML(response.body).css("li[data-travel-calendar-filter-target~='entry']").index_by { |row| row["data-travel-calendar-filter-mode-value"] }
+      plane_row = rows_by_mode.fetch("plane")
+      train_row = rows_by_mode.fetch("train")
+      expect(plane_row.xpath("./div").first.text).to include("Flight code: UA123")
+      expect(train_row.xpath("./div").first.text).to include("Carrier: Amtrak")
+      expect(plane_row.css("dt").map(&:text)).to include("Flight code")
+      expect(train_row.css("dt").map(&:text)).to include("Carrier")
     end
 
     it "redirects to the event dashboard when travel is disabled" do
