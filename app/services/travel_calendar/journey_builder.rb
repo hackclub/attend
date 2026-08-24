@@ -66,7 +66,7 @@ module TravelCalendar
     end
 
     def participant_sort_name(entry)
-      entry[:participant_name].to_s.downcase
+      (entry[:participant_preferred_name].presence || entry[:participant_name]).to_s.downcase
     end
   end
 end

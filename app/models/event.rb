@@ -2,6 +2,7 @@ class Event < ApplicationRecord
   include WalletPassUpdatable
   include RasterizesSvgLogo
   include DecodableImageAttachment
+  include TravelCalendarCacheInvalidatable
 
   has_paper_trail
 
@@ -215,6 +216,10 @@ class Event < ApplicationRecord
     ActiveSupport::TimeZone[timezone.to_s]&.tzinfo&.name
   end
 
+  def effective_timezone_identifier
+    event_time_zone.tzinfo.name
+  end
+
   # Value for datetime-local form fields: the stored time expressed in the
   # event's timezone, so admins always see and edit event-local times.
   def schedule_time_field_value(attr)
@@ -396,6 +401,10 @@ class Event < ApplicationRecord
   end
 
   private
+
+  def travel_calendar_event_ids
+    [ id ]
+  end
 
   def interpret_naive_schedule_times_in_event_timezone
     return if @naive_schedule_times.blank?

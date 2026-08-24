@@ -10,13 +10,23 @@ module TravelCalendar
       end
 
       def clear(event)
-        Rails.cache.delete(cache_key(event))
+        clear_event_ids([ event.id ])
+      end
+
+      def clear_event_ids(event_ids)
+        Array(event_ids).compact_blank.uniq.each do |event_id|
+          Rails.cache.delete(cache_key_for(event_id))
+        end
       end
 
       private
 
       def cache_key(event)
-        "travel_calendar/#{event.id}/journeys/v1"
+        cache_key_for(event.id)
+      end
+
+      def cache_key_for(event_id)
+        "travel_calendar/#{event_id}/journeys/v1"
       end
     end
   end

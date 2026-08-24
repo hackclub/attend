@@ -74,6 +74,23 @@ RSpec.describe "Admin::TravelCalendar", type: :request do
       expect(response.body).to include("No travel has been scheduled yet.")
     end
 
+    it "renders the effective event timezone for valid, blank, and invalid values" do
+      {
+        "America/Los_Angeles" => "America/Los_Angeles",
+        "" => "Etc/UTC",
+        "Not/A_Timezone" => "Etc/UTC"
+      }.each do |stored_timezone, expected_label|
+        event.update_column(:timezone, stored_timezone)
+
+        get "/admin/events/#{event.slug}/travel"
+
+        expect(response).to have_http_status(:ok)
+        context = Nokogiri::HTML(response.body).at_css("header p")&.text&.squish
+        expect(context).to eq("#{event.name} · times in #{expected_label}")
+        expect(context).not_to end_with("times in")
+      end
+    end
+
     it "renders a neutral fallback when travel mode is not provided" do
       create_journey(mode: nil, direction: "inbound", arrival_time: Time.utc(2026, 8, 24, 17))
 
@@ -173,10 +190,70 @@ RSpec.describe "Admin::TravelCalendar", type: :request do
       expect(response.body).to include("Travel is disabled for this event.")
     end
 
-    it "redirects the legacy admin route and preserves filters" do
-      get "/admin/events/#{event.slug}/airport_mode", params: { direction: "inbound" }
+    it "renders controls that support the canonical query contract" do
+      event.update!(groups_enabled: true)
+      group = create(:group, event: event, name: "Alex group")
+      participant = create(:participant, preferred_name: "Alex")
+      participant_event = create(:participant_event, event: event, participant: participant, status: :complete)
+      travel = create_journey(mode: "plane", direction: "inbound", participant_event: participant_event)
+      create(:travel_leg, travel: travel, departure_airport: "JFK", arrival_airport: "SFO")
 
-      expect(response).to redirect_to(admin_event_travel_path(event, direction: "inbound"))
+      get admin_event_travel_path(event), params: {
+        direction: "inbound",
+        mode: "plane",
+        group: group.id,
+        pickup: "awaiting_pickup",
+        search: "alex"
+      }
+
+      expect(response).to have_http_status(:ok)
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css("[data-controller~='travel-calendar-filter']")).to be_present
+      expect(document.css("select[data-travel-calendar-filter-target='direction'] option").map { |option| option["value"] }).to include("inbound")
+      expect(document.css("select[data-travel-calendar-filter-target='mode'] option").map { |option| option["value"] }).to include("plane")
+      expect(document.css("select[data-travel-calendar-filter-target='pickup'] option").map { |option| option["value"] }).to include("awaiting_pickup")
+      expect(document.css("select[data-travel-calendar-filter-target='group'] option").map { |option| option["value"] }).to include(group.id)
+    end
+
+    it "translates legacy query keys while preserving other filters" do
+      get "/admin/events/#{event.slug}/airport_mode", params: {
+        tab: "outbound",
+        group_id: "legacy-group",
+        mode: "plane",
+        search: "alex",
+        page: "2"
+      }
+
+      expect(response).to have_http_status(:found)
+      query = Rack::Utils.parse_query(URI.parse(response.location).query)
+      expect(URI.parse(response.location).path).to eq(admin_event_travel_path(event))
+      expect(query).to eq(
+        "direction" => "outbound",
+        "group" => "legacy-group",
+        "mode" => "plane",
+        "search" => "alex",
+        "page" => "2"
+      )
+    end
+
+    it "prefers canonical query keys when legacy keys conflict" do
+      get "/admin/events/#{event.slug}/airport_mode", params: {
+        tab: "outbound",
+        direction: "inbound",
+        group_id: "legacy-group",
+        group: "canonical-group",
+        pickup: "collected",
+        source: "operations"
+      }
+
+      query = Rack::Utils.parse_query(URI.parse(response.location).query)
+      expect(query).to include(
+        "direction" => "inbound",
+        "group" => "canonical-group",
+        "pickup" => "collected",
+        "source" => "operations"
+      )
+      expect(query).not_to include("tab", "group_id")
     end
 
     it "marks the sidebar link active only on the canonical travel calendar path" do
@@ -196,6 +273,21 @@ RSpec.describe "Admin::TravelCalendar", type: :request do
   end
 
   describe "POST /admin/events/:slug/travel/dismiss_pickup" do
+    it "rejects outbound travel for the current event without mutation" do
+      participant_event = create(:participant_event, event: event, status: :complete)
+      outbound = Travel.create!(
+        participant_event: participant_event,
+        direction: "outbound",
+        mode: "bus"
+      )
+
+      post dismiss_pickup_admin_event_travel_path(event), params: { travel_id: outbound.id }
+
+      expect(response).to have_http_status(:not_found)
+      expect(outbound.reload.pickup_dismissed_at).to be_nil
+      expect(outbound).not_to be_pickup_dismissed
+    end
+
     it "rejects dismissal for another event's travel" do
       other_event = create(:event)
       other_participant_event = create(:participant_event, event: other_event, status: :complete)

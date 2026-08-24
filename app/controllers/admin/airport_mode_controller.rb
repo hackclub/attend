@@ -4,7 +4,13 @@ module Admin
     before_action :require_travel_enabled
 
     def show
-      redirect_to admin_event_travel_path(current_event, request.query_parameters)
+      query = request.query_parameters.to_h
+      legacy_direction = query.delete("tab")
+      legacy_group = query.delete("group_id")
+      query["direction"] = legacy_direction if query["direction"].blank? && legacy_direction.present?
+      query["group"] = legacy_group if query["group"].blank? && legacy_group.present?
+
+      redirect_to admin_event_travel_path(current_event, query)
     end
 
     private

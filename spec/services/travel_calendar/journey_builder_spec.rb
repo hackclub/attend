@@ -121,6 +121,15 @@ RSpec.describe TravelCalendar::JourneyBuilder do
     expect(entries.map { |entry| entry[:participant_name] }).to eq([ "Amy Aardvark", "Zoe Zebra", "Ada Absent", "Noah Null" ])
   end
 
+  it "sorts same-time journeys by the displayed preferred name" do
+    legally_first = create(:participant, legal_first_name: "Aaron", legal_last_name: "First", preferred_name: "Zoe")
+    displayed_first = create(:participant, legal_first_name: "Zed", legal_last_name: "Last", preferred_name: "Amy")
+    create_travel(mode: "train", direction: "inbound", participant: legally_first, arrival_time: Time.utc(2026, 8, 24, 10))
+    create_travel(mode: "bus", direction: "inbound", participant: displayed_first, arrival_time: Time.utc(2026, 8, 24, 10))
+
+    expect(entries.map { |entry| entry[:participant_preferred_name] }).to eq([ "Amy", "Zoe" ])
+  end
+
   it "uses journey id to break same-time participant-name ties" do
     participant = create(:participant, legal_first_name: "Same", legal_last_name: "Name")
     later_id, = create_travel(

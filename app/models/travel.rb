@@ -1,4 +1,6 @@
 class Travel < ApplicationRecord
+  include TravelCalendarCacheInvalidatable
+
   has_paper_trail
 
   self.implicit_order_column = "created_at"
@@ -89,10 +91,22 @@ class Travel < ApplicationRecord
   end
 
   def dismiss_pickup!
+    unless inbound?
+      errors.add(:base, "Pickup dismissal only applies to inbound travel")
+      raise ActiveRecord::RecordInvalid, self
+    end
+
     update!(pickup_dismissed_at: Time.current)
   end
 
   def undismiss_pickup!
     update!(pickup_dismissed_at: nil)
+  end
+
+  private
+
+  def travel_calendar_event_ids
+    participant_event_ids = [ participant_event_id, saved_change_to_participant_event_id&.first ].compact
+    ParticipantEvent.where(id: participant_event_ids).distinct.pluck(:event_id)
   end
 end

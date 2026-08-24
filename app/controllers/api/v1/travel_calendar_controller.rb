@@ -32,7 +32,7 @@ module Api
       end
 
       def event_timezone
-        @event.timezone_identifier || @event.event_time_zone.tzinfo.name
+        @event.effective_timezone_identifier
       end
 
       def serialize_entry(entry)

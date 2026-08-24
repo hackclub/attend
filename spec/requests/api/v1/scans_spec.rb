@@ -136,4 +136,24 @@ RSpec.describe "Api::V1::Scans", type: :request do
       expect(legacy_leg.reload).not_to be_travel_picked_up
     end
   end
+
+  describe "DELETE /api/v1/events/:event_id/scans/:id" do
+    it "invalidates the journey cache when undoing a pickup scan" do
+      memory_store = ActiveSupport::Cache::MemoryStore.new
+      allow(Rails).to receive(:cache).and_return(memory_store)
+      participant_event = create(:participant_event, event: event, status: :complete)
+      pickup = event.scan_contexts.create!(name: "Station pickup", checks_in: false, is_travel_pickup: true)
+      travel = Travel.create!(participant_event: participant_event, direction: "inbound", mode: "train")
+      participant_event.scans.create!(scan_context: pickup, user: admin, scanned_at: Time.current)
+
+      expect(TravelCalendar::JourneyCache.fetch(event).sole).to include(id: travel.id, pickup_state: :collected)
+
+      delete "/api/v1/events/#{event.id}/scans/#{participant_event.id}",
+        params: { scan_context_id: pickup.id }, headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)).to include("deleted_scans" => 1)
+      expect(TravelCalendar::JourneyCache.fetch(event).sole).to include(id: travel.id, pickup_state: :awaiting_pickup)
+    end
+  end
 end

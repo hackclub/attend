@@ -1,4 +1,6 @@
 class Group < ApplicationRecord
+  include TravelCalendarCacheInvalidatable
+
   self.implicit_order_column = "created_at"
 
   has_paper_trail
@@ -27,6 +29,10 @@ class Group < ApplicationRecord
   end
 
   private
+
+  def travel_calendar_event_ids
+    [ event_id, saved_change_to_event_id&.first ]
+  end
 
   def generate_slug_from_name
     self.slug = name.downcase.gsub(/\s+/, "-").gsub(/[^a-z0-9-]/, "")

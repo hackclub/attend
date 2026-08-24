@@ -9,7 +9,7 @@ module TravelPickupMarkable
     return unless travel.plane?
 
     final_leg = travel.travel_legs.order(:position).last
-    return if final_leg.blank? || final_leg.travel_picked_up?
+    return if final_leg.blank?
 
     final_leg.mark_travel_picked_up!(user)
   end

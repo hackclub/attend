@@ -3,6 +3,18 @@ import { Controller } from "@hotwired/stimulus"
 export default class extends Controller {
   static targets = ["entry", "day", "count", "search", "direction", "mode", "pickup", "group", "empty"]
 
+  connect() {
+    const query = new URLSearchParams(window.location.search)
+
+    this.searchTarget.value = query.get("search") || ""
+    this.setSelectFromQuery(this.directionTarget, query, "direction")
+    this.setSelectFromQuery(this.modeTarget, query, "mode")
+    this.setSelectFromQuery(this.pickupTarget, query, "pickup")
+    if (this.hasGroupTarget) this.setSelectFromQuery(this.groupTarget, query, "group")
+
+    this.apply()
+  }
+
   apply() {
     const search = this.searchTarget.value.trim().toLowerCase()
     const direction = this.directionTarget.value
@@ -44,5 +56,12 @@ export default class extends Controller {
 
     this.apply()
     this.searchTarget.focus()
+  }
+
+  setSelectFromQuery(select, query, key) {
+    const requestedValue = query.get(key) || ""
+    const available = Array.from(select.options).some((option) => option.value === requestedValue)
+
+    select.value = available ? requestedValue : ""
   }
 }

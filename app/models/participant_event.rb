@@ -1,5 +1,6 @@
 class ParticipantEvent < ApplicationRecord
   include WalletPassUpdatable
+  include TravelCalendarCacheInvalidatable
 
   self.implicit_order_column = "created_at"
 
@@ -385,6 +386,10 @@ class ParticipantEvent < ApplicationRecord
   end
 
   private
+
+  def travel_calendar_event_ids
+    [ event_id, saved_change_to_event_id&.first ]
+  end
 
   # Uses the already-loaded consents when eager-loaded so per-row status
   # checks in list views don't issue a query each.

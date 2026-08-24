@@ -1,4 +1,6 @@
 class TravelLeg < ApplicationRecord
+  include TravelCalendarCacheInvalidatable
+
   has_paper_trail ignore: [ :last_tracked_at, :live_status, :live_departure_time, :live_arrival_time, :live_data ]
 
   self.implicit_order_column = "created_at"
@@ -127,7 +129,13 @@ class TravelLeg < ApplicationRecord
   end
 
   def mark_travel_picked_up!(user)
-    update!(travel_picked_up_at: Time.current, picked_up_by: user)
+    with_lock do
+      return self if travel_picked_up?
+
+      update!(travel_picked_up_at: Time.current, picked_up_by: user)
+    end
+
+    self
   end
 
   def unmark_travel_picked_up!
@@ -135,6 +143,11 @@ class TravelLeg < ApplicationRecord
   end
 
   private
+
+  def travel_calendar_event_ids
+    travel_ids = [ travel_id, saved_change_to_travel_id&.first ].compact
+    Travel.joins(:participant_event).where(id: travel_ids).distinct.pluck("participant_events.event_id")
+  end
 
   def any_flight_field_changed?
     return true if new_record? && any_flight_field_present?

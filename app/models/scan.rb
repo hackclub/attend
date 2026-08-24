@@ -1,4 +1,6 @@
 class Scan < ApplicationRecord
+  include TravelCalendarCacheInvalidatable
+
   self.implicit_order_column = "created_at"
 
   belongs_to :participant_event
@@ -22,6 +24,11 @@ class Scan < ApplicationRecord
   after_create_commit :broadcast_scan
 
   private
+
+  def travel_calendar_event_ids
+    participant_event_ids = [ participant_event_id, saved_change_to_participant_event_id&.first ].compact
+    ParticipantEvent.where(id: participant_event_ids).distinct.pluck(:event_id)
+  end
 
   def broadcast_scan
     medical = participant_event.medical

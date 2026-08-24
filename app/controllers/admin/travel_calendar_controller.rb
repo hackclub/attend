@@ -30,6 +30,7 @@ module Admin
     def dismiss_pickup
       travel = Travel.joins(:participant_event)
         .where(participant_events: { event_id: current_event.id })
+        .inbound
         .find(params[:travel_id])
       travel.dismiss_pickup!
       TravelCalendar::JourneyCache.clear(current_event)
