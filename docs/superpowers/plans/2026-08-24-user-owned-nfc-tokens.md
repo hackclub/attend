@@ -1,448 +1,312 @@
-# User-Owned NFC Tokens Implementation Plan
+# Hack Club Passports Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace participation-owned NFC issuance with durable user-owned tokens that identify their owner at every event while preserving assigned hardware.
+**Goal:** Add user-owned Hack Club passports that work at every event without changing existing event-scoped NFC badges.
 
-**Architecture:** Store Flipper actor gates and `NfcToken` records in PostgreSQL. Route browser and API scans through one resolver that maps a token to its user's participation in the selected event, with a read-only legacy fallback. Keep `Event#nfc_badges_enabled?` only as the hardware issuance gate while making NFC reading universal.
+**Architecture:** Keep the existing `ParticipantEvent` badge lifecycle and APIs intact. Store passports in a separate `Passport` model owned by `User`, administer them only from global admin user profiles, and resolve scans by checking the selected event's badge before an active passport. Render passport details on the owner's dashboard profile from persisted data, with no feature flag.
 
-**Tech Stack:** Rails 8.1, PostgreSQL UUIDs, RSpec, Flipper Active Record, ERB, JavaScript NFC bridge, OpenAPI YAML.
+**Tech Stack:** Rails 8.1, PostgreSQL UUIDs, RSpec, ERB, Stimulus, Attend NFC Bridge WebSocket protocol, OpenAPI YAML.
 
 **Spec:** `docs/superpowers/specs/2026-08-24-user-owned-nfc-tokens-design.md`
 
 ## Global Constraints
 
-- Tokens are owned by `User`; new flows never mutate participation token columns.
-- Every event accepts active personal tokens regardless of `nfc_badges_enabled?`.
-- `nfc_badges_enabled?` gates issuance, writing, confirmation, replacement, and revocation only.
-- Preserve assigned legacy UUIDs; unlinked legacy participants retain original-event fallback.
-- The actor flag is exactly `:personal_nfc_token`; this change adds no participant-facing UI.
-- Raw UUIDs do not enter audit metadata or logs.
-- Existing mobile paths and response keys remain compatible.
+- Existing NFC badges remain owned by `ParticipantEvent` and valid only at their event.
+- Every event accepts active passports regardless of `event.nfc_badges_enabled?`.
+- `event.nfc_badges_enabled?` continues to gate only event badge issuance and writing.
+- Passport pairing and revocation happen only on the global admin user profile.
+- No Flipper gems, initializer, tables, actor method, or feature gates remain.
+- No event-badge-to-passport backfill is created.
+- The private passport token is filtered from logs and never shown in HTML or audit metadata.
+- A public serial number uses the exact format `HCP-XXXXXXXX`.
 
 ---
 
-### Task 1: Persistent Flipper Actor Flags
+### Task 1: Restore Event Badges and Remove Flipper
 
 **Files:**
-- Modify: `Gemfile`, `Gemfile.lock`, `app/models/user.rb`, `spec/models/user_spec.rb`
-- Create: `db/migrate/20260824150000_create_flipper_tables.rb`, `config/initializers/flipper.rb`
-
-**Interfaces:**
-- Produces: `Flipper.enabled?(:personal_nfc_token, user)` and `User#flipper_id -> String`.
-
-- [ ] **Step 1: Install dependencies and create the official migration**
-
-```bash
-bundle add flipper flipper-active_record
-bin/rails generate flipper:active_record
-```
-
-Use timestamp `20260824150000`. Keep `t.text :value` and both official unique indexes.
-
-- [ ] **Step 2: Apply schema setup**
-
-```bash
-bin/rails db:migrate
-bin/rails db:test:prepare
-```
-
-- [ ] **Step 3: Write failing specs**
-
-Add to `spec/models/user_spec.rb`:
-
-```ruby
-describe "Flipper actor identity" do
-  it "uses a stable type-qualified id" do
-    user = create(:user)
-    expect(user.flipper_id).to eq("User;#{user.id}")
-  end
-
-  it "persists per-user enablement in Active Record" do
-    user = create(:user)
-    other = create(:user)
-    Flipper.enable_actor(:personal_nfc_token, user)
-    expect(Flipper.adapter).to be_a(Flipper::Adapters::ActiveRecord)
-    expect(Flipper.enabled?(:personal_nfc_token, user)).to be(true)
-    expect(Flipper.enabled?(:personal_nfc_token, other)).to be(false)
-  ensure
-    Flipper.disable(:personal_nfc_token)
-  end
-end
-```
-
-- [ ] **Step 4: Verify red**
-
-```bash
-bundle exec rspec spec/models/user_spec.rb
-```
-
-Expected: missing `flipper_id` and/or non-Active Record adapter.
-
-- [ ] **Step 5: Implement the adapter and actor id**
-
-```ruby
-# config/initializers/flipper.rb
-Flipper.configure do |config|
-  config.default { Flipper.new(Flipper::Adapters::ActiveRecord.new) }
-end
-
-# app/models/user.rb
-def flipper_id
-  "User;#{id}"
-end
-```
-
-- [ ] **Step 6: Verify green and commit**
-
-```bash
-bundle exec rspec spec/models/user_spec.rb
-git add Gemfile Gemfile.lock config/initializers/flipper.rb db/migrate/20260824150000_create_flipper_tables.rb db/schema.rb app/models/user.rb spec/models/user_spec.rb
-git commit -m "feat: install persistent flipper flags"
-```
-
----
-
-### Task 2: User-Owned Token Lifecycle and Backfill
-
-**Files:**
-- Create: `db/migrate/20260824150001_create_nfc_tokens.rb`, `db/migrate/20260824150002_backfill_user_owned_nfc_tokens.rb`
-- Create: `app/models/nfc_token.rb`, `spec/factories/nfc_tokens.rb`, `spec/models/nfc_token_spec.rb`, `spec/migrations/backfill_user_owned_nfc_tokens_spec.rb`
-- Modify: `app/models/user.rb`, `app/models/participant_event.rb`
-
-**Interfaces:**
-- Produces: `NfcToken.active`, `.pending`, `.ensure_pending_for!(user)`, `#confirm!`, `#revoke!`, and `User#nfc_tokens`.
-
-- [ ] **Step 1: Write failing lifecycle specs**
-
-Create examples proving a new token is pending, matching confirmation activates it and records staff, mismatch raises `NfcToken::TokenMismatch`, revocation affects one token, pending ensure is idempotent, one user may have two active tokens, and UUIDs are globally unique.
-
-```ruby
-token = NfcToken.create!(user: owner)
-expect(token).to be_pending
-token.confirm!(presented_token: token.token, actor: staff)
-expect(token.reload).to be_active
-expect(token.paired_by).to eq(staff)
-```
-
-- [ ] **Step 2: Verify red**
-
-```bash
-bundle exec rspec spec/models/nfc_token_spec.rb
-```
-
-Expected: `NfcToken` is undefined.
-
-- [ ] **Step 3: Create and migrate `nfc_tokens`**
-
-Use a UUID primary key, database-generated unique UUID `token`, required `user_id`, optional `paired_at`, `paired_by_id`, `revoked_at`, `revoked_by_id`, timestamps, indexes, and user foreign keys.
-
-```bash
-bin/rails db:migrate
-bin/rails db:test:prepare
-```
-
-- [ ] **Step 4: Implement the minimal lifecycle**
-
-```ruby
-class NfcToken < ApplicationRecord
-  class TokenMismatch < StandardError; end
-
-  self.implicit_order_column = "created_at"
-  belongs_to :user
-  belongs_to :paired_by, class_name: "User", optional: true
-  belongs_to :revoked_by, class_name: "User", optional: true
-  validates :token, presence: true, uniqueness: true
-  scope :active, -> { where.not(paired_at: nil).where(revoked_at: nil) }
-  scope :pending, -> { where(paired_at: nil, revoked_at: nil) }
-
-  def self.ensure_pending_for!(user)
-    user.nfc_tokens.pending.order(created_at: :desc).first || user.nfc_tokens.create!
-  end
-
-  def pending? = paired_at.nil? && revoked_at.nil?
-  def active? = paired_at.present? && revoked_at.nil?
-
-  def confirm!(presented_token:, actor:)
-    raise TokenMismatch unless token == presented_token
-    update!(paired_at: Time.current, paired_by: actor)
-  end
-
-  def revoke!(actor:)
-    update!(revoked_at: Time.current, revoked_by: actor)
-  end
-end
-```
-
-Add `has_many :nfc_tokens, dependent: :destroy` to `User` and an `:active` factory trait.
-
-- [ ] **Step 5: Verify lifecycle green**
-
-```bash
-bundle exec rspec spec/models/nfc_token_spec.rb
-```
-
-- [ ] **Step 6: Write a failing migration spec**
-
-Require `20260824150002_backfill_user_owned_nfc_tokens.rb`, invoke `BackfillUserOwnedNfcTokens.new.up`, and prove a linked assigned legacy row preserves UUID, owner, assignment time, and assigning staff. Prove an unlinked assigned row remains only in legacy columns.
-
-- [ ] **Step 7: Implement and verify the idempotent SQL backfill**
-
-Insert from `participant_events JOIN participants`, requiring non-null token, assigned time, and participant user id. Preserve the UUID and actor, set timestamps, and use `ON CONFLICT (token) DO NOTHING`. Do not modify legacy columns.
-
-```bash
-bundle exec rspec spec/models/nfc_token_spec.rb spec/migrations/backfill_user_owned_nfc_tokens_spec.rb
-```
-
-- [ ] **Step 8: Commit**
-
-```bash
-git add app/models/nfc_token.rb app/models/user.rb app/models/participant_event.rb spec/factories/nfc_tokens.rb spec/models/nfc_token_spec.rb spec/migrations/backfill_user_owned_nfc_tokens_spec.rb db/migrate/20260824150001_create_nfc_tokens.rb db/migrate/20260824150002_backfill_user_owned_nfc_tokens.rb db/schema.rb
-git commit -m "feat: add user-owned nfc tokens"
-```
-
----
-
-### Task 3: Universal Current-Event Resolution
-
-**Files:**
-- Create: `app/services/nfc_token_resolver.rb`, `spec/services/nfc_token_resolver_spec.rb`, `spec/requests/admin/scans_spec.rb`
-- Modify: `app/controllers/admin/scans_controller.rb`, `app/controllers/api/v1/scans_controller.rb`, `spec/requests/api/v1/scans_spec.rb`
-- Modify: `app/toolboxes/participant_events_toolbox.rb`, `spec/toolboxes/participant_events_toolbox_spec.rb`
-
-**Interfaces:**
-- Produces: `NfcTokenResolver.call(event:, token:) -> ParticipantEvent | nil`; all authenticated scanners accept active tokens at every event.
-
-- [ ] **Step 1: Write failing resolver specs**
-
-Cover active cross-event resolution, no participation in selected event, pending, revoked, linked legacy cross-event, unlinked legacy original-event only, and unassigned legacy rejection. The revoked case must also have a matching legacy row to prove revocation cannot fall through.
-
-- [ ] **Step 2: Verify red**
-
-```bash
-bundle exec rspec spec/services/nfc_token_resolver_spec.rb
-```
-
-- [ ] **Step 3: Implement the resolver**
-
-```ruby
-class NfcTokenResolver
-  def self.call(event:, token:) = new(event: event, token: token).call
-
-  def call
-    personal_token = NfcToken.includes(user: :participant).find_by(token: token)
-    return participation_for(personal_token.user.participant) if personal_token&.active?
-    return nil if personal_token
-
-    legacy = ParticipantEvent.includes(participant: :user).find_by(nfc_badge_token: token)
-    return nil unless legacy&.nfc_badge_assigned_at?
-
-    linked_participant = legacy.participant.user&.participant
-    return participation_for(linked_participant) if linked_participant
-
-    legacy if legacy.event_id == event.id
-  end
-
-  private
-
-  attr_reader :event, :token
-
-  def initialize(event:, token:)
-    @event = event
-    @token = token
-  end
-
-  def participation_for(participant)
-    participant&.participant_events&.find_by(event: event)
-  end
-end
-```
-
-- [ ] **Step 4: Verify resolver green**
-
-```bash
-bundle exec rspec spec/services/nfc_token_resolver_spec.rb
-```
-
-- [ ] **Step 5: Write failing browser and API request specs**
-
-For both controllers, prove a token owned by a participant at two events creates a `source: "nfc"` scan on the requested event when `nfc_badges_enabled` is false. Prove revoked and out-of-event tokens return 404 and create no scan.
-
-- [ ] **Step 6: Verify controller red**
-
-```bash
-bundle exec rspec spec/requests/api/v1/scans_spec.rb spec/requests/admin/scans_spec.rb
-```
-
-- [ ] **Step 7: Use the resolver and remove implicit legacy token generation**
-
-Replace both event-scoped token lookups with `NfcTokenResolver.call(event:, token:)`, then eager-load the resolved participation's participant/medical/dietary data. Remove both first-check-in calls to `ensure_nfc_badge_token!`. Remove the toolbox call too and change its spec to prove check-in does not create a user token.
-
-- [ ] **Step 8: Verify and commit**
-
-```bash
-bundle exec rspec spec/services/nfc_token_resolver_spec.rb spec/requests/api/v1/scans_spec.rb spec/requests/admin/scans_spec.rb spec/toolboxes/participant_events_toolbox_spec.rb
-git add app/services/nfc_token_resolver.rb app/controllers/admin/scans_controller.rb app/controllers/api/v1/scans_controller.rb app/toolboxes/participant_events_toolbox.rb spec/services/nfc_token_resolver_spec.rb spec/requests/admin/scans_spec.rb spec/requests/api/v1/scans_spec.rb spec/toolboxes/participant_events_toolbox_spec.rb
-git commit -m "feat: resolve nfc tokens across events"
-```
-
----
-
-### Task 4: User-Owned Issuance and Compatible Payloads
-
-**Files:**
+- Modify: `Gemfile`, `Gemfile.lock`, `app/models/user.rb`, `app/models/participant_event.rb`
 - Modify: `app/controllers/admin/participant_events_controller.rb`, `app/controllers/api/v1/nfc_badges_controller.rb`
-- Modify: `app/controllers/api/v1/participants_controller.rb`, `app/controllers/api/v1/scans_controller.rb`, `app/controllers/admin/scans_controller.rb`
-- Modify: `app/models/participant_event.rb`, `app/models/audit_log.rb`
-- Create: `spec/requests/api/v1/nfc_badges_spec.rb`, `spec/requests/admin/nfc_badges_spec.rb`
-- Modify: `spec/requests/api/v1/participants_spec.rb`
+- Modify: `app/controllers/admin/scans_controller.rb`, `app/controllers/api/v1/scans_controller.rb`, `app/controllers/api/v1/participants_controller.rb`
+- Modify: `app/toolboxes/participant_events_toolbox.rb`, `config/openapi.yml`, `db/schema.rb`
+- Delete: `config/initializers/flipper.rb`, `db/migrate/20260824130001_create_flipper_tables.rb`, `db/migrate/20260824130003_backfill_user_owned_nfc_tokens.rb`
+- Test: `spec/models/participant_event_spec.rb`, `spec/requests/api/v1/nfc_badges_spec.rb`, `spec/requests/api/v1/participants_spec.rb`, `spec/toolboxes/participant_events_toolbox_spec.rb`, `spec/models/user_spec.rb`
 
 **Interfaces:**
-- Produces: existing ensure/confirm/reset routes backed by user tokens; payload fields `nfc_badge_token`, `nfc_badge_assigned`, and `nfc_pairing_available`.
+- Produces: `ParticipantEvent#ensure_nfc_badge_token! -> String`, `#assign_nfc_badge!(user:)`, `#reset_nfc_badge!`, and the original event badge request/response contract.
 
-- [ ] **Step 1: Write failing issuance request specs**
+- [ ] **Step 1: Restore failing event badge regression specs**
 
-For API and admin routes, prove ensure creates/reuses the linked user's pending token; confirm matches it and records staff; mismatch fails; disabled issuance and unlinked participant fail; reset creates a fresh pending token without revoking active tokens; audit records target `NfcToken` and exclude raw UUID metadata.
-
-- [ ] **Step 2: Verify red**
-
-```bash
-bundle exec rspec spec/requests/api/v1/nfc_badges_spec.rb spec/requests/admin/nfc_badges_spec.rb
-```
-
-- [ ] **Step 3: Move both controllers to the linked user**
-
-Load `participant: :user`. Return 422 with `Participant must have a linked Attend account before pairing a personal NFC token` when absent. Ensure uses `NfcToken.ensure_pending_for!`; confirm finds the user's matching pending record and calls `confirm!`; reset creates a fresh pending record without revoking active ones. Keep the event issuance check. Audit the token record with participant name and token-record id, never the UUID.
-
-- [ ] **Step 4: Write failing payload specs**
-
-Replace the participation-token GET assertion with examples proving an existing pending user token is returned without writes, an active token sets assigned state, a non-issuing event hides pending issuance data, and an unlinked participant reports pairing unavailable.
-
-- [ ] **Step 5: Implement read-only compatibility payloads**
-
-For the browser scan, API scan, and participant serializers use:
+Add or restore examples proving that `ensure_nfc_badge_token!` persists a UUID on the participation, `assign_nfc_badge!` records staff and time, `reset_nfc_badge!` replaces the UUID, API ensure/confirm/reset mutate only that participation, and toolbox check-in provisions only the participation badge when enabled.
 
 ```ruby
-user = participant.user
-pending_token = user&.nfc_tokens&.pending&.order(created_at: :desc)&.first
-
-{
-  nfc_badge_token: event.nfc_badges_enabled? ? pending_token&.token : nil,
-  nfc_badge_assigned: user&.nfc_tokens&.active&.exists? || false,
-  nfc_pairing_available: user.present?
-}
+expect { participant_event.ensure_nfc_badge_token! }
+  .to change(participant_event, :nfc_badge_token).from(nil)
+expect(user.reload).not_to respond_to(:nfc_tokens)
 ```
 
-Eager-load user/tokens in collection payloads. Make `ParticipantEvent#nfc_badge_assigned?` prefer active user tokens, then assigned legacy state. Keep legacy mutator definitions with deprecation comments but no callers.
+- [ ] **Step 2: Run the restored specs and verify red**
 
-- [ ] **Step 6: Verify no legacy mutator callers and run specs**
+Run: `mise x ruby@3.4.7 -- bundle exec rspec spec/models/participant_event_spec.rb spec/requests/api/v1/nfc_badges_spec.rb spec/requests/api/v1/participants_spec.rb spec/toolboxes/participant_events_toolbox_spec.rb spec/models/user_spec.rb`
 
-```bash
-rg -n "ensure_nfc_badge_token!|assign_nfc_badge!|reset_nfc_badge!" app --glob '*.rb'
-bundle exec rspec spec/requests/api/v1/nfc_badges_spec.rb spec/requests/admin/nfc_badges_spec.rb spec/requests/api/v1/participants_spec.rb spec/requests/api/v1/scans_spec.rb spec/requests/admin/scans_spec.rb
+Expected: failures reference `NfcToken`, missing participant-event lifecycle methods, and Flipper expectations.
+
+- [ ] **Step 3: Restore the original event badge implementation**
+
+```ruby
+def nfc_badge_assigned?
+  nfc_badge_token.present? && nfc_badge_assigned_at.present?
+end
+
+def ensure_nfc_badge_token!
+  return nfc_badge_token if nfc_badge_token.present?
+  update!(nfc_badge_token: SecureRandom.uuid)
+  nfc_badge_token
+end
+
+def assign_nfc_badge!(user:)
+  update!(nfc_badge_assigned_at: Time.current, nfc_badge_assigned_by: user)
+end
+
+def reset_nfc_badge!
+  update!(nfc_badge_token: SecureRandom.uuid, nfc_badge_assigned_at: nil, nfc_badge_assigned_by: nil)
+end
 ```
 
-Expected: only definitions remain; all specs pass.
+Restore controllers, scanner/toolbox provisioning, participant payload fields, and OpenAPI NFC-badge descriptions to their `origin/main` behavior.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 4: Remove Flipper and the incorrect global-token artifacts**
 
-```bash
-git add app/controllers/admin/participant_events_controller.rb app/controllers/api/v1/nfc_badges_controller.rb app/controllers/api/v1/participants_controller.rb app/controllers/api/v1/scans_controller.rb app/controllers/admin/scans_controller.rb app/models/participant_event.rb app/models/audit_log.rb spec/requests/api/v1/nfc_badges_spec.rb spec/requests/admin/nfc_badges_spec.rb spec/requests/api/v1/participants_spec.rb
-git commit -m "feat: issue nfc tokens to users"
-```
+Remove both gems and lockfile entries, `User#flipper_id`, Flipper specs/initializer/migration, the `NfcToken` association/model/factory/spec, and the global backfill migration/spec. Remove `nfc_tokens` and Flipper tables/foreign keys from `db/schema.rb`.
+
+- [ ] **Step 5: Verify green and commit**
+
+Run the Step 2 command and `rg -n "Flipper|flipper|NfcToken|nfc_tokens|personal_nfc_token" Gemfile Gemfile.lock app config db spec`.
+
+Expected: specs pass; the search finds only the historical `20260813120000_drop_flipper_tables.rb` migration.
+
+Commit: `fix: preserve event scoped nfc badges`
 
 ---
 
-### Task 5: Universal Reader UI and API Contract
+### Task 2: Passport Model and Lifecycle
 
 **Files:**
-- Modify: `app/views/admin/scans/scanner.html.erb`, `config/openapi.yml`, `spec/requests/docs_spec.rb`
-- Create: `spec/requests/admin/scanner_spec.rb`
+- Create: `app/models/passport.rb`, `spec/factories/passports.rb`, `spec/models/passport_spec.rb`
+- Replace: `db/migrate/20260824130002_create_nfc_tokens.rb` with `db/migrate/20260824130002_create_passports.rb`
+- Modify: `app/models/user.rb`, `app/models/audit_log.rb`, `config/initializers/filter_parameter_logging.rb`, `db/schema.rb`
 
 **Interfaces:**
-- Produces: universal read UI, conditional write UI, and documented user ownership.
+- Produces: `User#passports`, `Passport.active`, `Passport.pending`, `Passport.ensure_pending_for!(user)`, `Passport#confirm!(presented_token:, actor:)`, `Passport#revoke!(actor:)`, `#active?`, `#pending?`, `#revoked?`.
 
-- [ ] **Step 1: Write failing visibility specs**
+- [ ] **Step 1: Write failing model specs**
 
-Authenticate a global admin against issuing and non-issuing events. Both responses must include `NFC Scanner`, `Connect`, `processNfcScan`, and `ws://localhost:9876`; only the issuing response includes `Write NFC Badge`, `modal-write-nfc-btn`, and enabled write-on-check-in state.
+Cover generated unique UUID token, generated `HCP-XXXXXXXX` serial, pending/active/revoked predicates, exact-match confirmation, invalid-state confirmation, staff attribution, idempotent pending creation, multiple active passports per user, and revoking one without touching another.
+
+```ruby
+passport = Passport.ensure_pending_for!(owner)
+expect(passport.serial_number).to match(/\AHCP-[A-F0-9]{8}\z/)
+passport.confirm!(presented_token: passport.token, actor: staff)
+expect(passport.reload).to be_active
+expect(passport.paired_by).to eq(staff)
+```
 
 - [ ] **Step 2: Verify red**
 
-```bash
-bundle exec rspec spec/requests/admin/scanner_spec.rb
+Run: `mise x ruby@3.4.7 -- bundle exec rspec spec/models/passport_spec.rb`
+
+Expected: `uninitialized constant Passport`.
+
+- [ ] **Step 3: Add the passports table and model**
+
+Create a UUID table with required unique UUID `token`, required unique string `serial_number`, required `user_id`, nullable `paired_at`/`paired_by_id`, nullable `revoked_at`/`revoked_by_id`, timestamps, and foreign keys. Generate values before validation:
+
+```ruby
+before_validation :set_token, :set_serial_number, on: :create
+
+def set_token
+  self.token ||= SecureRandom.uuid
+end
+
+def set_serial_number
+  self.serial_number ||= "HCP-#{SecureRandom.hex(4).upcase}"
+end
 ```
 
-- [ ] **Step 3: Split universal reads from gated writes**
+Use lifecycle guards so only pending passports confirm, revoked passports remain historical, and `ensure_pending_for!` reuses the newest pending record.
 
-Render connection/read status and bridge JavaScript for every event. Keep the write panel/modal controls inside the event flag. Set:
+- [ ] **Step 4: Protect private tokens**
 
-```javascript
-const nfcIssuanceEnabled = <%= current_event.nfc_badges_enabled? %>;
-const nfcWriteOnCheckin = nfcIssuanceEnabled && <%= current_event.nfc_badge_write_on_checkin_enabled? %>;
-```
+Add passport audit actions `passport_pair` and `passport_revoke`. Ensure `:token` remains in Rails filtered parameters, and tests prove audit metadata contains the public serial but not `passport.token`.
 
-Normal tag reads always call `processNfcScan`; write handlers require issuance. Auto-write requires `nfc_pairing_available` and calls ensure before opening the panel. Remove the Slack-id requirement for the Attend token; include `badge_url` only when Slack id exists. Copy must distinguish scanning existing personal tokens from issuing event badges.
+- [ ] **Step 5: Migrate, verify, and commit**
 
-- [ ] **Step 4: Verify scanner and CSP behavior**
+Run: `mise x ruby@3.4.7 -- bin/rails db:migrate`
 
-```bash
-bundle exec rspec spec/requests/admin/scanner_spec.rb spec/requests/content_security_policy_spec.rb
-```
+Run: `mise x ruby@3.4.7 -- bundle exec rspec spec/models/passport_spec.rb`
 
-- [ ] **Step 5: Update and test OpenAPI**
+Expected: all examples pass.
 
-Describe scan acceptance as universal, issuance as flag-gated, and ownership as the linked user. Keep existing paths and keys. Extend `spec/requests/docs_spec.rb` to parse YAML and assert NFC paths and `badge_token` fields remain.
-
-```bash
-bundle exec rspec spec/requests/docs_spec.rb
-```
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add app/views/admin/scans/scanner.html.erb spec/requests/admin/scanner_spec.rb config/openapi.yml spec/requests/docs_spec.rb
-git commit -m "feat: accept personal nfc tokens at every event"
-```
+Commit: `feat: add hack club passports`
 
 ---
 
-### Task 6: Full Verification
+### Task 3: Global Admin Passport Pairing
 
 **Files:**
-- Modify only previously listed files if verification reveals defects.
+- Create: `app/controllers/admin/passports_controller.rb`, `app/javascript/controllers/passport_pairing_controller.js`
+- Create: `spec/requests/admin/passports_spec.rb`
+- Modify: `config/routes.rb`, `app/controllers/admin/users_controller.rb`, `app/views/admin/users/show.html.erb`
+- Test: `spec/requests/admin/users_spec.rb`
 
 **Interfaces:**
-- Produces: migration-clean, lint-clean, fully tested implementation.
+- Consumes: `Passport.ensure_pending_for!`, `#confirm!`, and `#revoke!` from Task 2.
+- Produces: `POST /admin/users/:user_id/passports`, `POST /admin/users/:user_id/passports/:id/confirm`, and `DELETE /admin/users/:user_id/passports/:id`.
 
-- [ ] **Step 1: Run focused verification**
+- [ ] **Step 1: Write failing authorization and lifecycle request specs**
 
-```bash
-bundle exec rspec spec/models/nfc_token_spec.rb spec/models/user_spec.rb spec/migrations/backfill_user_owned_nfc_tokens_spec.rb spec/services/nfc_token_resolver_spec.rb spec/requests/admin/scans_spec.rb spec/requests/admin/scanner_spec.rb spec/requests/admin/nfc_badges_spec.rb spec/requests/api/v1/scans_spec.rb spec/requests/api/v1/nfc_badges_spec.rb spec/requests/api/v1/participants_spec.rb spec/toolboxes/participant_events_toolbox_spec.rb spec/requests/docs_spec.rb spec/requests/content_security_policy_spec.rb
+Prove global admins can create/reuse pending passports, confirm only an exact token, and revoke an active passport. Prove event admins and ordinary users cannot use any route. Verify JSON creation includes `id`, private `token`, and public `serial_number`; subsequent rendered HTML includes only the serial. Verify audit records target the passport and omit its token.
+
+```ruby
+post admin_user_passports_path(owner)
+expect(response).to have_http_status(:created)
+passport = owner.passports.pending.sole
+
+post confirm_admin_user_passport_path(owner, passport), params: { passport_token: passport.token }
+expect(passport.reload).to be_active
 ```
 
-- [ ] **Step 2: Run lint and the full suite**
+- [ ] **Step 2: Verify red**
 
-```bash
-bin/rubocop
-bundle exec rspec
+Run: `mise x ruby@3.4.7 -- bundle exec rspec spec/requests/admin/passports_spec.rb spec/requests/admin/users_spec.rb`
+
+Expected: missing routes/controller and missing passport UI.
+
+- [ ] **Step 3: Implement routes and controller**
+
+Nest `resources :passports, only: [:create, :destroy]` under admin users with a member `post :confirm`. Require `current_user.global_admin?`, scope every lookup through `@user.passports`, set `@record = @passport` for automatic auditing, return 422 for mismatches or invalid states, and redirect back to the user for revocation.
+
+- [ ] **Step 4: Add the admin UI and bridge controller**
+
+Render an orange dashed Hack Club Passports section with connection state, pair button, transient status, and passport history. The Stimulus controller connects to `ws://localhost:9876`, creates a pending passport on click, sends `{ action: "write", attend_token: token }`, waits for `write_result`, verifies the second `tag_read.attendToken`, posts the exact token to confirm, clears the token from controller state, and reloads after success. It never puts the private token into HTML, a URL, or console output.
+
+- [ ] **Step 5: Verify green and commit**
+
+Run the Step 2 command.
+
+Expected: all examples pass and response HTML excludes every private token.
+
+Commit: `feat: pair passports from admin user profiles`
+
+---
+
+### Task 4: Participant Passport Profile
+
+**Files:**
+- Modify: `app/controllers/dashboard_controller.rb`, `app/views/dashboard/profile.html.erb`
+- Create: `spec/requests/dashboard_passports_spec.rb`
+
+**Interfaces:**
+- Consumes: `current_user.passports`.
+- Produces: data-driven `#passport` navigation and profile section for successfully paired passports.
+
+- [ ] **Step 1: Write failing profile request specs**
+
+Prove no section or navigation appears with no passport or only a pending passport. Prove active and revoked paired passports render their serial number, status, and pairing date while their private tokens and pairing administrator do not render.
+
+```ruby
+get dashboard_profile_path
+expect(response.body).to include("Hack Club Passport", passport.serial_number, "Active")
+expect(response.body).not_to include(passport.token, passport.paired_by.display_name_or_fallback)
 ```
 
-- [ ] **Step 3: Check invariants and leakage**
+- [ ] **Step 2: Verify red**
 
-```bash
-bin/rails db:migrate:status
-rg -n "ensure_nfc_badge_token!|assign_nfc_badge!|reset_nfc_badge!" app --glob '*.rb'
-rg -n "badge_token|nfc_badge_token|personal_nfc_token" app config spec
-git diff --check
+Run: `mise x ruby@3.4.7 -- bundle exec rspec spec/requests/dashboard_passports_spec.rb`
+
+Expected: passport section is absent.
+
+- [ ] **Step 3: Load and render successfully paired passports**
+
+In `DashboardController#profile`, set `@passports = current_user.passports.where.not(paired_at: nil).order(created_at: :desc)`. Render nav and section only when `@passports.any?`, and display only `serial_number`, `active?`/`revoked?`, and `paired_at`.
+
+- [ ] **Step 4: Verify green and commit**
+
+Run the Step 2 command.
+
+Expected: all examples pass.
+
+Commit: `feat: show passports on dashboard profile`
+
+---
+
+### Task 5: Passport Scan Resolution and Universal NFC Reading
+
+**Files:**
+- Replace: `app/services/nfc_token_resolver.rb` with `app/services/nfc_token_resolver.rb` using passport semantics
+- Modify: `app/controllers/admin/scans_controller.rb`, `app/controllers/api/v1/scans_controller.rb`
+- Modify: `app/views/admin/scans/scanner.html.erb`, `config/openapi.yml`
+- Replace: `spec/services/nfc_token_resolver_spec.rb`
+- Modify: `spec/requests/admin/scans_spec.rb`, `spec/requests/api/v1/scans_spec.rb`
+
+**Interfaces:**
+- Produces: `NfcTokenResolver.call(event:, token:) -> ParticipantEvent | nil`.
+
+- [ ] **Step 1: Write failing resolver and request specs**
+
+Cover current-event assigned badge success, cross-event badge rejection, active passport success at two events, pending/revoked/unknown/malformed rejection, owner without a participant, owner without selected-event participation, and current-event badge precedence. For browser and API controllers, prove passport scans create an NFC-source scan even when badge issuance is disabled.
+
+```ruby
+expect(described_class.call(event: second_event, token: passport.token))
+  .to eq(second_participation)
+expect(described_class.call(event: second_event, token: first_participation.nfc_badge_token))
+  .to be_nil
 ```
 
-Expected: migrations are up; legacy mutators have definitions only; raw tokens occur only in authenticated payload code/tests; participant-facing views contain no feature mention.
+- [ ] **Step 2: Verify red**
 
-- [ ] **Step 4: Commit verification fixes if any**
+Run: `mise x ruby@3.4.7 -- bundle exec rspec spec/services/nfc_token_resolver_spec.rb spec/requests/admin/scans_spec.rb spec/requests/api/v1/scans_spec.rb`
 
-```bash
-git add -u
-git commit -m "fix: complete nfc token rollout verification"
+Expected: the current resolver references `NfcToken` and/or passport scans fail.
+
+- [ ] **Step 3: Implement ordered resolution**
+
+```ruby
+def call
+  event_badge = event.participant_events
+    .where.not(nfc_badge_assigned_at: nil)
+    .find_by(nfc_badge_token: token)
+  return event_badge if event_badge
+
+  passport = Passport.active.includes(user: :participant).find_by(token: token)
+  participant = passport&.user&.participant
+  participant && event.participant_events.find_by(participant: participant)
+end
 ```
 
-Skip only when verification changed no files.
+Both scan controllers call the resolver for `badge_token`, then load their existing medical/dietary/safeguarding associations without changing scan creation or deduplication.
+
+- [ ] **Step 4: Keep reading universal and writing event-scoped**
+
+Render the scanner's bridge connection/read UI and WebSocket logic at every event. Keep the write panel, automatic write-on-check-in, modal write controls, event badge ensure/confirm/reset endpoints, and payloads conditional on `current_event.nfc_badges_enabled?`. Remove the incorrect `nfc_pairing_available` payload and logic.
+
+- [ ] **Step 5: Update documentation and verify**
+
+Document that `badge_token` accepts either an assigned badge for the selected event or an active passport, while all NFC badge provisioning endpoints remain participant-event scoped.
+
+Run: `mise x ruby@3.4.7 -- bundle exec rspec spec/models/passport_spec.rb spec/requests/admin/passports_spec.rb spec/requests/dashboard_passports_spec.rb spec/services/nfc_token_resolver_spec.rb spec/requests/admin/scans_spec.rb spec/requests/api/v1/scans_spec.rb spec/requests/api/v1/nfc_badges_spec.rb spec/requests/api/v1/participants_spec.rb spec/toolboxes/participant_events_toolbox_spec.rb`
+
+Run: `mise x ruby@3.4.7 -- bin/rubocop`
+
+Run: `mise x ruby@3.4.7 -- ruby -e 'require "yaml"; YAML.safe_load_file("config/openapi.yml", aliases: true); puts "openapi ok"'`
+
+Expected: focused specs and RuboCop pass; OpenAPI prints `openapi ok`.
+
+- [ ] **Step 6: Run full verification and commit**
+
+Run: `mise x ruby@3.4.7 -- bundle exec rspec`
+
+Report any pre-existing baseline failures separately from failures introduced by passports.
+
+Commit: `feat: accept passports at every event`
