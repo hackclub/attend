@@ -10,6 +10,8 @@ module Api
           handle_delivery
         when "Bounce"
           handle_bounce
+        when "SpamComplaint"
+          handle_spam_complaint
         when "Open"
           handle_open
         when "Click"
@@ -105,10 +107,54 @@ module Api
           )
         end
 
+        # Postmark suppresses the address after a hard bounce; further sends
+        # would raise InactiveRecipientError, so flag the owner now.
+        mark_recipients_undeliverable(email_log) if params[:Type] == "HardBounce"
+
         Rails.logger.info("[Postmark Webhook] Bounce recorded for #{message_id}: #{params[:Type]}")
       rescue => e
         Rails.logger.error("[Postmark Webhook] Failed to record bounce for #{message_id}: #{e.class}: #{e.message}")
         Sentry.capture_exception(e) if defined?(Sentry)
+      end
+
+      def handle_spam_complaint
+        message_id = params[:MessageID]
+        return unless message_id
+
+        email_log = EmailLog.find_by(postmark_message_id: message_id)
+        unless email_log
+          Rails.logger.warn("[Postmark Webhook] No email log found for message_id: #{message_id}")
+          return
+        end
+
+        occurred_at = parse_timestamp(params[:BouncedAt]) || Time.current
+
+        EmailLog.transaction do
+          email_log.update!(status: "failed") unless email_log.bounced?
+          email_log.email_log_events.create!(
+            event_type: "spam_complaint",
+            occurred_at: occurred_at,
+            metadata: {
+              type_code: params[:TypeCode],
+              description: params[:Description],
+              details: params[:Details]
+            }.compact
+          )
+        end
+
+        # A spam complaint also lands the address on Postmark's suppression list.
+        mark_recipients_undeliverable(email_log)
+
+        Rails.logger.info("[Postmark Webhook] Spam complaint recorded for #{message_id}")
+      rescue => e
+        Rails.logger.error("[Postmark Webhook] Failed to record spam complaint for #{message_id}: #{e.class}: #{e.message}")
+        Sentry.capture_exception(e) if defined?(Sentry)
+      end
+
+      def mark_recipients_undeliverable(email_log)
+        addresses = email_log.to_address.to_s.split(",").map(&:strip)
+        Participant.mark_email_undeliverable!(addresses)
+        Guardian.mark_email_undeliverable!(addresses)
       end
 
       def handle_open

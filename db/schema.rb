@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_130002) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -518,6 +518,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_130002) do
     t.text "country"
     t.datetime "created_at", null: false
     t.string "email", null: false
+    t.datetime "email_undeliverable_at"
     t.string "legal_first_name", null: false
     t.string "legal_last_name", null: false
     t.text "phone"
@@ -858,6 +859,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_130002) do
     t.datetime "created_at", null: false
     t.date "date_of_birth"
     t.string "email", null: false
+    t.datetime "email_undeliverable_at"
     t.text "engagement_notes"
     t.string "engagement_preference"
     t.string "legal_first_name", null: false

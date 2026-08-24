@@ -47,7 +47,7 @@ RSpec.describe SyncSlackChannelJob, type: :job do
 
     expect {
       described_class.perform_now(event.id, send_emails: true)
-    }.to have_enqueued_job(ActionMailer::MailDeliveryJob)
+    }.to have_enqueued_job(ActionMailer::Base.delivery_job)
       .with("ParticipantMailer", "slack_link_reminder", "deliver_now", anything)
   end
 
