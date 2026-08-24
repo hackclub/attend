@@ -1,6 +1,50 @@
 require "rails_helper"
 
 RSpec.describe Event, type: :model do
+  describe "support email validation" do
+    it "requires a support email on create" do
+      event = build(:event, support_email: nil)
+      expect(event).not_to be_valid
+      expect(event.errors[:support_email]).to include("can't be blank")
+    end
+
+    it "accepts @hackclub.com and @events.hackclub.com addresses" do
+      expect(build(:event, support_email: "sunbeam@hackclub.com")).to be_valid
+      expect(build(:event, support_email: "sunbeam@events.hackclub.com")).to be_valid
+    end
+
+    it "rejects addresses on any other domain" do
+      event = build(:event, support_email: "sunbeam@gmail.com")
+      expect(event).not_to be_valid
+      expect(event.errors[:support_email])
+        .to include("must be a @hackclub.com or @events.hackclub.com address")
+    end
+
+    it "rejects lookalike domains" do
+      %w[sunbeam@nothackclub.com sunbeam@hackclub.com.evil.com sunbeam@sub.events.hackclub.com]
+        .each do |address|
+          expect(build(:event, support_email: address)).not_to be_valid
+        end
+    end
+
+    it "strips and downcases the address" do
+      event = create(:event, support_email: "  Sunbeam@HackClub.com ")
+      expect(event.support_email).to eq("sunbeam@hackclub.com")
+    end
+
+    it "lets legacy events without a support email still be saved" do
+      event = create(:event)
+      event.update_column(:support_email, nil)
+      expect(event.reload.update(name: "Renamed")).to be(true)
+    end
+
+    it "does not let an existing support email be cleared" do
+      event = create(:event)
+      expect(event.update(support_email: "")).to be(false)
+      expect(event.errors[:support_email]).to include("can't be blank")
+    end
+  end
+
   describe "#airtable_sync_stale?" do
     def configured_event(**attrs)
       build(
