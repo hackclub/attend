@@ -23,6 +23,7 @@ RSpec.describe ScanRecorder do
 
     expect(result.outcome).to eq("scanned")
     expect(result.first_scan_in_context?).to be(true)
+    expect(result.deduplicated?).to be(false)
     expect(result.first_scanned_at).to eq(result.scan.scanned_at)
   end
 
@@ -56,6 +57,7 @@ RSpec.describe ScanRecorder do
 
     expect(retry_result.scan.id).to eq(first.scan.id)
     expect(retry_result.outcome).to eq("scanned")
+    expect(retry_result.deduplicated?).to be(true)
     expect(participant_event.scans.count).to eq(1)
   end
 
@@ -77,13 +79,15 @@ RSpec.describe ScanRecorder do
 
   context "with concurrent attempts" do
     before(:context) do
-      @concurrent_participant_event = FactoryBot.create(:participant_event)
+      @concurrent_event = FactoryBot.create(:event, slug: "concurrent-scans-#{SecureRandom.hex(8)}")
+      @concurrent_participant_event = FactoryBot.create(:participant_event, event: @concurrent_event)
       @concurrent_context = @concurrent_participant_event.event.scan_contexts.find_by!(checks_in: true)
       @concurrent_user = FactoryBot.create(:user)
     end
 
     after(:context) do
       @concurrent_participant_event.destroy!
+      @concurrent_event.destroy!
       @concurrent_user.destroy!
     end
 

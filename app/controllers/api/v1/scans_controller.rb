@@ -54,22 +54,28 @@ module Api
           return render json: { error: "Participant not found for this event" }, status: :not_found
         end
 
-        scans_to_delete = if params[:scan_context_id].present?
-          scan_context = @event.scan_contexts.find_by(id: params[:scan_context_id])
-          unless scan_context
-            return render json: { error: "Invalid scan context" }, status: :unprocessable_entity
-          end
-          participant_event.scans.where(scan_context: scan_context)
-        else
-          participant_event.scans
+        scan_context = if params[:scan_context_id].present?
+          @event.scan_contexts.find_by(id: params[:scan_context_id])
+        end
+        if params[:scan_context_id].present? && !scan_context
+          return render json: { error: "Invalid scan context" }, status: :unprocessable_entity
         end
 
-        deleted_count = scans_to_delete.count
-        context_name = params[:scan_context_id].present? ? scan_context&.name : "all contexts"
+        context_name = params[:scan_context_id].present? ? scan_context.name : "all contexts"
+        deleted_count = nil
 
-        # Deleting the scans is the whole undo — check-in state is derived from
-        # them (ParticipantEvent#check_in_time).
-        scans_to_delete.destroy_all
+        participant_event.with_lock do
+          scans_to_delete = if scan_context
+            participant_event.scans.where(scan_context: scan_context)
+          else
+            participant_event.scans
+          end
+          deleted_count = scans_to_delete.count
+
+          # Deleting the scans is the whole undo — check-in state is derived from
+          # them (ParticipantEvent#check_in_time).
+          scans_to_delete.destroy_all
+        end
 
         # Audit log the undo action
         AuditLog.log!(
@@ -95,18 +101,6 @@ module Api
       end
 
       def create
-        if params[:client_scan_id].present?
-          existing_scan = Scan.find_by(client_scan_id: params[:client_scan_id])
-          if existing_scan
-            return render json: {
-              success: true,
-              scan: scan_json(existing_scan),
-              participant: participant_detail_json(existing_scan.participant_event),
-              deduplicated: true
-            }
-          end
-        end
-
         scan_contexts = @event.scan_contexts.to_a
 
         if scan_contexts.empty?
@@ -157,31 +151,36 @@ module Api
           return render json: { error: "Participant not found for this event" }, status: :not_found
         end
 
-        first_scan_in_context = participant_event.scans.where(scan_context: scan_context).none?
-
-        scan = participant_event.scans.create!(
+        result = ScanRecorder.call(
+          participant_event: participant_event,
           user: current_user,
           scan_context: scan_context,
-          scanned_at: params[:scanned_at] || Time.current,
+          scanned_at: params[:scanned_at].presence || Time.current,
           client_scan_id: params[:client_scan_id],
           source: scan_source
         )
 
+        first_attempt_in_context = result.first_scan_in_context? && !result.deduplicated?
+
         # Mark airport pickup for airport or check-in contexts on first scan in that context
-        if (scan_context.is_airport? || scan_context.checks_in?) && first_scan_in_context
+        if (scan_context.is_airport? || scan_context.checks_in?) && first_attempt_in_context
           mark_airport_pickup(participant_event, current_user)
         end
 
         # Auto-generate NFC badge token on first check-in if NFC is enabled
-        if @event.nfc_badges_enabled? && scan_context.checks_in? && first_scan_in_context
+        if @event.nfc_badges_enabled? && scan_context.checks_in? && first_attempt_in_context
           participant_event.ensure_nfc_badge_token!
         end
 
         render json: {
           success: true,
-          first_scan_in_context: first_scan_in_context,
-          scan: scan_json(scan),
-          participant: participant_detail_json(participant_event)
+          outcome: result.outcome,
+          first_scan_in_context: result.first_scan_in_context?,
+          first_scanned_at: result.first_scanned_at.iso8601,
+          deduplicated: result.deduplicated?,
+          scan: scan_json(result.scan),
+          scan_context: scan_context_json(result.scan.scan_context),
+          participant: participant_detail_json(participant_event.reload)
         }
       rescue ActiveRecord::RecordInvalid => e
         render json: { error: e.message }, status: :unprocessable_entity
@@ -206,13 +205,19 @@ module Api
           scanned_by: scan.user.name,
           client_scan_id: scan.client_scan_id,
           source: scan.source,
-          scan_context: scan.scan_context ? {
-            id: scan.scan_context_id,
-            name: scan.scan_context.name,
-            checks_in: scan.scan_context.checks_in,
-            is_airport: scan.scan_context.is_airport
-          } : nil,
+          scan_context: scan_context_json(scan.scan_context),
           created_at: scan.created_at.iso8601
+        }
+      end
+
+      def scan_context_json(scan_context)
+        return nil unless scan_context
+
+        {
+          id: scan_context.id,
+          name: scan_context.name,
+          checks_in: scan_context.checks_in,
+          is_airport: scan_context.is_airport
         }
       end
 
@@ -231,8 +236,11 @@ module Api
           slack_user_id: participant.slack_user_id,
           phone: participant.phone,
           pronouns: participant.pronouns,
+          headshot_url: headshot_url_for(participant),
           tshirt_size: participant.tshirt_size,
           status: pe.status,
+          checked_in_at: pe.check_in_time&.iso8601,
+          updated_at: pe.updated_at.iso8601,
 
           has_anaphylaxis_risk: medical&.has_anaphylaxis_risk || false,
           requires_refrigeration: medical&.requires_refrigeration || false,
@@ -253,8 +261,36 @@ module Api
           nfc_badge_token: pe.event.nfc_badges_enabled? ? pe.ensure_nfc_badge_token! : nil,
           nfc_badge_assigned: pe.nfc_badge_assigned?,
 
-          groups: pe.event.groups_enabled? ? pe.groups.ordered.map { |g| { id: g.id, name: g.name, color: g.normalized_color } } : []
+          groups: pe.event.groups_enabled? ? pe.groups.ordered.map { |g| { id: g.id, name: g.name, color: g.normalized_color } } : [],
+          scans_by_context: scans_by_context_json(pe)
         }
+      end
+
+      def scans_by_context_json(participant_event)
+        scans = participant_event.scans.sort_by(&:scanned_at)
+        scans.group_by(&:scan_context).filter_map do |context, context_scans|
+          next unless context
+
+          {
+            scan_context_id: context.id,
+            scan_context_name: context.name,
+            checks_in: context.checks_in,
+            is_airport: context.is_airport,
+            scan_count: context_scans.size,
+            first_scanned_at: context_scans.first&.scanned_at&.iso8601,
+            last_scanned_at: context_scans.last&.scanned_at&.iso8601
+          }
+        end
+      end
+
+      def headshot_url_for(participant)
+        return nil unless participant.headshot.attached?
+
+        path = Rails.application.routes.url_helpers.rails_storage_proxy_path(participant.headshot, only_path: true)
+        "#{request.protocol}#{request.host_with_port}#{path}"
+      rescue StandardError => e
+        Rails.logger.error("Failed to generate headshot URL: #{e.message}")
+        nil
       end
     end
   end

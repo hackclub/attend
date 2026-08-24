@@ -1,7 +1,11 @@
 class ScanRecorder
-  Result = Data.define(:scan, :outcome, :first_scanned_at) do
+  Result = Data.define(:scan, :outcome, :first_scanned_at, :deduplicated) do
     def first_scan_in_context?
       outcome == "scanned"
+    end
+
+    def deduplicated?
+      deduplicated
     end
   end
 
@@ -35,7 +39,8 @@ class ScanRecorder
       Result.new(
         scan: scan,
         outcome: first_scan ? "already_scanned" : "scanned",
-        first_scanned_at: first_scan&.scanned_at || scan.scanned_at
+        first_scanned_at: first_scan&.scanned_at || scan.scanned_at,
+        deduplicated: false
       )
     end
   rescue ActiveRecord::RecordNotUnique
@@ -58,7 +63,8 @@ class ScanRecorder
     Result.new(
       scan: scan,
       outcome: first_scan.id == scan.id ? "scanned" : "already_scanned",
-      first_scanned_at: first_scan.scanned_at
+      first_scanned_at: first_scan.scanned_at,
+      deduplicated: true
     )
   end
 end
