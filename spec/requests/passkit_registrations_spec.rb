@@ -9,11 +9,11 @@ RSpec.describe "Passkit device registrations", type: :request do
     )
   end
   let(:device_id) { SecureRandom.hex(16) }
-  let(:headers) { {"Authorization" => "ApplePass #{pass.authentication_token}"} }
+  let(:headers) { { "Authorization" => "ApplePass #{pass.authentication_token}" } }
 
   def register
     post "/passkit/api/v1/devices/#{device_id}/registrations/pass.com.hackclub.attend/#{pass.serial_number}",
-      params: {pushToken: "token-123"}.to_json,
+      params: { pushToken: "token-123" }.to_json,
       headers: headers.merge("CONTENT_TYPE" => "application/json")
   end
 
