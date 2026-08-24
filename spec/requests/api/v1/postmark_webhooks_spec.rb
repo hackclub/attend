@@ -167,6 +167,56 @@ RSpec.describe "Api::V1::PostmarkWebhooks", type: :request do
         expect(event.metadata["bounce_type"]).to eq("HardBounce")
         expect(event.metadata["description"]).to eq("The email account does not exist")
       end
+
+      it "flags matching participants and guardians as undeliverable on hard bounces" do
+        participant = create(:participant, email: email_log.to_address)
+        guardian = create(:guardian, email: email_log.to_address)
+
+        post api_v1_postmark_webhooks_path, params: payload.to_json, headers: headers
+
+        expect(participant.reload.email_undeliverable_at).to be_present
+        expect(guardian.reload.email_undeliverable_at).to be_present
+      end
+
+      it "does not flag recipients on soft bounces" do
+        participant = create(:participant, email: email_log.to_address)
+
+        post api_v1_postmark_webhooks_path,
+          params: payload.merge(Type: "SoftBounce").to_json,
+          headers: headers
+
+        expect(participant.reload.email_undeliverable_at).to be_nil
+      end
+    end
+
+    describe "SpamComplaint events" do
+      let(:payload) do
+        {
+          RecordType: "SpamComplaint",
+          MessageID: "msg-12345",
+          BouncedAt: "2024-12-22T10:30:00Z",
+          TypeCode: 512,
+          Description: "The subscriber explicitly marked this message as spam."
+        }
+      end
+
+      it "records a spam_complaint event and marks the log failed" do
+        expect {
+          post api_v1_postmark_webhooks_path, params: payload.to_json, headers: headers
+        }.to change(EmailLogEvent, :count).by(1)
+
+        email_log.reload
+        expect(email_log.status).to eq("failed")
+        expect(email_log.email_log_events.last.event_type).to eq("spam_complaint")
+      end
+
+      it "flags matching recipients as undeliverable" do
+        participant = create(:participant, email: email_log.to_address)
+
+        post api_v1_postmark_webhooks_path, params: payload.to_json, headers: headers
+
+        expect(participant.reload.email_undeliverable_at).to be_present
+      end
     end
 
     describe "Open events" do
@@ -260,7 +310,7 @@ RSpec.describe "Api::V1::PostmarkWebhooks", type: :request do
     describe "Unhandled events" do
       it "returns 200 OK for unhandled record types" do
         post api_v1_postmark_webhooks_path,
-          params: { RecordType: "SpamComplaint", MessageID: "msg-12345" }.to_json,
+          params: { RecordType: "SubscriptionChange", MessageID: "msg-12345" }.to_json,
           headers: headers
 
         expect(response).to have_http_status(:ok)

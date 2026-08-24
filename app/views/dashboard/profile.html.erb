@@ -38,6 +38,14 @@
           Public profile
         </a>
       <% end %>
+      <% if @passports.any? %>
+        <a href="#passport" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
+          <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 1.105-.895 2-2 2s-2-.895-2-2 .895-2 2-2 2 .895 2 2zm0 0h8m-3 0v3m0 3v.01M4 5h16a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V7a2 2 0 012-2z"/>
+          </svg>
+          Hack Club Passport
+        </a>
+      <% end %>
       <% if current_user.admin? %>
         <a href="#staff-settings" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
           <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -64,6 +72,31 @@
     </nav>
 
     <div class="min-w-0 space-y-10">
+      <% if @passports.any? %>
+        <section id="passport" class="scroll-mt-8">
+          <h2 class="border-b border-(--border-soft) pb-3 text-xl font-semibold text-(--text-strong)">Hack Club Passport</h2>
+          <p class="mt-3 text-sm text-(--text-muted)">Your passport identifies you when you check in at Hack Club events.</p>
+
+          <div class="mt-4 overflow-hidden rounded-2xl border border-(--border-card) bg-(--bg-elev)">
+            <dl class="divide-y divide-(--border-soft)">
+              <% @passports.each do |passport| %>
+                <div class="px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div>
+                    <dt class="font-mono text-sm font-semibold text-(--text-strong)"><%= passport.serial_number %></dt>
+                    <dd class="mt-1 text-sm text-(--text-muted)">Paired <%= passport.paired_at.strftime("%B %d, %Y") %></dd>
+                  </div>
+                  <% if passport.active? %>
+                    <span class="inline-flex w-fit rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Active</span>
+                  <% else %>
+                    <span class="inline-flex w-fit rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Revoked</span>
+                  <% end %>
+                </div>
+              <% end %>
+            </dl>
+          </div>
+        </section>
+      <% end %>
+
       <% if @participant %>
       <!-- Account -->
       <section id="account" class="scroll-mt-8">
@@ -374,6 +407,11 @@
             <a href="https://attend.hackclub.com/mcp" class="font-medium text-(--text-link) hover:underline">MCP</a>.
             They act as you, limited to the scopes you approved. Disconnecting one signs it out immediately.
           </p>
+          <p class="mt-2 text-sm text-(--text-muted)">
+            You can tighten a connection here at any time. Giving one <em>more</em> access — more events, or
+            turning anonymising off — means disconnecting it and connecting it again, so the change goes
+            back through the approval screen.
+          </p>
         <% else %>
           <p class="mt-3 text-sm text-(--text-muted)">
             MCP is only available to Attend staff, so these apps can no longer reach your
@@ -402,6 +440,72 @@
                             <span class="inline-flex rounded-md px-1.5 py-0.5 font-mono text-[11px] <%= sensitive ? "bg-(--warning)/15 text-(--warning)" : "bg-(--bg-elev-2) text-(--text-muted)" %>">
                               <%= scope %>
                             </span>
+                          <% end %>
+                        </div>
+                      <% end %>
+
+                      <dl class="mt-3 space-y-1 text-xs">
+                        <div class="flex flex-wrap gap-x-2">
+                          <dt class="text-(--text-muted)">Events</dt>
+                          <dd class="text-(--text)">
+                            <% if connection[:events].nil? %>
+                              Every event you can access
+                            <% else %>
+                              <%= connection[:events].map(&:name).to_sentence %>
+                            <% end %>
+                          </dd>
+                        </div>
+                        <div class="flex flex-wrap gap-x-2">
+                          <dt class="text-(--text-muted)">Anonymised</dt>
+                          <dd class="<%= connection[:anonymized] ? "text-(--success)" : "text-(--text)" %>">
+                            <% if connection[:anonymized] %>
+                              Yes — initials only, no contact details, read-only
+                            <% else %>
+                              No — full names and contact details
+                            <% end %>
+                          </dd>
+                        </div>
+                      </dl>
+
+                      <% if current_user.admin? %>
+                        <div class="mt-3 flex flex-wrap items-center gap-2">
+                          <% unless connection[:anonymized] %>
+                            <%= form_with url: update_dashboard_mcp_connection_path(connection[:application]), method: :patch, class: "contents" do |f| %>
+                              <%= f.hidden_field :mcp_anonymize, value: "1" %>
+                              <%= f.submit "Anonymise",
+                                  data: { turbo_confirm: "Anonymise #{connection[:application].name}? It will only see initials, lose access to emails, phone numbers and addresses, and become read-only. Undoing this means disconnecting and reconnecting it." },
+                                  class: "cursor-pointer rounded-lg border border-(--border-card) px-2.5 py-1 text-xs font-medium text-(--text) hover:bg-(--bg-elev-2) transition-colors" %>
+                            <% end %>
+                          <% end %>
+
+                          <% if connection[:scopable_events].many? || connection[:events].nil? && connection[:scopable_events].any? %>
+                            <details class="w-full">
+                              <summary class="inline-flex cursor-pointer rounded-lg border border-(--border-card) px-2.5 py-1 text-xs font-medium text-(--text) hover:bg-(--bg-elev-2) transition-colors">
+                                Limit to specific events
+                              </summary>
+                              <%= form_with url: update_dashboard_mcp_connection_path(connection[:application]), method: :patch, class: "mt-2 rounded-xl border border-(--border-card) bg-(--bg-elev-2) p-3" do |f| %>
+                                <%= f.hidden_field :event_scope, value: "selected" %>
+                                <p class="text-xs text-(--text-muted)">
+                                  Untick an event to take it away from this app. You can't add events back here.
+                                </p>
+                                <div class="mt-2 max-h-52 space-y-1 overflow-y-auto">
+                                  <% current_ids = connection[:events]&.map(&:id) %>
+                                  <% connection[:scopable_events].each do |event| %>
+                                    <label class="flex items-center gap-2 rounded-md px-1 py-1 text-xs text-(--text) hover:bg-(--bg-elev-3)">
+                                      <%= check_box_tag "mcp_event_ids[]", event.id, current_ids.nil? || current_ids.include?(event.id),
+                                            id: "mcp_event_#{connection[:application].id}_#{event.id}",
+                                            class: "size-3.5 accent-(--brand)" %>
+                                      <span><%= event.name %></span>
+                                      <% if event.starts_at %>
+                                        <span class="ml-auto text-[11px] text-(--text-muted)"><%= event.starts_at.strftime("%b %Y") %></span>
+                                      <% end %>
+                                    </label>
+                                  <% end %>
+                                </div>
+                                <%= f.submit "Save event limits",
+                                    class: "mt-2 cursor-pointer rounded-lg border border-(--border-card) px-2.5 py-1 text-xs font-medium text-(--text) hover:bg-(--bg-elev) transition-colors" %>
+                              <% end %>
+                            </details>
                           <% end %>
                         </div>
                       <% end %>

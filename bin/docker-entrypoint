@@ -1,5 +1,17 @@
 #!/bin/bash
 
+case "${PROCESS_TYPE-web}" in
+  web)
+    ;;
+  worker)
+    set -- ./bin/jobs
+    ;;
+  *)
+    echo "Unknown PROCESS_TYPE: ${PROCESS_TYPE}" >&2
+    exit 64
+    ;;
+esac
+
 echo "=== Docker Entrypoint Starting ==="
 echo "Command: $@"
 echo "RAILS_MASTER_KEY set: ${RAILS_MASTER_KEY:+yes}"

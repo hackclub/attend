@@ -1,0 +1,37 @@
+<% markers = series_map_markers(event_rows) %>
+<section class="bg-(--bg-elev) border border-(--border-card) rounded-lg overflow-hidden h-full flex flex-col">
+  <div class="px-4 py-3 border-b border-(--border)">
+    <h2 class="text-sm font-semibold text-(--text-strong)">Venue locations</h2>
+  </div>
+
+  <% if markers.empty? %>
+    <div class="px-4 py-10 text-center flex-1 flex flex-col items-center justify-center">
+      <svg class="w-6 h-6 text-(--text-muted) mb-3" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+      <p class="text-sm text-(--text-soft) max-w-xs">
+        None of these events has a venue location set yet, so there's nothing to plot. Add one in an event's settings.
+      </p>
+    </div>
+  <% else %>
+    <%# Markers travel as JSON rather than interpolated markup so an event name
+        is never parsed as HTML on its way onto the map. %>
+    <div class="p-3 flex-1 flex flex-col"
+         data-controller="series-map"
+         data-series-map-markers-value="<%= markers.to_json %>">
+      <div class="series-map flex-1 bg-(--bg-elev-2)" data-series-map-target="map" role="group" aria-label="Map of this series' event venues. Each venue is also listed, with the same details, in the Events list on this page."></div>
+    </div>
+
+    <%# Swatches come from the same ramp the markers do, so the legend cannot
+        drift from the map when the ramp is re-stepped. Both counts sit together:
+        how much is plotted and how much is missing is one fact, not two. %>
+    <div class="px-4 pb-3 -mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-(--text-soft)">
+      <span class="flex items-center gap-1.5">
+        <span class="series-marker-dot inline-block w-2 h-2" style="background: <%= series_blocked_fill(0.0) %>" aria-hidden="true"></span>
+        <span class="series-marker-dot inline-block w-3.5 h-3.5" style="background: <%= series_blocked_fill(1.0) %>" aria-hidden="true"></span>
+        Deeper and larger means more people still blocked
+      </span>
+      <span>
+        <%= pluralize(markers.length, "venue") %> plotted<% if dashboard.unmapped_events.any? %>, <%= pluralize(dashboard.unmapped_events.length, "event") %> with no location set<% end %>
+      </span>
+    </div>
+  <% end %>
+</section>

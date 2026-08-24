@@ -45,13 +45,26 @@
   --accent-strong: #d42f46;
   --accent-soft: rgba(236, 55, 80, 0.10);
   --accent-on: #ffffff;
+  /* The focus indicator colour. --accent everywhere it clears the 3:1
+   * non-text contrast floor of WCAG 1.4.11 against --bg-elev, lifted
+   * per-theme where it does not. Focus rules should read this token
+   * rather than --accent directly. */
+  --focus-ring: var(--accent); /* 4.02:1 on --bg-elev */
 
   /* states */
   --success: #33d6a6;
   --success-strong: #2ab890;
+  /* --success-strong / --warning-strong are fills, dots and bars, where the
+   * 3:1 non-text floor applies; several of them are under 4.5:1 on this
+   * theme's --bg-elev and must not be used for words. --success-text /
+   * --warning-text are the text-safe pair, same role split as
+   * --accent / --accent-fill. Every value below is >= 4.5:1 on its own
+   * theme's --bg-elev. */
+  --success-text: #047857; /* 5.48:1 on --bg-elev */
   --success-soft: rgba(51, 214, 166, 0.10);
   --warning: #ff8c37;
   --warning-strong: #f97316;
+  --warning-text: #c2410c; /* 5.18:1 on --bg-elev */
   --danger: #ec3750;
   --danger-strong: #d42f46;
   --info: #338eda;
@@ -91,6 +104,7 @@
   --accent-strong: #ff5670;
   --accent-soft: rgba(236, 55, 80, 0.16);
   --accent-on: #ffffff;
+  --focus-ring: var(--accent); /* 4.37:1 */
   /* --accent keeps the brand value, but #ffffff on it is only 4.02:1.
    * --accent-fill is the fill to use under --accent-on text: 4.89 / 6.15. */
   --accent-fill: #d42f46;
@@ -98,9 +112,11 @@
 
   --success: #33d6a6;
   --success-strong: #4ee2b4;
+  --success-text: #4ee2b4; /* 10.75:1 on --bg-elev */
   --success-soft: rgba(51, 214, 166, 0.14);
   --warning: #ff8c37;
   --warning-strong: #ffa55c;
+  --warning-text: #ffa55c; /* 9.02:1 on --bg-elev */
   --danger: #ff5670;
   --danger-strong: #ff7588;
   --info: #5aa4e6;
@@ -139,12 +155,15 @@
   --accent-strong: #b3082e;
   --accent-soft: rgba(210, 15, 57, 0.10);
   --accent-on: #ffffff;
+  --focus-ring: var(--accent); /* 5.43:1 */
 
   --success: #40a02b;
   --success-strong: #2f8020;
+  --success-text: #2f8020; /* 4.97:1 on --bg-elev */
   --success-soft: rgba(64, 160, 43, 0.12);
   --warning: #fe640b;
   --warning-strong: #df8e1d;
+  --warning-text: #96610f; /* 5.23:1 on --bg-elev */
   --danger: #d20f39;
   --danger-strong: #b3082e;
   --info: #1e66f5;
@@ -179,12 +198,15 @@
   --accent-strong: #ef9b9d;
   --accent-soft: rgba(231, 130, 132, 0.14);
   --accent-on: #303446;
+  --focus-ring: var(--accent); /* 3.57:1 */
 
   --success: #a6d189;
   --success-strong: #b9dfa0;
+  --success-text: #b9dfa0; /* 6.36:1 on --bg-elev */
   --success-soft: rgba(166, 209, 137, 0.14);
   --warning: #ef9f76;
   --warning-strong: #f2b48f;
+  --warning-text: #f2b48f; /* 5.27:1 on --bg-elev */
   --danger: #e78284;
   --danger-strong: #ef9b9d;
   --info: #8caaee;
@@ -219,12 +241,15 @@
   --accent-strong: #f0a5b0;
   --accent-soft: rgba(237, 135, 150, 0.14);
   --accent-on: #24273a;
+  --focus-ring: var(--accent); /* 4.54:1 */
 
   --success: #a6da95;
   --success-strong: #bce4ae;
+  --success-text: #bce4ae; /* 7.92:1 on --bg-elev */
   --success-soft: rgba(166, 218, 149, 0.14);
   --warning: #f5a97f;
   --warning-strong: #f7bc99;
+  --warning-text: #f7bc99; /* 6.72:1 on --bg-elev */
   --danger: #ed8796;
   --danger-strong: #f0a5b0;
   --info: #8aadf4;
@@ -259,12 +284,15 @@
   --accent-strong: #f7a6bd;
   --accent-soft: rgba(243, 139, 168, 0.14);
   --accent-on: #1e1e2e;
+  --focus-ring: var(--accent); /* 5.43:1 */
 
   --success: #a6e3a1;
   --success-strong: #bdebb9;
+  --success-text: #bdebb9; /* 9.43:1 on --bg-elev */
   --success-soft: rgba(166, 227, 161, 0.14);
   --warning: #fab387;
   --warning-strong: #fbc4a0;
+  --warning-text: #fbc4a0; /* 8.09:1 on --bg-elev */
   --danger: #f38ba8;
   --danger-strong: #f7a6bd;
   --info: #89b4fa;
@@ -299,12 +327,15 @@
   --accent-strong: #ff92d3;
   --accent-soft: rgba(255, 121, 198, 0.14);
   --accent-on: #282a36;
+  --focus-ring: var(--accent); /* 4.94:1 */
 
   --success: #50fa7b;
   --success-strong: #6dfb91;
+  --success-text: #6dfb91; /* 8.90:1 on --bg-elev */
   --success-soft: rgba(80, 250, 123, 0.14);
   --warning: #ffb86c;
   --warning-strong: #ffc78a;
+  --warning-text: #ffc78a; /* 7.74:1 on --bg-elev */
   --danger: #ff5555;
   --danger-strong: #ff7474;
   --info: #8be9fd;
@@ -339,12 +370,15 @@
   --accent-strong: #9fcedb;
   --accent-soft: rgba(136, 192, 208, 0.14);
   --accent-on: #2e3440;
+  --focus-ring: var(--accent); /* 5.03:1 */
 
   --success: #a3be8c;
   --success-strong: #b6ce9f;
+  --success-text: #b6ce9f; /* 5.90:1 on --bg-elev */
   --success-soft: rgba(163, 190, 140, 0.14);
   --warning: #d08770;
   --warning-strong: #db9d85;
+  --warning-text: #ebcb8b; /* 6.44:1 on --bg-elev */
   --danger: #bf616a;
   --danger-strong: #cc7a82;
   --info: #81a1c1;
@@ -379,6 +413,7 @@
   --accent-strong: #e75452;
   --accent-soft: rgba(220, 50, 47, 0.14);
   --accent-on: #fdf6e3;
+  --focus-ring: #e25350; /* 3.46:1 — plain --accent (#dc322f) is only 2.81:1 here */
   /* solarized red under solarized base3 is 4.29:1 — one step deeper clears
    * AA (4.91 / 5.80) while staying inside the palette's red. */
   --accent-fill: #cb2e2b;
@@ -386,9 +421,11 @@
 
   --success: #859900;
   --success-strong: #a3bd00;
+  --success-text: #a3bd00; /* 6.09:1 on --bg-elev */
   --success-soft: rgba(133, 153, 0, 0.16);
   --warning: #cb4b16;
   --warning-strong: #d56230;
+  --warning-text: #e8974a; /* 5.54:1 on --bg-elev */
   --danger: #dc322f;
   --danger-strong: #e75452;
   --info: #268bd2;

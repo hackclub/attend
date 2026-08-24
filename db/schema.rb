@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -518,6 +518,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_120000) do
     t.text "country"
     t.datetime "created_at", null: false
     t.string "email", null: false
+    t.datetime "email_undeliverable_at"
     t.string "legal_first_name", null: false
     t.string "legal_last_name", null: false
     t.text "phone"
@@ -704,6 +705,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_120000) do
     t.index ["token"], name: "index_invitations_on_token", unique: true
   end
 
+  create_table "mcp_connection_events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "event_id", null: false
+    t.uuid "mcp_connection_setting_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["event_id"], name: "index_mcp_connection_events_on_event_id"
+    t.index ["mcp_connection_setting_id", "event_id"], name: "index_mcp_connection_events_on_setting_and_event", unique: true
+  end
+
+  create_table "mcp_connection_settings", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.boolean "all_events", default: true, null: false
+    t.boolean "anonymize", default: false, null: false
+    t.datetime "anonymize_enabled_at"
+    t.string "anonymize_enabled_by", comment: "consent | dashboard | mcp"
+    t.bigint "application_id", null: false
+    t.datetime "created_at", null: false
+    t.string "resource_owner_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["application_id", "resource_owner_id"], name: "index_mcp_connection_settings_on_application_and_owner", unique: true
+  end
+
   create_table "medicals", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.text "additional_notes"
     t.text "allergies"
@@ -837,6 +859,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_120000) do
     t.datetime "created_at", null: false
     t.date "date_of_birth"
     t.string "email", null: false
+    t.datetime "email_undeliverable_at"
     t.text "engagement_notes"
     t.string "engagement_preference"
     t.string "legal_first_name", null: false
@@ -906,6 +929,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_120000) do
     t.datetime "updated_at", null: false
     t.index ["passkit_device_id"], name: "index_passkit_registrations_on_passkit_device_id"
     t.index ["passkit_pass_id"], name: "index_passkit_registrations_on_passkit_pass_id"
+  end
+
+  create_table "passports", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "paired_at"
+    t.uuid "paired_by_id"
+    t.datetime "revoked_at"
+    t.uuid "revoked_by_id"
+    t.string "serial_number", null: false
+    t.uuid "token", default: -> { "gen_random_uuid()" }, null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["paired_by_id"], name: "index_passports_on_paired_by_id"
+    t.index ["revoked_by_id"], name: "index_passports_on_revoked_by_id"
+    t.index ["serial_number"], name: "index_passports_on_serial_number", unique: true
+    t.index ["token"], name: "index_passports_on_token", unique: true
+    t.index ["user_id"], name: "index_passports_on_user_id"
   end
 
   create_table "push_tokens", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1328,6 +1368,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_120000) do
   add_foreign_key "incidents", "participant_events"
   add_foreign_key "incidents", "users", column: "reported_by_user_id"
   add_foreign_key "invitations", "events"
+  add_foreign_key "mcp_connection_events", "events"
+  add_foreign_key "mcp_connection_events", "mcp_connection_settings"
+  add_foreign_key "mcp_connection_settings", "toolchest_oauth_applications", column: "application_id"
   add_foreign_key "medicals", "participant_events"
   add_foreign_key "medicals", "users", column: "last_updated_by_user_id"
   add_foreign_key "message_deliveries", "guardians"
@@ -1345,6 +1388,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_120000) do
   add_foreign_key "participant_events", "users", column: "nfc_badge_assigned_by_id"
   add_foreign_key "participant_events", "users", column: "um_verified_by_id"
   add_foreign_key "participants", "users"
+  add_foreign_key "passports", "users"
+  add_foreign_key "passports", "users", column: "paired_by_id"
+  add_foreign_key "passports", "users", column: "revoked_by_id"
   add_foreign_key "push_tokens", "users"
   add_foreign_key "room_assignments", "participant_events"
   add_foreign_key "room_assignments", "rooms"

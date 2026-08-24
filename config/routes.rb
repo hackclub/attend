@@ -83,6 +83,7 @@ Rails.application.routes.draw do
   patch "dashboard/staff_profile", to: "dashboard#update_staff_profile", as: :dashboard_staff_profile
   delete "dashboard/staff_profile/avatar", to: "dashboard#destroy_staff_avatar", as: :dashboard_staff_profile_avatar
   delete "dashboard/mcp_connections/:id", to: "dashboard#revoke_mcp_connection", as: :dashboard_mcp_connection
+  patch "dashboard/mcp_connections/:id", to: "dashboard#update_mcp_connection", as: :update_dashboard_mcp_connection
   post "theme", to: "themes#update", as: :update_theme
   get "dashboard/events/:id", to: "dashboard#show", as: :dashboard_event
   get "dashboard/events/:id/google_wallet", to: "dashboard#google_wallet", as: :dashboard_google_wallet
@@ -272,6 +273,7 @@ Rails.application.routes.draw do
         get :preferences
         post :link_preference
         delete :unlink_preference
+        post :manual_assign
         post :auto_assign
         get :assignments
         post :move_assignment
@@ -307,6 +309,9 @@ Rails.application.routes.draw do
 
     resources :users, only: [ :index, :show, :new, :create, :edit, :update ] do
       resource :impersonation, only: [ :create ]
+      resources :passports, only: [ :create, :destroy ] do
+        post :confirm, on: :member
+      end
     end
 
     resources :bans do

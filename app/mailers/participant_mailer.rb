@@ -26,7 +26,7 @@ class ParticipantMailer < ApplicationMailer
       to: participant&.email || email,
       from: "Hack Club #{@event_name} <#{@support_email}>",
       subject: "Complete your attendee information for #{@event_name}",
-      reply_to: "attend@hackclub.com"
+      reply_to: @support_email
     )
   end
 

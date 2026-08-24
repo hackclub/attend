@@ -9,6 +9,63 @@ RSpec.describe "Api::V1::Scans", type: :request do
     { "Authorization" => "Bearer #{mobile_token.token}" }
   end
 
+  describe "POST /api/v1/events/:event_id/scans" do
+    let(:participant_event) { create(:participant_event, event: event) }
+    let(:scan_context) { event.scan_contexts.find_by!(checks_in: true) }
+
+    {
+      "a bare participant ID" => ->(pe) { pe.participant.id },
+      "a bare participant event ID" => ->(pe) { pe.id },
+      "an Apple Wallet participant deep link" => ->(pe) { "attend://checkin/#{pe.participant.id}" },
+      "a participant event deep link" => ->(pe) { "attend://checkin/#{pe.id}" }
+    }.each do |description, identifier|
+      it "accepts #{description}" do
+        expect {
+          post "/api/v1/events/#{event.id}/scans", params: {
+            participant_id: identifier.call(participant_event),
+            scan_context_id: scan_context.id
+          }, headers: auth_headers, as: :json
+        }.to change { participant_event.scans.count }.by(1)
+
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body.dig("participant", "participant_event_id")).to eq(participant_event.id)
+      end
+    end
+
+    it "accepts an active passport when event badge issuance is disabled" do
+      event.update!(nfc_badges_enabled: false)
+      owner = create(:user)
+      participant = create(:participant, user: owner)
+      participation = create(:participant_event, event: event, participant: participant)
+      passport = create(:passport, :active, user: owner)
+
+      expect {
+        post "/api/v1/events/#{event.id}/scans",
+          params: { badge_token: passport.token, scan_context_id: scan_context.id },
+          headers: auth_headers,
+          as: :json
+      }.to change { participation.scans.count }.by(1)
+
+      expect(response).to have_http_status(:ok)
+      expect(participation.scans.last.source).to eq("nfc")
+    end
+
+    it "rejects a passport whose owner is not participating in the selected event" do
+      owner = create(:user)
+      participant = create(:participant, user: owner)
+      other_participation = create(:participant_event, participant: participant)
+      passport = create(:passport, :active, user: owner)
+
+      post "/api/v1/events/#{event.id}/scans",
+        params: { badge_token: passport.token, scan_context_id: scan_context.id },
+        headers: auth_headers,
+        as: :json
+
+      expect(response).to have_http_status(:not_found)
+      expect(other_participation.scans).to be_empty
+    end
+  end
+
   describe "GET /api/v1/events/:event_id/scans with since" do
     it "caps the response and marks it resumable" do
       stub_const("Api::V1::ScansController::SINCE_SYNC_LIMIT", 3)

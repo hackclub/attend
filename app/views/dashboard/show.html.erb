@@ -162,7 +162,9 @@
               <% end %>
             </div>
             <p class="text-xs text-[#8492a6] uppercase tracking-wide mb-2">Scan to Check In</p>
-            <div class="bg-white p-2 rounded-lg shadow-sm border border-[#e0e6ed]">
+            <%# literal white, not bg-white — themes.css remaps --color-white to the theme
+    surface, which would put black QR modules on a dark tile %>
+            <div class="bg-[#ffffff] p-2 rounded-lg shadow-sm border border-[#e0e6ed]">
               <%= qr_code_svg(attend_deep_link(@participant_event.participant_id), size: 100) %>
             </div>
             <p class="text-xs text-[#8492a6] mt-2 font-mono"><%= @participant_event.participant_id[0..7].upcase %></p>
@@ -184,8 +186,10 @@
           Save your pass for easy access
         </p>
         <div class="flex flex-wrap gap-2 items-center">
-          <%= link_to wallet_pass_url(@participant_event), class: "inline-flex items-center hover:opacity-80 transition-opacity" do %>
-            <img src="/add-to-apple-wallet.svg" alt="Add to Apple Wallet" class="h-11">
+          <% if (apple_wallet_url = wallet_pass_url(@participant_event)) %>
+            <%= link_to apple_wallet_url, class: "inline-flex items-center hover:opacity-80 transition-opacity" do %>
+              <img src="/add-to-apple-wallet.svg" alt="Add to Apple Wallet" class="h-11">
+            <% end %>
           <% end %>
           <button
             id="google-wallet-btn"

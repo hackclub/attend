@@ -2,6 +2,7 @@ class Participant < ApplicationRecord
   include WalletPassUpdatable
   include DecodableImageAttachment
   include TravelCalendarCacheInvalidatable
+  include EmailDeliverability
 
   has_paper_trail
 

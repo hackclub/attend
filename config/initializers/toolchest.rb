@@ -4,7 +4,7 @@ Toolchest.configure do |config|
   config.server_instructions = <<~INSTRUCTIONS.squish
     You are acting on behalf of an Attend staff user. Attend manages events and their
     participants, travel, accommodation, rooming, groups, messaging, incidents, and
-    safeguarding. Most data is scoped to a single event: call events_list to discover
+    safeguarding. Most data is scoped to a single event: call events_index to discover
     events and use the event_id (or slug) the user is working in. Participants are people
     registered for an event; a participant_event is one person's registration for one
     event. Medical, safeguarding, and incident data is sensitive and only visible to users
@@ -12,6 +12,12 @@ Toolchest.configure do |config|
     retrying. Prefer the read tools to orient yourself before making any changes. To port a
     rooming sheet, call rooming_overview first to map names to participant_event_ids and see
     existing rooms, then rooming_bulk_assign (it can create rooms by name as it fills them).
+    A connection can also be restricted by the user who created it: scoped to specific
+    events, and/or anonymized so names arrive as initials with emails, phone numbers and
+    addresses stripped and every write refused. Call me_show to see which restrictions
+    apply; relay those limits plainly instead of working around them. me_anonymize turns
+    anonymization on for this connection and can never turn it off — only offer it when the
+    user asks to work without personal data.
     When you tell a human about a record, give them its link, not its ID: read tools return a
     `url` on the records they serialize, links_participant turns a participant_id into every
     link that exists for that person, and links_patterns has the URL templates for anything

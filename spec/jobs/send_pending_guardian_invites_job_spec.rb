@@ -78,7 +78,7 @@ RSpec.describe SendPendingGuardianInvitesJob do
 
   describe "guardian invites" do
     def invitation_for(gpe)
-      have_enqueued_job(ActionMailer::MailDeliveryJob)
+      have_enqueued_job(ActionMailer::Base.delivery_job)
         .with("GuardianMailer", "invitation", "deliver_now", args: [ { guardian_participant_event: gpe } ])
     end
 
@@ -125,7 +125,18 @@ RSpec.describe SendPendingGuardianInvitesJob do
 
       expect {
         described_class.perform_now(event.id)
-      }.not_to have_enqueued_job(ActionMailer::MailDeliveryJob)
+      }.not_to have_enqueued_job(ActionMailer::Base.delivery_job)
+    end
+
+    it "skips guardians whose email is known-undeliverable" do
+      pe = submitted_minor_pe
+      gpe = create(:guardian_participant_event, :never_sent, participant_event: pe)
+      gpe.guardian.update!(email_undeliverable_at: Time.current)
+      create(:consent, :signed, participant_event: pe)
+
+      expect {
+        described_class.perform_now(event.id)
+      }.not_to have_enqueued_job(ActionMailer::Base.delivery_job)
     end
 
     it "does not re-invite unopened invites still inside their validity window" do
@@ -135,7 +146,7 @@ RSpec.describe SendPendingGuardianInvitesJob do
 
       expect {
         described_class.perform_now(event.id)
-      }.not_to have_enqueued_job(ActionMailer::MailDeliveryJob)
+      }.not_to have_enqueued_job(ActionMailer::Base.delivery_job)
     end
   end
 end

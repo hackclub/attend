@@ -108,7 +108,7 @@ RSpec.describe "Onboarding documents step", type: :request do
         post complete_onboarding_path(event_id: event.id), params: {
           code_of_conduct_accepted: "1", code_of_conduct_signature: "Milo Minorson"
         }
-      }.to have_enqueued_job(ActionMailer::MailDeliveryJob)
+      }.to have_enqueued_job(ActionMailer::Base.delivery_job)
         .with("GuardianMailer", "invitation", "deliver_now", args: [ { guardian_participant_event: gpe } ])
 
       expect(response).to redirect_to(dashboard_path)
