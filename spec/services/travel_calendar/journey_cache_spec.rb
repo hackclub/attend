@@ -82,6 +82,46 @@ RSpec.describe TravelCalendar::JourneyCache do
     expect(described_class.fetch(event)).to be_empty
   end
 
+  it "invalidates once without resolving child event ids during a registration destroy cascade" do
+    inbound = create_travel(arrival_time: Time.utc(2026, 8, 24, 10))
+    outbound = create_travel(participant_event: participant_event, direction: "outbound", departure_time: Time.utc(2026, 8, 25, 10))
+    [ inbound, outbound ].each do |travel|
+      2.times do |position|
+        travel.travel_legs.create!(position: position)
+      end
+    end
+    check_in = event.scan_contexts.find_by!(checks_in: true)
+    user = create(:user)
+    2.times do
+      participant_event.scans.create!(scan_context: check_in, user: user, scanned_at: Time.current)
+    end
+    2.times do |index|
+      group = create(:group, event: event, name: "Cascade group #{index}")
+      create(:group_membership, group: group, participant_event: participant_event)
+    end
+    expect(described_class.fetch(event).size).to eq(2)
+
+    cache_deletes = []
+    event_id_queries = []
+    cache_subscriber = lambda do |*, payload|
+      cache_deletes << payload[:key]
+    end
+    sql_subscriber = lambda do |*, payload|
+      sql = payload[:sql]
+      event_id_queries << sql if sql.include?('SELECT DISTINCT "participant_events"."event_id"')
+    end
+
+    ActiveSupport::Notifications.subscribed(cache_subscriber, "cache_delete.active_support") do
+      ActiveSupport::Notifications.subscribed(sql_subscriber, "sql.active_record") do
+        participant_event.destroy!
+      end
+    end
+
+    expect(cache_deletes.count("travel_calendar/#{event.id}/journeys/v1")).to eq(1)
+    expect(event_id_queries).to be_empty
+    expect(described_class.fetch(event)).to be_empty
+  end
+
   it "refreshes participant names in every event with a bounded event-id query" do
     events = 3.times.map { |index| create(:event, name: "Cache event #{index}") }
     travels = events.map do |registered_event|

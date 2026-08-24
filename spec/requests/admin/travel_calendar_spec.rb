@@ -256,6 +256,24 @@ RSpec.describe "Admin::TravelCalendar", type: :request do
       expect(query).not_to include("tab", "group_id")
     end
 
+    it "preserves blank canonical keys when legacy keys conflict" do
+      get "/admin/events/#{event.slug}/airport_mode", params: {
+        tab: "outbound",
+        direction: "",
+        group_id: "legacy-group",
+        group: "",
+        search: "alex"
+      }
+
+      query = Rack::Utils.parse_query(URI.parse(response.location).query)
+      expect(query).to include(
+        "direction" => "",
+        "group" => "",
+        "search" => "alex"
+      )
+      expect(query).not_to include("tab", "group_id")
+    end
+
     it "marks the sidebar link active only on the canonical travel calendar path" do
       get admin_event_travel_path(event)
 

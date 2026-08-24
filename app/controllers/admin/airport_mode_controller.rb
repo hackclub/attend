@@ -7,8 +7,8 @@ module Admin
       query = request.query_parameters.to_h
       legacy_direction = query.delete("tab")
       legacy_group = query.delete("group_id")
-      query["direction"] = legacy_direction if query["direction"].blank? && legacy_direction.present?
-      query["group"] = legacy_group if query["group"].blank? && legacy_group.present?
+      query["direction"] = legacy_direction if !query.key?("direction") && legacy_direction.present?
+      query["group"] = legacy_group if !query.key?("group") && legacy_group.present?
 
       redirect_to admin_event_travel_path(current_event, query)
     end

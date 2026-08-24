@@ -94,7 +94,12 @@ function buildController() {
     modeTarget: select("plane", ["", "plane", "train", "bus"]),
     pickupTarget: select("awaiting_pickup", ["", "awaiting_pickup", "collected", "checked_in", "pickup_not_needed"]),
     groupTarget: select("group-two", ["", "group-one", "group-two", "group-three"]),
+    hasSearchTarget: true,
+    hasDirectionTarget: true,
+    hasModeTarget: true,
+    hasPickupTarget: true,
     hasGroupTarget: true,
+    hasEmptyTarget: true,
     emptyTarget: trackedEmptyState()
   })
   controller.searchTarget.focus = () => { focused = true }
@@ -161,6 +166,21 @@ test("connect ignores unavailable select values and exposes query no-results sta
   assert.equal(controller.dayTargets[1].hidden, true)
   assert.equal(controller.dayTargets[1].count.textContent, "0 journeys")
   assert.equal(controller.emptyTarget.hidden, false)
+})
+
+test("connect is inert on an empty calendar without filter targets", () => {
+  const controller = new TravelCalendarFilterController()
+  let applyCalls = 0
+  Object.assign(controller, {
+    hasSearchTarget: false,
+    apply() {
+      applyCalls += 1
+    }
+  })
+  globalThis.window = { location: { search: "?direction=inbound&search=alex" } }
+
+  assert.doesNotThrow(() => controller.connect())
+  assert.equal(applyCalls, 0)
 })
 
 test("apply combines every active predicate and hides empty days", () => {

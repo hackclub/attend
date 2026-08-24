@@ -4,6 +4,8 @@ export default class extends Controller {
   static targets = ["entry", "day", "count", "search", "direction", "mode", "pickup", "group", "empty"]
 
   connect() {
+    if (!this.hasSearchTarget || !this.hasDirectionTarget || !this.hasModeTarget || !this.hasPickupTarget || !this.hasEmptyTarget) return
+
     const query = new URLSearchParams(window.location.search)
 
     this.searchTarget.value = query.get("search") || ""
