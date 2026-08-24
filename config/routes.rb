@@ -311,6 +311,9 @@ Rails.application.routes.draw do
 
     resources :users, only: [ :index, :show, :new, :create, :edit, :update ] do
       resource :impersonation, only: [ :create ]
+      resources :passports, only: [ :create, :destroy ] do
+        post :confirm, on: :member
+      end
     end
 
     resources :bans do

@@ -4,7 +4,7 @@ RSpec.describe "Admin::Scans", type: :request do
   include Devise::Test::IntegrationHelpers
 
   let(:admin) { create(:user, global_role: "global_admin") }
-  let(:event) { create(:event) }
+  let(:event) { create(:event, nfc_badges_enabled: false) }
   let(:participant_event) { create(:participant_event, event: event) }
   let(:scan_context) { event.scan_contexts.find_by!(checks_in: true) }
 
@@ -29,5 +29,54 @@ RSpec.describe "Admin::Scans", type: :request do
         expect(response.parsed_body.dig("participant", "participant_event_id")).to eq(participant_event.id)
       end
     end
+
+    it "accepts an active passport when event badge issuance is disabled" do
+      owner = create(:user)
+      participant = create(:participant, user: owner)
+      participation = create(:participant_event, event: event, participant: participant)
+      passport = create(:passport, :active, user: owner)
+
+      expect {
+        post admin_event_scans_path(event), params: {
+          badge_token: passport.token,
+          scan_context_id: scan_context.id
+        }, as: :json
+      }.to change { participation.scans.count }.by(1)
+
+      expect(response).to have_http_status(:ok)
+      expect(participation.scans.last.source).to eq("nfc")
+    end
+
+    it "rejects a revoked passport" do
+      owner = create(:user)
+      participant = create(:participant, user: owner)
+      participation = create(:participant_event, event: event, participant: participant)
+      passport = create(:passport, :revoked, user: owner)
+
+      post admin_event_scans_path(event), params: {
+        badge_token: passport.token,
+        scan_context_id: scan_context.id
+      }, as: :json
+
+      expect(response).to have_http_status(:not_found)
+      expect(participation.scans).to be_empty
+    end
+  end
+
+  it "shows NFC reading but hides writing when issuance is disabled" do
+    get scanner_admin_event_scans_path(event)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("NFC Scanner")
+    expect(response.body).not_to include('id="nfc-write-panel"', 'id="modal-write-nfc-btn"')
+  end
+
+  it "shows NFC writing when issuance is enabled" do
+    event.update!(nfc_badges_enabled: true)
+
+    get scanner_admin_event_scans_path(event)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("NFC Scanner", 'id="nfc-write-panel"', 'id="modal-write-nfc-btn"')
   end
 end

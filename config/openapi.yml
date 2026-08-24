@@ -553,9 +553,11 @@ paths:
       description: >-
         Record a QR / NFC / manual scan for a participant. Pass `client_scan_id`
         for idempotency — a repeat returns the existing scan with
-        `deduplicated: true`. The participant is identified by `badge_token`, or
-        by `participant_id` (matched as a participant_event id first, then a
-        participant id).
+        `deduplicated: true`. `badge_token` accepts either an assigned NFC badge
+        belonging to the selected event or an active Hack Club passport. Passport
+        scans work regardless of the event's NFC badge issuance setting. The
+        participant can also be identified by `participant_id` (matched as a
+        participant_event id first, then a participant id).
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
       requestBody:
@@ -774,7 +776,7 @@ paths:
     post:
       tags: [NFC Badges]
       summary: Ensure an NFC badge token
-      description: Create a badge token for the participant if one does not exist.
+      description: Create an event-scoped badge token for the participant if one does not exist.
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
         - $ref: "#/components/parameters/ParticipantEventId"

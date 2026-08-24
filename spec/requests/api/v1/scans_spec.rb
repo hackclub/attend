@@ -31,6 +31,39 @@ RSpec.describe "Api::V1::Scans", type: :request do
         expect(response.parsed_body.dig("participant", "participant_event_id")).to eq(participant_event.id)
       end
     end
+
+    it "accepts an active passport when event badge issuance is disabled" do
+      event.update!(nfc_badges_enabled: false)
+      owner = create(:user)
+      participant = create(:participant, user: owner)
+      participation = create(:participant_event, event: event, participant: participant)
+      passport = create(:passport, :active, user: owner)
+
+      expect {
+        post "/api/v1/events/#{event.id}/scans",
+          params: { badge_token: passport.token, scan_context_id: scan_context.id },
+          headers: auth_headers,
+          as: :json
+      }.to change { participation.scans.count }.by(1)
+
+      expect(response).to have_http_status(:ok)
+      expect(participation.scans.last.source).to eq("nfc")
+    end
+
+    it "rejects a passport whose owner is not participating in the selected event" do
+      owner = create(:user)
+      participant = create(:participant, user: owner)
+      other_participation = create(:participant_event, participant: participant)
+      passport = create(:passport, :active, user: owner)
+
+      post "/api/v1/events/#{event.id}/scans",
+        params: { badge_token: passport.token, scan_context_id: scan_context.id },
+        headers: auth_headers,
+        as: :json
+
+      expect(response).to have_http_status(:not_found)
+      expect(other_participation.scans).to be_empty
+    end
   end
 
   describe "GET /api/v1/events/:event_id/scans with since" do

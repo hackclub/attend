@@ -14,7 +14,7 @@
       <%= link_to admin_event_scans_path(current_event), class: "text-sm text-[#ec3750] hover:text-blue-800" do %>← Check Ins<% end %>
       <h1 class="text-xl sm:text-2xl font-bold">Scanner</h1>
     </div>
-    <span class="text-xs sm:text-sm text-gray-500 hidden sm:block">Check in participants by scanning QR codes<%= " or NFC badges" if current_event.nfc_badges_enabled? %></span>
+    <span class="text-xs sm:text-sm text-gray-500 hidden sm:block">Check in participants by scanning QR codes or NFC tokens</span>
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -89,9 +89,8 @@
         </form>
       </div>
 
-      <% if current_event.nfc_badges_enabled? %>
-        <!-- NFC Scanner (via macOS bridge) -->
-        <div class="mt-4 pt-4 border-t border-gray-200" id="nfc-scanner-section">
+      <!-- NFC Scanner (via macOS bridge) -->
+      <div class="mt-4 pt-4 border-t border-gray-200" id="nfc-scanner-section">
           <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-2">
               <p class="text-sm font-medium text-gray-700">NFC Scanner</p>
@@ -105,10 +104,11 @@
             </button>
           </div>
           <p class="text-xs text-gray-500 mb-3">
-            Connect to the Attend NFC Bridge app to scan NFC badges. 
+            Connect to the Attend NFC Bridge app to scan NFC badges or passports.
             <a href="https://github.com/hackclub/attend-nfc" target="_blank" class="text-[#ec3750] hover:underline">Download bridge app →</a>
           </p>
           
+          <% if current_event.nfc_badges_enabled? %>
           <!-- NFC Write Panel (shown after QR scan) -->
           <div id="nfc-write-panel" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-4 mt-3">
             <div class="flex items-center justify-between mb-2">
@@ -120,8 +120,8 @@
             </p>
             <div id="nfc-write-status" class="text-xs text-[#ec3750]">Waiting for badge...</div>
           </div>
-        </div>
-      <% end %>
+          <% end %>
+      </div>
     </div>
 
     <!-- Recent Scans -->
@@ -796,17 +796,14 @@ document.querySelectorAll('[data-close-participant-modal]').forEach((el) => {
   el.addEventListener('click', closeModal);
 });
 
-// triggerNfcWriteFromModal is defined further down, inside the NFC block that
-// only renders when the event has badges enabled — so bind at click time.
+// Bind at click time so the bridge can connect after the page loads.
 document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => {
   triggerNfcWriteFromModal();
 });
 
 // NFC Bridge Integration
-<% if current_event.nfc_badges_enabled? %>
 (function() {
-  const nfcEnabled = true;
-  const nfcWriteOnCheckin = <%= current_event.nfc_badge_write_on_checkin_enabled? %>;
+  const nfcWriteOnCheckin = <%= current_event.nfc_badges_enabled? && current_event.nfc_badge_write_on_checkin_enabled? %>;
   const eventId = '<%= current_event.id %>';
   const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
   
@@ -882,7 +879,6 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
   }
   
   function handleNfcMessage(data) {
-    console.log('NFC message:', data.type, data);
     switch (data.type) {
       case 'tag_read':
         handleNfcTagRead(data.tag);
@@ -897,8 +893,6 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
   }
   
   function handleNfcTagRead(tag) {
-    console.log('NFC tag read:', tag, 'pendingWriteData:', pendingWriteData);
-    
     // If we're in write mode (waiting for write or verifying), don't process as normal scan
     if (pendingWriteData) {
       if (pendingWriteData.verifying) {
@@ -1052,5 +1046,4 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
   // Auto-connect on page load
   setTimeout(connectNfcBridge, 1000);
 })();
-<% end %>
 </script>

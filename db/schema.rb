@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_130002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -929,6 +929,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_130000) do
     t.index ["passkit_pass_id"], name: "index_passkit_registrations_on_passkit_pass_id"
   end
 
+  create_table "passports", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "paired_at"
+    t.uuid "paired_by_id"
+    t.datetime "revoked_at"
+    t.uuid "revoked_by_id"
+    t.string "serial_number", null: false
+    t.uuid "token", default: -> { "gen_random_uuid()" }, null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["paired_by_id"], name: "index_passports_on_paired_by_id"
+    t.index ["revoked_by_id"], name: "index_passports_on_revoked_by_id"
+    t.index ["serial_number"], name: "index_passports_on_serial_number", unique: true
+    t.index ["token"], name: "index_passports_on_token", unique: true
+    t.index ["user_id"], name: "index_passports_on_user_id"
+  end
+
   create_table "push_tokens", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "platform"
@@ -1369,6 +1386,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_130000) do
   add_foreign_key "participant_events", "users", column: "nfc_badge_assigned_by_id"
   add_foreign_key "participant_events", "users", column: "um_verified_by_id"
   add_foreign_key "participants", "users"
+  add_foreign_key "passports", "users"
+  add_foreign_key "passports", "users", column: "paired_by_id"
+  add_foreign_key "passports", "users", column: "revoked_by_id"
   add_foreign_key "push_tokens", "users"
   add_foreign_key "room_assignments", "participant_events"
   add_foreign_key "room_assignments", "rooms"
