@@ -15,8 +15,8 @@ class Scan < ApplicationRecord
   scope :for_event, ->(event) { joins(:participant_event).where(participant_events: { event_id: event.id }) }
   scope :today, -> { where(scanned_at: Time.current.beginning_of_day..Time.current.end_of_day) }
   scope :for_check_in, -> { joins(:scan_context).where(scan_contexts: { checks_in: true }) }
-  scope :for_airport, -> { joins(:scan_context).where(scan_contexts: { is_airport: true }) }
-  scope :for_airport_or_check_in, -> { joins(:scan_context).where(scan_contexts: { is_airport: true }).or(joins(:scan_context).where(scan_contexts: { checks_in: true })) }
+  scope :for_airport, -> { joins(:scan_context).where(scan_contexts: { is_travel_pickup: true }) }
+  scope :for_airport_or_check_in, -> { joins(:scan_context).where(scan_contexts: { is_travel_pickup: true }).or(joins(:scan_context).where(scan_contexts: { checks_in: true })) }
   scope :for_context, ->(context) { where(scan_context: context) }
 
   after_create_commit :broadcast_scan

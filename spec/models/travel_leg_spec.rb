@@ -18,10 +18,12 @@ RSpec.describe TravelLeg, type: :model do
       leg.mark_travel_picked_up!(user)
       expect(leg.reload.travel_picked_up_at).to be_present
       expect(leg.picked_up_by).to eq(user)
+      expect(leg).to be_travel_picked_up
 
       leg.unmark_travel_picked_up!
       expect(leg.reload.travel_picked_up_at).to be_nil
       expect(leg.picked_up_by).to be_nil
+      expect(leg).not_to be_travel_picked_up
     end
   end
 
