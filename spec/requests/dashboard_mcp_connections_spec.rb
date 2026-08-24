@@ -6,7 +6,9 @@ require "rails_helper"
 RSpec.describe "Dashboard MCP connections", type: :request do
   include Devise::Test::IntegrationHelpers
 
-  let(:user) { create(:user) }
+  # The Connections section is staff-only (non-staff only see it to clean up a
+  # connection made before they lost the role).
+  let(:user) { create(:user, global_role: "global_admin") }
   let!(:participant) { create(:participant, user: user) }
 
   let(:application) do

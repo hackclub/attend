@@ -47,12 +47,14 @@
           Staff settings
         </a>
       <% end %>
-      <a href="#connections" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
-        <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5"/>
-        </svg>
-        Connections
-      </a>
+      <% if @show_mcp_connections %>
+        <a href="#connections" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
+          <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5"/>
+          </svg>
+          Connections
+        </a>
+      <% end %>
       <a href="#appearance" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
         <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
@@ -363,13 +365,21 @@
       <% end %>
 
       <!-- Connections -->
+      <% if @show_mcp_connections %>
       <section id="connections" class="scroll-mt-8">
         <h2 class="border-b border-(--border-soft) pb-3 text-xl font-semibold text-(--text-strong)">Connections</h2>
-        <p class="mt-3 text-sm text-(--text-muted)">
-          Apps connected to your Attend account through
-          <a href="https://attend.hackclub.com/mcp" class="font-medium text-(--text-link) hover:underline">MCP</a>.
-          They act as you, limited to the scopes you approved. Disconnecting one signs it out immediately.
-        </p>
+        <% if current_user.admin? %>
+          <p class="mt-3 text-sm text-(--text-muted)">
+            Apps connected to your Attend account through
+            <a href="https://attend.hackclub.com/mcp" class="font-medium text-(--text-link) hover:underline">MCP</a>.
+            They act as you, limited to the scopes you approved. Disconnecting one signs it out immediately.
+          </p>
+        <% else %>
+          <p class="mt-3 text-sm text-(--text-muted)">
+            MCP is only available to Attend staff, so these apps can no longer reach your
+            account. Disconnect them to clear them out.
+          </p>
+        <% end %>
 
         <% if @mcp_connections.any? %>
           <div class="mt-4 overflow-hidden rounded-2xl border border-(--border-card) bg-(--bg-elev)">
@@ -412,6 +422,7 @@
           </div>
         <% end %>
       </section>
+      <% end %>
 
       <!-- Appearance -->
       <section id="appearance" class="scroll-mt-8">

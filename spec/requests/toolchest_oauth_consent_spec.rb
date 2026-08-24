@@ -9,8 +9,9 @@ require "rails_helper"
 RSpec.describe "Toolchest OAuth consent screen", type: :request do
   include Devise::Test::IntegrationHelpers
 
+  # MCP is staff-only, so the consent screen only renders for staff.
   let(:user) do
-    create(:user).tap do |u|
+    create(:user, global_role: "global_admin").tap do |u|
       u.avatar.attach(
         io: File.open(file_fixture("headshot.png")),
         filename: "headshot.png",
