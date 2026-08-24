@@ -84,7 +84,8 @@ class EventsToolbox < ApplicationToolbox
       ends_at: e.ends_at,
       timezone: e.timezone,
       location: [ e.venue_name, e.location_city, e.location_country ].compact_blank.join(", "),
-      draft: e.setup_completed_at.nil?
+      draft: e.setup_completed_at.nil?,
+      url: event_admin_url(e)
     }
     return base unless full
 
@@ -101,7 +102,16 @@ class EventsToolbox < ApplicationToolbox
         nfc_badges: e.nfc_badges_enabled?,
         visa_options: e.visa_options_enabled?
       },
-      your_role: current_user.role_for_event(e) || (current_user.global_admin? ? "global_admin" : nil)
+      your_role: current_user.role_for_event(e) || (current_user.global_admin? ? "global_admin" : nil),
+      urls: {
+        participants: event_participants_url(e),
+        incidents: event_incidents_url(e),
+        messages: event_messages_url(e),
+        groups: event_groups_url(e),
+        rooming: event_rooming_url(e),
+        scanner: event_scanner_url(e),
+        airport_mode: event_airport_mode_url(e)
+      }
     )
   end
 end

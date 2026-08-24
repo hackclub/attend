@@ -12,6 +12,11 @@ Toolchest.configure do |config|
     retrying. Prefer the read tools to orient yourself before making any changes. To port a
     rooming sheet, call rooming_overview first to map names to participant_event_ids and see
     existing rooms, then rooming_bulk_assign (it can create rooms by name as it fills them).
+    When you tell a human about a record, give them its link, not its ID: read tools return a
+    `url` on the records they serialize, links_participant turns a participant_id into every
+    link that exists for that person, and links_patterns has the URL templates for anything
+    else. Public participant profiles (/p/:slug) are opt-in, so many people simply don't have
+    one — never invent a profile URL or any other path.
   INSTRUCTIONS
 
   config.auth = :oauth

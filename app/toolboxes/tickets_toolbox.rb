@@ -79,7 +79,8 @@ class TicketsToolbox < ApplicationToolbox
       phone_number: t.phone_number,
       event: t.event&.name,
       assigned_to: t.assigned_to&.display_name_or_fallback,
-      last_message_at: t.last_message_at
+      last_message_at: t.last_message_at,
+      url: ticket_url(t)
     }
     return base unless full
 
