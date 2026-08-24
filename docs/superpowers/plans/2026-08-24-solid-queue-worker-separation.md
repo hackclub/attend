@@ -4,7 +4,7 @@
 
 **Goal:** Move Solid Queue execution out of the staging and production Puma pods into independently scalable Orchard worker deployments.
 
-**Architecture:** Each environment keeps its existing web deployment and PostgreSQL-backed Solid Queue tables. A new Orchard deployment builds the same `hackclub/attend` Dockerfile from `main`, overrides the start command to `./bin/jobs`, and receives the corresponding Rails and database environment in memory from the existing web deployment. Staging is cut over and verified before production.
+**Architecture:** Each environment keeps its existing web deployment and PostgreSQL-backed Solid Queue tables. A tested `PROCESS_TYPE` selector in `bin/docker-entrypoint` preserves the default web command and switches worker deployments to `./bin/jobs`. A new Orchard deployment builds the same `hackclub/attend` Dockerfile from `main`, receives the corresponding Rails and database environment in memory from the existing web deployment, and has Orchard's auto-generated ingress removed before validation. Staging is cut over and verified before production.
 
 **Tech Stack:** Rails 8.1, Solid Queue 1.4, PostgreSQL 17, Docker, Kubernetes, Orchard
 
@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Keep Solid Queue and PostgreSQL; do not add Redis or Sidekiq.
-- Do not expose either worker deployment through an ingress or public service.
+- Delete Orchard's auto-generated worker ingress immediately after deployment creation, and do not expose either worker through any other ingress or public service.
 - Never write Orchard environment-variable values or database credentials to the repository, logs, plan, or final report.
 - Preserve the existing web deployments, services, ingresses, replica counts, and resource requests.
 - Keep embedded workers active until the corresponding standalone worker deployment has healthy pods and fresh Solid Queue heartbeats.
@@ -22,7 +22,52 @@
 
 ---
 
-### Task 1: Capture the Staging Baseline
+### Task 1: Add and Land the Container Process Role
+
+**Files:**
+- Modify: `bin/docker-entrypoint`
+- Create: `spec/bin/docker_entrypoint_spec.sh`
+- Modify: `.github/workflows/ci.yml`
+
+**Interfaces:**
+- Consumes: `PROCESS_TYPE`, with supported values `web` and `worker`
+- Produces: a Docker entrypoint that preserves the image command for `web`, runs `./bin/jobs` for `worker`, and exits 64 for any other value
+
+- [x] **Step 1: Write and run the failing worker-role test**
+
+Execute the real entrypoint from a temporary directory containing controlled `bin/rails`, `bin/jobs`, and `bin/thrust` executables. Require `PROCESS_TYPE=worker` to execute `bin/jobs` without executing `db:prepare` or Thruster.
+
+Run:
+
+```bash
+bash spec/bin/docker_entrypoint_spec.sh
+```
+
+Expected before implementation: exit 1 with `worker process did not start bin/jobs`.
+
+- [x] **Step 2: Implement and verify the worker role**
+
+Select `./bin/jobs` before the existing boot checks when `PROCESS_TYPE=worker`, then rerun the test and require exit 0.
+
+- [x] **Step 3: Write and run the failing invalid-role test**
+
+Require a misspelled `PROCESS_TYPE=workre` to exit nonzero without invoking Rails, jobs, or Thruster.
+
+Run the shell spec and require it to fail with `invalid process type did not fail` before implementing validation.
+
+- [x] **Step 4: Implement fail-closed validation and verify both roles**
+
+Accept `web` and `worker`, default an absent value to `web`, and exit 64 for every other value. Rerun the shell spec and require exit 0.
+
+- [x] **Step 5: Add the shell spec to continuous integration**
+
+Add a `Test container entrypoint` step running `bash spec/bin/docker_entrypoint_spec.sh` immediately before the RSpec step in `.github/workflows/ci.yml`.
+
+- [ ] **Step 6: Commit and land the change on `main`**
+
+Commit the entrypoint, test, CI, design, and plan changes. Push the working branch, create or update its pull request, merge it after required checks pass, then require both existing web deployments to auto-deploy the merged commit and return to their existing healthy replica counts before creating a worker.
+
+### Task 2: Capture the Staging Baseline
 
 **Files:**
 - Read: `config/queue.yml`
@@ -60,18 +105,18 @@ Record the output only as counts. Do not print environment values.
 Fetch the staging web environment from Orchard. Copy every entry except these web/build-specific keys:
 
 ```ruby
-%w[SOLID_QUEUE_IN_PUMA HOST APP_REVISION GIT_REVISION]
+%w[SOLID_QUEUE_IN_PUMA HOST APP_REVISION GIT_REVISION PROCESS_TYPE]
 ```
 
-Require the resulting keys to include `DATABASE_URL`, `RAILS_ENV`, and `RAILS_MASTER_KEY`, and require `RAILS_ENV` to equal `staging`. Do not display the values.
+Require the resulting keys to include `DATABASE_URL`, `RAILS_ENV`, and `RAILS_MASTER_KEY`, and require `RAILS_ENV` to equal `staging`. Add `{ key: "PROCESS_TYPE", value: "worker" }`. Do not display the other values.
 
-### Task 2: Create and Validate the Staging Worker
+### Task 3: Create and Validate the Staging Worker
 
 **Files:**
 - No repository files are changed.
 
 **Interfaces:**
-- Consumes: `staging_worker_env` from Task 1
+- Consumes: `staging_worker_env` from Task 2
 - Produces: `staging_worker_id`, the deployment ID returned by Orchard
 
 - [ ] **Step 1: Create the worker deployment**
@@ -86,7 +131,6 @@ Call Orchard's GitHub deployment operation with exactly:
   "name": "attend-staging-worker",
   "buildType": "dockerfile",
   "dockerfilePath": "Dockerfile",
-  "startCommand": "./bin/jobs",
   "port": 3000,
   "cpuRequestMilli": 500,
   "memoryRequestBytes": 2147483648,
@@ -94,27 +138,31 @@ Call Orchard's GitHub deployment operation with exactly:
 }
 ```
 
-`env` above means the exact in-memory array from Task 1, not a serialized string. Capture the returned deployment ID as `staging_worker_id`.
+`env` above means the exact in-memory array from Task 2, including `PROCESS_TYPE=worker`, not a serialized string. Capture the returned deployment ID as `staging_worker_id`.
 
 - [ ] **Step 2: Wait for the build and pod to become healthy**
 
 Poll Orchard deployment state until the build is `succeeded`, deployment state is `running`, one replica is available, and restart count is zero. On build or startup failure, inspect build logs and pod logs; do not change staging web.
 
-- [ ] **Step 3: Verify the worker process tree**
+- [ ] **Step 3: Remove the auto-generated ingress**
 
-Read the worker pod logs and Solid Queue process records. Require fresh standalone `Supervisor`, `Worker`, `Dispatcher`, and `Scheduler` heartbeats. Require the deployment to have no ingress and no publicly enabled service port.
+Read the deployment's ingress list, delete every ingress attached to `staging_worker_id`, then require the deployment to have no ingress and no publicly enabled service port.
 
-- [ ] **Step 4: Enable worker auto-deploy**
+- [ ] **Step 4: Verify the worker process tree**
 
-Enable auto-deploy for `staging_worker_id` on branch `main`, then read the deployment back and require `autoDeployEnabled=true`, `autoDeployBranch=main`, and `startCommand=./bin/jobs`.
+Read the worker pod logs and require `Command: ./bin/jobs`, with no `Running db:prepare` or Puma startup. Require fresh standalone `Supervisor`, `Worker`, `Dispatcher`, and `Scheduler` heartbeats.
 
-### Task 3: Cut Staging Web Over to the Standalone Worker
+- [ ] **Step 5: Enable worker auto-deploy**
+
+Enable auto-deploy for `staging_worker_id` on branch `main`, then read the deployment back and require `autoDeployEnabled=true`, `autoDeployBranch=main`, and `PROCESS_TYPE=worker`.
+
+### Task 4: Cut Staging Web Over to the Standalone Worker
 
 **Files:**
 - No repository files are changed.
 
 **Interfaces:**
-- Consumes: `staging_worker_id` from Task 2
+- Consumes: `staging_worker_id` from Task 3
 - Produces: staging web without embedded Solid Queue; verified standalone job execution
 
 - [ ] **Step 1: Disable embedded workers**
@@ -145,7 +193,7 @@ Require fresh Solid Queue process heartbeats only from the standalone worker pod
 
 If Steps 2 through 4 fail, add `SOLID_QUEUE_IN_PUMA=true` back to staging web, wait for healthy embedded-worker heartbeats, then scale `staging_worker_id` to zero. Do not proceed to production.
 
-### Task 4: Capture the Production Baseline
+### Task 5: Capture the Production Baseline
 
 **Files:**
 - No repository files are changed.
@@ -160,19 +208,19 @@ Use Orchard to read deployment `79b6905f-3928-4969-beaa-a95423b6a650` and databa
 
 - [ ] **Step 2: Capture current Solid Queue state and connection count**
 
-Run the queue-count runner from Task 1 in one production web pod. Query `pg_stat_activity` for the current database connection count and require it to remain below 100.
+Run the queue-count runner from Task 2 in one production web pod. Query `pg_stat_activity` for the current database connection count and require it to remain below 100.
 
 - [ ] **Step 3: Build the production worker environment in memory**
 
-Fetch the production web environment from Orchard. Copy every entry except `SOLID_QUEUE_IN_PUMA` and `HOST`. Require the resulting keys to include `DATABASE_URL` and `RAILS_MASTER_KEY`. Do not display values.
+Fetch the production web environment from Orchard. Copy every entry except `SOLID_QUEUE_IN_PUMA`, `HOST`, and `PROCESS_TYPE`. Require the resulting keys to include `DATABASE_URL` and `RAILS_MASTER_KEY`. Add `{ key: "PROCESS_TYPE", value: "worker" }`. Do not display the other values.
 
-### Task 5: Create and Validate the Production Workers
+### Task 6: Create and Validate the Production Workers
 
 **Files:**
 - No repository files are changed.
 
 **Interfaces:**
-- Consumes: `production_worker_env` from Task 4
+- Consumes: `production_worker_env` from Task 5
 - Produces: `production_worker_id`, the deployment ID returned by Orchard
 
 - [ ] **Step 1: Create the initial worker deployment**
@@ -187,7 +235,6 @@ Call Orchard's GitHub deployment operation with exactly:
   "name": "attend-worker",
   "buildType": "dockerfile",
   "dockerfilePath": "Dockerfile",
-  "startCommand": "./bin/jobs",
   "port": 3000,
   "cpuRequestMilli": 1000,
   "memoryRequestBytes": 2147483648,
@@ -197,25 +244,29 @@ Call Orchard's GitHub deployment operation with exactly:
 
 Capture the returned deployment ID as `production_worker_id`.
 
-- [ ] **Step 2: Validate one production worker pod**
+- [ ] **Step 2: Remove the auto-generated ingress**
 
-Wait for the build to succeed and one pod to run with zero restarts. Require fresh `Supervisor`, `Worker`, `Dispatcher`, and `Scheduler` heartbeats, and require no ingress or publicly enabled service port.
+Delete every ingress attached to `production_worker_id`, then require no ingress and no publicly enabled service port.
 
-- [ ] **Step 3: Scale to two worker replicas**
+- [ ] **Step 3: Validate one production worker pod**
+
+Wait for the build to succeed and one pod to run with zero restarts. Require logs to show `Command: ./bin/jobs` without `Running db:prepare` or Puma startup. Require fresh `Supervisor`, `Worker`, `Dispatcher`, and `Scheduler` heartbeats.
+
+- [ ] **Step 4: Scale to two worker replicas**
 
 Scale `production_worker_id` to two replicas. Require two available pods, zero unexpected restarts, and fresh process heartbeats from both pod hostnames.
 
-- [ ] **Step 4: Enable worker auto-deploy**
+- [ ] **Step 5: Enable worker auto-deploy**
 
-Enable auto-deploy for `production_worker_id` on `main`, then read the deployment back and require `autoDeployEnabled=true`, `autoDeployBranch=main`, `startCommand=./bin/jobs`, and `replicas=2`.
+Enable auto-deploy for `production_worker_id` on `main`, then read the deployment back and require `autoDeployEnabled=true`, `autoDeployBranch=main`, `PROCESS_TYPE=worker`, and `replicas=2`.
 
-### Task 6: Cut Production Web Over and Complete Verification
+### Task 7: Cut Production Web Over and Complete Verification
 
 **Files:**
 - Modify: `docs/superpowers/plans/2026-08-24-solid-queue-worker-separation.md`
 
 **Interfaces:**
-- Consumes: `production_worker_id` from Task 5
+- Consumes: `production_worker_id` from Task 6
 - Produces: production web without embedded Solid Queue; two verified standalone worker replicas; completed runbook
 
 - [ ] **Step 1: Disable embedded production workers**
@@ -228,7 +279,7 @@ Require three available web replicas with zero unexpected restarts. Require `htt
 
 - [ ] **Step 3: Verify standalone production job execution**
 
-Enqueue the marker job from Task 3 in a production web pod. Require the marker token in one standalone worker pod's logs and require the job to leave ready/claimed state.
+Enqueue the marker job from Task 4 in a production web pod. Require the marker token in one standalone worker pod's logs and require the job to leave ready/claimed state.
 
 - [ ] **Step 4: Verify final ownership and capacity**
 

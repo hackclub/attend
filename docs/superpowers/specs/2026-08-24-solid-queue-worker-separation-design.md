@@ -8,13 +8,13 @@ this change does not introduce redis or sidekiq. jobs remain durable in postgres
 
 ## considered approaches
 
-### 1. separate orchard deployments with a start-command override
+### 1. separate orchard deployments with an explicit process role
 
-build the existing dockerfile from the same github repository, but override the worker deployment's command to `./bin/jobs`.
+build the existing dockerfile from the same github repository. set `PROCESS_TYPE=worker` on worker deployments, and have `bin/docker-entrypoint` replace the image's default web command with `./bin/jobs` before performing its boot checks.
 
 advantages:
 
-- no application-code or image-layout change
+- one small, tested application-entrypoint change
 - uses the existing supported solid queue executable
 - web and worker replicas can be scaled independently
 - both roles can continue auto-deploying from `main`
@@ -24,8 +24,11 @@ tradeoffs:
 - orchard builds the repository once for each deployment
 - web and worker rollouts can briefly overlap different commits
 - workers do not expose an http health endpoint, so health is verified through pod state, logs, and solid queue heartbeats
+- orchard's github deployment flow creates a protected ingress automatically, so the worker ingress must be deleted immediately after creation
 
 this is the selected approach.
+
+orchard's dockerfile `startCommand` override was tested and rejected: orchard persisted `./bin/jobs` in deployment metadata, but the generated kubernetes pod still ran the Dockerfile's default puma command. the failed staging deployment and its generated ingress were deleted before any web-tier change.
 
 ### 2. add a worker-specific dockerfile
 
@@ -48,7 +51,7 @@ this is operationally simple, but every web replica also creates a solid queue s
 - github repository: `hackclub/attend`
 - branch: `main`
 - dockerfile: `Dockerfile`
-- start command: `./bin/jobs`
+- environment: `PROCESS_TYPE=worker`
 - replicas: 1
 - initial resources: 500 millicpu and 2 gibibytes memory per pod
 - no ingress and no public service exposure
@@ -61,7 +64,7 @@ this is operationally simple, but every web replica also creates a solid queue s
 - github repository: `hackclub/attend`
 - branch: `main`
 - dockerfile: `Dockerfile`
-- start command: `./bin/jobs`
+- environment: `PROCESS_TYPE=worker`
 - replicas: 2, allowing one worker pod or node to fail without stopping job processing
 - initial resources: 1000 millicpu and 2 gibibytes memory per pod
 - no ingress and no public service exposure
@@ -71,7 +74,7 @@ the worker deployments receive the environment needed to boot the corresponding 
 
 ## startup and migrations
 
-the existing container entrypoint performs a rails boot check for every process. it only runs `db:prepare` and secondary-schema setup for the rails server command, so standalone workers will not attempt concurrent schema changes.
+the container entrypoint defaults `PROCESS_TYPE` to `web`, preserving the existing Dockerfile command. `PROCESS_TYPE=worker` replaces that command with `./bin/jobs`; any other value fails closed before Rails boots. the entrypoint performs a Rails boot check for every valid process, but it only runs `db:prepare` and secondary-schema setup for the Rails server command, so standalone workers do not attempt concurrent schema changes.
 
 web and worker builds can complete in either order when both deployments auto-deploy from `main`. migrations must remain compatible with the preceding application release because the web tier already uses rolling updates and old web pods remain live while a new pod runs `db:prepare`. the worker separation does not create a new migration-safety requirement, but it makes release-version overlap more visible.
 
@@ -80,13 +83,14 @@ web and worker builds can complete in either order when both deployments auto-de
 each environment is migrated independently, staging first.
 
 1. record the existing web, database, and solid queue state.
-2. create the standalone worker deployment while embedded puma workers remain active.
-3. wait for all worker pods to run without restarts.
-4. verify solid queue registers the expected standalone processes and has fresh heartbeats.
-5. observe an existing recurring job being claimed and completed by the standalone worker.
-6. remove `SOLID_QUEUE_IN_PUMA` from the web deployment, triggering a rolling restart.
-7. verify web health, worker health, queue progress, and the absence of solid queue supervisors in web pods.
-8. observe logs, restarts, database connections, cpu, and memory before proceeding to the next environment.
+2. create the standalone worker deployment with `PROCESS_TYPE=worker` while embedded puma workers remain active.
+3. delete the worker deployment's auto-generated ingress and verify that it has no public exposure.
+4. wait for all worker pods to run without restarts.
+5. verify solid queue registers the expected standalone processes and has fresh heartbeats.
+6. observe an existing recurring job being claimed and completed by the standalone worker.
+7. remove `SOLID_QUEUE_IN_PUMA` from the web deployment, triggering a rolling restart.
+8. verify web health, worker health, queue progress, and the absence of solid queue supervisors in web pods.
+9. observe logs, restarts, database connections, cpu, and memory before proceeding to the next environment.
 
 brief duplicate worker capacity during the cutover is safe because solid queue coordinates claims in postgresql.
 
