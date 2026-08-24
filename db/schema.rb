@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_15_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -876,6 +876,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_15_120000) do
     t.string "identifier"
     t.string "push_token"
     t.datetime "updated_at", null: false
+    t.index ["identifier"], name: "index_passkit_devices_on_identifier", unique: true
   end
 
   create_table "passkit_logs", force: :cascade do |t|
