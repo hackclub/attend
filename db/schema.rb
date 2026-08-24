@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_130003) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -489,6 +489,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_130003) do
     t.integer "emergency_contact_priority"
     t.boolean "emergency_medical_consent"
     t.uuid "guardian_id", null: false
+    t.datetime "invite_last_used_at"
     t.string "invite_token_ciphertext"
     t.string "invite_token_digest"
     t.datetime "invite_token_sent_at"
@@ -799,21 +800,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_130003) do
     t.index ["user_id"], name: "index_mobile_tokens_on_user_id"
   end
 
-  create_table "nfc_tokens", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.datetime "paired_at"
-    t.uuid "paired_by_id"
-    t.datetime "revoked_at"
-    t.uuid "revoked_by_id"
-    t.uuid "token", default: -> { "gen_random_uuid()" }, null: false
-    t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
-    t.index ["paired_by_id"], name: "index_nfc_tokens_on_paired_by_id"
-    t.index ["revoked_by_id"], name: "index_nfc_tokens_on_revoked_by_id"
-    t.index ["token"], name: "index_nfc_tokens_on_token", unique: true
-    t.index ["user_id"], name: "index_nfc_tokens_on_user_id"
-  end
-
   create_table "notes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "author_user_id", null: false
     t.text "body"
@@ -1035,7 +1021,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_130003) do
     t.datetime "created_at", null: false
     t.datetime "ends_at"
     t.uuid "event_id", null: false
-    t.boolean "is_travel_pickup", default: false, null: false
+    t.boolean "is_airport", default: false, null: false
     t.string "name", null: false
     t.integer "position", default: 0, null: false
     t.datetime "starts_at"
@@ -1214,6 +1200,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_130003) do
   end
 
   create_table "travel_legs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "airport_picked_up_at"
     t.string "arrival_airport"
     t.datetime "arrival_time"
     t.string "confirmation_code"
@@ -1231,7 +1218,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_130003) do
     t.uuid "picked_up_by_user_id"
     t.integer "position", default: 0
     t.uuid "travel_id", null: false
-    t.datetime "travel_picked_up_at"
     t.datetime "updated_at", null: false
     t.index ["picked_up_by_user_id"], name: "index_travel_legs_on_picked_up_by_user_id"
     t.index ["travel_id"], name: "index_travel_legs_on_travel_id"
@@ -1374,9 +1360,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_130003) do
   add_foreign_key "messages", "events"
   add_foreign_key "messages", "users", column: "sent_by_user_id"
   add_foreign_key "mobile_tokens", "users"
-  add_foreign_key "nfc_tokens", "users"
-  add_foreign_key "nfc_tokens", "users", column: "paired_by_id"
-  add_foreign_key "nfc_tokens", "users", column: "revoked_by_id"
   add_foreign_key "notes", "events"
   add_foreign_key "notes", "participant_events"
   add_foreign_key "notes", "tickets"

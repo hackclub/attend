@@ -26,9 +26,8 @@ RSpec.describe "Api::V1::Participants", type: :request do
     end
 
     it "exposes the NFC badge token without writing or enqueuing wallet-pass jobs" do
-      owner = create(:user)
-      pe = create(:participant_event, event: event, participant: create(:participant, user: owner))
-      pending_token = create(:nfc_token, user: owner)
+      pe = create(:participant_event, event: event)
+      expect(pe.nfc_badge_token).to be_present # DB default backfills new rows
 
       updates = []
       callback = lambda do |_name, _start, _finish, _id, payload|
@@ -44,9 +43,8 @@ RSpec.describe "Api::V1::Participants", type: :request do
 
       expect(response).to have_http_status(:ok)
       participant = JSON.parse(response.body)["participants"].sole
-      expect(participant["nfc_badge_token"]).to eq(pending_token.token)
-      expect(participant["nfc_pairing_available"]).to be(true)
-      expect(updates.grep(/participant_events|nfc_tokens/)).to be_empty
+      expect(participant["nfc_badge_token"]).to eq(pe.reload.nfc_badge_token)
+      expect(updates.grep(/participant_events/)).to be_empty
     end
   end
 

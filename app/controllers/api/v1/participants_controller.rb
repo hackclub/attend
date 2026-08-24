@@ -217,9 +217,8 @@ module Api
           headshot_url: headshot_url_for(participant),
           status: pe.status,
           checked_in_at: pe.check_in_time&.iso8601,
-          nfc_badge_token: pe.event.nfc_badges_enabled? ? pe.pending_nfc_token&.token : nil,
+          nfc_badge_token: pe.event.nfc_badges_enabled? ? pe.nfc_badge_token : nil,
           nfc_badge_assigned: pe.nfc_badge_assigned?,
-          nfc_pairing_available: pe.nfc_pairing_available?,
 
           has_anaphylaxis_risk: medical&.has_anaphylaxis_risk || false,
           requires_refrigeration: medical&.requires_refrigeration || false,

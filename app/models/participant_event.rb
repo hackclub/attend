@@ -315,19 +315,29 @@ class ParticipantEvent < ApplicationRecord
   end
 
   def nfc_badge_assigned?
-    active_nfc_token.present? || (nfc_badge_token.present? && nfc_badge_assigned_at.present?)
+    nfc_badge_token.present? && nfc_badge_assigned_at.present?
   end
 
-  def active_nfc_token
-    participant.user&.nfc_tokens&.active&.order(created_at: :desc)&.first
+  def ensure_nfc_badge_token!
+    return nfc_badge_token if nfc_badge_token.present?
+
+    update!(nfc_badge_token: SecureRandom.uuid)
+    nfc_badge_token
   end
 
-  def pending_nfc_token
-    participant.user&.nfc_tokens&.pending&.order(created_at: :desc)&.first
+  def assign_nfc_badge!(user:)
+    update!(
+      nfc_badge_assigned_at: Time.current,
+      nfc_badge_assigned_by: user
+    )
   end
 
-  def nfc_pairing_available?
-    participant.user.present?
+  def reset_nfc_badge!
+    update!(
+      nfc_badge_token: SecureRandom.uuid,
+      nfc_badge_assigned_at: nil,
+      nfc_badge_assigned_by: nil
+    )
   end
 
   # Self-declared airline UM service on either flight direction.

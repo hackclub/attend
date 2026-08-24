@@ -48,45 +48,4 @@ RSpec.describe "Admin::Scans", type: :request do
     expect(response.body).to include("NFC Scanner", 'id="nfc-write-panel"', 'id="modal-write-nfc-btn"')
   end
 
-  it "accepts an active personal token when event badge issuance is disabled" do
-    owner = create(:user)
-    participant = create(:participant, user: owner)
-    participation = create(:participant_event, event: event, participant: participant)
-    token = create(:nfc_token, :active, user: owner)
-
-    post admin_event_scans_path(event), params: {
-      badge_token: token.token,
-      scan_context_id: scan_context.id
-    }
-
-    expect(response).to have_http_status(:ok)
-    expect(participation.scans.last.source).to eq("nfc")
-    expect(response.parsed_body.dig("participant", "participant_event_id")).to eq(participation.id)
-  end
-
-  it "confirms a pending user-owned token when issuance is enabled" do
-    event.update!(nfc_badges_enabled: true)
-    owner = create(:user)
-    participation = create(:participant_event, event: event, participant: create(:participant, user: owner))
-    token = create(:nfc_token, user: owner)
-
-    post confirm_nfc_badge_admin_event_participant_event_path(event, participation),
-      params: { badge_token: token.token }
-
-    expect(response).to have_http_status(:ok)
-    expect(token.reload).to be_active
-    expect(token.paired_by).to eq(admin)
-  end
-
-  it "rejects confirmation when issuance is disabled" do
-    owner = create(:user)
-    participation = create(:participant_event, event: event, participant: create(:participant, user: owner))
-    token = create(:nfc_token, user: owner)
-
-    post confirm_nfc_badge_admin_event_participant_event_path(event, participation),
-      params: { badge_token: token.token }
-
-    expect(response).to have_http_status(:unprocessable_entity)
-    expect(token.reload).to be_pending
-  end
 end

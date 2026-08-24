@@ -1106,7 +1106,6 @@ components:
         waiver_signed: { type: boolean }
         nfc_badge_token: { type: string, format: uuid, nullable: true }
         nfc_badge_assigned: { type: boolean }
-        nfc_pairing_available: { type: boolean }
         groups:
           type: array
           items:
@@ -1275,7 +1274,6 @@ components:
         checked_in_at: { type: string, format: date-time, nullable: true }
         nfc_badge_token: { type: string, format: uuid, nullable: true }
         nfc_badge_assigned: { type: boolean }
-        nfc_pairing_available: { type: boolean }
         has_anaphylaxis_risk: { type: boolean }
         requires_refrigeration: { type: boolean }
         cross_contamination_risk: { type: boolean }

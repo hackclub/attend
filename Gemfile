@@ -155,6 +155,3 @@ group :development do
   # Preview emails in browser via web UI
   gem "letter_opener_web"
 end
-
-gem "flipper", "~> 1.4"
-gem "flipper-active_record", "~> 1.4"

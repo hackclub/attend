@@ -95,9 +95,7 @@ class ParticipantEventsToolbox < ApplicationToolbox
 
     if first_scan_in_context
       mark_airport_pickup(@participant_event, current_user)
-      if event.nfc_badges_enabled? && @participant_event.nfc_pairing_available?
-        NfcToken.ensure_pending_for!(@participant_event.participant.user)
-      end
+      @participant_event.ensure_nfc_badge_token! if event.nfc_badges_enabled?
     end
 
     # An earlier scan wins on time, so report what #show would.

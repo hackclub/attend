@@ -130,7 +130,9 @@ module Api
 
         # First, try NFC badge token lookup if provided
         if params[:badge_token].present?
-          participant_event = NfcTokenResolver.call(event: @event, token: params[:badge_token])
+          participant_event = @event.participant_events
+            .includes(:participant, :medical, :dietary, :safeguarding_info)
+            .find_by(nfc_badge_token: params[:badge_token])
           scan_source = "nfc" if participant_event
         end
 
@@ -165,9 +167,9 @@ module Api
           mark_airport_pickup(participant_event, current_user)
         end
 
-        # Prepare a user-owned token on first check-in when this event issues NFC hardware.
+        # Auto-generate NFC badge token on first check-in if NFC is enabled
         if @event.nfc_badges_enabled? && scan_context.checks_in? && first_scan_in_context
-          NfcToken.ensure_pending_for!(participant_event.participant.user) if participant_event.nfc_pairing_available?
+          participant_event.ensure_nfc_badge_token!
         end
 
         render json: {
@@ -243,9 +245,8 @@ module Api
 
           waiver_signed: pe.waiver_signed?,
 
-          nfc_badge_token: pe.event.nfc_badges_enabled? ? pe.pending_nfc_token&.token : nil,
+          nfc_badge_token: pe.event.nfc_badges_enabled? ? pe.ensure_nfc_badge_token! : nil,
           nfc_badge_assigned: pe.nfc_badge_assigned?,
-          nfc_pairing_available: pe.nfc_pairing_available?,
 
           groups: pe.event.groups_enabled? ? pe.groups.ordered.map { |g| { id: g.id, name: g.name, color: g.normalized_color } } : []
         }

@@ -4,9 +4,7 @@ RSpec.describe "Api::V1::NfcBadges", type: :request do
   let(:event) { create(:event, nfc_badges_enabled: true) }
   let(:admin) { create(:user, global_role: "global_admin") }
   let(:mobile_token) { MobileToken.generate_for(admin) }
-  let(:owner) { create(:user) }
-  let(:participant) { create(:participant, user: owner) }
-  let(:participation) { create(:participant_event, event: event, participant: participant) }
+  let(:participation) { create(:participant_event, event: event) }
 
   def headers
     { "Authorization" => "Bearer #{mobile_token.token}" }
@@ -16,63 +14,47 @@ RSpec.describe "Api::V1::NfcBadges", type: :request do
     "/api/v1/events/#{event.id}/participant_events/#{participation.id}/nfc_badge/#{action}"
   end
 
-  it "rejects issuance when the event does not issue NFC hardware" do
+  it "rejects issuance when the event does not issue NFC badges" do
     event.update!(nfc_badges_enabled: false)
 
     post endpoint("ensure"), headers: headers
 
     expect(response).to have_http_status(:unprocessable_entity)
-    expect(owner.nfc_tokens).to be_empty
   end
 
-  it "rejects issuance for a participant without a user" do
-    participation.update!(participant: create(:participant))
+  it "ensures and confirms an event-scoped badge" do
+    participation.update_columns(nfc_badge_token: nil)
 
     post endpoint("ensure"), headers: headers
-
-    expect(response).to have_http_status(:unprocessable_entity)
-  end
-
-  it "ensures and confirms a user-owned token" do
-    post endpoint("ensure"), headers: headers
-    token_value = JSON.parse(response.body).fetch("badge_token")
+    token = JSON.parse(response.body).fetch("badge_token")
 
     expect(response).to have_http_status(:ok)
-    expect(owner.nfc_tokens.sole).to be_pending
+    expect(participation.reload.nfc_badge_token).to eq(token)
 
-    post endpoint("confirm"), params: { badge_token: token_value }, headers: headers
+    post endpoint("confirm"), params: { badge_token: token }, headers: headers
 
     expect(response).to have_http_status(:ok)
-    token = owner.nfc_tokens.sole.reload
-    expect(token).to be_active
-    expect(token.paired_by).to eq(admin)
-    expect(AuditLog.last.record).to eq(token)
-    expect(AuditLog.last.metadata.to_json).not_to include(token_value)
+    expect(participation.reload).to be_nfc_badge_assigned
+    expect(participation.nfc_badge_assigned_by).to eq(admin)
+    expect(AuditLog.last.record).to eq(participation)
   end
 
-  it "rejects mismatches and confirmation without a pending token" do
-    post endpoint("ensure"), headers: headers
-
+  it "rejects a mismatched badge token" do
     post endpoint("confirm"), params: { badge_token: SecureRandom.uuid }, headers: headers
-    expect(response).to have_http_status(:unprocessable_entity)
 
-    owner.nfc_tokens.pending.destroy_all
-    post endpoint("confirm"), params: { badge_token: SecureRandom.uuid }, headers: headers
     expect(response).to have_http_status(:unprocessable_entity)
+    expect(participation.reload).not_to be_nfc_badge_assigned
   end
 
-  it "resets to a fresh pending token without revoking active hardware" do
-    active = create(:nfc_token, :active, user: owner)
-    stale_pending = create(:nfc_token, user: owner)
+  it "resets only this participation to a fresh badge token" do
+    original = participation.nfc_badge_token
+    participation.assign_nfc_badge!(user: admin)
 
     post endpoint("reset"), headers: headers
 
     expect(response).to have_http_status(:ok)
-    replacement = owner.nfc_tokens.pending.sole
-    expect(replacement).not_to eq(stale_pending)
-    expect(stale_pending.reload.revoked_at).to be_present
-    expect(active.reload).to be_active
-    expect(JSON.parse(response.body).fetch("badge_token")).to eq(replacement.token)
-    expect(AuditLog.last.metadata.to_json).not_to include(replacement.token)
+    expect(participation.reload.nfc_badge_token).not_to eq(original)
+    expect(participation).not_to be_nfc_badge_assigned
+    expect(JSON.parse(response.body).fetch("badge_token")).to eq(participation.nfc_badge_token)
   end
 end

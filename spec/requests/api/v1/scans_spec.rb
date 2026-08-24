@@ -72,23 +72,4 @@ RSpec.describe "Api::V1::Scans", type: :request do
       expect(json["has_more"]).to be(false)
     end
   end
-
-  describe "POST /api/v1/events/:event_id/scans" do
-    it "accepts an active personal token when event badge issuance is disabled" do
-      event.update!(nfc_badges_enabled: false)
-      owner = create(:user)
-      participant = create(:participant, user: owner)
-      participation = create(:participant_event, event: event, participant: participant)
-      token = create(:nfc_token, :active, user: owner)
-      context = event.scan_contexts.find_by!(checks_in: true)
-
-      post "/api/v1/events/#{event.id}/scans",
-        params: { badge_token: token.token, scan_context_id: context.id },
-        headers: auth_headers
-
-      expect(response).to have_http_status(:ok)
-      expect(participation.scans.last.source).to eq("nfc")
-      expect(JSON.parse(response.body).dig("participant", "participant_event_id")).to eq(participation.id)
-    end
-  end
 end

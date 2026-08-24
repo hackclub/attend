@@ -400,7 +400,6 @@ function groupBadgeHtml(group, fallbackColor) {
             window.nfcBridge.isConnected() &&
             data.scan_context?.checks_in && 
             data.participant.nfc_badge_token &&
-            data.participant.nfc_pairing_available &&
             !data.participant.nfc_badge_assigned) {
           
           window.nfcBridge.showWritePanel(
@@ -682,13 +681,13 @@ function showParticipantModal(data, scanContext, firstScan) {
     alertsDiv.innerHTML += '<div class="bg-blue-100 border-l-4 border-[#ec3750] text-blue-700 px-4 py-3 mt-4"><strong>❄️ Needs Medication Refrigeration</strong></div>';
   }
 
-  // Show NFC write controls only when issuance is enabled and pairing is possible
+  // Show NFC section if NFC is enabled and bridge is connected
   const nfcSection = document.getElementById('modal-nfc-section');
   const nfcBtnText = document.getElementById('modal-nfc-btn-text');
   const nfcStatus = document.getElementById('modal-nfc-status');
   
   if (nfcSection && window.nfcBridge) {
-    if (window.nfcBridge.isConnected() && data.nfc_pairing_available) {
+    if (window.nfcBridge.isConnected()) {
       nfcSection.classList.remove('hidden');
       if (data.nfc_badge_assigned) {
         nfcBtnText.textContent = 'Rewrite NFC Badge';
