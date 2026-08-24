@@ -52,6 +52,38 @@ class Travel < ApplicationRecord
     end
   end
 
+  def calendar_time
+    if plane?
+      inbound? ? travel_legs.last&.arrival_time : travel_legs.first&.departure_time
+    elsif car? && inbound?
+      expected_arrival_time
+    else
+      inbound? ? arrival_time : departure_time
+    end
+  end
+
+  def calendar_route
+    case mode
+    when "plane"
+      airports = travel_legs.flat_map { |leg| [ leg.departure_airport, leg.arrival_airport ] }.compact
+      airports.each_with_object([]) { |airport, route| route << airport unless route.last == airport }.join(" → ").presence
+    when "train"
+      [ train_departure_station, train_arrival_station ].compact_blank.join(" → ").presence
+    when "bus"
+      [ bus_departure_location, bus_arrival_location ].compact_blank.join(" → ").presence
+    when "car"
+      origin_address.presence
+    when "other"
+      other_details.presence
+    end
+  end
+
+  def calendar_reference
+    return travel_legs.filter_map(&:flight_code).join(" · ").presence if plane?
+
+    carrier.presence
+  end
+
   def pickup_dismissed?
     pickup_dismissed_at.present?
   end
