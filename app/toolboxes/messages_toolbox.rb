@@ -87,7 +87,8 @@ class MessagesToolbox < ApplicationToolbox
 
   def serialize_message(m, full: false)
     base = { id: m.id, subject: m.subject, audience: m.audience_label,
-             channels: m.channels, status: m.status, scheduled_at: m.scheduled_at, sent_at: m.sent_at }
+             channels: m.channels, status: m.status, scheduled_at: m.scheduled_at, sent_at: m.sent_at,
+             url: message_admin_url(m) }
     return base unless full
 
     base.merge(body: m.body, recipient_count: m.recipient_count,

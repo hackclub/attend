@@ -37,6 +37,12 @@ RSpec.describe ParticipantEventsToolbox do
     expect(serialize(pe)[:checked_in]).to be(false)
   end
 
+  it "links every registration at its admin page, keyed by participant_event id" do
+    pe = create(:participant_event, event: event)
+
+    expect(serialize(pe)[:url]).to end_with("/admin/events/#{event.slug}/participants/#{pe.id}")
+  end
+
   it "reports a participant with no check-in at all as not checked in" do
     expect(serialize(create(:participant_event, event: event))[:checked_in]).to be(false)
   end

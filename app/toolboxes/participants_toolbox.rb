@@ -75,7 +75,10 @@ class ParticipantsToolbox < ApplicationToolbox
       name: [ p.preferred_name.presence || p.legal_first_name, p.legal_last_name ].join(" "),
       legal_name: [ p.legal_first_name, p.legal_last_name ].join(" "),
       email: p.email,
-      pronouns: p.pronouns
+      pronouns: p.pronouns,
+      # Only opted-in participants have a public profile; nil means there is no
+      # shareable profile link, not that you should guess a slug.
+      public_profile_url: public_profile_url(p)
     }
     return base unless full
 
@@ -90,7 +93,8 @@ class ParticipantsToolbox < ApplicationToolbox
       registrations: p.participant_events
         .where(current_user.global_admin? ? {} : { event_id: current_user.assigned_events.select(:id) })
         .includes(:event).map { |pe|
-          { participant_event_id: pe.id, event: pe.event.name, event_slug: pe.event.slug, status: pe.status }
+          { participant_event_id: pe.id, event: pe.event.name, event_slug: pe.event.slug,
+            status: pe.status, url: registration_url(pe) }
         }
     )
   end

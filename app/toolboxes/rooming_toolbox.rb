@@ -17,6 +17,7 @@ class RoomingToolbox < ApplicationToolbox
     plan = current_event.rooming_plan
     render json: {
       event: current_event.name,
+      url: event_rooming_url(current_event),
       plan: plan && { status: plan.status, locked: plan.locked?, default_capacity: plan.room_capacity },
       rooms: current_event.rooms.ordered.map { |r| serialize_room(r) },
       unassigned: unassigned_registrations.map { |pe| serialize_person(pe) }

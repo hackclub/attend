@@ -98,7 +98,8 @@ class IncidentsToolbox < ApplicationToolbox
       status: i.status,
       summary: i.summary,
       occurred_at: i.occurred_at,
-      location: i.location
+      location: i.location,
+      url: incident_admin_url(i)
     }
     return base unless full
 
