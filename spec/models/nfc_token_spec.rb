@@ -26,6 +26,14 @@ RSpec.describe NfcToken, type: :model do
     expect(nfc_token.reload).to be_pending
   end
 
+  it "does not confirm a revoked token" do
+    nfc_token = create(:nfc_token, :revoked, user: owner)
+
+    expect {
+      nfc_token.confirm!(presented_token: nfc_token.token, actor: staff)
+    }.to raise_error(NfcToken::InvalidState)
+  end
+
   it "reuses a pending token for a user" do
     pending = described_class.ensure_pending_for!(owner)
 

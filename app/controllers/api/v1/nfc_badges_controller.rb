@@ -10,12 +10,17 @@ module Api
           return render json: { error: "NFC badges are not enabled for this event" }, status: :unprocessable_entity
         end
 
-        token = @participant_event.ensure_nfc_badge_token!
+        owner = token_owner
+        unless owner
+          return render json: { error: "Participant must have a linked user to pair an NFC token" }, status: :unprocessable_entity
+        end
+
+        token = NfcToken.ensure_pending_for!(owner)
 
         render json: {
-          badge_token: token,
+          badge_token: token.token,
           assigned: @participant_event.nfc_badge_assigned?,
-          assigned_at: @participant_event.nfc_badge_assigned_at&.iso8601
+          assigned_at: @participant_event.active_nfc_token&.paired_at&.iso8601
         }
       end
 
@@ -24,32 +29,38 @@ module Api
           return render json: { error: "NFC badges are not enabled for this event" }, status: :unprocessable_entity
         end
 
-        unless @participant_event.nfc_badge_token.present?
-          return render json: { error: "No NFC badge token exists for this participant" }, status: :unprocessable_entity
+        owner = token_owner
+        unless owner
+          return render json: { error: "Participant must have a linked user to pair an NFC token" }, status: :unprocessable_entity
         end
 
-        if params[:badge_token].present? && params[:badge_token] != @participant_event.nfc_badge_token
+        token = owner.nfc_tokens.pending.order(created_at: :desc).first
+        unless token
+          return render json: { error: "No pending NFC token exists for this participant" }, status: :unprocessable_entity
+        end
+
+        begin
+          token.confirm!(presented_token: params[:badge_token], actor: current_user)
+        rescue NfcToken::TokenMismatch
           return render json: { error: "Badge token mismatch" }, status: :unprocessable_entity
         end
 
-        @participant_event.assign_nfc_badge!(user: current_user)
-
         AuditLog.log!(
           action: "nfc_badge_assigned",
-          record: @participant_event,
+          record: token,
           actor: current_user,
           event: @event,
           changed_fields: {},
           metadata: {
             participant_name: @participant_event.participant.display_name,
-            badge_token: @participant_event.nfc_badge_token
+            user_id: owner.id
           }
         )
 
         render json: {
           success: true,
-          badge_token: @participant_event.nfc_badge_token,
-          assigned_at: @participant_event.nfc_badge_assigned_at.iso8601
+          badge_token: token.token,
+          assigned_at: token.paired_at.iso8601
         }
       end
 
@@ -58,25 +69,29 @@ module Api
           return render json: { error: "NFC badges are not enabled for this event" }, status: :unprocessable_entity
         end
 
-        old_token = @participant_event.nfc_badge_token
-        @participant_event.reset_nfc_badge!
+        owner = token_owner
+        unless owner
+          return render json: { error: "Participant must have a linked user to pair an NFC token" }, status: :unprocessable_entity
+        end
+
+        owner.nfc_tokens.pending.find_each { |token| token.revoke!(actor: current_user) }
+        replacement = owner.nfc_tokens.create!
 
         AuditLog.log!(
           action: "nfc_badge_reset",
-          record: @participant_event,
+          record: replacement,
           actor: current_user,
           event: @event,
           changed_fields: {},
           metadata: {
             participant_name: @participant_event.participant.display_name,
-            old_badge_token: old_token,
-            new_badge_token: @participant_event.nfc_badge_token
+            user_id: owner.id
           }
         )
 
         render json: {
           success: true,
-          badge_token: @participant_event.nfc_badge_token
+          badge_token: replacement.token
         }
       end
 
@@ -92,8 +107,12 @@ module Api
 
       def set_participant_event
         @participant_event = @event.participant_events
-          .includes(:participant)
+          .includes(participant: :user)
           .find(params[:participant_event_id])
+      end
+
+      def token_owner
+        @participant_event.participant.user
       end
     end
   end

@@ -330,28 +330,6 @@ class ParticipantEvent < ApplicationRecord
     participant.user.present?
   end
 
-  def ensure_nfc_badge_token!
-    return nfc_badge_token if nfc_badge_token.present?
-
-    update!(nfc_badge_token: SecureRandom.uuid)
-    nfc_badge_token
-  end
-
-  def assign_nfc_badge!(user:)
-    update!(
-      nfc_badge_assigned_at: Time.current,
-      nfc_badge_assigned_by: user
-    )
-  end
-
-  def reset_nfc_badge!
-    update!(
-      nfc_badge_token: SecureRandom.uuid,
-      nfc_badge_assigned_at: nil,
-      nfc_badge_assigned_by: nil
-    )
-  end
-
   # Self-declared airline UM service on either flight direction.
   def unaccompanied_minor_declared?
     !!((travel_inbound&.plane? && travel_inbound.is_unaccompanied_minor?) ||

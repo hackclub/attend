@@ -73,15 +73,15 @@ RSpec.describe ParticipantEventsToolbox do
       expect(pe.scans.count).to eq(0)
     end
 
-    it "mints an NFC badge token on the first check-in when NFC is enabled" do
+    it "mints a pending user-owned NFC token on the first check-in when NFC is enabled" do
       check_in
       event.update!(nfc_badges_enabled: true)
-      pe = create(:participant_event, event: event)
-      pe.update_columns(nfc_badge_token: nil)
+      owner = create(:user)
+      pe = create(:participant_event, event: event, participant: create(:participant, user: owner))
 
-      run_check_in(pe)
+      expect { run_check_in(pe) }.to change { owner.nfc_tokens.count }.by(1)
 
-      expect(pe.reload.nfc_badge_token).to be_present
+      expect(owner.nfc_tokens.sole).to be_pending
     end
 
     it "keeps the earliest scan as the check-in time on a repeat check-in" do

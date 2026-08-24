@@ -68,7 +68,7 @@ tags:
   - name: Slack Blasts
     description: Broadcast Slack messages to an event's participants.
   - name: NFC Badges
-    description: Provision and manage participant NFC badges.
+    description: Provision user-owned NFC tokens through an event registration.
   - name: Push Tokens
     description: Register device push-notification tokens.
   - name: Travel
@@ -553,7 +553,8 @@ paths:
       description: >-
         Record a QR / NFC / manual scan for a participant. Pass `client_scan_id`
         for idempotency — a repeat returns the existing scan with
-        `deduplicated: true`. The participant is identified by `badge_token`, or
+        `deduplicated: true`. Every event accepts an active user-owned
+        `badge_token`, regardless of its NFC issuance setting. The participant is identified by `badge_token`, or
         by `participant_id` (matched as a participant_event id first, then a
         participant id).
       parameters:
@@ -773,8 +774,11 @@ paths:
   /events/{event_id}/participant_events/{participant_event_id}/nfc_badge/ensure:
     post:
       tags: [NFC Badges]
-      summary: Ensure an NFC badge token
-      description: Create a badge token for the participant if one does not exist.
+      summary: Ensure a pending user-owned NFC token
+      description: >-
+        Return the linked user's latest pending token or create one. The event
+        must have NFC badge issuance enabled and the participant must be linked
+        to a user.
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
         - $ref: "#/components/parameters/ParticipantEventId"
@@ -786,7 +790,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  badge_token: { type: string }
+                  badge_token: { type: string, format: uuid }
                   assigned: { type: boolean }
                   assigned_at: { type: string, format: date-time, nullable: true }
         "422": { $ref: "#/components/responses/NfcNotEnabled" }
@@ -802,14 +806,17 @@ paths:
         - $ref: "#/components/parameters/EventIdNumeric"
         - $ref: "#/components/parameters/ParticipantEventId"
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               type: object
+              required: [badge_token]
               properties:
                 badge_token:
                   type: string
-                  description: If given, must match the stored token.
+                  format: uuid
+                  description: Must match the user's latest pending token.
       responses:
         "200":
           description: Badge assigned.
@@ -819,10 +826,10 @@ paths:
                 type: object
                 properties:
                   success: { type: boolean, example: true }
-                  badge_token: { type: string }
+                  badge_token: { type: string, format: uuid }
                   assigned_at: { type: string, format: date-time }
         "422":
-          description: No badge token exists, token mismatch, or NFC not enabled.
+          description: No pending token exists, token mismatch, no linked user, or NFC issuance is not enabled.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -833,7 +840,7 @@ paths:
   /events/{event_id}/participant_events/{participant_event_id}/nfc_badge/reset:
     post:
       tags: [NFC Badges]
-      summary: Reset an NFC badge token
+      summary: Create a fresh pending user-owned NFC token
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
         - $ref: "#/components/parameters/ParticipantEventId"
@@ -846,7 +853,7 @@ paths:
                 type: object
                 properties:
                   success: { type: boolean, example: true }
-                  badge_token: { type: string, nullable: true }
+                  badge_token: { type: string, format: uuid }
         "422": { $ref: "#/components/responses/NfcNotEnabled" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -1097,8 +1104,9 @@ components:
         high_support_flag: { type: boolean }
         can_leave_unaccompanied: { type: boolean }
         waiver_signed: { type: boolean }
-        nfc_badge_token: { type: string, nullable: true }
+        nfc_badge_token: { type: string, format: uuid, nullable: true }
         nfc_badge_assigned: { type: boolean }
+        nfc_pairing_available: { type: boolean }
         groups:
           type: array
           items:
@@ -1265,8 +1273,9 @@ components:
         headshot_url: { type: string, nullable: true }
         status: { $ref: "#/components/schemas/ParticipantStatus" }
         checked_in_at: { type: string, format: date-time, nullable: true }
-        nfc_badge_token: { type: string, nullable: true }
+        nfc_badge_token: { type: string, format: uuid, nullable: true }
         nfc_badge_assigned: { type: boolean }
+        nfc_pairing_available: { type: boolean }
         has_anaphylaxis_risk: { type: boolean }
         requires_refrigeration: { type: boolean }
         cross_contamination_risk: { type: boolean }

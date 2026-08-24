@@ -1,5 +1,6 @@
 class NfcToken < ApplicationRecord
   class TokenMismatch < StandardError; end
+  class InvalidState < StandardError; end
 
   self.implicit_order_column = "created_at"
 
@@ -27,6 +28,7 @@ class NfcToken < ApplicationRecord
   end
 
   def confirm!(presented_token:, actor:)
+    raise InvalidState unless pending?
     raise TokenMismatch unless token == presented_token
 
     update!(paired_at: Time.current, paired_by: actor)
