@@ -275,6 +275,7 @@ Rails.application.routes.draw do
         get :preferences
         post :link_preference
         delete :unlink_preference
+        post :manual_assign
         post :auto_assign
         get :assignments
         post :move_assignment
