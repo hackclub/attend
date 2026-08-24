@@ -10,11 +10,28 @@ RSpec.describe "Admin::EventSetup", type: :request do
 
   describe "POST /admin/events (step 1)" do
     it "creates a draft event and redirects into the wizard" do
-      post admin_events_path, params: { event: { name: "Wizard Con", slug: "wizard-con" } }
+      post admin_events_path, params: { event: { name: "Wizard Con", slug: "wizard-con", support_email: "wizard@hackclub.com" } }
 
       created = Event.find_by(slug: "wizard-con")
       expect(created.setup_complete?).to be(false)
       expect(response).to redirect_to(admin_event_setup_schedule_path(created))
+    end
+
+    it "rejects a draft without a support email" do
+      post admin_events_path, params: { event: { name: "No Mail Con", slug: "no-mail-con" } }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(Event.find_by(slug: "no-mail-con")).to be_nil
+    end
+
+    it "rejects a support email outside the Hack Club domains" do
+      post admin_events_path, params: {
+        event: { name: "Outside Con", slug: "outside-con", support_email: "hi@gmail.com" }
+      }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(Event.find_by(slug: "outside-con")).to be_nil
+      expect(response.body).to include("@hackclub.com or @events.hackclub.com")
     end
   end
 
@@ -198,6 +215,15 @@ RSpec.describe "Admin::EventSetup", type: :request do
   end
 
   describe "POST complete" do
+    it "refuses to finish setup while the support email is missing" do
+      event.update_column(:support_email, nil)
+
+      post admin_event_setup_complete_path(event)
+
+      expect(response).to redirect_to(edit_admin_event_path(event))
+      expect(event.reload.setup_complete?).to be(false)
+    end
+
     it "marks setup complete and lands on the event dashboard" do
       post admin_event_setup_complete_path(event)
 

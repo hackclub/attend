@@ -87,13 +87,17 @@ RSpec.describe EventSeries, type: :model do
       expect(event.effective_support_email).to eq("own@hackclub.com")
     end
 
+    # New events must set a support email, so blank-support-email events only
+    # exist as legacy rows — hence update_column rather than the factory.
     it "falls back to the series contact email" do
-      event = create(:event, event_series: series, support_email: nil)
+      event = create(:event, event_series: series)
+      event.update_column(:support_email, nil)
       expect(event.effective_support_email).to eq("series@hackclub.com")
     end
 
     it "defaults to team@hackclub.com when neither is set" do
-      event = create(:event, support_email: nil)
+      event = create(:event)
+      event.update_column(:support_email, nil)
       expect(event.effective_support_email).to eq("team@hackclub.com")
     end
   end

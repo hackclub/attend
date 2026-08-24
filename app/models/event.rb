@@ -94,6 +94,25 @@ class Event < ApplicationRecord
   ].freeze
 
   validates :name, presence: true
+
+  # Support email is the from/reply-to on every participant- and guardian-facing
+  # email, so it has to be an address we actually control. Required from setup
+  # onwards; older events created before this rule keep passing validation until
+  # someone edits the field (hence allow_blank on the format check).
+  SUPPORT_EMAIL_DOMAINS = %w[hackclub.com events.hackclub.com].freeze
+  SUPPORT_EMAIL_FORMAT = /\A[^@\s]+@(?:#{SUPPORT_EMAIL_DOMAINS.map { |d| Regexp.escape(d) }.join("|")})\z/i
+
+  normalizes :support_email, with: ->(v) { v.strip.downcase.presence }
+
+  validates :support_email, presence: true, on: :create
+  validates :support_email, presence: true, on: :update, if: :support_email_changed?
+  validates :support_email,
+            format: {
+              with: SUPPORT_EMAIL_FORMAT,
+              message: "must be a #{SUPPORT_EMAIL_DOMAINS.map { |d| "@#{d}" }.join(" or ")} address"
+            },
+            allow_blank: true
+
   validates :slug, presence: true,
                    uniqueness: true,
                    format: { with: /\A[a-z0-9-]+\z/, message: "must be lowercase with no spaces (dashes allowed)" },

@@ -121,7 +121,7 @@ RSpec.describe "Admin::EventSeries", type: :request do
       sign_in organizer
 
       post admin_events_path, params: {
-        event: { name: "Sunbeam Berlin Spec", event_series_id: series.id }
+        event: { name: "Sunbeam Berlin Spec", event_series_id: series.id, support_email: "berlin@events.hackclub.com" }
       }
 
       event = Event.find_by(name: "Sunbeam Berlin Spec")
