@@ -6,6 +6,10 @@ class ApplicationToolbox < Toolchest::Toolbox
   # auth.scopes         — scopes the user consented to for this client
   # auth.token          — the raw OAuth access token record
 
+  # Every serialized record carries the URL of the page it lives on, so agents
+  # hand humans links instead of bare IDs.
+  include AttendUrls
+
   helper_method :current_user, :current_event, :global_admin?, :participant_name, :person_name
 
   before_action :require_staff!

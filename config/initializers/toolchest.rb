@@ -18,6 +18,11 @@ Toolchest.configure do |config|
     apply; relay those limits plainly instead of working around them. me_anonymize turns
     anonymization on for this connection and can never turn it off — only offer it when the
     user asks to work without personal data.
+    When you tell a human about a record, give them its link, not its ID: read tools return a
+    `url` on the records they serialize, links_participant turns a participant_id into every
+    link that exists for that person, and links_patterns has the URL templates for anything
+    else. Public participant profiles (/p/:slug) are opt-in, so many people simply don't have
+    one — never invent a profile URL or any other path.
   INSTRUCTIONS
 
   config.auth = :oauth

@@ -154,8 +154,11 @@ class ParticipantEventsToolbox < ApplicationToolbox
       name: participant_name(p),
       email: p.email,
       event: pe.event.name,
+      event_slug: pe.event.slug,
       status: pe.status,
-      checked_in: pe.check_in_time.present?
+      checked_in: pe.check_in_time.present?,
+      url: registration_url(pe),
+      public_profile_url: public_profile_url(p)
     }
   end
 

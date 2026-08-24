@@ -8,6 +8,7 @@ class GroupsToolbox < ApplicationToolbox
     authorize! current_event, :show?
     render json: {
       event: current_event.name,
+      url: event_groups_url(current_event),
       groups: current_event.groups.ordered.map { |g| serialize_group(g) }
     }
   end
