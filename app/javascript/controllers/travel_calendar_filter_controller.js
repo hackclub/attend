@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["entry", "day", "search", "direction", "mode", "pickup", "group", "empty"]
+  static targets = ["entry", "day", "count", "search", "direction", "mode", "pickup", "group", "empty"]
 
   apply() {
     const search = this.searchTarget.value.trim().toLowerCase()
@@ -24,10 +24,15 @@ export default class extends Controller {
 
     this.dayTargets.forEach((day) => {
       const entries = this.entryTargets.filter((entry) => day.contains(entry))
-      day.hidden = entries.every((entry) => entry.hidden)
+      const visibleCount = entries.filter((entry) => !entry.hidden).length
+      const count = day.querySelector("[data-travel-calendar-filter-target~='count']")
+
+      count.textContent = `${visibleCount} ${visibleCount === 1 ? "journey" : "journeys"}`
+      day.hidden = visibleCount === 0
     })
 
-    this.emptyTarget.hidden = this.entryTargets.some((entry) => !entry.hidden)
+    const shouldHideEmptyState = this.entryTargets.some((entry) => !entry.hidden)
+    if (this.emptyTarget.hidden !== shouldHideEmptyState) this.emptyTarget.hidden = shouldHideEmptyState
   }
 
   reset() {

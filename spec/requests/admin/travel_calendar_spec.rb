@@ -37,6 +37,7 @@ RSpec.describe "Admin::TravelCalendar", type: :request do
 
       document = Nokogiri::HTML(response.body)
       expect(document.css("nav[aria-label='Travel filters']").size).to eq(1)
+      expect(document.css("[data-travel-calendar-filter-target~='day'] [data-travel-calendar-filter-target~='count']").map(&:text).map(&:strip)).to eq([ "2 journeys", "2 journeys", "1 journey" ])
       rows = document.css("section[data-travel-calendar-filter-target~='day'] ol > li[data-travel-calendar-filter-target~='entry']")
       expect(rows.size).to eq(5)
       expect(document.css("li[data-travel-calendar-filter-target~='entry'] > details").size).to eq(5)
@@ -48,6 +49,22 @@ RSpec.describe "Admin::TravelCalendar", type: :request do
       )
       expect(rows_by_mode.fetch("bus")["data-travel-calendar-filter-pickup-value"]).to eq("")
       expect(rows_by_mode.fetch("plane")["data-travel-calendar-filter-search-value"]).to include("ua123", "jfk", "sfo")
+    end
+
+    it "renders one hidden live status for dynamic no-results feedback" do
+      create_journey(mode: "train", direction: "inbound", arrival_time: Time.utc(2026, 8, 24, 17))
+
+      get "/admin/events/#{event.slug}/travel"
+
+      statuses = Nokogiri::HTML(response.body).css("[data-travel-calendar-filter-target~='empty']")
+      expect(statuses.size).to eq(1)
+      expect(statuses.first.attributes).to include(
+        "role" => have_attributes(value: "status"),
+        "aria-live" => have_attributes(value: "polite"),
+        "aria-atomic" => have_attributes(value: "true")
+      )
+      expect(statuses.first).to have_attribute("hidden")
+      expect(statuses.first.text.strip).to eq("No journeys match these filters.")
     end
 
     it "renders an empty-calendar explanation" do
