@@ -353,6 +353,7 @@ def admin_tool(class_name = "", element = "div", **options, &block)
     qr = ::RQRCode::QRCode.new(data)
     qr.as_svg(
       color: "000",
+      fill: "fff",
       shape_rendering: "crispEdges",
       module_size: 4,
       standalone: true,
