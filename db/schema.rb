@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_135022) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_150001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -121,6 +121,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_135022) do
     t.datetime "updated_at", null: false
     t.index ["auditor_id"], name: "index_audits1984_audits_on_auditor_id"
     t.index ["session_id"], name: "index_audits1984_audits_on_session_id"
+  end
+
+  create_table "automated_sms_logs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "body", null: false
+    t.datetime "created_at", null: false
+    t.string "phone_number", null: false
+    t.datetime "sent_at", null: false
+    t.string "source"
+    t.string "twilio_sid"
+    t.datetime "updated_at", null: false
+    t.index ["phone_number", "sent_at"], name: "index_automated_sms_logs_on_phone_number_and_sent_at"
+    t.index ["twilio_sid"], name: "index_automated_sms_logs_on_twilio_sid", unique: true, where: "(twilio_sid IS NOT NULL)"
   end
 
   create_table "ban_emails", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1156,6 +1168,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_135022) do
   end
 
   create_table "ticket_messages", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.boolean "automated", default: false, null: false
     t.text "body", null: false
     t.string "channel", null: false
     t.datetime "created_at", null: false

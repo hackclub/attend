@@ -25,6 +25,12 @@ class TicketMessage < ApplicationRecord
   validates :channel, presence: true
   validates :body, presence: true
 
+  # Short label for where an automated message came from (e.g. "Broadcast
+  # message", "Incident reports"), stored when the message is recorded.
+  def automated_source
+    raw_payload&.dig("source")
+  end
+
   after_create_commit :broadcast_message
   after_create_commit :notify_assigned_user, if: :inbound?
   after_create_commit :notify_assigned_user_by_sms, if: :inbound?

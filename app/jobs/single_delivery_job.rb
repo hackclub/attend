@@ -150,7 +150,8 @@ class SingleDeliveryJob < ApplicationJob
     sms_service = TwilioService.new
     result = sms_service.send_sms(
       to: phone,
-      body: sms_body
+      body: sms_body,
+      source: "Broadcast message"
     )
 
     if result[:skipped]

@@ -9,7 +9,7 @@ class SendIncidentReportUpdateSmsJob < ApplicationJob
     sender = comment.user&.display_name_or_fallback
     body = sender.present? ? "#{sender}: #{comment.body}" : comment.body
 
-    TwilioService.new.send_sms(to: report.reporter_phone, body: body)
+    TwilioService.new.send_sms(to: report.reporter_phone, body: body, source: "Incident reports")
   rescue TwilioService::Error => e
     Rails.logger.error("[IncidentReportSms] update SMS failed for comment #{comment_id}: #{e.message}")
   end
