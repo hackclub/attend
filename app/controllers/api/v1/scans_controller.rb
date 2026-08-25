@@ -10,9 +10,11 @@ module Api
       SINCE_SYNC_LIMIT = 500
 
       def index
+        sync_cutoff = Time.current
         scans = Scan.for_event(@event)
           .includes(:user, :scan_context, participant_event: :participant)
           .recent
+          .where("scans.created_at <= ?", sync_cutoff)
 
         if params[:scan_context_id].present?
           scans = scans.where(scan_context_id: params[:scan_context_id])
@@ -36,7 +38,7 @@ module Api
         render json: {
           scans: scans.map { |scan| scan_json(scan) },
           has_more: truncated,
-          synced_at: truncated ? scans.last.created_at.iso8601(6) : Time.current.iso8601
+          synced_at: truncated ? scans.last.created_at.iso8601(6) : sync_cutoff.iso8601(6)
         }
       end
 

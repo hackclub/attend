@@ -8,6 +8,7 @@ module Api
       before_action :set_participant_event, only: [ :show ]
 
       def index
+        sync_cutoff = Time.current
         participant_events = @event.participant_events
           .includes(
             :event,
@@ -21,6 +22,7 @@ module Api
             travel_outbound: :travel_legs,
             scans: :scan_context
           )
+          .where("participant_events.updated_at <= ?", sync_cutoff)
 
         if params[:updated_since].present?
           since = Time.zone.parse(params[:updated_since])
@@ -29,7 +31,7 @@ module Api
 
         render json: {
           participants: participant_events.map { |pe| participant_json(pe) },
-          synced_at: Time.current.iso8601
+          synced_at: sync_cutoff.iso8601(6)
         }
       end
 

@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe "Api::V1::Scans", type: :request do
+  include ActiveSupport::Testing::TimeHelpers
+
   let(:event) { create(:event, slug: "api-scans-#{SecureRandom.hex(8)}") }
   let(:admin) { User.create!(email: "api-scans@example.com", name: "API Admin", global_role: "global_admin") }
   let(:mobile_token) { MobileToken.generate_for(admin) }
@@ -46,6 +48,30 @@ RSpec.describe "Api::V1::Scans", type: :request do
       json = JSON.parse(response.body)
       expect(json["scans"].size).to eq(2)
       expect(json["has_more"]).to be(false)
+    end
+
+    it "uses a bounded high-water timestamp so concurrent scans remain resumable" do
+      cutoff = Time.zone.parse("2026-08-24 10:00:00")
+      pe = create(:participant_event, event: event)
+      context = event.scan_contexts.create!(name: "Check-in", checks_in: true)
+      scan = pe.scans.create!(scan_context: context, user: admin, scanned_at: cutoff)
+      scan.update_columns(created_at: cutoff + 1.second)
+
+      travel_to(cutoff) do
+        get "/api/v1/events/#{event.id}/scans",
+          params: { since: (cutoff - 1.hour).iso8601(6) }, headers: auth_headers
+
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body["scans"]).to be_empty
+        expect(response.parsed_body["synced_at"]).to eq(cutoff.iso8601(6))
+      end
+
+      travel_to(cutoff + 2.seconds) do
+        get "/api/v1/events/#{event.id}/scans",
+          params: { since: cutoff.iso8601(6) }, headers: auth_headers
+
+        expect(response.parsed_body["scans"].sole["id"]).to eq(scan.id)
+      end
     end
   end
 
