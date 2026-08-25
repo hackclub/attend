@@ -87,6 +87,7 @@ class IncidentsToolbox < ApplicationToolbox
     unless current_user.can_access_event?(incident.event)
       halt error: "You don't have access to that event."
     end
+    halt error: out_of_connection_scope(incident.event) unless connection_permits_event?(incident.event)
     incident
   end
 
@@ -98,7 +99,8 @@ class IncidentsToolbox < ApplicationToolbox
       status: i.status,
       summary: i.summary,
       occurred_at: i.occurred_at,
-      location: i.location
+      location: i.location,
+      url: incident_admin_url(i)
     }
     return base unless full
 

@@ -15,7 +15,7 @@
       <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
         <div><dt class="text-gray-500 inline">Name:</dt> <dd class="inline text-gray-900"><%= @event.name %></dd></div>
         <div><dt class="text-gray-500 inline">Slug:</dt> <dd class="inline text-gray-900 font-mono"><%= @event.slug %></dd></div>
-        <div><dt class="text-gray-500 inline">Support email:</dt> <dd class="inline text-gray-900"><%= @event.support_email.presence || "team@hackclub.com (default)" %></dd></div>
+        <div><dt class="text-gray-500 inline">Support email:</dt> <dd class="inline <%= @event.support_email.present? ? "text-gray-900" : "text-amber-700 font-medium" %>"><%= @event.support_email.presence || "Not set — required" %></dd></div>
         <div><dt class="text-gray-500 inline">Timezone:</dt> <dd class="inline text-gray-900"><%= @event.timezone.presence || "Not set" %></dd></div>
       </dl>
     </div>
@@ -105,6 +105,13 @@
       <% end %>
     </div>
   </div>
+
+  <% if @event.support_email.blank? %>
+    <p class="mt-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+      This event needs a support email before setup can be finished — it's the from and reply-to address on participant and guardian emails.
+      Set a @hackclub.com or @events.hackclub.com address from <%= link_to "event settings", edit_admin_event_path(@event), class: "font-medium underline" %>.
+    </p>
+  <% end %>
 
   <div class="mt-6 flex flex-col sm:flex-row justify-end gap-3">
     <%= button_to "Finish setup", admin_event_setup_complete_path(@event), method: :post, class: "w-full sm:w-auto bg-[#d42f46] hover:bg-[#b82840] text-white font-semibold py-2 px-6 rounded-lg transition-colors cursor-pointer" %>

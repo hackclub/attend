@@ -33,7 +33,12 @@
       <% if @participant.preferred_name.present? %>
         <p class="text-gray-600">Legal name: <%= @participant.full_name %></p>
       <% end %>
-      <p class="text-gray-600"><%= @participant.email %></p>
+      <p class="text-gray-600">
+        <%= @participant.email %>
+        <% if @participant.email_undeliverable? %>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800" title="This address hard-bounced and is suppressed — emails to it will not be delivered. Correct the email to clear this.">⚠ Email bouncing</span>
+        <% end %>
+      </p>
     </div>
   </div>
   <div class="relative w-full lg:w-auto" data-controller="dropdown">
@@ -82,8 +87,10 @@
       <%= link_to "Travel", travel_admin_event_participant_path(current_event, @participant_event),
           class: "py-3 px-1 border-b-2 #{action_name == 'travel' ? 'border-[#ec3750] text-[#ec3750]' : 'border-transparent text-gray-500 hover:text-gray-700'}" %>
     <% end %>
-    <%= link_to "Accommodation", accommodation_admin_event_participant_path(current_event, @participant_event),
-        class: "py-3 px-1 border-b-2 #{action_name == 'accommodation' ? 'border-[#ec3750] text-[#ec3750]' : 'border-transparent text-gray-500 hover:text-gray-700'}" %>
+    <% if current_event.accommodation_enabled? %>
+      <%= link_to "Accommodation", accommodation_admin_event_participant_path(current_event, @participant_event),
+          class: "py-3 px-1 border-b-2 #{action_name == 'accommodation' ? 'border-[#ec3750] text-[#ec3750]' : 'border-transparent text-gray-500 hover:text-gray-700'}" %>
+    <% end %>
     <% if policy(@participant_event.medical || Medical.new(participant_event: @participant_event)).show? %>
       <%= link_to "Medical", medical_admin_event_participant_path(current_event, @participant_event),
           class: "py-3 px-1 border-b-2 #{action_name == 'medical' ? 'border-[#ec3750] text-[#ec3750]' : 'border-transparent text-gray-500 hover:text-gray-700'}" %>

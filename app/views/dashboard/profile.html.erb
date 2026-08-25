@@ -2,18 +2,20 @@
 
 <div class="w-full max-w-6xl mx-auto">
   <!-- Account header -->
+  <% header_name = @participant&.display_name.presence || current_user.display_name_or_fallback %>
+  <% header_email = @participant&.email.presence || current_user.email %>
   <div class="mb-8 flex items-center gap-4">
-    <% if @participant.headshot.attached? && @participant.headshot.blob.persisted? %>
+    <% if @participant&.headshot&.attached? && @participant.headshot.blob.persisted? %>
       <%= image_tag @participant.headshot, class: "size-14 rounded-full object-cover ring-2 ring-(--border-card)" %>
     <% else %>
       <div class="flex size-14 items-center justify-center rounded-full bg-(--bg-elev-2) text-xl font-semibold text-(--text-muted)">
-        <%= @participant.display_name.to_s.first&.upcase %>
+        <%= header_name.to_s.first&.upcase %>
       </div>
     <% end %>
     <div class="min-w-0">
       <h1 class="text-xl font-bold text-(--text-strong) truncate">
-        <%= @participant.display_name %>
-        <span class="font-normal text-(--text-muted)">(<%= @participant.email %>)</span>
+        <%= header_name %>
+        <span class="font-normal text-(--text-muted)">(<%= header_email %>)</span>
       </h1>
       <p class="text-sm text-(--text-muted)">Your personal account</p>
     </div>
@@ -22,18 +24,45 @@
   <div class="grid items-start gap-x-8 gap-y-8 lg:grid-cols-[220px_minmax(0,1fr)]">
     <!-- Settings nav -->
     <nav class="flex gap-1 overflow-x-auto max-lg:border-b max-lg:border-(--border-soft) max-lg:pb-3 lg:sticky lg:top-8 lg:flex-col" aria-label="Settings">
-      <a href="#account" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
-        <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-        </svg>
-        Account
-      </a>
-      <a href="#public-profile" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
-        <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM3.6 9h16.8M3.6 15h16.8M12 3a15.3 15.3 0 010 18M12 3a15.3 15.3 0 000 18"/>
-        </svg>
-        Public profile
-      </a>
+      <% if @participant %>
+        <a href="#account" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
+          <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+          </svg>
+          Account
+        </a>
+        <a href="#public-profile" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
+          <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM3.6 9h16.8M3.6 15h16.8M12 3a15.3 15.3 0 010 18M12 3a15.3 15.3 0 000 18"/>
+          </svg>
+          Public profile
+        </a>
+      <% end %>
+      <% if @passports.any? %>
+        <a href="#passport" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
+          <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 1.105-.895 2-2 2s-2-.895-2-2 .895-2 2-2 2 .895 2 2zm0 0h8m-3 0v3m0 3v.01M4 5h16a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V7a2 2 0 012-2z"/>
+          </svg>
+          Hack Club Passport
+        </a>
+      <% end %>
+      <% if current_user.admin? %>
+        <a href="#staff-settings" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
+          <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+          Staff settings
+        </a>
+      <% end %>
+      <% if @show_mcp_connections %>
+        <a href="#connections" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
+          <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5"/>
+          </svg>
+          Connections
+        </a>
+      <% end %>
       <a href="#appearance" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
         <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
@@ -43,6 +72,32 @@
     </nav>
 
     <div class="min-w-0 space-y-10">
+      <% if @passports.any? %>
+        <section id="passport" class="scroll-mt-8">
+          <h2 class="border-b border-(--border-soft) pb-3 text-xl font-semibold text-(--text-strong)">Hack Club Passport</h2>
+          <p class="mt-3 text-sm text-(--text-muted)">Your passport identifies you when you check in at Hack Club events.</p>
+
+          <div class="mt-4 overflow-hidden rounded-2xl border border-(--border-card) bg-(--bg-elev)">
+            <dl class="divide-y divide-(--border-soft)">
+              <% @passports.each do |passport| %>
+                <div class="px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div>
+                    <dt class="font-mono text-sm font-semibold text-(--text-strong)"><%= passport.serial_number %></dt>
+                    <dd class="mt-1 text-sm text-(--text-muted)">Paired <%= passport.paired_at.strftime("%B %d, %Y") %></dd>
+                  </div>
+                  <% if passport.active? %>
+                    <span class="inline-flex w-fit rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Active</span>
+                  <% else %>
+                    <span class="inline-flex w-fit rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Revoked</span>
+                  <% end %>
+                </div>
+              <% end %>
+            </dl>
+          </div>
+        </section>
+      <% end %>
+
+      <% if @participant %>
       <!-- Account -->
       <section id="account" class="scroll-mt-8">
         <h2 class="border-b border-(--border-soft) pb-3 text-xl font-semibold text-(--text-strong)">Account</h2>
@@ -265,6 +320,213 @@
           <% end %>
         </div>
       </section>
+      <% end %>
+
+      <% if current_user.admin? %>
+        <!-- Staff settings (User record: shown on comments, audit logs, incident calls) -->
+        <section id="staff-settings" class="scroll-mt-8">
+          <h2 class="border-b border-(--border-soft) pb-3 text-xl font-semibold text-(--text-strong)">Staff settings</h2>
+          <p class="mt-3 text-sm text-(--text-muted)">
+            How you appear to other organizers — on comments, audit logs, and other admin activity — and how Attend reaches you for incidents.
+          </p>
+          <div class="mt-4 overflow-hidden rounded-2xl border border-(--border-card) bg-(--bg-elev)">
+            <%= form_with model: current_user, url: dashboard_staff_profile_path, method: :patch, class: "px-6 py-5 space-y-5", data: { controller: "avatar-preview" } do |f| %>
+              <div class="flex items-center gap-5">
+                <div class="relative shrink-0" data-avatar-preview-target="container">
+                  <% if current_user.avatar_displayable? %>
+                    <%= image_tag current_user.avatar.variant(resize_to_fill: [ 96, 96 ]), class: "size-16 rounded-full object-cover ring-2 ring-(--border-card)", data: { avatar_preview_target: "image" } %>
+                  <% else %>
+                    <div class="flex size-16 items-center justify-center rounded-full bg-(--bg-elev-2)" data-avatar-preview-target="placeholder">
+                      <span class="text-xl font-semibold text-(--text-muted)"><%= current_user.initials %></span>
+                    </div>
+                    <img src="" class="size-16 rounded-full object-cover hidden" data-avatar-preview-target="image">
+                  <% end %>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <label class="block text-sm font-medium text-(--text-strong) mb-1">Profile picture</label>
+                  <%= f.file_field :avatar, accept: "image/jpeg,image/png,image/gif,image/webp", class: "block w-full text-sm text-(--text-muted) file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-(--bg-elev-2) file:text-(--text-strong) file:text-sm file:font-medium file:cursor-pointer", data: { action: "change->avatar-preview#preview", avatar_preview_target: "input" } %>
+                  <p class="text-xs text-(--text-faint) mt-1">JPG, PNG, GIF, or WebP up to 5MB</p>
+                </div>
+              </div>
+
+              <div>
+                <%= f.label :display_name, "Display name", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+                <%= f.text_field :display_name, placeholder: current_user.name || current_user.email, class: "w-full rounded-lg border border-(--border-card) bg-(--bg-app) px-3 py-2 text-sm text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-[#ec3750]/40" %>
+                <p class="text-xs text-(--text-faint) mt-1">If left blank, your Hack Club Auth name (<%= current_user.name || "not set" %>) or email is used.</p>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <%= f.label :phone_number, "Phone number", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+                  <%= f.telephone_field :phone_number,
+                        placeholder: current_user.oidc_claims&.dig("phone_number").presence || "+15551234567",
+                        class: "w-full rounded-lg border border-(--border-card) bg-(--bg-app) px-3 py-2 text-sm text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-[#ec3750]/40" %>
+                  <p class="text-xs text-(--text-faint) mt-1">
+                    Used for emergency incident calls.
+                    <%= current_user.oidc_claims&.dig("phone_number").present? ? "Defaults to your Hack Club account number; override here." : "Not provided by Hack Club login — set it here." %>
+                  </p>
+                </div>
+                <div>
+                  <%= f.label :slack_user_id, "Slack member ID", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+                  <%= f.text_field :slack_user_id,
+                        placeholder: current_user.oidc_claims&.dig("slack_id").presence || "U01ABCDEF",
+                        class: "w-full rounded-lg border border-(--border-card) bg-(--bg-app) px-3 py-2 text-sm text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-[#ec3750]/40" %>
+                  <p class="text-xs text-(--text-faint) mt-1">
+                    Used for Slack DM alerts.
+                    <%= current_user.oidc_claims&.dig("slack_id").present? ? "Defaults to your Hack Club account; override here." : "Set it here." %>
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between gap-4 border-t border-(--border-soft) pt-4 text-sm">
+                <div class="text-(--text-muted)">
+                  Role: <span class="text-(--text-strong)"><%= current_user.global_role.titleize %></span>
+                </div>
+                <%# f.button (not f.submit): themes.css themes every `input` element in dark
+                    modes with an unlayered rule that beats Tailwind's utility layer. %>
+                <%= f.button "Save staff settings", class: "inline-flex items-center px-4 py-2 bg-[#d42f46] hover:bg-[#b82840] text-[#ffffff] text-sm font-semibold rounded-lg transition-colors cursor-pointer" %>
+              </div>
+            <% end %>
+
+            <% if current_user.avatar.attached? %>
+              <div class="px-6 pb-5 -mt-2">
+                <%= button_to "Remove profile picture", dashboard_staff_profile_avatar_path, method: :delete, form: { data: { turbo_confirm: "Are you sure you want to remove your profile picture?" } }, class: "text-sm text-(--danger) hover:underline cursor-pointer" %>
+              </div>
+            <% end %>
+          </div>
+        </section>
+      <% end %>
+
+      <!-- Connections -->
+      <% if @show_mcp_connections %>
+      <section id="connections" class="scroll-mt-8">
+        <h2 class="border-b border-(--border-soft) pb-3 text-xl font-semibold text-(--text-strong)">Connections</h2>
+        <% if current_user.admin? %>
+          <p class="mt-3 text-sm text-(--text-muted)">
+            Apps connected to your Attend account through
+            <a href="https://attend.hackclub.com/mcp" class="font-medium text-(--text-link) hover:underline">MCP</a>.
+            They act as you, limited to the scopes you approved. Disconnecting one signs it out immediately.
+          </p>
+          <p class="mt-2 text-sm text-(--text-muted)">
+            You can tighten a connection here at any time. Giving one <em>more</em> access — more events, or
+            turning anonymising off — means disconnecting it and connecting it again, so the change goes
+            back through the approval screen.
+          </p>
+        <% else %>
+          <p class="mt-3 text-sm text-(--text-muted)">
+            MCP is only available to Attend staff, so these apps can no longer reach your
+            account. Disconnect them to clear them out.
+          </p>
+        <% end %>
+
+        <% if @mcp_connections.any? %>
+          <div class="mt-4 overflow-hidden rounded-2xl border border-(--border-card) bg-(--bg-elev)">
+            <ul class="divide-y divide-(--border-soft)">
+              <% @mcp_connections.each do |connection| %>
+                <li class="px-6 py-4">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <p class="text-sm font-semibold text-(--text-strong)"><%= connection[:application].name %></p>
+                      <p class="mt-0.5 text-xs text-(--text-muted)">
+                        Connected <%= connection[:connected_at].strftime("%b %-d, %Y") %>
+                        <% if connection[:last_used_at] %>
+                          · Last active <%= time_ago_in_words(connection[:last_used_at]) %> ago
+                        <% end %>
+                      </p>
+                      <% if connection[:scopes].any? %>
+                        <div class="mt-2 flex flex-wrap gap-1.5">
+                          <% connection[:scopes].each do |scope| %>
+                            <% sensitive = scope.start_with?("medical:", "safeguarding:") %>
+                            <span class="inline-flex rounded-md px-1.5 py-0.5 font-mono text-[11px] <%= sensitive ? "bg-(--warning)/15 text-(--warning)" : "bg-(--bg-elev-2) text-(--text-muted)" %>">
+                              <%= scope %>
+                            </span>
+                          <% end %>
+                        </div>
+                      <% end %>
+
+                      <dl class="mt-3 space-y-1 text-xs">
+                        <div class="flex flex-wrap gap-x-2">
+                          <dt class="text-(--text-muted)">Events</dt>
+                          <dd class="text-(--text)">
+                            <% if connection[:events].nil? %>
+                              Every event you can access
+                            <% else %>
+                              <%= connection[:events].map(&:name).to_sentence %>
+                            <% end %>
+                          </dd>
+                        </div>
+                        <div class="flex flex-wrap gap-x-2">
+                          <dt class="text-(--text-muted)">Anonymised</dt>
+                          <dd class="<%= connection[:anonymized] ? "text-(--success)" : "text-(--text)" %>">
+                            <% if connection[:anonymized] %>
+                              Yes — initials only, no contact details, read-only
+                            <% else %>
+                              No — full names and contact details
+                            <% end %>
+                          </dd>
+                        </div>
+                      </dl>
+
+                      <% if current_user.admin? %>
+                        <div class="mt-3 flex flex-wrap items-center gap-2">
+                          <% unless connection[:anonymized] %>
+                            <%= form_with url: update_dashboard_mcp_connection_path(connection[:application]), method: :patch, class: "contents" do |f| %>
+                              <%= f.hidden_field :mcp_anonymize, value: "1" %>
+                              <%= f.submit "Anonymise",
+                                  data: { turbo_confirm: "Anonymise #{connection[:application].name}? It will only see initials, lose access to emails, phone numbers and addresses, and become read-only. Undoing this means disconnecting and reconnecting it." },
+                                  class: "cursor-pointer rounded-lg border border-(--border-card) px-2.5 py-1 text-xs font-medium text-(--text) hover:bg-(--bg-elev-2) transition-colors" %>
+                            <% end %>
+                          <% end %>
+
+                          <% if connection[:scopable_events].many? || connection[:events].nil? && connection[:scopable_events].any? %>
+                            <details class="w-full">
+                              <summary class="inline-flex cursor-pointer rounded-lg border border-(--border-card) px-2.5 py-1 text-xs font-medium text-(--text) hover:bg-(--bg-elev-2) transition-colors">
+                                Limit to specific events
+                              </summary>
+                              <%= form_with url: update_dashboard_mcp_connection_path(connection[:application]), method: :patch, class: "mt-2 rounded-xl border border-(--border-card) bg-(--bg-elev-2) p-3" do |f| %>
+                                <%= f.hidden_field :event_scope, value: "selected" %>
+                                <p class="text-xs text-(--text-muted)">
+                                  Untick an event to take it away from this app. You can't add events back here.
+                                </p>
+                                <div class="mt-2 max-h-52 space-y-1 overflow-y-auto">
+                                  <% current_ids = connection[:events]&.map(&:id) %>
+                                  <% connection[:scopable_events].each do |event| %>
+                                    <label class="flex items-center gap-2 rounded-md px-1 py-1 text-xs text-(--text) hover:bg-(--bg-elev-3)">
+                                      <%= check_box_tag "mcp_event_ids[]", event.id, current_ids.nil? || current_ids.include?(event.id),
+                                            id: "mcp_event_#{connection[:application].id}_#{event.id}",
+                                            class: "size-3.5 accent-(--brand)" %>
+                                      <span><%= event.name %></span>
+                                      <% if event.starts_at %>
+                                        <span class="ml-auto text-[11px] text-(--text-muted)"><%= event.starts_at.strftime("%b %Y") %></span>
+                                      <% end %>
+                                    </label>
+                                  <% end %>
+                                </div>
+                                <%= f.submit "Save event limits",
+                                    class: "mt-2 cursor-pointer rounded-lg border border-(--border-card) px-2.5 py-1 text-xs font-medium text-(--text) hover:bg-(--bg-elev) transition-colors" %>
+                              <% end %>
+                            </details>
+                          <% end %>
+                        </div>
+                      <% end %>
+                    </div>
+                    <%= button_to "Disconnect",
+                        dashboard_mcp_connection_path(connection[:application]),
+                        method: :delete,
+                        data: { turbo_confirm: "Disconnect #{connection[:application].name}? It will lose access to your Attend account immediately." },
+                        class: "shrink-0 rounded-lg border border-(--border-card) px-3 py-1.5 text-sm font-medium text-(--danger) hover:bg-(--danger)/10 transition-colors cursor-pointer" %>
+                  </div>
+                </li>
+              <% end %>
+            </ul>
+          </div>
+        <% else %>
+          <div class="mt-4 rounded-2xl border border-dashed border-(--border-card) bg-(--bg-elev) px-6 py-8 text-center text-sm text-(--text-muted)">
+            Nothing is connected to your account.
+          </div>
+        <% end %>
+      </section>
+      <% end %>
 
       <!-- Appearance -->
       <section id="appearance" class="scroll-mt-8">

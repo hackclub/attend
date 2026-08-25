@@ -1,0 +1,60 @@
+<section>
+  <h2 class="text-sm font-semibold text-(--text-strong) mb-2">Events</h2>
+
+  <div class="bg-(--bg-elev) border border-(--border-card) rounded-lg overflow-hidden">
+    <ul>
+      <% event_rows.each do |row| %>
+        <% event = row[:event] %>
+        <% phase_label, phase_class = event_phase_badge(event) %>
+        <li class="series-row" id="series-event-<%= event.id %>">
+          <%= link_to admin_event_dashboard_path(event.slug), class: "series-row-link px-4 py-4 cursor-pointer group" do %>
+            <div class="flex flex-col md:flex-row md:items-center gap-3 md:gap-5">
+              <div class="flex items-center gap-3 min-w-0 md:flex-1">
+                <%= render "admin/events/avatar", event: event, size: 36, rounded: "rounded-lg" %>
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span class="text-sm font-semibold text-(--text-strong) group-hover:text-(--accent-strong) transition-colors"><%= event.name %></span>
+                    <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap <%= phase_class %>"><%= phase_label %></span>
+                    <% if !event.completed? && !event.setup_complete? %>
+                      <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">Setup incomplete</span>
+                    <% end %>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-(--text-soft)">
+                    <span class="whitespace-nowrap"><%= event_date_range(event.starts_at, event.ends_at) %></span>
+                    <% if event.location_city.present? %>
+                      <span class="truncate"><%= [ event.location_city, event.location_country ].compact_blank.join(", ") %></span>
+                    <% end %>
+                  </div>
+                </div>
+              </div>
+
+              <div class="md:w-64 md:flex-shrink-0">
+                <div class="flex items-baseline justify-between gap-2 text-xs">
+                  <span class="text-(--text-soft) tabular-nums">
+                    <%= pluralize(row[:active], "participant") %>
+                  </span>
+                  <span class="font-semibold text-(--text-strong) tabular-nums"><%= row[:percent] %>% cleared</span>
+                </div>
+                <div class="series-microbar mt-1.5" aria-hidden="true">
+                  <div class="series-microbar-fill" style="width: <%= row[:percent] %>%"></div>
+                </div>
+                <p class="text-xs mt-1.5 truncate">
+                  <% if row[:active].zero? %>
+                    <span class="text-(--text-soft)">No participants yet</span>
+                  <% elsif row[:top_blocker] %>
+                    <span class="text-(--warning-text) font-medium tabular-nums"><%= row[:top_blocker][:count] %></span>
+                    <span class="text-(--text-soft)">stuck on <%= row[:top_blocker][:stage].label.downcase %></span>
+                  <% else %>
+                    <span class="text-(--success-text) font-medium">Everyone cleared</span>
+                  <% end %>
+                </p>
+              </div>
+
+              <svg class="hidden md:block w-4 h-4 text-(--text-faint) group-hover:text-(--text-muted) transition-colors flex-shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+            </div>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+</section>

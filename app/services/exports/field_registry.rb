@@ -102,6 +102,17 @@ module Exports
     end
     fields << Field.new(key: "participant_event.slack_user_id", label: "Event Slack ID", category: "event_status",
                         type: :string, includes: nil, extractor: ->(pe) { pe.slack_user_id })
+    # Opt-in activity waivers. The registry is built once at boot and custom
+    # documents are per-event rows, so these roll every optional document the
+    # participant took up into one column rather than getting a column each —
+    # enough to hand an activity provider their list.
+    optional_consents = ->(pe) { pe.consents.select { |c| !c.withdrawn? && c.custom_document&.optional? } }
+    fields << Field.new(key: "participant_event.optional_documents_added", label: "Optional Documents Added",
+                        category: "event_status", type: :string, includes: { consents: :custom_document },
+                        extractor: ->(pe) { optional_consents.call(pe).map { |c| c.custom_document.name }.sort.join(", ").presence })
+    fields << Field.new(key: "participant_event.optional_documents_pending", label: "Optional Documents Awaiting Signature",
+                        category: "event_status", type: :string, includes: { consents: :custom_document },
+                        extractor: ->(pe) { optional_consents.call(pe).reject(&:signed?).map { |c| c.custom_document.name }.sort.join(", ").presence })
 
     # --- travel (inbound/outbound) ---
     %w[inbound outbound].each do |dir|

@@ -3,7 +3,7 @@
   <div>
     <div class="flex items-center justify-between mb-1">
       <p class="text-xs font-medium text-green-700 uppercase">Linked Preferences</p>
-      <button type="button" onclick="openLinkModal('<%= participant_event.id %>', 'preference')" 
+      <button type="button" data-open-link-modal="<%= participant_event.id %>" data-link-kind="preference" 
               class="text-xs text-[#ec3750] hover:text-blue-800">+ Add</button>
     </div>
     <div class="space-y-1">
@@ -17,7 +17,7 @@
             <% end %>
           </span>
           <button type="button" 
-                  onclick="unlinkPreference('<%= pref.id %>', 'preference')"
+                  data-unlink="<%= pref.id %>" data-link-kind="preference"
                   class="text-red-500 hover:text-red-700">&times;</button>
         </div>
       <% end %>
@@ -31,7 +31,7 @@
   <div>
     <div class="flex items-center justify-between mb-1">
       <p class="text-xs font-medium text-red-700 uppercase">Linked Exclusions</p>
-      <button type="button" onclick="openLinkModal('<%= participant_event.id %>', 'exclusion')" 
+      <button type="button" data-open-link-modal="<%= participant_event.id %>" data-link-kind="exclusion" 
               class="text-xs text-[#ec3750] hover:text-blue-800">+ Add</button>
     </div>
     <div class="space-y-1">
@@ -39,7 +39,7 @@
         <div class="flex items-center justify-between bg-red-50 rounded px-2 py-1 text-sm">
           <span><%= excl.excluded_participant_event.participant.full_name %></span>
           <button type="button" 
-                  onclick="unlinkPreference('<%= excl.id %>', 'exclusion')"
+                  data-unlink="<%= excl.id %>" data-link-kind="exclusion"
                   class="text-red-500 hover:text-red-700">&times;</button>
         </div>
       <% end %>
@@ -50,7 +50,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="<%= content_security_policy_nonce %>">
 async function unlinkPreference(linkId, kind) {
   if (!confirm('Remove this link?')) return;
   
@@ -65,5 +65,22 @@ async function unlinkPreference(linkId, kind) {
   });
   
   location.reload();
+}
+
+// Rendered once per participant, so guard against stacking listeners.
+// openLinkModal lives in the parent page and is resolved at click time.
+if (!window.preferenceLinkHandlersInstalled) {
+  window.preferenceLinkHandlersInstalled = true;
+
+  document.addEventListener('click', (event) => {
+    const openButton = event.target.closest('[data-open-link-modal]');
+    if (openButton) {
+      openLinkModal(openButton.dataset.openLinkModal, openButton.dataset.linkKind);
+      return;
+    }
+
+    const unlinkButton = event.target.closest('[data-unlink]');
+    if (unlinkButton) unlinkPreference(unlinkButton.dataset.unlink, unlinkButton.dataset.linkKind);
+  });
 }
 </script>

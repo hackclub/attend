@@ -37,11 +37,30 @@ RSpec.describe ParticipantEventsToolbox do
     expect(serialize(pe)[:checked_in]).to be(false)
   end
 
+  it "links every registration at its admin page, keyed by participant_event id" do
+    pe = create(:participant_event, event: event)
+
+    expect(serialize(pe)[:url]).to end_with("/admin/events/#{event.slug}/participants/#{pe.id}")
+  end
+
   it "reports a participant with no check-in at all as not checked in" do
     expect(serialize(create(:participant_event, event: event))[:checked_in]).to be(false)
   end
 
   describe "#check_in" do
+    it "invalidates the journey cache after toolbox check-in" do
+      memory_store = ActiveSupport::Cache::MemoryStore.new
+      allow(Rails).to receive(:cache).and_return(memory_store)
+      pe = create(:participant_event, event: event, status: :complete)
+      travel = Travel.create!(participant_event: pe, direction: "inbound", mode: "bus")
+
+      expect(TravelCalendar::JourneyCache.fetch(event).sole[:pickup_state]).to eq(:awaiting_pickup)
+
+      run_check_in(pe)
+
+      expect(TravelCalendar::JourneyCache.fetch(event).sole).to include(id: travel.id, pickup_state: :checked_in)
+    end
+
     it "records a real check-in scan attributed to the acting user" do
       check_in
       pe = create(:participant_event, event: event)
@@ -88,7 +107,7 @@ RSpec.describe ParticipantEventsToolbox do
       expect(pe.reload.check_in_time).to be_within(1.second).of(earlier.scanned_at)
     end
 
-    it "marks the inbound flight's final leg as picked up" do
+    it "does not mark travel pickup when checking in at the venue" do
       check_in
       pe = create(:participant_event, event: event)
       travel = Travel.create!(participant_event: pe, direction: "inbound", mode: "plane")
@@ -96,7 +115,8 @@ RSpec.describe ParticipantEventsToolbox do
 
       run_check_in(pe)
 
-      expect(leg.reload).to be_picked_up
+      expect(leg.reload).not_to be_travel_picked_up
+      expect(pe.reload).to be_checked_in
     end
   end
 end

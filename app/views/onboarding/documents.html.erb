@@ -1,68 +1,82 @@
 <div class="w-full max-w-3xl mx-auto">
   <%= render "wizard_nav" %>
 
-  <h1 class="text-2xl font-bold mb-2">Sign Your Documents</h1>
-  <% if @participant_event.requires_guardian? %>
-    <p class="text-sm text-gray-600 mb-6">
-      Sign your portion of each document below. Anything that also needs a parent/guardian signature
-      will be sent to them after you submit.
-    </p>
-  <% else %>
-    <p class="text-sm text-gray-600 mb-6">Review and sign each document below to continue.</p>
-  <% end %>
+  <header class="mb-6">
+    <h1 class="portal-title text-2xl">Sign Your Documents</h1>
+    <% if @participant_event.requires_guardian? %>
+      <p class="portal-hint text-sm mt-2">
+        Sign your portion of each document below. Anything that also needs a parent/guardian signature
+        will be sent to them after you submit.
+      </p>
+    <% else %>
+      <p class="portal-hint text-sm mt-2">Review and sign each document below to continue.</p>
+    <% end %>
+  </header>
 
   <% if @documents_paused %>
-    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center mb-6">
-      <p class="text-gray-700 text-lg mb-2">Documents aren't ready to sign yet.</p>
-      <p class="text-gray-500">You can finish submitting your registration — we'll email you when your documents are ready.</p>
+    <div class="portal-note portal-note-warn mb-6">
+      <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+      </svg>
+      <div>
+        <p class="portal-heading text-sm">Documents aren't ready to sign yet.</p>
+        <p class="portal-body text-sm mt-0.5">You can finish submitting your registration — we'll email you when your documents are ready.</p>
+      </div>
     </div>
     <div class="flex justify-end">
       <%= form_with url: onboarding_step_path(step: "documents", event_id: current_event.id), method: :patch, data: { turbo: false } do %>
-        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors cursor-pointer">
+        <button type="submit" class="portal-btn portal-btn-primary">
           Continue to Review
         </button>
       <% end %>
     </div>
   <% elsif @missing_guardian %>
-    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center mb-6">
-      <p class="text-gray-700 text-lg mb-2">We need your guardian's details first.</p>
-      <%= link_to "Add guardian details", onboarding_step_path(step: "guardian", event_id: current_event.id), class: "text-blue-600 hover:underline" %>
+    <div class="portal-note portal-note-warn mb-6">
+      <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+      </svg>
+      <p class="portal-body text-sm">
+        We need your guardian's details first.
+        <%= link_to "Add guardian details", onboarding_step_path(step: "guardian", event_id: current_event.id), class: "portal-link" %>
+      </p>
     </div>
   <% else %>
     <!-- Checklist -->
-    <div class="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100 mb-6">
-      <% @documents.each do |doc| %>
+    <div class="portal-card divide-y mb-6" style="border-color: var(--border);">
+      <% @documents.each_with_index do |doc, index| %>
         <% consent = doc[:consent] %>
         <div class="p-4 flex items-center justify-between gap-4">
           <div class="flex items-center gap-3 min-w-0">
-            <% if consent&.participant_portion_signed? %>
-              <span class="flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-600 shrink-0">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-              </span>
-            <% elsif doc == @current_document %>
-              <span class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 shrink-0">
-                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3a7 7 0 100 14 7 7 0 000-14z"/></svg>
-              </span>
-            <% else %>
-              <span class="w-6 h-6 rounded-full border-2 border-gray-300 shrink-0"></span>
-            <% end %>
-            <span class="font-medium text-gray-900 truncate"><%= doc[:name] %></span>
+            <span class="portal-step-marker <%= if consent&.participant_portion_signed?
+                "portal-step-marker-done"
+              elsif doc == @current_document
+                "portal-step-marker-current"
+              end %>">
+              <% if consent&.participant_portion_signed? %>
+                <svg class="size-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+                </svg>
+              <% else %>
+                <%= index + 1 %>
+              <% end %>
+            </span>
+            <span class="portal-heading text-sm truncate"><%= doc[:name] %></span>
           </div>
           <div class="shrink-0 text-sm">
             <% if consent&.participant_portion_signed? %>
-              <span class="text-green-600 font-medium"><%= doc[:custom_document]&.physical? ? "Uploaded" : "Signed" %></span>
+              <span class="portal-badge portal-badge-done"><%= doc[:custom_document]&.physical? ? "Uploaded" : "Signed" %></span>
             <% elsif doc[:custom_document]&.physical? && @current_document.nil? && !@documents_preparing %>
               <%# Matches the render condition on the upload sections below —
                   while an electronic document is being signed or prepared the
                   upload UI isn't on the page yet. %>
-              <span class="text-blue-600 font-medium">Upload below</span>
+              <span class="portal-badge portal-badge-waiting">Upload below</span>
             <% elsif consent&.failed? %>
               <%= button_to "Retry", onboarding_document_signed_path(consent_id: consent.id, event_id: current_event.id, retry: 1),
-                  method: :post, class: "text-red-600 hover:text-red-800 font-medium" %>
+                  method: :post, class: "portal-btn portal-btn-secondary text-sm" %>
             <% elsif doc == @current_document %>
-              <span class="text-blue-600 font-medium">Sign below</span>
+              <span class="portal-badge portal-badge-waiting">Sign below</span>
             <% else %>
-              <span class="text-gray-400">Waiting</span>
+              <span class="portal-badge portal-badge-neutral">Waiting</span>
             <% end %>
           </div>
         </div>
@@ -72,16 +86,23 @@
     <% if @current_document %>
       <% consent = @current_document[:consent] %>
       <% signing_url = Docuseal.signing_url(consent.docuseal_participant_slug, host: consent.docuseal_host) %>
-      <h2 class="text-lg font-semibold text-gray-900 mb-3">Now signing: <%= @current_document[:name] %></h2>
-      <div class="border rounded-lg overflow-hidden bg-white shadow-sm mb-4">
+      <%# The "completed" callback below is the fast path out of this step, but
+          it isn't guaranteed to reach us (signed in the new-tab fallback, a
+          dropped postMessage). Poll alongside it so a signature that lands
+          some other way still moves the page on. %>
+      <div data-controller="document-status"
+           data-document-status-url-value="<%= onboarding_documents_status_path(event_id: current_event.id) %>"
+           data-document-status-signed-ids-value="<%= @documents.filter_map { |d| d[:consent]&.id.to_s if d[:consent]&.participant_portion_signed? }.sort.to_json %>"></div>
+      <h2 class="portal-heading text-lg mb-3">Now signing: <%= @current_document[:name] %></h2>
+      <div class="portal-card overflow-hidden mb-4">
         <docuseal-form
           id="docusealForm"
           data-src="<%= signing_url %>"
           style="height: 500px; overflow: auto;">
         </docuseal-form>
       </div>
-      <div class="text-center text-sm text-gray-500 mb-6">
-        <p>Having trouble? <a href="<%= signing_url %>" target="_blank" class="text-blue-600 hover:underline">Open in a new tab</a></p>
+      <div class="text-center text-sm portal-hint mb-6">
+        <p>Having trouble? <a href="<%= signing_url %>" target="_blank" class="portal-link">Open in a new tab</a></p>
       </div>
 
       <script src="https://<%= consent.docuseal_host %>/js/form.js"></script>
@@ -112,7 +133,7 @@
     <% if @physical_pending.present? && @current_document.nil? && !@documents_preparing %>
       <% @physical_pending.each do |doc| %>
         <div class="mb-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-3"><%= doc[:name] %> — print, sign & upload</h2>
+          <h2 class="portal-heading text-lg mb-3"><%= doc[:name] %> — print, sign & upload</h2>
           <%= render "shared/physical_document_upload",
               custom_document: doc[:custom_document],
               consent: doc[:consent],
@@ -123,21 +144,71 @@
       <% end %>
     <% end %>
 
+    <!-- Optional extras: waivers for activities you choose to take part in.
+         Nothing here is required, and until you add one nobody is asked to
+         sign it — your parent/guardian included. -->
+    <% if @optional_documents.present? %>
+      <div class="portal-card mt-6">
+        <div class="p-4 portal-inset-bottom">
+          <h2 class="portal-heading">Optional extras</h2>
+          <p class="portal-hint text-sm mt-0.5">
+            Only for activities you want to take part in. Skip anything you're not doing — you can add it later from your dashboard.
+          </p>
+        </div>
+        <div class="divide-y" style="border-color: var(--border);">
+          <% @optional_documents.each do |doc| %>
+            <% added = @participant_event.opted_into_custom_document?(doc) %>
+            <div class="p-4 flex flex-wrap items-center justify-between gap-3">
+              <div class="min-w-0">
+                <p class="portal-heading text-sm"><%= doc.name %></p>
+                <p class="portal-hint text-xs mt-0.5">
+                  <% if added && doc.participant_signs? %>
+                    Added — sign it in the list above.
+                  <% elsif added %>
+                    Added — your parent/guardian will be asked to sign it.
+                  <% elsif doc.description.present? %>
+                    <%= doc.description %>
+                  <% elsif doc.guardian_signs? && @participant_event.requires_guardian? %>
+                    Your parent/guardian is only asked to sign this if you add it.
+                  <% else %>
+                    Only add this if you want to take part.
+                  <% end %>
+                </p>
+              </div>
+              <% if added %>
+                <%= button_to onboarding_withdraw_optional_document_path(custom_document_id: doc.id, event_id: current_event.id),
+                    method: :delete, data: { turbo_confirm: "Remove \"#{doc.name}\"? You can add it back any time." },
+                    class: "portal-btn portal-btn-quiet text-sm shrink-0" do %>
+                  Remove<span class="sr-only"> <%= doc.name %></span>
+                <% end %>
+              <% else %>
+                <%= button_to onboarding_add_optional_document_path(custom_document_id: doc.id, event_id: current_event.id),
+                    method: :post,
+                    class: "portal-btn portal-btn-primary text-sm shrink-0" do %>
+                  Add and sign<span class="sr-only"> <%= doc.name %></span>
+                <% end %>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
     <!-- Continue -->
     <div class="flex items-center justify-between mt-6">
-      <span class="text-sm text-gray-500">
+      <span class="portal-hint text-sm tabular-nums">
         <% unless @all_documents_signed %>
           <%= @documents.count { |d| d[:consent]&.participant_portion_signed? } %> of <%= @documents.size %> signed
         <% end %>
       </span>
       <% if @all_documents_signed %>
         <%= form_with url: onboarding_step_path(step: "documents", event_id: current_event.id), method: :patch, data: { turbo: false } do %>
-          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors cursor-pointer">
+          <button type="submit" class="portal-btn portal-btn-primary">
             Continue to Review
           </button>
         <% end %>
       <% else %>
-        <button disabled class="bg-gray-200 text-gray-400 font-medium py-2 px-6 rounded-lg cursor-not-allowed">
+        <button disabled class="portal-btn portal-btn-primary">
           Continue to Review
         </button>
       <% end %>

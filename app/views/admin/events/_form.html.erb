@@ -108,7 +108,7 @@
     <%= f.hidden_field :location_longitude, id: "venue-longitude" %>
   </div>
 
-  <script>
+  <script nonce="<%= content_security_policy_nonce %>">
     (function() {
       var script = document.createElement('script');
       script.src = 'https://maps.googleapis.com/maps/api/js?key=<%= Rails.application.credentials.dig(:google, :key) %>&libraries=places&callback=initPlacesAutocomplete';
@@ -171,8 +171,8 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div>
         <%= f.label :support_email, "Support Email", class: "block text-sm font-medium text-gray-700" %>
-        <%= f.email_field :support_email, class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "team@hackclub.com" %>
-        <p class="mt-1 text-sm text-gray-500">Used in guardian invitation emails. Defaults to team@hackclub.com if not set.</p>
+        <%= f.email_field :support_email, required: true, class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "team@hackclub.com" %>
+        <p class="mt-1 text-sm text-gray-500">Used as the from and reply-to address on participant and guardian emails. Must be a @hackclub.com or @events.hackclub.com address.</p>
       </div>
     </div>
   </div>
@@ -209,7 +209,7 @@
         </div>
         <div class="ml-3">
           <%= f.label :travel_enabled, "Enable Travel", class: "text-sm font-medium text-gray-700" %>
-          <p class="text-sm text-gray-500">Collect travel information from participants. Disabling hides the travel onboarding step, travel dashboards, and Airport Mode</p>
+          <p class="text-sm text-gray-500">Collect travel information from participants. Disabling hides the travel onboarding step, travel dashboards, and Travel Calendar</p>
         </div>
       </div>
       <div class="flex items-start">
@@ -290,7 +290,7 @@
       </div>
       <div class="ml-3">
         <%= f.label :groups_enabled, "Enable Groups", class: "text-sm font-medium text-gray-700" %>
-        <p class="text-sm text-gray-500">Show group chips on tickets, scans, the participant table, messaging, rooming, and airport mode.</p>
+        <p class="text-sm text-gray-500">Show group chips on tickets, scans, the participant table, messaging, rooming, and the Travel Calendar.</p>
       </div>
     </div>
   </div>

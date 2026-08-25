@@ -286,6 +286,10 @@ class GuardianPortalController < ApplicationController
       render :error, status: :not_found and return
     end
 
+    # Keeps the invite alive while the guardian is actually working through the
+    # portal, so a long gathering-documents stretch does not expire mid-flow.
+    @guardian_participant_event.touch_invite_use!
+
     @guardian = @guardian_participant_event.guardian
     @participant_event = @guardian_participant_event.participant_event
     @participant = @participant_event.participant

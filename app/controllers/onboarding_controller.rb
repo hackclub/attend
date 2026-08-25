@@ -1,8 +1,9 @@
 class OnboardingController < ApplicationController
   include TravelLegDateMerging
   include PhysicalDocumentUploads
+  include OptionalDocumentEnrolment
 
-  before_action :force_html_format
+  before_action :force_html_format, except: [ :documents_status ]
   before_action :store_invitation_token
   before_action :authenticate_user!
   before_action :process_invitation
@@ -162,13 +163,67 @@ class OnboardingController < ApplicationController
     redirect_to onboarding_step_path(step: DOCUMENTS_STEP, event_id: current_event.id)
   end
 
+  # Polled by the documents step while a document is still outstanding.
+  #
+  # The embedded form's "completed" event is the fast path, but it's a single
+  # point of failure: if it never reaches us — the participant signed in the
+  # "open in a new tab" window, the iframe's postMessage was dropped, the
+  # signature landed while the tab was backgrounded — the page keeps showing
+  # "0 of 1 signed" and a dead Continue button until they think to reload.
+  # The webhook has usually already updated the consent by then; nothing was
+  # telling the open page about it. This lets the page find out on its own.
+  def documents_status
+    consents = pollable_document_consents
+    consents.each { |c| sync_from_docuseal_throttled(c) }
+
+    render json: {
+      signed_consent_ids: consents.select(&:participant_portion_signed?).map { |c| c.id.to_s }.sort
+    }
+  end
+
+  # Optional documents — waivers for opt-in activities. Adding one is what
+  # makes it exist for this participant (and, in turn, for their guardian).
+  def add_optional_document
+    custom_document = current_event.custom_documents.active.find(params[:custom_document_id])
+
+    unless custom_document.optional? && custom_document.relevant_to?(@participant_event)
+      redirect_to onboarding_step_path(step: DOCUMENTS_STEP, event_id: current_event.id),
+                  alert: "That document isn't available to add."
+      return
+    end
+
+    enrol_in_optional_document(@participant_event, custom_document)
+
+    redirect_to onboarding_step_path(step: DOCUMENTS_STEP, event_id: current_event.id),
+                notice: "\"#{custom_document.name}\" added."
+  end
+
+  def withdraw_optional_document
+    custom_document = current_event.custom_documents.active.find(params[:custom_document_id])
+
+    unless custom_document.optional?
+      redirect_to onboarding_step_path(step: DOCUMENTS_STEP, event_id: current_event.id),
+                  alert: "That document can't be removed."
+      return
+    end
+
+    if withdraw_from_optional_document(@participant_event, custom_document).nil?
+      redirect_to onboarding_step_path(step: DOCUMENTS_STEP, event_id: current_event.id),
+                  alert: "You haven't added \"#{custom_document.name}\"."
+      return
+    end
+
+    redirect_to onboarding_step_path(step: DOCUMENTS_STEP, event_id: current_event.id),
+                notice: "\"#{custom_document.name}\" removed. You can add it again any time."
+  end
+
   # Fired by the documents step for physical documents: the participant
   # uploads a photo (or scan) of the form they signed on paper.
   def physical_document_upload
     consent = @participant_event.consents.find(params[:consent_id])
     custom_document = consent.custom_document
 
-    unless custom_document&.physical? && custom_document.participant_signs?
+    unless custom_document&.physical? && custom_document.participant_signs? && !consent.withdrawn?
       redirect_to onboarding_step_path(step: DOCUMENTS_STEP, event_id: current_event.id), alert: "This document can't be uploaded."
       return
     end
@@ -196,7 +251,7 @@ class OnboardingController < ApplicationController
     consent = @participant_event.consents.find(params[:consent_id])
     custom_document = consent.custom_document
 
-    unless custom_document&.physical? && custom_document.participant_signs?
+    unless custom_document&.physical? && custom_document.participant_signs? && !consent.withdrawn?
       redirect_to onboarding_step_path(step: DOCUMENTS_STEP, event_id: current_event.id), alert: "This document can't be updated."
       return
     end
@@ -920,6 +975,39 @@ class OnboardingController < ApplicationController
     @participant_event.consents.any? { |c| c.consent_type == "waiver" && c.participant_portion_signed? }
   end
 
+  # Exactly the consents the documents step renders a row for — the same set,
+  # in the same order, as the @documents it builds. It has to match: the page
+  # reloads as soon as this answer differs from what it was rendered with, so
+  # a consent the page never showed (a withdrawn optional document, say)
+  # would otherwise put it in a reload loop.
+  def pollable_document_consents
+    consents = @participant_event.consents.reload
+    document_ids = @participant_event.applicable_custom_documents.select(&:participant_signs?).map(&:id)
+
+    [
+      consents.find { |c| c.consent_type == "waiver" },
+      *document_ids.map { |id| consents.find { |c| c.custom_document_id == id } }
+    ].compact
+  end
+
+  # Poll interval is a few seconds; hitting the DocuSeal API that often for
+  # every outstanding document would be rude, and the webhook usually gets
+  # there first anyway. Sync at most once per consent per window — the plain
+  # DB read on every poll is what actually carries the webhook's update
+  # through to the page.
+  DOCUSEAL_POLL_THROTTLE = 15.seconds
+
+  def sync_from_docuseal_throttled(consent)
+    return if consent.participant_portion_signed?
+    return if consent.docuseal_envelope_id.blank?
+
+    key = "docuseal_status_poll/#{consent.id}"
+    return if Rails.cache.read(key)
+    Rails.cache.write(key, true, expires_in: DOCUSEAL_POLL_THROTTLE)
+
+    consent.sync_from_docuseal!
+  end
+
   def load_documents_step_data
     @documents_paused = Setting.waiver_sending_paused? || current_event.guardian_invites_locked?
     @missing_guardian = @participant_event.requires_guardian? && @participant_event.guardian_participant_events.empty?
@@ -942,6 +1030,10 @@ class OnboardingController < ApplicationController
     @participant_event.applicable_custom_documents.select(&:participant_signs?).each do |doc|
       @documents << { name: doc.name, consent: consents.find { |c| c.custom_document_id == doc.id }, custom_document: doc }
     end
+
+    # Optional activity waivers. Offered here, but never gating the step —
+    # skipping them is the whole point.
+    @optional_documents = @participant_event.relevant_optional_custom_documents
 
     pending = @documents.reject { |d| d[:consent]&.participant_portion_signed? }
     # Physical documents are downloaded/uploaded rather than signed embedded,

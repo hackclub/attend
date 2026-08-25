@@ -1,5 +1,7 @@
 module DashboardHelper
   def wallet_pass_url(participant_event)
+    return if ENV["PASSKIT_WEB_SERVICE_HOST"].blank?
+
     Passkit::UrlGenerator.new(Passkit::EventTicket, participant_event).ios
   end
 

@@ -33,6 +33,29 @@
                   border: 1px solid rgba(255,255,255,.15); font-weight: 500; }
   .tc-btn-ghost:hover { background: rgba(255,255,255,.05); color: #fff; }
   .tc-foot { margin-top: 1.5rem; text-align: center; font-size: .75rem; color: rgba(255,255,255,.4); }
+  .tc-section { margin: 0 0 1.5rem; }
+  .tc-error { margin-bottom: 1.25rem; border: 1px solid rgba(236,55,80,.45); background: rgba(236,55,80,.12);
+              border-radius: 8px; padding: .625rem .75rem; font-size: .8125rem; color: #ffb3bf; }
+  .tc-choice { display: flex; align-items: flex-start; gap: .75rem; border: 1px solid rgba(255,255,255,.10);
+               background: rgba(255,255,255,.03); border-radius: 8px; padding: .625rem .75rem; cursor: pointer;
+               margin-bottom: .5rem; }
+  .tc-choice input { margin-top: .15rem; width: 1rem; height: 1rem; flex: 0 0 auto; accent-color: #ec3750; }
+  .tc-choice-name { font-size: .875rem; font-weight: 600; color: #fff; }
+  .tc-choice-desc { display: block; margin-top: .15rem; font-size: .8125rem; color: rgba(255,255,255,.6); }
+  .tc-events { margin: 0 0 .25rem; border: 1px solid rgba(255,255,255,.10); border-radius: 8px;
+               background: rgba(0,0,0,.25); max-height: 13rem; overflow-y: auto; padding: .25rem; }
+  .tc-events[data-disabled="true"] { opacity: .45; }
+  .tc-event { display: flex; align-items: center; gap: .625rem; padding: .375rem .5rem; border-radius: 6px;
+              font-size: .8125rem; color: rgba(255,255,255,.8); cursor: pointer; }
+  .tc-event:hover { background: rgba(255,255,255,.05); }
+  .tc-event input { width: .9rem; height: .9rem; flex: 0 0 auto; accent-color: #ec3750; }
+  .tc-event-dates { margin-left: auto; padding-left: .5rem; font-size: .6875rem; color: rgba(255,255,255,.4); white-space: nowrap; }
+  .tc-filter { width: 100%; margin-bottom: .5rem; border-radius: 6px; border: 1px solid rgba(255,255,255,.12);
+               background: rgba(0,0,0,.3); padding: .375rem .5rem; font-size: .8125rem; color: #fff; }
+  .tc-filter::placeholder { color: rgba(255,255,255,.35); }
+  .tc-empty { padding: .5rem; font-size: .8125rem; color: rgba(255,255,255,.45); }
+  .tc-anon { border-color: rgba(56,189,248,.3); background: rgba(56,189,248,.07); }
+  .tc-note { margin: .35rem 0 0; font-size: .75rem; color: rgba(255,255,255,.45); line-height: 1.5; }
 </style>
 
 <div class="tc-wrap">
@@ -48,6 +71,10 @@
         <p class="tc-sub">wants to access your Attend account as <%= @current_resource_owner.try(:email) || "you" %></p>
       </div>
     </div>
+
+    <% if @mcp_settings_error.present? %>
+      <div class="tc-error"><%= @mcp_settings_error %></div>
+    <% end %>
 
     <div class="tc-trust">
       After you authorize, you'll be sent to <code><%= @redirect_uri %></code>.
@@ -89,6 +116,67 @@
         </ul>
       <% end %>
 
+      <div class="tc-section" data-mcp-events>
+        <p class="tc-label">Which events can it see?</p>
+
+        <label class="tc-choice">
+          <%= radio_button_tag "mcp_event_scope", "all", @mcp_event_scope != "selected", data: { mcp_scope: "all" } %>
+          <span>
+            <span class="tc-choice-name">Every event you can access</span>
+            <span class="tc-choice-desc">Including events you're added to later.</span>
+          </span>
+        </label>
+
+        <label class="tc-choice">
+          <%= radio_button_tag "mcp_event_scope", "selected", @mcp_event_scope == "selected", data: { mcp_scope: "selected" } %>
+          <span>
+            <span class="tc-choice-name">Only the events I pick</span>
+            <span class="tc-choice-desc">Anything outside them is invisible to this app, even where you have access.</span>
+          </span>
+        </label>
+
+        <% if @mcp_events&.any? %>
+          <% if @mcp_events.size > 8 %>
+            <input type="search" class="tc-filter" placeholder="Filter events…" data-mcp-filter aria-label="Filter events">
+          <% end %>
+          <div class="tc-events" data-mcp-event-list data-disabled="<%= @mcp_event_scope != "selected" %>">
+            <% @mcp_events.each do |event| %>
+              <label class="tc-event" data-mcp-event-name="<%= event.name.to_s.downcase %>">
+                <%= check_box_tag "mcp_event_ids[]", event.id,
+                      @mcp_selected_event_ids.include?(event.id.to_s),
+                      id: "mcp_event_#{event.id}",
+                      disabled: @mcp_event_scope != "selected" %>
+                <span><%= event.name %></span>
+                <% if event.starts_at %>
+                  <span class="tc-event-dates"><%= event.starts_at.strftime("%b %Y") %></span>
+                <% end %>
+              </label>
+            <% end %>
+          </div>
+        <% else %>
+          <div class="tc-events"><p class="tc-empty">You don't have access to any events yet.</p></div>
+        <% end %>
+      </div>
+
+      <div class="tc-section">
+        <p class="tc-label">Privacy</p>
+        <label class="tc-choice tc-anon">
+          <%= check_box_tag "mcp_anonymize", "1", @mcp_anonymize %>
+          <span>
+            <span class="tc-choice-name">Anonymise everything</span>
+            <span class="tc-choice-desc">
+              Names come back as initials, and emails, phone numbers and addresses are
+              stripped from every response. The app also becomes read-only, so it can't
+              change anything in Attend.
+            </span>
+          </span>
+        </label>
+        <p class="tc-note">
+          The app can switch anonymising on for itself, but never off. Turning it back off
+          means reconnecting the app from Attend.
+        </p>
+      </div>
+
       <%= submit_tag "Authorize", class: "tc-btn tc-btn-primary" %>
     <% end %>
 
@@ -105,3 +193,45 @@
     </p>
   </div>
 </div>
+
+<%= javascript_tag nonce: true do %>
+  // Progressive only: without JS every checkbox is server-rendered in the right
+  // state, and the server re-checks the scope choice on POST either way.
+  (function () {
+    var section = document.querySelector('[data-mcp-events]');
+    if (!section) return;
+
+    var list = section.querySelector('[data-mcp-event-list]');
+    var boxes = section.querySelectorAll('input[name="mcp_event_ids[]"]');
+    var radios = section.querySelectorAll('input[name="mcp_event_scope"]');
+    var filter = section.querySelector('[data-mcp-filter]');
+
+    function sync() {
+      var picking = section.querySelector('[data-mcp-scope="selected"]').checked;
+      if (list) list.setAttribute('data-disabled', picking ? 'false' : 'true');
+      boxes.forEach(function (box) { box.disabled = !picking; });
+      if (filter) filter.disabled = !picking;
+    }
+
+    radios.forEach(function (radio) { radio.addEventListener('change', sync); });
+
+    boxes.forEach(function (box) {
+      box.addEventListener('change', function () {
+        if (box.checked) section.querySelector('[data-mcp-scope="selected"]').checked = true;
+        sync();
+      });
+    });
+
+    if (filter) {
+      filter.addEventListener('input', function () {
+        var term = filter.value.trim().toLowerCase();
+        section.querySelectorAll('[data-mcp-event-name]').forEach(function (row) {
+          var hit = !term || row.getAttribute('data-mcp-event-name').indexOf(term) !== -1;
+          row.style.display = hit ? '' : 'none';
+        });
+      });
+    }
+
+    sync();
+  })();
+<% end %>

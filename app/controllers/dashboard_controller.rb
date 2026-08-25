@@ -1,9 +1,19 @@
 class DashboardController < ApplicationController
   include TravelLegDateMerging
   include PhysicalDocumentUploads
+  include OptionalDocumentEnrolment
+
+  # MCP connections are managed from the profile page, so they follow the same
+  # rule as the rest of it: admins without a participant record still get in.
+  PROFILE_ACTIONS = %w[profile update_staff_profile destroy_staff_avatar
+                       revoke_mcp_connection update_mcp_connection].freeze
 
   before_action :authenticate_user!
-  before_action :require_participant
+  before_action :require_participant, except: PROFILE_ACTIONS
+  # Admins without a participant record still need the profile page — it's
+  # where their staff settings (display name, avatar, contact info) live now.
+  before_action :require_participant_or_admin, only: PROFILE_ACTIONS
+  before_action :require_admin, only: [ :update_staff_profile, :destroy_staff_avatar, :update_mcp_connection ]
 
   def index
     # display_status per row walks travel/health/guardian/consent/custom-doc
@@ -20,16 +30,88 @@ class DashboardController < ApplicationController
   end
 
   def profile
-    @public_profile_events = @participant.public_profile_eligible_participant_events.preload(:event)
-    # One [event, hidden] pair per staffed event — a user can hold several
-    # roles on an event, and it's hidden only when every assignment is.
-    @public_profile_staff_events = @participant.public_profile_eligible_staff_role_assignments
-      .preload(:event)
-      .group_by(&:event_id)
-      .values
-      .map { |assignments| [ assignments.first.event, assignments.all?(&:hidden_from_public_profile) ] }
-      .sort_by { |event, _hidden| event.starts_at || Time.current }
-      .reverse
+    @passports = current_user.passports.where.not(paired_at: nil).order(created_at: :desc)
+
+    if @participant
+      @public_profile_events = @participant.public_profile_eligible_participant_events.preload(:event)
+      # One [event, hidden] pair per staffed event — a user can hold several
+      # roles on an event, and it's hidden only when every assignment is.
+      @public_profile_staff_events = @participant.public_profile_eligible_staff_role_assignments
+        .preload(:event)
+        .group_by(&:event_id)
+        .values
+        .map { |assignments| [ assignments.first.event, assignments.all?(&:hidden_from_public_profile) ] }
+        .sort_by { |event, _hidden| event.starts_at || Time.current }
+        .reverse
+    end
+    # MCP is staff-only, so the Connections section is too — except for someone who
+    # connected a client while they were staff and has since lost the role, who still
+    # needs a way to clear the (now dead) connection out.
+    @mcp_connections = mcp_connections
+    @show_mcp_connections = current_user.admin? || @mcp_connections.any?
+  end
+
+  def update_staff_profile
+    if current_user.update(staff_profile_params)
+      redirect_to dashboard_profile_path(anchor: "staff-settings"), notice: "Staff settings updated."
+    else
+      redirect_to dashboard_profile_path(anchor: "staff-settings"),
+        alert: current_user.errors.full_messages.to_sentence
+    end
+  end
+
+  def destroy_staff_avatar
+    current_user.avatar.purge_later
+    redirect_to dashboard_profile_path(anchor: "staff-settings"), notice: "Profile picture removed."
+  end
+
+  # Tighten an MCP connection in place: narrow it to specific events, or turn on
+  # anonymisation. Both directions of loosening are deliberately missing —
+  # widening access means disconnecting the client and authorising it again, so
+  # a wider grant always passes back through the consent screen.
+  def update_mcp_connection
+    application = Toolchest::OauthApplication.find_by(id: params[:id])
+    return redirect_to(dashboard_profile_path(anchor: "connections"), alert: "Connection not found.") if application.nil?
+
+    settings = McpConnectionSetting.find_or_create_by!(
+      application_id: application.id, resource_owner_id: current_user.id.to_s
+    )
+    notices = []
+
+    if params[:mcp_anonymize] == "1" && !settings.anonymize?
+      settings.anonymize!(:dashboard)
+      notices << "#{application.name} is now anonymised and read-only"
+    end
+
+    if params[:event_scope] == "selected"
+      requested = mcp_scopable_events(settings).where(id: Array(params[:mcp_event_ids]).compact_blank).pluck(:id)
+      if requested.empty?
+        return redirect_to dashboard_profile_path(anchor: "connections"),
+          alert: "Pick at least one event to limit #{application.name} to."
+      end
+      if settings.narrow_events!(requested)
+        notices << "#{application.name} is now limited to #{settings.events.reload.order(:name).pluck(:name).to_sentence}"
+      end
+    end
+
+    redirect_to dashboard_profile_path(anchor: "connections"),
+      notice: notices.any? ? "#{notices.to_sentence}." : "Nothing changed."
+  end
+
+  # Disconnect an MCP client: revoke every live token and pending grant this
+  # user holds for the application. The application row itself stays (it's a
+  # global client registration, not per-user).
+  def revoke_mcp_connection
+    application = Toolchest::OauthApplication.find_by(id: params[:id])
+
+    if application
+      Toolchest::OauthAccessToken.revoke_all_for(application, current_user.id)
+      Toolchest::OauthAccessGrant.revoke_all_for(application, current_user.id)
+      redirect_to dashboard_profile_path(anchor: "connections"),
+        notice: "#{application.name} has been disconnected."
+    else
+      redirect_to dashboard_profile_path(anchor: "connections"), alert: "Connection not found."
+    end
   end
 
   def update_public_profile
@@ -62,6 +144,13 @@ class DashboardController < ApplicationController
       .limit(20)
 
     @custom_documents = @participant_event.applicable_custom_documents
+    @optional_documents = @participant_event.relevant_optional_custom_documents
+    # Documents live in the wizard while the participant is still filling it
+    # in for the first time, and on the dashboard once they've submitted.
+    # Adding an optional document reopens a completed participant, so
+    # "in_progress" on its own no longer means "still in the wizard".
+    @show_documents_section = @custom_documents.any? && !@participant_event.invited? &&
+      (!@participant_event.in_progress? || @participant_event.onboarding_completed_at.present?)
     @custom_document_consents = @participant_event.consents
       .select(&:custom_document_id)
       .index_by(&:custom_document_id)
@@ -110,6 +199,52 @@ class DashboardController < ApplicationController
 
     @signing_url = @consent.participant_signing_url if @custom_document.participant_signs?
     @preparing = @consent.docuseal_envelope_id.blank? && @consent.requires_signature?
+  end
+
+  # Opting into an activity's waiver. Until this happens the document doesn't
+  # exist for this participant — nobody, guardian included, is shown it.
+  def add_optional_document
+    @participant_event = @participant.participant_events.includes(:event, :consents).find(params[:id])
+    authorize @participant_event, :update?
+    @event = @participant_event.event
+    @custom_document = @event.custom_documents.active.find(params[:custom_document_id])
+
+    unless @custom_document.optional? && @custom_document.relevant_to?(@participant_event)
+      redirect_to dashboard_event_path(@participant_event), alert: "That document isn't available to add."
+      return
+    end
+
+    enrol_in_optional_document(@participant_event, @custom_document)
+
+    if @custom_document.participant_signs?
+      redirect_to dashboard_sign_document_path(@participant_event, @custom_document),
+                  notice: "\"#{@custom_document.name}\" added."
+    else
+      redirect_to dashboard_event_path(@participant_event),
+                  notice: "\"#{@custom_document.name}\" added — we've asked your parent/guardian to sign it."
+    end
+  end
+
+  # Changing their mind. The consent is withdrawn rather than deleted, so a
+  # signature already collected stays on file.
+  def withdraw_optional_document
+    @participant_event = @participant.participant_events.includes(:event, :consents).find(params[:id])
+    authorize @participant_event, :update?
+    @event = @participant_event.event
+    @custom_document = @event.custom_documents.active.find(params[:custom_document_id])
+
+    unless @custom_document.optional?
+      redirect_to dashboard_event_path(@participant_event), alert: "That document can't be removed."
+      return
+    end
+
+    if withdraw_from_optional_document(@participant_event, @custom_document).nil?
+      redirect_to dashboard_event_path(@participant_event), alert: "You haven't added \"#{@custom_document.name}\"."
+      return
+    end
+
+    redirect_to dashboard_event_path(@participant_event),
+                notice: "\"#{@custom_document.name}\" removed. You can add it again any time."
   end
 
   def upload_physical_document
@@ -313,12 +448,64 @@ class DashboardController < ApplicationController
       .update_all(hidden_from_public_profile: true)
   end
 
+  # Live MCP connections for the signed-in user, one row per client
+  # application. Mirrors toolchest's own authorized-applications semantics:
+  # a connection counts as live while any token for the app is unrevoked
+  # (access tokens expire in hours, but the client keeps refreshing them).
+  def mcp_connections
+    tokens = Toolchest::OauthAccessToken
+      .where(resource_owner_id: current_user.id.to_s, revoked_at: nil)
+      .includes(:application)
+
+    settings = McpConnectionSetting.for_user(current_user).includes(:events).index_by(&:application_id)
+
+    tokens.group_by(&:application).filter_map do |application, app_tokens|
+      next unless application
+
+      setting = settings[application.id]
+      {
+        application: application,
+        scopes: app_tokens.flat_map(&:scopes_array).uniq.sort,
+        connected_at: app_tokens.map(&:created_at).min,
+        last_used_at: app_tokens.map(&:updated_at).max,
+        settings: setting,
+        anonymized: setting&.anonymize? || false,
+        events: setting&.restricted_to_events? ? setting.events.sort_by { |e| e.name.to_s } : nil,
+        scopable_events: mcp_scopable_events(setting)
+      }
+    end.sort_by { |connection| connection[:connected_at] }.reverse
+  end
+
+  # The events a connection could be narrowed to: what the user can reach, and
+  # never wider than the connection already is.
+  def mcp_scopable_events(setting)
+    scope = current_user.global_admin? ? Event.all : current_user.assigned_events
+    scope = scope.where(id: setting.permitted_event_ids) if setting&.restricted_to_events?
+    scope.order(Arel.sql("starts_at DESC NULLS LAST"), :name)
+  end
+
   def require_participant
     @participant = current_user.participant
 
     if @participant.nil?
       redirect_to onboarding_path, alert: "Please complete your profile first."
     end
+  end
+
+  def require_participant_or_admin
+    @participant = current_user.participant
+
+    if @participant.nil? && !current_user.admin?
+      redirect_to onboarding_path, alert: "Please complete your profile first."
+    end
+  end
+
+  def require_admin
+    redirect_to dashboard_profile_path unless current_user.admin?
+  end
+
+  def staff_profile_params
+    params.require(:user).permit(:display_name, :avatar, :phone_number, :slack_user_id)
   end
 
   def travel_params(direction)

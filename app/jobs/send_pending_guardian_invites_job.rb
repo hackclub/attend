@@ -16,17 +16,28 @@ class SendPendingGuardianInvitesJob < ApplicationJob
       .or(submitted.where(id: waivers.where(status: [ :pending, :failed ], docuseal_participant_slug: nil).select(:participant_event_id)))
   end
 
-  # Guardians of submitted minors who were never sent an invite, plus invites
-  # that expired before the guardian ever opened the portal — those links are
-  # dead, and re-sending delivers the same token with a fresh validity window.
+  # Guardians of submitted minors who were never sent an invite, plus anyone
+  # whose link has since expired — those are dead, and re-sending delivers the
+  # same token with a fresh validity window.
+  #
+  # This mirrors GuardianParticipantEvent#invite_expired? in SQL: the window
+  # runs from the later of the send and the guardian's last use. Guardians who
+  # opened the portal but stalled are deliberately included; excluding them
+  # (as an accepted_at IS NULL filter used to) stranded exactly the people
+  # whose links had lapsed mid-flow.
   def self.gpes_needing_invites(event)
     awaiting = GuardianParticipantEvent
       .joins(:participant_event)
       .where(participant_events: { event_id: event.id, status: :awaiting_guardian })
 
-    awaiting.where(invite_token_sent_at: nil)
-      .or(awaiting.where(accepted_at: nil)
-                  .where(invite_token_sent_at: ...GuardianParticipantEvent::INVITE_VALIDITY.ago))
+    lapsed = awaiting.where(
+      "GREATEST(guardian_participant_events.invite_token_sent_at, " \
+      "COALESCE(guardian_participant_events.invite_last_used_at, " \
+      "guardian_participant_events.invite_token_sent_at)) < ?",
+      GuardianParticipantEvent::INVITE_VALIDITY.ago
+    )
+
+    awaiting.where(invite_token_sent_at: nil).or(lapsed)
   end
 
   def perform(event_id)
@@ -49,6 +60,13 @@ class SendPendingGuardianInvitesJob < ApplicationJob
     Rails.logger.info("[SendPendingGuardianInvitesJob] Sending #{pending_gpes.count} guardian invites for event #{event.id}")
 
     pending_gpes.find_each do |gpe|
+      # Postmark suppresses hard-bounced addresses; re-sending every run just
+      # raises InactiveRecipientError. Needs the email corrected in admin.
+      if gpe.guardian.email_undeliverable?
+        Rails.logger.warn("[SendPendingGuardianInvitesJob] Skipping GPE #{gpe.id}: guardian email is undeliverable")
+        next
+      end
+
       GuardianMailer.invitation(guardian_participant_event: gpe).deliver_later
       Rails.logger.info("[SendPendingGuardianInvitesJob] Sent invite for GPE #{gpe.id}")
     end

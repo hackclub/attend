@@ -1,4 +1,6 @@
 class ScanContext < ApplicationRecord
+  include TravelCalendarCacheInvalidatable
+
   self.implicit_order_column = "created_at"
 
   belongs_to :event
@@ -6,7 +8,7 @@ class ScanContext < ApplicationRecord
 
   validates :name, presence: true
   validates :checks_in, inclusion: { in: [ true, false ] }
-  validates :is_airport, inclusion: { in: [ true, false ] }
+  validates :is_travel_pickup, inclusion: { in: [ true, false ] }
   validate :ends_at_after_starts_at
 
   default_scope { order(:position, :created_at) }
@@ -16,6 +18,10 @@ class ScanContext < ApplicationRecord
   before_destroy :ensure_not_hotel_scan_context
 
   private
+
+  def travel_calendar_event_ids
+    [ event_id, saved_change_to_event_id&.first ]
+  end
 
   def ends_at_after_starts_at
     return if starts_at.blank? || ends_at.blank?

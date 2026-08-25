@@ -2,6 +2,10 @@
 
 <%= content_for :head do %>
   <script src="<%= asset_path("vendor/zxing.min.js") %>"></script>
+  <%# Turbo doesn't re-run scripts when it restores a cached snapshot, so a %>
+  <%# back-navigation would land on a dead preview. Opt out of the cache and %>
+  <%# every arrival here is a fresh render that boots the camera again. %>
+  <meta name="turbo-cache-control" content="no-cache">
 <% end %>
 
 <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-0">
@@ -10,7 +14,7 @@
       <%= link_to admin_event_scans_path(current_event), class: "text-sm text-[#ec3750] hover:text-blue-800" do %>← Check Ins<% end %>
       <h1 class="text-xl sm:text-2xl font-bold">Scanner</h1>
     </div>
-    <span class="text-xs sm:text-sm text-gray-500 hidden sm:block">Check in participants by scanning QR codes<%= " or NFC badges" if current_event.nfc_badges_enabled? %></span>
+    <span class="text-xs sm:text-sm text-gray-500 hidden sm:block">Check in participants by scanning QR codes or NFC tokens</span>
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -31,7 +35,7 @@
             <select id="scan-context" class="border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]">
               <% @scan_contexts.each do |context| %>
                 <option value="<%= context.id %>" <%= "selected" if context == @default_scan_context %>>
-                  <%= context.name %><% if context.is_airport? %> ✈️<% end %><% if context.checks_in? %> ✓<% end %>
+                  <%= context.name %><%= " — Travel pickup" if context.is_travel_pickup? %><% if context.checks_in? %> ✓<% end %>
                 </option>
               <% end %>
             </select>
@@ -46,8 +50,14 @@
         <select id="camera-select" class="flex-1 border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]"></select>
       </div>
 
-      <div id="qr-reader" class="w-full bg-gray-900 rounded-lg overflow-hidden" style="min-height: 280px;">
+      <div id="qr-reader" class="w-full bg-gray-900 rounded-lg overflow-hidden relative" style="min-height: 280px;">
         <video id="qr-video" class="w-full h-full object-cover" style="min-height: 280px;" muted playsinline></video>
+        <!-- iOS home-screen web apps often refuse a camera prompt that isn't
+             tied to a tap, so keep a manual way to (re)start it. -->
+        <button type="button" id="start-camera-btn"
+                class="hidden absolute inset-0 w-full h-full flex items-center justify-center text-white text-sm font-medium bg-gray-900/80">
+          Tap to start camera
+        </button>
       </div>
       
       <div id="scan-result" class="mt-4 p-3 sm:p-4 rounded-lg hidden">
@@ -79,9 +89,8 @@
         </form>
       </div>
 
-      <% if current_event.nfc_badges_enabled? %>
-        <!-- NFC Scanner (via macOS bridge) -->
-        <div class="mt-4 pt-4 border-t border-gray-200" id="nfc-scanner-section">
+      <!-- NFC Scanner (via macOS bridge) -->
+      <div class="mt-4 pt-4 border-t border-gray-200" id="nfc-scanner-section">
           <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-2">
               <p class="text-sm font-medium text-gray-700">NFC Scanner</p>
@@ -95,10 +104,11 @@
             </button>
           </div>
           <p class="text-xs text-gray-500 mb-3">
-            Connect to the Attend NFC Bridge app to scan NFC badges. 
+            Connect to the Attend NFC Bridge app to scan NFC badges or passports.
             <a href="https://github.com/hackclub/attend-nfc" target="_blank" class="text-[#ec3750] hover:underline">Download bridge app →</a>
           </p>
           
+          <% if current_event.nfc_badges_enabled? %>
           <!-- NFC Write Panel (shown after QR scan) -->
           <div id="nfc-write-panel" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-4 mt-3">
             <div class="flex items-center justify-between mb-2">
@@ -110,8 +120,8 @@
             </p>
             <div id="nfc-write-status" class="text-xs text-[#ec3750]">Waiting for badge...</div>
           </div>
-        </div>
-      <% end %>
+          <% end %>
+      </div>
     </div>
 
     <!-- Recent Scans -->
@@ -164,7 +174,7 @@
           <div id="modal-groups" class="flex flex-wrap gap-1 mt-1"></div>
           <p class="text-blue-200 text-xs mt-1" id="modal-context-name"></p>
         </div>
-        <button onclick="closeModal()" class="text-white/70 hover:text-white text-2xl leading-none min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2">&times;</button>
+        <button data-close-participant-modal class="text-white/70 hover:text-white text-2xl leading-none min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2">&times;</button>
       </div>
     </div>
     
@@ -204,13 +214,13 @@
         <a id="modal-view-link" href="#" class="flex-1 bg-[#d42f46] text-white px-4 py-3 sm:py-2 rounded-lg text-center hover:bg-[#b82840] font-medium min-h-[44px] flex items-center justify-center">
           View Full Profile
         </a>
-        <button onclick="closeModal()" class="flex-1 bg-gray-100 text-gray-700 px-4 py-3 sm:py-2 rounded-lg hover:bg-gray-200 font-medium min-h-[44px]">
+        <button data-close-participant-modal class="flex-1 bg-gray-100 text-gray-700 px-4 py-3 sm:py-2 rounded-lg hover:bg-gray-200 font-medium min-h-[44px]">
           Scan Next
         </button>
       </div>
       <% if current_event.nfc_badges_enabled? %>
       <div id="modal-nfc-section" class="mt-4 pt-4 border-t border-gray-200 hidden">
-        <button id="modal-write-nfc-btn" onclick="triggerNfcWriteFromModal()" class="w-full bg-purple-600 text-white px-4 py-3 sm:py-2 rounded-lg hover:bg-purple-700 font-medium min-h-[44px] flex items-center justify-center gap-2">
+        <button id="modal-write-nfc-btn" class="w-full bg-purple-600 text-white px-4 py-3 sm:py-2 rounded-lg hover:bg-purple-700 font-medium min-h-[44px] flex items-center justify-center gap-2">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
           <span id="modal-nfc-btn-text">Write NFC Badge</span>
         </button>
@@ -221,8 +231,57 @@
   </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
+<script nonce="<%= content_security_policy_nonce %>">
+// Mirror of app/javascript/utils/html.js, inlined because this is a classic
+// script and can't import from the importmap. Participant names, group labels
+// and scan context names are all user-controlled, so every template literal
+// that becomes markup here is tagged `html` and escapes its interpolations.
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/[&<>"'`=]/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+    "'": '&#39;', '`': '&#96;', '=': '&#61;'
+  })[char]);
+}
+
+// Marks a string as markup we built ourselves, so `html` inlines it as-is.
+function safeMarkup(value) {
+  return Object.assign(Object.create(safeMarkup.prototype), { value: String(value) });
+}
+safeMarkup.prototype.toString = function() { return this.value; };
+
+function html(strings, ...values) {
+  return safeMarkup(values.reduce((out, value, i) => {
+    let piece;
+    if (value instanceof safeMarkup) piece = value.value;
+    else if (Array.isArray(value)) piece = value.map((v) => html`${v}`.value).join('');
+    else if (value === null || value === undefined || value === false) piece = '';
+    else piece = escapeHtml(value);
+    return out + piece + strings[i + 1];
+  }, strings[0]));
+}
+
+// Groups are admin-created but their colour still lands in a style attribute,
+// so only accept the 6-digit hex the model validates and fall back otherwise.
+function safeHexColor(value) {
+  return /^#?[0-9a-fA-F]{6}$/.test(String(value || '')) ? String(value) : null;
+}
+
+function groupBadgeHtml(group, fallbackColor) {
+  const color = safeHexColor(group.color);
+  return html`<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium" style="background-color: ${color || fallbackColor}; color: ${color ? 'white' : '#1f2d3d'};">${group.name}</span>`;
+}
+
+// Runs on every render, not just the first: this script sits below the markup
+// it touches, and on a Turbo Drive visit DOMContentLoaded has long since fired
+// (which is why the scanner used to sit on "Initializing..." forever whenever
+// you arrived here from another page - e.g. always, inside the installed PWA).
+(function() {
+  // Everything bound to document/window is torn down when we navigate away,
+  // so repeat visits don't stack handlers over detached nodes.
+  const pageListeners = new AbortController();
+  const signal = pageListeners.signal;
+
   const scanUrl = '<%= admin_event_scans_path(current_event) %>';
   const searchUrl = '<%= search_admin_event_scans_path(current_event) %>';
   const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
@@ -246,6 +305,26 @@ document.addEventListener('DOMContentLoaded', function() {
     else if (state === 'error') dot.classList.add('bg-red-500');
     else if (state === 'scanning') dot.classList.add('bg-yellow-500', 'animate-pulse');
     else dot.classList.add('bg-gray-400');
+  }
+
+  function offerManualStart() {
+    document.getElementById('start-camera-btn').classList.remove('hidden');
+  }
+
+  function stopScanner() {
+    if (scanner) scanner.reset();
+    scanner = null;
+  }
+
+  function waitForZXing(timeoutMs = 8000) {
+    return new Promise((resolve) => {
+      const deadline = performance.now() + timeoutMs;
+      (function poll() {
+        if (typeof ZXing !== 'undefined' && ZXing.BrowserQRCodeReader) return resolve();
+        if (performance.now() > deadline) return resolve();
+        setTimeout(poll, 50);
+      })();
+    });
   }
 
   function showResult(message, isError = false) {
@@ -350,6 +429,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   async function initScanner() {
+    stopScanner(); // re-entrant: also reached from the tap-to-start button
     if (typeof ZXing === 'undefined' || !ZXing.BrowserQRCodeReader) {
       updateStatus('Scanner library not loaded', 'error');
       return;
@@ -379,6 +459,7 @@ document.addEventListener('DOMContentLoaded', function() {
       console.error('Camera permission error:', err.name, err.message, err);
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         updateStatus('Camera blocked - check browser settings', 'error');
+        offerManualStart();
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
         updateStatus('No camera found on device', 'error');
       } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
@@ -390,10 +471,12 @@ document.addEventListener('DOMContentLoaded', function() {
           stream.getTracks().forEach(track => track.stop());
         } catch (retryErr) {
           updateStatus('Camera access failed: ' + retryErr.message, 'error');
+          offerManualStart();
           return;
         }
       } else {
         updateStatus('Camera error: ' + err.name + ' - ' + err.message, 'error');
+        offerManualStart();
       }
       return;
     }
@@ -410,7 +493,7 @@ document.addEventListener('DOMContentLoaded', function() {
       // Populate the camera picker
       const select = document.getElementById('camera-select');
       select.innerHTML = cameras
-        .map((c, i) => `<option value="${c.deviceId}">${c.label || `Camera ${i + 1}`}</option>`)
+        .map((c, i) => html`<option value="${c.deviceId}">${c.label || `Camera ${i + 1}`}</option>`)
         .join('');
 
       // Pick a sensible default: remembered choice, else a back/rear camera, else last device
@@ -434,12 +517,14 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (err) {
       console.error('Camera start error:', err);
       updateStatus('Camera access denied', 'error');
+      offerManualStart();
     }
   }
 
   async function startCamera(deviceId) {
     if (!scanner) return;
     updateStatus('Starting camera...', 'loading');
+    document.getElementById('start-camera-btn').classList.add('hidden');
     scanner.reset(); // stop any in-progress stream before switching
     try {
       await scanner.decodeFromVideoDevice(deviceId, 'qr-video', (result, err) => {
@@ -452,6 +537,7 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (err) {
       console.error('Camera start error:', err);
       updateStatus('Could not start camera', 'error');
+      offerManualStart();
     }
   }
 
@@ -488,14 +574,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (data.results.length === 0) {
           searchResults.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500">No participants found</div>';
         } else {
-          searchResults.innerHTML = data.results.map(p => `
+          searchResults.innerHTML = data.results.map(p => html`
             <div class="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0 search-result" 
                  data-participant-id="${p.id}">
               <div class="flex justify-between items-center">
                 <div>
                   <p class="font-medium text-sm">${p.display_name}</p>
                   <p class="text-xs text-gray-500">ID: ${p.short_id}</p>
-                  ${(p.groups && p.groups.length) ? `<div class="flex flex-wrap gap-1 mt-1">${p.groups.map(g => `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium" style="background-color: ${g.color || '#e5e7eb'}; color: ${g.color ? 'white' : '#1f2d3d'};">${g.name}</span>`).join('')}</div>` : ''}
+                  ${(p.groups && p.groups.length) ? html`<div class="flex flex-wrap gap-1 mt-1">${p.groups.map(g => groupBadgeHtml(g, '#e5e7eb'))}</div>` : ''}
                 </div>
                 <span class="text-xs px-2 py-1 rounded-full ${p.status === 'complete' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
                   ${p.status.replace('_', ' ')}
@@ -528,15 +614,29 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
       searchResults.classList.add('hidden');
     }
+  }, { signal });
+
+  document.getElementById('start-camera-btn').addEventListener('click', function() {
+    this.classList.add('hidden');
+    initScanner();
   });
 
-  // Initialize scanner
-  setTimeout(initScanner, 500);
-  
+  // Initialize scanner. The zxing tag lives in <head>, and on a Turbo visit
+  // Turbo appends it without waiting for it to load, so poll for the global
+  // rather than betting on a fixed delay.
+  waitForZXing().then(initScanner);
+
+  // Hand the camera back as soon as we navigate away, otherwise iOS keeps the
+  // capture (and its indicator) alive behind the next page.
+  document.addEventListener('turbo:before-render', function() {
+    stopScanner();
+    pageListeners.abort();
+  }, { signal });
+
   // Expose functions for NFC bridge integration
   window.showResult = showResult;
   window.getCurrentContextId = getCurrentContextId;
-});
+})();
 
 let currentModalParticipant = null;
 
@@ -564,7 +664,7 @@ function showParticipantModal(data, scanContext, firstScan) {
   const groupsEl = document.getElementById('modal-groups');
   if (groupsEl) {
     groupsEl.innerHTML = (data.groups && data.groups.length)
-      ? data.groups.map(g => `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium" style="background-color: ${g.color || '#ffffff'}; color: ${g.color ? 'white' : '#1f2d3d'};">${g.name}</span>`).join('')
+      ? data.groups.map(g => groupBadgeHtml(g, '#ffffff')).join('')
       : '';
   }
   document.getElementById('modal-status').textContent = data.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -664,8 +764,8 @@ function addToRecentScans(participant, scanContext, scannedBy) {
   const emptyMessage = container.querySelector('.text-center.py-8');
   if (emptyMessage) emptyMessage.remove();
 
-  const contextInfo = scanContext?.name ? `<span class="text-gray-400">@ ${scanContext.name}</span>` : '';
-  const scanHtml = `
+  const contextInfo = scanContext?.name ? html`<span class="text-gray-400">@ ${scanContext.name}</span>` : '';
+  const scanHtml = html`
     <div class="flex items-center justify-between border-b border-gray-100 pb-3 bg-green-50 -mx-2 px-2 rounded transition-colors">
       <div class="min-w-0 flex-1 mr-2">
         <p class="font-medium text-sm truncate">${participant.display_name}</p>
@@ -675,7 +775,7 @@ function addToRecentScans(participant, scanContext, scannedBy) {
       <a href="${participant.show_url}" class="text-xs text-[#ec3750] hover:text-blue-800">View</a>
     </div>
   `;
-  container.insertAdjacentHTML('afterbegin', scanHtml);
+  container.insertAdjacentHTML('afterbegin', scanHtml.toString());
 
   setTimeout(() => {
     const firstChild = container.firstElementChild;
@@ -692,11 +792,18 @@ document.getElementById('participant-modal').addEventListener('click', function(
   if (e.target === this) closeModal();
 });
 
+document.querySelectorAll('[data-close-participant-modal]').forEach((el) => {
+  el.addEventListener('click', closeModal);
+});
+
+// Bind at click time so the bridge can connect after the page loads.
+document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => {
+  triggerNfcWriteFromModal();
+});
+
 // NFC Bridge Integration
-<% if current_event.nfc_badges_enabled? %>
 (function() {
-  const nfcEnabled = true;
-  const nfcWriteOnCheckin = <%= current_event.nfc_badge_write_on_checkin_enabled? %>;
+  const nfcWriteOnCheckin = <%= current_event.nfc_badges_enabled? && current_event.nfc_badge_write_on_checkin_enabled? %>;
   const eventId = '<%= current_event.id %>';
   const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
   
@@ -772,7 +879,6 @@ document.getElementById('participant-modal').addEventListener('click', function(
   }
   
   function handleNfcMessage(data) {
-    console.log('NFC message:', data.type, data);
     switch (data.type) {
       case 'tag_read':
         handleNfcTagRead(data.tag);
@@ -787,8 +893,6 @@ document.getElementById('participant-modal').addEventListener('click', function(
   }
   
   function handleNfcTagRead(tag) {
-    console.log('NFC tag read:', tag, 'pendingWriteData:', pendingWriteData);
-    
     // If we're in write mode (waiting for write or verifying), don't process as normal scan
     if (pendingWriteData) {
       if (pendingWriteData.verifying) {
@@ -942,5 +1046,4 @@ document.getElementById('participant-modal').addEventListener('click', function(
   // Auto-connect on page load
   setTimeout(connectNfcBridge, 1000);
 })();
-<% end %>
 </script>

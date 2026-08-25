@@ -27,6 +27,33 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(participant["scans_by_context"].sole["scan_count"]).to eq(2)
     end
 
+    it "returns canonical and deprecated travel pickup fields" do
+      pe = create(:participant_event, event: event)
+      context = event.scan_contexts.create!(name: "Station pickup", is_travel_pickup: true)
+      pe.scans.create!(scan_context: context, user: admin, scanned_at: 1.hour.ago)
+      travel = Travel.create!(participant_event: pe, direction: "inbound", mode: "plane")
+      leg = create(
+        :travel_leg,
+        travel: travel,
+        departure_airport: "LHR",
+        arrival_airport: "JFK",
+        travel_picked_up_at: Time.utc(2026, 8, 24, 12, 0)
+      )
+
+      get "/api/v1/events/#{event.id}/participants", headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      participant = JSON.parse(response.body)["participants"].sole
+      expect(participant["scans_by_context"].sole).to include(
+        "is_travel_pickup" => true,
+        "is_airport" => true
+      )
+      expect(participant["travel_inbound"]["legs"].sole).to include(
+        "travel_picked_up_at" => leg.travel_picked_up_at.iso8601,
+        "airport_picked_up_at" => leg.travel_picked_up_at.iso8601
+      )
+    end
+
     it "exposes the NFC badge token without writing or enqueuing wallet-pass jobs" do
       pe = create(:participant_event, event: event)
       expect(pe.nfc_badge_token).to be_present # DB default backfills new rows

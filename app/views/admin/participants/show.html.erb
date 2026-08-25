@@ -40,6 +40,7 @@
         </dl>
       </section>
 
+      <% if current_event.travel_enabled? %>
       <section class="bg-white rounded-lg border border-gray-200 p-6">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-lg font-semibold">Travel</h2>
@@ -117,7 +118,9 @@
           <p class="text-gray-500">No travel information provided.</p>
         <% end %>
       </section>
+      <% end %>
 
+      <% if current_event.accommodation_enabled? %>
       <section class="bg-white rounded-lg border border-gray-200 p-6">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-lg font-semibold">Accommodation</h2>
@@ -162,6 +165,7 @@
           <p class="text-gray-500">No accommodation information provided.</p>
         <% end %>
       </section>
+      <% end %>
 
       <% if policy(@medical || Medical.new(participant_event: @participant_event)).show? %>
         <section class="bg-white rounded-lg border border-gray-200 p-6">
@@ -231,7 +235,12 @@
                 <div class="flex justify-between items-start">
                   <div>
                     <div class="font-medium"><%= gpe.guardian.full_name %></div>
-                    <div class="text-sm text-gray-600"><%= gpe.guardian.email %></div>
+                    <div class="text-sm text-gray-600">
+                      <%= gpe.guardian.email %>
+                      <% if gpe.guardian.email_undeliverable? %>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800" title="This address hard-bounced and is suppressed — emails to it will not be delivered. Correct the email to clear this.">⚠ Email bouncing</span>
+                      <% end %>
+                    </div>
                     <div class="text-sm text-gray-500"><%= gpe.guardian.phone %></div>
                   </div>
                   <div class="text-right">
@@ -374,18 +383,22 @@
       <section class="bg-white rounded-lg border border-gray-200 p-6">
         <h2 class="text-lg font-semibold mb-4">Onboarding Progress</h2>
         <ul class="space-y-2">
-          <li class="flex items-center gap-2">
-            <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @travel_inbound ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
-            <span class="text-sm">Inbound Travel</span>
-          </li>
-          <li class="flex items-center gap-2">
-            <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @travel_outbound ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
-            <span class="text-sm">Outbound Travel</span>
-          </li>
-          <li class="flex items-center gap-2">
-            <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @accommodation ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
-            <span class="text-sm">Accommodation</span>
-          </li>
+          <% if current_event.travel_enabled? %>
+            <li class="flex items-center gap-2">
+              <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @travel_inbound ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
+              <span class="text-sm">Inbound Travel</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @travel_outbound ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
+              <span class="text-sm">Outbound Travel</span>
+            </li>
+          <% end %>
+          <% if current_event.accommodation_enabled? %>
+            <li class="flex items-center gap-2">
+              <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @accommodation ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
+              <span class="text-sm">Accommodation</span>
+            </li>
+          <% end %>
           <li class="flex items-center gap-2">
             <span class="w-4 h-4 rounded-full flex items-center justify-center text-xs <%= @medical ? 'bg-green-500 text-white' : 'bg-gray-200' %>">✓</span>
             <span class="text-sm">Medical</span>

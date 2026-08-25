@@ -105,6 +105,9 @@ jobs:
       - name: Prepare the test database
         run: bin/rails db:test:prepare
 
+      - name: Test container entrypoint
+        run: bash spec/bin/docker_entrypoint_spec.sh
+
       - name: Run tests
         run: bundle exec rspec
 

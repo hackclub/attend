@@ -2,7 +2,12 @@
 
 data_sources:
   main:
-    url: <%= Rails.application.credentials.dig(:database_url) %>
+    # BLAZER_DATABASE_URL points analytics queries at the CNPG read-only
+    # service so long-running admin queries stay off the primary. The rest is
+    # the same precedence as config/database.yml — otherwise Blazer on a
+    # non-production deployment would query whichever database the credentials
+    # file names.
+    url: <%= ENV["BLAZER_DATABASE_URL"] || ENV["DATABASE_URL"] || Rails.application.credentials.dig(:database_url) %>
 
     # statement timeout, in seconds
     # none by default

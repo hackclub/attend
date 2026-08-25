@@ -8,6 +8,7 @@ class GroupsToolbox < ApplicationToolbox
     authorize! current_event, :show?
     render json: {
       event: current_event.name,
+      url: event_groups_url(current_event),
       groups: current_event.groups.ordered.map { |g| serialize_group(g) }
     }
   end
@@ -63,6 +64,7 @@ class GroupsToolbox < ApplicationToolbox
   def find_group!
     Group.find(params[:group_id]).tap do |g|
       halt error: "You don't have access to that event." unless current_user.can_access_event?(g.event)
+      halt error: out_of_connection_scope(g.event) unless connection_permits_event?(g.event)
     end
   end
 
@@ -72,9 +74,7 @@ class GroupsToolbox < ApplicationToolbox
     return data unless members
 
     data.merge(members: g.participant_events.includes(:participant).map { |pe|
-      { participant_event_id: pe.id,
-        name: [ pe.participant.preferred_name.presence || pe.participant.legal_first_name,
-                pe.participant.legal_last_name ].join(" ") }
+      { participant_event_id: pe.id, name: participant_name(pe.participant) }
     })
   end
 end

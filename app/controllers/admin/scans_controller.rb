@@ -1,6 +1,6 @@
 module Admin
   class ScansController < BaseController
-    include AirportPickupMarkable
+    include TravelPickupMarkable
     before_action :require_event_selected
     before_action :set_scan, only: [ :update ]
     before_action :require_global_admin, only: [ :update ]
@@ -118,18 +118,17 @@ module Admin
 
       # First, try NFC badge token lookup if provided
       if params[:badge_token].present?
-        participant_event = current_event.participant_events
-          .includes(:participant, :medical, :dietary)
-          .find_by(nfc_badge_token: params[:badge_token])
+        participant_event = NfcTokenResolver.call(event: current_event, token: params[:badge_token])
         scan_source = "nfc" if participant_event
       end
 
-      # Fall back to participant_id lookup (QR code flow)
+      # Fall back to participant identifier lookup (QR code flow)
       if participant_event.nil? && params[:participant_id].present?
-        participant_event = current_event.participant_events
-          .joins(:participant)
-          .includes(:medical, :dietary)
-          .find_by(participants: { id: params[:participant_id] })
+        participant_event = ScanParticipantResolver.call(
+          event: current_event,
+          identifier: params[:participant_id],
+          includes: [ :participant, :medical, :dietary ]
+        )
       end
 
       unless participant_event
@@ -146,9 +145,12 @@ module Admin
         source: scan_source
       )
 
-      # Mark airport pickup for airport or check-in contexts on first scan in that context
-      if (scan_context.is_airport? || scan_context.checks_in?) && first_scan_in_context
-        mark_airport_pickup(participant_event, current_user)
+      if scan_context.is_travel_pickup? && first_scan_in_context
+        mark_travel_pickup(participant_event, current_user)
+      end
+
+      if scan_context.is_travel_pickup? || scan_context.checks_in?
+        TravelCalendar::JourneyCache.clear(current_event)
       end
 
       # Auto-generate NFC badge token on first check-in if NFC is enabled
@@ -167,7 +169,7 @@ module Admin
           id: scan_context.id,
           name: scan_context.name,
           checks_in: scan_context.checks_in,
-          is_airport: scan_context.is_airport
+          is_travel_pickup: scan_context.is_travel_pickup
         },
         participant: {
           id: participant.id,

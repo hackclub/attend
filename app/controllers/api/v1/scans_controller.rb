@@ -1,7 +1,7 @@
 module Api
   module V1
     class ScansController < BaseController
-      include AirportPickupMarkable
+      include TravelPickupMarkable
       before_action :set_event
       before_action :require_event_access
 
@@ -126,24 +126,17 @@ module Api
 
         # First, try NFC badge token lookup if provided
         if params[:badge_token].present?
-          participant_event = @event.participant_events
-            .includes(:participant, :medical, :dietary, :safeguarding_info)
-            .find_by(nfc_badge_token: params[:badge_token])
+          participant_event = NfcTokenResolver.call(event: @event, token: params[:badge_token])
           scan_source = "nfc" if participant_event
         end
 
-        # Fall back to participant_id lookup (QR code flow)
+        # Fall back to participant identifier lookup (QR code flow)
         if participant_event.nil? && params[:participant_id].present?
-          # Support both participant_event_id (from QR code) and participant_id
-          participant_event = @event.participant_events
-            .includes(:participant, :medical, :dietary, :safeguarding_info)
-            .find_by(id: params[:participant_id])
-
-          # Fall back to lookup by participant.id if not found by participant_event.id
-          participant_event ||= @event.participant_events
-            .joins(:participant)
-            .includes(:participant, :medical, :dietary, :safeguarding_info)
-            .find_by(participants: { id: params[:participant_id] })
+          participant_event = ScanParticipantResolver.call(
+            event: @event,
+            identifier: params[:participant_id],
+            includes: [ :participant, :medical, :dietary, :safeguarding_info ]
+          )
         end
 
         # Manual search-based scan
@@ -164,9 +157,13 @@ module Api
 
         first_attempt_in_context = result.first_scan_in_context? && !result.deduplicated?
 
-        # Mark airport pickup for airport or check-in contexts on first scan in that context
-        if (scan_context.is_airport? || scan_context.checks_in?) && first_attempt_in_context
-          mark_airport_pickup(participant_event, current_user)
+        # Mark travel pickup for travel or check-in contexts on first scan in that context
+        if (scan_context.is_travel_pickup? || scan_context.checks_in?) && first_attempt_in_context
+          mark_travel_pickup(participant_event, current_user)
+        end
+
+        if scan_context.is_travel_pickup? || scan_context.checks_in?
+          TravelCalendar::JourneyCache.clear(@event)
         end
 
         # Auto-generate NFC badge token on first check-in if NFC is enabled
@@ -219,7 +216,8 @@ module Api
           id: scan_context.id,
           name: scan_context.name,
           checks_in: scan_context.checks_in,
-          is_airport: scan_context.is_airport
+          is_travel_pickup: scan_context.is_travel_pickup,
+          is_airport: scan_context.is_travel_pickup
         }
       end
 
@@ -277,7 +275,8 @@ module Api
             scan_context_id: context.id,
             scan_context_name: context.name,
             checks_in: context.checks_in,
-            is_airport: context.is_airport,
+            is_travel_pickup: context.is_travel_pickup,
+            is_airport: context.is_travel_pickup,
             scan_count: context_scans.size,
             first_scanned_at: context_scans.first&.scanned_at&.iso8601,
             last_scanned_at: context_scans.last&.scanned_at&.iso8601

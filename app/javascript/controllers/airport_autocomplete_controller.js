@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { html } from "utils/html"
 
 export default class extends Controller {
   static targets = ["input", "dropdown", "results"]
@@ -60,7 +61,7 @@ export default class extends Controller {
     }
 
     this.selectedIndex = -1
-    this.resultsTarget.innerHTML = airports.map((airport, index) => `
+    this.resultsTarget.innerHTML = airports.map((airport, index) => html`
       <button type="button" 
               class="w-full text-left px-3 py-2 hover:bg-blue-50 focus:bg-blue-50 focus:outline-none cursor-pointer"
               data-action="click->airport-autocomplete#select"
@@ -69,7 +70,7 @@ export default class extends Controller {
               data-index="${index}">
         <span class="font-mono font-medium text-blue-600">${airport.iata}</span>
         <span class="text-gray-700">${airport.name}</span>
-        ${airport.city ? `<span class="text-gray-500 text-sm">- ${airport.city}, ${airport.country}</span>` : ""}
+        ${airport.city ? html`<span class="text-gray-500 text-sm">- ${airport.city}, ${airport.country}</span>` : ""}
       </button>
     `).join("")
 

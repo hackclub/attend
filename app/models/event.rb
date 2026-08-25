@@ -2,6 +2,7 @@ class Event < ApplicationRecord
   include WalletPassUpdatable
   include RasterizesSvgLogo
   include DecodableImageAttachment
+  include TravelCalendarCacheInvalidatable
 
   has_paper_trail
 
@@ -94,6 +95,25 @@ class Event < ApplicationRecord
   ].freeze
 
   validates :name, presence: true
+
+  # Support email is the from/reply-to on every participant- and guardian-facing
+  # email, so it has to be an address we actually control. Required from setup
+  # onwards; older events created before this rule keep passing validation until
+  # someone edits the field (hence allow_blank on the format check).
+  SUPPORT_EMAIL_DOMAINS = %w[hackclub.com events.hackclub.com].freeze
+  SUPPORT_EMAIL_FORMAT = /\A[^@\s]+@(?:#{SUPPORT_EMAIL_DOMAINS.map { |d| Regexp.escape(d) }.join("|")})\z/i
+
+  normalizes :support_email, with: ->(v) { v.strip.downcase.presence }
+
+  validates :support_email, presence: true, on: :create
+  validates :support_email, presence: true, on: :update, if: :support_email_changed?
+  validates :support_email,
+            format: {
+              with: SUPPORT_EMAIL_FORMAT,
+              message: "must be a #{SUPPORT_EMAIL_DOMAINS.map { |d| "@#{d}" }.join(" or ")} address"
+            },
+            allow_blank: true
+
   validates :slug, presence: true,
                    uniqueness: true,
                    format: { with: /\A[a-z0-9-]+\z/, message: "must be lowercase with no spaces (dashes allowed)" },
@@ -194,6 +214,10 @@ class Event < ApplicationRecord
   # Intl APIs don't understand.
   def timezone_identifier
     ActiveSupport::TimeZone[timezone.to_s]&.tzinfo&.name
+  end
+
+  def effective_timezone_identifier
+    event_time_zone.tzinfo.name
   end
 
   # Value for datetime-local form fields: the stored time expressed in the
@@ -378,6 +402,10 @@ class Event < ApplicationRecord
 
   private
 
+  def travel_calendar_event_ids
+    [ id ]
+  end
+
   def interpret_naive_schedule_times_in_event_timezone
     return if @naive_schedule_times.blank?
 
@@ -497,7 +525,7 @@ class Event < ApplicationRecord
     scan_contexts.create!(
       name: "Event check-in",
       checks_in: true,
-      is_airport: false,
+      is_travel_pickup: false,
       position: 0
     )
   end

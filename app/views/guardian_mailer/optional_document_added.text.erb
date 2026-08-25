@@ -1,0 +1,15 @@
+Dear <%= @first_name %>,
+
+<%= @child_first_name %> has signed up for an optional activity at <%= @event_name %>, and it comes with its own form: <%= @document_name %>.
+
+This one is optional - <%= @child_first_name %> chose to take part, which is why it's coming to you now rather than with the rest of the paperwork. If they'd rather not do the activity after all, they can remove it from their dashboard and you can ignore this email.
+<% if @participant_uploads_first %>
+<%= @child_first_name %> signs this one on paper and uploads a photo of it. Once they have, you'll be asked to check the photo and confirm it's complete.
+<% elsif @physical %>
+This one is signed on paper: download it, print and sign it, then upload a photo of the signed form.
+<% end %>
+Open <%= @document_name %> here: <%= @document_url %>
+
+Everything else you completed earlier is saved - this is the only outstanding item.
+
+If you have any questions, don't hesitate to email us at <%= @support_email %>, or just hit reply to this email!

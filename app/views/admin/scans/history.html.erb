@@ -90,7 +90,7 @@
               <td class="px-6 py-4">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                   <%= scan.scan_context&.name || "Unknown" %>
-                  <% if scan.scan_context&.is_airport? %> ✈️<% end %>
+                  <% if scan.scan_context&.is_travel_pickup? %><span class="ml-1 text-xs font-medium text-blue-700">Travel pickup</span><% end %>
                   <% if scan.scan_context&.checks_in? %> ✓<% end %>
                 </span>
               </td>
@@ -104,7 +104,9 @@
               <% if current_user.global_admin? %>
                 <td class="px-6 py-4 text-right">
                   <button type="button" 
-                          onclick="openEditModal('<%= scan.id %>', '<%= scan.scan_context_id %>', '<%= scan.user_id %>')"
+                          data-edit-scan="<%= scan.id %>"
+                          data-scan-context-id="<%= scan.scan_context_id %>"
+                          data-scan-user-id="<%= scan.user_id %>"
                           class="text-[#ec3750] hover:text-blue-900 text-xs border-2 border-dashed border-orange-400 px-2 py-1 rounded">
                     Edit
                   </button>
@@ -152,7 +154,7 @@
       <div class="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-4 rounded-t-xl">
         <div class="flex justify-between items-center">
           <h3 class="text-lg font-bold">Edit Scan</h3>
-          <button onclick="closeEditModal()" class="text-white/70 hover:text-white text-2xl leading-none">&times;</button>
+          <button data-close-edit-modal class="text-white/70 hover:text-white text-2xl leading-none">&times;</button>
         </div>
         <p class="text-orange-200 text-xs mt-1">Global Admin Only</p>
       </div>
@@ -168,7 +170,7 @@
                     class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]">
               <% @scan_contexts.each do |context| %>
                 <option value="<%= context.id %>">
-                  <%= context.name %><% if context.is_airport? %> ✈️<% end %><% if context.checks_in? %> ✓<% end %>
+                  <%= context.name %><%= " — Travel pickup" if context.is_travel_pickup? %><% if context.checks_in? %> ✓<% end %>
                 </option>
               <% end %>
             </select>
@@ -189,7 +191,7 @@
           <button type="submit" class="flex-1 bg-[#d42f46] text-white px-4 py-2 rounded-lg hover:bg-[#b82840] font-medium">
             Save Changes
           </button>
-          <button type="button" onclick="closeEditModal()" class="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 font-medium">
+          <button type="button" data-close-edit-modal class="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 font-medium">
             Cancel
           </button>
         </div>
@@ -197,7 +199,7 @@
     </div>
   </div>
 
-  <script>
+  <script nonce="<%= content_security_policy_nonce %>">
     function openEditModal(scanId, contextId, userId) {
       const modal = document.getElementById('edit-scan-modal');
       const form = document.getElementById('edit-scan-form');
@@ -220,6 +222,18 @@
     
     document.getElementById('edit-scan-modal').addEventListener('click', function(e) {
       if (e.target === this) closeEditModal();
+    });
+
+    document.querySelectorAll('[data-close-edit-modal]').forEach((el) => {
+      el.addEventListener('click', closeEditModal);
+    });
+
+    document.querySelectorAll('[data-edit-scan]').forEach((button) => {
+      button.addEventListener('click', () => openEditModal(
+        button.dataset.editScan,
+        button.dataset.scanContextId,
+        button.dataset.scanUserId
+      ));
     });
   </script>
 <% end %>

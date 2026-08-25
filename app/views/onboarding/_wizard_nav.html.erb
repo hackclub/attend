@@ -1,49 +1,67 @@
 <div class="mb-6 text-center">
-  <p class="text-sm text-gray-500">Registering for</p>
-  <h2 class="text-lg font-semibold text-gray-900"><%= current_event.name %></h2>
+  <p class="portal-meta text-sm">Registering for</p>
+  <h2 class="portal-heading text-lg"><%= current_event.name %></h2>
 </div>
 
-<nav class="mb-8 overflow-x-auto">
-  <ol class="flex w-full min-w-max">
-    <% current_index = @steps.index(@current_step) %>
+<%# Position indicator for the onboarding wizard, mirroring the guardian
+    portal's step nav: completed steps are links back, the current step is
+    marked with aria-current, and steps not yet reached stay inert.
+
+    On phones the rail would need horizontal scrolling to stay legible, so we
+    show a compact "step N of M" line instead and keep the rail for sm and up. %>
+<nav class="mb-8" aria-label="Progress">
+  <% current_index = @steps.index(@current_step) %>
+
+  <p class="sm:hidden portal-hint text-sm font-medium mb-2">
+    Step <%= current_index + 1 %> of <%= @steps.length %> ·
+    <span class="portal-heading"><%= @current_step.to_s.titleize %></span>
+  </p>
+
+  <div class="portal-progress sm:hidden">
+    <div class="portal-progress-fill"
+         style="--portal-progress: <%= ((current_index + 1).to_f / @steps.length).round(3) %>"></div>
+  </div>
+
+  <ol class="hidden sm:flex items-start w-full">
     <% @steps.each_with_index do |step, index| %>
-      <% step_number = index + 1 %>
       <% is_completed = index < current_index %>
       <% is_current = step == @current_step %>
       <% is_last = index == @steps.length - 1 %>
 
-      <li class="relative flex-1 min-w-[5.5rem] px-1">
-        <% unless is_last %>
-          <%# Connector spans from this circle's edge to the next circle's edge,
-              independent of label widths %>
-          <div class="absolute top-[19px] h-0.5 left-[calc(50%+1.5rem)] right-[calc(-50%+1.5rem)] <%= is_completed ? 'bg-green-600' : 'bg-gray-300' %>" aria-hidden="true"></div>
-        <% end %>
-        <div class="relative flex flex-col items-center">
-          <div class="flex items-center justify-center w-10 h-10 rounded-full border-2 shrink-0 <%= if is_completed
-              'bg-green-600 border-green-600 text-white'
-            elsif is_current
-              'bg-blue-600 border-blue-600 text-white'
-            else
-              'bg-white border-gray-300 text-gray-500'
-            end %>">
+      <li class="flex items-start <%= "flex-1" unless is_last %>">
+        <div class="flex flex-col items-center gap-2 w-24 shrink-0">
+          <% marker_class = is_current ? "portal-step-marker-current" : (is_completed ? "portal-step-marker-done" : "") %>
+          <% marker = capture do %>
             <% if is_completed %>
-              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+              <svg class="size-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
               </svg>
             <% else %>
-              <%= step_number %>
+              <%= index + 1 %>
             <% end %>
-          </div>
-          <span class="mt-2 text-xs font-medium whitespace-nowrap <%= if is_current
-              'text-blue-600'
-            elsif is_completed
-              'text-green-600'
-            else
-              'text-gray-500'
-            end %>">
+          <% end %>
+
+          <% if is_completed && !is_current %>
+            <%= link_to onboarding_step_path(step: step, event_id: current_event.id),
+                  class: "portal-step-marker #{marker_class} transition-transform hover:scale-110",
+                  aria: { label: "Back to #{step.to_s.titleize}" } do %>
+              <%= marker %>
+            <% end %>
+          <% else %>
+            <span class="portal-step-marker <%= marker_class %>" <%= "aria-current=step".html_safe if is_current %>>
+              <%= marker %>
+            </span>
+          <% end %>
+
+          <span class="text-xs font-medium text-center leading-tight <%= is_current ? "portal-heading" : (is_completed ? "portal-hint" : "portal-meta") %>">
             <%= step.to_s.titleize %>
           </span>
         </div>
+
+        <% unless is_last %>
+          <div class="flex-1 h-0.5 mt-[0.6875rem] rounded-full"
+               style="background-color: <%= is_completed ? "var(--success)" : "var(--border)" %>"></div>
+        <% end %>
       </li>
     <% end %>
   </ol>

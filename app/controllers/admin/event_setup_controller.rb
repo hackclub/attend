@@ -81,6 +81,13 @@ module Admin
 
     def remove_team_member
       @event_role_assignment = @event.event_role_assignments.find(params[:assignment_id])
+
+      if @event_role_assignment.inherited_from_series?
+        redirect_to admin_event_setup_team_path(@event),
+          alert: "#{@event_role_assignment.user.email} is a series #{@event_role_assignment.series_role} — their access is inherited from the series, so they can't be removed here."
+        return
+      end
+
       @event_role_assignment.destroy
       redirect_to admin_event_setup_team_path(@event), notice: "Staff member removed."
     end
@@ -90,6 +97,12 @@ module Admin
     end
 
     def complete
+      if @event.support_email.blank?
+        redirect_to edit_admin_event_path(@event),
+          alert: "Set a support email (@hackclub.com or @events.hackclub.com) before finishing setup — it's the from and reply-to address on every participant and guardian email."
+        return
+      end
+
       @event.update!(setup_completed_at: Time.current) unless @event.setup_complete?
       redirect_to admin_event_dashboard_path(@event), notice: "#{@event.name} is ready to go!"
     end

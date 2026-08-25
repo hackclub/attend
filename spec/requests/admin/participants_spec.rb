@@ -43,6 +43,56 @@ RSpec.describe "Admin::Participants", type: :request do
     end
   end
 
+  describe "accommodation when disabled for the event" do
+    let(:participant_event) { create(:participant_event, event: event) }
+
+    before { sign_in global_admin }
+
+    it "hides the Accommodation tab on the participant page" do
+      get admin_event_participant_path(event, participant_event)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include(accommodation_admin_event_participant_path(event, participant_event))
+    end
+
+    it "redirects direct visits to the accommodation page" do
+      get accommodation_admin_event_participant_path(event, participant_event)
+
+      expect(response).to redirect_to(admin_event_participant_path(event, participant_event))
+      expect(flash[:alert]).to include("Accommodation is disabled")
+    end
+
+    it "shows the tab and page when accommodation is enabled" do
+      event.update!(accommodation_enabled: true)
+
+      get admin_event_participant_path(event, participant_event)
+      expect(response.body).to include(accommodation_admin_event_participant_path(event, participant_event))
+
+      get accommodation_admin_event_participant_path(event, participant_event)
+      expect(response).to have_http_status(:ok)
+    end
+  end
+
+  describe "GET travel" do
+    let(:participant_event) { create(:participant_event, event: event) }
+
+    before { sign_in global_admin }
+
+    it "renders both mode selectors with the targets and actions required by the travel form controller" do
+      get travel_admin_event_participant_path(event, participant_event)
+
+      expect(response).to have_http_status(:ok)
+      form = Nokogiri::HTML(response.body).at_css("form[data-controller~='travel-form']")
+      mode_selects = form.css("select[data-travel-form-target]").index_by { |select| select["data-travel-form-target"] }
+
+      expect(mode_selects.keys).to include("inboundMode", "outboundMode")
+      expect(mode_selects.values_at("inboundMode", "outboundMode").map { |select| select["data-action"] }).to eq([
+        "change->travel-form#updateFields",
+        "change->travel-form#updateFields"
+      ])
+    end
+  end
+
   describe "POST sync_slack_channel" do
     include ActiveJob::TestHelper
 

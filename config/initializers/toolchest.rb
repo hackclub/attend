@@ -4,7 +4,7 @@ Toolchest.configure do |config|
   config.server_instructions = <<~INSTRUCTIONS.squish
     You are acting on behalf of an Attend staff user. Attend manages events and their
     participants, travel, accommodation, rooming, groups, messaging, incidents, and
-    safeguarding. Most data is scoped to a single event: call events_list to discover
+    safeguarding. Most data is scoped to a single event: call events_index to discover
     events and use the event_id (or slug) the user is working in. Participants are people
     registered for an event; a participant_event is one person's registration for one
     event. Medical, safeguarding, and incident data is sensitive and only visible to users
@@ -12,6 +12,17 @@ Toolchest.configure do |config|
     retrying. Prefer the read tools to orient yourself before making any changes. To port a
     rooming sheet, call rooming_overview first to map names to participant_event_ids and see
     existing rooms, then rooming_bulk_assign (it can create rooms by name as it fills them).
+    A connection can also be restricted by the user who created it: scoped to specific
+    events, and/or anonymized so names arrive as initials with emails, phone numbers and
+    addresses stripped and every write refused. Call me_show to see which restrictions
+    apply; relay those limits plainly instead of working around them. me_anonymize turns
+    anonymization on for this connection and can never turn it off — only offer it when the
+    user asks to work without personal data.
+    When you tell a human about a record, give them its link, not its ID: read tools return a
+    `url` on the records they serialize, links_participant turns a participant_id into every
+    link that exists for that person, and links_patterns has the URL templates for anything
+    else. Public participant profiles (/p/:slug) are opt-in, so many people simply don't have
+    one — never invent a profile URL or any other path.
   INSTRUCTIONS
 
   config.auth = :oauth
@@ -26,10 +37,18 @@ Toolchest.configure do |config|
     request.env["warden"]&.user
   end
 
+  # MCP is staff-only. Anyone who isn't staff (participants, guardians, signed-up
+  # users with no role) can't reach the consent screen: toolchest bounces them back
+  # to the client with an access_denied error on both GET and POST /oauth/authorize.
+  config.authorize_link { |user| user.present? && user.admin? }
+
   # Resolve an access token back to the Attend user it was issued for. Everything a
-  # toolbox does runs as this user, with this user's real permissions.
+  # toolbox does runs as this user, with this user's real permissions. Tokens issued
+  # before a user lost their staff roles stop resolving here, so demoting someone
+  # kills their MCP access without anyone having to revoke tokens by hand.
   config.authenticate do |token|
-    User.find_by(id: token.resource_owner_id)
+    user = User.find_by(id: token.resource_owner_id)
+    user if user&.admin?
   end
 
   # Scopes the user consents to when connecting a client. These gate which tools are
@@ -57,6 +76,9 @@ Toolchest.configure do |config|
   # Never hand a client more than the account itself could ever use. Fine-grained,
   # per-event enforcement still happens inside the toolboxes via the event roles.
   config.allowed_scopes_for do |user, requested_scopes|
+    # Belt and braces with authorize_link above — a non-staff account gets nothing.
+    next [] unless user&.admin?
+
     allowed = requested_scopes
 
     # Global read-only accounts can never write anything.

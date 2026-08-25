@@ -44,19 +44,49 @@ class GuardianParticipantEvent < ApplicationRecord
     end
   end
 
+  # Handing this link to someone counts as sending it: an unstamped invite is
+  # treated as dead by #invite_expired?, so admins copying a link out of the
+  # participant page would otherwise paste a URL that 404s on arrival. Only
+  # stamp a link that is actually dead -- this renders inside the admin
+  # participant page, and refreshing a live invite on every page load would
+  # write (and record a PaperTrail version) for every guardian shown.
   def invite_url
     host = ENV.fetch("APP_HOST") { Rails.application.config.action_mailer.default_url_options[:host] || "localhost:3000" }
+    token = generate_invite_token!
+    update!(invite_token_sent_at: Time.current) if invite_expired?
+
     Rails.application.routes.url_helpers.guardian_portal_url(
-      token: invite_token || generate_invite_token!,
+      token: token,
       host: host
     )
   end
 
   INVITE_VALIDITY = 7.days
 
+  # Bump at most hourly. The window is measured in days, so stamping every
+  # request would buy no useful precision and add a write to each page load.
+  INVITE_USE_TOUCH_INTERVAL = 1.hour
+
+  # The window slides off whichever happened last: the invite being sent, or the
+  # guardian actually using it. Measuring from the send alone would cut off
+  # anyone still working through the portal seven days after the first email.
+  # A record with neither timestamp has had its invite revoked (an admin changed
+  # the guardian's email) or never had one delivered, so its token is dead
+  # rather than eternal -- that unstamped-means-forever gap was the original bug.
   def invite_expired?
-    return false if accepted_at.present?
-    invite_token_sent_at.present? && invite_token_sent_at < INVITE_VALIDITY.ago
+    last_active_at = [ invite_token_sent_at, invite_last_used_at ].compact.max
+    return true if last_active_at.nil?
+
+    last_active_at < INVITE_VALIDITY.ago
+  end
+
+  # Called on every authenticated portal request. Callers reach this only after
+  # find_by_invite_token! has already rejected expired tokens, so this extends a
+  # live window and can never resurrect a dead one.
+  def touch_invite_use!
+    return if invite_last_used_at.present? && invite_last_used_at > INVITE_USE_TOUCH_INTERVAL.ago
+
+    update_column(:invite_last_used_at, Time.current)
   end
 
   def mark_accepted!

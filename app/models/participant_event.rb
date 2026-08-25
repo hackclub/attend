@@ -1,5 +1,6 @@
 class ParticipantEvent < ApplicationRecord
   include WalletPassUpdatable
+  include TravelCalendarCacheInvalidatable
 
   self.implicit_order_column = "created_at"
 
@@ -27,6 +28,10 @@ class ParticipantEvent < ApplicationRecord
   has_one :room, through: :room_assignment
   has_many :roommate_preferences, dependent: :destroy
   has_many :roommate_exclusions, dependent: :destroy
+  # The other side of the pairing — someone else naming this participant as a
+  # preferred or excluded roommate also holds a foreign key to us.
+  has_many :inbound_roommate_preferences, class_name: "RoommatePreference", foreign_key: :preferred_participant_event_id, dependent: :destroy, inverse_of: :preferred_participant_event
+  has_many :inbound_roommate_exclusions, class_name: "RoommateExclusion", foreign_key: :excluded_participant_event_id, dependent: :destroy, inverse_of: :excluded_participant_event
   has_one :dietary, dependent: :destroy
   has_one :accessibility, dependent: :destroy
   has_one :safeguarding_info, dependent: :destroy
@@ -35,9 +40,13 @@ class ParticipantEvent < ApplicationRecord
   accepts_nested_attributes_for :emergency_contacts, allow_destroy: true, reject_if: :all_blank
 
   has_many :consents, dependent: :destroy
-  has_many :incidents
-  has_many :notes
+  # Incidents and notes outlive the participant's enrolment — they stay on the
+  # event as a safeguarding record — but the join rows pointing at us can't.
+  has_many :incidents, dependent: :nullify
+  has_many :notes, dependent: :nullify
+  has_many :incident_participants, dependent: :destroy
   has_many :scans, dependent: :destroy
+  has_many :slack_blast_recipients, dependent: :destroy
   has_many :message_deliveries, dependent: :destroy
   has_many :group_memberships, dependent: :destroy
   has_many :groups, through: :group_memberships
@@ -69,16 +78,18 @@ class ParticipantEvent < ApplicationRecord
 
   # SQL mirror of !onboarding_complete? so list filters don't have to load
   # every row into Ruby. Keep in sync with #onboarding_complete?.
-  scope :missing_onboarding_data, ->(accommodation_required:) {
+  scope :missing_onboarding_data, ->(accommodation_required:, travel_required: true) {
     clauses = [
-      "NOT EXISTS (SELECT 1 FROM travels t WHERE t.participant_event_id = participant_events.id AND t.direction = 'inbound')",
-      "NOT EXISTS (SELECT 1 FROM travels t WHERE t.participant_event_id = participant_events.id AND t.direction = 'outbound')",
       "NOT EXISTS (SELECT 1 FROM medicals m WHERE m.participant_event_id = participant_events.id)",
       "NOT EXISTS (SELECT 1 FROM dietaries d WHERE d.participant_event_id = participant_events.id)",
       "NOT EXISTS (SELECT 1 FROM accessibilities a WHERE a.participant_event_id = participant_events.id)",
       "NOT EXISTS (SELECT 1 FROM safeguarding_infos si WHERE si.participant_event_id = participant_events.id)",
       "NOT EXISTS (SELECT 1 FROM consents c WHERE c.participant_event_id = participant_events.id)"
     ]
+    if travel_required
+      clauses << "NOT EXISTS (SELECT 1 FROM travels t WHERE t.participant_event_id = participant_events.id AND t.direction = 'inbound')"
+      clauses << "NOT EXISTS (SELECT 1 FROM travels t WHERE t.participant_event_id = participant_events.id AND t.direction = 'outbound')"
+    end
     if accommodation_required
       clauses << "NOT EXISTS (SELECT 1 FROM accommodations ac WHERE ac.participant_event_id = participant_events.id)"
     end
@@ -96,8 +107,8 @@ class ParticipantEvent < ApplicationRecord
   end
 
   def onboarding_complete?
-    travel_inbound.present? &&
-      travel_outbound.present? &&
+    (travel_inbound.present? || !event.travel_enabled?) &&
+      (travel_outbound.present? || !event.travel_enabled?) &&
       (accommodation.present? || !event.accommodation_enabled?) &&
       medical.present? &&
       dietary.present? &&
@@ -138,6 +149,55 @@ class ParticipantEvent < ApplicationRecord
 
   def applicable_custom_documents
     @applicable_custom_documents ||= event.active_custom_documents.select { |doc| doc.applies_to?(self) }
+  end
+
+  # Every optional document on offer to this participant, added or not.
+  # Relevance still applies, so an adult is never offered an under-18s-only
+  # document.
+  def relevant_optional_custom_documents
+    event.active_custom_documents.select { |doc| doc.optional? && doc.relevant_to?(self) }
+  end
+
+  # The "Add and sign" list — on offer but not taken up.
+  def available_optional_custom_documents
+    relevant_optional_custom_documents.reject { |doc| opted_into_custom_document?(doc) }
+  end
+
+  # Whether the participant has taken this optional document up. Once they
+  # have, it behaves exactly like any other document: signable, visible to
+  # their guardian, and blocking until signed.
+  def opted_into_custom_document?(custom_document)
+    consent = custom_document_consent(custom_document)
+    consent.present? && !consent.withdrawn?
+  end
+
+  # Where this participant stands on one optional document, for the admin
+  # table's column, filter, sort and grouping. Reads the consent row that
+  # records the opt-in, so it costs no extra query when consents are
+  # eager-loaded. Keep in sync with Admin::ParticipantsController's SQL
+  # equivalents, which have to answer the same question in the database.
+  def optional_document_state(custom_document)
+    consent = custom_document_consent(custom_document)
+    return :not_added if consent.nil?
+    return :withdrawn if consent.withdrawn?
+
+    consent.signed? ? :signed : :awaiting
+  end
+
+  def custom_document_consent(custom_document)
+    if consents.loaded?
+      consents.find { |c| c.custom_document_id == custom_document.id }
+    else
+      consents.find_by(custom_document_id: custom_document.id)
+    end
+  end
+
+  # Adding or withdrawing a document mid-request invalidates everything
+  # derived from the consent set, none of which #reload touches.
+  def reset_document_memoisation!
+    @applicable_custom_documents = nil
+    @onboarding_progress = nil
+    self
   end
 
   def pending_custom_documents
@@ -215,7 +275,7 @@ class ParticipantEvent < ApplicationRecord
     steps = []
 
     steps << { name: "profile", done: participant.legal_first_name.present? && participant.legal_last_name.present? && participant.date_of_birth.present? }
-    steps << { name: "travel", done: travel_inbound.present? && travel_outbound.present? }
+    steps << { name: "travel", done: travel_inbound.present? && travel_outbound.present? } if event.travel_enabled?
     steps << { name: "accommodation", done: accommodation.present? } if event.accommodation_enabled?
     steps << { name: "health", done: medical.present? && dietary.present? && accessibility.present? }
 
@@ -287,7 +347,7 @@ class ParticipantEvent < ApplicationRecord
       (travel_outbound&.plane? && travel_outbound.is_unaccompanied_minor?))
   end
 
-  # Only verified UMs are surfaced to event admins and airport mode.
+  # Only verified UMs are surfaced to event admins and the Travel Calendar.
   def verified_unaccompanied_minor?
     unaccompanied_minor_declared? && um_approved?
   end
@@ -326,6 +386,10 @@ class ParticipantEvent < ApplicationRecord
   end
 
   private
+
+  def travel_calendar_event_ids
+    [ event_id, saved_change_to_event_id&.first ]
+  end
 
   # Uses the already-loaded consents when eager-loaded so per-row status
   # checks in list views don't issue a query each.

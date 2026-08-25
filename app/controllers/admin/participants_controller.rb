@@ -11,6 +11,7 @@ module Admin
       authorize ParticipantEvent
 
       @show_pending_invitations = params[:status] == "pending_invitations"
+      @optional_documents = current_event.active_custom_documents.select(&:optional?)
 
       if @show_pending_invitations
         @pending_invitations = current_event.invitations.pending.order(created_at: :desc)
@@ -51,7 +52,7 @@ module Admin
       if params[:flag].present?
         case params[:flag]
         when "incomplete_onboarding"
-          @participant_events = @participant_events.missing_onboarding_data(accommodation_required: current_event.accommodation_enabled?)
+          @participant_events = @participant_events.missing_onboarding_data(accommodation_required: current_event.accommodation_enabled?, travel_required: current_event.travel_enabled?)
         when "missing_travel"
           @participant_events = @participant_events.left_joins(:travel_inbound).where(travels: { id: nil })
         when "missing_medical"
@@ -61,6 +62,13 @@ module Admin
         when "anaphylaxis"
           @participant_events = @participant_events.joins(:medical).where(medicals: { has_anaphylaxis_risk: true })
         end
+      end
+
+      # "<document id>:<state>" from the optional-document dropdown, which is
+      # only rendered when the event has opt-in activities to filter by.
+      if params[:optional_document].present? && @participant_events.is_a?(ActiveRecord::Relation)
+        doc_id, state = params[:optional_document].to_s.split(":", 2)
+        @participant_events = apply_optional_document_filter(@participant_events, state, doc_id)
       end
 
       if current_event.groups_enabled? && params[:group_id].present?
@@ -86,6 +94,10 @@ module Admin
             .select(:participant_event_id).distinct
           @participant_events = @participant_events.where.not(id: checked_in_ids)
         end
+      end
+
+      if params[:blocked_on].present? && @participant_events.is_a?(ActiveRecord::Relation)
+        @participant_events = filter_by_blocking_stage(@participant_events, params[:blocked_on])
       end
 
       @participant_events = @participant_events.joins(:participant).order("participants.legal_last_name ASC") if @participant_events.is_a?(ActiveRecord::Relation)
@@ -118,6 +130,9 @@ module Admin
       @group_by = params[:group_by].presence || "status"
 
       @scan_contexts = current_event.scan_contexts.to_a
+      # One column, sort key and grouping per optional document — an event can
+      # run several opt-in activities, and each is its own question.
+      @optional_documents = current_event.active_custom_documents.select(&:optional?)
 
       @participant_events = apply_table_filters(@participant_events)
       @participant_events = apply_table_sorting(@participant_events)
@@ -217,14 +232,14 @@ module Admin
     def approve_um
       authorize @participant_event, :update_travel?
       @participant_event.approve_um!(user: current_user)
-      Rails.cache.delete("airport_mode/#{current_event.id}/journeys/v3")
+      TravelCalendar::JourneyCache.clear(current_event)
       redirect_to travel_admin_event_participant_path(current_event, @participant_event), notice: "Unaccompanied minor status approved."
     end
 
     def reject_um
       authorize @participant_event, :update_travel?
       @participant_event.reject_um!(user: current_user)
-      Rails.cache.delete("airport_mode/#{current_event.id}/journeys/v3")
+      TravelCalendar::JourneyCache.clear(current_event)
       redirect_to travel_admin_event_participant_path(current_event, @participant_event), notice: "Unaccompanied minor status rejected."
     end
 
@@ -240,11 +255,15 @@ module Admin
 
     def accommodation
       authorize @participant_event, :view_accommodation?
+      return redirect_to admin_event_participant_path(current_event, @participant_event), alert: "Accommodation is disabled for this event." unless current_event.accommodation_enabled?
+
       @accommodation = @participant_event.accommodation || @participant_event.build_accommodation
     end
 
     def update_accommodation
       authorize @participant_event, :update_accommodation?
+      return redirect_to admin_event_participant_path(current_event, @participant_event), alert: "Accommodation is disabled for this event." unless current_event.accommodation_enabled?
+
       @accommodation = @participant_event.accommodation || @participant_event.build_accommodation
 
       if @accommodation.update(accommodation_params)
@@ -327,6 +346,10 @@ module Admin
       # document, so a doc nobody has touched would otherwise be invisible here).
       @custom_documents = @participant_event.applicable_custom_documents
       @custom_document_consents = @consents.select { |c| c.custom_document_id.present? }.index_by(&:custom_document_id)
+      # Optional documents on offer that this participant hasn't taken up.
+      # Listed separately so "no waiver on file" reads as "not doing the
+      # activity" rather than as a chase-up.
+      @unadded_optional_documents = @participant_event.available_optional_custom_documents
     end
 
     def reset_waiver
@@ -428,6 +451,49 @@ module Admin
       end
     end
 
+    # Re-issue an electronic custom document: void the stale DocuSeal
+    # submission, put the consent back to pending, and let the normal job build
+    # a fresh one so whoever must sign gets a link that works.
+    def resend_custom_document
+      authorize @participant_event, :reset_waiver?
+
+      custom_document, consent = custom_document_and_consent
+
+      if (error = custom_document_resend_error(custom_document, consent))
+        redirect_to consents_admin_event_participant_path(current_event, @participant_event), alert: error
+        return
+      end
+
+      reissue_custom_document(custom_document, consent)
+
+      redirect_to consents_admin_event_participant_path(current_event, @participant_event),
+        notice: custom_document_resend_notice(custom_document)
+    end
+
+    # The destructive counterpart: throw away an existing signature and issue a
+    # fresh document. Separate from resend so the signature can only ever be
+    # discarded on purpose.
+    def reset_custom_document
+      authorize @participant_event, :reset_waiver?
+
+      custom_document, consent = custom_document_and_consent
+
+      if (error = custom_document_reset_error(custom_document, consent))
+        redirect_to consents_admin_event_participant_path(current_event, @participant_event), alert: error
+        return
+      end
+
+      reissue_custom_document(custom_document, consent)
+
+      # A signature just vanished, so the participant isn't done any more and a
+      # guardian who had finished needs their portal back to sign again.
+      reopen_guardian_portal_access
+      @participant_event.update!(status: :in_progress) if @participant_event.complete?
+
+      redirect_to consents_admin_event_participant_path(current_event, @participant_event),
+        notice: "The previous signature has been discarded. #{custom_document_resend_notice(custom_document)}"
+    end
+
     def notes
       authorize @participant_event, :view_notes?
       @notes = @participant_event.notes.includes(:author).order(created_at: :desc)
@@ -496,6 +562,12 @@ module Admin
 
     def send_travel_update_reminder
       authorize @participant_event, :update_travel?
+
+      if @participant_event.participant.email_undeliverable?
+        redirect_to admin_event_participant_path(current_event, @participant_event),
+          alert: "#{@participant_event.participant.email} is bouncing — correct the participant's email before sending."
+        return
+      end
 
       ParticipantMailer.travel_update_reminder(participant_event: @participant_event).deliver_later
       redirect_to admin_event_participant_path(current_event, @participant_event),
@@ -587,6 +659,13 @@ module Admin
       end
 
       gpe = @participant_event.guardian_participant_events.find(params[:guardian_participant_event_id])
+
+      if gpe.guardian.email_undeliverable?
+        redirect_to admin_event_participant_path(current_event, @participant_event),
+          alert: "#{gpe.guardian.email} is bouncing — correct the guardian's email before resending."
+        return
+      end
+
       gpe.update!(invite_token_sent_at: nil)
 
       GuardianMailer.invitation(guardian_participant_event: gpe).deliver_later
@@ -761,6 +840,62 @@ module Admin
     end
 
     private
+
+    # `blocked_on=<stage key>` — the series dashboard's chase links. A stage's
+    # count is "whose *first* uncleared onboarding step maps to this stage", so
+    # nothing else selects the same people: `awaiting_participant` is shared by
+    # three stages, and `flag=missing_travel` also matches someone still stuck on
+    # their profile. Withdrawn and rejected participants are excluded, exactly as
+    # SeriesDashboard excludes them, so the link's list and the number on it agree.
+    #
+    # onboarding_progress is Ruby, not SQL (CustomDocument#applies_to? and
+    # Participant#minor_on? both branch there), so this evaluates it over the
+    # already-preloaded rows and hands the ids back to SQL — keeping the result a
+    # relation, so the ordering and any count downstream still work. A parallel
+    # SQL reimplementation would drift; see SeriesDashboard's header comment.
+    def filter_by_blocking_stage(scope, stage_key)
+      key = stage_key.to_s
+
+      if key == SeriesDashboard::ARRIVAL_STAGE.key.to_s
+        return scope.where(id: awaiting_check_in_ids(scope))
+      end
+
+      return scope.none unless SeriesDashboard::STAGE_INDEX.key?(key.to_sym)
+
+      scope.where(id: blocked_at_stage_ids(scope, key.to_sym))
+    end
+
+    def blocked_at_stage_ids(scope, stage_key)
+      active_participant_events(scope).filter_map do |pe|
+        blocking = pe.onboarding_progress[:blocking_step]
+        pe.id if blocking && SeriesDashboard::STEP_TO_STAGE[blocking] == stage_key
+      end
+    end
+
+    # Check-in sits after onboarding, not inside it: these are people who have
+    # finished everything and still haven't walked through the door.
+    def awaiting_check_in_ids(scope)
+      return [] unless SeriesDashboard.arrivals_expected?(current_event)
+
+      checked_in = Scan.for_check_in.joins(:participant_event)
+        .where(participant_events: { event_id: current_event.id })
+        .distinct.pluck(:participant_event_id).to_set
+
+      active_participant_events(scope).filter_map do |pe|
+        next if checked_in.include?(pe.id) || pe.onboarding_progress[:blocking_step]
+
+        pe.id
+      end
+    end
+
+    def active_participant_events(scope)
+      scope.to_a.reject { |pe| SeriesDashboard::INACTIVE_STATUSES.include?(pe.status) }.each do |pe|
+        # onboarding_progress asks the event about accommodation, freedom waivers
+        # and custom documents; pointing every row at the instance we already hold
+        # memoizes active_custom_documents once instead of once per participant.
+        pe.association(:event).target = current_event
+      end
+    end
 
     def set_participant_event
       @participant_event = current_event.participant_events.find(params[:id])
@@ -937,6 +1072,34 @@ module Admin
         apply_scan_context_filter(scope, operator, value)
       when "group"
         apply_group_filter(scope, operator, value)
+      when "optional_document"
+        apply_optional_document_filter(scope, operator, value)
+      else
+        scope
+      end
+    end
+
+    # Optional documents are per-event rows, so the document is the filter's
+    # value and the operator carries the state — same shape as scan_context.
+    # Looking the document up through the event's own list is what stops an
+    # id from another event being filtered on.
+    def apply_optional_document_filter(scope, operator, value)
+      doc = optional_document_by_id(value)
+      return scope unless doc
+
+      live = Consent.where(custom_document_id: doc.id, withdrawn_at: nil).select(:participant_event_id)
+
+      case operator
+      when "added"
+        scope.where(id: live)
+      when "not_added"
+        scope.where.not(id: live)
+      when "signed"
+        scope.where(id: Consent.where(custom_document_id: doc.id, withdrawn_at: nil, status: "signed").select(:participant_event_id))
+      when "awaiting"
+        scope.where(id: Consent.where(custom_document_id: doc.id, withdrawn_at: nil).where.not(status: "signed").select(:participant_event_id))
+      when "withdrawn"
+        scope.where(id: Consent.where(custom_document_id: doc.id).where.not(withdrawn_at: nil).select(:participant_event_id))
       else
         scope
       end
@@ -1082,7 +1245,7 @@ module Admin
 
     def apply_onboarding_filter(scope, operator, value)
       complete = value == "true"
-      incomplete = current_event.participant_events.missing_onboarding_data(accommodation_required: current_event.accommodation_enabled?)
+      incomplete = current_event.participant_events.missing_onboarding_data(accommodation_required: current_event.accommodation_enabled?, travel_required: current_event.travel_enabled?)
 
       if complete
         scope.where.not(id: incomplete.select(:id))
@@ -1150,9 +1313,49 @@ module Admin
       ))
     SQL
 
+    OPTIONAL_DOCUMENT_KEY_PREFIX = "optional_document:".freeze
+
+    # Sort and group need to name one document, and neither UI has a value
+    # slot of its own — hence the compound key. Resolving it against the
+    # event's own document list keeps another event's id out.
+    def optional_document_for_key(key)
+      return nil unless key.to_s.start_with?(OPTIONAL_DOCUMENT_KEY_PREFIX)
+
+      optional_document_by_id(key.to_s.delete_prefix(OPTIONAL_DOCUMENT_KEY_PREFIX))
+    end
+
+    def optional_document_by_id(id)
+      return nil if id.blank?
+
+      current_event.active_custom_documents.find { |doc| doc.optional? && doc.id == id }
+    end
+
+    # Ranks a participant by where they stand on one optional document, in the
+    # order an organiser wants to read: done, chasing, backed out, not doing
+    # it. Mirrors ParticipantEvent#optional_document_state.
+    OPTIONAL_DOCUMENT_RANK_SQL = <<~SQL.squish
+      CASE
+        WHEN EXISTS (SELECT 1 FROM consents c WHERE c.participant_event_id = participant_events.id
+                     AND c.custom_document_id = :id AND c.withdrawn_at IS NULL AND c.status = 'signed') THEN 0
+        WHEN EXISTS (SELECT 1 FROM consents c WHERE c.participant_event_id = participant_events.id
+                     AND c.custom_document_id = :id AND c.withdrawn_at IS NULL) THEN 1
+        WHEN EXISTS (SELECT 1 FROM consents c WHERE c.participant_event_id = participant_events.id
+                     AND c.custom_document_id = :id) THEN 2
+        ELSE 3
+      END
+    SQL
+
+    def optional_document_rank_sql(doc)
+      ActiveRecord::Base.sanitize_sql_array([ OPTIONAL_DOCUMENT_RANK_SQL, { id: doc.id } ])
+    end
+
     def apply_table_sorting(scope)
       direction = @sort_direction == "desc" ? :desc : :asc
       nulls_last = direction == :desc ? "DESC NULLS LAST" : "ASC NULLS LAST"
+
+      if (doc = optional_document_for_key(@sort_field))
+        return scope.order(Arel.sql("#{optional_document_rank_sql(doc)} #{direction.to_s.upcase}"))
+      end
 
       case @sort_field
       when *ALLOWED_PARTICIPANT_SORT_FIELDS
@@ -1176,6 +1379,10 @@ module Admin
     end
 
     def group_participants(scope)
+      if (doc = optional_document_for_key(@group_by))
+        return scope.group_by { |pe| helpers.optional_document_state_label(pe.optional_document_state(doc)) }
+      end
+
       case @group_by
       when "status"
         scope.group_by(&:display_status)
@@ -1219,6 +1426,127 @@ module Admin
       else
         ParticipantMailer.waiver_ready(participant_event: @participant_event).deliver_later
       end
+    end
+
+    def custom_document_and_consent
+      custom_document = current_event.custom_documents.find_by(id: params[:custom_document_id])
+      consent = custom_document && @participant_event.consents.find_by(custom_document_id: custom_document.id)
+
+      [ custom_document, consent ]
+    end
+
+    # Void the stale DocuSeal submission, put the consent back to pending, and
+    # let the normal job build a fresh one so whoever must sign gets a working
+    # link. Shared by resend and reset — they differ only in what state they
+    # accept beforehand and what they clean up afterwards.
+    def reissue_custom_document(custom_document, consent)
+      if consent
+        void_docuseal_submission(consent)
+        consent.update!(
+          status: :pending,
+          docuseal_envelope_id: nil,
+          docuseal_participant_slug: nil,
+          docuseal_guardian_slug: nil,
+          docuseal_template_id: nil,
+          participant_signed_at: nil,
+          guardian_signed_at: nil,
+          signed_at: nil,
+          document_url: nil,
+          failure_reason: nil,
+          pending_on: nil,
+          sent_at: nil
+        )
+      else
+        consent = @participant_event.consents.create!(
+          consent_type: :custom_document,
+          custom_document: custom_document
+        )
+      end
+
+      DocusealJobs::CreateCustomDocumentJob.perform_later(consent.id)
+
+      # DocuSeal emails the guardian their link, but participants sign embedded
+      # in Attend and are never emailed by DocuSeal — they need Attend's nudge.
+      if custom_document.participant_signs?
+        ParticipantMailer.new_document_ready(participant_event: @participant_event).deliver_later
+      end
+
+      consent
+    end
+
+    # Everything that makes a resend pointless or harmful, in the order an
+    # admin would hit it. A signed document is a legal record, so discarding
+    # the signature is the separate, explicit reset action.
+    def custom_document_resend_error(custom_document, consent)
+      return "#{quoted(custom_document)} is already signed. Use Reset to discard the signature and issue a new one." if consent&.signed?
+
+      custom_document_sendable_error(custom_document)
+    end
+
+    def custom_document_reset_error(custom_document, consent)
+      return "Document not found for this event." if custom_document.nil?
+
+      unless consent&.signed?
+        return "#{quoted(custom_document)} isn't signed, so there's nothing to reset — use Resend instead."
+      end
+
+      custom_document_sendable_error(custom_document)
+    end
+
+    # Reasons a fresh DocuSeal submission can't be built at all.
+    def custom_document_sendable_error(custom_document)
+      return "Document not found for this event." if custom_document.nil?
+
+      name = quoted(custom_document)
+
+      unless custom_document.electronic?
+        return "#{name} is signed on paper, so it doesn't go through DocuSeal."
+      end
+
+      unless custom_document.applies_to?(@participant_event)
+        return "#{name} doesn't apply to this participant."
+      end
+
+      if custom_document.guardian_signs? && @participant_event.requires_guardian?
+        return "#{name} needs a guardian, and none is on file yet." if resend_guardian.nil?
+        if current_event.guardian_invites_locked?
+          return "Guardian invites are still locked for this event, so #{name} can't be sent yet."
+        end
+      end
+
+      nil
+    end
+
+    def quoted(custom_document)
+      "\"#{custom_document.name}\""
+    end
+
+    def resend_guardian
+      @participant_event.guardian_participant_events.first&.guardian
+    end
+
+    def custom_document_resend_notice(custom_document)
+      name = quoted(custom_document)
+
+      if custom_document.signed_by_guardian?
+        "#{name} has been re-sent — the guardian will be emailed a new signing link."
+      elsif custom_document.guardian_signs? && @participant_event.requires_guardian?
+        "#{name} has been re-sent — the participant has been emailed, and their guardian is emailed their link once the participant signs."
+      else
+        "#{name} has been re-sent — the participant has been emailed a link to sign it."
+      end
+    end
+
+    # Best effort: the point is to stop the old link working, but a DocuSeal
+    # failure mustn't block re-issuing the document.
+    def void_docuseal_submission(consent)
+      return if consent.docuseal_envelope_id.blank?
+
+      Docuseal::Client.for(consent).archive_submission(consent.docuseal_envelope_id)
+    rescue Docuseal::Error => e
+      Rails.logger.warn(
+        "Couldn't archive DocuSeal submission #{consent.docuseal_envelope_id} for consent #{consent.id}: #{e.message}"
+      )
     end
 
     def reopen_guardian_portal_access

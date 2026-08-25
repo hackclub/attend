@@ -1,5 +1,17 @@
 #!/bin/bash
 
+case "${PROCESS_TYPE-web}" in
+  web)
+    ;;
+  worker)
+    set -- ./bin/jobs
+    ;;
+  *)
+    echo "Unknown PROCESS_TYPE: ${PROCESS_TYPE}" >&2
+    exit 64
+    ;;
+esac
+
 echo "=== Docker Entrypoint Starting ==="
 echo "Command: $@"
 echo "RAILS_MASTER_KEY set: ${RAILS_MASTER_KEY:+yes}"
@@ -19,6 +31,13 @@ if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
   echo "=== Running db:prepare ==="
   ./bin/rails db:prepare 2>&1 || { echo "db:prepare failed with exit code $?"; exit 1; }
   echo "=== db:prepare complete ==="
+
+  # db:prepare cannot create the cache/queue/cable tables when those connections
+  # share the primary database — see lib/tasks/secondary_schemas.rake. Without
+  # this, a new environment boots and then dies in Solid Queue's supervisor.
+  echo "=== Ensuring secondary schemas ==="
+  ./bin/rails db:ensure_secondary_schemas 2>&1 || { echo "db:ensure_secondary_schemas failed with exit code $?"; exit 1; }
+  echo "=== secondary schemas complete ==="
 fi
 
 echo "=== Starting server ==="

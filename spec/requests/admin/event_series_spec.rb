@@ -24,6 +24,90 @@ RSpec.describe "Admin::EventSeries", type: :request do
     end
   end
 
+  describe "the series dashboard" do
+    it "renders the funnel, chase list, and map for a series with participants" do
+      3.times { create(:participant_event, event: sub_event) }
+      create(:participant_event, event: sub_event, status: :withdrawn)
+      sign_in owner
+
+      get admin_series_path(series)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Needs chasing")
+      expect(response.body).to include("How far participants have got")
+      expect(response.body).to include("Venue locations")
+      # The map duplicates the events list, so it must not claim the keyboard.
+      expect(response.body).to include('role="group"')
+      expect(response.body).not_to include('role="application"')
+      # The ribbon's per-stage figures have to be reachable without the graphic.
+      expect(response.body).to include("Stuck here")
+      # Markers reach the map as JSON in a data attribute, so the event name is
+      # escaped rather than parsed as markup.
+      expect(response.body).to include("data-series-map-markers-value")
+      # The ribbon geometry is generated, so assert on the emitted path rather
+      # than just the class: an empty <path d=""> would still match a class check.
+      expect(response.body).to include("series-ribbon-fill")
+      expect(response.body).to match(/<path d="M 0 [\d.]+ C .+Z"/)
+    end
+
+    it "keeps identity in the header line and participant figures in the funnel" do
+      3.times { create(:participant_event, event: sub_event) }
+      create(:participant_event, event: sub_event, status: :withdrawn)
+      sign_in owner
+
+      get admin_series_path(series)
+
+      # Header line: how big, what's running, who has dropped out.
+      expect(response.body).to include("1 event")
+      expect(response.body).to include("1 withdrawn")
+      # Funnel: the two endpoints, and nothing restating them above.
+      expect(response.body).to include("started onboarding")
+      expect(response.body).to include("cleared every stage")
+      # The KPI strip that repeated all four of these figures is gone.
+      expect(response.body).not_to include("fully cleared")
+    end
+
+    it "says so plainly when nothing needs chasing" do
+      sign_in owner
+
+      get admin_series_path(series)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Nothing needs chasing")
+    end
+
+    it "admits when the viewer cannot see an event's incidents" do
+      # Series membership alone grants no incident visibility, so this viewer's
+      # chase list is genuinely incomplete and has to say so rather than imply
+      # a zero.
+      sign_in organizer
+
+      get admin_series_path(series)
+
+      expect(response.body).to include("aren't visible to you")
+    end
+
+    it "stays quiet about incident visibility when nothing is hidden" do
+      sign_in global_admin
+
+      get admin_series_path(series)
+
+      expect(response.body).not_to include("aren't visible to you")
+    end
+
+    it "still renders when no event has a venue location" do
+      sub_event.update_columns(location_city: nil, location_country: nil,
+                              location_latitude: nil, location_longitude: nil)
+      sign_in owner
+
+      get admin_series_path(series)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("nothing to plot")
+      expect(response.body).not_to include("data-series-map-markers-value")
+    end
+  end
+
   describe "series pages" do
     it "lets a series member view the series and its events" do
       sign_in organizer
@@ -121,7 +205,7 @@ RSpec.describe "Admin::EventSeries", type: :request do
       sign_in organizer
 
       post admin_events_path, params: {
-        event: { name: "Sunbeam Berlin Spec", event_series_id: series.id }
+        event: { name: "Sunbeam Berlin Spec", event_series_id: series.id, support_email: "berlin@events.hackclub.com" }
       }
 
       event = Event.find_by(name: "Sunbeam Berlin Spec")

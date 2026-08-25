@@ -1,57 +1,62 @@
 <div class="w-full max-w-2xl mx-auto">
   <%= render "wizard_nav" %>
 
-  <h1 class="text-2xl font-bold mb-2">Guardian Information</h1>
-  <p class="text-sm text-gray-600 mb-6">Fields marked with <span class="text-red-500">*</span> are required.</p>
+  <header class="mb-6">
+    <h1 class="portal-title text-2xl">Guardian Information</h1>
+    <p class="portal-hint text-sm mt-2">Fields marked with <span class="portal-required" aria-hidden="true">*</span> are required.</p>
+  </header>
 
-  <div class="bg-blue-50 border border-blue-200 rounded-md p-4 mb-6">
-    <p class="text-sm text-blue-800">
+  <div class="portal-note portal-note-info mb-6">
+    <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.852l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/>
+    </svg>
+    <p class="portal-body text-sm">
       This information is required for participants under 18 years of age. A guardian will need to provide consent for your participation.
     </p>
   </div>
 
   <%= form_with url: onboarding_step_path(step: @step, event_id: current_event.id), method: :patch, local: true, data: { turbo: false, controller: "phone-input autosave", autosave_url_value: onboarding_step_path(step: @step, event_id: current_event.id), action: "input->autosave#input change->autosave#change" } do |f| %>
     <%= render "autosave_status" %>
-    <div class="space-y-6">
+    <div class="portal-card p-5 sm:p-6 space-y-6">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <%= f.label :guardian_first_name, label_text("Guardian First Name", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
-          <%= f.text_field :guardian_first_name, value: @guardian.legal_first_name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true %>
+          <%= f.label :guardian_first_name, label_text("Guardian First Name", required: true), class: "portal-label" %>
+          <%= f.text_field :guardian_first_name, value: @guardian.legal_first_name, class: "portal-input", required: true %>
         </div>
 
         <div>
-          <%= f.label :guardian_last_name, label_text("Guardian Last Name", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
-          <%= f.text_field :guardian_last_name, value: @guardian.legal_last_name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true %>
+          <%= f.label :guardian_last_name, label_text("Guardian Last Name", required: true), class: "portal-label" %>
+          <%= f.text_field :guardian_last_name, value: @guardian.legal_last_name, class: "portal-input", required: true %>
         </div>
       </div>
 
       <div>
-        <%= f.label :guardian_email, label_text("Guardian Email", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= f.email_field :guardian_email, value: @guardian.email, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true %>
-        <p class="mt-1 text-sm text-gray-500">We'll send consent forms and important updates to this email</p>
+        <%= f.label :guardian_email, label_text("Guardian Email", required: true), class: "portal-label" %>
+        <%= f.email_field :guardian_email, value: @guardian.email, class: "portal-input", required: true %>
+        <p class="mt-1 portal-hint text-sm">We'll send consent forms and important updates to this email</p>
       </div>
 
       <div>
-        <%= f.label :guardian_phone, label_text("Guardian Phone Number", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= f.telephone_field :guardian_phone, value: @guardian.phone, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true %>
+        <%= f.label :guardian_phone, label_text("Guardian Phone Number", required: true), class: "portal-label" %>
+        <%= f.telephone_field :guardian_phone, value: @guardian.phone, class: "portal-input", required: true %>
       </div>
 
       <div>
-        <%= f.label :guardian_relationship, label_text("Relationship to Participant", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.label :guardian_relationship, label_text("Relationship to Participant", required: true), class: "portal-label" %>
         <% standard_relationships = ["Parent", "Legal Guardian", "Grandparent", "Aunt/Uncle", "Sibling (18+)", "Other"] %>
         <% selected_relationship = standard_relationships.include?(@existing_gpe&.relationship) ? @existing_gpe&.relationship : (@existing_gpe&.relationship.present? ? "Other" : nil) %>
-        <%= f.select :guardian_relationship, [["Select relationship", ""]] + standard_relationships, { selected: selected_relationship }, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", required: true, data: { action: "change->guardian-form#toggleOtherDetails" } %>
+        <%= f.select :guardian_relationship, [["Select relationship", ""]] + standard_relationships, { selected: selected_relationship }, class: "portal-select", required: true, data: { action: "change->guardian-form#toggleOtherDetails" } %>
       </div>
 
       <div id="other-relationship-details" class="hidden">
-        <%= f.label :guardian_relationship_other, label_text("Please specify relationship", required: true), class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.label :guardian_relationship_other, label_text("Please specify relationship", required: true), class: "portal-label" %>
         <% other_relationship_value = @existing_gpe&.relationship unless %w[Parent Legal\ Guardian Grandparent Aunt/Uncle Sibling\ (18+)].include?(@existing_gpe&.relationship) %>
-        <%= f.text_field :guardian_relationship_other, value: other_relationship_value, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500", placeholder: "e.g., Family friend, Coach, etc." %>
+        <%= f.text_field :guardian_relationship_other, value: other_relationship_value, class: "portal-input", placeholder: "e.g., Family friend, Coach, etc." %>
       </div>
 
       <%= f.hidden_field :onboarding_step, value: "guardian" %>
 
-      <script>
+      <script nonce="<%= content_security_policy_nonce %>">
         document.addEventListener('DOMContentLoaded', function() {
           const relationshipSelect = document.querySelector('[name="guardian_relationship"]');
           const otherDetails = document.getElementById('other-relationship-details');

@@ -39,8 +39,28 @@
       "user_input": ":role",
       "confidence": "Medium",
       "note": "Role assignment in admin controller is intentional - only series owners/global admins reach this (require_series_owner_access), and role is an enum restricted to owner/organizer."
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "a3c826887eecb37e1dbeddbfe8cfa821c730f3f312d213ac15701948cbf1f54d",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/controllers/admin/participants_controller.rb",
+      "line": 1237,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "Arel.sql(\"#{optional_document_rank_sql(optional_document_for_key(@sort_field))} #{(:desc or :asc).to_s.upcase}\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ParticipantsController",
+        "method": "apply_table_sorting"
+      },
+      "user_input": "optional_document_rank_sql(optional_document_for_key(@sort_field))",
+      "confidence": "Medium",
+      "note": "False positive - optional_document_rank_sql builds its SQL through sanitize_sql_array with the document id bound as :id, the document itself is resolved against the current event's own document list, and the interpolated sort direction is one of two literal symbols."
     }
   ],
-  "updated": "2026-02-04",
+  "updated": "2026-08-17",
   "brakeman_version": "8.0.2"
 }

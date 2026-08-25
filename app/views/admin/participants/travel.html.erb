@@ -18,7 +18,7 @@
 
       <p class="text-sm text-gray-600 mb-4">
         UM means the airline's formal (paid) unaccompanied minor chaperone service — not just an under-18 travelling alone.
-        Only approved participants show the UM badge in Airport Mode and admin views.
+        Only approved participants show the UM badge in the Travel Calendar and admin views.
       </p>
 
       <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm mb-4">
@@ -76,7 +76,7 @@
             <%= f.select :mode, Travel.modes.keys.map { |m| [m.titleize, m] },
                 { include_blank: "Select mode..." },
                 class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2",
-                data: { action: "change->travel-form#toggleMode", travel_form_target: "inboundMode" } %>
+                data: { action: "change->travel-form#updateFields", travel_form_target: "inboundMode" } %>
           </div>
 
           <% if current_event.visa_options_enabled? %>
@@ -193,7 +193,8 @@
             <%= f.label :mode, "Travel Mode", class: "block text-sm font-medium text-gray-700 mb-1" %>
             <%= f.select :mode, Travel.modes.keys.map { |m| [m.titleize, m] },
                 { include_blank: "Select mode..." },
-                class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2",
+                data: { action: "change->travel-form#updateFields", travel_form_target: "outboundMode" } %>
           </div>
 
           <!-- Unaccompanied Minor -->

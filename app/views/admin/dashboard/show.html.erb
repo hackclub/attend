@@ -75,11 +75,11 @@
         <span class="text-xs font-medium text-gray-700 text-center">Participants</span>
       <% end %>
       <% if @event.travel_enabled? %>
-        <%= link_to admin_event_airport_mode_path(@event), class: "flex flex-col items-center gap-2 p-4 hover:bg-gray-50 transition-colors" do %>
+        <%= link_to admin_event_travel_path(@event), class: "flex flex-col items-center gap-2 p-4 hover:bg-gray-50 transition-colors" do %>
           <div class="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center">
-            <svg class="w-5 h-5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+            <svg class="w-5 h-5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
           </div>
-          <span class="text-xs font-medium text-gray-700 text-center">Airport Mode</span>
+          <span class="text-xs font-medium text-gray-700 text-center">Travel Calendar</span>
         <% end %>
       <% end %>
       <% if @event.accommodation_enabled? %>
@@ -213,7 +213,7 @@
       <div class="bg-white border border-gray-200 rounded-lg ">
         <div class="p-4 border-b border-gray-100 flex items-center justify-between">
           <h2 class="font-semibold text-gray-900">Travel Overview</h2>
-          <%= link_to "Airport Mode", admin_event_airport_mode_path(@event), class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
+          <%= link_to "Travel Calendar", admin_event_travel_path(@event), class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
         </div>
         <div class="p-4">
           <div class="grid grid-cols-2 gap-6">

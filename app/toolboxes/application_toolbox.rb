@@ -6,9 +6,15 @@ class ApplicationToolbox < Toolchest::Toolbox
   # auth.scopes         — scopes the user consented to for this client
   # auth.token          — the raw OAuth access token record
 
-  helper_method :current_user, :current_event, :global_admin?
+  # Every serialized record carries the URL of the page it lives on, so agents
+  # hand humans links instead of bare IDs.
+  include AttendUrls
 
+  helper_method :current_user, :current_event, :global_admin?, :participant_name, :person_name
+
+  before_action :require_staff!
   before_action :establish_current_context
+  before_action :refuse_writes_when_anonymized!
   after_action :audit_write!
 
   rescue_from Pundit::NotAuthorizedError do |_e|
@@ -44,7 +50,69 @@ class ApplicationToolbox < Toolchest::Toolbox
       end
   end
 
+  # Per-connection restrictions the user set when they authorized this client
+  # (see McpConnectionSetting). nil when the client predates the setting or the
+  # user left it unrestricted.
+  def mcp_connection
+    return @mcp_connection if defined?(@mcp_connection)
+
+    @mcp_connection = McpConnectionSetting.for(auth&.token&.application_id, current_user)
+  end
+
+  def anonymized? = mcp_connection&.anonymize? || false
+
+  # nil means "no connection-level restriction" — every event the user can reach.
+  def permitted_event_ids
+    return @permitted_event_ids if defined?(@permitted_event_ids)
+
+    @permitted_event_ids = mcp_connection&.permitted_event_ids
+  end
+
+  # The events this call may touch: the user's own access, narrowed by whatever
+  # the connection was scoped to.
+  def accessible_events
+    scope = global_admin? ? Event.all : current_user.assigned_events
+    permitted_event_ids ? scope.where(id: permitted_event_ids) : scope
+  end
+
+  def accessible_event?(event)
+    event.present? && current_user.can_access_event?(event) && connection_permits_event?(event)
+  end
+
+  def connection_permits_event?(event)
+    permitted_event_ids.nil? || permitted_event_ids.include?(event&.id)
+  end
+
+  # A participant's name, reduced to initials on an anonymized connection.
+  def participant_name(participant)
+    return nil if participant.nil?
+
+    person_name([ participant.preferred_name.presence || participant.legal_first_name,
+                  participant.legal_last_name ].compact_blank.join(" "))
+  end
+
+  def person_name(name)
+    anonymized? ? Mcp::ResponseFilter.initials(name) : name
+  end
+
+  # Runs every response through the privacy filter on an anonymized connection.
+  # Doing it here rather than in each serializer means a new tool is anonymized
+  # by default instead of by remembering to be.
+  def render(action_or_template = nil, json: nil, text: nil)
+    json = Mcp::ResponseFilter.call(json) if anonymized? && (json.is_a?(Hash) || json.is_a?(Array))
+    super
+  end
+
   private
+
+  # MCP is a staff-only surface. The consent screen and token resolution already
+  # gate on this (config/initializers/toolchest.rb), so getting here without a
+  # staff user means a token outlived its owner's roles — refuse every tool call.
+  def require_staff!
+    return if current_user&.admin?
+
+    halt error: "MCP access is limited to Attend staff."
+  end
 
   # Mirror ApplicationController#set_current_attributes so PaperTrail versions and
   # anything reading Current.* are attributed to the acting user, not a null actor.
@@ -54,21 +122,84 @@ class ApplicationToolbox < Toolchest::Toolbox
     PaperTrail.request.whodunnit = current_user&.id
   end
 
+  # Anonymized connections are read-only: an agent that can't see who someone is
+  # has no business changing their record, and blocking writes also closes the
+  # write-then-read path back to the values we just stripped.
+  def refuse_writes_when_anonymized!
+    return unless anonymized?
+    return if @_tool_definition&.access_level == :read
+
+    halt error: <<~MESSAGE.squish
+      This connection is anonymized, so it can read data but not change it —
+      #{@_tool_definition&.tool_name || action_name} was not run and nothing was modified.
+      Anonymization also replaces names with initials and removes emails, phone
+      numbers and addresses from every response. To let this agent make changes,
+      the account holder needs to disconnect it under Profile → Connections in
+      Attend and reconnect it without anonymization; it can't be lifted from here.
+    MESSAGE
+  end
+
   def require_event!
-    halt error: "Pass an event_id or event_slug — use events_list to find one." if current_event.nil?
+    halt error: "Pass an event_id or event_slug — use events_index to find one." if current_event.nil?
     unless current_user.can_access_event?(current_event)
       halt error: "You don't have access to #{current_event.name}."
     end
+    halt error: out_of_connection_scope(current_event) unless connection_permits_event?(current_event)
     Current.event = current_event
   end
 
-  # Pundit, callable without a controller context.
+  # Pundit, callable without a controller context. The connection's event
+  # allowlist is checked alongside it: Pundit answers "may this user?", this
+  # answers "may this connection?".
   def authorize!(record, query = nil)
-    Pundit.authorize(current_user, record, query || "#{action_name}?".to_sym)
+    result = Pundit.authorize(current_user, record, query || "#{action_name}?".to_sym)
+    guard_connection_event!(record)
+    result
   end
 
   def policy_scope(scope)
-    Pundit.policy_scope!(current_user, scope)
+    narrow_to_connection_events(Pundit.policy_scope!(current_user, scope))
+  end
+
+  def guard_connection_event!(record)
+    return if permitted_event_ids.nil?
+    return unless record.is_a?(Event) || record.respond_to?(:event)
+
+    event = record.is_a?(Event) ? record : record.event
+    # An event-scoped record with no event — a support ticket nobody has filed
+    # under an event yet — sits outside every allowlist rather than inside all
+    # of them.
+    if event.nil?
+      return unless record.class.column_names.include?("event_id")
+
+      halt error: "This connection is scoped to #{connection_event_names.to_sentence}, and this " \
+                  "#{record.class.model_name.human.downcase} isn't linked to any event."
+    end
+
+    halt error: out_of_connection_scope(event) unless permitted_event_ids.include?(event.id)
+  end
+
+  # Event-restricted connections see only their events' rows. Records with no
+  # event at all (an unlinked support ticket, say) are outside the allowlist too.
+  def narrow_to_connection_events(scope)
+    return scope if permitted_event_ids.nil?
+
+    klass = scope.respond_to?(:klass) ? scope.klass : nil
+    return scope if klass.nil?
+    return scope.where(id: permitted_event_ids) if klass == Event
+    return scope unless klass.column_names.include?("event_id")
+
+    scope.where(event_id: permitted_event_ids)
+  end
+
+  def out_of_connection_scope(event)
+    "This connection is scoped to #{connection_event_names.to_sentence} and can't reach #{event.name}. " \
+      "The account holder can change that under Profile → Connections in Attend."
+  end
+
+  def connection_event_names
+    names = mcp_connection&.events&.order(:name)&.pluck(:name)
+    names.presence || [ "no events" ]
   end
 
   # Log mutating tool calls so MCP activity lands in the same audit trail as the

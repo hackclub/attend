@@ -33,6 +33,104 @@ RSpec.describe "Custom documents", type: :request do
       expect(response).to redirect_to(admin_event_integrations_path(event))
     end
 
+    it "links to the edit page from the integrations list" do
+      doc = create(:custom_document, event: event, name: "Hotel Waiver")
+
+      get admin_event_integrations_path(event)
+
+      expect(response.body).to include(admin_event_custom_document_edit_path(event, doc))
+    end
+
+    it "renders the edit form" do
+      doc = create(:custom_document, event: event, name: "Hotel Waiver")
+
+      get admin_event_custom_document_edit_path(event, doc)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Edit Hotel Waiver")
+      expect(response.body).to include("Who signs?")
+    end
+
+    it "updates the name, description and signer type when nobody has signed" do
+      doc = create(:custom_document, event: event, name: "Hotel Waiver", signer_type: "participant")
+
+      patch admin_event_custom_document_path(event, doc), params: {
+        custom_document: { name: "Hotel Indemnity", description: "Sign page 2", signer_type: "participant_and_guardian" }
+      }
+
+      expect(response).to redirect_to(admin_event_integrations_path(event))
+      expect(doc.reload).to have_attributes(
+        name: "Hotel Indemnity",
+        description: "Sign page 2",
+        signer_type: "participant_and_guardian"
+      )
+    end
+
+    it "keeps the signing setup but still renames once a consent exists" do
+      doc = create(:custom_document, event: event, name: "Hotel Waiver", signer_type: "participant",
+        docuseal_template_id: "1234")
+      create(:consent, :custom_document, custom_document: doc,
+        participant_event: create(:participant_event, event: event))
+
+      patch admin_event_custom_document_path(event, doc), params: {
+        custom_document: { name: "Hotel Waiver (2026)", signer_type: "guardian", docuseal_template_id: "9999" }
+      }
+
+      expect(doc.reload).to have_attributes(
+        name: "Hotel Waiver (2026)",
+        signer_type: "participant",
+        docuseal_template_id: "1234"
+      )
+    end
+
+    it "shows the edit form without the signing fields once a consent exists" do
+      doc = create(:custom_document, event: event)
+      create(:consent, :custom_document, custom_document: doc,
+        participant_event: create(:participant_event, event: event))
+
+      get admin_event_custom_document_edit_path(event, doc)
+
+      expect(response.body).to include("Signing setup is locked")
+      expect(response.body).not_to include("Who signs?")
+    end
+
+    it "drops stale field mappings when the template changes" do
+      doc = create(:custom_document, event: event, docuseal_template_id: "1234")
+      event.update!(docuseal_field_mappings: {
+        doc.mapping_key => { "mappings" => [ { "field_name" => "Name", "source_key" => "participant.full_name" } ] }
+      })
+
+      patch admin_event_custom_document_path(event, doc), params: {
+        custom_document: { name: doc.name, docuseal_template_id: "5678" }
+      }
+
+      expect(doc.reload.docuseal_template_id).to eq("5678")
+      expect(event.reload.docuseal_field_mappings).not_to have_key(doc.mapping_key)
+    end
+
+    it "reopens completed participants when an optional document becomes required" do
+      doc = create(:custom_document, event: event, optional: true)
+
+      expect {
+        patch admin_event_custom_document_path(event, doc), params: {
+          custom_document: { name: doc.name, docuseal_template_id: doc.docuseal_template_id, optional: "0" }
+        }
+      }.to have_enqueued_job(ReopenParticipantsForCustomDocumentsJob).with(event.id)
+
+      expect(doc.reload).not_to be_optional
+    end
+
+    it "rejects an invalid update instead of saving it" do
+      doc = create(:custom_document, event: event, name: "Hotel Waiver")
+
+      patch admin_event_custom_document_path(event, doc), params: {
+        custom_document: { name: "", docuseal_template_id: doc.docuseal_template_id }
+      }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(doc.reload.name).to eq("Hotel Waiver")
+    end
+
     it "destroys a document without consents but archives one with consents" do
       unused = create(:custom_document, event: event)
       used = create(:custom_document, event: event)
@@ -72,6 +170,185 @@ RSpec.describe "Custom documents", type: :request do
         "readonly" => true
       )
       expect(doc.field_mapper.has_mappings?).to be true
+    end
+  end
+
+  describe "admin resend" do
+    let(:admin) { User.create!(email: "admin-resend@example.com", name: "Admin", global_role: "global_admin") }
+    let(:participant_event) { create(:participant_event, event: event) }
+    let(:docuseal) { instance_double(Docuseal::Client, archive_submission: true) }
+
+    before do
+      sign_in admin
+      allow(Docuseal::Client).to receive(:for).and_return(docuseal)
+    end
+
+    def resend(doc)
+      post resend_custom_document_admin_event_participant_path(event, participant_event),
+        params: { custom_document_id: doc.id }
+    end
+
+    it "voids the old submission, resets the consent, and re-enqueues the job" do
+      doc = create(:custom_document, event: event)
+      consent = create(:consent, :custom_document, custom_document: doc, participant_event: participant_event,
+        status: :sent, docuseal_envelope_id: "sub-1", docuseal_participant_slug: "abc123",
+        failure_reason: "docuseal_error: boom")
+
+      expect { resend(doc) }
+        .to have_enqueued_job(DocusealJobs::CreateCustomDocumentJob).with(consent.id)
+        .and have_enqueued_mail(ParticipantMailer, :new_document_ready)
+
+      expect(docuseal).to have_received(:archive_submission).with("sub-1")
+      expect(consent.reload).to have_attributes(
+        status: "pending",
+        docuseal_envelope_id: nil,
+        docuseal_participant_slug: nil,
+        failure_reason: nil
+      )
+    end
+
+    it "creates the consent when the document was never started" do
+      doc = create(:custom_document, event: event)
+
+      expect { resend(doc) }.to change(participant_event.consents, :count).by(1)
+      expect(participant_event.consents.last.custom_document).to eq(doc)
+    end
+
+    it "re-issues to the guardian without emailing the participant" do
+      participant_event.participant.update!(date_of_birth: 15.years.ago)
+      create(:guardian_participant_event, participant_event: participant_event)
+      doc = create(:custom_document, :guardian_only, event: event)
+
+      expect { resend(doc) }.to have_enqueued_job(DocusealJobs::CreateCustomDocumentJob)
+      # DocuSeal emails the guardian directly; the participant isn't involved.
+      expect(enqueued_jobs.map { |job| job[:args].first(2) })
+        .not_to include([ "ParticipantMailer", "new_document_ready" ])
+      expect(response).to redirect_to(consents_admin_event_participant_path(event, participant_event))
+    end
+
+    it "refuses to resend a signed document" do
+      doc = create(:custom_document, event: event)
+      create(:consent, :custom_document, custom_document: doc, participant_event: participant_event,
+        status: :signed, signed_at: Time.current, docuseal_envelope_id: "sub-1")
+
+      expect { resend(doc) }.not_to have_enqueued_job(DocusealJobs::CreateCustomDocumentJob)
+      expect(flash[:alert]).to include("already signed")
+      expect(docuseal).not_to have_received(:archive_submission)
+    end
+
+    describe "resetting a signed document" do
+      def reset(doc)
+        delete reset_custom_document_admin_event_participant_path(event, participant_event),
+          params: { custom_document_id: doc.id }
+      end
+
+      it "discards the signature, re-issues, and reopens the participant" do
+        participant_event.update!(status: :complete)
+        doc = create(:custom_document, event: event)
+        consent = create(:consent, :custom_document, custom_document: doc, participant_event: participant_event,
+          status: :signed, signed_at: Time.current, participant_signed_at: Time.current,
+          docuseal_envelope_id: "sub-1", document_url: "https://docuseal.test/d/abc")
+
+        expect { reset(doc) }
+          .to have_enqueued_job(DocusealJobs::CreateCustomDocumentJob).with(consent.id)
+          .and have_enqueued_mail(ParticipantMailer, :new_document_ready)
+
+        expect(docuseal).to have_received(:archive_submission).with("sub-1")
+        expect(consent.reload).to have_attributes(
+          status: "pending",
+          signed_at: nil,
+          participant_signed_at: nil,
+          document_url: nil,
+          docuseal_envelope_id: nil
+        )
+        expect(participant_event.reload.status).to eq("in_progress")
+      end
+
+      it "reopens a guardian who had already finished" do
+        participant_event.participant.update!(date_of_birth: 15.years.ago)
+        gpe = create(:guardian_participant_event, participant_event: participant_event,
+          status: :completed, completed_at: Time.current)
+        doc = create(:custom_document, :guardian_only, event: event)
+        create(:consent, :custom_document, custom_document: doc, participant_event: participant_event,
+          guardian_participant_event: gpe, status: :signed, signed_at: Time.current,
+          guardian_signed_at: Time.current, docuseal_envelope_id: "sub-1")
+
+        reset(doc)
+
+        expect(gpe.reload.status).to eq("in_progress")
+      end
+
+      it "refuses to reset a document that isn't signed" do
+        doc = create(:custom_document, event: event)
+        create(:consent, :custom_document, custom_document: doc, participant_event: participant_event,
+          status: :sent, docuseal_envelope_id: "sub-1")
+
+        expect { reset(doc) }.not_to have_enqueued_job(DocusealJobs::CreateCustomDocumentJob)
+        expect(flash[:alert]).to include("use Resend instead")
+        expect(docuseal).not_to have_received(:archive_submission)
+      end
+
+      it "refuses to reset a physical document" do
+        doc = create(:custom_document, :physical, event: event)
+        create(:consent, :custom_document, custom_document: doc, participant_event: participant_event,
+          status: :signed, signed_at: Time.current)
+
+        expect { reset(doc) }.not_to have_enqueued_job(DocusealJobs::CreateCustomDocumentJob)
+        expect(flash[:alert]).to include("doesn't go through DocuSeal")
+      end
+
+      it "shows Reset rather than Resend once the document is signed" do
+        doc = create(:custom_document, event: event)
+        create(:consent, :custom_document, custom_document: doc, participant_event: participant_event,
+          status: :signed, signed_at: Time.current)
+
+        get consents_admin_event_participant_path(event, participant_event)
+
+        expect(response.body).to include(reset_custom_document_admin_event_participant_path(event, participant_event))
+        expect(response.body).not_to include(resend_custom_document_admin_event_participant_path(event, participant_event))
+      end
+    end
+
+    it "refuses to resend a physical document" do
+      doc = create(:custom_document, :physical, event: event)
+
+      expect { resend(doc) }.not_to have_enqueued_job(DocusealJobs::CreateCustomDocumentJob)
+      expect(flash[:alert]).to include("signed on paper")
+    end
+
+    it "refuses a guardian document when no guardian is on file" do
+      participant_event.participant.update!(date_of_birth: 15.years.ago)
+      doc = create(:custom_document, :guardian_only, event: event)
+
+      expect { resend(doc) }.not_to have_enqueued_job(DocusealJobs::CreateCustomDocumentJob)
+      expect(flash[:alert]).to include("needs a guardian")
+    end
+
+    it "refuses an optional document the participant hasn't added" do
+      doc = create(:custom_document, :optional, event: event)
+
+      expect { resend(doc) }.not_to have_enqueued_job(DocusealJobs::CreateCustomDocumentJob)
+      expect(flash[:alert]).to include("doesn't apply")
+    end
+
+    it "still re-issues when DocuSeal can't archive the old submission" do
+      doc = create(:custom_document, event: event)
+      consent = create(:consent, :custom_document, custom_document: doc, participant_event: participant_event,
+        status: :sent, docuseal_envelope_id: "sub-1")
+      allow(docuseal).to receive(:archive_submission).and_raise(Docuseal::Error, "gone")
+
+      expect { resend(doc) }.to have_enqueued_job(DocusealJobs::CreateCustomDocumentJob).with(consent.id)
+      expect(consent.reload.status).to eq("pending")
+    end
+
+    it "shows a Resend button on the consents page" do
+      doc = create(:custom_document, event: event)
+
+      get consents_admin_event_participant_path(event, participant_event)
+
+      expect(response.body).to include("Resend")
+      expect(response.body).to include(resend_custom_document_admin_event_participant_path(event, participant_event))
+      expect(response.body).to include(doc.id)
     end
   end
 

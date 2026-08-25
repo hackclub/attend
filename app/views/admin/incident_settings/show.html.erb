@@ -14,7 +14,7 @@
           Select the global admins who respond to incident reports. Each new report is
           emailed and direct-messaged to everyone selected, and <strong>Emergency</strong>
           reports also phone anyone with a number on their profile. Contact details come
-          from each person's <%= link_to "Attend profile", edit_admin_profile_path, class: "text-[#ec3750] hover:underline" %>.
+          from each person's <%= link_to "Attend profile", dashboard_profile_path(anchor: "staff-settings"), class: "text-[#ec3750] hover:underline" %>.
         </p>
 
         <% if @selectable_users.any? %>
