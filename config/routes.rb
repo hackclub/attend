@@ -52,6 +52,7 @@ Rails.application.routes.draw do
         patch :assign
         patch :set_event
         patch :set_subject
+        patch :merge
       end
 
       resources :messages, only: :create, module: :tickets

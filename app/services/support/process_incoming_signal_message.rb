@@ -48,7 +48,7 @@ module Support
     private
 
     def find_or_create_ticket(phone:, signal_to:)
-      scope = Ticket.where(
+      scope = Ticket.unmerged.where(
         phone_number: phone,
         channel: "signal",
         status: "open"

@@ -15,6 +15,10 @@ module Support
     end
 
     def call
+      if @ticket.merged?
+        raise DeliveryError, "This ticket was merged into ##{@ticket.merged_into_id.first(8)} — reply there instead."
+      end
+
       if @ticket.signal?
         send_via_signal
       else

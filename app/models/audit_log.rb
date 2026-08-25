@@ -63,6 +63,7 @@ class AuditLog < ApplicationRecord
     ticket_assign: "assign",
     ticket_set_event: "set_event",
     ticket_set_subject: "set_subject",
+    ticket_merge: "merge",
     toggle_support_sms: "toggle_support_sms",
     update_support_sms_numbers: "update_support_sms_numbers",
     trigger_airtable_sync: "trigger_airtable_sync",

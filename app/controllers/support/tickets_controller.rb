@@ -1,18 +1,20 @@
 module Support
   class TicketsController < Admin::BaseController
     before_action :skip_require_event
-    before_action :set_ticket, only: %i[show close reopen assign set_event set_subject]
+    before_action :set_ticket, only: %i[show close reopen assign set_event set_subject merge]
     after_action :verify_authorized
 
     helper_method :can_link_ticket_to_event?
 
     def index
       authorize Ticket
-      @tickets = policy_scope(Ticket).recent_first.includes(:event, :assigned_to)
+      @tickets = policy_scope(Ticket).unmerged.recent_first.includes(:event, :assigned_to)
     end
 
     def show
       authorize @ticket
+      return redirect_to_merge_root if @ticket.merged?
+
       @message = TicketMessage.new
       @note = Note.new
 
@@ -27,10 +29,13 @@ module Support
       end
 
       @previous_tickets = policy_scope(Ticket)
+                            .unmerged
                             .where(phone_number: @ticket.phone_number)
                             .where.not(id: @ticket.id)
                             .recent_first
                             .limit(10)
+
+      @merged_sources = @ticket.merged_tickets.includes(:merged_by).order(:merged_at)
     end
 
     def close
@@ -45,6 +50,8 @@ module Support
 
     def reopen
       authorize @ticket, :update?
+      return redirect_to_merge_root if @ticket.merged?
+
       @ticket.reopen!
 
       respond_to do |format|
@@ -90,7 +97,31 @@ module Support
       redirect_to support_ticket_path(@ticket), notice: "Contact linked."
     end
 
+    # Folds another ticket with the same phone number into this one, so a contact
+    # coming back to a closed ticket reads as one conversation.
+    def merge
+      authorize @ticket, :merge?
+      source = policy_scope(Ticket).find(params[:source_id])
+      authorize source, :merge?
+
+      result = ::Support::MergeTickets.call(source: source, target: @ticket, user: current_user)
+
+      notice = "Merged ##{source.id[0..7]} into this ticket " \
+               "(#{helpers.pluralize(result.moved_messages, 'message')})."
+      notice += " Ticket reopened." if result.reopened
+
+      redirect_to support_ticket_path(@ticket), notice: notice
+    rescue ::Support::MergeTickets::MergeError => e
+      redirect_to support_ticket_path(@ticket), alert: e.message
+    end
+
     private
+
+    def redirect_to_merge_root
+      root = @ticket.merge_root
+      redirect_to support_ticket_path(root),
+                  notice: "Ticket ##{@ticket.id[0..7]} was merged into ##{root.id[0..7]}."
+    end
 
     def set_ticket
       @ticket = Ticket.find(params[:id])

@@ -37,6 +37,10 @@ class TicketPolicy < ApplicationPolicy
     update?
   end
 
+  def merge?
+    update?
+  end
+
   class Scope < ApplicationPolicy::Scope
     def resolve
       return scope.all if user.global_admin?

@@ -5,7 +5,7 @@ class TicketsToolbox < ApplicationToolbox
     param :limit, :integer, "Max results (default 30, max 100)", optional: true, default: 30
   end
   def index
-    scope = policy_scope(Ticket).recent_first.includes(:event, :assigned_to)
+    scope = policy_scope(Ticket).unmerged.recent_first.includes(:event, :assigned_to)
     scope = scope.where(status: params[:status]) if params[:status].present?
     scope = scope.where(assigned_to_id: current_user.id) if params[:assigned_to_me]
     limit = params[:limit].to_i.clamp(1, 100)
@@ -65,8 +65,31 @@ class TicketsToolbox < ApplicationToolbox
   def reopen
     @ticket = Ticket.find(params[:ticket_id])
     authorize! @ticket, :reopen?
+    halt error: "That ticket was merged into ##{@ticket.merged_into_id.first(8)} — work that one instead." if @ticket.merged?
     @ticket.reopen!
     render json: serialize_ticket(@ticket)
+  end
+
+  tool "Merge one ticket's thread into another. Both must be with the same phone number.",
+    access: :write, scope: "tickets:write" do
+    param :ticket_id, :string, "Ticket that survives and takes on the other thread"
+    param :source_ticket_id, :string, "Ticket to merge in — it closes and points at the surviving ticket"
+  end
+  def merge
+    @ticket = Ticket.find(params[:ticket_id])
+    source = Ticket.find(params[:source_ticket_id])
+    authorize! @ticket, :merge?
+    authorize! source, :merge?
+
+    begin
+      result = ::Support::MergeTickets.call(source: source, target: @ticket, user: current_user)
+    rescue ::Support::MergeTickets::MergeError => e
+      halt error: e.message
+    end
+
+    render json: serialize_ticket(result.target, full: true).merge(
+      merged: { from: source.id, messages_moved: result.moved_messages, reopened: result.reopened }
+    )
   end
 
   private
@@ -80,6 +103,7 @@ class TicketsToolbox < ApplicationToolbox
       event: t.event&.name,
       assigned_to: t.assigned_to&.display_name_or_fallback,
       last_message_at: t.last_message_at,
+      merged_into: t.merged_into_id,
       url: ticket_url(t)
     }
     return base unless full
