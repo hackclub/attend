@@ -65,7 +65,7 @@ module Support
     def find_or_create_ticket(phone:, channel:, twilio_to:)
       twilio_to_normalized = twilio_to.to_s.sub(/\Awhatsapp:/, "")
 
-      scope = Ticket.where(
+      scope = Ticket.unmerged.where(
         phone_number: phone,
         channel: channel,
         status: "open"

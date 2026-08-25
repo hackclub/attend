@@ -325,6 +325,74 @@ RSpec.describe "Support::Tickets", type: :request do
     end
   end
 
+  describe "PATCH merge" do
+    def add_message(ticket, body)
+      TicketMessage.create!(ticket: ticket, direction: "inbound", channel: "whatsapp", body: body)
+    end
+
+    it "folds another ticket with the same number into the one being viewed" do
+      older = make_ticket(event: live_event, phone: live_ticket.phone_number)
+      older.close!(user: global_admin)
+      add_message(older, "Original question")
+
+      sign_in event_ops
+      patch merge_support_ticket_path(live_ticket), params: { source_id: older.id }
+
+      expect(response).to redirect_to(support_ticket_path(live_ticket))
+      expect(older.reload.merged_into).to eq(live_ticket)
+      expect(live_ticket.ticket_messages.map(&:body)).to include("Original question")
+    end
+
+    it "reopens the surviving ticket when the ticket merged in is open" do
+      older = make_ticket(event: live_event, phone: live_ticket.phone_number)
+      live_ticket.close!(user: global_admin)
+
+      sign_in event_ops
+      patch merge_support_ticket_path(live_ticket), params: { source_id: older.id }
+
+      expect(live_ticket.reload).to be_open
+    end
+
+    it "rejects tickets with a different phone number" do
+      sign_in global_admin
+      patch merge_support_ticket_path(live_ticket), params: { source_id: pending_ticket.id }
+
+      expect(flash[:alert]).to be_present
+      expect(pending_ticket.reload.merged_into).to be_nil
+    end
+
+    it "denies merging in a ticket the user cannot see" do
+      hidden = make_ticket(event: other_event, phone: live_ticket.phone_number)
+
+      sign_in event_ops
+      patch merge_support_ticket_path(live_ticket), params: { source_id: hidden.id }
+
+      expect(response).to have_http_status(:redirect)
+      expect(hidden.reload.merged_into).to be_nil
+    end
+
+    it "sends a merged ticket's page to the ticket that absorbed it" do
+      older = make_ticket(event: live_event, phone: live_ticket.phone_number)
+
+      sign_in event_ops
+      patch merge_support_ticket_path(live_ticket), params: { source_id: older.id }
+      get support_ticket_path(older)
+
+      expect(response).to redirect_to(support_ticket_path(live_ticket))
+    end
+
+    it "keeps merged tickets out of the inbox" do
+      older = make_ticket(event: live_event, phone: live_ticket.phone_number)
+
+      sign_in event_ops
+      patch merge_support_ticket_path(live_ticket), params: { source_id: older.id }
+      get support_tickets_path
+
+      expect(response.body).to include("ticket_#{live_ticket.id}")
+      expect(response.body).not_to include("ticket_#{older.id}")
+    end
+  end
+
   describe "POST notes" do
     it "lets active event staff add a note to a pending ticket" do
       sign_in event_ops

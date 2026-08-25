@@ -1,7 +1,7 @@
 module Support
   class TicketsController < Admin::BaseController
     before_action :skip_require_event
-    before_action :set_ticket, only: %i[show close reopen assign set_event set_subject]
+    before_action :set_ticket, only: %i[show close reopen assign set_event set_subject merge]
     after_action :verify_authorized
     # Each ticket in a batch is audited individually in #bulk_close, so the
     # blanket one-record-per-request hook has nothing useful to record here.
@@ -20,6 +20,8 @@ module Support
 
     def show
       authorize @ticket
+      return redirect_to_merge_root if @ticket.merged?
+
       @message = TicketMessage.new
       @note = Note.new
 
@@ -34,10 +36,13 @@ module Support
       end
 
       @previous_tickets = policy_scope(Ticket)
+                            .unmerged
                             .where(phone_number: @ticket.phone_number)
                             .where.not(id: @ticket.id)
                             .recent_first
                             .limit(10)
+
+      @merged_sources = @ticket.merged_tickets.includes(:merged_by).order(:merged_at)
     end
 
     def bulk_close
@@ -75,6 +80,8 @@ module Support
 
     def reopen
       authorize @ticket, :update?
+      return redirect_to_merge_root if @ticket.merged?
+
       @ticket.reopen!
 
       respond_to do |format|
@@ -120,12 +127,36 @@ module Support
       redirect_to support_ticket_path(@ticket), notice: "Contact linked."
     end
 
+    # Folds another ticket with the same phone number into this one, so a contact
+    # coming back to a closed ticket reads as one conversation.
+    def merge
+      authorize @ticket, :merge?
+      source = policy_scope(Ticket).find(params[:source_id])
+      authorize source, :merge?
+
+      result = ::Support::MergeTickets.call(source: source, target: @ticket, user: current_user)
+
+      notice = "Merged ##{source.id[0..7]} into this ticket " \
+               "(#{helpers.pluralize(result.moved_messages, 'message')})."
+      notice += " Ticket reopened." if result.reopened
+
+      redirect_to support_ticket_path(@ticket), notice: notice
+    rescue ::Support::MergeTickets::MergeError => e
+      redirect_to support_ticket_path(@ticket), alert: e.message
+    end
+
     private
+
+    def redirect_to_merge_root
+      root = @ticket.merge_root
+      redirect_to support_ticket_path(root),
+                  notice: "Ticket ##{@ticket.id[0..7]} was merged into ##{root.id[0..7]}."
+    end
 
     # Filters the inbox by contact name, phone number, channel, assignee and
     # status. Each one is skipped when its param is blank.
     def filtered_tickets
-      scope = policy_scope(Ticket).recent_first
+      scope = policy_scope(Ticket).unmerged.recent_first
       scope = scope.where(status: params[:status]) if Ticket.statuses.key?(params[:status])
       scope = scope.where(channel: params[:channel]) if Ticket.channels.key?(params[:channel])
       scope = filter_by_assignee(scope)

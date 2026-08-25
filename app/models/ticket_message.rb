@@ -9,6 +9,8 @@ class TicketMessage < ApplicationRecord
 
   belongs_to :ticket
   belongs_to :user, optional: true
+  # Set when this message arrived on another ticket that was later merged in.
+  belongs_to :merged_from_ticket, class_name: "Ticket", optional: true
 
   enum :direction, {
     inbound: "inbound",
