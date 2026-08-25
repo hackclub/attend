@@ -10,14 +10,14 @@
       <span class="<%= compact ? "text-xs" : "text-sm" %> font-semibold truncate">App Store</span>
     </span>
   <% end %>
-  <%= link_to "https://cdn.hackclub.com/019f85b4-38ee-7f2c-8a5b-c2b931152ba8/Attend%20Scanner%20Build.apk", target: "_blank", rel: "noopener",
+  <%= link_to "https://play.google.com/store/apps/details?id=com.hackclub.attend", target: "_blank", rel: "noopener",
       class: "inline-flex items-center gap-2.5 rounded-lg bg-(--bg-elev-2) text-(--text-strong) border border-(--border-card) hover:bg-(--bg-elev-3) transition-colors #{compact ? 'px-2.5 h-9' : 'px-4 h-11'}" do %>
     <svg class="<%= compact ? "size-4" : "size-6" %> shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M3 20.5V3.5c0-.59.34-1.11.84-1.35L13.69 12l-9.85 9.85c-.5-.25-.84-.76-.84-1.35M16.81 15.12L6.05 21.34l8.49-8.49 2.27 2.27M20.16 10.81c.34.27.59.69.59 1.19 0 .5-.22.9-.57 1.18l-2.29 1.32-2.5-2.5 2.5-2.5 2.27 1.31M6.05 2.66l10.76 6.22-2.27 2.27-8.49-8.49z"/>
     </svg>
     <span class="flex flex-col leading-tight text-left min-w-0">
-      <span class="<%= compact ? "text-[8px]" : "text-[10px]" %> text-(--text-muted)">Download APK</span>
-      <span class="<%= compact ? "text-xs" : "text-sm" %> font-semibold truncate">for Android</span>
+      <span class="<%= compact ? "text-[8px]" : "text-[10px]" %> text-(--text-muted)">Get it on</span>
+      <span class="<%= compact ? "text-xs" : "text-sm" %> font-semibold truncate">Google Play</span>
     </span>
   <% end %>
 </div>
