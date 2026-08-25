@@ -1,4 +1,13 @@
 <tr id="<%= dom_id(ticket) %>">
+  <td class="pl-6 pr-2 py-4 whitespace-nowrap">
+    <% if ticket.open? %>
+      <%= check_box_tag "ticket_ids[]", ticket.id, false,
+            id: "select_#{dom_id(ticket)}",
+            class: "portal-check",
+            aria: { label: "Select ticket from #{ticket.phone_number}" },
+            data: { bulk_select_target: "checkbox", action: "change->bulk-select#toggle" } %>
+    <% end %>
+  </td>
   <td class="px-6 py-4 whitespace-nowrap">
     <% if ticket.open? %>
       <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Open</span>
