@@ -388,9 +388,7 @@ module Api
         {
           high_support_notes: sg.high_support_notes,
           authorized_pickup_adults: sg.authorized_pickup_adults,
-          other_instructions: sg.other_instructions,
-          curfew_acknowledged: sg.curfew_acknowledged,
-          overnight_rules_acknowledged: sg.overnight_rules_acknowledged
+          other_instructions: sg.other_instructions
         }
       end
 

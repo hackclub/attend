@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_135022) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -442,6 +442,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_140000) do
     t.index ["event_id"], name: "index_export_templates_on_event_id"
   end
 
+  create_table "flipper_features", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "key", null: false
+    t.datetime "updated_at", null: false
+    t.index ["key"], name: "index_flipper_features_on_key", unique: true
+  end
+
+  create_table "flipper_gates", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "feature_key", null: false
+    t.string "key", null: false
+    t.datetime "updated_at", null: false
+    t.text "value"
+    t.index ["feature_key", "key", "value"], name: "index_flipper_gates_on_feature_key_and_key_and_value", unique: true
+  end
+
   create_table "global_api_tokens", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "expires_at"
@@ -489,7 +505,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_140000) do
     t.integer "emergency_contact_priority"
     t.boolean "emergency_medical_consent"
     t.uuid "guardian_id", null: false
-    t.datetime "invite_last_used_at"
     t.string "invite_token_ciphertext"
     t.string "invite_token_digest"
     t.datetime "invite_token_sent_at"
@@ -801,6 +816,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_140000) do
     t.index ["user_id"], name: "index_mobile_tokens_on_user_id"
   end
 
+  create_table "nfc_tokens", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "paired_at"
+    t.uuid "paired_by_id"
+    t.datetime "revoked_at"
+    t.uuid "revoked_by_id"
+    t.uuid "token", default: -> { "gen_random_uuid()" }, null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["paired_by_id"], name: "index_nfc_tokens_on_paired_by_id"
+    t.index ["revoked_by_id"], name: "index_nfc_tokens_on_revoked_by_id"
+    t.index ["token"], name: "index_nfc_tokens_on_token", unique: true
+    t.index ["user_id"], name: "index_nfc_tokens_on_user_id"
+  end
+
   create_table "notes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "author_user_id", null: false
     t.text "body"
@@ -1024,12 +1054,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_140000) do
     t.text "authorized_pickup_adults"
     t.boolean "can_leave_unaccompanied", default: false
     t.datetime "created_at", null: false
-    t.boolean "curfew_acknowledged", default: false
     t.boolean "freedom_waiver_granted", default: false
     t.boolean "high_support_flag", default: false
     t.text "high_support_notes"
     t.text "other_instructions"
-    t.boolean "overnight_rules_acknowledged", default: false
     t.uuid "participant_event_id", null: false
     t.datetime "updated_at", null: false
     t.index ["participant_event_id"], name: "index_safeguarding_infos_on_participant_event_id"
@@ -1040,6 +1068,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_140000) do
     t.datetime "created_at", null: false
     t.datetime "ends_at"
     t.uuid "event_id", null: false
+    t.boolean "is_airport", default: false, null: false
     t.boolean "is_travel_pickup", default: false, null: false
     t.string "name", null: false
     t.integer "position", default: 0, null: false
@@ -1379,6 +1408,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_140000) do
   add_foreign_key "messages", "events"
   add_foreign_key "messages", "users", column: "sent_by_user_id"
   add_foreign_key "mobile_tokens", "users"
+  add_foreign_key "nfc_tokens", "users"
+  add_foreign_key "nfc_tokens", "users", column: "paired_by_id"
+  add_foreign_key "nfc_tokens", "users", column: "revoked_by_id"
   add_foreign_key "notes", "events"
   add_foreign_key "notes", "participant_events"
   add_foreign_key "notes", "tickets"
