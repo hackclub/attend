@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe "Api::V1::Participants", type: :request do
+  include ActiveSupport::Testing::TimeHelpers
+
   let(:event) { create(:event, nfc_badges_enabled: true) }
   let(:admin) { User.create!(email: "api-admin@example.com", name: "API Admin", global_role: "global_admin") }
   let(:mobile_token) { MobileToken.generate_for(admin) }
@@ -72,6 +74,27 @@ RSpec.describe "Api::V1::Participants", type: :request do
       participant = JSON.parse(response.body)["participants"].sole
       expect(participant["nfc_badge_token"]).to eq(pe.reload.nfc_badge_token)
       expect(updates.grep(/participant_events/)).to be_empty
+    end
+
+    it "uses a bounded high-water timestamp so concurrent updates remain resumable" do
+      cutoff = Time.zone.parse("2026-08-24 10:00:00")
+      pe = create(:participant_event, event: event)
+      pe.update_columns(updated_at: cutoff + 1.second)
+
+      travel_to(cutoff) do
+        get "/api/v1/events/#{event.id}/participants", headers: auth_headers
+
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body["participants"]).to be_empty
+        expect(response.parsed_body["synced_at"]).to eq(cutoff.iso8601(6))
+      end
+
+      travel_to(cutoff + 2.seconds) do
+        get "/api/v1/events/#{event.id}/participants",
+          params: { updated_since: cutoff.iso8601(6) }, headers: auth_headers
+
+        expect(response.parsed_body["participants"].sole["participant_event_id"]).to eq(pe.id)
+      end
     end
   end
 
