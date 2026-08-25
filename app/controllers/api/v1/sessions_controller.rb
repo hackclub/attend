@@ -45,8 +45,9 @@ module Api
       private
 
       def authenticate_user_from_session
-        if Rails.env.development? && params[:user_id].present?
-          return User.find_by(id: params[:user_id])
+        if Rails.env.development?
+          return User.find_by(id: params[:user_id]) if params[:user_id].present?
+          return User.find_by(email: params[:dev_email]) if params[:dev_email].present?
         end
 
         # Try OAuth code exchange first
