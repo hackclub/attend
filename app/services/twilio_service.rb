@@ -7,7 +7,10 @@ class TwilioService
     @from_number = from_number || Setting.twilio_from_number.presence || ENV["TWILIO_FROM_NUMBER"]
   end
 
-  def send_sms(to:, body:)
+  # log_body: alternative body to record in support chat history (e.g. with
+  # sensitive codes redacted). source: short label for where the automated
+  # message came from, shown to support agents.
+  def send_sms(to:, body:, log_body: nil, source: nil)
     return { skipped: true, reason: "Twilio disabled" } unless Setting.twilio_enabled?
     raise Error, "Twilio not configured" unless configured?
 
@@ -26,6 +29,7 @@ class TwilioService
     end
 
     parsed = JSON.parse(response.body)
+    record_automated_sms(to: to, body: log_body || body, sid: parsed["sid"], source: source)
     { sid: parsed["sid"], status: parsed["status"] }
   rescue Faraday::Error => e
     raise Error, "Twilio API error: #{e.message}"
@@ -36,6 +40,15 @@ class TwilioService
   end
 
   private
+
+  # Never let history logging fail the send — the SMS has already gone out,
+  # and raising here would make callers retry and double-send.
+  def record_automated_sms(to:, body:, sid:, source:)
+    Support::RecordAutomatedSms.call(phone: to, body: body, twilio_sid: sid, source: source)
+  rescue => e
+    Rails.logger.error("[TwilioService] Failed to record automated SMS: #{e.class}: #{e.message}")
+    nil
+  end
 
   def connection
     @connection ||= Faraday.new(url: "https://api.twilio.com/2010-04-01/") do |conn|

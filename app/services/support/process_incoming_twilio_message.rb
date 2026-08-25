@@ -27,6 +27,8 @@ module Support
       ticket = find_or_create_ticket(phone:, channel:, twilio_to: to_raw)
       new_chat = ticket.previously_new_record?
 
+      backfill_automated_messages(ticket) if new_chat
+
       message = TicketMessage.create!(
         ticket: ticket,
         direction: "inbound",
@@ -80,6 +82,43 @@ module Support
         last_inbound_at: Time.current,
         last_message_at: Time.current
       )
+    end
+
+    BACKFILL_WINDOW = 7.days
+    BACKFILL_LIMIT = 10
+
+    # When a reply opens a new ticket, pull in recent automated texts sent to
+    # this number so the agent can see what the person is responding to.
+    # Automated sends go out as plain SMS, so only SMS tickets get them.
+    def backfill_automated_messages(ticket)
+      return unless ticket.sms?
+
+      logs = AutomatedSmsLog.for_phone(ticket.phone_number)
+                            .where(sent_at: BACKFILL_WINDOW.ago..)
+                            .order(sent_at: :desc)
+                            .limit(BACKFILL_LIMIT)
+                            .to_a
+                            .reverse
+
+      sids = logs.filter_map(&:twilio_sid)
+      already_shown = TicketMessage.where(twilio_message_sid: sids).pluck(:twilio_message_sid).to_set
+
+      logs.each do |log|
+        next if log.twilio_sid.present? && already_shown.include?(log.twilio_sid)
+
+        TicketMessage.create!(
+          ticket: ticket,
+          direction: "outbound",
+          channel: "sms",
+          automated: true,
+          body: log.body,
+          twilio_message_sid: log.twilio_sid,
+          raw_payload: { "source" => log.source }.compact,
+          sent_at: log.sent_at
+        )
+      end
+    rescue => e
+      Rails.logger.error("[Support::ProcessIncomingTwilioMessage] Backfill failed for ticket #{ticket.id}: #{e.class}: #{e.message}")
     end
 
     def attach_subject_if_unset(ticket, phone)

@@ -20,8 +20,8 @@ RSpec.describe SendSupportTicketSmsNotificationJob do
     it "texts every configured number" do
       described_class.perform_now(message.id, "new_ticket")
 
-      expect(twilio).to have_received(:send_sms).with(to: "+14155551234", body: a_string_including("+15550001111", "Help please"))
-      expect(twilio).to have_received(:send_sms).with(to: "+447700900123", body: a_string_including("WhatsApp"))
+      expect(twilio).to have_received(:send_sms).with(to: "+14155551234", body: a_string_including("+15550001111", "Help please"), source: "Staff notifications")
+      expect(twilio).to have_received(:send_sms).with(to: "+447700900123", body: a_string_including("WhatsApp"), source: "Staff notifications")
     end
 
     it "sends nothing when the feature is disabled" do
@@ -33,10 +33,10 @@ RSpec.describe SendSupportTicketSmsNotificationJob do
     end
 
     it "survives a Twilio error on one number and continues to the next" do
-      allow(twilio).to receive(:send_sms).with(to: "+14155551234", body: anything).and_raise(TwilioService::Error, "boom")
+      allow(twilio).to receive(:send_sms).with(to: "+14155551234", body: anything, source: anything).and_raise(TwilioService::Error, "boom")
 
       expect { described_class.perform_now(message.id, "new_ticket") }.not_to raise_error
-      expect(twilio).to have_received(:send_sms).with(to: "+447700900123", body: anything)
+      expect(twilio).to have_received(:send_sms).with(to: "+447700900123", body: anything, source: anything)
     end
   end
 
@@ -46,7 +46,7 @@ RSpec.describe SendSupportTicketSmsNotificationJob do
     it "texts the assignee's phone" do
       described_class.perform_now(message.id, "assigned_reply")
 
-      expect(twilio).to have_received(:send_sms).with(to: "+15559990000", body: a_string_including("new reply"))
+      expect(twilio).to have_received(:send_sms).with(to: "+15559990000", body: a_string_including("new reply"), source: "Staff notifications")
     end
 
     it "skips when the assignee has no phone" do
