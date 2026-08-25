@@ -1,4 +1,8 @@
-<div id="<%= dom_id(message) %>" class="flex items-end gap-2 <%= message.inbound? ? 'justify-start' : 'justify-end' %>">
+<div id="<%= dom_id(message) %>" class="flex items-end gap-2 <%= message.inbound? ? 'justify-start' : 'justify-end' %>"
+  <% if message.inbound? && message.whatsapp? %>
+    data-controller="whatsapp-window-ping"
+    data-whatsapp-window-ping-at-value="<%= (message.sent_at || message.created_at).iso8601 %>"
+  <% end %>>
   <% if message.outbound? && message.user.present? %>
     <div class="order-2 w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-white text-xs font-medium flex-shrink-0" title="<%= message.user.display_name_or_fallback %>">
       <%= message.user.display_name_or_fallback.split.map(&:first).join.upcase[0..1] %>

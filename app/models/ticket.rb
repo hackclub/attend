@@ -104,6 +104,29 @@ class Ticket < ApplicationRecord
     ticket
   end
 
+  # WhatsApp only accepts freeform outbound messages within 24 hours of the
+  # contact's last inbound message. After that Meta rejects anything that
+  # isn't a pre-approved template, and Twilio reports error 63016.
+  WHATSAPP_FREEFORM_WINDOW = 24.hours
+
+  def whatsapp_window_expires_at
+    return nil unless whatsapp?
+    return nil if last_inbound_at.blank?
+
+    last_inbound_at + WHATSAPP_FREEFORM_WINDOW
+  end
+
+  def whatsapp_window_open?
+    expires_at = whatsapp_window_expires_at
+
+    expires_at.present? && expires_at.future?
+  end
+
+  # True when a plain text reply would be rejected by WhatsApp.
+  def freeform_reply_blocked?
+    whatsapp? && !whatsapp_window_open?
+  end
+
   def matching_participants
     Participant.where(phone: phone_number).includes(:participant_events, :events)
   end

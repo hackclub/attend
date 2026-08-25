@@ -98,6 +98,35 @@ RSpec.describe "Support::Tickets", type: :request do
     end
   end
 
+  describe "GET show WhatsApp reply window" do
+    it "warns and disables the composer when the 24-hour window has closed" do
+      live_ticket.update!(last_inbound_at: 30.hours.ago)
+      sign_in global_admin
+      get support_ticket_path(live_ticket)
+
+      expect(response.body).to include("WhatsApp reply window closed")
+      expect(response.body).to include("disabled=\"disabled\"")
+    end
+
+    it "shows the remaining time and leaves the composer usable inside the window" do
+      live_ticket.update!(last_inbound_at: 2.hours.ago)
+      sign_in global_admin
+      get support_ticket_path(live_ticket)
+
+      expect(response.body).to include("Freeform replies accepted for another")
+      expect(response.body).not_to include("disabled=\"disabled\"")
+    end
+
+    it "does not mention the window on SMS tickets" do
+      sms_ticket = Ticket.create!(channel: "sms", phone_number: "+15550009999", status: "open", event: live_event, last_inbound_at: 5.days.ago)
+      sign_in global_admin
+      get support_ticket_path(sms_ticket)
+
+      expect(response.body).not_to include("WhatsApp reply window closed")
+      expect(response.body).not_to include("disabled=\"disabled\"")
+    end
+  end
+
   describe "GET index filters" do
     let!(:participant) do
       Participant.create!(legal_first_name: "Ada", legal_last_name: "Lovelace", email: "ada@example.com", phone: "+15550009999")
