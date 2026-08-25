@@ -38,6 +38,12 @@
           Automated<%= " · #{message.automated_source}" if message.automated_source.present? %>
         </span>
       <% end %>
+      <% if message.merged_from_ticket_id.present? %>
+        <span class="text-xs font-mono <%= (message.inbound? || message.automated?) ? 'text-gray-400' : 'text-blue-200' %>"
+              title="Merged in from ticket #<%= message.merged_from_ticket_id[0..7] %>">
+          ⤵ #<%= message.merged_from_ticket_id[0..7] %>
+        </span>
+      <% end %>
       <span class="text-xs <%= meta_class %>">
         <%= message.sent_at&.strftime("%H:%M") || message.created_at.strftime("%H:%M") %>
       </span>

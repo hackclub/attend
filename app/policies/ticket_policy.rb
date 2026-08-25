@@ -37,6 +37,10 @@ class TicketPolicy < ApplicationPolicy
     update?
   end
 
+  def merge?
+    update?
+  end
+
   # The collection action itself only needs inbox access; each ticket in the
   # batch is still checked against #update? before it is closed.
   def bulk_close?

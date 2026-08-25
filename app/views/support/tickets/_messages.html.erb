@@ -1,0 +1,5 @@
+<div class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4" id="ticket_<%= ticket.id %>_messages">
+  <% ticket.ticket_messages.order(created_at: :asc).each do |message| %>
+    <%= render "support/tickets/message", message: message %>
+  <% end %>
+</div>

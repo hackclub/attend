@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_150001) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1174,6 +1174,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_150001) do
     t.datetime "created_at", null: false
     t.string "direction", null: false
     t.text "error_message"
+    t.uuid "merged_from_ticket_id"
     t.jsonb "raw_payload", default: {}
     t.datetime "sent_at"
     t.string "signal_message_sid"
@@ -1183,6 +1184,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_150001) do
     t.datetime "updated_at", null: false
     t.uuid "user_id"
     t.index ["direction"], name: "index_ticket_messages_on_direction"
+    t.index ["merged_from_ticket_id"], name: "index_ticket_messages_on_merged_from_ticket_id"
     t.index ["signal_message_sid"], name: "index_ticket_messages_on_signal_message_sid", unique: true, where: "(signal_message_sid IS NOT NULL)"
     t.index ["ticket_id"], name: "index_ticket_messages_on_ticket_id"
     t.index ["twilio_message_sid"], name: "index_ticket_messages_on_twilio_message_sid", unique: true, where: "(twilio_message_sid IS NOT NULL)"
@@ -1200,6 +1202,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_150001) do
     t.datetime "last_inbound_at"
     t.datetime "last_message_at"
     t.datetime "last_outbound_at"
+    t.datetime "merged_at"
+    t.uuid "merged_by_id"
+    t.uuid "merged_into_id"
     t.string "phone_number", null: false
     t.string "status", default: "open", null: false
     t.uuid "subject_id"
@@ -1211,6 +1216,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_150001) do
     t.index ["closed_by_id"], name: "index_tickets_on_closed_by_id"
     t.index ["created_by_id"], name: "index_tickets_on_created_by_id"
     t.index ["event_id"], name: "index_tickets_on_event_id"
+    t.index ["merged_by_id"], name: "index_tickets_on_merged_by_id"
+    t.index ["merged_into_id"], name: "index_tickets_on_merged_into_id"
     t.index ["phone_number"], name: "index_tickets_on_phone_number"
     t.index ["status"], name: "index_tickets_on_status"
     t.index ["subject_type", "subject_id"], name: "index_tickets_on_subject_type_and_subject_id"
@@ -1462,11 +1469,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_150001) do
   add_foreign_key "slack_blasts", "events"
   add_foreign_key "slack_blasts", "users", column: "sent_by_user_id"
   add_foreign_key "ticket_messages", "tickets"
+  add_foreign_key "ticket_messages", "tickets", column: "merged_from_ticket_id"
   add_foreign_key "ticket_messages", "users"
   add_foreign_key "tickets", "events"
+  add_foreign_key "tickets", "tickets", column: "merged_into_id"
   add_foreign_key "tickets", "users", column: "assigned_to_id"
   add_foreign_key "tickets", "users", column: "closed_by_id"
   add_foreign_key "tickets", "users", column: "created_by_id"
+  add_foreign_key "tickets", "users", column: "merged_by_id"
   add_foreign_key "toolchest_oauth_access_grants", "toolchest_oauth_applications", column: "application_id"
   add_foreign_key "toolchest_oauth_access_tokens", "toolchest_oauth_applications", column: "application_id"
   add_foreign_key "travel_legs", "travels"

@@ -749,7 +749,10 @@
 
 /* keep system scrollbars + form controls consistent with theme */
 [data-theme]:not([data-theme="light"]):not([data-theme="catppuccin-latte"]) {
-  input, select, textarea {
+  /* checkboxes and radios are excluded: painting a background over a native
+   * control stops chromium drawing the box at all, leaving an invisible
+   * dark square. `color-scheme: dark` above already themes them. */
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea {
     background-color: var(--bg-elev);
     color: var(--text-strong);
   }
