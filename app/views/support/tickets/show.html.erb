@@ -65,10 +65,31 @@
 
     <!-- Reply form -->
     <% if @ticket.open? %>
-      <div class="flex-shrink-0 bg-white border-t border-gray-200 p-3 sm:p-4 pb-16 sm:pb-4">
+      <% window_expires_at = @ticket.whatsapp_window_expires_at %>
+      <% window_open = @ticket.whatsapp_window_open? %>
+      <div class="flex-shrink-0 bg-white border-t border-gray-200 p-3 sm:p-4 pb-16 sm:pb-4"
+           <% if @ticket.whatsapp? %>
+             data-controller="whatsapp-window"
+             data-whatsapp-window-expires-at-value="<%= window_expires_at&.iso8601 %>"
+             data-action="whatsapp:inbound@window->whatsapp-window#inboundReceived"
+           <% end %>>
+        <% if @ticket.whatsapp? %>
+          <div data-whatsapp-window-target="closed" class="<%= "hidden" if window_open %> mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            <p class="font-medium">WhatsApp reply window closed</p>
+            <p class="mt-0.5">
+              WhatsApp only allows freeform replies within 24 hours of the contact's last message.
+              Sending now fails with error 63016 — ask them to message us again, or reach them by SMS or email.
+            </p>
+          </div>
+          <p data-whatsapp-window-target="open" class="<%= "hidden" unless window_open %> mb-2 text-xs text-gray-500">
+            Freeform replies accepted for another
+            <span data-whatsapp-window-target="countdown"><%= distance_of_time_in_words(Time.current, window_expires_at) if window_expires_at.present? %></span>.
+          </p>
+        <% end %>
         <%= form_with url: support_ticket_messages_path(@ticket), class: "flex gap-2 sm:gap-3" do |f| %>
-          <%= text_area_tag "ticket_message[body]", nil, rows: 2, class: "flex-1 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none", placeholder: "Type your reply..." %>
-          <%= f.submit "Send", class: "bg-blue-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-blue-700 font-medium cursor-pointer self-end" %>
+          <%= text_area_tag "ticket_message[body]", nil, rows: 2, disabled: @ticket.freeform_reply_blocked?, data: { whatsapp_window_target: "input" }, class: "flex-1 border border-gray-300 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed", placeholder: "Type your reply..." %>
+          <%# a <button> rather than f.submit: themes.css paints bare inputs in every dark theme, which would swallow the disabled styling %>
+          <%= f.button "Send", name: nil, disabled: @ticket.freeform_reply_blocked?, data: { whatsapp_window_target: "submit" }, class: "bg-blue-600 hover:bg-blue-700 text-[#ffffff] px-4 sm:px-6 py-2 rounded-lg font-medium cursor-pointer self-end transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed disabled:hover:bg-gray-300" %>
         <% end %>
       </div>
     <% end %>

@@ -61,6 +61,12 @@ module Support
     end
 
     def send_via_twilio
+      if @ticket.freeform_reply_blocked?
+        raise DeliveryError,
+              "WhatsApp only accepts freeform replies for 24 hours after the contact's last message, " \
+              "and that window has closed. Ask them to message us again, or reach them by SMS or email."
+      end
+
       client = Twilio::REST::Client.new(
         Rails.application.credentials.dig(:twilio, :account_sid) || ENV.fetch("TWILIO_ACCOUNT_SID"),
         Rails.application.credentials.dig(:twilio, :auth_token) || ENV.fetch("TWILIO_AUTH_TOKEN")
