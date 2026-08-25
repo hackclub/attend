@@ -98,6 +98,150 @@ RSpec.describe "Support::Tickets", type: :request do
     end
   end
 
+  describe "GET index filters" do
+    let!(:participant) do
+      Participant.create!(legal_first_name: "Ada", legal_last_name: "Lovelace", email: "ada@example.com", phone: "+15550009999")
+    end
+    let!(:guardian) do
+      Guardian.create!(legal_first_name: "Grace", legal_last_name: "Hopper", email: "grace@example.com", phone: "+15550008888")
+    end
+
+    before do
+      live_ticket.update!(subject: participant, assigned_to: event_ops, channel: "sms")
+      other_ticket.update!(subject: guardian, channel: "signal")
+    end
+
+    it "filters by the linked contact's name" do
+      sign_in global_admin
+      get support_tickets_path, params: { q: "lovel" }
+
+      expect(response.body).to include(live_ticket.phone_number)
+      expect(response.body).not_to include(other_ticket.phone_number)
+    end
+
+    it "matches guardians as well as participants" do
+      sign_in global_admin
+      get support_tickets_path, params: { q: "Grace Hopper" }
+
+      expect(response.body).to include(other_ticket.phone_number)
+      expect(response.body).not_to include(live_ticket.phone_number)
+    end
+
+    it "filters by phone number ignoring formatting" do
+      sign_in global_admin
+      get support_tickets_path, params: { phone: "(555) 000-2222" }
+
+      expect(response.body).to include(live_ticket.phone_number)
+      expect(response.body).not_to include(pending_ticket.phone_number)
+    end
+
+    it "filters by channel" do
+      sign_in global_admin
+      get support_tickets_path, params: { channel: "signal" }
+
+      expect(response.body).to include(other_ticket.phone_number)
+      expect(response.body).not_to include(live_ticket.phone_number)
+    end
+
+    it "filters by assignee" do
+      sign_in global_admin
+      get support_tickets_path, params: { assignee: event_ops.id }
+
+      expect(response.body).to include(live_ticket.phone_number)
+      expect(response.body).not_to include(other_ticket.phone_number)
+    end
+
+    it "filters by unassigned tickets" do
+      sign_in global_admin
+      get support_tickets_path, params: { assignee: "unassigned" }
+
+      expect(response.body).to include(other_ticket.phone_number)
+      expect(response.body).not_to include(live_ticket.phone_number)
+    end
+
+    it "filters by status" do
+      live_ticket.close!(user: global_admin)
+
+      sign_in global_admin
+      get support_tickets_path, params: { status: "closed" }
+
+      expect(response.body).to include(live_ticket.phone_number)
+      expect(response.body).not_to include(other_ticket.phone_number)
+    end
+
+    it "ignores an assignee that is not a valid id" do
+      sign_in global_admin
+      get support_tickets_path, params: { assignee: "not-a-uuid" }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include(live_ticket.phone_number)
+    end
+
+    it "combines every filter without blowing up" do
+      sign_in global_admin
+      get support_tickets_path, params: { q: "ada", phone: "555", channel: "sms", assignee: "not-a-uuid", status: "open" }
+
+      expect(response).to have_http_status(:ok)
+    end
+
+    it "still scopes filtered results to what the user may see" do
+      sign_in event_ops
+      get support_tickets_path, params: { channel: "signal" }
+
+      expect(response.body).not_to include(other_ticket.phone_number)
+    end
+  end
+
+  describe "PATCH bulk_close" do
+    it "closes every selected ticket the user may update" do
+      sign_in global_admin
+      patch bulk_close_support_tickets_path, params: { ticket_ids: [ pending_ticket.id, live_ticket.id ] }
+
+      expect(response).to redirect_to(support_tickets_path)
+      expect(pending_ticket.reload).to be_closed
+      expect(live_ticket.reload).to be_closed
+      expect(flash[:notice]).to eq("Closed 2 tickets.")
+    end
+
+    it "skips tickets outside the user's scope" do
+      sign_in event_ops
+      patch bulk_close_support_tickets_path, params: { ticket_ids: [ live_ticket.id, other_ticket.id ] }
+
+      expect(live_ticket.reload).to be_closed
+      expect(other_ticket.reload).to be_open
+      expect(flash[:notice]).to eq("Closed 1 ticket.")
+    end
+
+    it "denies staff outside their support window" do
+      sign_in past_event_admin
+      patch bulk_close_support_tickets_path, params: { ticket_ids: [ pending_ticket.id ] }
+
+      expect(pending_ticket.reload).to be_open
+    end
+
+    it "tolerates ids that are not valid uuids" do
+      sign_in global_admin
+      patch bulk_close_support_tickets_path, params: { ticket_ids: [ "", "nope", pending_ticket.id ] }
+
+      expect(pending_ticket.reload).to be_closed
+    end
+
+    it "keeps the active filters on the redirect" do
+      sign_in global_admin
+      patch bulk_close_support_tickets_path, params: { ticket_ids: [ pending_ticket.id ], channel: "whatsapp", status: "open" }
+
+      expect(response).to redirect_to(support_tickets_path(channel: "whatsapp", status: "open"))
+    end
+
+    it "audits each closed ticket" do
+      sign_in global_admin
+
+      expect {
+        patch bulk_close_support_tickets_path, params: { ticket_ids: [ pending_ticket.id, live_ticket.id ] }
+      }.to change { AuditLog.where(action: "close", record_type: "Ticket").count }.by(2)
+    end
+  end
+
   describe "PATCH close" do
     it "lets active event staff close a pending ticket" do
       sign_in event_ops
