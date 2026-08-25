@@ -3,91 +3,138 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Unprocessable Content – Attend</title>
+  <title>Change Rejected – Attend</title>
   <meta name="robots" content="noindex, nofollow">
   <link rel="icon" href="/icon-32.png" type="image/png" sizes="32x32">
   <style>
+    /* Static page: must stand alone (no app assets). Values mirror the
+       default light and dark palettes in app/assets/stylesheets/themes.css. */
+    :root {
+      --bg-app: #f9fafc;
+      --bg-elev: #ffffff;
+      --border-card: #e0e6ed;
+      --border-soft: #f3f4f6;
+      --text-strong: #1f2d3d;
+      --text: #3c4858;
+      --text-muted: #8492a6;
+      --text-link: #2563eb;
+      --accent: #ec3750;
+      --accent-fill: #d42f46;
+      --accent-fill-hover: #b82840;
+      --accent-soft: rgba(236, 55, 80, 0.10);
+      --pill-bg: rgba(255, 140, 55, 0.14);
+      --pill-text: #c2410c;
+      --shadow-sm: 0 1px 2px rgba(31, 45, 61, 0.06);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-app: #0f1115;
+        --bg-elev: #161922;
+        --border-card: #2a3043;
+        --border-soft: #1d2231;
+        --text-strong: #f3f4f8;
+        --text: #d6dae5;
+        --text-muted: #8089a0;
+        --text-link: #7dabff;
+        --accent-soft: rgba(236, 55, 80, 0.16);
+        --pill-bg: rgba(255, 140, 55, 0.14);
+        --pill-text: #ffa55c;
+        --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+      }
+    }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    
+
+    ::selection { background: var(--accent-soft); color: var(--text-strong); }
+
     body {
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      background: var(--bg-app);
+      color: var(--text);
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 1.5rem;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .card {
+      background: var(--bg-elev);
+      border: 1px solid var(--border-card);
+      border-radius: 8px;
+      box-shadow: var(--shadow-sm);
       padding: 2rem;
-    }
-    
-    .container {
-      background: white;
-      border-radius: 1rem;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-      padding: 3rem;
-      text-align: center;
-      max-width: 28rem;
+      max-width: 26rem;
       width: 100%;
+      animation: rise 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    
-    .error-code {
-      font-size: 6rem;
-      font-weight: 800;
-      color: #fef3c7;
-      line-height: 1;
-      margin-bottom: 1rem;
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: none; }
     }
-    
+    @media (prefers-reduced-motion: reduce) {
+      .card { animation: none; }
+    }
+
+    .logo { height: 2.25rem; width: auto; display: block; margin-bottom: 1.5rem; }
+
     h1 {
       font-size: 1.5rem;
       font-weight: 700;
-      color: #1f2937;
-      margin-bottom: 0.75rem;
-    }
-    
-    p {
-      color: #6b7280;
-      margin-bottom: 2rem;
-      line-height: 1.6;
-    }
-    
-    .btn {
-      display: inline-block;
-      background: #f59e0b;
-      color: white;
-      padding: 0.75rem 1.5rem;
-      border-radius: 0.5rem;
-      text-decoration: none;
-      font-weight: 600;
-      transition: background 0.2s;
-    }
-    
-    .btn:hover {
-      background: #d97706;
-    }
-    
-    .logo {
-      width: 3rem;
-      height: 3rem;
-      margin-bottom: 1.5rem;
+      line-height: 1.25;
+      letter-spacing: -0.01em;
+      color: var(--text-strong);
+      margin-bottom: 0.5rem;
     }
 
-    @media (prefers-color-scheme: dark) {
-      body {
-        background: linear-gradient(135deg, #451a03 0%, #78350f 100%);
-      }
-      .container {
-        background: #1f2937;
-      }
-      .error-code {
-        color: #78350f;
-      }
-      h1 {
-        color: #f9fafb;
-      }
-      p {
-        color: #9ca3af;
-      }
+    p { font-size: 0.875rem; line-height: 1.6; margin-bottom: 1.5rem; }
+
+    a { color: var(--text-link); }
+    a:focus-visible, .btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
     }
+
+    .btn {
+      display: block;
+      width: 100%;
+      text-align: center;
+      background: var(--accent-fill);
+      color: #ffffff;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease-out;
+    }
+    .btn:hover { background: var(--accent-fill-hover); }
+    .btn:focus-visible { border-radius: 6px; }
+    @media (min-width: 480px) {
+      .btn { display: inline-block; width: auto; }
+    }
+
+    .meta {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      margin-top: 1.5rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border-soft);
+    }
+    .pill {
+      display: inline-block;
+      background: var(--pill-bg);
+      color: var(--pill-text);
+      font-size: 0.75rem;
+      font-weight: 600;
+      line-height: 1.4;
+      padding: 0.125rem 0.625rem;
+      border-radius: 9999px;
+    }
+    .meta span { font-size: 0.75rem; color: var(--text-muted); }
   </style>
   <script async src="https://plausible.io/js/pa-_d2ghIq2L9Mv3kvZk8u3A.js"></script>
   <script>
@@ -97,12 +144,15 @@
   </script>
 </head>
 <body>
-  <div class="container">
+  <main class="card">
     <img src="/hackclub-logo.png" alt="Hack Club" class="logo">
-    <div class="error-code">422</div>
-    <h1>Unprocessable Content</h1>
-    <p>The request was well-formed but couldn't be processed. This might be due to a security issue or invalid data.</p>
-    <a href="/" class="btn">Go Home</a>
-  </div>
+    <h1>That didn&rsquo;t go through</h1>
+    <p>The change you submitted couldn&rsquo;t be saved. This usually happens when a page has been open for a while and the form expired &mdash; go back, refresh the page, and try once more.</p>
+    <a href="/" class="btn">Go to home</a>
+    <div class="meta">
+      <span class="pill">422</span>
+      <span>Change rejected &middot; Attend by Hack Club</span>
+    </div>
+  </main>
 </body>
 </html>
