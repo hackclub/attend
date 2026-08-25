@@ -43,7 +43,7 @@ class SendSupportTicketSmsNotificationJob < ApplicationJob
   end
 
   def send_sms(to:, body:, ticket:)
-    TwilioService.new.send_sms(to: to, body: body)
+    TwilioService.new.send_sms(to: to, body: body, source: "Staff notifications")
   rescue TwilioService::Error => e
     Rails.logger.error("[SupportTicketSms] notification to #{to} failed for ticket #{ticket.id}: #{e.message}")
   end

@@ -41,6 +41,12 @@ class TicketPolicy < ApplicationPolicy
     update?
   end
 
+  # The collection action itself only needs inbox access; each ticket in the
+  # batch is still checked against #update? before it is closed.
+  def bulk_close?
+    index?
+  end
+
   class Scope < ApplicationPolicy::Scope
     def resolve
       return scope.all if user.global_admin?

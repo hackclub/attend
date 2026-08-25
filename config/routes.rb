@@ -46,6 +46,10 @@ Rails.application.routes.draw do
   # Support / Chat system
   namespace :support do
     resources :tickets, only: %i[index show] do
+      collection do
+        patch :bulk_close
+      end
+
       member do
         patch :close
         patch :reopen
