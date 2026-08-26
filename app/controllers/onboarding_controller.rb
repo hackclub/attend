@@ -293,7 +293,13 @@ class OnboardingController < ApplicationController
 
       @participant_event.update!(status: :awaiting_guardian)
 
-      if current_event.guardian_invites_locked? || Setting.waiver_sending_paused?
+      # The guardian can finish everything — waiver and portal — before the
+      # participant hits submit. Every other completion hook already ran and
+      # bailed on the missing code of conduct, so accepting it here can be the
+      # last piece; nothing else would re-check.
+      if @participant_event.mark_complete_if_eligible!
+        redirect_to dashboard_path, notice: completion_notice("Registration submitted — you're all set!")
+      elsif current_event.guardian_invites_locked? || Setting.waiver_sending_paused?
         redirect_to dashboard_path, notice: completion_notice("Registration submitted! We'll notify you when waivers are ready to sign.")
       elsif waiver_participant_portion_signed?
         # Already signed during the documents step
