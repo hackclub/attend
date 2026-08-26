@@ -27,5 +27,65 @@ RSpec.describe "Admin::Users", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body).not_to include("Attendee at")
     end
+
+    it "surfaces matching participants who have never signed in" do
+      event = create(:event, name: "Sunbeam Dhaka")
+      participant = create(:participant, user: nil, email: "never-signed-in@example.com",
+                           legal_first_name: "Never", legal_last_name: "Signedin")
+      participant_event = create(:participant_event, participant: participant, event: event)
+
+      sign_in global_admin
+      get admin_users_path(search: "never-signed-in@example.com")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Participants without an account")
+      expect(response.body).to include("never-signed-in@example.com")
+      expect(response.body).to include("Sunbeam Dhaka")
+      expect(response.body).to include(admin_event_participant_path(event, participant_event))
+    end
+
+    it "matches unlinked participants by name as well as email" do
+      participant = create(:participant, user: nil, email: "anon@example.com",
+                           legal_first_name: "Anusha", legal_last_name: "Ismat")
+      create(:participant_event, participant: participant)
+
+      sign_in global_admin
+      get admin_users_path(search: "Anusha Ismat")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Participants without an account")
+      expect(response.body).to include("anon@example.com")
+    end
+
+    it "does not list participants who already have a user account" do
+      linked = User.create!(email: "linked@example.com", name: "Linked")
+      participant = create(:participant, user: linked, email: linked.email)
+      create(:participant_event, participant: participant)
+
+      sign_in global_admin
+      get admin_users_path(search: "linked@example.com")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("Participants without an account")
+    end
+
+    it "skips the participant fallthrough when filtering by role" do
+      create(:participant, user: nil, email: "roleless@example.com")
+
+      sign_in global_admin
+      get admin_users_path(search: "roleless@example.com", role: "global_admin")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("Participants without an account")
+    end
+
+    it "explains the empty result when nothing matches at all" do
+      sign_in global_admin
+      get admin_users_path(search: "nobody-at-all@example.com")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("No user account matches")
+      expect(response.body).not_to include("Participants without an account")
+    end
   end
 end

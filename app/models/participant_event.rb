@@ -278,6 +278,13 @@ class ParticipantEvent < ApplicationRecord
     steps << { name: "travel", done: travel_inbound.present? && travel_outbound.present? } if event.travel_enabled?
     steps << { name: "accommodation", done: accommodation.present? } if event.accommodation_enabled?
     steps << { name: "health", done: medical.present? && dietary.present? && accessibility.present? }
+    # Accepting the code of conduct is what "submitted" means — it gates
+    # `eligible_for_completion?`, so leaving it out of the progress list let
+    # display_status report Complete for registrations the DB could never
+    # complete (imported participants whose guardian did everything while they
+    # never signed in). It sits before the guardian steps because the guardian
+    # isn't even invited until the participant has submitted.
+    steps << { name: "code_of_conduct", done: code_of_conduct_accepted_at.present? }
 
     if requires_guardian?
       steps << { name: "guardian_details", done: guardian_participant_events.any? }
