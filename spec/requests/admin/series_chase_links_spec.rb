@@ -13,7 +13,7 @@ RSpec.describe "Admin::EventSeries chase links", type: :request do
 
   # In the order a participant clears them, so "stalled at stage N" means
   # "everything before N is done" — the rule the dashboard counts by.
-  STAGE_ORDER = %i[profile travel accommodation health contacts guardian_portal waiver freedom_waiver documents].freeze
+  STAGE_ORDER = %i[profile travel accommodation health code_of_conduct contacts guardian_portal waiver freedom_waiver documents].freeze
 
   let(:series) { create(:event_series, name: "Chase", slug: "chase-links-spec") }
   let(:global_admin) do
@@ -51,6 +51,7 @@ RSpec.describe "Admin::EventSeries chase links", type: :request do
       pe.create_dietary!
       pe.create_accessibility!
     end
+    pe.update!(code_of_conduct_accepted_at: Time.current) if done.include?(:code_of_conduct)
     if done.include?(:contacts)
       gpe = create(:guardian_participant_event, participant_event: pe)
       gpe.update!(status: :completed) if done.include?(:guardian_portal)

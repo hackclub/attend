@@ -12,6 +12,7 @@ module Admin::ParticipantsHelper
     "travel" => "Needs travel",
     "accommodation" => "Needs accommodation",
     "health" => "Needs health info",
+    "code_of_conduct" => "Needs code of conduct",
     "guardian_details" => "Needs guardian details",
     "guardian_portal" => "Awaiting guardian portal",
     "emergency_contacts" => "Needs emergency contacts",
