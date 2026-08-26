@@ -672,6 +672,30 @@ module Admin
       redirect_to admin_event_participant_path(current_event, @participant_event), notice: "Guardian invite resent to #{gpe.guardian.email}."
     end
 
+    # Re-send the participant's onboarding invitation. The mailer reuses the
+    # pending Invitation when there is one, so the link they were already sent
+    # keeps working; an expired one is replaced with a fresh token.
+    def resend_invitation
+      authorize @participant_event, :update?
+
+      participant = @participant_event.participant
+      error = invitation_resend_error(participant)
+
+      if error
+        redirect_to admin_event_participant_path(current_event, @participant_event), alert: error
+        return
+      end
+
+      ParticipantMailer.invitation(
+        email: participant.email,
+        event: current_event,
+        participant: participant
+      ).deliver_later
+
+      redirect_to admin_event_participant_path(current_event, @participant_event),
+        notice: "Invitation resent to #{participant.email}."
+    end
+
     def update_groups
       authorize @participant_event, :update?
       raise ActionController::RoutingError, "Not Found" unless current_event.groups_enabled?
@@ -1472,6 +1496,32 @@ module Admin
       end
 
       consent
+    end
+
+    # Everything that makes resending the onboarding invitation pointless or
+    # harmful, in the order an admin would hit it.
+    def invitation_resend_error(participant)
+      return "#{participant.display_name} is withdrawn from this event — reinstate them first." if @participant_event.withdrawn?
+      return "#{participant.display_name} was rejected for this event." if @participant_event.rejected?
+
+      unless @participant_event.invitation_resendable?
+        return nothing_to_invite_error(participant)
+      end
+
+      return "#{participant.email} is bouncing — correct their email address before resending." if participant.email_undeliverable?
+      return "#{participant.email} is banned from events and cannot be invited." if Ban.banned?(participant.email)
+
+      nil
+    end
+
+    # Why there's nothing to invite them to, in the words of the status badge
+    # the admin is looking at.
+    def nothing_to_invite_error(participant)
+      if @participant_event.display_status == "Awaiting Parent"
+        "#{participant.display_name} has submitted their information — what's outstanding is their guardian's. Resend the guardian invite instead."
+      else
+        "#{participant.display_name} has already finished onboarding."
+      end
     end
 
     # Everything that makes a resend pointless or harmful, in the order an
