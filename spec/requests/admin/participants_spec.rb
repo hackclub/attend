@@ -183,8 +183,11 @@ RSpec.describe "Admin::Participants", type: :request do
     before { sign_in global_admin }
 
     # display_status is computed from the data, not the status column, so each
-    # case has to be built out of the real onboarding shape.
+    # case has to be built out of the real onboarding shape — code of conduct
+    # included, since accepting it is what "the participant has submitted"
+    # means.
     def onboarded!(pe, waiver: :pending)
+      pe.update!(code_of_conduct_accepted_at: Time.current)
       pe.travels.create!(direction: "inbound", mode: "car")
       pe.travels.create!(direction: "outbound", mode: "car")
       pe.create_medical!
@@ -247,6 +250,22 @@ RSpec.describe "Admin::Participants", type: :request do
 
       expect(pe.reload.display_status).to eq("Complete")
       expect(flash[:alert]).to include("already finished onboarding")
+    end
+
+    # Since #86 the code of conduct is its own step, so an imported
+    # participant whose guardian did everything still owes us something — and
+    # the invitation link is how they get back in to give it.
+    it "still offers the resend when only the code of conduct is missing" do
+      pe = onboarded!(create(:participant_event, event: event, status: :in_progress), waiver: :signed)
+      pe.update!(code_of_conduct_accepted_at: nil)
+      create(:consent, :freedom_waiver, :signed, participant_event: pe)
+      create(:guardian_participant_event, participant_event: pe, status: :completed)
+
+      expect(pe.reload.display_status).to eq("Awaiting Participant")
+
+      expect {
+        post resend_invitation_admin_event_participant_path(event, pe)
+      }.to have_enqueued_mail(ParticipantMailer, :invitation)
     end
 
     it "refuses to resend to a withdrawn participant" do
