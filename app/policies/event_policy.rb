@@ -38,21 +38,24 @@ class EventPolicy < ApplicationPolicy
   def manage_rooming?
     return true if user.global_admin?
 
-    user.event_role_assignments.exists?(event: record, role: %w[event_admin ops]) ||
+    user.event_role_assignments.exists?(event: record, role: %w[event_admin ops limited]) ||
       user.series_member_for_event?(record)
   end
 
   def manage_groups?
     return true if user.global_admin?
 
-    user.event_role_assignments.exists?(event: record, role: %w[event_admin ops]) ||
+    user.event_role_assignments.exists?(event: record, role: %w[event_admin ops limited]) ||
       user.series_member_for_event?(record)
   end
 
+  # "limited" is included: the controller redacts dates of birth and addresses
+  # out of the payload for it (see Api::V1::ParticipantsController#include_pii?).
+  # "read_only" still gets nothing.
   def api_participants?
     return true if user.global_admin?
 
-    user.event_role_assignments.exists?(event: record, role: %w[event_admin ops safeguarding_lead]) ||
+    user.event_role_assignments.exists?(event: record, role: %w[event_admin ops limited safeguarding_lead]) ||
       user.series_member_for_event?(record)
   end
 

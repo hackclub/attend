@@ -359,6 +359,56 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#can_view_participant_pii?" do
+    let(:event) { create(:event) }
+    let(:user) { create(:user) }
+
+    it "is false when the only role on the event is a PII-restricted one" do
+      create(:event_role_assignment, user: user, event: event, role: "limited")
+
+      expect(user.can_view_participant_pii?(event)).to be(false)
+    end
+
+    it "is true when the user also holds an unrestricted role on that event" do
+      create(:event_role_assignment, user: user, event: event, role: "limited")
+      create(:event_role_assignment, user: user, event: event, role: "ops")
+
+      expect(user.can_view_participant_pii?(event)).to be(true)
+    end
+
+    it "is scoped per event" do
+      other_event = create(:event)
+      create(:event_role_assignment, user: user, event: event, role: "limited")
+      create(:event_role_assignment, user: user, event: other_event, role: "ops")
+
+      expect(user.can_view_participant_pii?(event)).to be(false)
+      expect(user.can_view_participant_pii?(other_event)).to be(true)
+    end
+
+    it "falls back to any unrestricted role when no event is given" do
+      create(:event_role_assignment, user: user, event: event, role: "limited")
+      expect(user.can_view_participant_pii?).to be(false)
+
+      create(:event_role_assignment, user: user, event: create(:event), role: "ops")
+      expect(user.reload.can_view_participant_pii?).to be(true)
+    end
+
+    it "is true for global admins and series members" do
+      expect(create(:user, global_role: "global_admin").can_view_participant_pii?(event)).to be(true)
+
+      series_event = create(:event, event_series: create(:event_series))
+      series_user = create(:user)
+      SeriesRoleAssignment.create!(user: series_user, event_series: series_event.event_series, role: "organizer")
+      create(:event_role_assignment, user: series_user, event: series_event, role: "limited")
+
+      expect(series_user.can_view_participant_pii?(series_event)).to be(true)
+    end
+
+    it "fails closed for a user with no roles at all" do
+      expect(user.can_view_participant_pii?(event)).to be(false)
+    end
+  end
+
   describe "#placeholder_account?" do
     it "is true for a user created by an admin invite" do
       expect(create(:user).placeholder_account?).to be(true)

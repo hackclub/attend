@@ -932,26 +932,39 @@ module Admin
     end
 
     def participant_params
-      params.require(:participant).permit(
+      permitted = [
         :legal_first_name, :legal_last_name, :preferred_name, :email,
         :date_of_birth, :phone, :pronouns, :tshirt_size, :headshot
-      )
+      ]
+      # The edit form hides the field for PII-restricted roles; dropping it here
+      # too means a hand-crafted POST can't write (or probe) a date of birth
+      # the same user isn't allowed to read back.
+      permitted.delete(:date_of_birth) unless can_view_participant_pii?
+
+      params.require(:participant).permit(*permitted)
     end
 
     def travel_params(direction)
       key = "travel_#{direction}"
       return { direction: direction } unless params[key].present?
 
-      permitted = params.require(key).permit(
+      allowed = [
         :mode, :carrier, :flight_number, :departure_city, :departure_time,
         :arrival_city, :arrival_time, :arrival_location, :booking_reference,
         :visa_status, :visa_notes, :is_unaccompanied_minor, :notes,
         :train_departure_station, :train_arrival_station,
         :bus_departure_location, :bus_arrival_location,
         :origin_address, :expected_arrival_time, :other_details,
-        travel_legs_attributes: [ :id, :position, :flight_code, :departure_airport, :arrival_airport,
-                                 :departure_time, :departure_time_zone, :arrival_time, :arrival_time_zone, :confirmation_code, :_destroy ]
-      ).merge(direction: direction)
+        { travel_legs_attributes: [ :id, :position, :flight_code, :departure_airport, :arrival_airport,
+                                    :departure_time, :departure_time_zone, :arrival_time, :arrival_time_zone,
+                                    :confirmation_code, :_destroy ] }
+      ]
+      # The pickup address is hidden from PII-restricted roles, so the form
+      # never renders the field — dropping it here as well stops a submit from
+      # blanking out an address the same user cannot read back.
+      allowed.delete(:origin_address) unless can_view_participant_pii?
+
+      permitted = params.require(key).permit(*allowed).merge(direction: direction)
 
       normalize_leg_times!(permitted)
       permitted
@@ -1002,7 +1015,7 @@ module Admin
       return true if current_user.global_admin?
 
       role = current_user.role_for_event(current_event)
-      %w[event_admin ops safeguarding_lead].include?(role)
+      %w[event_admin ops limited safeguarding_lead].include?(role)
     end
 
     def require_safeguarding_access

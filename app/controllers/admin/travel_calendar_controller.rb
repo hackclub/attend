@@ -6,7 +6,7 @@ module Admin
     before_action :require_travel_enabled
 
     def show
-      @journeys = TravelCalendar::JourneyCache.fetch(current_event)
+      @journeys = TravelCalendar::JourneyCache.fetch(current_event, include_addresses: can_view_participant_pii?)
       @entries = @journeys
       @journeys_by_date = @journeys.select { |journey| journey[:agenda_date].present? }.group_by { |journey| journey[:agenda_date] }
       @unscheduled_journeys = @journeys.select { |journey| journey[:agenda_date].nil? }

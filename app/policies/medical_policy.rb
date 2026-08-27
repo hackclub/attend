@@ -13,13 +13,18 @@ class MedicalPolicy < ApplicationPolicy
     can_edit?
   end
 
+  # "limited" is here on purpose: the role exists to keep addresses and exact
+  # birthdays away from staff who don't need them, not to leave them guessing
+  # during a medical incident. Conditions and medications are the point.
   def show_full_details?
     return true if user.global_admin?
     return false unless event
 
-    has_role?("safeguarding_lead", "event_admin")
+    has_role?("safeguarding_lead", "event_admin", "limited")
   end
 
+  # The trimmed-down medical view: allergies and dietary needs, no conditions
+  # or medications.
   def show_limited?
     return true if user.global_admin?
     return false unless event
@@ -35,7 +40,7 @@ class MedicalPolicy < ApplicationPolicy
         scope.all
       elsif (event = Current.event)
         user_roles = user.event_role_assignments.where(event: event).pluck(:role)
-        if user_roles.intersect?(%w[event_admin ops safeguarding_lead])
+        if user_roles.intersect?(%w[event_admin ops limited safeguarding_lead])
           scope.joins(:participant_event).where(participant_events: { event_id: event.id })
         elsif user.participant
           scope.joins(:participant_event).where(participant_events: { event_id: event.id, participant_id: user.participant.id })
@@ -54,7 +59,7 @@ class MedicalPolicy < ApplicationPolicy
     return true if user.global_admin?
     return false unless event
 
-    return true if has_role?("safeguarding_lead", "event_admin", "ops")
+    return true if has_role?("safeguarding_lead", "event_admin", "ops", "limited")
     return true if owns_record?
 
     false

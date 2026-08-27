@@ -9,9 +9,19 @@ class EventRoleAssignment < ApplicationRecord
   enum :role, {
     event_admin: "event_admin",
     ops: "ops",
+    limited: "limited",
     safeguarding_lead: "safeguarding_lead",
     read_only: "read_only"
   }
+
+  # Roles that do the job without seeing a participant's most identifying
+  # details: they get age instead of an exact date of birth, and no address of
+  # any kind — not the home address, not the travel pickup address. Medical
+  # records are deliberately NOT restricted; someone helping with a medical
+  # incident needs the conditions and medications. Enforced through
+  # User#can_view_participant_pii?, which every surface that renders or exports
+  # those fields checks.
+  PII_RESTRICTED_ROLES = %w[limited].freeze
 
   # Human-readable permission breakdown for each role, surfaced when adding or
   # reviewing staff. Keep in sync with the Pundit policies that enforce access.
@@ -42,6 +52,24 @@ class EventRoleAssignment < ApplicationRecord
         "Manage staff",
         "Add or remove participants",
         "Access full medical or safeguarding records"
+      ]
+    },
+    "limited" => {
+      label: "Limited",
+      summary: "Day-to-day logistics, without addresses or exact birthdays.",
+      can: [
+        "View and edit travel and accommodation",
+        "Manage groups and rooming",
+        "View full medical records, so they can help in an incident",
+        "View consents and notes",
+        "See age at the event, instead of a date of birth"
+      ],
+      cannot: [
+        "See exact dates of birth",
+        "See any address, at home or for travel pickup",
+        "Manage staff",
+        "Add or remove participants",
+        "Access safeguarding records"
       ]
     },
     "safeguarding_lead" => {

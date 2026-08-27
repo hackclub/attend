@@ -8,7 +8,8 @@ module Admin
       @templates = current_event.export_templates.order(:name)
       # Only offer presets the current role can fully export (the legacy page
       # likewise hid export types the user couldn't run).
-      @presets = Exports::FieldRegistry::PRESETS.select { |_, preset| (preset[:columns] - permitted_keys).empty? }
+      preset_keys = Exports::FieldRegistry.preset_keys_for(role: current_role, global_admin: current_user.global_admin?)
+      @presets = Exports::FieldRegistry::PRESETS.select { |_, preset| (preset[:columns] - preset_keys).empty? }
       @prefill = resolve_prefill
     end
 

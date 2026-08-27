@@ -9,7 +9,15 @@ module Admin
 
     layout "admin"
 
-    helper_method :current_event, :available_events
+    helper_method :current_event, :available_events, :can_view_participant_pii?
+
+    # Views that render an exact date of birth or a home address gate on this;
+    # PII-restricted roles (Limited) get age and no address instead.
+    def can_view_participant_pii?
+      return @can_view_participant_pii if defined?(@can_view_participant_pii)
+
+      @can_view_participant_pii = current_user&.can_view_participant_pii?(current_event) || false
+    end
 
     def current_event
       @current_event

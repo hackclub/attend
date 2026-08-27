@@ -543,6 +543,8 @@
 
   --color-teal-50:  color-mix(in oklab, #14b8a6 12%, var(--bg-elev));
   --color-teal-100: color-mix(in oklab, #14b8a6 20%, var(--bg-elev));
+  --color-teal-700: #5eead4;
+  --color-teal-800: #99f6e4;
 
   --color-sky-50:  color-mix(in oklab, #0ea5e9 12%, var(--bg-elev));
   --color-sky-100: color-mix(in oklab, #0ea5e9 20%, var(--bg-elev));

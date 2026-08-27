@@ -25,7 +25,7 @@ class ConsentPolicy < ApplicationPolicy
         scope.all
       elsif (event = Current.event)
         user_roles = user.event_role_assignments.where(event: event).pluck(:role)
-        if user_roles.intersect?(%w[event_admin ops safeguarding_lead read_only])
+        if user_roles.intersect?(%w[event_admin ops limited safeguarding_lead read_only])
           scope.joins(:participant_event).where(participant_events: { event_id: event.id })
         elsif user.participant
           scope.joins(:participant_event).where(participant_events: { event_id: event.id, participant_id: user.participant.id })

@@ -3,6 +3,12 @@ module Api
     class ParticipantsController < BaseController
       include Pundit::Authorization
 
+      # Roles without participant API access (read_only, limited) would
+      # otherwise surface Pundit's exception as a 500 to the mobile app.
+      rescue_from Pundit::NotAuthorizedError do
+        render json: { error: "Forbidden" }, status: :forbidden
+      end
+
       before_action :restrict_api_key_actions
       before_action :set_event
       before_action :set_participant_event, only: [ :show ]
@@ -291,16 +297,23 @@ module Api
         extra
       end
 
+      # `age` is always present; `date_of_birth` and `address` are omitted
+      # entirely for PII-restricted roles rather than sent as null, so a client
+      # can tell "not permitted" from "not on file".
       def personal_json(participant)
-        {
+        base = {
           legal_first_name: participant.legal_first_name,
           legal_last_name: participant.legal_last_name,
           preferred_name: participant.preferred_name,
-          date_of_birth: participant.date_of_birth&.iso8601,
           age: participant.date_of_birth ? age_from(participant.date_of_birth) : nil,
           tshirt_size: participant.tshirt_size,
           engagement_preference: participant.engagement_preference,
-          engagement_notes: participant.engagement_notes,
+          engagement_notes: participant.engagement_notes
+        }
+        return base unless include_pii?
+
+        base.merge(
+          date_of_birth: participant.date_of_birth&.iso8601,
           address: {
             line_1: participant.address_line_1,
             line_2: participant.address_line_2,
@@ -309,7 +322,7 @@ module Api
             postal_code: participant.postal_code,
             country: participant.country_of_residence
           }.compact_blank
-        }
+        )
       end
 
       def age_from(dob)
@@ -486,7 +499,7 @@ module Api
           expected_arrival_time: travel.expected_arrival_time&.iso8601,
           bus_departure_location: travel.bus_departure_location,
           bus_arrival_location: travel.bus_arrival_location,
-          origin_address: travel.origin_address,
+          **(include_pii? ? { origin_address: travel.origin_address } : {}),
           other_details: travel.other_details,
           notes: travel.notes,
           pickup_dismissed_at: travel.pickup_dismissed_at&.iso8601,
@@ -509,6 +522,16 @@ module Api
           travel_picked_up_at: leg.travel_picked_up_at&.iso8601,
           airport_picked_up_at: leg.travel_picked_up_at&.iso8601
         }
+      end
+
+      # Whether this caller gets exact dates of birth and addresses. Memoized
+      # for the same reason as can_view_sensitive_data? below. A nil
+      # current_user means an event API key, which never reaches the actions
+      # that serve these fields (see API_KEY_ALLOWED_ACTIONS).
+      def include_pii?
+        return @include_pii if defined?(@include_pii)
+
+        @include_pii = current_user.nil? || current_user.can_view_participant_pii?(@event)
       end
 
       # Memoized per request: participant_json calls this once per participant,

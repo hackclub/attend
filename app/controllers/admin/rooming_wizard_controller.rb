@@ -346,7 +346,7 @@ module Admin
       respond_to do |format|
         format.html
         format.csv do
-          csv_data = Rooming::CsvExporter.new(@event).generate
+          csv_data = Rooming::CsvExporter.new(@event, include_date_of_birth: can_view_participant_pii?).generate
           send_data csv_data,
             filename: "#{@event.slug}_rooming_#{Date.current.iso8601}.csv",
             type: "text/csv"

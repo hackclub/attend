@@ -5,7 +5,7 @@ module Api
       before_action :authorize_event
 
       def show
-        entries = TravelCalendar::JourneyCache.fetch(@event)
+        entries = TravelCalendar::JourneyCache.fetch(@event, include_addresses: include_addresses?)
 
         render json: {
           eventTimezone: event_timezone,
@@ -29,6 +29,11 @@ module Api
         else
           require_event_access!(@event)
         end
+      end
+
+      # No current_user means an event API key, which keeps the full payload.
+      def include_addresses?
+        current_user.nil? || current_user.can_view_participant_pii?(@event)
       end
 
       def event_timezone

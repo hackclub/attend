@@ -27,6 +27,7 @@
                   <%= case assignment.role
                       when 'event_admin' then 'bg-purple-100 text-purple-800'
                       when 'ops' then 'bg-blue-100 text-blue-800'
+                      when 'limited' then 'bg-teal-100 text-teal-800'
                       when 'safeguarding_lead' then 'bg-red-100 text-red-800'
                       when 'read_only' then 'bg-gray-100 text-gray-800'
                       end %>">
@@ -59,11 +60,12 @@
 
   <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
     <h3 class="text-sm font-medium text-blue-800 mb-2">Role Permissions</h3>
+    <%# Driven off ROLE_DETAILS so this legend can't drift from what the roles
+        actually do — the full can/cannot breakdown is on the Add Staff page. %>
     <ul class="text-sm text-blue-700 space-y-1">
-      <li><strong>Event Admin:</strong> Full access to this event, including staff management</li>
-      <li><strong>Ops:</strong> Can manage travel, accommodation, and operational data</li>
-      <li><strong>Safeguarding Lead:</strong> Can access medical and safeguarding information</li>
-      <li><strong>Read Only:</strong> Can view all event data but cannot make changes</li>
+      <% EventRoleAssignment::ROLE_DETAILS.each do |_role, details| %>
+        <li><strong><%= details[:label] %>:</strong> <%= details[:summary] %></li>
+      <% end %>
     </ul>
   </div>
 </div>
