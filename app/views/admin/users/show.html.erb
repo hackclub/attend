@@ -223,8 +223,18 @@
         <tbody class="bg-white divide-y divide-gray-100">
           <% @participant_events.each do |pe| %>
             <tr>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <td class="px-6 py-4 text-sm text-gray-900">
                 <%= link_to pe.event.name, admin_event_participant_path(pe.event, pe), class: "text-[#ec3750] hover:text-blue-900" %>
+                <% if pe.participant.user_id != @user.id %>
+                  <div class="text-xs text-amber-600 mt-1">
+                    On a participant record that isn't linked to this account
+                    (<%= pe.participant.email %>) &mdash; their dashboard follows the
+                    linked record, not this one.
+                    <% if @user.participant %>
+                      <%= link_to "Merge the records", merge_admin_event_participant_path(pe.event, pe, duplicate_id: @user.participant.id), class: "underline" %>
+                    <% end %>
+                  </div>
+                <% end %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 <%= pe.status.titleize %>

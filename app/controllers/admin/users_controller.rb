@@ -19,11 +19,13 @@ module Admin
       @total_pages = [ (@total_count.to_f / @per_page).ceil, 1 ].max
       @page = (params[:page] || 1).to_i.clamp(1, @total_pages)
 
-      @users = scope.includes(:event_role_assignments, participant: :participant_events)
+      @users = scope.includes(:event_role_assignments)
         .with_attached_avatar
         .order(:email)
         .offset((@page - 1) * @per_page)
         .limit(@per_page)
+
+      @participant_records_by_user = participant_records_by_user(@users)
 
       # Someone who has never signed in has no User row at all, so a search by
       # their address comes back empty even though Attend knows exactly who
@@ -41,7 +43,7 @@ module Admin
 
     def show
       @event_role_assignments = @user.event_role_assignments.includes(:event).order("events.starts_at DESC")
-      @participant_events = @user.participant&.participant_events&.includes(:event)&.order("events.starts_at DESC") || []
+      load_participant_events
       @passports = @user.passports.includes(:paired_by, :revoked_by).order(created_at: :desc)
     end
 
@@ -61,7 +63,7 @@ module Admin
 
     def edit
       @event_role_assignments = @user.event_role_assignments.includes(:event).order("events.starts_at DESC")
-      @participant_events = @user.participant&.participant_events&.includes(:event)&.order("events.starts_at DESC") || []
+      load_participant_events
     end
 
     def update
@@ -83,6 +85,35 @@ module Admin
 
     def search_like(term)
       "%#{ActiveRecord::Base.sanitize_sql_like(term)}%"
+    end
+
+    def load_participant_events
+      @participant_records = @user.participant_records.includes(participant_events: :event).to_a
+      @participant_events = @participant_records
+        .flat_map(&:participant_events)
+        .select(&:event)
+        .sort_by { |pe| pe.event.starts_at || Time.at(0) }
+        .reverse
+    end
+
+    # One query for the whole page rather than one per row. Registrations are
+    # matched by email as well as by the account link (see
+    # User#participant_records), which no association can eager-load.
+    def participant_records_by_user(users)
+      users = users.to_a
+      return {} if users.empty?
+
+      emails = users.filter_map { |user| user.email&.downcase }.uniq
+      records = Participant
+        .where(user_id: users.map(&:id))
+        .or(Participant.where("LOWER(participants.email) IN (?)", emails))
+        .includes(participant_events: :event)
+        .to_a
+
+      users.to_h do |user|
+        email = user.email&.downcase
+        [ user.id, records.select { |p| p.user_id == user.id || (email.present? && p.email&.downcase == email) } ]
+      end
     end
 
     UNLINKED_PARTICIPANT_LIMIT = 25
