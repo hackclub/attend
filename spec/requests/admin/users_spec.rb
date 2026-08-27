@@ -20,6 +20,37 @@ RSpec.describe "Admin::Users", type: :request do
       expect(response.body).to include("Attendee at 1 event")
     end
 
+    it "counts registrations held by a participant record with no account link" do
+      # The shape a corrected import typo leaves behind: the person signed in
+      # and got a bare participant row, while every registration sits on the
+      # imported row whose email an admin fixed after the fact.
+      event = create(:event)
+      user = User.create!(email: "afnan@example.com", name: "Afnan")
+      create(:participant, user: user, email: user.email)
+      imported = create(:participant, user: nil, email: "Afnan@example.com")
+      create(:participant_event, participant: imported, event: event, status: "invited")
+
+      sign_in global_admin
+      get admin_users_path(search: "afnan@example.com")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Attendee at 1 event")
+      expect(response.body).to include("Unlinked participant record")
+    end
+
+    it "counts each registration once when the record is both linked and email-matched" do
+      event = create(:event)
+      user = User.create!(email: "single@example.com", name: "Single")
+      participant = create(:participant, user: user, email: user.email)
+      create(:participant_event, participant: participant, event: event, status: "complete")
+
+      sign_in global_admin
+      get admin_users_path(search: "single@example.com")
+
+      expect(response.body).to include("Attendee at 1 event")
+      expect(response.body).not_to include("Unlinked participant record")
+    end
+
     it "omits the attendee line for users with no participant record" do
       sign_in global_admin
       get admin_users_path(search: "ga-users@example.com")
@@ -100,6 +131,40 @@ RSpec.describe "Admin::Users", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("No user account matches")
       expect(response.body).not_to include("Participants without an account")
+    end
+  end
+
+  describe "GET show" do
+    it "lists registrations held by an unlinked participant record and offers the merge" do
+      event = create(:event, name: "Sunbeam Dhaka")
+      user = User.create!(email: "afnan@example.com", name: "Afnan")
+      shell = create(:participant, user: user, email: user.email)
+      imported = create(:participant, user: nil, email: "Afnan@example.com")
+      participant_event = create(:participant_event, participant: imported, event: event, status: "invited")
+
+      sign_in global_admin
+      get admin_user_path(user)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Sunbeam Dhaka")
+      expect(response.body).to include("isn't linked to this account")
+      expect(response.body).to include(
+        merge_admin_event_participant_path(event, participant_event, duplicate_id: shell.id)
+      )
+    end
+
+    it "does not flag registrations on the account's own participant record" do
+      event = create(:event, name: "Sunbeam Dallas")
+      user = User.create!(email: "own@example.com", name: "Own")
+      participant = create(:participant, user: user, email: user.email)
+      create(:participant_event, participant: participant, event: event, status: "complete")
+
+      sign_in global_admin
+      get admin_user_path(user)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Sunbeam Dallas")
+      expect(response.body).not_to include("isn't linked to this account")
     end
   end
 end

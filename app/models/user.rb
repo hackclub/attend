@@ -51,6 +51,20 @@ class User < ApplicationRecord
     global_role == "global_admin"
   end
 
+  # Every Participant row that is this person, not just the one `participant`
+  # points at. `participants.user_id` is only filled in when someone runs
+  # through onboarding, so an imported row keeps a null there — and when an
+  # admin later corrects a typo'd import address, the registrations end up on
+  # one row while the shell built at first sign-in holds the account link.
+  # Matching on the address as well is what stops admin pages reporting that an
+  # account has never registered for anything.
+  def participant_records
+    scope = Participant.where(user_id: id)
+    return scope if email.blank?
+
+    scope.or(Participant.where("LOWER(participants.email) = ?", email.downcase))
+  end
+
   def role_for_event(event)
     event_role_assignments.find_by(event: event)&.role
   end

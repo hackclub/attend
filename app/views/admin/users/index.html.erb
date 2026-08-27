@@ -58,9 +58,13 @@
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               <%= pluralize(user.event_role_assignments.size, "role") %>
-              <% attendee_event_count = user.participant&.participant_events&.size.to_i %>
+              <% records = @participant_records_by_user[user.id] || [] %>
+              <% attendee_event_count = records.sum { |record| record.participant_events.size } %>
               <% if attendee_event_count > 0 %>
                 <div class="text-xs text-gray-400">Attendee at <%= pluralize(attendee_event_count, "event") %></div>
+              <% end %>
+              <% if records.any? { |record| record.user_id != user.id } %>
+                <div class="text-xs text-amber-600">Unlinked participant record</div>
               <% end %>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
