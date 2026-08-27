@@ -72,10 +72,73 @@
             </td>
           </tr>
         <% end %>
+        <% if @users.empty? %>
+          <tr>
+            <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500">
+              <% if params[:search].present? %>
+                No user account matches &ldquo;<%= params[:search] %>&rdquo;.
+                <div class="text-xs text-gray-400 mt-1">Accounts are created the first time someone signs in with Hack Club Auth.</div>
+              <% else %>
+                No users yet.
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
         </tbody>
       </table>
     </div>
   </div>
+
+  <% if @unlinked_participants.any? %>
+    <div class="bg-white border border-gray-200 rounded-lg">
+      <div class="p-4 border-b border-gray-200">
+        <h2 class="text-sm font-semibold text-gray-900">Participants without an account</h2>
+        <p class="text-xs text-gray-500 mt-1">
+          <%= pluralize(@unlinked_participants.size, "participant") %> matching &ldquo;<%= params[:search] %>&rdquo;
+          <%= @unlinked_participants.size == 1 ? "has" : "have" %> never signed in, so
+          <%= @unlinked_participants.size == 1 ? "there is" : "there are" %> no user
+          <%= "account".pluralize(@unlinked_participants.size) %> to show above.
+        </p>
+      </div>
+      <div class="overflow-x-auto -mx-4 sm:mx-0">
+        <table class="min-w-full divide-y divide-gray-100">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Participant</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Events</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-100 text-xs sm:text-sm">
+            <% @unlinked_participants.each do |participant| %>
+              <% participant_events = participant.participant_events.select(&:event).sort_by { |pe| pe.event.starts_at || Time.at(0) }.reverse %>
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="text-sm font-medium text-gray-900"><%= participant.full_name %></div>
+                  <div class="text-sm text-gray-500 truncate max-w-[220px]" title="<%= participant.email %>"><%= participant.email %></div>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500">
+                  <% if participant_events.any? %>
+                    <%= participant_events.map { |pe| pe.event.name }.join(", ") %>
+                  <% else %>
+                    <span class="text-gray-400">Not registered for any event</span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <% latest = participant_events.first %>
+                  <% if latest %>
+                    <%= link_to "View participant", admin_event_participant_path(latest.event, latest), class: "text-[#ec3750] hover:text-blue-900" %>
+                  <% else %>
+                    <span class="text-gray-400">—</span>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% end %>
 
   <% if @total_pages > 1 %>
     <div class="mt-6 flex items-center justify-between">

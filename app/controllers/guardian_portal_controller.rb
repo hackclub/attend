@@ -71,8 +71,10 @@ class GuardianPortalController < ApplicationController
       return
     end
 
+    # Completing the guardian fires GuardianParticipantEvent's after_update_commit
+    # hook, which is what marks the participant complete once every guardian is
+    # done — doing it here read a stale copy of this very row.
     @guardian_participant_event.update!(status: :completed, completed_at: Time.current)
-    mark_participant_complete_if_all_guardians_done
     trigger_docuseal_if_needed
 
     redirect_to guardian_portal_confirmed_path(token: @token), notice: "Thank you! Your portion is complete."
@@ -677,10 +679,6 @@ class GuardianPortalController < ApplicationController
       freedom_waiver.update!(status: :pending, failure_reason: nil)
       DocusealJobs::CreateFreedomWaiverJob.perform_later(freedom_waiver.id)
     end
-  end
-
-  def mark_participant_complete_if_all_guardians_done
-    @participant_event.mark_complete_if_eligible!
   end
 
   def next_priority(contacts)

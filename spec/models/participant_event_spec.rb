@@ -160,7 +160,9 @@ RSpec.describe ParticipantEvent, type: :model do
     describe "guardian-blocking via #display_status" do
       let(:event) { create(:event, accommodation_enabled: false, freedom_waivers_enabled: false) }
       let(:minor) { create(:participant, date_of_birth: 15.years.ago) }
-      let(:pe) { create(:participant_event, participant: minor, event: event) }
+      # Submitted: the guardian is only in the picture once the participant has
+      # accepted the code of conduct, so these scenarios all start past it.
+      let(:pe) { create(:participant_event, participant: minor, event: event, code_of_conduct_accepted_at: Time.current) }
 
       before do
         create(:guardian_participant_event, participant_event: pe, status: :completed)
@@ -243,6 +245,33 @@ RSpec.describe ParticipantEvent, type: :model do
 
         create(:guardian_participant_event, participant_event: pe, status: :completed, completed_at: Time.current)
         expect(pe.reload.mark_complete_if_eligible!).to be true
+      end
+
+      it "completes the participant when the guardian finishes last" do
+        no_freedom_event = create(:event, freedom_waivers_enabled: false)
+        pe = create(:participant_event, event: no_freedom_event, code_of_conduct_accepted_at: Time.current)
+        create(:consent, :signed, participant_event: pe)
+        gpe = create(:guardian_participant_event, participant_event: pe, status: :in_progress)
+
+        # Load the association so it holds a stale copy of the guardian, which
+        # is exactly the state GuardianPortalController#complete used to be in.
+        pe.guardian_participant_events.load
+
+        gpe.update!(status: :completed, completed_at: Time.current)
+
+        expect(pe.reload).to be_complete
+      end
+
+      it "does not complete the participant when another guardian is still pending" do
+        no_freedom_event = create(:event, freedom_waivers_enabled: false)
+        pe = create(:participant_event, event: no_freedom_event, code_of_conduct_accepted_at: Time.current)
+        create(:consent, :signed, participant_event: pe)
+        first = create(:guardian_participant_event, participant_event: pe, status: :in_progress)
+        create(:guardian_participant_event, participant_event: pe, status: :in_progress)
+
+        first.update!(status: :completed, completed_at: Time.current)
+
+        expect(pe.reload).not_to be_complete
       end
 
       it "requires a signed freedom waiver when the event has them enabled" do

@@ -20,6 +20,7 @@ class GuardianParticipantEvent < ApplicationRecord
   validates :participant_event_id, presence: true, uniqueness: { scope: :guardian_id }
 
   before_create :set_invited_via_email
+  after_update_commit :complete_participant_event_if_eligible
 
   def invite_token
     invite_token_ciphertext
@@ -113,5 +114,21 @@ class GuardianParticipantEvent < ApplicationRecord
 
   def set_invited_via_email
     self.invited_via_email = guardian.email
+  end
+
+  # Completion used to be triggered only from GuardianPortalController#complete,
+  # which checks `participant_event.guardian_participant_events` — an
+  # association that was already loaded, and so still held this row with its
+  # pre-update status. The check saw an incomplete guardian, and a participant
+  # whose guardian finished last stayed stuck forever. Hanging it off the
+  # commit instead means any path that completes a guardian re-checks, and the
+  # reload guarantees the participant sees this row's committed status.
+  def complete_participant_event_if_eligible
+    return unless saved_change_to_status? && completed?
+
+    participant_event.reload.mark_complete_if_eligible!
+  rescue ActiveRecord::RecordNotFound
+    # The participant_event was destroyed in the same transaction.
+    nil
   end
 end

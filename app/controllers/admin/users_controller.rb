@@ -7,8 +7,7 @@ module Admin
       scope = User.all
 
       if params[:search].present?
-        search_term = "%#{ActiveRecord::Base.sanitize_sql_like(params[:search])}%"
-        scope = scope.where("email ILIKE :term OR name ILIKE :term", term: search_term)
+        scope = scope.where("email ILIKE :term OR name ILIKE :term", term: search_like(params[:search]))
       end
 
       if params[:role].present?
@@ -25,6 +24,19 @@ module Admin
         .order(:email)
         .offset((@page - 1) * @per_page)
         .limit(@per_page)
+
+      # Someone who has never signed in has no User row at all, so a search by
+      # their address comes back empty even though Attend knows exactly who
+      # they are — imported participants complete a whole registration via the
+      # guardian portal without ever holding an account. Surface those matches
+      # so the lookup doesn't dead-end. Skipped when filtering by role, which
+      # only exists on User.
+      @unlinked_participants =
+        if params[:search].present? && params[:role].blank?
+          unlinked_participants_matching(search_like(params[:search]))
+        else
+          []
+        end
     end
 
     def show
@@ -68,6 +80,25 @@ module Admin
     end
 
     private
+
+    def search_like(term)
+      "%#{ActiveRecord::Base.sanitize_sql_like(term)}%"
+    end
+
+    UNLINKED_PARTICIPANT_LIMIT = 25
+
+    def unlinked_participants_matching(term)
+      Participant.where(user_id: nil)
+        .where(
+          "email ILIKE :term OR preferred_name ILIKE :term " \
+          "OR CONCAT(legal_first_name, ' ', legal_last_name) ILIKE :term",
+          term: term
+        )
+        .includes(participant_events: :event)
+        .order(:email)
+        .limit(UNLINKED_PARTICIPANT_LIMIT)
+        .to_a
+    end
 
     def set_user
       @user = User.find(params[:id])
