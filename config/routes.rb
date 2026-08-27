@@ -205,6 +205,7 @@ Rails.application.routes.draw do
           get :notes
           get :history
           post :resync_airtable
+          post :resend_invitation
           post :resend_guardian_invite
           get :slack_invite_link
           post :invite_to_slack_channel

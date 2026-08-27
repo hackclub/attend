@@ -18,6 +18,7 @@ class AuditLog < ApplicationRecord
     impersonate: "impersonate",
     update_integrations: "update_integrations",
     update_travel: "update_travel",
+    resend_invitation: "resend_invitation",
     resend_guardian_invite: "resend_guardian_invite",
     event_select: "select",
     reset_waiver: "reset_waiver",

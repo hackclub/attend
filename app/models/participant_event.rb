@@ -117,6 +117,17 @@ class ParticipantEvent < ApplicationRecord
       consents.any?
   end
 
+  # Resending the onboarding invitation only helps while the participant still
+  # owes us their own information. Once they've submitted, what's outstanding
+  # is the guardian's part, chased by resending the guardian invite instead.
+  #
+  # Deliberately keyed off display_status rather than the status column: the
+  # column lags behind reality, and the menu item has to agree with the badge
+  # staff are looking at on the same page.
+  def invitation_resendable?
+    display_status == "Awaiting Participant"
+  end
+
   def awaiting_guardian_completion?
     onboarding_complete? && guardian_participant_events.any? { |gpe| !gpe.complete? }
   end

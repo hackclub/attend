@@ -178,4 +178,136 @@ RSpec.describe "Admin::Participants", type: :request do
       expect(response.body).to include("Old Form")
     end
   end
+
+  describe "POST resend_invitation" do
+    before { sign_in global_admin }
+
+    # display_status is computed from the data, not the status column, so each
+    # case has to be built out of the real onboarding shape — code of conduct
+    # included, since accepting it is what "the participant has submitted"
+    # means.
+    def onboarded!(pe, waiver: :pending)
+      pe.update!(code_of_conduct_accepted_at: Time.current)
+      pe.travels.create!(direction: "inbound", mode: "car")
+      pe.travels.create!(direction: "outbound", mode: "car")
+      pe.create_medical!
+      pe.create_dietary!
+      pe.create_accessibility!
+      pe.create_safeguarding_info!
+      create(:consent, *(waiver == :signed ? [ :signed ] : []), participant_event: pe)
+      pe
+    end
+
+    it "re-sends the onboarding invitation" do
+      participant = create(:participant, email: "chase-me@example.com")
+      pe = create(:participant_event, event: event, participant: participant, status: :in_progress)
+
+      expect {
+        post resend_invitation_admin_event_participant_path(event, pe)
+      }.to have_enqueued_mail(ParticipantMailer, :invitation)
+
+      expect(response).to redirect_to(admin_event_participant_path(event, pe))
+      expect(flash[:notice]).to include(participant.email)
+    end
+
+    it "shows the action in the Actions dropdown while the participant still owes information" do
+      pe = create(:participant_event, event: event, status: :in_progress)
+
+      get admin_event_participant_path(event, pe)
+
+      expect(response.body).to include(resend_invitation_admin_event_participant_path(event, pe))
+    end
+
+    it "hides the action once the outstanding part is the guardian's" do
+      pe = onboarded!(create(:participant_event, event: event, status: :in_progress))
+      create(:guardian_participant_event, participant_event: pe)
+
+      get admin_event_participant_path(event, pe)
+
+      expect(pe.reload.display_status).to eq("Awaiting Parent")
+      expect(response.body).not_to include(resend_invitation_admin_event_participant_path(event, pe))
+    end
+
+    it "points at the guardian invite when the participant has already submitted" do
+      pe = onboarded!(create(:participant_event, event: event, status: :in_progress))
+      create(:guardian_participant_event, participant_event: pe)
+
+      expect {
+        post resend_invitation_admin_event_participant_path(event, pe)
+      }.not_to have_enqueued_mail(ParticipantMailer, :invitation)
+
+      expect(flash[:alert]).to include("guardian invite")
+    end
+
+    it "refuses to resend to a fully onboarded participant" do
+      pe = onboarded!(create(:participant_event, event: event, status: :complete), waiver: :signed)
+      create(:consent, :freedom_waiver, :signed, participant_event: pe)
+      create(:guardian_participant_event, participant_event: pe, status: :completed)
+
+      expect {
+        post resend_invitation_admin_event_participant_path(event, pe)
+      }.not_to have_enqueued_mail(ParticipantMailer, :invitation)
+
+      expect(pe.reload.display_status).to eq("Complete")
+      expect(flash[:alert]).to include("already finished onboarding")
+    end
+
+    # Since #86 the code of conduct is its own step, so an imported
+    # participant whose guardian did everything still owes us something — and
+    # the invitation link is how they get back in to give it.
+    it "still offers the resend when only the code of conduct is missing" do
+      pe = onboarded!(create(:participant_event, event: event, status: :in_progress), waiver: :signed)
+      pe.update!(code_of_conduct_accepted_at: nil)
+      create(:consent, :freedom_waiver, :signed, participant_event: pe)
+      create(:guardian_participant_event, participant_event: pe, status: :completed)
+
+      expect(pe.reload.display_status).to eq("Awaiting Participant")
+
+      expect {
+        post resend_invitation_admin_event_participant_path(event, pe)
+      }.to have_enqueued_mail(ParticipantMailer, :invitation)
+    end
+
+    it "refuses to resend to a withdrawn participant" do
+      pe = create(:participant_event, event: event, status: :withdrawn)
+
+      expect {
+        post resend_invitation_admin_event_participant_path(event, pe)
+      }.not_to have_enqueued_mail(ParticipantMailer, :invitation)
+
+      expect(flash[:alert]).to include("withdrawn")
+    end
+
+    it "refuses to resend to a bouncing address" do
+      participant = create(:participant, email: "bounces@example.com")
+      participant.update!(email_undeliverable_at: Time.current)
+      pe = create(:participant_event, event: event, participant: participant, status: :invited)
+
+      expect {
+        post resend_invitation_admin_event_participant_path(event, pe)
+      }.not_to have_enqueued_mail(ParticipantMailer, :invitation)
+
+      expect(flash[:alert]).to include("bouncing")
+    end
+
+    it "refuses to resend to a banned address" do
+      participant = create(:participant, email: "banned-resend@example.com")
+      pe = create(:participant_event, event: event, participant: participant, status: :invited)
+      create(:ban, email: participant.email)
+
+      expect {
+        post resend_invitation_admin_event_participant_path(event, pe)
+      }.not_to have_enqueued_mail(ParticipantMailer, :invitation)
+
+      expect(flash[:alert]).to include("banned")
+    end
+
+    it "records an audit log entry" do
+      pe = create(:participant_event, event: event, status: :in_progress)
+
+      expect {
+        post resend_invitation_admin_event_participant_path(event, pe)
+      }.to change { AuditLog.where(action: "resend_invitation").count }.by(1)
+    end
+  end
 end

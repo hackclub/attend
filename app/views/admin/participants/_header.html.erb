@@ -48,6 +48,12 @@
     </button>
     <div class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 py-1" data-dropdown-target="menu">
       <%= link_to "Edit", edit_admin_event_participant_path(current_event, @participant_event), class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" %>
+      <% if policy(@participant_event).update? && @participant_event.invitation_resendable? %>
+        <%= button_to "Resend Invitation", resend_invitation_admin_event_participant_path(current_event, @participant_event),
+            method: :post,
+            data: { turbo_confirm: "Resend the onboarding invitation to #{@participant.email}?" },
+            class: "w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer" %>
+      <% end %>
       <% if policy(@participant_event).merge_duplicate? %>
         <%= link_to "Merge Duplicate", merge_admin_event_participant_path(current_event, @participant_event), class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" %>
       <% end %>
