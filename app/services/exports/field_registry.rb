@@ -16,7 +16,8 @@ module Exports
   class FieldRegistry
     CATEGORIES = {
       "identity"           => { label: "Identity", tier: :identity, description: "Participant name and email" },
-      "basic"              => { label: "Participant", tier: :general, description: "Contact details, address, and profile information" },
+      "basic"              => { label: "Participant", tier: :general, description: "Contact details, address, and profile information",
+                                pii_restricted_description: "Contact details and profile information" },
       "event_status"       => { label: "Event Status", tier: :general, description: "Registration status, check-in, and onboarding progress" },
       "travel"             => { label: "Travel", tier: :general, description: "Inbound and outbound travel details" },
       "flight_legs"        => { label: "Flight Legs", tier: :general, description: "Per-leg flight details (only in one-row-per-flight-leg mode)" },
@@ -34,10 +35,27 @@ module Exports
     # exports, which included name + email in medical/dietary/accommodation
     # CSVs for safeguarding leads).
     TIER_ROLES = {
-      identity: %w[event_admin ops safeguarding_lead],
-      general: %w[event_admin ops],
+      identity: %w[event_admin ops limited safeguarding_lead],
+      general: %w[event_admin ops limited],
       sensitive: %w[event_admin safeguarding_lead]
     }.freeze
+
+    # Fields the PII-restricted roles never get, whatever tier they sit in (see
+    # EventRoleAssignment::PII_RESTRICTED_ROLES). "Age at Event Start" stays, so
+    # a Limited exporter can still do the rooming and minor-count work that
+    # needs an age. The travel origin addresses are here too: for a car
+    # journey that field is the participant's doorstep.
+    PII_RESTRICTED_FIELD_KEYS = %w[
+      participant.date_of_birth
+      participant.address_line_1
+      participant.address_line_2
+      participant.city
+      participant.state
+      participant.postal_code
+      participant.country_of_residence
+      travel.inbound.origin_address
+      travel.outbound.origin_address
+    ].freeze
 
     ROW_MODES = %w[participant flight_leg].freeze
 
@@ -344,12 +362,34 @@ module Exports
       end
 
       def categories_for(role:, global_admin: false)
-        CATEGORIES.select { |_, config| global_admin || TIER_ROLES.fetch(config[:tier]).include?(role) }
+        reachable = CATEGORIES.select { |_, config| global_admin || TIER_ROLES.fetch(config[:tier]).include?(role) }
+        return reachable if global_admin || !pii_restricted?(role)
+
+        # Don't promise an address the field list won't deliver.
+        reachable.transform_values do |config|
+          config[:pii_restricted_description] ? config.merge(description: config[:pii_restricted_description]) : config
+        end
+      end
+
+      # Preset eligibility ignores the PII field filter, so a PII-restricted
+      # role is still offered the presets its categories cover — loading one
+      # strips the fields it can't have and says so, which beats the preset
+      # silently disappearing.
+      def preset_keys_for(role:, global_admin: false)
+        permitted = categories_for(role: role, global_admin: global_admin).keys
+        FIELDS.values.select { |f| permitted.include?(f.category) }.map(&:key)
       end
 
       def fields_for(role:, global_admin: false)
         permitted = categories_for(role: role, global_admin: global_admin).keys
-        FIELDS.values.select { |f| permitted.include?(f.category) }
+        fields = FIELDS.values.select { |f| permitted.include?(f.category) }
+        return fields if global_admin || !pii_restricted?(role)
+
+        fields.reject { |f| PII_RESTRICTED_FIELD_KEYS.include?(f.key) }
+      end
+
+      def pii_restricted?(role)
+        EventRoleAssignment::PII_RESTRICTED_ROLES.include?(role)
       end
 
       def permitted_keys(role:, global_admin: false)

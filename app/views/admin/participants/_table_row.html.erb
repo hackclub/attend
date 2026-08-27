@@ -22,9 +22,11 @@
   <td class="px-2 py-1.5 text-gray-500 whitespace-nowrap" data-column="pronouns">
     <%= pe.participant.pronouns.presence || "—" %>
   </td>
-  <td class="px-2 py-1.5 text-gray-500 whitespace-nowrap" data-column="dob">
-    <%= pe.participant.date_of_birth&.strftime("%Y-%m-%d") || "—" %>
-  </td>
+  <% if can_view_participant_pii? %>
+    <td class="px-2 py-1.5 text-gray-500 whitespace-nowrap" data-column="dob">
+      <%= pe.participant.date_of_birth&.strftime("%Y-%m-%d") || "—" %>
+    </td>
+  <% end %>
   <td class="px-2 py-1.5 whitespace-nowrap" data-column="age">
     <% age = pe.participant.age_on(current_event.starts_at&.to_date || Date.current) %>
     <% if age %>

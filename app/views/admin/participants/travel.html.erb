@@ -154,10 +154,12 @@
           <!-- Car fields -->
           <% if @travel_inbound.car? %>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 mt-4">
-              <div data-controller="address-autocomplete">
-                <%= f.label :origin_address, "Travelling From", class: "block text-sm font-medium text-gray-700 mb-1" %>
-                <%= f.text_field :origin_address, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", data: { address_autocomplete_target: "input" } %>
-              </div>
+              <% if can_view_participant_pii? %>
+                <div data-controller="address-autocomplete">
+                  <%= f.label :origin_address, "Travelling From", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                  <%= f.text_field :origin_address, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", data: { address_autocomplete_target: "input" } %>
+                </div>
+              <% end %>
               <div>
                 <%= f.label :expected_arrival_time, "Expected Arrival Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
                 <%= f.datetime_local_field :expected_arrival_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
@@ -262,10 +264,12 @@
           <!-- Car fields -->
           <% if @travel_outbound.car? %>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 mt-4">
-              <div data-controller="address-autocomplete">
-                <%= f.label :origin_address, "Travelling To", class: "block text-sm font-medium text-gray-700 mb-1" %>
-                <%= f.text_field :origin_address, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", data: { address_autocomplete_target: "input" } %>
-              </div>
+              <% if can_view_participant_pii? %>
+                <div data-controller="address-autocomplete">
+                  <%= f.label :origin_address, "Travelling To", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                  <%= f.text_field :origin_address, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", data: { address_autocomplete_target: "input" } %>
+                </div>
+              <% end %>
               <div>
                 <%= f.label :departure_time, "Departure Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
                 <%= f.datetime_local_field :departure_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>

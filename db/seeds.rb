@@ -42,6 +42,14 @@ if Rails.env.development?
   EventRoleAssignment.find_or_create_by!(user: ops_staff, event: event, role: "ops")
   puts "Created ops staff: #{ops_staff.email}"
 
+  limited_staff = User.find_or_create_by!(email: "limited@hackclub.com") do |u|
+    u.name = "Limited Staff"
+    u.password = "password123"
+    u.global_role = "no_role"
+  end
+  EventRoleAssignment.find_or_create_by!(user: limited_staff, event: event, role: "limited")
+  puts "Created limited staff: #{limited_staff.email}"
+
   safeguarding = User.find_or_create_by!(email: "safeguarding@hackclub.com") do |u|
     u.name = "Safeguarding Lead"
     u.password = "password123"

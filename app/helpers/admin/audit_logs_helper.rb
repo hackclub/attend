@@ -2,6 +2,15 @@ module Admin
   module AuditLogsHelper
     SENSITIVE_FIELD_PATTERNS = /password|token|secret|api_key|otp|access_key/i
 
+    # Columns holding an exact date of birth or a home address, on participants
+    # and guardians alike. PII-restricted roles (see
+    # EventRoleAssignment::PII_RESTRICTED_ROLES) can reach a participant's change
+    # history, and a changeset is just as revealing as the field itself.
+    PII_FIELDS = %w[
+      date_of_birth address_line_1 address_line_2 city state postal_code
+      country country_of_residence
+    ].freeze
+
     def audit_field_label(field)
       field.to_s.humanize
     end
@@ -19,12 +28,14 @@ module Admin
     end
 
     # Returns a hash of {field => [old, new]} from a PaperTrail::Version.
-    # Hides framework noise so the diff stays human-readable.
-    def audit_version_changes(version)
+    # Hides framework noise so the diff stays human-readable. Pass
+    # `hide_pii: true` to also drop dates of birth and addresses.
+    def audit_version_changes(version, hide_pii: false)
       raw = (version.respond_to?(:changeset) ? version.changeset : nil) || {}
-      raw.except("updated_at", "created_at", "encrypted_password", "remember_created_at",
+      cleaned = raw.except("updated_at", "created_at", "encrypted_password", "remember_created_at",
         "current_sign_in_at", "last_sign_in_at", "current_sign_in_ip", "last_sign_in_ip",
         "sign_in_count", "oidc_claims")
+      hide_pii ? cleaned.except(*PII_FIELDS) : cleaned
     rescue => e
       Rails.logger.warn("[AuditLog] Could not parse version #{version.id}: #{e.message}")
       {}

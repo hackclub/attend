@@ -45,13 +45,22 @@ class ParticipantsToolbox < ApplicationToolbox
   end
   def update
     @participant = accessible_participants.find(params[:participant_id])
-    @participant.update!(params.permit(:preferred_name, :email, :phone,
-                                       :pronouns, :tshirt_size, :city, :state,
-                                       :country_of_residence).to_h)
+    permitted = %i[preferred_name email phone pronouns tshirt_size city state country_of_residence]
+    permitted -= %i[city state country_of_residence] unless view_pii?
+    @participant.update!(params.permit(*permitted).to_h)
     render json: serialize_participant(@participant, full: true)
   end
 
   private
+
+  # Whether this account may see exact dates of birth and addresses at all.
+  # Participants here aren't scoped to one event, so a PII-restricted role on
+  # one event doesn't hide anything for someone who is ops elsewhere.
+  def view_pii?
+    return @view_pii if defined?(@view_pii)
+
+    @view_pii = current_user.can_view_participant_pii?
+  end
 
   # Participants reachable through the events this connection can access.
   def accessible_participants
@@ -86,11 +95,9 @@ class ParticipantsToolbox < ApplicationToolbox
     base.merge(
       phone: p.phone,
       slack_user_id: p.slack_user_id,
-      date_of_birth: p.date_of_birth,
-      city: p.city,
-      state: p.state,
-      country_of_residence: p.country_of_residence,
       tshirt_size: p.tshirt_size,
+      **(view_pii? ? { date_of_birth: p.date_of_birth, city: p.city, state: p.state,
+                       country_of_residence: p.country_of_residence } : {}),
       registrations: p.participant_events
         .where(current_user.global_admin? && permitted_event_ids.nil? ? {} : { event_id: accessible_events.select(:id) })
         .includes(:event).map { |pe|

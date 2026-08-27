@@ -13,6 +13,9 @@ class User < ApplicationRecord
 
   enum :global_role, { no_role: "none", global_admin: "global_admin", read_only: "read_only" }, default: :no_role
 
+  # Event roles whose day-to-day work includes the support inbox.
+  SUPPORT_ROLES = %w[event_admin ops limited].freeze
+
   # `oidc_claims` holds PII straight from Hack Club Auth (phone number,
   # birthdate, home address). Encrypting the whole jsonb blob works because the
   # Active Record encryption envelope is itself JSON, so it round-trips through
@@ -296,8 +299,21 @@ class User < ApplicationRecord
 
   def admin?
     global_admin? ||
-      event_role_assignments.exists?(role: %w[event_admin ops safeguarding_lead]) ||
+      event_role_assignments.exists?(role: %w[event_admin ops limited safeguarding_lead]) ||
       series_role_assignments.exists?
+  end
+
+  # Whether this user may see participants' exact dates of birth and home
+  # addresses. False only for someone whose access comes entirely from
+  # PII-restricted roles (see EventRoleAssignment::PII_RESTRICTED_ROLES) —
+  # holding any other role, on the event in question or anywhere when no event
+  # is given, restores the full view. Fails closed for a user with no roles.
+  def can_view_participant_pii?(event = nil)
+    return true if global_admin?
+    return true if event ? series_member_for_event?(event) : series_role_assignments.exists?
+
+    assignments = event ? event_role_assignments.where(event: event) : event_role_assignments
+    assignments.where.not(role: EventRoleAssignment::PII_RESTRICTED_ROLES).exists?
   end
 
   def safeguarding_lead_for?(event)
@@ -316,11 +332,11 @@ class User < ApplicationRecord
       series_member_for_event?(event)
   end
 
-  # Events where this user can work support tickets (event_admin or ops,
-  # or any event in a series they belong to).
+  # Events where this user can work support tickets (event_admin, ops, or
+  # limited, or any event in a series they belong to).
   def support_staff_event_ids
     @support_staff_event_ids ||= (
-      event_role_assignments.where(role: %w[event_admin ops]).pluck(:event_id) +
+      event_role_assignments.where(role: SUPPORT_ROLES).pluck(:event_id) +
         series_event_ids
     ).uniq
   end
@@ -329,7 +345,7 @@ class User < ApplicationRecord
   # event staff only while one of their events is within its support window.
   def support_inbox_triage_access?
     global_admin? ||
-      event_role_assignments.where(role: %w[event_admin ops])
+      event_role_assignments.where(role: SUPPORT_ROLES)
                             .joins(:event).merge(Event.within_support_window)
                             .exists? ||
       Event.within_support_window.where(id: series_event_ids).exists?

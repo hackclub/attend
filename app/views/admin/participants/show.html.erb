@@ -16,10 +16,12 @@
             <dt class="text-sm text-gray-500">Phone</dt>
             <dd class="text-gray-900"><%= @participant.phone || "—" %></dd>
           </div>
-          <div>
-            <dt class="text-sm text-gray-500">Date of Birth</dt>
-            <dd class="text-gray-900"><%= @participant.date_of_birth&.strftime("%B %d, %Y") %></dd>
-          </div>
+          <% if can_view_participant_pii? %>
+            <div>
+              <dt class="text-sm text-gray-500">Date of Birth</dt>
+              <dd class="text-gray-900"><%= @participant.date_of_birth&.strftime("%B %d, %Y") %></dd>
+            </div>
+          <% end %>
           <div>
             <dt class="text-sm text-gray-500">Age at Event</dt>
             <dd class="text-gray-900">
@@ -33,10 +35,12 @@
             <dt class="text-sm text-gray-500">Pronouns</dt>
             <dd class="text-gray-900"><%= @participant.pronouns || "—" %></dd>
           </div>
-          <div>
-            <dt class="text-sm text-gray-500">Address</dt>
-            <dd class="text-gray-900"><%= [@participant.address_line_1, @participant.address_line_2, @participant.city, @participant.state, @participant.postal_code, @participant.country_of_residence].compact.reject(&:blank?).join(", ").presence || "—" %></dd>
-          </div>
+          <% if can_view_participant_pii? %>
+            <div>
+              <dt class="text-sm text-gray-500">Address</dt>
+              <dd class="text-gray-900"><%= [@participant.address_line_1, @participant.address_line_2, @participant.city, @participant.state, @participant.postal_code, @participant.country_of_residence].compact.reject(&:blank?).join(", ").presence || "—" %></dd>
+            </div>
+          <% end %>
         </dl>
       </section>
 
@@ -69,7 +73,10 @@
                     <div><span class="text-gray-500">Arrival:</span> <%= [ flight_local_time(last_leg.arrival_time, last_leg.arrival_airport), last_leg.arrival_airport ].compact.join(" - ") %></div>
                     <div><span class="text-gray-500">Flight:</span> <%= first_leg.flight_code %></div>
                   <% elsif @travel_inbound.car? %>
-                    <div><span class="text-gray-500">From:</span> <%= @travel_inbound.origin_address %></div>
+                    <div><span class="text-gray-500">From:</span>
+                      <% if can_view_participant_pii? %><%= @travel_inbound.origin_address %>
+                      <% else %><span class="italic text-gray-400" title="Pickup addresses are hidden for your role">Address hidden</span><% end %>
+                    </div>
                     <div><span class="text-gray-500">Arrival:</span> <%= @travel_inbound.expected_arrival_time&.strftime("%b %d, %Y %H:%M") %></div>
                   <% elsif @travel_inbound.train? %>
                     <div><span class="text-gray-500">From:</span> <%= @travel_inbound.train_departure_station %></div>
@@ -97,7 +104,10 @@
                     <div><span class="text-gray-500">Departure:</span> <%= flight_local_time(first_leg.departure_time, first_leg.departure_airport) %> - <%= first_leg.departure_airport %></div>
                     <div><span class="text-gray-500">Flight:</span> <%= first_leg.flight_code %></div>
                   <% elsif @travel_outbound.car? %>
-                    <div><span class="text-gray-500">To:</span> <%= @travel_outbound.origin_address %></div>
+                    <div><span class="text-gray-500">To:</span>
+                      <% if can_view_participant_pii? %><%= @travel_outbound.origin_address %>
+                      <% else %><span class="italic text-gray-400" title="Pickup addresses are hidden for your role">Address hidden</span><% end %>
+                    </div>
                     <div><span class="text-gray-500">Departure:</span> <%= @travel_outbound.departure_time&.strftime("%b %d, %Y %H:%M") %></div>
                   <% elsif @travel_outbound.train? %>
                     <div><span class="text-gray-500">To:</span> <%= @travel_outbound.train_arrival_station %></div>

@@ -38,37 +38,37 @@ class ParticipantEventPolicy < ApplicationPolicy
   def view_travel?
     return true if user.global_admin?
     return false unless record.event == Current.event
-    has_role?("event_admin", "ops", "safeguarding_lead")
+    has_role?("event_admin", "ops", "limited", "safeguarding_lead")
   end
 
   def update_travel?
     return true if user.global_admin?
     return false unless record.event == Current.event
-    has_role?("event_admin", "ops")
+    has_role?("event_admin", "ops", "limited")
   end
 
   def view_accommodation?
     return true if user.global_admin?
     return false unless record.event == Current.event
-    has_role?("event_admin", "ops", "safeguarding_lead")
+    has_role?("event_admin", "ops", "limited", "safeguarding_lead")
   end
 
   def update_accommodation?
     return true if user.global_admin?
     return false unless record.event == Current.event
-    has_role?("event_admin", "ops")
+    has_role?("event_admin", "ops", "limited")
   end
 
   def view_medical?
     return true if user.global_admin?
     return false unless record.event == Current.event
-    has_role?("event_admin", "ops", "safeguarding_lead")
+    has_role?("event_admin", "ops", "limited", "safeguarding_lead")
   end
 
   def update_medical?
     return true if user.global_admin?
     return false unless record.event == Current.event
-    has_role?("event_admin", "ops", "safeguarding_lead")
+    has_role?("event_admin", "ops", "limited", "safeguarding_lead")
   end
 
   def view_safeguarding?
@@ -86,7 +86,7 @@ class ParticipantEventPolicy < ApplicationPolicy
   def view_consents?
     return true if user.global_admin?
     return false unless record.event == Current.event
-    has_role?("event_admin", "safeguarding_lead", "ops")
+    has_role?("event_admin", "safeguarding_lead", "ops", "limited")
   end
 
   def reset_waiver?
@@ -96,7 +96,7 @@ class ParticipantEventPolicy < ApplicationPolicy
   def view_notes?
     return true if user.global_admin?
     return false unless record.event == Current.event
-    has_role?("event_admin", "ops", "safeguarding_lead")
+    has_role?("event_admin", "ops", "limited", "safeguarding_lead")
   end
 
   def resync_external?
@@ -119,7 +119,7 @@ class ParticipantEventPolicy < ApplicationPolicy
         scope.all
       elsif (event = Current.event)
         user_roles = user.event_role_assignments.where(event: event).pluck(:role)
-        if user_roles.intersect?(%w[event_admin ops safeguarding_lead])
+        if user_roles.intersect?(%w[event_admin ops limited safeguarding_lead])
           scope.where(event: event)
         elsif user.participant
           scope.where(event: event, participant: user.participant)
@@ -144,7 +144,7 @@ class ParticipantEventPolicy < ApplicationPolicy
     # Staff can only view within their current event context
     return false unless record.event == Current.event
 
-    has_role?("event_admin", "ops", "safeguarding_lead")
+    has_role?("event_admin", "ops", "limited", "safeguarding_lead")
   end
 
   def can_edit?
@@ -154,7 +154,7 @@ class ParticipantEventPolicy < ApplicationPolicy
     # Staff can only edit within their current event context
     return false unless record.event == Current.event
 
-    has_role?("event_admin", "ops")
+    has_role?("event_admin", "ops", "limited")
   end
 
   def owns_record?
