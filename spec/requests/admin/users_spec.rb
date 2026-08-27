@@ -69,6 +69,20 @@ RSpec.describe "Admin::Users", type: :request do
       expect(response.body).not_to include("Participants without an account")
     end
 
+    it "does not list participants whose account exists but was never linked" do
+      # Signing in creates the User; `participant.user_id` only gets filled in
+      # once they start onboarding, so the two can co-exist unlinked.
+      User.create!(email: "afnan@example.com", name: "Afnan")
+      participant = create(:participant, user: nil, email: "Afnan@example.com")
+      create(:participant_event, participant: participant)
+
+      sign_in global_admin
+      get admin_users_path(search: "afnan@example.com")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("Participants without an account")
+    end
+
     it "skips the participant fallthrough when filtering by role" do
       create(:participant, user: nil, email: "roleless@example.com")
 
