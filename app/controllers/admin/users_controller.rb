@@ -88,7 +88,15 @@ module Admin
     UNLINKED_PARTICIPANT_LIMIT = 25
 
     def unlinked_participants_matching(term)
+      # `user_id` only gets filled in when someone runs through onboarding, so a
+      # null there doesn't mean "no account" — the person may well have signed
+      # in and be listed in the table above. Match on the email instead, or the
+      # panel ends up telling admins nobody signed in right below the account
+      # that did.
       Participant.where(user_id: nil)
+        .where.not(
+          "EXISTS (SELECT 1 FROM users WHERE LOWER(users.email) = LOWER(participants.email))"
+        )
         .where(
           "email ILIKE :term OR preferred_name ILIKE :term " \
           "OR CONCAT(legal_first_name, ' ', legal_last_name) ILIKE :term",
