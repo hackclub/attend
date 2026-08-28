@@ -25,13 +25,13 @@ RSpec.describe "Admin::Users", type: :request do
       # and got a bare participant row, while every registration sits on the
       # imported row whose email an admin fixed after the fact.
       event = create(:event)
-      user = User.create!(email: "afnan@example.com", name: "Afnan")
+      user = User.create!(email: "rowan@example.com", name: "Rowan")
       create(:participant, user: user, email: user.email)
-      imported = create(:participant, user: nil, email: "Afnan@example.com")
+      imported = create(:participant, user: nil, email: "Rowan@example.com")
       create(:participant_event, participant: imported, event: event, status: "invited")
 
       sign_in global_admin
-      get admin_users_path(search: "afnan@example.com")
+      get admin_users_path(search: "rowan@example.com")
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Attendee at 1 event")
@@ -103,12 +103,12 @@ RSpec.describe "Admin::Users", type: :request do
     it "does not list participants whose account exists but was never linked" do
       # Signing in creates the User; `participant.user_id` only gets filled in
       # once they start onboarding, so the two can co-exist unlinked.
-      User.create!(email: "afnan@example.com", name: "Afnan")
-      participant = create(:participant, user: nil, email: "Afnan@example.com")
+      User.create!(email: "rowan@example.com", name: "Rowan")
+      participant = create(:participant, user: nil, email: "Rowan@example.com")
       create(:participant_event, participant: participant)
 
       sign_in global_admin
-      get admin_users_path(search: "afnan@example.com")
+      get admin_users_path(search: "rowan@example.com")
 
       expect(response).to have_http_status(:ok)
       expect(response.body).not_to include("Participants without an account")
@@ -137,9 +137,9 @@ RSpec.describe "Admin::Users", type: :request do
   describe "GET show" do
     it "lists registrations held by an unlinked participant record and offers the merge" do
       event = create(:event, name: "Sunbeam Dhaka")
-      user = User.create!(email: "afnan@example.com", name: "Afnan")
+      user = User.create!(email: "rowan@example.com", name: "Rowan")
       shell = create(:participant, user: user, email: user.email)
-      imported = create(:participant, user: nil, email: "Afnan@example.com")
+      imported = create(:participant, user: nil, email: "Rowan@example.com")
       participant_event = create(:participant_event, participant: imported, event: event, status: "invited")
 
       sign_in global_admin
