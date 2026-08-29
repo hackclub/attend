@@ -87,7 +87,7 @@
           </p>
         </div>
         <div class="flex items-center gap-2">
-          <%= form_with url: update_twilio_from_number_admin_settings_path, method: :post, class: "flex items-center gap-2" do |f| %>
+          <%= form_with url: update_twilio_from_number_admin_settings_path, method: :post, class: "flex items-center gap-2", data: { controller: "phone-input" } do |f| %>
             <%= f.telephone_field :twilio_from_number,
                   value: @twilio_from_number,
                   placeholder: "+1234567890",

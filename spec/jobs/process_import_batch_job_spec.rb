@@ -14,7 +14,7 @@ RSpec.describe ProcessImportBatchJob do
           email: "participant@example.com",
           legal_first_name: "Pat",
           legal_last_name: "Example",
-          phone: "+15551234567",
+          phone: "+14155550123",
           date_of_birth: "1/15/08",
           address_line_1: "123 Main St"
         }
@@ -38,7 +38,6 @@ RSpec.describe ProcessImportBatchJob do
           email: "solo@example.com",
           legal_first_name: "Pat",
           legal_last_name: "Example",
-          date_of_birth: "1/15/08",
           parent_first_name: "Pat",
           parent_last_name: "Example",
           parent_email: "SOLO@example.com"

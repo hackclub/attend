@@ -87,6 +87,18 @@ export default class extends Controller {
       if (input.name) formData.delete(input.name)
     })
 
+    // intl-tel-input keeps the country code out of the field itself, so the raw
+    // value here is bare national digits. Autosave writes straight to the record,
+    // so sending those means a non-US number is parsed against the default
+    // country, fails validation and is silently dropped — while the status line
+    // still says "Saved". Send the same E.164 number a real submit would.
+    form.querySelectorAll('input[type="tel"]').forEach((input) => {
+      if (!input.name || !input.iti) return
+
+      const e164 = input.iti.getNumber()
+      if (e164) formData.set(input.name, e164)
+    })
+
     this.inFlight = true
     this.updateStatus("Saving...")
 

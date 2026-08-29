@@ -313,10 +313,15 @@ class CsvImportService
     name = [ row[:emergency_first_name], row[:emergency_last_name] ].compact.join(" ")
     return if name.blank?
 
+    phone = normalize_phone(row[:emergency_phone])
+    if phone.nil? && row[:emergency_phone].present?
+      raise ArgumentError, "Emergency contact phone #{row[:emergency_phone].inspect} is not a valid phone number. Include the country code, for example +1 415 555 0132."
+    end
+
     EmergencyContact.create!(
       participant_event: participant_event,
       name: name,
-      phone: normalize_phone(row[:emergency_phone]),
+      phone: phone,
       email: row[:emergency_email].presence,
       relationship: row[:emergency_relationship].presence,
       priority: 1
@@ -461,16 +466,17 @@ class CsvImportService
     @errors << { email: participant.email, error: "Imported but failed to send invitation: #{e.message}" }
   end
 
+  # Returns E.164, or nil when the cell isn't a real number. It deliberately
+  # does NOT fall back to the raw string: that fallback is how values like
+  # "15555555" and "0555550100" got imported and then handed to Twilio.
   def normalize_phone(phone_str)
     return nil if phone_str.blank?
 
-    if phone_str.start_with?("+")
-      parsed = Phonelib.parse(phone_str)
-      parsed.valid? ? parsed.e164 : phone_str
-    else
-      parsed = Phonelib.parse(phone_str, nil)
-      parsed.valid? ? parsed.e164 : phone_str
+    normalized = PhoneNormalizer.normalize(phone_str)
+    if normalized.nil?
+      Rails.logger.warn("[CsvImportService] Dropping unparseable phone number #{phone_str.inspect}")
     end
+    normalized
   end
 
   def normalize_tshirt_size(size_str)

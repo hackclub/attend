@@ -531,8 +531,8 @@ class GuardianPortalController < ApplicationController
     when "details"
       details = step_params("details")
       if details[:phone].present? && @participant.phone.present?
-        guardian_phone_parsed = Phonelib.parse(details[:phone])
-        if guardian_phone_parsed.valid? && guardian_phone_parsed.e164 == @participant.phone
+        guardian_phone_e164 = PhoneNormalizer.normalize(details[:phone])
+        if guardian_phone_e164 && guardian_phone_e164 == @participant.phone
           @guardian.errors.add(:phone, "cannot be the same as the participant's phone number")
           return false
         end

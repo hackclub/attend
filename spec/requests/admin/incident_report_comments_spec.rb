@@ -11,7 +11,7 @@ RSpec.describe "Admin::IncidentReportComments", type: :request do
       event: event,
       reporter_name: "Reporter",
       reporter_email: "reporter-irc@example.com",
-      reporter_phone: "+15555550100",
+      reporter_phone: "+14155550150",
       reporter_role: "participant",
       incident_type: "other",
       priority: "standard",

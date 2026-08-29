@@ -1,5 +1,6 @@
 class Guardian < ApplicationRecord
   include EmailDeliverability
+  include NormalizesPhoneNumbers
 
   has_paper_trail
 
@@ -16,14 +17,14 @@ class Guardian < ApplicationRecord
   validates :legal_first_name, presence: true
   validates :legal_last_name, presence: true
   validates :email, presence: true, format: { with: URI::MailTo::EMAIL_REGEXP }
-  validates :phone, phone: { possible: true, allow_blank: true }
+  validates :phone, e164_phone: true, allow_blank: true
   # A guardian who shares the participant's address gets the participant's
   # invite links, waiver copies and portal codes -- and a minor can sign their
   # own consent by reading their "guardian's" mail. Only checked when the email
   # actually changes, so pre-existing rows can still be edited otherwise.
   validate :email_differs_from_participants, if: :will_save_change_to_email?
 
-  before_validation :normalize_phone
+  normalizes_phone_number :phone
 
   def full_name
     "#{legal_first_name} #{legal_last_name}"
@@ -38,17 +39,5 @@ class Guardian < ApplicationRecord
     return unless conflict
 
     errors.add(:email, "cannot be the same as the participant's email address")
-  end
-
-  def normalize_phone
-    return if phone.blank?
-
-    if phone.start_with?("+")
-      parsed = Phonelib.parse(phone)
-      self.phone = parsed.e164 if parsed.valid?
-    else
-      parsed = Phonelib.parse(phone, nil)
-      self.phone = parsed.e164 if parsed.valid?
-    end
   end
 end

@@ -441,8 +441,8 @@ RSpec.describe "Physical custom documents", type: :request do
     let(:participant_event) { create(:participant_event, event: event) }
     let(:gpe) do
       create(:guardian_participant_event, participant_event: participant_event).tap do |g|
-        g.guardian.update!(legal_first_name: "Pat", legal_last_name: "Guardian", phone: "+15555550100")
-        g.emergency_contacts.create!(name: "Pat Guardian", phone: "+15555550100", relationship: "Parent")
+        g.guardian.update!(legal_first_name: "Pat", legal_last_name: "Guardian", phone: "+14155550150")
+        g.emergency_contacts.create!(name: "Pat Guardian", phone: "+14155550150", relationship: "Parent")
       end
     end
     let(:token) { gpe.generate_invite_token! }
@@ -490,10 +490,10 @@ RSpec.describe "Physical custom documents", type: :request do
     let(:gpe) do
       create(:guardian_participant_event, participant_event: participant_event, relationship: "Parent").tap do |g|
         g.guardian.update!(
-          legal_first_name: "Pat", legal_last_name: "Guardian", phone: "+15555550100",
+          legal_first_name: "Pat", legal_last_name: "Guardian", phone: "+14155550150",
           address_line_1: "1 Main St", city: "Burlington", state: "VT", postal_code: "05401", country: "US"
         )
-        g.emergency_contacts.create!(name: "Pat Guardian", phone: "+15555550100", relationship: "Parent")
+        g.emergency_contacts.create!(name: "Pat Guardian", phone: "+14155550150", relationship: "Parent")
         g.update!(participant_info_reviewed_at: Time.current)
       end
     end
