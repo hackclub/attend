@@ -1,9 +1,13 @@
 class Dietary < ApplicationRecord
+  include ClearsNegativeResponses
+
   has_paper_trail
 
   self.implicit_order_column = "created_at"
 
   encrypts :intolerances, :life_threatening_allergies, :notes
+
+  clears_negative_responses :intolerances, :life_threatening_allergies, :notes
 
   belongs_to :participant_event
   has_one :participant, through: :participant_event
