@@ -181,22 +181,25 @@ RSpec.describe CsvImportService do
       end
 
       it "does not create associated records when data is missing" do
-        service.import(minimal_csv)
-
-        expect(Guardian.count).to eq(0)
-        expect(EmergencyContact.count).to eq(0)
-        expect(Dietary.count).to eq(0)
-        expect(Medical.count).to eq(0)
-        expect(Travel.count).to eq(0)
+        expect { service.import(minimal_csv) }
+          .to not_change(Guardian, :count)
+          .and not_change(EmergencyContact, :count)
+          .and not_change(Dietary, :count)
+          .and not_change(Medical, :count)
+          .and not_change(Travel, :count)
       end
     end
 
     context "with empty rows" do
       it "skips empty rows" do
-        result = service.import(empty_rows_csv)
+        result = nil
+
+        expect { result = service.import(empty_rows_csv) }
+          .to change(Participant, :count).by(2)
+          .and change(ParticipantEvent, :count).by(2)
 
         expect(result.imported_count).to eq(2)
-        expect(Participant.count).to eq(2)
+        expect(Participant.where(email: [ "valid@example.com", "another@example.com" ]).count).to eq(2)
       end
     end
 

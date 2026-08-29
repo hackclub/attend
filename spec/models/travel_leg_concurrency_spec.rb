@@ -17,7 +17,7 @@ RSpec.describe "TravelLeg pickup concurrency", type: :model do
       departure_airport: "JFK",
       arrival_airport: "LHR"
     )
-    record_ids.concat([ event.id, participant.id, participant_event.id, travel.id, leg.id ])
+    record_ids.concat([ first_user.id, second_user.id, event.id, participant.id, participant_event.id, travel.id, leg.id ])
 
     first_has_lock = Queue.new
     release_first = Queue.new
