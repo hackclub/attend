@@ -1,9 +1,15 @@
 class Accessibility < ApplicationRecord
+  include ClearsNegativeResponses
+
   has_paper_trail
 
   self.implicit_order_column = "created_at"
 
   encrypts :mobility_needs, :sensory_needs, :communication_needs, :religious_practices, :other_needs
+
+  clears_negative_responses :mobility_needs, :sensory_needs, :communication_needs,
+                            :religious_practices, :other_needs, :neurodivergent_notes,
+                            :distance_limitations, :unavailable_times
 
   belongs_to :participant_event
   has_one :participant, through: :participant_event

@@ -1,9 +1,14 @@
 class Medical < ApplicationRecord
+  include ClearsNegativeResponses
+
   has_paper_trail
 
   self.implicit_order_column = "created_at"
 
   encrypts :allergies, :medical_conditions, :medications, :emergency_action_plan, :additional_notes
+
+  clears_negative_responses :allergies, :medical_conditions, :medications,
+                            :emergency_action_plan, :additional_notes
 
   belongs_to :participant_event
   belongs_to :last_updated_by, class_name: "User", foreign_key: "last_updated_by_user_id", optional: true
