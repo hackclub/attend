@@ -1,4 +1,5 @@
 class IncidentReport < ApplicationRecord
+  include NormalizesPhoneNumbers
   has_paper_trail skip: [ :summary, :details ]
 
   self.implicit_order_column = "created_at"
@@ -43,7 +44,11 @@ class IncidentReport < ApplicationRecord
 
   enum :status, { open: "open", in_review: "in_review", resolved: "resolved" }
 
+  normalizes_phone_number :reporter_phone
+
   validates :reporter_name, :reporter_email, :reporter_phone, presence: true
+  # A safety report we can't call back on is close to useless.
+  validates :reporter_phone, e164_phone: true, allow_blank: true
   validates :reporter_email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
   validates :reporter_role, presence: true, inclusion: { in: ROLES.keys }
   validates :incident_type, presence: true, inclusion: { in: INCIDENT_TYPES.keys }

@@ -36,9 +36,9 @@ RSpec.describe "Admin::Settings", type: :request do
       sign_in global_admin
 
       post update_support_sms_numbers_admin_settings_path,
-        params: { support_sms_notification_numbers: "+14155551234\n+44 7700 900123, +14155551234" }
+        params: { support_sms_notification_numbers: "+14155551234\n+44 7911 123456, +14155551234" }
 
-      expect(Setting.support_sms_notification_number_list).to eq([ "+14155551234", "+447700900123" ])
+      expect(Setting.support_sms_notification_number_list).to eq([ "+14155551234", "+447911123456" ])
     end
 
     it "rejects invalid numbers without saving" do

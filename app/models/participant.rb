@@ -3,6 +3,7 @@ class Participant < ApplicationRecord
   include DecodableImageAttachment
   include TravelCalendarCacheInvalidatable
   include EmailDeliverability
+  include NormalizesPhoneNumbers
 
   has_paper_trail
 
@@ -44,7 +45,7 @@ class Participant < ApplicationRecord
   validates :email, presence: true, format: { with: URI::MailTo::EMAIL_REGEXP }
   validates :date_of_birth, presence: true, on: :onboarding
   validates :headshot, presence: true, on: :onboarding
-  validates :phone, phone: { possible: true, allow_blank: true }
+  validates :phone, e164_phone: true, allow_blank: true
   validate :headshot_content_type
   validates :public_profile_slug, presence: true, if: :public_profile_enabled?
   validates :public_profile_slug,
@@ -93,7 +94,7 @@ class Participant < ApplicationRecord
     value.presence
   }
 
-  before_validation :normalize_phone
+  normalizes_phone_number :phone
   before_validation :normalize_public_profile_slug
   before_validation :generate_public_profile_slug, if: -> { public_profile_enabled? && public_profile_slug.blank? }
   after_update_commit :touch_participant_events
@@ -249,18 +250,6 @@ class Participant < ApplicationRecord
     end
 
     self.public_profile_slug = candidate
-  end
-
-  def normalize_phone
-    return if phone.blank?
-
-    if phone.start_with?("+")
-      parsed = Phonelib.parse(phone)
-      self.phone = parsed.e164 if parsed.valid?
-    else
-      parsed = Phonelib.parse(phone, nil)
-      self.phone = parsed.e164 if parsed.valid?
-    end
   end
 
   def headshot_content_type

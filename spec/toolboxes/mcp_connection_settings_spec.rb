@@ -87,7 +87,7 @@ RSpec.describe "MCP connection settings", type: :toolbox do
 
     it "refuses a record that isn't linked to any event" do
       settings.narrow_events!([ assemble.id ])
-      ticket = Ticket.create!(channel: "sms", phone_number: "+15550100", status: "open")
+      ticket = Ticket.create!(channel: "sms", phone_number: "+14155550101", status: "open")
 
       call_tool("tickets_show", params: { "ticket_id" => ticket.id }, as: ticket_auth)
 
@@ -109,7 +109,7 @@ RSpec.describe "MCP connection settings", type: :toolbox do
   describe "anonymization" do
     let(:participant) do
       create(:participant, legal_first_name: "Kim", legal_last_name: "Doe",
-                           email: "kim@example.com", phone: "+1 555 0100")
+                           email: "kim@example.com", phone: "+1 415 555 0100")
     end
 
     before { create(:participant_event, participant: participant, event: assemble) }

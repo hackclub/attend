@@ -165,10 +165,10 @@ class GuardianPortalCenterController < ApplicationController
 
       [ "email", input.downcase ]
     else
-      parsed = Phonelib.parse(input)
-      return nil unless parsed.valid?
+      e164 = PhoneNormalizer.normalize(input)
+      return nil unless e164
 
-      [ "phone", parsed.e164 ]
+      [ "phone", e164 ]
     end
   end
 

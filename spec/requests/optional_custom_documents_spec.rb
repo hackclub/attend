@@ -120,8 +120,8 @@ RSpec.describe "Optional custom documents", type: :request do
     end
 
     it "does not create a submission for an un-added document when the portal is completed" do
-      gpe.guardian.update!(legal_first_name: "Pat", legal_last_name: "Guardian", phone: "+15555550100")
-      gpe.emergency_contacts.create!(name: "Pat Guardian", phone: "+15555550100", relationship: "Parent")
+      gpe.guardian.update!(legal_first_name: "Pat", legal_last_name: "Guardian", phone: "+14155550150")
+      gpe.emergency_contacts.create!(name: "Pat Guardian", phone: "+14155550150", relationship: "Parent")
       create(:consent, :signed, participant_event: participant_event, guardian_signed_at: Time.current)
 
       expect {

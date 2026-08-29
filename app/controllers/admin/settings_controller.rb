@@ -86,8 +86,10 @@ module Admin
       end
     end
 
+    # `default_country: nil` keeps this strict E.164 — an outbound sender
+    # number typed without a country code must be rejected, not guessed at.
     def valid_phone_number?(number)
-      number.present? && number.match?(/\A\+[1-9]\d{6,14}\z/)
+      PhoneNormalizer.valid?(number, default_country: nil)
     end
   end
 end

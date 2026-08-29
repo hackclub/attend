@@ -15,8 +15,8 @@ module Admin
 
       participant = @participant_event.participant
       if guardian_params[:phone].present? && participant.phone.present?
-        guardian_phone_parsed = Phonelib.parse(guardian_params[:phone])
-        if guardian_phone_parsed.valid? && guardian_phone_parsed.e164 == participant.phone
+        guardian_phone_e164 = PhoneNormalizer.normalize(guardian_params[:phone])
+        if guardian_phone_e164 && guardian_phone_e164 == participant.phone
           @guardian.errors.add(:phone, "cannot be the same as the participant's phone number")
           render :edit, status: :unprocessable_entity
           return

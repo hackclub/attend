@@ -1,6 +1,8 @@
 class Ticket < ApplicationRecord
   class MergedTicketError < StandardError; end
 
+  include NormalizesPhoneNumbers
+
   include ActionView::RecordIdentifier
 
   has_paper_trail
@@ -32,6 +34,11 @@ class Ticket < ApplicationRecord
   }
 
   validates :phone_number, presence: true
+
+  # Participant#phone and Guardian#phone are deterministically encrypted, so
+  # subject matching is an exact-string comparison — both sides have to be
+  # E.164 or an inbound message never links to the person who sent it.
+  normalizes_phone_number :phone_number
   validates :channel, presence: true
   validates :status, presence: true
 

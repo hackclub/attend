@@ -545,8 +545,8 @@ class OnboardingController < ApplicationController
 
     # Skip autosave if guardian phone matches participant phone
     if guardian_attrs[:phone].present? && @participant_event.participant.phone.present?
-      guardian_phone_parsed = Phonelib.parse(guardian_attrs[:phone])
-      return if guardian_phone_parsed.valid? && guardian_phone_parsed.e164 == @participant_event.participant.phone
+      guardian_phone_e164 = PhoneNormalizer.normalize(guardian_attrs[:phone])
+      return if guardian_phone_e164 && guardian_phone_e164 == @participant_event.participant.phone
     end
 
     relationship = params[:guardian_relationship]
@@ -763,8 +763,8 @@ class OnboardingController < ApplicationController
 
     # Ensure guardian phone is not the same as the participant's phone
     if guardian_attrs[:phone].present? && @participant_event.participant.phone.present?
-      guardian_phone_parsed = Phonelib.parse(guardian_attrs[:phone])
-      if guardian_phone_parsed.valid? && guardian_phone_parsed.e164 == @participant_event.participant.phone
+      guardian_phone_e164 = PhoneNormalizer.normalize(guardian_attrs[:phone])
+      if guardian_phone_e164 && guardian_phone_e164 == @participant_event.participant.phone
         flash.now[:alert] = "Guardian phone number cannot be the same as the participant's phone number."
         return false
       end

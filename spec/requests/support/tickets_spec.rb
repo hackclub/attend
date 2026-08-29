@@ -24,14 +24,14 @@ RSpec.describe "Support::Tickets", type: :request do
     end
   end
 
-  def make_ticket(event: nil, phone: "+15550001111")
+  def make_ticket(event: nil, phone: "+14155550111")
     Ticket.create!(channel: "whatsapp", phone_number: phone, status: "open", event: event)
   end
 
-  let!(:pending_ticket) { make_ticket(phone: "+15550001111") }
-  let!(:live_ticket) { make_ticket(event: live_event, phone: "+15550002222") }
-  let!(:other_ticket) { make_ticket(event: other_event, phone: "+15550003333") }
-  let!(:past_ticket) { make_ticket(event: past_event, phone: "+15550004444") }
+  let!(:pending_ticket) { make_ticket(phone: "+14155550111") }
+  let!(:live_ticket) { make_ticket(event: live_event, phone: "+14155550122") }
+  let!(:other_ticket) { make_ticket(event: other_event, phone: "+14155550133") }
+  let!(:past_ticket) { make_ticket(event: past_event, phone: "+14155550144") }
 
   describe "GET index" do
     it "shows every ticket to a global admin" do
@@ -118,7 +118,7 @@ RSpec.describe "Support::Tickets", type: :request do
     end
 
     it "does not mention the window on SMS tickets" do
-      sms_ticket = Ticket.create!(channel: "sms", phone_number: "+15550009999", status: "open", event: live_event, last_inbound_at: 5.days.ago)
+      sms_ticket = Ticket.create!(channel: "sms", phone_number: "+14155550199", status: "open", event: live_event, last_inbound_at: 5.days.ago)
       sign_in global_admin
       get support_ticket_path(sms_ticket)
 
@@ -129,10 +129,10 @@ RSpec.describe "Support::Tickets", type: :request do
 
   describe "GET index filters" do
     let!(:participant) do
-      Participant.create!(legal_first_name: "Ada", legal_last_name: "Lovelace", email: "ada@example.com", phone: "+15550009999")
+      Participant.create!(legal_first_name: "Ada", legal_last_name: "Lovelace", email: "ada@example.com", phone: "+14155550199")
     end
     let!(:guardian) do
-      Guardian.create!(legal_first_name: "Grace", legal_last_name: "Hopper", email: "grace@example.com", phone: "+15550008888")
+      Guardian.create!(legal_first_name: "Grace", legal_last_name: "Hopper", email: "grace@example.com", phone: "+14155550188")
     end
 
     before do
@@ -158,7 +158,7 @@ RSpec.describe "Support::Tickets", type: :request do
 
     it "filters by phone number ignoring formatting" do
       sign_in global_admin
-      get support_tickets_path, params: { phone: "(555) 000-2222" }
+      get support_tickets_path, params: { phone: "(415) 555-0122" }
 
       expect(response.body).to include(live_ticket.phone_number)
       expect(response.body).not_to include(pending_ticket.phone_number)
