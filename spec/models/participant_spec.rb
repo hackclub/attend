@@ -215,4 +215,25 @@ RSpec.describe Participant, type: :model do
       expect(participant.public_profile_participant_events).to be_empty
     end
   end
+
+  describe "email vs a guardian's email" do
+    it "rejects an email change onto a linked guardian's address" do
+      gpe = create(:guardian_participant_event)
+      participant = gpe.participant_event.participant
+
+      participant.email = gpe.guardian.email.upcase
+
+      expect(participant).not_to be_valid
+      expect(participant.errors[:email])
+        .to include("cannot be the same as a parent or guardian's email address")
+    end
+
+    it "allows unrelated edits on a participant whose email already collides" do
+      gpe = create(:guardian_participant_event)
+      participant = gpe.participant_event.participant
+      participant.update_column(:email, gpe.guardian.email)
+
+      expect(participant.reload.update(preferred_name: "Sam")).to be(true)
+    end
+  end
 end

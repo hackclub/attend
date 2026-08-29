@@ -162,7 +162,16 @@ module Admin
     def link_guardian
       authorize @participant_event, :update?
 
-      guardian = Guardian.find_or_initialize_by(email: params[:guardian_email].strip.downcase)
+      guardian_email = params[:guardian_email].to_s.strip.downcase
+      participant_email = @participant_event.participant.email.to_s.strip.downcase
+
+      if guardian_email.present? && guardian_email == participant_email
+        redirect_to admin_event_participant_path(current_event, @participant_event),
+          alert: "Guardian email cannot be the same as the participant's email address."
+        return
+      end
+
+      guardian = Guardian.find_or_initialize_by(email: guardian_email)
       guardian.assign_attributes(
         legal_first_name: params[:guardian_first_name],
         legal_last_name: params[:guardian_last_name],
@@ -178,7 +187,10 @@ module Admin
         if gpe.persisted?
           redirect_to admin_event_participant_path(current_event, @participant_event), notice: "Guardian linked successfully."
         else
-          redirect_to admin_event_participant_path(current_event, @participant_event), alert: "Guardian already linked to this participant."
+          # Anything the link itself rejected (a duplicate, or a guardian whose
+          # address collides with the participant's) is worth saying out loud.
+          reason = gpe.errors.full_messages.presence&.join(", ") || "Guardian already linked to this participant."
+          redirect_to admin_event_participant_path(current_event, @participant_event), alert: reason
         end
       else
         redirect_to admin_event_participant_path(current_event, @participant_event), alert: "Could not save guardian: #{guardian.errors.full_messages.join(', ')}"

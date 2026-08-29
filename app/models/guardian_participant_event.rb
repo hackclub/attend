@@ -18,6 +18,11 @@ class GuardianParticipantEvent < ApplicationRecord
 
   validates :guardian_id, presence: true
   validates :participant_event_id, presence: true, uniqueness: { scope: :guardian_id }
+  # Guardian#email_differs_from_participants can't see this pairing until the
+  # link exists, so a freshly created guardian is checked here instead. Create
+  # only: existing links are updated constantly (invite tokens, status) and
+  # must not be held hostage by historical data.
+  validate :guardian_email_differs_from_participant, on: :create
 
   before_create :set_invited_via_email
   after_update_commit :complete_participant_event_if_eligible
@@ -111,6 +116,14 @@ class GuardianParticipantEvent < ApplicationRecord
   end
 
   private
+
+  def guardian_email_differs_from_participant
+    guardian_email = guardian&.email.to_s.strip.downcase
+    participant_email = participant_event&.participant&.email.to_s.strip.downcase
+    return if guardian_email.blank? || guardian_email != participant_email
+
+    errors.add(:base, "Guardian email cannot be the same as the participant's email address")
+  end
 
   def set_invited_via_email
     self.invited_via_email = guardian.email

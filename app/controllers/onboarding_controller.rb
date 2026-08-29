@@ -456,7 +456,12 @@ class OnboardingController < ApplicationController
         flash.now[:alert] = "Please select a t-shirt size"
         return false
       end
-      @participant.save
+      # The profile form has no error summary, so say what was actually wrong
+      # (e.g. an email that belongs to this participant's guardian).
+      return true if @participant.save
+
+      flash.now[:alert] = @participant.errors.full_messages.to_sentence
+      false
     when "travel"
       save_travel_data
     when "accommodation"
@@ -548,6 +553,10 @@ class OnboardingController < ApplicationController
       guardian_phone_parsed = Phonelib.parse(guardian_attrs[:phone])
       return if guardian_phone_parsed.valid? && guardian_phone_parsed.e164 == @participant_event.participant.phone
     end
+
+    # Same for the email: half-typed addresses pass through here on every
+    # keystroke, so this stays silent and lets the submit path do the telling.
+    return if guardian_email_matches_participant?(guardian_attrs[:email])
 
     relationship = params[:guardian_relationship]
     relationship = params[:guardian_relationship_other] if relationship == "Other"
@@ -770,6 +779,12 @@ class OnboardingController < ApplicationController
       end
     end
 
+    # Ensure guardian email is not the same as the participant's email
+    if guardian_email_matches_participant?(guardian_attrs[:email])
+      flash.now[:alert] = "Guardian email address cannot be the same as the participant's email address."
+      return false
+    end
+
     existing_gpe = @participant_event.guardian_participant_events.first
 
     if existing_gpe
@@ -794,6 +809,15 @@ class OnboardingController < ApplicationController
         false
       end
     end
+  end
+
+  def guardian_email_matches_participant?(email)
+    return false if email.blank?
+
+    participant_email = @participant_event.participant.email
+    return false if participant_email.blank?
+
+    email.strip.downcase == participant_email.strip.downcase
   end
 
   def profile_params

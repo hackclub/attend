@@ -65,7 +65,11 @@ module Admin
           row_number: index + 2,
           email: email,
           name: [ row[:legal_first_name], row[:legal_last_name] ].compact.join(" "),
-          parent_email: row[:parent_email]
+          parent_email: row[:parent_email],
+          # The import drops a parent column that repeats the participant's own
+          # address; say so here rather than after the fact.
+          parent_email_conflict: row[:parent_email].present? &&
+            row[:parent_email].to_s.strip.downcase == email
         }
 
         if existing_pe
