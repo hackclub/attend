@@ -83,8 +83,7 @@ module Admin
     def phone_query_e164(query)
       return unless query.delete(" ().-").match?(/\A\+?\d{7,15}\z/)
 
-      parsed = Phonelib.parse(query)
-      parsed.e164 if parsed.valid?
+      PhoneNormalizer.normalize(query)
     end
 
     def slack_id_query(query)

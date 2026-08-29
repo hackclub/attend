@@ -1,4 +1,5 @@
 class EmergencyContact < ApplicationRecord
+  include NormalizesPhoneNumbers
   has_paper_trail
 
   self.implicit_order_column = "created_at"
@@ -15,10 +16,10 @@ class EmergencyContact < ApplicationRecord
   has_one :guardian, through: :guardian_participant_event
 
   validates :name, presence: true
-  validates :phone, presence: true, phone: { possible: true }
+  validates :phone, presence: true, e164_phone: true
   validate :linked_to_guardian_or_participant
 
-  before_validation :normalize_phone
+  normalizes_phone_number :phone
 
   scope :by_priority, -> { order(priority: :asc) }
 
@@ -27,13 +28,6 @@ class EmergencyContact < ApplicationRecord
   end
 
   private
-
-  def normalize_phone
-    return if phone.blank?
-
-    parsed = Phonelib.parse(phone)
-    self.phone = parsed.e164 if parsed.valid?
-  end
 
   def linked_to_guardian_or_participant
     if guardian_participant_event_id.blank? && participant_event_id.blank?

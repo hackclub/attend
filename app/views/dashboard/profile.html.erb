@@ -330,7 +330,7 @@
             How you appear to other organizers — on comments, audit logs, and other admin activity — and how Attend reaches you for incidents.
           </p>
           <div class="mt-4 overflow-hidden rounded-2xl border border-(--border-card) bg-(--bg-elev)">
-            <%= form_with model: current_user, url: dashboard_staff_profile_path, method: :patch, class: "px-6 py-5 space-y-5", data: { controller: "avatar-preview" } do |f| %>
+            <%= form_with model: current_user, url: dashboard_staff_profile_path, method: :patch, class: "px-6 py-5 space-y-5", data: { controller: "avatar-preview phone-input" } do |f| %>
               <div class="flex items-center gap-5">
                 <div class="relative shrink-0" data-avatar-preview-target="container">
                   <% if current_user.avatar_displayable? %>

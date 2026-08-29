@@ -1,4 +1,5 @@
 class User < ApplicationRecord
+  include NormalizesPhoneNumbers
   include DecodableImageAttachment
 
   self.implicit_order_column = "created_at"
@@ -24,6 +25,11 @@ class User < ApplicationRecord
   # the same treatment. Neither is queried by value, hence non-deterministic.
   encrypts :oidc_claims
   encrypts :phone_number
+
+  normalizes_phone_number :phone_number
+  # Guarded on `_changed?`: sign-in refreshes claims through `user.update`,
+  # and a pre-existing bad number must never block that.
+  validates :phone_number, e164_phone: true, allow_blank: true, if: :phone_number_changed?
 
   has_one_attached :avatar
 
@@ -251,7 +257,9 @@ class User < ApplicationRecord
   def backfill_contact_from_claims!
     updates = {}
     updates[:slack_user_id] = oidc_claims["slack_id"] if slack_user_id.blank? && oidc_claims["slack_id"].present?
-    updates[:phone_number] = oidc_claims["phone_number"] if phone_number.blank? && oidc_claims["phone_number"].present?
+    if phone_number.blank? && (claimed_phone = PhoneNormalizer.normalize(oidc_claims["phone_number"]))
+      updates[:phone_number] = claimed_phone
+    end
     return if updates.empty?
 
     # `update_columns` would bypass the encrypting type and write the phone

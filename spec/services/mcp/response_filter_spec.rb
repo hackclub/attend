@@ -18,7 +18,7 @@ RSpec.describe Mcp::ResponseFilter do
     end
 
     it "redacts a value with no letters to initial rather than echoing it" do
-      expect(described_class.initials("+1 555 0100")).to eq("[redacted]")
+      expect(described_class.initials("+1 415 555 0100")).to eq("[redacted]")
     end
   end
 
@@ -40,7 +40,7 @@ RSpec.describe Mcp::ResponseFilter do
     it "redacts contact and location detail whatever its type" do
       result = described_class.call({
         email: "leo@hackclub.com",
-        phone: "+1 555 0100",
+        phone: "+1 415 555 0100",
         date_of_birth: Date.new(2008, 3, 1),
         city: "Burlington",
         slack_user_id: "U123",

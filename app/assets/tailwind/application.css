@@ -719,3 +719,12 @@
     }
   }
 }
+
+/* intl-tel-input wraps the field in a `.iti` div that is `display: inline-block`,
+ * so a `w-full` phone input collapses to the wrapper's shrink-to-fit width and
+ * ends up narrower than the fields beside it. The wrapper has to carry the
+ * width instead. Applies to every form using the `phone-input` controller. */
+.iti {
+  display: block;
+  width: 100%;
+}

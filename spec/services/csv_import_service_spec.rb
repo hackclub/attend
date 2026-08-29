@@ -22,9 +22,9 @@ RSpec.describe CsvImportService do
       "Final Airline Code", "Final Flight Number", "Flight Departure Date"
     ]
     values = [
-      "test@example.com", "John", "Doe", "Johnny", "U12345", "He/Him", "male", "+15551234567", "1/15/08",
+      "test@example.com", "John", "Doe", "Johnny", "U12345", "He/Him", "male", "+14155550123", "1/15/08",
       "123 Main St", "", "San Francisco", "California", "94102", "United States", "M", "Jane", "Doe",
-      "jane@example.com", "+15559876543", "Bob", "Smith", "bob@example.com", "+15555555555", "Uncle",
+      "jane@example.com", "+14155550176", "Bob", "Smith", "bob@example.com", "+14155550155", "Uncle",
       "Allergic to peanuts", "Takes daily medication", "Flight", "", "", "", "2", "SFO", "ORD", "UA", "123",
       "12/19/25", "ORD", "JFK", "UA", "456", "12/19/25", "", "", "", "", "", "JFK", "UA", "789", "12/21/25"
     ]
