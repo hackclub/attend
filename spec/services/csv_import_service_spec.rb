@@ -312,4 +312,27 @@ RSpec.describe CsvImportService do
       expect(Participant.find_by(email: "xxl@example.com").tshirt_size).to eq("XXL")
     end
   end
+
+  describe "a parent email that repeats the participant's" do
+    let(:self_parent_csv) do
+      <<~CSV
+        Email,First Name,Last Name,Parent First Name,Parent Last Name,Parent Email
+        solo@example.com,Pat,Example,Pat,Example,SOLO@example.com
+      CSV
+    end
+
+    it "imports the participant but creates no guardian" do
+      expect { service.import(self_parent_csv) }.to change(Participant, :count).by(1)
+
+      expect(Guardian.count).to eq(0)
+      expect(GuardianParticipantEvent.count).to eq(0)
+    end
+
+    it "reports the row so the real parent address can be chased" do
+      result = service.import(self_parent_csv)
+
+      expect(result.errors.map { |e| e[:error] })
+        .to include(a_string_matching(/Parent email is the same as the participant's email/))
+    end
+  end
 end

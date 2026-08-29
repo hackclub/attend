@@ -157,7 +157,7 @@ class CsvImportService
       create_accommodation(participant_event, row)
       create_dietary(participant_event, row)
       create_medical(participant_event, row)
-      create_guardian_and_emergency_contact(participant_event, row)
+      create_guardian_and_emergency_contact(participant_event, row, row_number)
       create_travel(participant_event, row)
       apply_groups(participant_event, row)
 
@@ -255,15 +255,30 @@ class CsvImportService
     )
   end
 
-  def create_guardian_and_emergency_contact(participant_event, row)
+  def create_guardian_and_emergency_contact(participant_event, row, row_number)
     if row[:parent_email].present?
-      guardian = find_or_create_guardian(row)
-      create_guardian_participant_event(participant_event, guardian)
+      # Mirrors ProcessImportBatchJob: a parent column holding the participant's
+      # own address means there is no second person to invite, so import the
+      # participant and report the row instead of linking them to themselves.
+      if parent_email_matches_participant?(row)
+        @errors << {
+          row: row_number,
+          email: row[:email],
+          error: "Parent email is the same as the participant's email - guardian not created"
+        }
+      else
+        guardian = find_or_create_guardian(row)
+        create_guardian_participant_event(participant_event, guardian)
+      end
     end
 
     if row[:emergency_first_name].present? && row[:emergency_phone].present?
       create_emergency_contact(participant_event, row)
     end
+  end
+
+  def parent_email_matches_participant?(row)
+    row[:parent_email].to_s.strip.downcase == row[:email].to_s.strip.downcase
   end
 
   def find_or_create_guardian(row)

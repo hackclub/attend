@@ -59,6 +59,10 @@ class GuardianPortalController < ApplicationController
         redirect_to guardian_portal_path(token: @token), notice: "Progress saved."
       end
     else
+      # The step partials render bare forms, so a rejected save (a guardian
+      # email or phone that matches the participant's, say) would otherwise
+      # bounce back looking identical to a successful one.
+      flash.now[:alert] = step_error_message
       load_wizard_position
       load_step_data
       render :step, status: :unprocessable_entity
@@ -511,6 +515,13 @@ class GuardianPortalController < ApplicationController
       @consents = @participant_event.consents.where(consent_type: consent_types)
       @required_consent_types = consent_types
     end
+  end
+
+  def step_error_message
+    messages = [ @guardian, @participant ].compact.flat_map { |record| record.errors.full_messages }
+    return "We couldn't save your changes. Please check the highlighted fields and try again." if messages.empty?
+
+    messages.uniq.to_sentence
   end
 
   def save_step_data

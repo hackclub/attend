@@ -119,4 +119,24 @@ RSpec.describe GuardianParticipantEvent do
       expect(described_class.find_by_invite_token!(token)).to eq(gpe)
     end
   end
+
+  describe "guardian email vs participant email" do
+    it "refuses to link a guardian who shares the participant's email" do
+      participant_event = create(:participant_event)
+      guardian = create(:guardian, email: participant_event.participant.email.upcase)
+
+      gpe = described_class.new(guardian: guardian, participant_event: participant_event)
+
+      expect(gpe).not_to be_valid
+      expect(gpe.errors[:base])
+        .to include("Guardian email cannot be the same as the participant's email address")
+    end
+
+    it "still allows updates to a link that already collides" do
+      gpe = create(:guardian_participant_event)
+      gpe.guardian.update_column(:email, gpe.participant_event.participant.email)
+
+      expect(gpe.reload.update(status: :in_progress)).to be(true)
+    end
+  end
 end

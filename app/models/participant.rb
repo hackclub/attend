@@ -19,6 +19,8 @@ class Participant < ApplicationRecord
   belongs_to :user, optional: true
   has_many :participant_events, dependent: :destroy
   has_many :events, through: :participant_events
+  has_many :guardian_participant_events, through: :participant_events
+  has_many :guardians, through: :guardian_participant_events
   has_many :sibling_memberships, dependent: :destroy
   has_many :sibling_groups, through: :sibling_memberships
 
@@ -47,6 +49,10 @@ class Participant < ApplicationRecord
   validates :headshot, presence: true, on: :onboarding
   validates :phone, e164_phone: true, allow_blank: true
   validate :headshot_content_type
+  # The mirror of Guardian#email_differs_from_participants: the guardian portal
+  # and the admin edit form can both rewrite a participant's email, and landing
+  # it on their own guardian's address collapses the two people into one inbox.
+  validate :email_differs_from_guardians, if: :will_save_change_to_email?
   validates :public_profile_slug, presence: true, if: :public_profile_enabled?
   validates :public_profile_slug,
     uniqueness: true,
@@ -225,6 +231,15 @@ class Participant < ApplicationRecord
 
   def touch_participant_events
     participant_events.touch_all
+  end
+
+  def email_differs_from_guardians
+    return if email.blank? || new_record?
+
+    conflict = guardians.where("LOWER(guardians.email) = ?", email.strip.downcase).exists?
+    return unless conflict
+
+    errors.add(:email, "cannot be the same as a parent or guardian's email address")
   end
 
   def normalize_public_profile_slug

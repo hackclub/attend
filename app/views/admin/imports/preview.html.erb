@@ -43,7 +43,12 @@
                 <td class="px-4 py-3 text-sm text-gray-500"><%= row[:row_number] %></td>
                 <td class="px-4 py-3 text-sm font-medium text-gray-900"><%= row[:name].presence || "—" %></td>
                 <td class="px-4 py-3 text-sm text-gray-600"><%= row[:email] %></td>
-                <td class="px-4 py-3 text-sm text-gray-600"><%= row[:parent_email].presence || "—" %></td>
+                <td class="px-4 py-3 text-sm <%= row[:parent_email_conflict] ? "text-yellow-700" : "text-gray-600" %>">
+                  <%= row[:parent_email].presence || "—" %>
+                  <% if row[:parent_email_conflict] %>
+                    <span class="block text-xs">Same as participant email — no guardian will be created</span>
+                  <% end %>
+                </td>
               </tr>
             <% end %>
             <% if @valid_rows.count > 100 %>

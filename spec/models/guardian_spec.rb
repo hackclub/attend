@@ -30,4 +30,33 @@ RSpec.describe Guardian do
     expect(guardian.address_line_1).to eq("123 Main St")
     expect(guardian.city).to eq("San Francisco")
   end
+
+  describe "email vs the participant's email" do
+    it "rejects an email change onto a linked participant's address" do
+      gpe = create(:guardian_participant_event)
+      participant = gpe.participant_event.participant
+
+      gpe.guardian.email = participant.email.upcase
+
+      expect(gpe.guardian).not_to be_valid
+      expect(gpe.guardian.errors[:email])
+        .to include("cannot be the same as the participant's email address")
+    end
+
+    it "allows unrelated edits on a guardian whose email already collides" do
+      gpe = create(:guardian_participant_event)
+      participant = gpe.participant_event.participant
+      guardian = gpe.guardian
+      guardian.update_column(:email, participant.email)
+
+      expect(guardian.reload.update(legal_first_name: "Robin")).to be(true)
+    end
+
+    it "leaves guardians of other participants alone" do
+      guardian = create(:guardian)
+      create(:participant, email: "someone-else@example.com")
+
+      expect(guardian.update(email: "someone-else@example.com")).to be(true)
+    end
+  end
 end
