@@ -78,17 +78,24 @@ RSpec.describe ScanRecorder do
   end
 
   context "with concurrent attempts" do
+    # The racing threads each need their own connection, so the fixtures have to
+    # be visible outside the example's transaction: `before(:context)` commits
+    # them. Nothing rolls that back, so `after(:context)` has to delete every
+    # row (and every PaperTrail version) the setup created, or the leftovers
+    # survive into later runs and break other specs' table-wide counts.
     before(:context) do
       @concurrent_event = FactoryBot.create(:event, slug: "concurrent-scans-#{SecureRandom.hex(8)}")
       @concurrent_participant_event = FactoryBot.create(:participant_event, event: @concurrent_event)
+      @concurrent_participant = @concurrent_participant_event.participant
       @concurrent_context = @concurrent_participant_event.event.scan_contexts.find_by!(checks_in: true)
       @concurrent_user = FactoryBot.create(:user)
     end
 
     after(:context) do
-      @concurrent_participant_event.destroy!
-      @concurrent_event.destroy!
-      @concurrent_user.destroy!
+      records = [ @concurrent_participant_event, @concurrent_event, @concurrent_participant, @concurrent_user ]
+      record_ids = records.compact.map(&:id)
+      records.each(&:destroy!)
+      PaperTrail::Version.where(item_id: record_ids).delete_all
     end
 
     it "classifies exactly one attempt as the first scan" do
