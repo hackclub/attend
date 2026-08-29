@@ -25,6 +25,23 @@
     </p>
   </div>
 
+  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
+    <div class="flex items-start gap-3 grow">
+      <svg class="w-5 h-5 shrink-0 text-amber-600 mt-0.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
+      </svg>
+      <p class="text-sm text-amber-900">
+        <strong class="font-semibold">This form is not for support tickets.</strong>
+        If you need help with registration, travel, waivers, or anything else about your event,
+        please email our support team instead — reports filed here go to our incident response team.
+      </p>
+    </div>
+    <a href="mailto:attend@hackclub.com?subject=<%= ERB::Util.url_encode("Support request") %>"
+       class="shrink-0 self-start sm:self-auto inline-flex items-center text-sm bg-white border border-amber-300 hover:border-amber-400 text-amber-900 font-medium px-3 py-1.5 rounded-lg transition-colors">
+      Get Support →
+    </a>
+  </div>
+
   <% unless user_signed_in? %>
     <div class="flex items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-6">
       <p class="text-sm text-gray-600">
