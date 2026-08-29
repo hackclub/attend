@@ -49,7 +49,15 @@ export default class extends Controller {
     const draft = {}
     this.persistTargets.forEach((el) => {
       if (!el.name) return
-      draft[el.name] = el.type === "checkbox" ? el.checked : el.value
+      if (el.type === "checkbox") {
+        draft[el.name] = el.checked
+      } else if (el.type === "tel" && el.iti) {
+        // Save the full +country number, not the national digits on screen, so
+        // the chosen country survives the login round-trip.
+        draft[el.name] = el.iti.getNumber() || el.value
+      } else {
+        draft[el.name] = el.value
+      }
     })
     try {
       localStorage.setItem(this.constructor.STORAGE_KEY, JSON.stringify(draft))
