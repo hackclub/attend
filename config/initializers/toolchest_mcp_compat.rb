@@ -24,10 +24,11 @@ module ToolchestMcpCompat
     install_resource_handler!(server, router)
     relax_handler_signatures!(server)
 
-    # Toolchest advertises list-change, logging, and completion features that it
-    # does not implement on this stateless endpoint. Advertising only the APIs we
-    # actually serve keeps capability negotiation honest.
-    server.capabilities = { tools: {} }
+    # Toolchest advertises list-change and logging features that it does not
+    # implement on this stateless endpoint. Keep completions, which Toolchest
+    # implements for enum-backed toolbox parameters, while advertising only the
+    # APIs we actually serve.
+    server.capabilities = { tools: {}, completions: {} }
     server.capabilities[:prompts] = {} if router.prompts_list.any?
     server.capabilities[:resources] = {} if router.toolbox_classes.any? { |toolbox| toolbox.resources.any? }
   end

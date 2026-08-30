@@ -83,7 +83,10 @@ RSpec.describe "MCP endpoint", type: :request do
 
     expect(discovery.dig("result", "supportedVersions"))
       .to include(MCP::Configuration::LATEST_STABLE_PROTOCOL_VERSION)
-    expect(discovery.dig("result", "capabilities")).to eq("tools" => {})
+    expect(discovery.dig("result", "capabilities")).to eq(
+      "tools" => {},
+      "completions" => {}
+    )
     expect(discovery.dig("result", "resultType")).to eq("complete")
 
     tools = rpc("tools/list", modern_params, id: 2, headers: modern_headers("tools/list"))
@@ -102,6 +105,23 @@ RSpec.describe "MCP endpoint", type: :request do
 
     expect(response).to have_http_status(:not_found)
     expect(listen.dig("error", "code")).to eq(-32601)
+  end
+
+  it "serves enum completions" do
+    completion = rpc(
+      "completion/complete",
+      modern_params(
+        ref: { type: "ref/prompt", name: "toolbox-parameter" },
+        argument: { name: "status", value: "" }
+      ),
+      id: 2,
+      headers: modern_headers("completion/complete")
+    )
+
+    expect(response).to have_http_status(:ok)
+    expect(completion["error"]).to be_nil
+    expect(completion.dig("result", "completion", "values"))
+      .to include("draft", "scheduled", "open", "closed")
   end
 
   it "runs statelessly, so it issues no session and needs none" do
