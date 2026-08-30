@@ -41,7 +41,7 @@ gem "toolchest", "~> 0.3.7"
 # unbounded stdio line buffer, unbounded session retention). toolchest 0.3.x
 # still targets the 0.11 signatures, so config/initializers/toolchest_mcp_compat.rb
 # bridges the two — read it before bumping either gem.
-gem "mcp", "~> 1.3.0"
+gem "mcp", "~> 1.4.0"
 gem "jb" # JSON view layer for toolbox actions
 
 # Audit logging

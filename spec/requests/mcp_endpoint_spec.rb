@@ -37,10 +37,29 @@ RSpec.describe "MCP endpoint", type: :request do
 
   def initialize_session
     rpc("initialize", {
-      protocolVersion: MCP::Configuration::LATEST_STABLE_PROTOCOL_VERSION,
+      protocolVersion: MCP::Configuration::LATEST_HANDSHAKE_PROTOCOL_VERSION,
       capabilities: {},
       clientInfo: { name: "spec", version: "1" }
     })
+  end
+
+  def modern_params(params = {})
+    params.merge(
+      _meta: {
+        MCP::RequestEnvelope::PROTOCOL_VERSION_META_KEY => MCP::Configuration::LATEST_STABLE_PROTOCOL_VERSION,
+        MCP::RequestEnvelope::CLIENT_CAPABILITIES_META_KEY => {},
+        MCP::RequestEnvelope::CLIENT_INFO_META_KEY => { name: "spec", version: "1" }
+      }
+    )
+  end
+
+  def modern_headers(method, name: nil)
+    headers = {
+      "MCP-Protocol-Version" => MCP::Configuration::LATEST_STABLE_PROTOCOL_VERSION,
+      "Mcp-Method" => method
+    }
+    headers["Mcp-Name"] = name if name
+    headers
   end
 
   it "requires a bearer token" do
@@ -56,7 +75,33 @@ RSpec.describe "MCP endpoint", type: :request do
     expect(response).to have_http_status(:ok)
     expect(body.dig("result", "serverInfo", "name")).to eq("Attend")
     expect(body.dig("result", "protocolVersion"))
-      .to eq(MCP::Configuration::LATEST_STABLE_PROTOCOL_VERSION)
+      .to eq(MCP::Configuration::LATEST_HANDSHAKE_PROTOCOL_VERSION)
+  end
+
+  it "advertises and serves the modern stateless lifecycle" do
+    discovery = rpc("server/discover")
+
+    expect(discovery.dig("result", "supportedVersions"))
+      .to include(MCP::Configuration::LATEST_STABLE_PROTOCOL_VERSION)
+    expect(discovery.dig("result", "capabilities")).to eq("tools" => {})
+    expect(discovery.dig("result", "resultType")).to eq("complete")
+
+    tools = rpc("tools/list", modern_params, id: 2, headers: modern_headers("tools/list"))
+
+    expect(tools.dig("result", "tools")).to be_an(Array), tools.inspect
+    expect(tools.dig("result", "resultType")).to eq("complete")
+    expect(tools.dig("result", "ttlMs")).to eq(0)
+    expect(tools.dig("result", "cacheScope")).to eq("private")
+
+    listen = rpc(
+      "subscriptions/listen",
+      modern_params,
+      id: 3,
+      headers: modern_headers("subscriptions/listen")
+    )
+
+    expect(response).to have_http_status(:not_found)
+    expect(listen.dig("error", "code")).to eq(-32601)
   end
 
   it "runs statelessly, so it issues no session and needs none" do
@@ -76,9 +121,7 @@ RSpec.describe "MCP endpoint", type: :request do
     initialize_session
     body = rpc("tools/list", {}, id: 2)
 
-    # toolchest answers tools/list with a bare array rather than the spec's
-    # { tools: [...] } wrapper. Unchanged by the mcp bump; asserted as-is.
-    names = body["result"].map { |tool| tool["name"] }
+    names = body.dig("result", "tools").map { |tool| tool["name"] }
 
     expect(names).to include("events_index")
     # events:read only — nothing that writes, and nothing safeguarding-related.
@@ -89,11 +132,16 @@ RSpec.describe "MCP endpoint", type: :request do
     event = create(:event)
     user.event_role_assignments.create!(event: event, role: "event_admin")
 
-    initialize_session
-    body = rpc("tools/call", { name: "events_index", arguments: {} }, id: 2)
+    body = rpc(
+      "tools/call",
+      modern_params(name: "events_index", arguments: {}),
+      id: 2,
+      headers: modern_headers("tools/call", name: "events_index")
+    )
 
     expect(response).to have_http_status(:ok)
     expect(body["error"]).to be_nil
+    expect(body.dig("result", "resultType")).to eq("complete")
 
     text = body.dig("result", "content").map { |part| part["text"] }.join
     expect(JSON.parse(text).fetch("events").map { |e| e["slug"] }).to eq([ event.slug ])

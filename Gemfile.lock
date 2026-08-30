@@ -291,7 +291,7 @@ GEM
       net-smtp
     marcel (1.2.1)
     matrix (0.4.3)
-    mcp (1.3.0)
+    mcp (1.4.0)
       json_schemer (>= 2.4)
     mini_magick (5.3.3)
       logger
@@ -839,7 +839,7 @@ DEPENDENCIES
   jb
   kramdown
   letter_opener_web
-  mcp (~> 1.3.0)
+  mcp (~> 1.4.0)
   mini_magick
   mission_control-jobs
   omniauth
