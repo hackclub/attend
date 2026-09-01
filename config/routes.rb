@@ -434,6 +434,9 @@ Rails.application.routes.draw do
       resources :events, only: [ :index ]
       resources :push_tokens, only: [ :create, :destroy ], param: :token
 
+      # Global-admin only: adds emails to the app-wide ban list.
+      resources :bans, only: [ :create ]
+
       get "travel/search_airports", to: "travel#search_airports"
       post "travel/validate_flight", to: "travel#validate_flight"
 
