@@ -1,0 +1,52 @@
+# Project and product names
+Attend's
+DocuSeal
+Airtable
+Twilio
+Catppuccin
+Postgres
+Hotwire
+Propshaft
+Importmap
+[Oo]makase
+[Tt]oolchest
+
+# Domain vocabulary
+[Oo]nboarding
+[Oo]nboards
+[Ss]afeguarding
+[Uu]nassign
+
+# Standard technical English the base dictionary lacks
+APIs
+OAuth
+WCAG
+WCAG's
+[Bb]reakpoint
+[Ee]nums
+[Hh]ardcoded
+[Hh]ostname
+[Nn]amespaced
+[Nn]oindex
+[Ss]ubstring
+[Uu]nremapped
+[Tt]ooltip
+[Ww]ebfont
+Dockerfile
+Don'ts
+[Pp]arams
+[Pp]refs
+[Dd]ev
+
+# Code identifiers that appear in prose
+participant_event
+participant_events
+event_admin
+event_id
+event_slug
+safeguarding_lead
+actions_taken
+messages_send
+tickets_reply
+set_status
+hack_club
