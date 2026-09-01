@@ -23,7 +23,12 @@ info:
       `X-Token-Refresh-Recommended: true` when the token is nearing expiry;
       call `POST /session/refresh` to rotate it.
     - **Global API token** — a superadmin-issued token. Only honoured while its
-      owner is still a global admin. Sets the current user.
+      owner is still a global admin. Sets the current user. May be **scoped**
+      when issued, in which case it reaches only the endpoints that accept
+      that scope and returns `403` everywhere else, read-only endpoints
+      included. An unscoped token carries its owner's full access. Scopes are
+      noted on the endpoints that accept them; the only one today is
+      `bans:write`.
     - **Event API key** — per-event key (`Event#api_key`). Does **not** set a
       current user, so it only works on the subset of endpoints that don't
       require one (participant `lookup`, `roster`, `create`, and the travel
@@ -72,6 +77,8 @@ tags:
     description: Provision and manage participant NFC badges.
   - name: Push Tokens
     description: Register device push-notification tokens.
+  - name: Bans
+    description: The app-wide ban list. Global admins only.
   - name: Travel
     description: >-
       Airport and flight lookups. These endpoints authenticate with the web
@@ -244,6 +251,91 @@ paths:
               schema: { $ref: "#/components/schemas/Success" }
         "404":
           description: Token not found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /bans:
+    post:
+      tags: [Bans]
+      summary: Add emails to the ban list
+      description: >-
+        Ban one person from every event. A ban holds one or more emails, so
+        send all of a person's addresses in a single call rather than creating
+        a ban per address. Omitting `expires_at` makes the ban indefinite.
+
+
+        Requires a global admin — a mobile token belonging to one, or a global
+        API token. Event API keys are rejected.
+
+
+        This is the only endpoint reachable by a token scoped to `bans:write`,
+        so an integration that just needs to ban people can hold a credential
+        that can do nothing else.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  description: A single email to ban. Use `emails` for several.
+                  example: banned@example.com
+                emails:
+                  type: array
+                  description: >-
+                    Every email belonging to the person. Case and surrounding
+                    whitespace are normalised, and duplicates collapse.
+                  items: { type: string }
+                reason:
+                  type: string
+                  nullable: true
+                  description: Free text shown to admins in the ban list.
+                expires_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  description: >-
+                    ISO 8601 timestamp the ban lifts at. Omit for an
+                    indefinite ban. A value that isn't ISO 8601 is rejected
+                    rather than treated as absent.
+      responses:
+        "201":
+          description: Ban created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ban: { $ref: "#/components/schemas/Ban" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: >-
+            The caller is not a global admin, or holds a scoped token that
+            doesn't include `bans:write`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: >-
+            At least one email is already on the ban list. Emails stay
+            reserved even after a ban is revoked, so the response includes the
+            bans holding them — revoke or reinstate those instead of creating
+            a new one.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  bans:
+                    type: array
+                    items: { $ref: "#/components/schemas/Ban" }
+        "422":
+          description: No email supplied, a malformed email, or a bad `expires_at`.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -997,6 +1089,31 @@ components:
       type: object
       properties:
         success: { type: boolean, example: true }
+
+    Ban:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        emails:
+          type: array
+          items: { type: string }
+        reason: { type: string, nullable: true }
+        status:
+          type: string
+          description: Indefinite, Active, Expired, or Revoked.
+          example: Indefinite
+        active:
+          type: boolean
+          description: Whether the ban currently blocks registration.
+        expires_at: { type: string, format: date-time, nullable: true }
+        revoked_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        created_by:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
 
     InviteError:
       type: object
