@@ -1,0 +1,51 @@
+# Prose linting for the Markdown docs. Advisory only: this workflow reports
+# what Vale found in the job summary but always exits green, so a style nit
+# never blocks a merge. Config lives in .vale.ini; vocabulary in
+# .vale/styles/config/vocabularies/Attend/.
+name: Vale
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  vale:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # Third-party action, like ruby/setup-ruby elsewhere in CI.
+      # Installs the Vale version pinned in mise.toml.
+      - name: Set up mise
+        uses: jdx/mise-action@v2
+
+      - name: Download Vale styles
+        run: vale sync
+
+      # Vale exits non-zero only for errors, so warnings alone would look like
+      # a pass. Judge the result by whether it printed anything, not by status.
+      - name: Lint prose
+        run: |
+          vale --no-global --output=line . > vale.out || true
+          cat vale.out
+          {
+            echo "## Vale"
+            echo
+            if [ -s vale.out ]; then
+              echo "\`$(wc -l < vale.out | tr -d ' ')\` finding(s). Advisory only — these do not block the merge."
+              echo
+              echo '```'
+              cat vale.out
+              echo '```'
+            else
+              echo "No prose issues found."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

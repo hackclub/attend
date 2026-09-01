@@ -56,3 +56,8 @@ macos-nfc-bridge/.build/
 
 # stray npm artifacts (repo has no package.json)
 package-lock.json
+
+# Vale styles are downloaded build output (`vale sync`); the vocabulary is not.
+/.vale/styles/*
+!/.vale/styles/config/
+/vale.out
