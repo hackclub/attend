@@ -2,11 +2,33 @@ module Api
   module V1
     class BaseController < ActionController::API
       before_action :authenticate_token!
+      before_action :authorize_token_scope!
 
       attr_reader :current_user, :current_token, :current_event_from_api_key,
                   :current_series_from_api_key, :current_series_api_token
 
+      class_attribute :required_scope, instance_writer: false, default: nil
+
+      # Declares the GlobalApiToken scope that reaches this controller. A
+      # scoped token can call nothing else, so leaving it unset — as every
+      # controller but Bans does — keeps that controller full-access only.
+      def self.requires_scope(scope)
+        self.required_scope = scope
+      end
+
       private
+
+      # Scope narrowing applies to global API tokens only: mobile tokens are a
+      # signed-in human with their own permissions, and event API keys are
+      # already restricted per-controller.
+      def authorize_token_scope!
+        return unless current_token.is_a?(GlobalApiToken)
+        return if current_token.permits?(self.class.required_scope)
+
+        render json: {
+          error: "This token is limited to: #{current_token.scope_labels.join(', ')}"
+        }, status: :forbidden
+      end
 
       def authenticate_token!
         token = extract_bearer_token

@@ -439,6 +439,9 @@ Rails.application.routes.draw do
       resources :events, only: [ :index ]
       resources :push_tokens, only: [ :create, :destroy ], param: :token
 
+      # Global-admin only: adds emails to the app-wide ban list.
+      resources :bans, only: [ :create ]
+
       # Series API: one key per event series. `:series_id` accepts the series
       # id, its slug, or the literal `current` (the series the calling key
       # belongs to). Event creation lives here and nowhere else — it needs a

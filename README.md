@@ -172,7 +172,7 @@ Event
 │   ├── Dietary
 │   ├── Accessibility (encrypted)
 │   ├── SafeguardingInfo (encrypted)
-│   └── Consent (Docuseal tracking)
+│   └── Consent (DocuSeal tracking)
 ├── Incident (encrypted)
 ├── Note (encrypted)
 ├── Scan (check-in records)
@@ -183,7 +183,7 @@ Event
 
 | Service | Purpose |
 |---------|---------|
-| **Docuseal** | Embedded consent forms with webhook status updates |
+| **DocuSeal** | Embedded consent forms with webhook status updates |
 
 ---
 

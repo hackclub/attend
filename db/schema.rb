@@ -476,6 +476,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_03_130000) do
     t.datetime "last_used_at"
     t.string "name"
     t.datetime "revoked_at"
+    t.string "scopes", default: [], null: false, array: true
     t.string "token_digest", null: false
     t.datetime "updated_at", null: false
     t.uuid "user_id", null: false
