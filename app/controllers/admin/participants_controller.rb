@@ -157,10 +157,20 @@ module Admin
       @guardian_participant_events = @participant_event.guardian_participant_events.includes(:guardian)
       @notes = @participant_event.notes.includes(:author).order(created_at: :desc)
       @scans = @participant_event.scans.includes(:user, :scan_context).recent.limit(3)
+      @emergency_contacts = emergency_contacts_for_profile
     end
 
     def link_guardian
       authorize @participant_event, :update?
+
+      # A guardian's contact details stay hidden from PII-restricted roles, so
+      # they have no business writing them either. The form is hidden for them;
+      # this stops a hand-crafted POST.
+      unless can_view_participant_pii?
+        redirect_to admin_event_participant_path(current_event, @participant_event),
+          alert: "Your role cannot add guardians, because it cannot see their contact details."
+        return
+      end
 
       guardian_email = params[:guardian_email].to_s.strip.downcase
       participant_email = @participant_event.participant.email.to_s.strip.downcase
@@ -937,6 +947,20 @@ module Admin
       @participant_event = current_event.participant_events.find(params[:id])
     end
 
+    # Emergency contacts for the profile page. Safeguarding viewers see them in
+    # full (the same list the safeguarding tab shows); PII-restricted roles get
+    # a first name and a phone number, because running an incident means being
+    # able to call someone. Every other role sees no section at all, which is
+    # what they saw before this block existed.
+    def emergency_contacts_for_profile
+      return nil unless !can_view_participant_pii? || policy(@participant_event).view_safeguarding?
+
+      EmergencyContact.left_joins(:guardian_participant_event).where(
+        "emergency_contacts.participant_event_id = :pe_id OR guardian_participant_events.participant_event_id = :pe_id",
+        pe_id: @participant_event.id
+      ).by_priority
+    end
+
     def set_participant_header_data
       @participant = @participant_event.participant
       @safeguarding_info = @participant_event.safeguarding_info
@@ -948,10 +972,11 @@ module Admin
         :legal_first_name, :legal_last_name, :preferred_name, :email,
         :date_of_birth, :phone, :pronouns, :tshirt_size, :headshot
       ]
-      # The edit form hides the field for PII-restricted roles; dropping it here
-      # too means a hand-crafted POST can't write (or probe) a date of birth
-      # the same user isn't allowed to read back.
-      permitted.delete(:date_of_birth) unless can_view_participant_pii?
+      # The edit form hides these fields for PII-restricted roles; dropping them
+      # here too means a hand-crafted POST can't write (or probe) a date of
+      # birth or phone number the same user isn't allowed to read back. Email
+      # stays: those roles can see and search on a participant's address.
+      permitted -= [ :date_of_birth, :phone ] unless can_view_participant_pii?
 
       params.require(:participant).permit(*permitted)
     end

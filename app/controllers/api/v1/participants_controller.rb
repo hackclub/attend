@@ -217,9 +217,10 @@ module Api
           participant_event_id: pe.id,
           display_name: participant.display_name,
           full_name: participant.full_name,
-          # Contact details are omitted, not nulled, for PII-restricted roles —
-          # same contract as date_of_birth and address in #personal_json.
-          **(include_pii? ? { email: participant.email, phone: participant.phone } : {}),
+          email: participant.email,
+          # The phone is omitted, not nulled, for PII-restricted roles — same
+          # contract as date_of_birth and address in #personal_json.
+          **(include_pii? ? { phone: participant.phone } : {}),
           slack_user_id: participant.slack_user_id,
           pronouns: participant.pronouns,
           headshot_url: headshot_url_for(participant),
@@ -528,8 +529,9 @@ module Api
         }
       end
 
-      # Whether this caller gets exact dates of birth, addresses, and contact
-      # details (their own and their guardians'). Memoized
+      # Whether this caller gets exact dates of birth, addresses, phone numbers,
+      # and the people around a participant (guardian and emergency contact
+      # details). A participant's own email address is not gated. Memoized
       # for the same reason as can_view_sensitive_data? below. A nil
       # current_user means an event API key, which never reaches the actions
       # that serve these fields (see API_KEY_ALLOWED_ACTIONS).

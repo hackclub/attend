@@ -76,6 +76,14 @@ module Admin::ParticipantsHelper
     content_tag(:span, label, class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200")
   end
 
+  # Placeholder for a contact detail the current role isn't allowed to see (see
+  # EventRoleAssignment::PII_RESTRICTED_ROLES). Every surface hides it the same
+  # way, and the title says why so it doesn't read as missing data.
+  def contact_hidden_placeholder(label = "Hidden")
+    content_tag(:span, label, class: "italic text-gray-400",
+      title: "Phone numbers and guardian contact details are hidden for your role")
+  end
+
   def render_sort_icon(field, current_sort, current_direction)
     return "" unless current_sort == field
 

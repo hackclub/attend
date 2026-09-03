@@ -111,7 +111,7 @@
               ["last_name", "Last Name"],
               ["preferred_name", "Preferred Name"],
               ["email", "Email"],
-              ["phone", "Phone"],
+              *(can_view_participant_pii? ? [["phone", "Phone"]] : []),
               ["pronouns", "Pronouns"],
               *(can_view_participant_pii? ? [["dob", "Date of Birth"]] : []),
               ["age", "Age"],
@@ -218,7 +218,9 @@
                 data-column="email" data-action="click->data-table#sort" data-sort-field="email">
               <div class="flex items-center gap-1">Email <%= render_sort_icon("email", @sort_field, @sort_direction) %></div>
             </th>
-            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="phone">Phone</th>
+            <% if can_view_participant_pii? %>
+              <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="phone">Phone</th>
+            <% end %>
             <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap"
                 data-column="pronouns" data-action="click->data-table#sort" data-sort-field="pronouns">
               <div class="flex items-center gap-1">Pronouns <%= render_sort_icon("pronouns", @sort_field, @sort_direction) %></div>

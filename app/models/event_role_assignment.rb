@@ -15,10 +15,14 @@ class EventRoleAssignment < ApplicationRecord
   }
 
   # Roles that do the job without seeing a participant's most identifying
-  # details: they get age instead of an exact date of birth, and no address of
-  # any kind — not the home address, not the travel pickup address. Medical
-  # records are deliberately NOT restricted; someone helping with a medical
-  # incident needs the conditions and medications. Enforced through
+  # details: they get age instead of an exact date of birth, no address of any
+  # kind — not the home address, not the travel pickup address — and no phone
+  # numbers, plus nothing at all for the people around a participant (guardian
+  # and emergency contact contact details). The exceptions are the
+  # participant's own email address, which these roles search and work from
+  # every day, and an emergency contact's first name and phone number, which
+  # someone running an incident has to be able to dial. Medical records are
+  # deliberately NOT restricted for the same reason. Enforced through
   # User#can_view_participant_pii?, which every surface that renders or exports
   # those fields checks.
   PII_RESTRICTED_ROLES = %w[limited].freeze
@@ -56,17 +60,22 @@ class EventRoleAssignment < ApplicationRecord
     },
     "limited" => {
       label: "Limited",
-      summary: "Day-to-day logistics, without addresses or exact birthdays.",
+      summary: "Day-to-day logistics, without phone numbers, addresses, or exact birthdays.",
       can: [
         "View and edit travel and accommodation",
         "Manage groups and rooming",
         "View full medical records, so they can help in an incident",
         "View consents and notes",
-        "See age at the event, instead of a date of birth"
+        "See age at the event, instead of a date of birth",
+        "See attendee email addresses, and search by them",
+        "See the first name and phone number of an emergency contact"
       ],
       cannot: [
         "See exact dates of birth",
         "See any address, at home or for travel pickup",
+        "See phone numbers, other than an emergency contact one",
+        "See a guardian email address, or edit guardian details",
+        "Work the support inbox",
         "Manage staff",
         "Add or remove participants",
         "Access safeguarding records"

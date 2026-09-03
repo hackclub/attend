@@ -153,7 +153,16 @@
                           end %>">
                       <%= delivery.channel.titleize %>
                     </span>
-                    <span class="text-gray-500"><%= delivery.recipient_identifier %></span>
+                    <span class="text-gray-500">
+                      <%# For an SMS the identifier is the recipient's phone number, which
+                          PII-restricted roles don't get; an email address or Slack ID is
+                          fine for them. %>
+                      <% if can_view_participant_pii? || delivery.channel != "sms" %>
+                        <%= delivery.recipient_identifier %>
+                      <% else %>
+                        <%= contact_hidden_placeholder %>
+                      <% end %>
+                    </span>
                   </div>
                   <div class="flex items-center gap-3">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium

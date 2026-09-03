@@ -61,6 +61,16 @@ class ApplicationToolbox < Toolchest::Toolbox
 
   def anonymized? = mcp_connection&.anonymize? || false
 
+  # Whether this account may see participants' exact dates of birth, addresses,
+  # and phone numbers. Participants here aren't scoped to one event, so a
+  # PII-restricted role on one event doesn't hide anything for someone who is
+  # ops elsewhere.
+  def view_pii?
+    return @view_pii if defined?(@view_pii)
+
+    @view_pii = current_user&.can_view_participant_pii? || false
+  end
+
   # nil means "no connection-level restriction" — every event the user can reach.
   def permitted_event_ids
     return @permitted_event_ids if defined?(@permitted_event_ids)

@@ -46,7 +46,7 @@
         <span class="text-gray-900"><%= participant.age_on(event.starts_at || Date.current) %> years</span>
       </div>
     <% end %>
-    <% if participant.phone.present? %>
+    <% if participant.phone.present? && can_view_participant_pii? %>
       <div>
         <span class="text-gray-500">Phone:</span>
         <span class="text-gray-900"><%= participant.phone %></span>

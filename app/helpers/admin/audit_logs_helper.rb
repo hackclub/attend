@@ -2,14 +2,21 @@ module Admin
   module AuditLogsHelper
     SENSITIVE_FIELD_PATTERNS = /password|token|secret|api_key|otp|access_key/i
 
-    # Columns holding an exact date of birth or a home address, on participants
-    # and guardians alike. PII-restricted roles (see
-    # EventRoleAssignment::PII_RESTRICTED_ROLES) can reach a participant's change
-    # history, and a changeset is just as revealing as the field itself.
+    # Columns holding an exact date of birth, a home address, or a phone number,
+    # on participants, guardians, and emergency contacts alike. PII-restricted
+    # roles (see EventRoleAssignment::PII_RESTRICTED_ROLES) can reach a
+    # participant's change history, and a changeset is just as revealing as the
+    # field itself.
     PII_FIELDS = %w[
       date_of_birth address_line_1 address_line_2 city state postal_code
       country country_of_residence
+      phone phone_number phone_override
     ].freeze
+
+    # The history page mixes in Guardian and EmergencyContact versions. A
+    # participant's own email address is visible to PII-restricted roles; the
+    # people around them still aren't.
+    EMAIL_FIELDS = %w[email invited_via_email].freeze
 
     def audit_field_label(field)
       field.to_s.humanize
@@ -29,13 +36,18 @@ module Admin
 
     # Returns a hash of {field => [old, new]} from a PaperTrail::Version.
     # Hides framework noise so the diff stays human-readable. Pass
-    # `hide_pii: true` to also drop dates of birth and addresses.
+    # `hide_pii: true` to also drop dates of birth, addresses, phone numbers,
+    # and everyone-but-the-participant's email.
     def audit_version_changes(version, hide_pii: false)
       raw = (version.respond_to?(:changeset) ? version.changeset : nil) || {}
       cleaned = raw.except("updated_at", "created_at", "encrypted_password", "remember_created_at",
         "current_sign_in_at", "last_sign_in_at", "current_sign_in_ip", "last_sign_in_ip",
         "sign_in_count", "oidc_claims")
-      hide_pii ? cleaned.except(*PII_FIELDS) : cleaned
+      return cleaned unless hide_pii
+
+      hidden = PII_FIELDS
+      hidden += EMAIL_FIELDS unless version.item_type == "Participant"
+      cleaned.except(*hidden)
     rescue => e
       Rails.logger.warn("[AuditLog] Could not parse version #{version.id}: #{e.message}")
       {}

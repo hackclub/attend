@@ -27,6 +27,13 @@ class EmergencyContact < ApplicationRecord
     participant_event&.participant || guardian_participant_event&.participant
   end
 
+  # `name` is one free-form field, so the first word is the best we can do for a
+  # first name. Roles that can't see contact details still get this much plus
+  # the phone number, so they can call the contact during an incident.
+  def first_name
+    name.to_s.split.first.presence || name
+  end
+
   private
 
   def linked_to_guardian_or_participant

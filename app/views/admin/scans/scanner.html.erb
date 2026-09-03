@@ -196,10 +196,12 @@
           <dt class="text-gray-500">Email</dt>
           <dd id="modal-email" class="truncate"></dd>
         </div>
-        <div>
-          <dt class="text-gray-500">Phone</dt>
-          <dd id="modal-phone"></dd>
-        </div>
+        <% if can_view_participant_pii? %>
+          <div>
+            <dt class="text-gray-500">Phone</dt>
+            <dd id="modal-phone"></dd>
+          </div>
+        <% end %>
         <div>
           <dt class="text-gray-500">T-Shirt Size</dt>
           <dd id="modal-tshirt" class="font-medium"></dd>
@@ -670,7 +672,10 @@ function showParticipantModal(data, scanContext, firstScan) {
   document.getElementById('modal-status').textContent = data.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
   document.getElementById('modal-pronouns').textContent = data.pronouns || '—';
   document.getElementById('modal-email').textContent = data.email || '—';
-  document.getElementById('modal-phone').textContent = data.phone || '—';
+  // The phone row is absent for roles that can't see phone numbers, and the
+  // lookup response leaves the field out for them too.
+  const phoneEl = document.getElementById('modal-phone');
+  if (phoneEl) phoneEl.textContent = data.phone || '—';
   document.getElementById('modal-tshirt').textContent = data.tshirt_size?.toUpperCase() || '—';
   document.getElementById('modal-dietary').textContent = data.dietary?.replace('_', ' ') || 'None specified';
   document.getElementById('modal-view-link').href = data.show_url;
