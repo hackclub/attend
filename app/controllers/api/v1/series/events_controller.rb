@@ -160,7 +160,7 @@ module Api
         end
 
         # API-key requests have no current_user, so the token's owner is the
-        # closest thing to an actor; the token name goes in the metadata either
+        # closest thing to an actor; the key's id goes in the metadata either
         # way so a series key's writes are attributable.
         def log_event_change(action)
           AuditLog.log!(
@@ -174,7 +174,11 @@ module Api
               user_agent: request.user_agent,
               source: "series_api",
               series_id: @series.id,
-              series_api_token_name: current_series_api_token&.name
+              # The key's id, not its name: audit_logs.metadata is stored in
+              # clear text, and an id is provably not a credential. It also
+              # outlives a rename or a rotation, and revoking a key keeps its
+              # row, so this always resolves to the key that acted.
+              series_api_token_id: current_series_api_token&.id
             }.compact
           )
         rescue StandardError => e

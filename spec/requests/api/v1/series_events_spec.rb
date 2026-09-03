@@ -154,7 +154,7 @@ RSpec.describe "Api::V1::Series::Events", type: :request do
       expect(log.action).to eq("record_create")
       expect(log.actor).to eq(owner)
       expect(log.metadata["source"]).to eq("series_api")
-      expect(log.metadata["series_api_token_name"]).to eq("owner-series-events@ops")
+      expect(log.metadata["series_api_token_id"]).to eq(SeriesApiToken.last.id)
     end
 
     describe "non-series credentials" do
