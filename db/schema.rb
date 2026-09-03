@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_29_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_03_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -476,6 +476,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_29_120000) do
     t.datetime "last_used_at"
     t.string "name"
     t.datetime "revoked_at"
+    t.string "scopes", default: [], null: false, array: true
     t.string "token_digest", null: false
     t.datetime "updated_at", null: false
     t.uuid "user_id", null: false
@@ -1108,6 +1109,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_29_120000) do
     t.index ["user_id"], name: "index_scans_on_user_id"
   end
 
+  create_table "series_api_tokens", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "event_series_id", null: false
+    t.datetime "last_used_at"
+    t.string "name", null: false
+    t.datetime "revoked_at"
+    t.string "token_digest", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id"
+    t.index ["event_series_id", "revoked_at"], name: "index_series_api_tokens_on_event_series_id_and_revoked_at"
+    t.index ["event_series_id"], name: "index_series_api_tokens_on_event_series_id"
+    t.index ["token_digest"], name: "index_series_api_tokens_on_token_digest", unique: true
+    t.index ["user_id"], name: "index_series_api_tokens_on_user_id"
+  end
+
   create_table "series_role_assignments", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.uuid "event_series_id", null: false
@@ -1382,7 +1398,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_29_120000) do
   add_foreign_key "emergency_contacts", "guardian_participant_events"
   add_foreign_key "emergency_contacts", "participant_events"
   add_foreign_key "event_api_tokens", "events"
-  add_foreign_key "event_api_tokens", "users"
+  add_foreign_key "event_api_tokens", "users", on_delete: :nullify
   add_foreign_key "event_role_assignments", "events"
   add_foreign_key "event_role_assignments", "users"
   add_foreign_key "events", "event_series"
@@ -1390,7 +1406,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_29_120000) do
   add_foreign_key "events", "users", column: "airtable_config_updated_by_id"
   add_foreign_key "export_templates", "events"
   add_foreign_key "export_templates", "users", column: "created_by_id"
-  add_foreign_key "global_api_tokens", "users"
+  add_foreign_key "global_api_tokens", "users", on_delete: :cascade
   add_foreign_key "group_memberships", "groups"
   add_foreign_key "group_memberships", "participant_events"
   add_foreign_key "groups", "events"
@@ -1460,6 +1476,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_29_120000) do
   add_foreign_key "scans", "participant_events"
   add_foreign_key "scans", "scan_contexts"
   add_foreign_key "scans", "users"
+  add_foreign_key "series_api_tokens", "event_series"
+  add_foreign_key "series_api_tokens", "users", on_delete: :nullify
   add_foreign_key "series_role_assignments", "event_series"
   add_foreign_key "series_role_assignments", "users"
   add_foreign_key "sibling_memberships", "participants"

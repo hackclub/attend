@@ -162,14 +162,15 @@ module Api
 
       private
 
-      # An event API key may only send invitations and read minimal
+      # An API key may only send invitations and read minimal
       # identity/registration data (lookup, roster) — never the full
       # participant payload from index/show, which includes sensitive
-      # medical/safeguarding/travel PII.
+      # medical/safeguarding/travel PII. Applies to event and series keys
+      # alike: a series key is broader in reach, not in what it may read.
       API_KEY_ALLOWED_ACTIONS = %w[create lookup roster].freeze
 
       def restrict_api_key_actions
-        return unless current_event_from_api_key
+        return unless api_key_request?
         return if API_KEY_ALLOWED_ACTIONS.include?(action_name)
 
         render json: { error: "API key is not authorized for this action" }, status: :forbidden
@@ -179,10 +180,8 @@ module Api
         @event = Event.find_by(id: params[:event_id]) || Event.find_by!(slug: params[:event_id])
         Current.event = @event
 
-        if current_event_from_api_key
-          unless current_event_from_api_key.id == @event.id
-            render json: { error: "API key is not valid for this event" }, status: :forbidden
-          end
+        if api_key_request?
+          require_api_key_event_scope!(@event)
         else
           authorize @event, :api_participants?
         end

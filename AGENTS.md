@@ -12,7 +12,7 @@ rails db:migrate                  # Run migrations
 ## Architecture
 Rails 8.1 app with PostgreSQL, Hotwire, Tailwind. UUID primary keys (set `self.implicit_order_column = "created_at"`). Pundit for authorization, Devise for auth, Active Record Encryption for sensitive fields.
 
-**Structure:** `app/models/` (AR models), `app/controllers/` (namespaced: admin/, guardian_portal/, onboarding/), `app/policies/` (Pundit), `app/services/` (Docuseal, Airtable APIs), `app/jobs/` (Solid Queue).
+**Structure:** `app/models/` (AR models), `app/controllers/` (namespaced: admin/, guardian_portal/, onboarding/), `app/policies/` (Pundit), `app/services/` (DocuSeal, Airtable APIs), `app/jobs/` (Solid Queue).
 
 ## Code Style
 - Omakase Ruby style (rubocop-rails-omakase)

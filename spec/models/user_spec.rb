@@ -409,6 +409,75 @@ RSpec.describe User, type: :model do
     end
   end
 
+  # Deleting a user used to raise ActiveRecord::InvalidForeignKey the moment
+  # they had ever issued an API token. Each kind now survives its creator
+  # differently, and the FK carries the matching ON DELETE so a raw SQL delete
+  # behaves the same way as user.destroy.
+  describe "destroying a user who issued API tokens" do
+    let(:user) { create(:user, email: "departing@hackclub.com", global_role: "global_admin") }
+    let(:event) { create(:event) }
+    let(:series) { create(:event_series) }
+
+    it "leaves an event API key working, with its creator nulled" do
+      token = EventApiToken.generate_for(event, user: user, name: "integration")
+      secret = token.token
+
+      user.destroy!
+
+      expect(token.reload.user_id).to be_nil
+      expect(token.name).to eq("departing@integration")
+      expect(EventApiToken.find_by_token(secret)).to eq(token)
+    end
+
+    it "leaves a series API key working, with its creator nulled" do
+      token = SeriesApiToken.generate_for(series, user: user, name: "integration")
+      secret = token.token
+
+      user.destroy!
+
+      expect(token.reload.user_id).to be_nil
+      expect(SeriesApiToken.find_by_token(secret)).to eq(token)
+    end
+
+    # A global key's authority *is* its owner's global-admin standing, which
+    # Api::V1::BaseController re-checks per request — so once they're gone the
+    # key could never authenticate again, and its row cannot even be saved
+    # (GlobalApiToken validates the owner is a global admin).
+    it "takes the owner's global API tokens with them" do
+      token = GlobalApiToken.generate_for(user, name: "superadmin")
+      secret = token.token
+
+      user.destroy!
+
+      expect(GlobalApiToken).not_to exist(token.id)
+      expect(GlobalApiToken.find_by_token(secret)).to be_nil
+    end
+
+    it "destroys a user holding all three kinds at once" do
+      EventApiToken.generate_for(event, user: user, name: "e")
+      SeriesApiToken.generate_for(series, user: user, name: "s")
+      GlobalApiToken.generate_for(user, name: "g")
+
+      expect { user.destroy! }.not_to raise_error
+      expect(User).not_to exist(user.id)
+    end
+
+    # The FK is the backstop for anything that bypasses Active Record.
+    it "applies the same rules to a raw SQL delete" do
+      event_token = EventApiToken.generate_for(event, user: user, name: "e")
+      series_token = SeriesApiToken.generate_for(series, user: user, name: "s")
+      global_token = GlobalApiToken.generate_for(user, name: "g")
+
+      User.connection.execute(
+        User.sanitize_sql_array([ "DELETE FROM users WHERE id = ?", user.id ])
+      )
+
+      expect(event_token.reload.user_id).to be_nil
+      expect(series_token.reload.user_id).to be_nil
+      expect(GlobalApiToken).not_to exist(global_token.id)
+    end
+  end
+
   describe "#placeholder_account?" do
     it "is true for a user created by an admin invite" do
       expect(create(:user).placeholder_account?).to be(true)
