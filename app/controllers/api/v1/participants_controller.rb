@@ -162,14 +162,15 @@ module Api
 
       private
 
-      # An event API key may only send invitations and read minimal
+      # An API key may only send invitations and read minimal
       # identity/registration data (lookup, roster) — never the full
       # participant payload from index/show, which includes sensitive
-      # medical/safeguarding/travel PII.
+      # medical/safeguarding/travel PII. Applies to event and series keys
+      # alike: a series key is broader in reach, not in what it may read.
       API_KEY_ALLOWED_ACTIONS = %w[create lookup roster].freeze
 
       def restrict_api_key_actions
-        return unless current_event_from_api_key
+        return unless api_key_request?
         return if API_KEY_ALLOWED_ACTIONS.include?(action_name)
 
         render json: { error: "API key is not authorized for this action" }, status: :forbidden
@@ -179,10 +180,8 @@ module Api
         @event = Event.find_by(id: params[:event_id]) || Event.find_by!(slug: params[:event_id])
         Current.event = @event
 
-        if current_event_from_api_key
-          unless current_event_from_api_key.id == @event.id
-            render json: { error: "API key is not valid for this event" }, status: :forbidden
-          end
+        if api_key_request?
+          require_api_key_event_scope!(@event)
         else
           authorize @event, :api_participants?
         end
@@ -218,9 +217,10 @@ module Api
           participant_event_id: pe.id,
           display_name: participant.display_name,
           full_name: participant.full_name,
-          email: participant.email,
+          # Contact details are omitted, not nulled, for PII-restricted roles —
+          # same contract as date_of_birth and address in #personal_json.
+          **(include_pii? ? { email: participant.email, phone: participant.phone } : {}),
           slack_user_id: participant.slack_user_id,
-          phone: participant.phone,
           pronouns: participant.pronouns,
           headshot_url: headshot_url_for(participant),
           status: pe.status,
@@ -427,14 +427,13 @@ module Api
           id: gpe.id,
           guardian_id: g&.id,
           name: g&.full_name,
-          email: g&.email,
-          phone: gpe.phone_override.presence || g&.phone,
+          **(include_pii? ? { email: g&.email, phone: gpe.phone_override.presence || g&.phone } : {}),
           relationship: gpe.relationship,
           is_primary: gpe.is_primary_guardian,
           status: gpe.status,
           accepted_at: gpe.accepted_at&.iso8601,
           completed_at: gpe.completed_at&.iso8601,
-          invited_via_email: gpe.invited_via_email,
+          **(include_pii? ? { invited_via_email: gpe.invited_via_email } : {}),
           invite_token_sent_at: gpe.invite_token_sent_at&.iso8601,
           media_permission: gpe.media_permission,
           photo_permission: gpe.photo_permission,
@@ -445,7 +444,12 @@ module Api
         }
       end
 
+      # An emergency contact's phone number is the one number a PII-restricted
+      # role keeps — you can't run an incident without being able to call
+      # someone — but they get the first name only, and no email address.
       def emergency_contact_json(ec)
+        return { id: ec.id, name: ec.first_name, phone: ec.phone, priority: ec.priority } unless include_pii?
+
         {
           id: ec.id,
           name: ec.name,
@@ -524,7 +528,8 @@ module Api
         }
       end
 
-      # Whether this caller gets exact dates of birth and addresses. Memoized
+      # Whether this caller gets exact dates of birth, addresses, and contact
+      # details (their own and their guardians'). Memoized
       # for the same reason as can_view_sensitive_data? below. A nil
       # current_user means an event API key, which never reaches the actions
       # that serve these fields (see API_KEY_ALLOWED_ACTIONS).
@@ -551,6 +556,8 @@ module Api
       def emergency_contacts_json(pe)
         pe.guardian_participant_events.flat_map do |gpe|
           gpe.emergency_contacts.sort_by { |ec| ec.priority || Float::INFINITY }.map do |ec|
+            next { name: ec.first_name, phone: ec.phone, priority: ec.priority } unless include_pii?
+
             {
               name: ec.name,
               phone: ec.phone,

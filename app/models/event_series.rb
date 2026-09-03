@@ -15,6 +15,7 @@ class EventSeries < ApplicationRecord
   has_many :events, dependent: :nullify
   has_many :series_role_assignments, dependent: :destroy
   has_many :members, through: :series_role_assignments, source: :user
+  has_many :series_api_tokens, dependent: :destroy
 
   RESERVED_SLUGS = %w[new].freeze
 

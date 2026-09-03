@@ -8,6 +8,9 @@
   <% if @token_kind == "event" && @event_name.present? %>
     for the event <strong><%= @event_name %></strong>
   <% end %>
+  <% if @token_kind == "series" && @series_name.present? %>
+    for the <strong><%= @series_name %></strong> series
+  <% end %>
   was just <strong>revoked</strong> using the token revocation endpoint.
 </p>
 
@@ -20,7 +23,8 @@
 
 <p>
   <strong>If this was you,</strong> no further action is needed — you can create a
-  new token from the event's Integrations page (or the global API tokens page).
+  new token from the event's Integrations page, the series' API Keys page, or the
+  global API tokens page.
 </p>
 
 <p>

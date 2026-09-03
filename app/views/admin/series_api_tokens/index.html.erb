@@ -1,0 +1,91 @@
+<% content_for :title, "#{@series.name} API Keys – Attend" %>
+
+<div class="max-w-5xl mx-auto space-y-6">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div class="flex items-center gap-3 min-w-0">
+      <%= render "admin/events/avatar", event: @series, size: 32, rounded: "rounded-lg" %>
+      <h1 class="text-2xl font-bold text-gray-900 truncate"><%= @series.name %> API Keys</h1>
+    </div>
+    <%= link_to "Members", admin_series_members_path(@series), class: "w-full sm:w-auto text-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors" %>
+  </div>
+
+  <% if flash[:series_api_token] %>
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+      <p class="text-sm font-medium text-amber-900 mb-2">Your new API key</p>
+      <code class="block bg-amber-100 px-3 py-2 rounded text-sm font-mono break-all text-amber-950"><%= flash[:series_api_token] %></code>
+      <p class="text-xs text-amber-700 mt-2">⚠️ Copy this now — it won't be shown again. Send it as <code>Authorization: Bearer &lt;key&gt;</code>.</p>
+    </div>
+  <% end %>
+
+  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <% if @series_api_tokens.any? %>
+      <table class="min-w-full divide-y divide-gray-100">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last used</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-100">
+          <% @series_api_tokens.each do |token| %>
+            <tr>
+              <td class="px-6 py-4">
+                <div class="text-sm font-mono text-gray-900 break-all"><%= token.name %></div>
+                <% if token.user %>
+                  <div class="text-sm text-gray-500">Created by <%= token.user.email %></div>
+                <% end %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <%= token.last_used_at ? "#{time_ago_in_words(token.last_used_at)} ago" : "Never" %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <%= token.created_at.strftime("%B %d, %Y") %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <div class="flex items-center justify-end gap-4">
+                  <%= button_to "Rotate", rotate_admin_series_api_token_path(@series, token), method: :post,
+                        class: "text-[#ec3750] hover:text-[#d42f46]",
+                        data: { turbo_confirm: "Rotating issues a new secret and invalidates the current one. Integrations using this key will stop working until updated. Continue?" } %>
+                  <%= button_to "Revoke", admin_series_api_token_path(@series, token), method: :delete,
+                        class: "text-gray-500 hover:text-gray-700",
+                        data: { turbo_confirm: "This permanently revokes the key. Any integration using it will stop working. Continue?" } %>
+                </div>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <div class="px-6 py-12 text-center">
+        <p class="text-gray-500">No API keys for this series yet.</p>
+        <p class="text-sm text-gray-400 mt-2">One key covers every event in the series — and it's the only credential that can create new ones.</p>
+      </div>
+    <% end %>
+
+    <div class="border-t border-gray-100 bg-gray-50 px-6 py-4">
+      <%= form_with url: admin_series_api_tokens_path(@series), method: :post, class: "flex flex-col sm:flex-row items-stretch sm:items-center gap-2" do |f| %>
+        <div class="flex flex-1 items-center bg-white border border-gray-300 rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-[#ec3750]">
+          <span class="pl-3 text-sm font-mono text-gray-400 select-none"><%= current_user.email.to_s.split("@").first %>@</span>
+          <%= f.text_field :name, placeholder: "series-ops-integration", required: true,
+                class: "flex-1 bg-transparent px-1 py-2 text-sm font-mono focus:outline-none text-gray-900" %>
+        </div>
+        <%= f.submit "Create API key", class: "px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] transition-colors cursor-pointer text-sm font-medium" %>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+    <h3 class="text-sm font-medium text-blue-800 mb-2">What a series API key can do</h3>
+    <ul class="text-sm text-blue-700 space-y-1">
+      <li><strong>Create events</strong> in this series, and only this series — the series is taken from the key, not the request</li>
+      <li><strong>Read and update</strong> every event in this series (schedule, location, module toggles)</li>
+      <li><strong>Act as an event API key</strong> on every event in the series: participant lookup, roster, invitations, travel calendar</li>
+      <li><strong>Not</strong> read medical, safeguarding or note data — those need a signed-in person, whatever key you hold</li>
+    </ul>
+    <p class="text-sm text-blue-700 mt-3">
+      Full reference: <%= link_to "API docs", docs_path, class: "underline font-medium" %> (Series section).
+    </p>
+  </div>
+</div>

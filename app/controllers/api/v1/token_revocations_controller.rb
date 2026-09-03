@@ -18,8 +18,8 @@ module Api
     # the owner on every successful revocation, since it can't tell whether the
     # caller (e.g. Revoker) sends its own notification.
     #
-    # Handles all three token kinds: GlobalApiToken, EventApiToken, and the
-    # legacy single Event#api_key.
+    # Handles every token kind: GlobalApiToken, SeriesApiToken, EventApiToken,
+    # and the legacy single Event#api_key.
     class TokenRevocationsController < ActionController::API
       # Deliberately no authenticate_token! — this endpoint is public by design.
 
@@ -62,6 +62,18 @@ module Api
           }
         end
 
+        if (series_token = SeriesApiToken.find_by_token(token))
+          series_token.revoke!
+          series = series_token.event_series
+          owner = series_token.user&.email
+          recipients = [ owner ].compact.presence || series_owner_emails(series)
+          send_email(recipients, token_name: series_token.name, kind: "series", series_name: series.name)
+          return {
+            owner_email: owner || recipients.first,
+            key_name: "#{series_token.name} (#{series.name})"
+          }
+        end
+
         if (event = Event.find_by_api_key(token))
           # Legacy single event key: revoking means clearing its digest.
           event.update!(api_key_digest: nil)
@@ -77,7 +89,13 @@ module Api
         event.event_role_assignments.event_admin.includes(:user).filter_map { |a| a.user&.email }
       end
 
-      def send_email(emails, token_name:, kind:, event_name: nil)
+      # Series owners are the people who can issue a replacement key, so
+      # they're who hears about it when the token's own creator is gone.
+      def series_owner_emails(series)
+        series.series_role_assignments.where(role: :owner).includes(:user).filter_map { |a| a.user&.email }
+      end
+
+      def send_email(emails, token_name:, kind:, event_name: nil, series_name: nil)
         emails.compact.uniq.each do |email|
           next if email.blank?
 
@@ -85,7 +103,8 @@ module Api
             email: email,
             token_name: token_name,
             token_kind: kind,
-            event_name: event_name
+            event_name: event_name,
+            series_name: series_name
           ).revoked.deliver_later
         end
       end

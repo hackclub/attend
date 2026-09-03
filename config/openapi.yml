@@ -16,7 +16,7 @@ info:
     Authorization: Bearer <token>
     ```
 
-    Three kinds of token are accepted:
+    Four kinds of token are accepted:
 
     - **Mobile token** — issued to a signed-in user by `POST /session`. Sets the
       current user. May return the response header
@@ -29,12 +29,37 @@ info:
       included. An unscoped token carries its owner's full access. Scopes are
       noted on the endpoints that accept them; the only one today is
       `bans:write`.
-    - **Event API key** — per-event key (`Event#api_key`). Does **not** set a
-      current user, so it only works on the subset of endpoints that don't
-      require one (participant `lookup`, `roster`, `create`, and the travel
-      calendar).
+    - **Series API key** — one key for a whole event series, issued from
+      **Series → API Keys** in the dashboard by a series owner. Does **not** set
+      a current user. It acts as an event API key on *every* event in its
+      series, and it is the only credential that can create an event. Scopes do
+      not apply — a series key's reach is its series. See the **Series**
+      section.
+    - **Event API key** — per-event key (`EventApiToken`, or the legacy
+      `Event#api_key`). Does **not** set a current user, so it only works on the
+      subset of endpoints that don't require one (participant `lookup`,
+      `roster`, `create`, and the travel calendar).
 
     Missing or invalid credentials return `401 { "error": "Unauthorized" }`.
+
+    ### What an API key cannot do
+
+    Neither key kind sets a current user, so endpoints that must attribute work
+    to a person stay closed to both — regardless of how broad the key is. A
+    series key is wider in *reach* (more events), never in *depth*:
+
+    | Endpoint | Series key | Event key |
+    | --- | --- | --- |
+    | `GET/POST /series/…` | ✅ its own series | ❌ `403` |
+    | `POST /series/{id}/events` | ✅ its own series | ❌ `403` |
+    | Participant `lookup`, `roster`, `create` | ✅ any event in the series | ✅ its own event |
+    | `GET /events/{id}/travel` | ✅ any event in the series | ✅ its own event |
+    | `GET /events/{id}/participants` (full payload) | ❌ `403` | ❌ `403` |
+    | Notes, scans, scan contexts, Slack blasts, NFC badges | ❌ `403` | ❌ `403` |
+
+    Either key can be revoked without credentials by POSTing its own secret to
+    `POST /tokens/revoke`; Attend emails the key's owner (or, if their account
+    is gone, the series owners) when that happens.
 
     ## Conventions
 
@@ -61,6 +86,11 @@ tags:
     description: Obtain, refresh, and revoke mobile bearer tokens.
   - name: Account
     description: The authenticated user's profile and accessible events.
+  - name: Series
+    description: >-
+      Event series, and the events inside one, addressed with a single series
+      API key. Creating an event lives here — an event has to belong to a
+      series, and only a series key names one unambiguously.
   - name: Participants
     description: Participant registrations for an event.
   - name: Notes
@@ -336,6 +366,293 @@ paths:
                     items: { $ref: "#/components/schemas/Ban" }
         "422":
           description: No email supplied, a malformed email, or a bad `expires_at`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /series:
+    get:
+      tags: [Series]
+      summary: List series
+      description: |
+        With a **series API key**, returns exactly one series — the one the key
+        belongs to. This is how a client discovers its own series when all it
+        has been given is a key.
+
+        With a **user token**, returns every series the user is a member of
+        (all series for a global admin), ordered by name.
+
+        An **event API key** gets an empty list: it has no standing over the
+        series its event happens to sit in.
+      responses:
+        "200":
+          description: Series the caller can see.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  series:
+                    type: array
+                    items: { $ref: "#/components/schemas/Series" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /series/{id}:
+    get:
+      tags: [Series]
+      summary: Get one series
+      description: >-
+        The series plus a compact list of its events. Pass `current` as the id
+        to mean "whichever series this key belongs to".
+      parameters:
+        - $ref: "#/components/parameters/SeriesId"
+      responses:
+        "200":
+          description: The series.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  series: { $ref: "#/components/schemas/SeriesDetail" }
+        "400":
+          description: >-
+            `current` was used with a credential that is not a series API key.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: >-
+            The series API key belongs to a different series, the caller is an
+            event API key, or the user is not a member of this series.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /series/{series_id}/events:
+    get:
+      tags: [Series]
+      summary: List the events in a series
+      description: >-
+        Summary records for every event in the series, earliest start first
+        (events with no start date last).
+      parameters:
+        - $ref: "#/components/parameters/SeriesIdNested"
+      responses:
+        "200":
+          description: The series' events.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items: { $ref: "#/components/schemas/SeriesEventSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    post:
+      tags: [Series]
+      summary: Create an event in the series
+      description: |
+        **Requires a series API key.** A mobile token, a global API token and an
+        event API key are all refused with `403` — an event has to land in a
+        series, and only a series key names one unambiguously.
+
+        The series is taken from the key, never from the request body. You
+        cannot create an event in another series by passing a different
+        `event_series_id`: a foreign value is rejected with `403` rather than
+        silently overridden (passing the key's own series id or slug is fine and
+        redundant).
+
+        ### Required fields
+
+        `name` and `support_email` — exactly what the web's new-event form
+        requires. `support_email` must be on `@hackclub.com` or
+        `@events.hackclub.com`: it is the from and reply-to address on every
+        participant and guardian email, so it has to be an address Hack Club
+        controls.
+
+        Everything else is optional here because it is optional on the web too:
+
+        - `slug` is generated from `name` when omitted (lowercase, dashes).
+        - `timezone` defaults to `UTC`.
+        - Schedule, location and module fields are collected by the web's setup
+          wizard *after* creation, and may all be sent in this one call instead.
+
+        ### What this does not do
+
+        - **Logo and banner** are not accepted. Upload them from the event's
+          dashboard; multipart uploads are out of scope for this endpoint.
+        - **Setup is not marked complete.** Like the web's create step, the new
+          event is a draft (`setup_complete: false`) until someone finishes the
+          setup wizard — which is also where waiver templates are configured.
+          Registration should not be opened before that.
+        - **Waiver / DocuSeal templates** are not settable here.
+
+        ### Side effects
+
+        The key's owner is given an explicit `event_admin` role on the new
+        event, mirroring what the web does for the series member who creates
+        one. The creation is written to the audit log, attributed to the key's
+        owner with the key's name in the metadata.
+      parameters:
+        - $ref: "#/components/parameters/SeriesIdNested"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event]
+              properties:
+                event: { $ref: "#/components/schemas/EventCreateAttributes" }
+            examples:
+              minimal:
+                summary: Only what the web requires
+                value:
+                  event:
+                    name: Sunbeam Summer 2027
+                    support_email: sunbeam@hackclub.com
+              fully_configured:
+                summary: Basics, schedule, location and modules in one call
+                value:
+                  event:
+                    name: Sunbeam Summer 2027
+                    slug: sunbeam-summer-2027
+                    support_email: sunbeam@hackclub.com
+                    timezone: Europe/Helsinki
+                    starts_at: "2027-07-12T09:00:00Z"
+                    ends_at: "2027-07-15T17:00:00Z"
+                    registration_open_at: "2027-04-01T00:00:00Z"
+                    registration_close_at: "2027-06-01T00:00:00Z"
+                    venue_name: Kaapelitehdas
+                    location_city: Helsinki
+                    location_country: Finland
+                    location_address: Tallberginkatu 1
+                    travel_enabled: true
+                    accommodation_enabled: true
+                    groups_enabled: true
+      responses:
+        "201":
+          description: Event created, in the key's own series.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event: { $ref: "#/components/schemas/SeriesEvent" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: |
+            One of:
+
+            - the caller is not a series API key (`Creating an event requires a
+              series API key.`)
+            - the key belongs to a different series
+            - the body named a different series in `event_series_id`
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: >-
+            A required field was missing, or the event failed validation (bad
+            support-email domain, slug already taken, reserved slug).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                missing_required:
+                  value: { error: name and support_email are required }
+                bad_support_email:
+                  value: { error: Support email must be a @hackclub.com or @events.hackclub.com address }
+
+  /series/{series_id}/events/{id}:
+    get:
+      tags: [Series]
+      summary: Get one event in the series
+      description: >-
+        An event outside the series returns `404`, not `403` — from this key's
+        point of view it does not exist.
+      parameters:
+        - $ref: "#/components/parameters/SeriesIdNested"
+        - $ref: "#/components/parameters/SeriesEventId"
+      responses:
+        "200":
+          description: The event.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event: { $ref: "#/components/schemas/SeriesEvent" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: No such event in this series.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+    patch:
+      tags: [Series]
+      summary: Update an event in the series
+      description: |
+        One series key updates any event in its series — that is the point of a
+        series key. Accepts the same fields as the web's event settings form and
+        setup wizard (basics, schedule, location, module toggles); send only the
+        fields you want to change.
+
+        `event_series_id` is not writable: an event cannot be moved out of its
+        series through this API (a value in the body is ignored, not rejected,
+        so a client can round-trip a `GET` response). Moving an event between
+        series is a global-admin action on the web.
+
+        A user token also works here if the caller could update the event on the
+        web — unlike `POST`, which is series-key-only.
+      parameters:
+        - $ref: "#/components/parameters/SeriesIdNested"
+        - $ref: "#/components/parameters/SeriesEventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event]
+              properties:
+                event: { $ref: "#/components/schemas/EventUpdateAttributes" }
+            examples:
+              move_the_venue:
+                summary: Change the venue and turn on groups
+                value:
+                  event:
+                    venue_name: Kaapelitehdas
+                    location_address: Tallberginkatu 1
+                    groups_enabled: true
+      responses:
+        "200":
+          description: Event updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event: { $ref: "#/components/schemas/SeriesEvent" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: No such event in this series.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: The event failed validation.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -1019,7 +1336,9 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      description: Mobile token, global API token, or event API key.
+      description: >-
+        Mobile token, global API token, series API key, or event API key. See
+        Authentication above for which endpoints each one reaches.
     sessionCookie:
       type: apiKey
       in: cookie
@@ -1033,6 +1352,30 @@ components:
       required: true
       schema: { type: string }
       description: Event id or slug.
+    SeriesId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: >-
+        Series UUID, series slug, or the literal `current` — the series the
+        calling series API key belongs to. `current` is only valid for a series
+        API key.
+    SeriesIdNested:
+      name: series_id
+      in: path
+      required: true
+      schema: { type: string }
+      description: >-
+        Series UUID, series slug, or the literal `current` — the series the
+        calling series API key belongs to. `current` is only valid for a series
+        API key.
+    SeriesEventId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: Event UUID or slug. Must belong to the series in the path.
     EventIdNumeric:
       name: event_id
       in: path
@@ -1137,6 +1480,181 @@ components:
         location_city: { type: string, nullable: true, example: New York }
         logo_url: { type: string, nullable: true }
         banner_url: { type: string, nullable: true }
+
+    Series:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string, example: sunbeam }
+        name: { type: string, example: Sunbeam }
+        description: { type: string, nullable: true }
+        contact_email: { type: string, format: email, nullable: true }
+        event_count: { type: integer, example: 4 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    SeriesDetail:
+      allOf:
+        - $ref: "#/components/schemas/Series"
+        - type: object
+          properties:
+            events:
+              type: array
+              description: The series' events, earliest start first.
+              items:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  slug: { type: string }
+                  name: { type: string }
+                  starts_at: { type: string, format: date-time, nullable: true }
+
+    SeriesEventSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string, example: sunbeam-summer-2027 }
+        name: { type: string, example: Sunbeam Summer 2027 }
+        series:
+          type: object
+          properties:
+            id: { type: string, format: uuid, nullable: true }
+            slug: { type: string, nullable: true }
+            name: { type: string, nullable: true }
+        support_email: { type: string, format: email, nullable: true }
+        timezone:
+          type: string
+          nullable: true
+          description: IANA identifier, e.g. `Europe/Helsinki`.
+          example: Europe/Helsinki
+        starts_at: { type: string, format: date-time, nullable: true }
+        ends_at: { type: string, format: date-time, nullable: true }
+        registration_open_at: { type: string, format: date-time, nullable: true }
+        registration_close_at: { type: string, format: date-time, nullable: true }
+        venue_name: { type: string, nullable: true }
+        location_city: { type: string, nullable: true }
+        location_country: { type: string, nullable: true }
+        location_address: { type: string, nullable: true }
+        location_latitude: { type: number, format: double, nullable: true }
+        location_longitude: { type: number, format: double, nullable: true }
+        setup_complete:
+          type: boolean
+          description: >-
+            False until someone finishes the setup wizard on the web. An event
+            created through this API starts as a draft.
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    SeriesEvent:
+      allOf:
+        - $ref: "#/components/schemas/SeriesEventSummary"
+        - type: object
+          properties:
+            modules: { $ref: "#/components/schemas/EventModules" }
+            hotel_scan_context_id: { type: string, format: uuid, nullable: true }
+            participant_count: { type: integer, example: 120 }
+
+    EventModules:
+      type: object
+      description: >-
+        The event's feature toggles, always returned as real booleans (they are
+        stored loosely, so read them from here rather than assuming a shape).
+      properties:
+        freedom_waivers_enabled: { type: boolean }
+        travel_enabled: { type: boolean }
+        visa_options_enabled: { type: boolean }
+        visa_application_url: { type: string, nullable: true }
+        accommodation_enabled: { type: boolean }
+        roommate_preferences_enabled: { type: boolean }
+        guardian_invites_locked: { type: boolean }
+        nfc_badges_enabled: { type: boolean }
+        nfc_badge_write_on_checkin_enabled: { type: boolean }
+        groups_enabled: { type: boolean }
+
+    EventWritableAttributes:
+      type: object
+      description: >-
+        Every event field this API can write — the same set as the web's event
+        settings form plus its setup wizard, minus the series (decided by the
+        key), the logo/banner (uploaded from the dashboard) and the DocuSeal
+        waiver templates (configured in the setup wizard).
+      properties:
+        name: { type: string, example: Sunbeam Summer 2027 }
+        slug:
+          type: string
+          description: >-
+            Lowercase letters, numbers and dashes. Generated from `name` when
+            omitted. Must be unique, and cannot be a reserved word (`new`,
+            `admin`, `api`, `series`, …).
+          example: sunbeam-summer-2027
+        support_email:
+          type: string
+          format: email
+          description: >-
+            Must be `@hackclub.com` or `@events.hackclub.com` — it is the from
+            and reply-to address on every participant and guardian email.
+          example: sunbeam@hackclub.com
+        timezone:
+          type: string
+          description: >-
+            IANA identifier or Rails zone name. Defaults to `UTC`. Zone-less
+            timestamps (`2027-07-12T09:00`) are interpreted in this zone, so
+            send it alongside the schedule; timestamps with an offset or `Z` are
+            taken as given.
+          example: Europe/Helsinki
+        starts_at: { type: string, format: date-time, nullable: true }
+        ends_at: { type: string, format: date-time, nullable: true }
+        registration_open_at: { type: string, format: date-time, nullable: true }
+        registration_close_at: { type: string, format: date-time, nullable: true }
+        venue_name: { type: string, nullable: true, example: Kaapelitehdas }
+        location_city: { type: string, nullable: true, example: Helsinki }
+        location_country: { type: string, nullable: true, example: Finland }
+        location_address:
+          type: string
+          nullable: true
+          description: >-
+            Saving an address, venue, city or country geocodes it in the
+            background, filling in latitude and longitude — so a later `GET` may
+            show coordinates you never sent.
+          example: Tallberginkatu 1
+        location_latitude: { type: number, format: double, nullable: true }
+        location_longitude: { type: number, format: double, nullable: true }
+        freedom_waivers_enabled: { type: boolean, description: "Defaults to true on create." }
+        travel_enabled: { type: boolean, description: "Defaults to true on create." }
+        visa_options_enabled: { type: boolean, description: "Defaults to true on create." }
+        visa_application_url: { type: string, nullable: true }
+        accommodation_enabled: { type: boolean, description: "Defaults to true on create." }
+        roommate_preferences_enabled: { type: boolean, description: "Defaults to true on create." }
+        guardian_invites_locked: { type: boolean }
+        nfc_badges_enabled: { type: boolean }
+        nfc_badge_write_on_checkin_enabled: { type: boolean }
+        groups_enabled: { type: boolean }
+        hotel_scan_context_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Must be a scan context belonging to this event.
+
+    EventCreateAttributes:
+      allOf:
+        - $ref: "#/components/schemas/EventWritableAttributes"
+        - type: object
+          required: [name, support_email]
+          properties:
+            event_series_id:
+              type: string
+              description: >-
+                Not needed — the series comes from the key. If sent it must
+                match the key's own series (id or slug); any other value is
+                rejected with `403`.
+
+    EventUpdateAttributes:
+      allOf:
+        - $ref: "#/components/schemas/EventWritableAttributes"
+        - type: object
+          description: >-
+            Send only the fields you want to change. `event_series_id` is not
+            writable and is ignored if present.
 
     SessionResponse:
       type: object

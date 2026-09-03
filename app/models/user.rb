@@ -50,6 +50,15 @@ class User < ApplicationRecord
   has_many :mobile_tokens, dependent: :destroy
   has_many :push_tokens, dependent: :destroy
   has_many :passports, dependent: :destroy
+  # API tokens name their creator, and each kind survives that person
+  # differently. Event and series keys belong to the event or series and keep
+  # working with a null creator; a global key's authority *is* its owner's
+  # global-admin status (re-checked per request), so it goes with them. The
+  # matching ON DELETE actions are on the foreign keys too — these are what
+  # make `user.destroy` work, the FKs are the backstop.
+  has_many :event_api_tokens, dependent: :nullify
+  has_many :series_api_tokens, dependent: :nullify
+  has_many :global_api_tokens, dependent: :destroy
 
   validates :email, presence: true, uniqueness: true
 

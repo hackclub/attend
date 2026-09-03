@@ -21,6 +21,13 @@ class EventSeriesPolicy < ApplicationPolicy
     user.series_owner_for?(record)
   end
 
+  # A series API key acts as an event admin on every event in the series and
+  # can create new ones, so issuing it is owner-only — the same bar as handing
+  # someone series membership.
+  def manage_api_tokens?
+    user.series_owner_for?(record)
+  end
+
   def destroy?
     user.global_admin?
   end

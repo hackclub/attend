@@ -22,16 +22,15 @@ module Api
       end
 
       def authorize_event
-        if current_event_from_api_key
-          unless current_event_from_api_key.id == @event.id
-            render json: { error: "API key is not valid for this event" }, status: :forbidden
-          end
+        if api_key_request?
+          require_api_key_event_scope!(@event)
         else
           require_event_access!(@event)
         end
       end
 
-      # No current_user means an event API key, which keeps the full payload.
+      # No current_user means an event or series API key, which keeps the full
+      # payload.
       def include_addresses?
         current_user.nil? || current_user.can_view_participant_pii?(@event)
       end
