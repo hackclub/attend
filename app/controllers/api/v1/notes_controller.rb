@@ -35,8 +35,10 @@ module Api
 
       private
 
+      # Notes are attributed to their author, so every note endpoint needs a
+      # person behind the request. No API key — event or series — qualifies.
       def reject_api_key_auth
-        return unless current_event_from_api_key
+        return unless api_key_request?
         render json: { error: "API key is not authorized for notes" }, status: :forbidden
       end
 
@@ -44,10 +46,8 @@ module Api
         @event = Event.find(params[:event_id])
         Current.event = @event
 
-        if current_event_from_api_key
-          unless current_event_from_api_key.id == @event.id
-            render json: { error: "API key is not valid for this event" }, status: :forbidden
-          end
+        if api_key_request?
+          require_api_key_event_scope!(@event)
         else
           authorize @event, :api_participants?
         end

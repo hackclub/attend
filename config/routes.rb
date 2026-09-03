@@ -311,6 +311,11 @@ Rails.application.routes.draw do
 
     resources :series, controller: "event_series", param: :slug, except: [ :destroy ] do
       resources :members, only: [ :index, :new, :create, :destroy ], controller: "series_members"
+      resources :api_tokens, only: [ :index, :create, :destroy ], controller: "series_api_tokens" do
+        member do
+          post :rotate
+        end
+      end
     end
 
     resources :users, only: [ :index, :show, :new, :create, :edit, :update ] do
@@ -433,6 +438,15 @@ Rails.application.routes.draw do
 
       resources :events, only: [ :index ]
       resources :push_tokens, only: [ :create, :destroy ], param: :token
+
+      # Series API: one key per event series. `:series_id` accepts the series
+      # id, its slug, or the literal `current` (the series the calling key
+      # belongs to). Event creation lives here and nowhere else — it needs a
+      # series, and only a series key names one.
+      resources :series, only: [ :index, :show ], controller: "series", param: :id do
+        resources :events, only: [ :index, :show, :create, :update ],
+                  controller: "series/events", param: :id
+      end
 
       get "travel/search_airports", to: "travel#search_airports"
       post "travel/validate_flight", to: "travel#validate_flight"
