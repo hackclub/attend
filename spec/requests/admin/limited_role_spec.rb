@@ -1,9 +1,13 @@
 require "rails_helper"
 
 # The Limited event role does everything Ops does, minus a participant's exact
-# date of birth and any address -- home or travel pickup. Medical records are
-# deliberately full: the role has to be able to help in an incident. These specs
-# pin the redaction on every surface that renders or exports a restricted field.
+# date of birth, any address (home or travel pickup), every phone number, and
+# the contact details of the people around them (guardians, emergency contacts).
+# Two things stay: the attendee's own email address, which the role searches and
+# works from, and an emergency contact's first name and phone number, which
+# running an incident depends on. Medical records are deliberately full for the
+# same reason. These specs pin the redaction on every surface that renders or
+# exports a restricted field.
 RSpec.describe "Limited event role", type: :request do
   include Devise::Test::IntegrationHelpers
 
@@ -36,6 +40,25 @@ RSpec.describe "Limited event role", type: :request do
       expect(response.body).not_to include("12 Langley Road", "23666")
     end
 
+    it "hides the phone number but keeps the attendee's email" do
+      participant.update!(phone: "+15005550001")
+      sign_in_with_role("limited")
+
+      get admin_event_participant_path(event.slug, participant_event)
+
+      expect(response.body).to include(participant.email)
+      expect(response.body).not_to include("+15005550001")
+    end
+
+    it "still shows the phone number to ops" do
+      participant.update!(phone: "+15005550001")
+      sign_in_with_role("ops", email: "ops-contact-spec@example.com")
+
+      get admin_event_participant_path(event.slug, participant_event)
+
+      expect(response.body).to include(participant.email, "+15005550001")
+    end
+
     it "still shows both to ops" do
       sign_in_with_role("ops")
 
@@ -56,6 +79,30 @@ RSpec.describe "Limited event role", type: :request do
       expect(response.body).to include(">Age<")
       expect(response.body).not_to include('data-column="dob"', "2009-03-14")
     end
+
+    it "drops the phone column and keeps the email one" do
+      participant.update!(phone: "+15005550001")
+      sign_in_with_role("limited")
+
+      get table_admin_event_participants_path(event.slug)
+
+      expect(response.body).to include('data-column="email"', participant.email)
+      expect(response.body).not_to include('data-column="phone"', "+15005550001")
+    end
+
+    it "still filters by email, which is how the role finds people" do
+      participant.update!(email: "dorothy@example.com")
+      other = create(:participant, legal_first_name: "Mary", legal_last_name: "Jackson",
+        email: "mary@example.com")
+      create(:participant_event, event: event, participant: other)
+      sign_in_with_role("limited")
+
+      get table_admin_event_participants_path(event.slug,
+        filters: { "0" => { field: "email", operator: "starts_with", value: "dorothy" } })
+
+      expect(response.body).to include("Dorothy")
+      expect(response.body).not_to include("Mary")
+    end
   end
 
   describe "the edit form" do
@@ -71,6 +118,21 @@ RSpec.describe "Limited event role", type: :request do
       expect(participant.reload.preferred_name).to eq("Dot")
       expect(participant.date_of_birth).to eq(Date.new(2009, 3, 14))
     end
+
+    it "omits the phone field and ignores it when posted, but still edits email" do
+      participant.update!(phone: "+15005550001")
+      sign_in_with_role("limited")
+
+      get edit_admin_event_participant_path(event.slug, participant_event)
+      expect(response.body).to include("participant[email]")
+      expect(response.body).not_to include("participant[phone]")
+
+      patch admin_event_participant_path(event.slug, participant_event),
+        params: { participant: { preferred_name: "Dot", email: "elsewhere@example.com", phone: "+15005550009" } }
+
+      expect(participant.reload.email).to eq("elsewhere@example.com")
+      expect(participant.phone).to eq("+15005550001")
+    end
   end
 
   describe "the change history" do
@@ -83,18 +145,36 @@ RSpec.describe "Limited event role", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body).not_to include("2008-01-02", "Newport")
     end
+
+    it "hides phone changes, and a guardian's email, but not the attendee's own" do
+      guardian = Guardian.create!(legal_first_name: "Katherine", legal_last_name: "Johnson",
+        email: "katherine-history@example.com", phone: "+15005550003")
+      participant_event.guardian_participant_events.create!(guardian: guardian, relationship: "Parent")
+      PaperTrail.request(whodunnit: nil) do
+        participant.update!(email: "moved@example.com", phone: "+15005550004")
+        guardian.update!(email: "katherine-new@example.com")
+      end
+      sign_in_with_role("limited")
+
+      get history_admin_event_participant_path(event.slug, participant_event)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("moved@example.com")
+      expect(response.body).not_to include("+15005550004", "katherine-new@example.com")
+    end
   end
 
   describe "exports" do
-    it "does not offer the DOB or address columns" do
+    it "does not offer the DOB, address, or phone columns, but keeps email" do
       sign_in_with_role("limited")
 
       get admin_event_exports_path(event_slug: event.slug)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("participant.age_at_event", "travel.inbound.mode")
+      expect(response.body).to include("participant.age_at_event", "travel.inbound.mode",
+        "participant.email")
       expect(response.body).not_to include("participant.date_of_birth", "participant.address_line_1",
-        "participant.postal_code")
+        "participant.postal_code", "participant.phone")
     end
 
     it "still offers the participants preset, stripping the DOB column from it" do
@@ -108,12 +188,12 @@ RSpec.describe "Limited event role", type: :request do
       expect(response.body).not_to include("participant.date_of_birth")
     end
 
-    it "describes the Participant category without promising an address" do
+    it "describes the Participant category without promising a phone or an address" do
       sign_in_with_role("limited")
 
       get admin_event_exports_path(event_slug: event.slug)
 
-      expect(response.body).to include("Contact details and profile information")
+      expect(response.body).to include("Profile information")
       expect(response.body).not_to include("Contact details, address, and profile information")
     end
 
@@ -243,6 +323,25 @@ RSpec.describe "Limited event role", type: :request do
       expect(personal).not_to have_key("address")
     end
 
+    it "omits the participant's phone but serves their email" do
+      payload = show_payload
+
+      expect(payload["email"]).to eq(participant.email)
+      expect(payload).not_to have_key("phone")
+    end
+
+    it "omits a guardian's email and phone, keeping their name" do
+      guardian = Guardian.create!(legal_first_name: "Katherine", legal_last_name: "Johnson",
+        email: "katherine-api@example.com", phone: "+15005550003")
+      participant_event.guardian_participant_events.create!(guardian: guardian, relationship: "Parent")
+
+      guardians = show_payload["guardians"]
+
+      expect(guardians.first["name"]).to eq("Katherine Johnson")
+      expect(guardians.first).not_to have_key("email")
+      expect(guardians.first).not_to have_key("phone")
+    end
+
     it "omits the travel pickup address" do
       travel = show_payload["travel_inbound"]
 
@@ -316,6 +415,145 @@ RSpec.describe "Limited event role", type: :request do
       payload = JSON.parse(response.body)["events"].find { |e| e["id"] == event.id }
       expect(payload["role"]).to eq("series_member")
       expect(payload["can_view_participant_pii"]).to be(true)
+    end
+  end
+  describe "emergency contacts" do
+    let!(:emergency_contact) do
+      EmergencyContact.create!(participant_event: participant_event, name: "Mary Jackson",
+        phone: "+15005550002", email: "mary@example.com", relationship: "Aunt", priority: 1)
+    end
+
+    it "gives the profile a first name and a phone number, and nothing else" do
+      sign_in_with_role("limited")
+
+      get admin_event_participant_path(event.slug, participant_event)
+
+      expect(response.body).to include("Emergency Contacts", "Mary", "+15005550002")
+      expect(response.body).not_to include("Mary Jackson", "mary@example.com")
+    end
+
+    it "is not offered to ops, who never had it on the profile" do
+      sign_in_with_role("ops", email: "ops-ec-spec@example.com")
+
+      get admin_event_participant_path(event.slug, participant_event)
+
+      expect(response.body).not_to include("Emergency Contacts", "+15005550002")
+    end
+  end
+
+  describe "guardians" do
+    let(:guardian) do
+      Guardian.create!(legal_first_name: "Katherine", legal_last_name: "Johnson",
+        email: "katherine@example.com", phone: "+15005550003")
+    end
+    let!(:gpe) do
+      participant_event.guardian_participant_events.create!(guardian: guardian, relationship: "Parent")
+    end
+
+    it "shows the guardian's name but not their email or phone" do
+      sign_in_with_role("limited")
+
+      get admin_event_participant_path(event.slug, participant_event)
+
+      expect(response.body).to include("Katherine Johnson")
+      expect(response.body).not_to include("katherine@example.com", "+15005550003")
+    end
+
+    it "closes the guardian edit form, which is all their contact details" do
+      sign_in_with_role("limited")
+
+      get edit_admin_event_participant_guardian_path(event.slug, participant_event, gpe)
+
+      expect(response).to redirect_to(admin_event_participant_path(event.slug, participant_event))
+      expect(flash[:alert]).to include("cannot see their contact details")
+    end
+
+    it "refuses to link a new guardian, which means typing their contact details in" do
+      sign_in_with_role("limited")
+
+      expect {
+        post link_guardian_admin_event_participant_path(event.slug, participant_event),
+          params: { guardian_first_name: "Dorothy", guardian_last_name: "Hoover",
+                    guardian_email: "dorothy@example.com", guardian_relationship: "Parent" }
+      }.not_to change(Guardian, :count)
+
+      expect(flash[:alert]).to include("cannot see their contact details")
+    end
+  end
+
+  describe "invitations" do
+    # Invitations are addressed by email, and the role can see those, so this
+    # surface stays open to it.
+    it "still lists pending invitations" do
+      event.invitations.create!(email: "invited@example.com", expires_at: 1.week.from_now)
+      sign_in_with_role("limited")
+
+      get admin_event_participants_path(event.slug, status: "pending_invitations")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("invited@example.com")
+    end
+  end
+
+  describe "the support inbox" do
+    # A ticket is an email or SMS thread, keyed by the sender's address or
+    # number, so there is no redacted version of it to show.
+    it "is closed to the role entirely" do
+      user = sign_in_with_role("limited")
+
+      expect(TicketPolicy.new(user, Ticket).index?).to be(false)
+      expect(user.support_staff_event_ids).to be_empty
+
+      get support_tickets_path
+
+      expect(response).to redirect_to(root_path)
+    end
+
+    it "stays open to ops" do
+      user = sign_in_with_role("ops", email: "ops-support-spec@example.com")
+
+      expect(TicketPolicy.new(user, Ticket).index?).to be(true)
+    end
+  end
+
+  describe "the command palette search" do
+    it "finds someone by email and shows it back" do
+      sign_in_with_role("limited")
+
+      get admin_search_path(q: participant.email), headers: { "ACCEPT" => "application/json" }
+
+      payload = JSON.parse(response.body)
+      expect(payload["participants"].first["name"]).to eq("Dorothy Vaughan")
+      expect(payload["participants"].first["email"]).to eq(participant.email)
+    end
+  end
+  describe "bulk messaging" do
+    # The role keeps the ability to send; what it loses is the sight of the
+    # address or number each message went to.
+    it "hides the number an SMS went to, keeping the channel and status" do
+      user = sign_in_with_role("limited")
+      message = event.messages.create!(audience: "confirmed_attendees", channels: [ "sms" ],
+        subject: "Hi", body: "<p>Hello</p>", status: "completed", sent_by_user: user)
+      message.message_deliveries.create!(participant_event: participant_event, channel: "sms",
+        recipient_phone: "+15005550001", status: "delivered")
+
+      get admin_event_message_path(event_slug: event.slug, id: message)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Dorothy Vaughan", "Delivered")
+      expect(response.body).not_to include("+15005550001")
+    end
+
+    it "still shows the address an email went to" do
+      user = sign_in_with_role("limited")
+      message = event.messages.create!(audience: "confirmed_attendees", channels: [ "email" ],
+        subject: "Hi", body: "<p>Hello</p>", status: "completed", sent_by_user: user)
+      message.message_deliveries.create!(participant_event: participant_event, channel: "email",
+        recipient_email: participant.email, status: "delivered")
+
+      get admin_event_message_path(event_slug: event.slug, id: message)
+
+      expect(response.body).to include(participant.email)
     end
   end
 end

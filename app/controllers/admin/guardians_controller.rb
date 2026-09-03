@@ -3,6 +3,9 @@ module Admin
     before_action :require_event_selected
     before_action :set_participant_event
     before_action :set_guardian_participant_event
+    # The form is nothing but a guardian's contact details and address, none of
+    # which PII-restricted roles may see, so they can't open or submit it.
+    before_action :require_contact_details_access
 
     def edit
       @guardian = @guardian_participant_event.guardian
@@ -36,6 +39,13 @@ module Admin
     end
 
     private
+
+    def require_contact_details_access
+      return if can_view_participant_pii?
+
+      redirect_to admin_event_participant_path(current_event, @participant_event),
+        alert: "Your role cannot edit guardian details, because it cannot see their contact details."
+    end
 
     def set_participant_event
       @participant_event = current_event.participant_events.find(params[:participant_id])

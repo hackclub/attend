@@ -14,8 +14,11 @@ class User < ApplicationRecord
 
   enum :global_role, { no_role: "none", global_admin: "global_admin", read_only: "read_only" }, default: :no_role
 
-  # Event roles whose day-to-day work includes the support inbox.
-  SUPPORT_ROLES = %w[event_admin ops limited].freeze
+  # Event roles whose day-to-day work includes the support inbox. Limited is
+  # deliberately absent: an SMS ticket is keyed by the sender's phone number,
+  # and threads carry guardians' contact details too, neither of which that
+  # role may see (see EventRoleAssignment::PII_RESTRICTED_ROLES).
+  SUPPORT_ROLES = %w[event_admin ops].freeze
 
   # `oidc_claims` holds PII straight from Hack Club Auth (phone number,
   # birthdate, home address). Encrypting the whole jsonb blob works because the
@@ -325,8 +328,10 @@ class User < ApplicationRecord
       series_role_assignments.exists?
   end
 
-  # Whether this user may see participants' exact dates of birth and home
-  # addresses. False only for someone whose access comes entirely from
+  # Whether this user may see participants' identifying details: exact dates of
+  # birth, home addresses, phone numbers, and the contact details of the people
+  # around them (guardians and emergency contacts). A participant's own email
+  # address is not gated. False only for someone whose access comes entirely from
   # PII-restricted roles (see EventRoleAssignment::PII_RESTRICTED_ROLES) —
   # holding any other role, on the event in question or anywhere when no event
   # is given, restores the full view. Fails closed for a user with no roles.

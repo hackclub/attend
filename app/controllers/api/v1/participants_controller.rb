@@ -219,8 +219,10 @@ module Api
           display_name: participant.display_name,
           full_name: participant.full_name,
           email: participant.email,
+          # The phone is omitted, not nulled, for PII-restricted roles — same
+          # contract as date_of_birth and address in #personal_json.
+          **(include_pii? ? { phone: participant.phone } : {}),
           slack_user_id: participant.slack_user_id,
-          phone: participant.phone,
           pronouns: participant.pronouns,
           headshot_url: headshot_url_for(participant),
           status: pe.status,
@@ -427,14 +429,13 @@ module Api
           id: gpe.id,
           guardian_id: g&.id,
           name: g&.full_name,
-          email: g&.email,
-          phone: gpe.phone_override.presence || g&.phone,
+          **(include_pii? ? { email: g&.email, phone: gpe.phone_override.presence || g&.phone } : {}),
           relationship: gpe.relationship,
           is_primary: gpe.is_primary_guardian,
           status: gpe.status,
           accepted_at: gpe.accepted_at&.iso8601,
           completed_at: gpe.completed_at&.iso8601,
-          invited_via_email: gpe.invited_via_email,
+          **(include_pii? ? { invited_via_email: gpe.invited_via_email } : {}),
           invite_token_sent_at: gpe.invite_token_sent_at&.iso8601,
           media_permission: gpe.media_permission,
           photo_permission: gpe.photo_permission,
@@ -445,7 +446,12 @@ module Api
         }
       end
 
+      # An emergency contact's phone number is the one number a PII-restricted
+      # role keeps — you can't run an incident without being able to call
+      # someone — but they get the first name only, and no email address.
       def emergency_contact_json(ec)
+        return { id: ec.id, name: ec.first_name, phone: ec.phone, priority: ec.priority } unless include_pii?
+
         {
           id: ec.id,
           name: ec.name,
@@ -524,7 +530,9 @@ module Api
         }
       end
 
-      # Whether this caller gets exact dates of birth and addresses. Memoized
+      # Whether this caller gets exact dates of birth, addresses, phone numbers,
+      # and the people around a participant (guardian and emergency contact
+      # details). A participant's own email address is not gated. Memoized
       # for the same reason as can_view_sensitive_data? below. A nil
       # current_user means an event API key, which never reaches the actions
       # that serve these fields (see API_KEY_ALLOWED_ACTIONS).
@@ -551,6 +559,8 @@ module Api
       def emergency_contacts_json(pe)
         pe.guardian_participant_events.flat_map do |gpe|
           gpe.emergency_contacts.sort_by { |ec| ec.priority || Float::INFINITY }.map do |ec|
+            next { name: ec.first_name, phone: ec.phone, priority: ec.priority } unless include_pii?
+
             {
               name: ec.name,
               phone: ec.phone,

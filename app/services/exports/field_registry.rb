@@ -17,7 +17,7 @@ module Exports
     CATEGORIES = {
       "identity"           => { label: "Identity", tier: :identity, description: "Participant name and email" },
       "basic"              => { label: "Participant", tier: :general, description: "Contact details, address, and profile information",
-                                pii_restricted_description: "Contact details and profile information" },
+                                pii_restricted_description: "Profile information" },
       "event_status"       => { label: "Event Status", tier: :general, description: "Registration status, check-in, and onboarding progress" },
       "travel"             => { label: "Travel", tier: :general, description: "Inbound and outbound travel details" },
       "flight_legs"        => { label: "Flight Legs", tier: :general, description: "Per-leg flight details (only in one-row-per-flight-leg mode)" },
@@ -44,8 +44,11 @@ module Exports
     # EventRoleAssignment::PII_RESTRICTED_ROLES). "Age at Event Start" stays, so
     # a Limited exporter can still do the rooming and minor-count work that
     # needs an age. The travel origin addresses are here too: for a car
-    # journey that field is the participant's doorstep.
+    # journey that field is the participant's doorstep. The phone number goes
+    # with them; a participant's email address does not, since those roles work
+    # from it every day.
     PII_RESTRICTED_FIELD_KEYS = %w[
+      participant.phone
       participant.date_of_birth
       participant.address_line_1
       participant.address_line_2

@@ -177,7 +177,9 @@ module Admin
           display_name: participant.display_name,
           full_name: participant.full_name,
           email: participant.email,
-          phone: participant.phone,
+          # The phone is omitted, not blanked, for PII-restricted roles; the
+          # scanner modal hides that row entirely for them.
+          **(can_view_participant_pii? ? { phone: participant.phone } : {}),
           pronouns: participant.pronouns,
           tshirt_size: participant.tshirt_size,
           status: participant_event.status,
@@ -208,6 +210,13 @@ module Admin
             "LOWER(participants.email) LIKE :q",
             q: search_term
           )
+      end
+
+      # The participant profile links here for one person's scans. It filters by
+      # id rather than putting their email in the URL, which roles that can't
+      # see contact details must not be handed.
+      if params[:participant_event_id].present?
+        @scans = @scans.where(participant_event_id: params[:participant_event_id])
       end
 
       if params[:scan_context_id].present?
