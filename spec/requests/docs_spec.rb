@@ -3,6 +3,16 @@ require "rails_helper"
 RSpec.describe "Docs", type: :request do
   include Devise::Test::IntegrationHelpers
 
+  HTTP_METHODS = %w[get post put patch delete head options].freeze
+
+  # [name, operation] for every operation in the document, named the way a
+  # failure message should read them.
+  def operations(doc)
+    doc.fetch("paths").flat_map do |path, item|
+      item.slice(*HTTP_METHODS).map { |verb, op| [ "#{verb.upcase} #{path}", op ] }
+    end
+  end
+
   let(:global_admin) { User.create!(email: "ga-docs@example.com", name: "Global Admin", global_role: "global_admin") }
   let(:regular_user) { User.create!(email: "user-docs@example.com", name: "Regular User") }
 
@@ -163,6 +173,33 @@ RSpec.describe "Docs", type: :request do
       expect(doc["openapi"]).to start_with("3.")
       expect(doc.dig("info", "title")).to eq("Attend API")
       expect(doc["paths"]).to include("/me", "/events/{event_id}/participants")
+    end
+
+    # Mintlify builds the endpoint pages from this document, and by default it
+    # derives each page's URL from the operation's tag and summary — so a
+    # retitle silently moves the page and 404s every link to it. Every
+    # operation pins its own URL instead. That only stays true if new
+    # endpoints pin one too, which is what this checks.
+    it "pins a documentation URL on every operation" do
+      get openapi_path
+      doc = JSON.parse(response.body)
+
+      unpinned = operations(doc).filter_map { |name, op| name if op.dig("x-mint", "href").blank? }
+
+      expect(unpinned).to be_empty,
+        "these operations would fall back to a summary-derived URL: #{unpinned.join(", ")}"
+    end
+
+    # Two operations pointing at one page means the second silently wins.
+    it "gives every operation a distinct documentation URL" do
+      get openapi_path
+      doc = JSON.parse(response.body)
+
+      by_href = operations(doc).group_by { |_, op| op.dig("x-mint", "href") }
+      collisions = by_href.select { |_, ops| ops.length > 1 }
+
+      expect(collisions).to be_empty,
+        "these URLs are claimed more than once: #{collisions.keys.join(", ")}"
     end
 
     it "documents the UUID travel paths and nullable group-object entry contract" do
