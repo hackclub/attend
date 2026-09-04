@@ -114,11 +114,25 @@ tags:
       Airport and flight lookups. These endpoints authenticate with the web
       session cookie (Devise), not a bearer token.
 
+# Every operation pins its documentation URL with `x-mint.href`.
+#
+# Mintlify builds the endpoint pages in docs/ from this file, and by default it
+# derives each page's URL from the operation's tag and summary. That makes the
+# summary load-bearing: retitling "Create a mobile token" would silently move
+# its page and 404 every existing link to it. Pinning the href decouples the
+# two, so summaries stay free to change.
+#
+# The hrefs below were generated from the summaries as they stood when the docs
+# first went live, so they match the URLs already in the wild. A new operation
+# needs its own href — keep the /api-reference/<tag>/<summary> shape for
+# consistency, but nothing enforces it, and nothing breaks if you don't.
 paths:
   /session:
     post:
       tags: [Authentication]
       summary: Create a mobile token
+      x-mint:
+        href: /api-reference/authentication/create-a-mobile-token
       description: >-
         Exchange a Hack Club OAuth authorization code, or a signed session
         token, for a mobile bearer token. Public — no bearer token required.
@@ -159,6 +173,8 @@ paths:
     delete:
       tags: [Authentication]
       summary: Revoke the current token (log out)
+      x-mint:
+        href: /api-reference/authentication/revoke-the-current-token-log-out
       responses:
         "200":
           description: Token revoked.
@@ -175,6 +191,8 @@ paths:
     post:
       tags: [Authentication]
       summary: Rotate the current token
+      x-mint:
+        href: /api-reference/authentication/rotate-the-current-token
       description: Revoke the current mobile token and issue a fresh one.
       responses:
         "200":
@@ -197,6 +215,8 @@ paths:
     get:
       tags: [Account]
       summary: Current user profile
+      x-mint:
+        href: /api-reference/account/current-user-profile
       responses:
         "200":
           description: The authenticated user.
@@ -213,6 +233,8 @@ paths:
     get:
       tags: [Account]
       summary: List accessible events
+      x-mint:
+        href: /api-reference/account/list-accessible-events
       description: >-
         All events for a global admin, otherwise the events the user is
         assigned to, ordered by start date.
@@ -237,6 +259,8 @@ paths:
     post:
       tags: [Push Tokens]
       summary: Register a push token
+      x-mint:
+        href: /api-reference/push-tokens/register-a-push-token
       description: >-
         Upsert a push-notification token for the current user. Platform is
         auto-detected (`expo` for Expo tokens, otherwise `unknown`).
@@ -267,6 +291,8 @@ paths:
     delete:
       tags: [Push Tokens]
       summary: Delete a push token
+      x-mint:
+        href: /api-reference/push-tokens/delete-a-push-token
       parameters:
         - name: token
           in: path
@@ -289,6 +315,8 @@ paths:
     post:
       tags: [Bans]
       summary: Add emails to the ban list
+      x-mint:
+        href: /api-reference/bans/add-emails-to-the-ban-list
       description: >-
         Ban one person from every event. A ban holds one or more emails, so
         send all of a person's addresses in a single call rather than creating
@@ -374,6 +402,8 @@ paths:
     get:
       tags: [Series]
       summary: List series
+      x-mint:
+        href: /api-reference/series/list-series
       description: |
         With a **series API key**, returns exactly one series — the one the key
         belongs to. This is how a client discovers its own series when all it
@@ -401,6 +431,8 @@ paths:
     get:
       tags: [Series]
       summary: Get one series
+      x-mint:
+        href: /api-reference/series/get-one-series
       description: >-
         The series plus a compact list of its events. Pass `current` as the id
         to mean "whichever series this key belongs to".
@@ -435,6 +467,8 @@ paths:
     get:
       tags: [Series]
       summary: List the events in a series
+      x-mint:
+        href: /api-reference/series/list-the-events-in-a-series
       description: >-
         Summary records for every event in the series, earliest start first
         (events with no start date last).
@@ -458,6 +492,8 @@ paths:
     post:
       tags: [Series]
       summary: Create an event in the series
+      x-mint:
+        href: /api-reference/series/create-an-event-in-the-series
       description: |
         **Requires a series API key.** A mobile token, a global API token and an
         event API key are all refused with `403` — an event has to land in a
@@ -576,6 +612,8 @@ paths:
     get:
       tags: [Series]
       summary: Get one event in the series
+      x-mint:
+        href: /api-reference/series/get-one-event-in-the-series
       description: >-
         An event outside the series returns `404`, not `403` — from this key's
         point of view it does not exist.
@@ -602,6 +640,8 @@ paths:
     patch:
       tags: [Series]
       summary: Update an event in the series
+      x-mint:
+        href: /api-reference/series/update-an-event-in-the-series
       description: |
         One series key updates any event in its series — that is the point of a
         series key. Accepts the same fields as the web's event settings form and
@@ -661,6 +701,8 @@ paths:
     get:
       tags: [Participants]
       summary: List participants
+      x-mint:
+        href: /api-reference/participants/list-participants
       description: >-
         Full per-participant records for an event. Sensitive medical,
         dietary, safeguarding, and contact fields are only included for global
@@ -690,6 +732,8 @@ paths:
     post:
       tags: [Participants]
       summary: Invite a participant
+      x-mint:
+        href: /api-reference/participants/invite-a-participant
       description: >-
         Send an event invitation email. Does not create a participant record
         directly — it enqueues an invitation.
@@ -735,6 +779,8 @@ paths:
     get:
       tags: [Participants]
       summary: Search participants
+      x-mint:
+        href: /api-reference/participants/search-participants
       description: >-
         Case-insensitive search by name, email, or id. Returns up to 20
         matches. Not available to event API keys.
@@ -764,6 +810,8 @@ paths:
     get:
       tags: [Participants]
       summary: Look up a registration by email
+      x-mint:
+        href: /api-reference/participants/look-up-a-registration-by-email
       description: >-
         Read-only check of whether an email is registered for the event. Safe
         to call on every sign-in; never mutates. Available to event API keys.
@@ -800,6 +848,8 @@ paths:
     get:
       tags: [Participants]
       summary: Minimal roster
+      x-mint:
+        href: /api-reference/participants/minimal-roster
       description: >-
         Identity-only roster (no sensitive PII), excluding withdrawn and
         rejected registrations. Available to event API keys.
@@ -825,6 +875,8 @@ paths:
     get:
       tags: [Participants]
       summary: Get a participant
+      x-mint:
+        href: /api-reference/participants/get-a-participant
       description: >-
         Full detailed record for one registration, including personal,
         accommodation, consent, and guardian sections (and sensitive medical /
@@ -854,6 +906,8 @@ paths:
     get:
       tags: [Notes]
       summary: List notes
+      x-mint:
+        href: /api-reference/notes/list-notes
       description: Notes on a participant's registration, newest first. User tokens only.
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
@@ -879,6 +933,8 @@ paths:
     post:
       tags: [Notes]
       summary: Create a note
+      x-mint:
+        href: /api-reference/notes/create-a-note
       description: Add a note authored by the current user. User tokens only.
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
@@ -926,6 +982,8 @@ paths:
     get:
       tags: [Scans]
       summary: List scans
+      x-mint:
+        href: /api-reference/scans/list-scans
       description: >-
         Recent scans for the event. Pass `since` for incremental sync
         (oldest-first, up to 500); otherwise the latest 100 are returned.
@@ -960,6 +1018,8 @@ paths:
     post:
       tags: [Scans]
       summary: Record a scan
+      x-mint:
+        href: /api-reference/scans/record-a-scan
       description: >-
         Record a QR / NFC / manual scan for a participant. Pass `client_scan_id`
         for idempotency — a repeat returns the existing scan with
@@ -1017,6 +1077,8 @@ paths:
     delete:
       tags: [Scans]
       summary: Undo scans for a participant
+      x-mint:
+        href: /api-reference/scans/undo-scans-for-a-participant
       description: >-
         Delete a participant's scans (all, or just one context) and clear their
         check-in if no check-in scans remain. Despite the name, `id` is a
@@ -1062,6 +1124,8 @@ paths:
     get:
       tags: [Scan Contexts]
       summary: List scan contexts
+      x-mint:
+        href: /api-reference/scan-contexts/list-scan-contexts
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
       responses:
@@ -1083,6 +1147,8 @@ paths:
     get:
       tags: [Travel Calendar]
       summary: Show the travel calendar
+      x-mint:
+        href: /api-reference/travel-calendar/show-the-travel-calendar
       description: >-
         Day-grouped inbound and outbound travel for participants with completed
         registrations, across all transport modes. Includes pickup-state
@@ -1103,6 +1169,8 @@ paths:
     get:
       tags: [Travel Calendar]
       summary: Show the travel calendar (legacy path)
+      x-mint:
+        href: /api-reference/travel-calendar/show-the-travel-calendar-legacy-path
       description: Deprecated alias for `/events/{event_id}/travel`.
       deprecated: true
       parameters:
@@ -1121,6 +1189,8 @@ paths:
     get:
       tags: [Slack Blasts]
       summary: List Slack blasts
+      x-mint:
+        href: /api-reference/slack-blasts/list-slack-blasts
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
       responses:
@@ -1140,6 +1210,8 @@ paths:
     post:
       tags: [Slack Blasts]
       summary: Send a Slack blast
+      x-mint:
+        href: /api-reference/slack-blasts/send-a-slack-blast
       description: >-
         Broadcast a message to every completed participant with a linked Slack
         account, and enqueue delivery.
@@ -1176,6 +1248,8 @@ paths:
     get:
       tags: [Slack Blasts]
       summary: Get a Slack blast
+      x-mint:
+        href: /api-reference/slack-blasts/get-a-slack-blast
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
         - name: id
@@ -1199,6 +1273,8 @@ paths:
     post:
       tags: [NFC Badges]
       summary: Ensure an NFC badge token
+      x-mint:
+        href: /api-reference/nfc-badges/ensure-an-nfc-badge-token
       description: Create an event-scoped badge token for the participant if one does not exist.
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
@@ -1223,6 +1299,8 @@ paths:
     post:
       tags: [NFC Badges]
       summary: Confirm an NFC badge assignment
+      x-mint:
+        href: /api-reference/nfc-badges/confirm-an-nfc-badge-assignment
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
         - $ref: "#/components/parameters/ParticipantEventId"
@@ -1259,6 +1337,8 @@ paths:
     post:
       tags: [NFC Badges]
       summary: Reset an NFC badge token
+      x-mint:
+        href: /api-reference/nfc-badges/reset-an-nfc-badge-token
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
         - $ref: "#/components/parameters/ParticipantEventId"
@@ -1281,6 +1361,8 @@ paths:
     get:
       tags: [Travel]
       summary: Search airports
+      x-mint:
+        href: /api-reference/travel/search-airports
       description: >-
         Search airports by keyword. **Authenticated with the web session
         cookie, not a bearer token.** Returns an empty list for terms shorter
@@ -1308,6 +1390,8 @@ paths:
     post:
       tags: [Travel]
       summary: Validate a flight
+      x-mint:
+        href: /api-reference/travel/validate-a-flight
       description: >-
         Validate a flight code + date and return matching legs and airline
         info. **Authenticated with the web session cookie, not a bearer token.**
