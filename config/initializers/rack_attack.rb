@@ -8,7 +8,16 @@ class Rack::Attack
     # and counting it costs a cache read + write on every request.
     next if req.path == "/api/v1/slack/events" && req.post?
 
-    req.ip unless req.path.start_with?("/assets")
+    # /docs is a proxy onto a Next.js site: one page view pulls a dozen-odd
+    # chunks, none of them under /assets, so reading the docs would burn this
+    # budget and lock the reader out of the app itself. It gets its own,
+    # looser bucket below rather than no limit at all — it's public, and every
+    # request through it costs us a call to Mintlify.
+    req.ip unless req.path.start_with?("/assets", "/docs")
+  end
+
+  throttle("docs/ip", limit: 600, period: 5.minutes) do |req|
+    req.ip if req.path.start_with?("/docs")
   end
 
   throttle("logins/ip", limit: 5, period: 20.seconds) do |req|
