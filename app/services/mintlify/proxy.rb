@@ -19,6 +19,22 @@ module Mintlify
     # so the controller doesn't have to know we use Faraday.
     class Unavailable < StandardError; end
 
+    # Raised when asked to fetch something outside the proxied prefixes, or
+    # when the built URL would leave the Mintlify host. Neither should be
+    # reachable through the router; see ALLOWED_PATHS.
+    class Forbidden < StandardError; end
+
+    # The only paths this proxy will ever fetch upstream.
+    #
+    # `request.path` reaches us already routed, so in practice it is always one
+    # of these. But it is caller-shaped input feeding an outbound request, and
+    # a base-relative Faraday GET resolves a protocol-relative path like
+    # //example.com/x against the *scheme*, not the base host — which would
+    # turn this into an open proxy sitting inside our network. The prefix match
+    # rules that out (neither prefix can start with //), and #upstream_url
+    # re-checks the resolved host afterwards regardless.
+    ALLOWED_PATHS = %r{\A/(?:docs|\.well-known/vercel)(?:/|\z)}
+
     Result = Struct.new(:status, :headers, :body, keyword_init: true)
 
     # Copied back to the browser, lowercased as Faraday hands them to us.
@@ -75,7 +91,7 @@ module Mintlify
     # as its base path, so it already builds every link and asset URL under
     # that prefix and there is nothing to rewrite.
     def call(request, upstream_path)
-      response = connection.get(target_for(request, upstream_path)) do |req|
+      response = connection.get(upstream_url(request, upstream_path)) do |req|
         apply_headers(req, request)
       end
 
@@ -90,10 +106,19 @@ module Mintlify
 
     private
 
-    def target_for(request, upstream_path)
-      return upstream_path if request.query_string.blank?
+    # Resolves the path against the pinned base and refuses anything that
+    # lands off-host. Faraday would otherwise happily follow whatever the
+    # joined URL turned out to be.
+    def upstream_url(request, upstream_path)
+      raise Forbidden, "refusing to proxy #{upstream_path.inspect}" unless upstream_path.match?(ALLOWED_PATHS)
 
-      "#{upstream_path}?#{request.query_string}"
+      target = upstream_path
+      target = "#{target}?#{request.query_string}" if request.query_string.present?
+
+      url = connection.build_url(target)
+      raise Forbidden, "refusing to proxy off-host to #{url.host.inspect}" unless url.host == @host
+
+      url
     end
 
     def apply_headers(req, request)

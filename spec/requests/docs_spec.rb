@@ -44,6 +44,10 @@ RSpec.describe "Docs", type: :request do
       expect(response.media_type).to eq("text/html")
     end
 
+    # Also the regression test for verify_same_origin_request: Rails rejects a
+    # cross-origin GET that returns JavaScript with a 422, so without the
+    # skip in DocsController every Next.js chunk 422s and the docs render
+    # blank. Serve this one as application/javascript deliberately.
     it "proxies nested paths, including assets" do
       stub_upstream("/docs/_next/static/chunk.js", headers: { "content-type" => "application/javascript" }, body: "console.log(1)")
 
@@ -94,6 +98,39 @@ RSpec.describe "Docs", type: :request do
       get "/docs/missing"
 
       expect(response).to have_http_status(:not_found)
+    end
+
+    # The proxy takes a path and issues an outbound request with it, so the
+    # host has to be pinned rather than inferred from what it was handed. The
+    # router can't produce these, but the guard is what makes that safe to
+    # rely on.
+    describe "the upstream host is pinned" do
+      it "refuses a path outside the proxied prefixes" do
+        proxy = Mintlify::Proxy.new(host: host)
+
+        expect { proxy.call(ActionDispatch::TestRequest.create, "/admin/events") }
+          .to raise_error(Mintlify::Proxy::Forbidden, /refusing to proxy/)
+      end
+
+      it "refuses a protocol-relative path that would resolve to another host" do
+        proxy = Mintlify::Proxy.new(host: host)
+
+        expect { proxy.call(ActionDispatch::TestRequest.create, "//example.com/docs") }
+          .to raise_error(Mintlify::Proxy::Forbidden)
+
+        expect(a_request(:any, %r{example\.com})).not_to have_been_made
+      end
+
+      it "allows the paths the router can actually produce" do
+        stub_upstream("/docs/api/events")
+        stub_request(:get, "https://#{host}/.well-known/vercel/x").to_return(status: 200, body: "ok")
+
+        get "/docs/api/events"
+        expect(response).to have_http_status(:ok)
+
+        get "/.well-known/vercel/x"
+        expect(response).to have_http_status(:ok)
+      end
     end
 
     it "answers 502 when Mintlify is unreachable" do

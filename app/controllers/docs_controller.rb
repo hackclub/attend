@@ -15,9 +15,17 @@
 # tooling at it. Every endpoint it documents is token-authenticated in its own
 # right; the spec describes that surface, it does not open it.
 class DocsController < ApplicationController
-  # Nothing under /docs renders a Rails form, and Mintlify's bundle makes XHRs
-  # we never issued a token for.
-  skip_forgery_protection
+  # Rails appends verify_same_origin_request to stop another site embedding our
+  # JavaScript with a <script> tag and reading whatever user-specific data it
+  # returns. Mintlify's docs bundle comes back through here as
+  # application/javascript, so that check rejects every Next.js chunk with a
+  # 422 — but those chunks are Mintlify's public static assets, byte-identical
+  # for every visitor and carrying nothing of ours.
+  #
+  # Skip only that check. Token verification stays on, so a non-GET route added
+  # here later is still protected; skip_forgery_protection would have disarmed
+  # both and left nothing to notice it.
+  skip_after_action :verify_same_origin_request, only: %i[show vercel_verification]
 
   layout false
 
@@ -62,6 +70,12 @@ class DocsController < ApplicationController
       status: result.status,
       type: result.headers["content-type"].presence || "application/octet-stream",
       disposition: "inline"
+  rescue Mintlify::Proxy::Forbidden => e
+    # Not reachable through the router — the proxy's own allowlist and ours
+    # agree — so this means the two drifted apart. Don't dress it up as an
+    # upstream outage.
+    Rails.logger.error("[Docs] refused to proxy #{request.path}: #{e.message}")
+    head :not_found
   rescue Mintlify::Proxy::Unavailable => e
     Rails.logger.error("[Docs] Mintlify proxy failed for #{request.path}: #{e.message}")
     render plain: "The API reference is temporarily unavailable.", status: :bad_gateway
