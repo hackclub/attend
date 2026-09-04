@@ -1,46 +1,31 @@
 ---
-title: "Attend API"
-description: "REST API for Attend, Hack Club's event management platform."
+title: "Attend Help"
+description: "Everything you need to get from \"you're invited!\" to walking through the doors of a Hack Club event."
 ---
 
-Attend runs registration, check-in, travel and safeguarding for Hack Club
-events. This API is what the Attend mobile app talks to, and what trusted
-server-to-server integrations use.
+Attend is how you register for a Hack Club event: your profile, your travel,
+your documents, your ticket. These guides walk through the whole thing.
 
-## Base URL
+<Columns cols={2}>
+  <Card title="Complete your onboarding" icon="pencil" href="/participants/03-completing-onboarding">
+    The registration wizard, step by step — and what blocks you.
+  </Card>
+  <Card title="Your parent or guardian's part" icon="circle-check" href="/participants/08-guardian-consent">
+    What happens after you submit, and how to resend their invitation.
+  </Card>
+  <Card title="Tickets & wallet passes" icon="ticket" href="/participants/10-tickets-and-wallet-passes">
+    Your boarding pass, Apple/Google Wallet, and the school excuse letter.
+  </Card>
+  <Card title="Travel details" icon="plane" href="/participants/04-travel-details">
+    Flights, trains, and how to update your plans any time.
+  </Card>
+</Columns>
 
-```
-https://attend.hackclub.com/api/v1
-```
+## New here?
 
-## Authentication
+Start with [Welcome to Attend](/participants/01-welcome-to-attend), then
+[Logging in](/participants/02-logging-in).
 
-Almost every endpoint takes a bearer token:
-
-```http
-Authorization: Bearer <token>
-```
-
-There are four kinds, and which one you hold decides what you can reach:
-
-| Token | Sets a current user | Reach |
-| --- | --- | --- |
-| Mobile token | Yes | Whatever the signed-in user can see |
-| Global API token | Yes | Its owner's full access, or only the scopes it was issued with |
-| Series API key | No | Every event in one series, and creating new events in it |
-| Event API key | No | One event, and only the endpoints that don't need a user |
-
-The **API reference** tab notes which tokens each endpoint accepts, and which
-scopes apply.
-
-## Getting a token
-
-Mobile tokens come from `POST /session`. Series and event keys are issued from
-the Attend dashboard by someone who owns the series or administers the event.
-Global API tokens are issued by a superadmin.
-
-## Rate limits and errors
-
-Errors are JSON, with an `error` key describing what went wrong. A `401` means
-the token is missing, expired or revoked; a `403` means the token is valid but
-its scope or event doesn't cover the request.
+Stuck on something specific? [Troubleshooting & FAQ](/participants/17-troubleshooting)
+covers the things that go wrong most often. If none of it helps, email
+[attend@hackclub.com](mailto:attend@hackclub.com) — a real human reads it.
