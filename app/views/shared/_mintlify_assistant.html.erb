@@ -1,0 +1,30 @@
+<%# Mintlify's docs assistant, rendered on every layout.
+
+    The widget id is a public client-side key: Mintlify's own embed docs put it
+    straight in the page source, and it identifies the docs project rather than
+    authorising anything, so it lives here rather than in credentials.
+
+    The origins this needs are allowlisted in
+    config/initializers/content_security_policy.rb. Our policy has no
+    unsafe-inline on script-src, so the init block below has to carry the
+    request nonce — and if the CSP hosts are ever dropped the widget fails
+    silently, with nothing on the server side to show for it.
+
+    No subresource-integrity hash: /v1/embed.js is a rolling URL that Mintlify
+    republishes in place, so pinning a digest would break the widget on their
+    next release rather than protect us from anything. %>
+<script type="module" src="https://widget.mintlify.com/v1/embed.js"></script>
+<script type="module" nonce="<%= content_security_policy_nonce %>">
+  await window.MintlifyAssistant.init({
+    id: "mint_widget_27e4366e-41a4-4085-b53d-34c17b726968",
+    supportEmail: "attend@hackclub.com",
+    appearance: {
+      variant: "widget",
+      theme: "system",
+      accent: "#ec3750",
+      radius: "12px",
+      side: "bottom",
+      align: "end"
+    }
+  });
+</script>

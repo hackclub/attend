@@ -79,9 +79,10 @@ RSpec.describe "Content Security Policy", type: :request do
     end
   end
 
-  # The app layout renders three inline scripts of its own (theme, importmap,
-  # module preloads), so that is the floor for any page using it.
-  LAYOUT_INLINE_SCRIPTS = 3
+  # The app layout renders four inline scripts of its own (theme, importmap,
+  # module preloads, and the Mintlify assistant's init block), so that is the
+  # floor for any page using it.
+  LAYOUT_INLINE_SCRIPTS = 4
 
   describe "public pages" do
     it "the sign-in page is clean" do
@@ -135,8 +136,22 @@ RSpec.describe "Content Security Policy", type: :request do
     end
 
     # /docs uses its own bare layout rather than the app one, hence the count.
+    # It is also the Scalar fallback: once MINTLIFY_DOCS_HOST is set the
+    # response is Mintlify's HTML under Mintlify's own policy, and this stops
+    # being ours to check.
     it "the API docs page is clean" do
       expect_csp_clean(docs_path, inline_scripts: 1)
+    end
+
+    # The assistant widget loads from Mintlify and talks to their API. Losing
+    # any of these origins breaks it with nothing in the server logs.
+    it "allows the Mintlify assistant's origins" do
+      get root_path
+
+      header = response.headers["Content-Security-Policy"]
+      expect(header[/script-src[^;]*/]).to include("https://widget.mintlify.com")
+      expect(header[/connect-src[^;]*/]).to include("https://api.mintlify.com", "https://ph.mintlify.com")
+      expect(header[/frame-src[^;]*/]).to include("hcaptcha.com")
     end
   end
 

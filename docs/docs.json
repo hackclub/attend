@@ -1,0 +1,49 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Attend API",
+  "description": "REST API for Attend, Hack Club's event management platform.",
+  "favicon": "/favicon.png",
+  "colors": {
+    "primary": "#ec3750",
+    "light": "#ff8c37",
+    "dark": "#d42f46"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Getting started",
+            "pages": [
+              "index"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API reference",
+        "openapi": "openapi.yml"
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Attend",
+        "href": "https://attend.hackclub.com"
+      }
+    ],
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/hackclub/attend"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/hackclub/attend",
+      "website": "https://hackclub.com"
+    }
+  }
+}

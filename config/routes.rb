@@ -21,10 +21,18 @@ Rails.application.routes.draw do
 
   root "home#index"
 
-  # Admin-only API reference (Scalar). The OpenAPI document is served through
-  # the controller so it stays behind the same admin gate as the page itself.
-  get "docs", to: "docs#index"
-  get "docs/openapi.json", to: "docs#openapi", as: :docs_openapi
+  # Admin-only API reference. /docs is reverse-proxied onto the Mintlify-hosted
+  # docs (see Mintlify::Proxy), so the whole prefix belongs to the proxy —
+  # `format: false` keeps Rails from splitting /docs/_next/chunk.js into a path
+  # plus a :js format. The OpenAPI document therefore sits at the root, still
+  # served through the controller so it stays behind the same admin gate.
+  get "docs", to: "docs#show"
+  get "docs/*path", to: "docs#show", format: false
+  get "openapi.json", to: "docs#openapi", as: :openapi
+
+  # Mintlify's domain-ownership check, which it fetches on the apex rather than
+  # under the base path. Unauthenticated on purpose (see DocsController).
+  get ".well-known/vercel/*path", to: "docs#vercel_verification", format: false
 
   # Opt-in public participant profiles (attend.hackclub.com/p/:slug)
   get "p/:slug/markers", to: "public_profiles#markers", as: :public_profile_markers, constraints: { slug: /[A-Za-z0-9-]+/ }, defaults: { format: :json }

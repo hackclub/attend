@@ -9,15 +9,24 @@ require Rails.root.join("app/services/docuseal/host_config")
 Rails.application.configure do
   docuseal_origins = Docuseal::HostConfig.all_hosts.map { |h| "https://#{h}" }
 
+  # Mintlify's docs assistant widget (app/views/shared/_mintlify_assistant).
+  # widget.mintlify.com serves the loader, runtime and its fonts; api. carries
+  # config, messages and feedback; ph. is their analytics; hcaptcha is the bot
+  # check in front of the assistant and renders in its own frame. Drop any of
+  # these and the widget fails silently.
+  mintlify_widget = "https://widget.mintlify.com"
+  mintlify_api = %w[https://api.mintlify.com https://ph.mintlify.com]
+  hcaptcha = %w[https://js.hcaptcha.com https://*.hcaptcha.com]
+
   config.content_security_policy do |policy|
     policy.default_src :self
-    policy.font_src    :self, :data, "https://cdn.docuseal.com", *docuseal_origins
+    policy.font_src    :self, :data, "https://cdn.docuseal.com", *docuseal_origins, mintlify_widget
     policy.img_src     :self, :data, :https
     policy.object_src  :none
-    policy.script_src  :self, "https://cdn.docuseal.com", *docuseal_origins, "https://cdn.cloudflare.com", "https://unpkg.com", "https://cdn.jsdelivr.net", "https://challenges.cloudflare.com", "https://plausible.io"
-    policy.style_src   :self, :unsafe_inline, "https://cdn.docuseal.com", *docuseal_origins, "https://cdn.jsdelivr.net"
-    policy.connect_src :self, "https://api.docuseal.com", *docuseal_origins, "ws://localhost:9876", "ws://127.0.0.1:9876", "https://challenges.cloudflare.com", "https://plausible.io"
-    policy.frame_src   :self, *docuseal_origins, "https://challenges.cloudflare.com"
+    policy.script_src  :self, "https://cdn.docuseal.com", *docuseal_origins, "https://cdn.cloudflare.com", "https://unpkg.com", "https://cdn.jsdelivr.net", "https://challenges.cloudflare.com", "https://plausible.io", mintlify_widget, *hcaptcha
+    policy.style_src   :self, :unsafe_inline, "https://cdn.docuseal.com", *docuseal_origins, "https://cdn.jsdelivr.net", mintlify_widget
+    policy.connect_src :self, "https://api.docuseal.com", *docuseal_origins, "ws://localhost:9876", "ws://127.0.0.1:9876", "https://challenges.cloudflare.com", "https://plausible.io", mintlify_widget, *mintlify_api, *hcaptcha
+    policy.frame_src   :self, *docuseal_origins, "https://challenges.cloudflare.com", *hcaptcha
     policy.frame_ancestors :self
     policy.base_uri    :self
     # HCA sign-in: the button posts to /users/auth/hack_club (self), which then
