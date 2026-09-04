@@ -1,8 +1,8 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Attend API",
-  "description": "REST API for Attend, Hack Club's event management platform.",
+  "name": "Attend",
+  "description": "Help articles and the API reference for Attend, Hack Club's event platform.",
   "favicon": "/favicon.png",
   "colors": {
     "primary": "#ec3750",
@@ -12,19 +12,72 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Help",
         "groups": [
           {
             "group": "Getting started",
             "pages": [
-              "index"
+              "index",
+              "participants/01-welcome-to-attend",
+              "participants/02-logging-in",
+              "participants/03-completing-onboarding"
+            ]
+          },
+          {
+            "group": "Travel",
+            "pages": [
+              "participants/04-travel-details",
+              "participants/05-unaccompanied-minors"
+            ]
+          },
+          {
+            "group": "Documents & consent",
+            "pages": [
+              "participants/06-signing-documents",
+              "participants/07-physical-documents",
+              "participants/08-guardian-consent"
+            ]
+          },
+          {
+            "group": "Your event",
+            "pages": [
+              "participants/09-dashboard-and-status",
+              "participants/10-tickets-and-wallet-passes",
+              "participants/11-event-day-check-in",
+              "participants/12-messages-from-organizers",
+              "participants/13-connecting-slack"
+            ]
+          },
+          {
+            "group": "Account & privacy",
+            "pages": [
+              "participants/14-public-profile",
+              "participants/15-updating-your-info"
+            ]
+          },
+          {
+            "group": "Help",
+            "pages": [
+              "participants/16-reporting-an-incident",
+              "participants/17-troubleshooting"
             ]
           }
         ]
       },
       {
         "tab": "API reference",
-        "openapi": "openapi.yml"
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api-introduction"
+            ]
+          },
+          {
+            "group": "Endpoints",
+            "openapi": "openapi.yml"
+          }
+        ]
       }
     ]
   },

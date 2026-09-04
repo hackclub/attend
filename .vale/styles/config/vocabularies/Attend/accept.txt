@@ -50,3 +50,14 @@ messages_send
 tickets_reply
 set_status
 hack_club
+
+# Participant-facing help articles
+[Aa]utosave
+Bluesky
+DMs
+[Dd]ropoff
+[Hh]eadshot
+Nord
+[Ss]uperadmin
+[Uu]nsubmitted
+[Ww]ifi
