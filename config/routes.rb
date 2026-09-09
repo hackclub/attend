@@ -332,6 +332,11 @@ Rails.application.routes.draw do
     end
 
     resources :series, controller: "event_series", param: :slug, except: [ :destroy ] do
+      resource :integrations, only: [ :show ], controller: "series_integrations" do
+        # Vote events are per event, so this one names which of the series'
+        # events it is for.
+        post "vote_event/:event_id", action: :create_vote_event, as: :create_vote_event
+      end
       resources :members, only: [ :index, :new, :create, :destroy ], controller: "series_members"
       resources :api_tokens, only: [ :index, :create, :destroy ], controller: "series_api_tokens" do
         member do
