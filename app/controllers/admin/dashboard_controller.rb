@@ -75,56 +75,9 @@ class Admin::DashboardController < Admin::BaseController
     # hides it from every non-global admin's audit log.
     set_current_event(@event)
 
-    client = Vote::Client.new
-
-    if @event.vote_event_linked?
-      redirect_to admin_event_integrations_path(@event),
-        notice: "This event is already linked to a vote.hackclub.com event."
-      return
-    end
-
-    unless client.configured?
-      redirect_to admin_event_integrations_path(@event),
-        alert: "The vote.hackclub.com API key is not configured on the server."
-      return
-    end
-
-    # Backfill: if a vote event already exists for this slug, link it instead of
-    # creating a duplicate.
-    if (existing = client.find_event(@event.slug))
-      @event.link_vote_event!(existing)
-      redirect_to admin_event_integrations_path(@event),
-        notice: "Linked to the existing vote.hackclub.com event for this slug."
-      return
-    end
-
-    unless @event.logo.attached? && @event.banner.attached?
-      redirect_to admin_event_integrations_path(@event),
-        alert: "This event needs both a logo and a banner before a vote.hackclub.com event can be created."
-      return
-    end
-
-    result = client.create_event(
-      name: @event.name,
-      slug: @event.slug,
-      logo_url: public_attachment_url(@event.logo),
-      background_url: public_attachment_url(@event.banner),
-      admins: vote_admin_emails
-    )
-    @event.link_vote_event!(result)
-
+    result = Vote::EventLinker.new(@event).call
     redirect_to admin_event_integrations_path(@event),
-      notice: "Created vote.hackclub.com event."
-  rescue Vote::Error => e
-    # Lost a race (or slug taken): try to link the now-existing event.
-    if e.status == 409 && (existing = client.find_event(@event.slug))
-      @event.link_vote_event!(existing)
-      redirect_to admin_event_integrations_path(@event),
-        notice: "Linked to the existing vote.hackclub.com event for this slug."
-    else
-      redirect_to admin_event_integrations_path(@event),
-        alert: "vote.hackclub.com: #{e.message.presence || 'Failed to create the vote event.'}"
-    end
+      (result.linked? ? :notice : :alert) => result.message
   end
 
   def update_integrations
@@ -167,21 +120,6 @@ class Admin::DashboardController < Admin::BaseController
   # broken-looking until the next scheduled run.
   def airtable_settings_saved?
     AIRTABLE_SETTINGS.any? { |setting| @event.public_send("saved_change_to_#{setting}?") }
-  end
-
-  # Emails granted event-admin access on the vote.hackclub.com event. Only
-  # Attend event admins qualify — ops, safeguarding, and read-only roles don't
-  # imply control over voting.
-  def vote_admin_emails
-    @event.event_role_assignments.event_admin.includes(:user).map { |a| a.user.email }
-  end
-
-  def public_attachment_url(attachment)
-    Rails.application.routes.url_helpers.rails_storage_proxy_url(
-      attachment,
-      host: ENV.fetch("APP_HOST", "attend.hackclub.com"),
-      protocol: "https"
-    )
   end
 
   def load_airtable_sync_status
