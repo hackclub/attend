@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_03_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_09_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -133,6 +133,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_03_130000) do
     t.datetime "updated_at", null: false
     t.index ["phone_number", "sent_at"], name: "index_automated_sms_logs_on_phone_number_and_sent_at"
     t.index ["twilio_sid"], name: "index_automated_sms_logs_on_twilio_sid", unique: true, where: "(twilio_sid IS NOT NULL)"
+  end
+
+  create_table "badge_redirects", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "slack_id", null: false
+    t.datetime "updated_at", null: false
+    t.string "url"
+    t.uuid "user_id"
+    t.index ["slack_id"], name: "index_badge_redirects_on_slack_id", unique: true
+    t.index ["user_id"], name: "index_badge_redirects_on_user_id"
   end
 
   create_table "ban_emails", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1385,6 +1395,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_03_130000) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "audit_logs", "events"
   add_foreign_key "audit_logs", "users", column: "actor_user_id"
+  add_foreign_key "badge_redirects", "users", on_delete: :nullify
   add_foreign_key "ban_emails", "bans"
   add_foreign_key "bans", "users", column: "created_by_id"
   add_foreign_key "bans", "users", column: "revoked_by_id"

@@ -1,4 +1,17 @@
 Rails.application.routes.draw do
+  # badge.hackclub.com is a redirect host and nothing else. It answers the QR
+  # codes printed on event badges (/t/:slack_id) and bounces everything else to
+  # Attend, where the links are managed — so this block has to come before the
+  # engines and the rest of the app, or the badge host would serve them too.
+  #
+  # Deliberately host-scoped: /t/:slack_id is an open redirect by design, and it
+  # has no business being reachable on attend.hackclub.com, where people sign in.
+  constraints(->(request) { BadgeRedirect.badge_host?(request.host) }) do
+    get "up", to: "rails/health#show"
+    get "t/:slack_id", to: "badge_redirects#show", constraints: { slack_id: /[A-Za-z0-9._-]+/ }
+    match "(*path)", to: "badge_redirects#elsewhere", via: :all, format: false
+  end
+
   toolchest_oauth
   mount Toolchest::Engine => "/mcp"
   mount ActionCable.server => "/cable"
@@ -94,6 +107,7 @@ Rails.application.routes.draw do
   get "dashboard/profile", to: "dashboard#profile", as: :dashboard_profile
   patch "dashboard/public_profile", to: "dashboard#update_public_profile", as: :dashboard_public_profile
   patch "dashboard/staff_profile", to: "dashboard#update_staff_profile", as: :dashboard_staff_profile
+  patch "dashboard/badge_redirect", to: "dashboard#update_badge_redirect", as: :dashboard_badge_redirect
   delete "dashboard/staff_profile/avatar", to: "dashboard#destroy_staff_avatar", as: :dashboard_staff_profile_avatar
   delete "dashboard/mcp_connections/:id", to: "dashboard#revoke_mcp_connection", as: :dashboard_mcp_connection
   patch "dashboard/mcp_connections/:id", to: "dashboard#update_mcp_connection", as: :update_dashboard_mcp_connection

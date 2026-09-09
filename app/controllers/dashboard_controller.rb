@@ -6,7 +6,8 @@ class DashboardController < ApplicationController
   # MCP connections are managed from the profile page, so they follow the same
   # rule as the rest of it: admins without a participant record still get in.
   PROFILE_ACTIONS = %w[profile update_staff_profile destroy_staff_avatar
-                       revoke_mcp_connection update_mcp_connection].freeze
+                       revoke_mcp_connection update_mcp_connection
+                       update_badge_redirect].freeze
 
   before_action :authenticate_user!
   before_action :require_participant, except: PROFILE_ACTIONS
@@ -49,6 +50,15 @@ class DashboardController < ApplicationController
     # needs a way to clear the (now dead) connection out.
     @mcp_connections = mcp_connections
     @show_mcp_connections = current_user.admin? || @mcp_connections.any?
+
+    # Badge links are keyed by Slack ID (that's what the printed QR encodes),
+    # so someone whose account has no Slack ID gets the section as a prompt to
+    # connect Slack rather than a form that could never resolve.
+    @badge_slack_id = current_user.slack_id
+    if @badge_slack_id.present?
+      @badge_redirect = BadgeRedirect.for_slack_id(@badge_slack_id) ||
+        BadgeRedirect.new(slack_id: @badge_slack_id)
+    end
   end
 
   def update_staff_profile
@@ -57,6 +67,30 @@ class DashboardController < ApplicationController
     else
       redirect_to dashboard_profile_path(anchor: "staff-settings"),
         alert: current_user.errors.full_messages.to_sentence
+    end
+  end
+
+  # The redirect behind the QR code on this user's event badge. Managed here so
+  # nobody has to sign in to badge.hackclub.com, which now only serves the
+  # redirects themselves.
+  def update_badge_redirect
+    slack_id = current_user.slack_id
+
+    if slack_id.blank?
+      return redirect_to dashboard_profile_path(anchor: "badge-link"),
+        alert: "Connect your Slack account before setting a badge link."
+    end
+
+    badge_redirect = BadgeRedirect.for_slack_id(slack_id) || BadgeRedirect.new(slack_id: slack_id)
+    badge_redirect.user = current_user
+    badge_redirect.url = params.dig(:badge_redirect, :url)
+
+    if badge_redirect.save
+      redirect_to dashboard_profile_path(anchor: "badge-link"),
+        notice: badge_redirect.url.present? ? "Badge link updated." : "Badge link cleared."
+    else
+      redirect_to dashboard_profile_path(anchor: "badge-link"),
+        alert: badge_redirect.errors.full_messages.to_sentence
     end
   end
 
