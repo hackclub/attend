@@ -94,4 +94,7 @@ Rails.application.configure do
   config.hosts << /.*\.ngrok\.io/
 
   config.hosts << "attend.local"
+  # The badge redirect host, so /t/:slack_id can be exercised locally with a
+  # Host header (see BadgeRedirect and the badge block in config/routes.rb).
+  config.hosts << ENV.fetch("BADGE_HOST", "badge.hackclub.com")
 end
