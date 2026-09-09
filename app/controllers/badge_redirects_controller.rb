@@ -7,9 +7,6 @@
 # badge's owner chose. `allow_browser versions: :modern` in particular would
 # answer 406 to whatever old handset happens to scan it.
 class BadgeRedirectsController < ActionController::Base
-  # Nothing here reads or writes session state; `elsewhere` answers every verb.
-  skip_forgery_protection
-
   layout false
 
   def show
@@ -26,6 +23,10 @@ class BadgeRedirectsController < ActionController::Base
   # Any other path on the badge host. The links live in Attend now, so send
   # people to the page where they can set theirs instead of serving them a
   # second copy of the app on the wrong domain.
+  #
+  # The catch-all route hands this every verb, and forgery protection is left
+  # on deliberately: a GET gets the redirect, and anything that tries to write
+  # to the badge domain is refused before it reaches the app at all.
   def elsewhere
     redirect_to AttendUrls.attend_url(
       Rails.application.routes.url_helpers.dashboard_profile_path(anchor: "badge-link")

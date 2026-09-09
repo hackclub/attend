@@ -61,6 +61,24 @@ RSpec.describe "Badge redirects", type: :request do
       expect(response).to have_http_status(:moved_permanently)
     end
 
+    it "routes a write to the badge domain away from Attend's controllers" do
+      post "/dashboard/badge_redirect", params: { badge_redirect: { url: "https://evil.example.com" } }
+
+      expect(response).to have_http_status(:moved_permanently)
+      expect(badge_redirect.reload.url).to eq("https://example.com/grace")
+    end
+
+    it "refuses it outright once forgery protection is on, as it is in production" do
+      original = ActionController::Base.allow_forgery_protection
+      ActionController::Base.allow_forgery_protection = true
+
+      post "/dashboard/badge_redirect", params: { badge_redirect: { url: "https://evil.example.com" } }
+
+      expect(response).to have_http_status(:unprocessable_content)
+    ensure
+      ActionController::Base.allow_forgery_protection = original
+    end
+
     it "still answers the health check" do
       get "/up"
 
