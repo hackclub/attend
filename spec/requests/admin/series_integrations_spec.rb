@@ -64,6 +64,25 @@ RSpec.describe "Admin::SeriesIntegrations", type: :request do
         expect(response.body).to include("Linked")
         expect(response.body).not_to include("Create gallery")
       end
+
+      # The URLs come back from vote.hackclub.com and we store what it sends, so
+      # a `javascript:` one must never end up in an href.
+      it "refuses to link a stored URL that is not http(s)" do
+        sub_event.link_vote_event!(
+          "id" => "vote-evt-1",
+          "slug" => sub_event.slug,
+          "adminUrl" => "javascript:alert(document.cookie)",
+          "galleryUrl" => "javascript:alert(1)"
+        )
+        sign_in owner
+
+        get admin_series_integrations_path(series)
+
+        expect(response.body).to include("Linked")
+        expect(response.body).not_to include("javascript:")
+        expect(response.body).not_to include("View gallery")
+        expect(response.body).not_to include(">Manage<")
+      end
     end
 
     it "keeps a series organizer out — creating a gallery publishes the event elsewhere" do

@@ -53,6 +53,9 @@
           <tbody class="bg-white divide-y divide-gray-100">
             <% @events.each do |event| %>
               <% artwork_ready = event.logo.attached? && event.banner.attached? %>
+              <%# vote.hackclub.com sends these; only an http(s) one gets linked. %>
+              <% gallery_url = external_http_url(event.vote_event_gallery_url) %>
+              <% admin_url = external_http_url(event.vote_event_admin_url) %>
               <tr>
                 <td class="px-6 py-4">
                   <div class="text-sm font-medium text-gray-900"><%= event.name %></div>
@@ -62,8 +65,8 @@
                   <% if event.vote_event_linked? %>
                     <div class="flex flex-wrap items-center gap-2">
                       <span class="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">Linked</span>
-                      <% if event.vote_event_gallery_url.present? %>
-                        <%= link_to "View gallery", event.vote_event_gallery_url, target: "_blank", rel: "noopener",
+                      <% if gallery_url %>
+                        <%= link_to "View gallery", gallery_url, target: "_blank", rel: "noopener",
                               class: "text-[#ec3750] hover:underline font-medium" %>
                       <% end %>
                     </div>
@@ -78,8 +81,8 @@
                 <td class="px-6 py-4 text-right text-sm font-medium">
                   <div class="flex items-center justify-end gap-4">
                     <% if event.vote_event_linked? %>
-                      <% if event.vote_event_admin_url.present? %>
-                        <%= link_to "Manage", event.vote_event_admin_url, target: "_blank", rel: "noopener",
+                      <% if admin_url %>
+                        <%= link_to "Manage", admin_url, target: "_blank", rel: "noopener",
                               class: "text-[#ec3750] hover:text-[#d42f46]" %>
                       <% end %>
                     <% else %>
