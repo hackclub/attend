@@ -739,10 +739,14 @@ module Admin
     end
 
     def new_invite
+      authorize current_event, :invite_participants?
+
       @invite = Struct.new(:email, :name, :group_ids).new("", "", [])
     end
 
     def send_invite
+      authorize current_event, :invite_participants?
+
       email = params[:invite][:email]&.strip&.downcase
       name = params[:invite][:name]
       group_ids = Array(params[:invite][:group_ids]).reject(&:blank?)
@@ -773,6 +777,8 @@ module Admin
     end
 
     def revoke_invite
+      authorize current_event, :invite_participants?
+
       invitation = current_event.invitations.find(params[:id])
       email = invitation.email
       invitation.destroy!

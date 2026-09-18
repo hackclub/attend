@@ -39,7 +39,7 @@ class EventRoleAssignment < ApplicationRecord
         "View and edit travel and accommodation",
         "View and edit full medical and safeguarding records",
         "Manage groups and rooming",
-        "Regenerate the event API key"
+        "Create, rotate, and revoke event API tokens"
       ],
       cannot: []
     },
@@ -55,6 +55,7 @@ class EventRoleAssignment < ApplicationRecord
       cannot: [
         "Manage staff",
         "Add or remove participants",
+        "Manage event API tokens",
         "Access full medical or safeguarding records"
       ]
     },
@@ -78,6 +79,7 @@ class EventRoleAssignment < ApplicationRecord
         "Work the support inbox",
         "Manage staff",
         "Add or remove participants",
+        "Manage event API tokens",
         "Access safeguarding records"
       ]
     },
@@ -92,6 +94,7 @@ class EventRoleAssignment < ApplicationRecord
       cannot: [
         "Manage staff",
         "Add or remove participants",
+        "Manage event API tokens",
         "Edit travel or accommodation"
       ]
     },

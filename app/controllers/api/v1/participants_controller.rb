@@ -71,6 +71,12 @@ module Api
       end
 
       def create
+        # API keys are event-scoped credentials issued by an event admin, so
+        # they may invite. A signed-in person needs the event admin role;
+        # api_participants? alone (checked in set_event) lets ops, limited, and
+        # safeguarding leads read the roster, not add to it.
+        authorize @event, :invite_participants? unless api_key_request?
+
         email = params[:email]&.strip&.downcase
         first_name = params[:first_name]&.strip
         last_name = params[:last_name]&.strip

@@ -264,4 +264,49 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(response).to have_http_status(:unauthorized)
     end
   end
+
+  describe "POST /api/v1/events/:event_id/participants" do
+    def sign_in_headers_for(role)
+      user = User.create!(email: "#{role}-api-invite@example.com", name: role.titleize)
+      EventRoleAssignment.create!(user: user, event: event, role: role)
+      { "Authorization" => "Bearer #{MobileToken.generate_for(user).token}" }
+    end
+
+    it "lets an event admin invite" do
+      expect {
+        post "/api/v1/events/#{event.id}/participants",
+          params: { email: "invitee@example.com" }, headers: sign_in_headers_for("event_admin")
+      }.to have_enqueued_mail(ParticipantMailer, :invitation)
+
+      expect(response).to have_http_status(:created)
+    end
+
+    it "lets an event API key invite" do
+      event_token = EventApiToken.generate_for(event, user: create(:user), name: "integration")
+
+      expect {
+        post "/api/v1/events/#{event.id}/participants",
+          params: { email: "keyed@example.com" },
+          headers: { "Authorization" => "Bearer #{event_token.token}" }
+      }.to have_enqueued_mail(ParticipantMailer, :invitation)
+
+      expect(response).to have_http_status(:created)
+    end
+
+    %w[limited ops safeguarding_lead].each do |role|
+      it "forbids #{role}, who can read the roster but not add to it" do
+        headers = sign_in_headers_for(role)
+
+        get "/api/v1/events/#{event.id}/participants", headers: headers
+        expect(response).to have_http_status(:ok)
+
+        expect {
+          post "/api/v1/events/#{event.id}/participants",
+            params: { email: "sneaky@example.com" }, headers: headers
+        }.not_to have_enqueued_mail(ParticipantMailer, :invitation)
+
+        expect(response).to have_http_status(:forbidden)
+      end
+    end
+  end
 end

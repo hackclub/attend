@@ -192,7 +192,9 @@
       <div class="bg-white border border-gray-200 rounded-lg ">
         <div class="p-4 border-b border-gray-100 flex items-center justify-between">
           <h2 class="font-semibold text-gray-900">Onboarding Progress</h2>
-          <%= link_to "Invite Participants", new_invite_admin_event_participants_path(@event), class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
+          <% if policy(@event).invite_participants? %>
+            <%= link_to "Invite Participants", new_invite_admin_event_participants_path(@event), class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
+          <% end %>
         </div>
         <div class="p-4">
           <% display_status_colors = { "Awaiting Participant" => "bg-blue-50 text-blue-700", "Awaiting Parent" => "bg-amber-50 text-amber-700", "Complete" => "bg-green-50 text-green-700", "Withdrawn" => "bg-gray-100 text-gray-500" } %>
@@ -379,11 +381,13 @@
           <h2 class="font-semibold text-gray-900">Admin Tools</h2>
         </div>
         <div class="p-2">
-          <%= link_to new_admin_event_import_path(@event), class: "flex items-center gap-3 p-2 rounded hover:bg-gray-50 transition-colors" do %>
-            <div class="w-8 h-8 rounded bg-blue-100 flex items-center justify-center">
-              <svg class="w-4 h-4 text-[#ec3750]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-            </div>
-            <span class="text-sm font-medium text-gray-700">Import Participants</span>
+          <% if policy(@event).invite_participants? %>
+            <%= link_to new_admin_event_import_path(@event), class: "flex items-center gap-3 p-2 rounded hover:bg-gray-50 transition-colors" do %>
+              <div class="w-8 h-8 rounded bg-blue-100 flex items-center justify-center">
+                <svg class="w-4 h-4 text-[#ec3750]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+              </div>
+              <span class="text-sm font-medium text-gray-700">Import Participants</span>
+            <% end %>
           <% end %>
           <%= link_to admin_event_exports_path(@event), class: "flex items-center gap-3 p-2 rounded hover:bg-gray-50 transition-colors" do %>
             <div class="w-8 h-8 rounded bg-green-100 flex items-center justify-center">

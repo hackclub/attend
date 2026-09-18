@@ -23,8 +23,22 @@ class EventPolicy < ApplicationPolicy
     user.global_admin? || user.can_access_event?(record)
   end
 
-  def regenerate_api_key?
+  # Adding people to an event is an event admin's call — every other role's
+  # ROLE_DETAILS say "cannot add or remove participants". Covers the invite
+  # form, the CSV import, and the API's POST /participants for signed-in users.
+  # Series owners and organizers count as event admins (User#event_admin_for?).
+  def invite_participants?
     user.global_admin? || user.event_admin_for?(record)
+  end
+
+  # An event API token can send invitations without any role check, so minting
+  # one is the same privilege as inviting: event admins only.
+  def manage_api_tokens?
+    user.global_admin? || user.event_admin_for?(record)
+  end
+
+  def regenerate_api_key?
+    manage_api_tokens?
   end
 
   def destroy?
