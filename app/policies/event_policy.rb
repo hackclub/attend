@@ -23,6 +23,14 @@ class EventPolicy < ApplicationPolicy
     user.global_admin? || user.can_access_event?(record)
   end
 
+  # Who may add, re-role and remove staff: global admins, this event's own
+  # admins, and — through User#event_admin_for? — members of its series. Ops,
+  # limited, safeguarding leads and read-only staff cannot (mirrors
+  # Admin::EventStaffController#require_event_admin_access).
+  def manage_staff?
+    user.global_admin? || user.event_admin_for?(record)
+  end
+
   def regenerate_api_key?
     user.global_admin? || user.event_admin_for?(record)
   end
