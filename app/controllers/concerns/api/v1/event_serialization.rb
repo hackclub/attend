@@ -49,6 +49,7 @@ module Api
             accommodation_enabled: event.accommodation_enabled?,
             roommate_preferences_enabled: event.roommate_preferences_enabled?,
             guardian_invites_locked: event.guardian_invites_locked?,
+            onboarding_invites_held: event.onboarding_invites_held?,
             nfc_badges_enabled: event.nfc_badges_enabled?,
             nfc_badge_write_on_checkin_enabled: event.nfc_badge_write_on_checkin_enabled?,
             groups_enabled: event.groups_enabled?

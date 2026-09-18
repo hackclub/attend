@@ -368,8 +368,11 @@ class OnboardingController < ApplicationController
     @participant_event = ParticipantEvent.find_by(participant: participant, event: current_event)
 
     unless @participant_event
+      # Held invitations don't count: they haven't been sent, so the
+      # participant has nothing to act on yet.
       has_invitation = Invitation.where(event: current_event)
                                  .for_email(current_user.email)
+                                 .sent
                                  .where("expires_at > ? OR accepted_at IS NOT NULL", Time.current)
                                  .exists?
 
@@ -398,6 +401,11 @@ class OnboardingController < ApplicationController
         end
         pending_invitation.accept!
       end
+    end
+
+    if @participant_event.onboarding_held?
+      redirect_to dashboard_path, alert: "Registration for #{current_event.name} isn't open yet. We'll email you as soon as it is."
+      return
     end
 
     # CSV-imported participants start with status "invited" — transition to

@@ -1015,6 +1015,12 @@ paths:
       description: >-
         Send an event invitation email. Does not create a participant record
         directly — it enqueues an invitation.
+
+
+        While the event is holding onboarding invitations
+        (`modules.onboarding_invites_held`), the invitation is recorded but not
+        emailed: it goes out when the event's held invitations are released
+        from the dashboard. The response says which happened.
       parameters:
         - $ref: "#/components/parameters/EventId"
       requestBody:
@@ -1030,13 +1036,19 @@ paths:
                 last_name: { type: string }
       responses:
         "201":
-          description: Invitation enqueued.
+          description: Invitation enqueued, or recorded as held.
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   success: { type: boolean, example: true }
+                  held:
+                    type: boolean
+                    example: false
+                    description: >-
+                      True when the event is holding onboarding invitations and
+                      this one was recorded without an email.
                   message: { type: string, example: Invitation sent to jane@example.com }
                   event: { type: string, example: My Event }
         "409":
@@ -2085,6 +2097,12 @@ components:
         accommodation_enabled: { type: boolean }
         roommate_preferences_enabled: { type: boolean }
         guardian_invites_locked: { type: boolean }
+        onboarding_invites_held:
+          type: boolean
+          description: >-
+            While true, participants added by any route (dashboard, import,
+            this API) are recorded without an onboarding email. Releasing the
+            hold sends every held invitation.
         nfc_badges_enabled: { type: boolean }
         nfc_badge_write_on_checkin_enabled: { type: boolean }
         groups_enabled: { type: boolean }
@@ -2144,6 +2162,11 @@ components:
         accommodation_enabled: { type: boolean, description: "Defaults to true on create." }
         roommate_preferences_enabled: { type: boolean, description: "Defaults to true on create." }
         guardian_invites_locked: { type: boolean }
+        onboarding_invites_held:
+          type: boolean
+          description: >-
+            Setting this from true to false sends every held invitation on the
+            event, exactly like the dashboard's release button.
         nfc_badges_enabled: { type: boolean }
         nfc_badge_write_on_checkin_enabled: { type: boolean }
         groups_enabled: { type: boolean }

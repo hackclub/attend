@@ -142,8 +142,11 @@ class Participant < ApplicationRecord
     (sibling_group_ids & other_participant.sibling_group_ids).any?
   end
 
+  # Invitations this participant can act on. Held ones are left out: the
+  # participant hasn't been told about the event yet, and the dashboard must
+  # not be the way they find out.
   def pending_invitations
-    Invitation.pending.for_email(email).where.not(event_id: event_ids)
+    Invitation.pending.sent.for_email(email).where.not(event_id: event_ids)
   end
 
   # Events that may appear on the public profile: fully registered, actually
