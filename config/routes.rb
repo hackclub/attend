@@ -482,7 +482,19 @@ Rails.application.routes.draw do
       post "travel/validate_flight", to: "travel#validate_flight"
 
       resources :events, only: [] do
-        resources :participants, only: [ :index, :show, :create ], controller: "participants" do
+        # The tail of the setup wizard for events created through the API:
+        # waiver configuration and the flip out of draft. The earlier steps
+        # (basics, schedule, modules) are the Series API's event create/update.
+        resource :setup, only: [ :show ], controller: "event_setup" do
+          put :waivers
+          post :complete
+        end
+
+        # Event staff and their roles. `:id` is the assignment id from #index,
+        # never an email address — those don't belong in a URL.
+        resources :staff, only: [ :index, :create, :update, :destroy ], controller: "event_staff"
+
+        resources :participants, only: [ :index, :show, :create, :update, :destroy ], controller: "participants" do
           collection do
             get :search
             get :lookup

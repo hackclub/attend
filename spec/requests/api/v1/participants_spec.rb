@@ -309,4 +309,154 @@ RSpec.describe "Api::V1::Participants", type: :request do
       end
     end
   end
+
+  describe "PATCH /api/v1/events/:event_id/participants/:id" do
+    let(:participant) { create(:participant, legal_first_name: "Robin", preferred_name: nil, phone: "+12025550100") }
+    let!(:participant_event) { create(:participant_event, participant: participant, event: event) }
+
+    let(:api_key) do
+      event.generate_api_key!
+      event.api_key
+    end
+
+    def api_key_headers
+      { "Authorization" => "Bearer #{api_key}" }
+    end
+
+    it "updates only the fields it was sent" do
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        params: { participant: { preferred_name: "Rob" } }, headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)["participant"]["display_name"]).to eq("Rob")
+      participant.reload
+      expect(participant.preferred_name).to eq("Rob")
+      expect(participant.legal_first_name).to eq("Robin")
+      expect(participant.phone).to eq("+12025550100")
+    end
+
+    it "withdraws and reinstates a registration, auditing each as the web does" do
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        params: { status: "withdrawn" }, headers: auth_headers
+      expect(response).to have_http_status(:ok)
+      expect(participant_event.reload.status).to eq("withdrawn")
+      expect(AuditLog.where(action: "withdraw", event: event)).to exist
+
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        params: { status: "in_progress" }, headers: auth_headers
+      expect(participant_event.reload.status).to eq("in_progress")
+      expect(AuditLog.where(action: "unwithdraw", event: event)).to exist
+    end
+
+    it "rejects a status that isn't one of the registration states" do
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        params: { status: "vibing" }, headers: auth_headers
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)["error"]).to include("in_progress")
+      expect(participant_event.reload.status).to eq("in_progress")
+    end
+
+    it "rejects an empty request rather than reporting a no-op as success" do
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}", headers: auth_headers
+
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it "surfaces model validation failures without writing anything" do
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        params: { participant: { phone: "12345", preferred_name: "Rob" } }, headers: auth_headers
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)["error"]).to match(/phone/i)
+      participant.reload
+      expect(participant.preferred_name).to be_nil
+      expect(participant.phone).to eq("+12025550100")
+    end
+
+    it "lets an API key write a phone number it is not allowed to read back" do
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        params: { participant: { phone: "+12025550199" } }, headers: api_key_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(participant.reload.phone).to eq("+12025550199")
+      body = JSON.parse(response.body)["participant"]
+      expect(body).not_to have_key("phone")
+      expect(body["email"]).to eq(participant.email)
+      log = AuditLog.find_by(action: "update", event: event)
+      expect(log.metadata["source"]).to eq("event_api")
+    end
+
+    it "refuses an API key issued for another event" do
+      other_event = create(:event)
+      other_pe = create(:participant_event, event: other_event)
+
+      patch "/api/v1/events/#{other_event.id}/participants/#{other_pe.id}",
+        params: { participant: { preferred_name: "Nope" } }, headers: api_key_headers
+
+      expect(response).to have_http_status(:forbidden)
+      expect(other_pe.participant.reload.preferred_name).to be_nil
+    end
+
+    it "refuses a staff role that cannot edit participants" do
+      read_only = create(:event_role_assignment, event: event, role: "read_only").user
+
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        params: { participant: { preferred_name: "Rob" } },
+        headers: { "Authorization" => "Bearer #{MobileToken.generate_for(read_only).token}" }
+
+      expect(response).to have_http_status(:forbidden)
+      expect(participant.reload.preferred_name).to be_nil
+    end
+
+    it "404s for a participant_event on another event" do
+      elsewhere = create(:participant_event)
+
+      patch "/api/v1/events/#{event.id}/participants/#{elsewhere.id}",
+        params: { participant: { preferred_name: "Rob" } }, headers: auth_headers
+
+      expect(response).to have_http_status(:not_found)
+    end
+  end
+
+  describe "DELETE /api/v1/events/:event_id/participants/:id" do
+    let!(:participant_event) { create(:participant_event, event: event) }
+
+    it "removes the registration but keeps the person and their other events" do
+      other_event = create(:event)
+      elsewhere = create(:participant_event, participant: participant_event.participant, event: other_event)
+
+      delete "/api/v1/events/#{event.id}/participants/#{participant_event.id}", headers: auth_headers
+
+      expect(response).to have_http_status(:no_content)
+      expect(ParticipantEvent.exists?(participant_event.id)).to be(false)
+      expect(ParticipantEvent.exists?(elsewhere.id)).to be(true)
+      expect(Participant.exists?(participant_event.participant_id)).to be(true)
+      expect(AuditLog.where(action: "destroy", event: event)).to exist
+    end
+
+    it "refuses a role that isn't an event admin" do
+      ops = create(:event_role_assignment, event: event, role: "ops").user
+
+      delete "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        headers: { "Authorization" => "Bearer #{MobileToken.generate_for(ops).token}" }
+
+      expect(response).to have_http_status(:forbidden)
+      expect(ParticipantEvent.exists?(participant_event.id)).to be(true)
+    end
+
+    it "lets an event API key remove a registration on its own event only" do
+      event.generate_api_key!
+      headers = { "Authorization" => "Bearer #{event.api_key}" }
+      other_event = create(:event)
+      elsewhere = create(:participant_event, event: other_event)
+
+      delete "/api/v1/events/#{other_event.id}/participants/#{elsewhere.id}", headers: headers
+      expect(response).to have_http_status(:forbidden)
+
+      delete "/api/v1/events/#{event.id}/participants/#{participant_event.id}", headers: headers
+      expect(response).to have_http_status(:no_content)
+      expect(ParticipantEvent.exists?(participant_event.id)).to be(false)
+    end
+  end
 end
