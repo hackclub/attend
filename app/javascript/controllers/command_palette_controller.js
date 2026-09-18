@@ -110,10 +110,15 @@ export default class extends Controller {
         { type: "navigation", label: "Messages", url: `/admin/events/${currentEventSlug}/messages`, icon: "message", category: "Current Event" },
         { type: "navigation", label: "New Message", url: `/admin/events/${currentEventSlug}/messages/new`, icon: "message", category: "Current Event" },
         { type: "navigation", label: "Staff", url: `/admin/events/${currentEventSlug}/staff`, icon: "staff", category: "Current Event" },
-        { type: "navigation", label: "Export Data", url: `/admin/events/${currentEventSlug}/exports`, icon: "download", category: "Current Event" },
-        { type: "navigation", label: "Integrations", url: `/admin/${currentEventSlug}/integrations`, icon: "integration", category: "Current Event" },
-        { type: "navigation", label: "New Event", url: `/admin/new`, icon: "calendar", category: "Navigation" }
+        { type: "navigation", label: "Export Data", url: `/admin/events/${currentEventSlug}/exports`, icon: "download", category: "Current Event" }
       )
+
+      const canManageIntegrations = document.querySelector('meta[name="can-manage-integrations"]')?.content === "true"
+      if (canManageIntegrations) {
+        items.push({ type: "navigation", label: "Integrations", url: `/admin/${currentEventSlug}/integrations`, icon: "integration", category: "Current Event" })
+      }
+
+      items.push({ type: "navigation", label: "New Event", url: `/admin/new`, icon: "calendar", category: "Navigation" })
     }
 
     const isGlobalAdmin = document.querySelector('meta[name="global-admin"]')?.content === "true"

@@ -81,7 +81,11 @@
       <% else %>
         <p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
           Waivers aren't configured yet — participants can't complete onboarding without them.
-          Set them up from the <%= link_to "waivers step", admin_event_setup_waivers_path(@event), class: "font-medium underline" %> or the <%= link_to "integrations page", admin_event_integrations_path(@event), class: "font-medium underline" %>.
+          <% if policy(@event).manage_integrations? %>
+            Set them up from the <%= link_to "waivers step", admin_event_setup_waivers_path(@event), class: "font-medium underline" %> or the <%= link_to "integrations page", admin_event_integrations_path(@event), class: "font-medium underline" %>.
+          <% else %>
+            Ask an event admin to set them up.
+          <% end %>
         </p>
       <% end %>
     </div>
