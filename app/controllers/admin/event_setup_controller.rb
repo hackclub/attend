@@ -8,6 +8,9 @@ module Admin
     STEPS = %w[basics schedule modules waivers team review].freeze
 
     before_action :require_staff_management_access, only: [ :add_team_member, :remove_team_member ]
+    # The waivers step edits the same DocuSeal templates as the integrations
+    # page, so it is gated the same way.
+    before_action :require_integrations_access, only: [ :waivers, :update_waivers ]
 
     def show
       redirect_to resume_step_path
@@ -113,6 +116,10 @@ module Admin
       @event = Event.find_by!(slug: params[:slug])
       authorize @event, :update?
       set_current_event(@event)
+    end
+
+    def require_integrations_access
+      authorize @event, :manage_integrations?
     end
 
     def resume_step_path

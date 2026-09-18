@@ -37,7 +37,7 @@ class Admin::DashboardController < Admin::BaseController
 
   def integrations
     @event = Event.find_by!(slug: params[:slug])
-    authorize @event, :show?
+    authorize @event, :manage_integrations?
 
     set_current_event(@event)
     @events = Event.order(starts_at: :desc)
@@ -46,7 +46,7 @@ class Admin::DashboardController < Admin::BaseController
 
   def trigger_airtable_sync
     @event = Event.find_by!(slug: params[:slug])
-    authorize @event, :update?
+    authorize @event, :manage_integrations?
 
     if @event.airtable_sync_configured?
       # "Sync Now" is a deliberate retry, so it also lifts a pause left by an
@@ -69,7 +69,7 @@ class Admin::DashboardController < Admin::BaseController
 
   def create_vote_event
     @event = Event.find_by!(slug: params[:slug])
-    authorize @event, :update?
+    authorize @event, :manage_integrations?
 
     # Without a current event the audit row lands with a null event_id, which
     # hides it from every non-global admin's audit log.
@@ -82,7 +82,7 @@ class Admin::DashboardController < Admin::BaseController
 
   def update_integrations
     @event = Event.find_by!(slug: params[:slug])
-    authorize @event, :update?
+    authorize @event, :manage_integrations?
 
     set_current_event(@event)
 

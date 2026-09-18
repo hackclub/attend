@@ -556,4 +556,149 @@ RSpec.describe "Limited event role", type: :request do
       expect(response.body).to include(participant.email)
     end
   end
+
+  describe "integrations and API" do
+    # Local organizers should not be able to swap the waiver, add documents for
+    # participants to sign, or mint API tokens that pull the event's data. The
+    # page is hidden and every endpoint behind it is closed; ops keeps all of it.
+    let(:denied_alert) { "You are not authorized to perform this action." }
+
+    it "is closed to the role in the policy" do
+      user = sign_in_with_role("limited")
+
+      expect(EventPolicy.new(user, event).manage_integrations?).to be(false)
+    end
+
+    it "stays open to ops in the policy" do
+      user = sign_in_with_role("ops", email: "ops-integrations-spec@example.com")
+
+      expect(EventPolicy.new(user, event).manage_integrations?).to be(true)
+    end
+
+    it "refuses the integrations page" do
+      sign_in_with_role("limited")
+
+      get admin_event_integrations_path(event.slug)
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to eq(denied_alert)
+    end
+
+    it "still serves the integrations page to ops" do
+      sign_in_with_role("ops", email: "ops-integrations-spec@example.com")
+
+      get admin_event_integrations_path(event.slug)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Configure external services and API access")
+    end
+
+    it "refuses to save integration settings" do
+      sign_in_with_role("limited")
+
+      patch admin_event_integrations_path(event.slug), params: { event: { docuseal_waiver_template_id: "999" } }
+
+      expect(flash[:alert]).to eq(denied_alert)
+      expect(event.reload.docuseal_waiver_template_id).not_to eq("999")
+    end
+
+    it "refuses to trigger an Airtable sync or link a vote event" do
+      sign_in_with_role("limited")
+
+      post admin_event_trigger_airtable_sync_path(event.slug)
+      expect(flash[:alert]).to eq(denied_alert)
+
+      post admin_event_create_vote_event_path(event.slug)
+      expect(flash[:alert]).to eq(denied_alert)
+    end
+
+    it "refuses to create, rotate, or revoke event API tokens" do
+      user = sign_in_with_role("limited")
+      token = EventApiToken.generate_for(event, user: user, name: "Existing")
+
+      expect {
+        post admin_event_api_tokens_path(event.slug), params: { name: "Sneaky" }
+      }.not_to change(EventApiToken, :count)
+      expect(flash[:alert]).to eq(denied_alert)
+
+      digest_before = token.token_digest
+      post admin_rotate_event_api_token_path(event.slug, token)
+      expect(flash[:alert]).to eq(denied_alert)
+      expect(token.reload.token_digest).to eq(digest_before)
+
+      delete admin_event_api_token_path(event.slug, token)
+      expect(flash[:alert]).to eq(denied_alert)
+      expect(token.reload.revoked_at).to be_nil
+    end
+
+    it "refuses to add, edit, or remove custom documents" do
+      sign_in_with_role("limited")
+      document = create(:custom_document, event: event)
+
+      expect {
+        post admin_event_custom_documents_path(event.slug),
+          params: { custom_document: { name: "Extra Form", document_kind: "electronic", docuseal_template_id: "555", signer_type: "participant" } }
+      }.not_to change(CustomDocument, :count)
+      expect(flash[:alert]).to eq(denied_alert)
+
+      get admin_event_custom_document_edit_path(event.slug, document)
+      expect(flash[:alert]).to eq(denied_alert)
+
+      patch admin_event_custom_document_path(event.slug, document), params: { custom_document: { name: "Renamed" } }
+      expect(flash[:alert]).to eq(denied_alert)
+      expect(document.reload.name).to eq("Hotel Waiver")
+
+      expect {
+        delete admin_event_custom_document_path(event.slug, document)
+      }.not_to change(CustomDocument, :count)
+      expect(flash[:alert]).to eq(denied_alert)
+    end
+
+    it "refuses the DocuSeal template mappings" do
+      sign_in_with_role("limited")
+
+      get admin_event_docuseal_template_mappings_path(event.slug, "waiver")
+      expect(flash[:alert]).to eq(denied_alert)
+
+      patch admin_event_docuseal_template_mappings_path(event.slug, "waiver"), params: { mappings: [] }
+      expect(flash[:alert]).to eq(denied_alert)
+
+      post admin_event_docuseal_template_sync_path(event.slug, "waiver")
+      expect(flash[:alert]).to eq(denied_alert)
+
+      post admin_event_docuseal_template_use_default_path(event.slug, "waiver")
+      expect(flash[:alert]).to eq(denied_alert)
+    end
+
+    it "refuses the waivers step of event setup" do
+      sign_in_with_role("limited")
+
+      get admin_event_setup_waivers_path(event)
+      expect(flash[:alert]).to eq(denied_alert)
+
+      patch admin_event_setup_waivers_path(event), params: { waiver_mode: "manual", event: { docuseal_waiver_template_id: "999" } }
+      expect(flash[:alert]).to eq(denied_alert)
+      expect(event.reload.docuseal_waiver_template_id).not_to eq("999")
+    end
+
+    it "hides every way in from the dashboard" do
+      sign_in_with_role("limited")
+
+      get admin_event_dashboard_path(event)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include(admin_event_integrations_path(event.slug))
+      expect(response.body).not_to include("Integrations &amp; API")
+      expect(response.body).to include('<meta name="can-manage-integrations" content="false">')
+    end
+
+    it "shows the way in to ops" do
+      sign_in_with_role("ops", email: "ops-integrations-spec@example.com")
+
+      get admin_event_dashboard_path(event)
+
+      expect(response.body).to include(admin_event_integrations_path(event.slug))
+      expect(response.body).to include('<meta name="can-manage-integrations" content="true">')
+    end
+  end
 end

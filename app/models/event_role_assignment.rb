@@ -50,7 +50,8 @@ class EventRoleAssignment < ApplicationRecord
         "View and edit travel and accommodation",
         "Manage groups and rooming",
         "View limited medical info (allergies, dietary needs)",
-        "View consents and notes"
+        "View consents and notes",
+        "Manage integrations: waivers, custom documents, API tokens"
       ],
       cannot: [
         "Manage staff",
@@ -76,6 +77,7 @@ class EventRoleAssignment < ApplicationRecord
         "See phone numbers, other than an emergency contact one",
         "See a guardian email address, or edit guardian details",
         "Work the support inbox",
+        "Manage integrations: waivers, custom documents, API tokens",
         "Manage staff",
         "Add or remove participants",
         "Access safeguarding records"
@@ -92,7 +94,8 @@ class EventRoleAssignment < ApplicationRecord
       cannot: [
         "Manage staff",
         "Add or remove participants",
-        "Edit travel or accommodation"
+        "Edit travel or accommodation",
+        "Manage integrations: waivers, custom documents, API tokens"
       ]
     },
     "read_only" => {
