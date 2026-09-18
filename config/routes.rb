@@ -200,6 +200,7 @@ Rails.application.routes.draw do
           get :new_invite
           post :send_invite
           delete :revoke_invite
+          post :send_held_invitations
           get :sync_slack_channel_preview
           post :sync_slack_channel
         end
@@ -332,6 +333,9 @@ Rails.application.routes.draw do
     end
 
     resources :series, controller: "event_series", param: :slug, except: [ :destroy ] do
+      member do
+        post :send_held_invitations
+      end
       resource :integrations, only: [ :show ], controller: "series_integrations" do
         # Vote events are per event, so this one names which of the series'
         # events it is for.

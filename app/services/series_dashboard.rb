@@ -202,6 +202,7 @@ class SeriesDashboard
         percent: percent(cleared, active),
         inactive: @inactive_by_event[event.id].to_i,
         pending_invitations: pending_invitations[event.id].to_i,
+        held_invitations: held_invitations[event.id].to_i,
         open_incidents: open_incidents[event.id],
         # The single biggest blocker on this event, which is what a series lead
         # actually wants off a row: "this one is stuck on guardians".
@@ -220,6 +221,10 @@ class SeriesDashboard
       percent: percent(@cleared_by_event.values.sum, active_total),
       blocked: active_total - @cleared_by_event.values.sum,
       pending_invitations: pending_invitations.values.sum,
+      held_invitations: held_invitations.values.sum,
+      # Events still holding, whether or not anything is held on them yet: the
+      # series button releases the hold on each of these too.
+      holding_events: events.count(&:onboarding_invites_held?),
       open_incidents: open_incidents.values.compact.sum,
       incidents_visible: open_incidents.values.any? { |v| !v.nil? }
     }
@@ -250,8 +255,14 @@ class SeriesDashboard
 
   # ── Invitations & incidents ───────────────────────────────────────────────
 
+  # Sent and not yet accepted — people who were emailed and haven't acted.
   def pending_invitations
-    @pending_invitations ||= Invitation.where(event_id: event_ids).pending.group(:event_id).count
+    @pending_invitations ||= Invitation.where(event_id: event_ids).pending.sent.group(:event_id).count
+  end
+
+  # Recorded but never emailed: nobody is chasing these, HQ is holding them.
+  def held_invitations
+    @held_invitations ||= Invitation.where(event_id: event_ids).held.group(:event_id).count
   end
 
   # Series membership does not by itself grant incident visibility — IncidentPolicy

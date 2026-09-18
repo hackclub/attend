@@ -23,7 +23,9 @@ module Admin
       end
 
       csv_content = params[:csv_file].read
-      send_invitations = params[:send_invitations] != "0"
+      # A held event never emails on import, whatever the box says: the
+      # invitations are recorded and go out when the hold is released.
+      send_invitations = params[:send_invitations] != "0" && !current_event.onboarding_invites_held?
 
       rows = parse_csv(csv_content)
 

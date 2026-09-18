@@ -35,7 +35,8 @@ RSpec.describe ParticipantMailer, type: :mailer do
       event = create(:event)
       participant = create(:participant, email: "expired@example.com")
       stale = Invitation.create!(event: event, email: participant.email)
-      stale.update_column(:expires_at, 1.day.ago)
+      # Only a sent invitation can expire: the link's window runs from the send.
+      stale.update_columns(sent_at: 31.days.ago, expires_at: 1.day.ago)
 
       described_class.invitation(email: participant.email, event: event, participant: participant).deliver_now
 
