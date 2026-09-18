@@ -1181,7 +1181,7 @@ paths:
         read them back: the response is redacted exactly as a read would be.
       parameters:
         - $ref: "#/components/parameters/EventId"
-        - $ref: "#/components/parameters/ParticipantEventId"
+        - $ref: "#/components/parameters/RegistrationId"
       requestBody:
         required: true
         content:
@@ -1200,7 +1200,9 @@ paths:
                     preferred_name: { type: string }
                     email: { type: string, format: email }
                     date_of_birth: { type: string, format: date }
-                    phone: { type: string, description: E.164, e.g. +12025550100 }
+                    phone:
+                      type: string
+                      description: E.164 format, e.g. +12025550100
                     pronouns: { type: string }
                     tshirt_size: { type: string }
       responses:
@@ -1231,7 +1233,7 @@ paths:
         their registrations for other events survive. Event admins only.
       parameters:
         - $ref: "#/components/parameters/EventId"
-        - $ref: "#/components/parameters/ParticipantEventId"
+        - $ref: "#/components/parameters/RegistrationId"
       responses:
         "204": { description: Registration removed. }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -1804,12 +1806,12 @@ components:
       description: >-
         The role assignment id from `GET /events/{event_id}/staff` — not an
         email address; those don't belong in a URL.
-    ParticipantEventId:
+    RegistrationId:
       name: id
       in: path
       required: true
       schema: { type: integer }
-      description: The participant_event id.
+      description: The participant_event id — one person's registration for this event.
     EventIdNumeric:
       name: event_id
       in: path
