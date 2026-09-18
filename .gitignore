@@ -61,3 +61,6 @@ package-lock.json
 /.vale/styles/*
 !/.vale/styles/config/
 /vale.out
+
+# Local gem installs (bundle config set path vendor/bundle)
+/vendor/bundle/

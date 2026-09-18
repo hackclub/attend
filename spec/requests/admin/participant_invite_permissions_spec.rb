@@ -54,12 +54,21 @@ RSpec.describe "Participant invite permissions", type: :request do
       end
 
       it "cannot revoke an invitation" do
-        invitation = create(:invitation, event: event)
+        invitation = create(:invitation, event: event, sent_at: Time.current)
 
         delete revoke_invite_admin_event_participants_path(event.slug, id: invitation.id)
 
         expect(response).to redirect_to(root_path)
         expect(Invitation.exists?(invitation.id)).to be(true)
+      end
+
+      it "cannot release held invitations" do
+        event.update!(onboarding_invites_held: true)
+
+        post send_held_invitations_admin_event_participants_path(event.slug)
+
+        expect(response).to redirect_to(root_path)
+        expect(event.reload.onboarding_invites_held?).to be(true)
       end
 
       it "cannot open the CSV import" do
@@ -105,7 +114,7 @@ RSpec.describe "Participant invite permissions", type: :request do
       end
 
       it "sees no invite, import, or token controls" do
-        create(:invitation, event: event)
+        create(:invitation, event: event, sent_at: Time.current)
 
         get admin_event_participants_path(event.slug)
         expect(response).to have_http_status(:ok)
@@ -145,7 +154,7 @@ RSpec.describe "Participant invite permissions", type: :request do
     end
 
     it "revokes an invitation" do
-      invitation = create(:invitation, event: event)
+      invitation = create(:invitation, event: event, sent_at: Time.current)
 
       delete revoke_invite_admin_event_participants_path(event.slug, id: invitation.id)
 
@@ -183,7 +192,7 @@ RSpec.describe "Participant invite permissions", type: :request do
     include_examples "can add participants"
 
     it "sees the controls on the participants page" do
-      create(:invitation, event: event)
+      create(:invitation, event: event, sent_at: Time.current)
 
       get admin_event_participants_path(event.slug)
       expect(response.body).to include(new_invite_admin_event_participants_path(event.slug))

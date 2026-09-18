@@ -97,7 +97,8 @@ module Api
 
         existing_invitation = @event.invitations.find_by(email: email)
         if existing_invitation
-          return render json: { success: false, error: "An invitation has already been sent to this email" }, status: :conflict
+          error = existing_invitation.held? ? "This email has already been added; its invitation is held" : "An invitation has already been sent to this email"
+          return render json: { success: false, error: error }, status: :conflict
         end
 
         existing_participant = @event.participants.find_by(email: email)
@@ -106,15 +107,15 @@ module Api
         end
 
         begin
-          ParticipantMailer.invitation(
-            email: email,
-            name: name,
-            event: @event
-          ).deliver_later
+          # Honours the event's hold: while onboarding invitations are held,
+          # the invitation is recorded and goes out when they're released.
+          Invitation.issue!(event: @event, email: email, name: name)
+          held = @event.onboarding_invites_held?
 
           render json: {
             success: true,
-            message: "Invitation sent to #{email}",
+            held: held,
+            message: held ? "Invitation held for #{email}" : "Invitation sent to #{email}",
             event: @event.name
           }, status: :created
         rescue ActiveRecord::RecordInvalid => e

@@ -268,6 +268,7 @@ RSpec.describe CsvImportService do
 
         expect(ParticipantMailer).to have_received(:invitation).with(
           email: "minimal@example.com",
+          name: nil,
           event: event,
           participant: an_instance_of(Participant)
         )
