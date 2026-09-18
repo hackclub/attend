@@ -715,6 +715,8 @@ paths:
     get:
       tags: [Event Setup]
       summary: Setup progress
+      x-mint:
+        href: /api-reference/event-setup/setup-progress
       description: >-
         Which steps of the setup wizard this event has left. `remaining` lists
         the keys of `steps` that are still false; an event whose setup was
@@ -738,6 +740,8 @@ paths:
     put:
       tags: [Event Setup]
       summary: Configure waivers
+      x-mint:
+        href: /api-reference/event-setup/configure-waivers
       description: |
         Points the event at its DocuSeal waiver templates.
 
@@ -809,6 +813,8 @@ paths:
     post:
       tags: [Event Setup]
       summary: Finish setup
+      x-mint:
+        href: /api-reference/event-setup/finish-setup
       description: >-
         Takes the event out of draft. Idempotent — an event that is already set
         up keeps its original completion time. Requires a support email: it is
@@ -838,6 +844,8 @@ paths:
     get:
       tags: [Event Staff]
       summary: List staff
+      x-mint:
+        href: /api-reference/event-staff/list-staff
       description: >-
         Everyone with a role on this event, plus the catalogue of roles so a
         client never has to hardcode them. Event admins only (global admins and
@@ -869,6 +877,8 @@ paths:
     post:
       tags: [Event Staff]
       summary: Add a staff member
+      x-mint:
+        href: /api-reference/event-staff/add-a-staff-member
       description: >-
         Gives someone a role on the event and emails them about it. Someone who
         has never signed in to Attend gets a shell account now, which links up
@@ -911,6 +921,8 @@ paths:
     patch:
       tags: [Event Staff]
       summary: Change a staff member's role
+      x-mint:
+        href: /api-reference/event-staff/change-a-staff-members-role
       parameters:
         - $ref: "#/components/parameters/EventId"
         - $ref: "#/components/parameters/StaffAssignmentId"
@@ -943,6 +955,8 @@ paths:
     delete:
       tags: [Event Staff]
       summary: Remove a staff member
+      x-mint:
+        href: /api-reference/event-staff/remove-a-staff-member
       description: >-
         Removes this event role. Access that comes from a *series* role can't be
         removed here — it is inherited, so removing the row would either do
@@ -1168,6 +1182,8 @@ paths:
     patch:
       tags: [Participants]
       summary: Update a participant
+      x-mint:
+        href: /api-reference/participants/update-a-participant
       description: |
         Edits the person and/or where their registration stands. Only the keys
         you send are written.
@@ -1227,6 +1243,8 @@ paths:
     delete:
       tags: [Participants]
       summary: Remove a participant from the event
+      x-mint:
+        href: /api-reference/participants/remove-a-participant-from-the-event
       description: >-
         Deletes this registration — the profile, travel, consents and scans
         attached to it — and nothing else. The person's Attend account and
