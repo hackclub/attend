@@ -745,10 +745,14 @@ module Admin
     end
 
     def new_invite
+      authorize current_event, :invite_participants?
+
       @invite = Struct.new(:email, :name, :group_ids).new("", "", [])
     end
 
     def send_invite
+      authorize current_event, :invite_participants?
+
       email = params[:invite][:email]&.strip&.downcase
       name = params[:invite][:name]
       group_ids = Array(params[:invite][:group_ids]).reject(&:blank?)
@@ -792,7 +796,7 @@ module Admin
     # invitations, and stops holding new ones. The series page has the same
     # button for every event at once.
     def send_held_invitations
-      authorize current_event, :update?
+      authorize current_event, :invite_participants?
 
       count = current_event.held_invitations_count
       current_event.release_onboarding_invites!
@@ -803,6 +807,8 @@ module Admin
     end
 
     def revoke_invite
+      authorize current_event, :invite_participants?
+
       invitation = current_event.invitations.find(params[:id])
       email = invitation.email
       invitation.destroy!

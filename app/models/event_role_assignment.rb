@@ -39,7 +39,7 @@ class EventRoleAssignment < ApplicationRecord
         "View and edit travel and accommodation",
         "View and edit full medical and safeguarding records",
         "Manage groups and rooming",
-        "Regenerate the event API key"
+        "Create, rotate, and revoke event API tokens"
       ],
       cannot: []
     },
@@ -51,11 +51,12 @@ class EventRoleAssignment < ApplicationRecord
         "Manage groups and rooming",
         "View limited medical info (allergies, dietary needs)",
         "View consents and notes",
-        "Manage integrations: waivers, custom documents, API tokens"
+        "Manage integrations: waivers, custom documents, Airtable sync"
       ],
       cannot: [
         "Manage staff",
         "Add or remove participants",
+        "Create event API tokens, which can invite participants",
         "Access full medical or safeguarding records"
       ]
     },

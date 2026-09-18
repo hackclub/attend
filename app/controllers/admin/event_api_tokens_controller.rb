@@ -4,7 +4,7 @@ module Admin
 
     def create
       @event = Event.find_by!(slug: params[:slug])
-      authorize @event, :manage_integrations?
+      authorize @event, :manage_api_tokens?
 
       name = params[:name].to_s.strip
       if name.blank?
@@ -21,7 +21,7 @@ module Admin
 
     def rotate
       @event = Event.find_by!(slug: params[:slug])
-      authorize @event, :manage_integrations?
+      authorize @event, :manage_api_tokens?
 
       token = @event.event_api_tokens.active.find(params[:id])
       token.rotate!
@@ -33,7 +33,7 @@ module Admin
 
     def destroy
       @event = Event.find_by!(slug: params[:slug])
-      authorize @event, :manage_integrations?
+      authorize @event, :manage_api_tokens?
 
       token = @event.event_api_tokens.active.find(params[:id])
       token.revoke!

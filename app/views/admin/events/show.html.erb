@@ -258,13 +258,15 @@
             <dd class="mt-1 text-sm text-gray-400">No API key generated</dd>
           <% end %>
         </div>
-        <div>
-          <%= button_to @event.api_key_set? ? "Regenerate Key" : "Generate Key",
-              regenerate_api_key_admin_event_path(@event),
-              method: :post,
-              data: @event.api_key_set? ? { confirm: "This will invalidate the existing API key. Continue?" } : {},
-              class: "bg-[#d42f46] text-white px-4 py-2 rounded hover:bg-[#b82840] text-sm" %>
-        </div>
+        <% if policy(@event).regenerate_api_key? %>
+          <div>
+            <%= button_to @event.api_key_set? ? "Regenerate Key" : "Generate Key",
+                regenerate_api_key_admin_event_path(@event),
+                method: :post,
+                data: @event.api_key_set? ? { confirm: "This will invalidate the existing API key. Continue?" } : {},
+                class: "bg-[#d42f46] text-white px-4 py-2 rounded hover:bg-[#b82840] text-sm" %>
+          </div>
+        <% end %>
       </div>
     </div>
 
