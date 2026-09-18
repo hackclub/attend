@@ -32,13 +32,24 @@ class EventPolicy < ApplicationPolicy
   end
 
   # An event API token can send invitations without any role check, so minting
-  # one is the same privilege as inviting: event admins only.
+  # one is the same privilege as inviting: event admins only. Narrower than
+  # manage_integrations? on purpose — ops can run the rest of the page.
   def manage_api_tokens?
     user.global_admin? || user.event_admin_for?(record)
   end
 
   def regenerate_api_key?
     manage_api_tokens?
+  end
+
+  # The Integrations & API page: waiver and custom document templates, DocuSeal
+  # field mappings, Airtable sync, Slack, and event API tokens. Changing any of
+  # these changes what participants are asked to sign or who can pull their
+  # data, so it is held to the ops bar — event admins, ops, and series members.
+  # Limited (local organizers), safeguarding leads, and read-only staff can
+  # withdraw participants and work the event without it.
+  def manage_integrations?
+    user.ops_for?(record)
   end
 
   def destroy?

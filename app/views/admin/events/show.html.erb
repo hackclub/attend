@@ -89,6 +89,7 @@
       </dl>
     </div>
 
+    <% if policy(@event).manage_integrations? %>
     <div class="bg-white border border-gray-200 rounded-lg p-6">
       <h2 class="text-lg font-semibold mb-4">Integrations</h2>
       <dl class="space-y-3">
@@ -119,6 +120,7 @@
         </div>
       </dl>
     </div>
+    <% end %>
 
     <div class="bg-white border border-gray-200 rounded-lg p-6">
       <h2 class="text-lg font-semibold mb-4">Event Options</h2>
