@@ -1,0 +1,119 @@
+<% content_for :title, "Update registration – #{@event.name} – Attend" %>
+
+<div class="w-full max-w-2xl mx-auto">
+  <%= link_to "← Back to #{@event.name}", dashboard_event_path(@participant_event), class: "text-sm text-[#ec3750]" %>
+  <h1 class="portal-title text-2xl mt-5 mb-2"><%= @section.titleize %> correction</h1>
+
+  <% if @section == "contact" %>
+    <p class="portal-hint text-sm mb-6">Routine contact details update immediately. Legal name and date of birth require staff review because they may be bound to signed documents.</p>
+    <%= form_with model: @participant, url: dashboard_event_correction_path(@participant_event, section: :contact), method: :patch, class: "portal-card p-5 space-y-4" do |f| %>
+      <%= f.text_field :preferred_name, class: "portal-input", placeholder: "Preferred name" %>
+      <%= f.text_field :pronouns, class: "portal-input", placeholder: "Pronouns" %>
+      <%= f.email_field :email, class: "portal-input", required: true %>
+      <%= f.telephone_field :phone, class: "portal-input", placeholder: "Phone" %>
+      <%= f.text_field :address_line_1, class: "portal-input", placeholder: "Address line 1" %>
+      <%= f.text_field :address_line_2, class: "portal-input", placeholder: "Address line 2" %>
+      <div class="grid grid-cols-2 gap-3"><%= f.text_field :city, class: "portal-input", placeholder: "City" %><%= f.text_field :state, class: "portal-input", placeholder: "State / region" %></div>
+      <div class="grid grid-cols-2 gap-3"><%= f.text_field :postal_code, class: "portal-input", placeholder: "Postal code" %><%= f.text_field :country_of_residence, class: "portal-input", placeholder: "Country" %></div>
+      <%= f.select :tshirt_size, ["XS", "S", "M", "L", "XL", "XXL", "XXXL"], { include_blank: "T-shirt size" }, class: "portal-select" %>
+      <%= f.submit "Save contact details", class: "portal-button-primary" %>
+    <% end %>
+
+    <%= form_with url: dashboard_event_registration_change_requests_path(@participant_event), scope: :registration_change_request, class: "portal-card p-5 mt-6 space-y-4" do |f| %>
+      <%= f.hidden_field :kind, value: "signed_identity" %>
+      <h2 class="portal-heading text-base">Request a signed identity correction</h2>
+      <p class="portal-hint text-sm">Staff will review every affected registration. Your current legal identity remains in place until that review is complete.</p>
+      <%= f.fields_for :requested_changes do |c| %>
+        <%= c.text_field :legal_first_name, value: @participant.legal_first_name, class: "portal-input", placeholder: "Legal first name" %>
+        <%= c.text_field :legal_last_name, value: @participant.legal_last_name, class: "portal-input", placeholder: "Legal last name" %>
+        <%= c.date_field :date_of_birth, value: @participant.date_of_birth, class: "portal-input" %>
+      <% end %>
+      <%= f.text_area :requester_note, class: "portal-textarea", placeholder: "Anything staff should know" %>
+      <%= f.submit "Submit identity correction", class: "portal-button-primary" %>
+    <% end %>
+  <% elsif @section == "health" %>
+    <p class="portal-hint text-sm mb-6">These changes update immediately and are visible only to staff with health access.</p>
+    <%= form_with url: dashboard_event_correction_path(@participant_event, section: :health), method: :patch, class: "portal-card p-5 space-y-4" do |f| %>
+      <%= fields_for :medical, @medical do |m| %><%= m.text_area :allergies, class: "portal-textarea", placeholder: "Allergies" %><%= m.select :allergy_severity, [["No severity selected", ""], ["Mild", "mild"], ["Moderate", "moderate"], ["Severe", "severe"]], {}, class: "portal-select" %><%= m.text_area :medical_conditions, class: "portal-textarea", placeholder: "Medical conditions" %><%= m.text_area :medications, class: "portal-textarea", placeholder: "Medications" %><%= m.text_area :emergency_action_plan, class: "portal-textarea", placeholder: "Emergency action plan" %><%= m.text_area :additional_notes, class: "portal-textarea", placeholder: "Additional medical notes" %><%= m.check_box :has_anaphylaxis_risk %> Anaphylaxis risk<br><%= m.check_box :requires_refrigeration %> Medication refrigeration<% end %>
+      <%= fields_for :dietary, @dietary do |d| %><%= d.select :diet_type, [["No specific diet", ""], ["Vegetarian", "vegetarian"], ["Vegan", "vegan"], ["Halal", "halal"], ["Kosher", "kosher"], ["Other", "other"]], {}, class: "portal-select" %><%= d.text_area :intolerances, class: "portal-textarea", placeholder: "Food intolerances" %><%= d.text_area :life_threatening_allergies, class: "portal-textarea", placeholder: "Life-threatening food allergies" %><% end %>
+      <%= fields_for :accessibility, @accessibility do |a| %>
+        <fieldset class="space-y-3">
+          <legend class="portal-heading text-base">Learning and cognitive needs</legend>
+          <% [
+            [:has_adhd, "ADHD"],
+            [:has_dyslexia, "Dyslexia"],
+            [:has_autism, "Autism"]
+          ].each do |field, label| %>
+            <label class="flex items-center gap-2">
+              <%= a.check_box field, class: "portal-check" %>
+              <span><%= label %></span>
+            </label>
+          <% end %>
+          <%= a.text_area :neurodivergent_notes, class: "portal-textarea", placeholder: "Any specific accommodations or support that would help" %>
+        </fieldset>
+
+        <fieldset class="space-y-3">
+          <legend class="portal-heading text-base">Accessibility and communication needs</legend>
+          <% [
+            [:uses_wheelchair, "Wheelchair access"],
+            [:step_free_required, "Step-free access"],
+            [:needs_captioning, "Captioning"],
+            [:needs_large_print, "Large print"],
+            [:needs_sign_language, "Sign language interpreter"]
+          ].each do |field, label| %>
+            <label class="flex items-center gap-2">
+              <%= a.check_box field, class: "portal-check" %>
+              <span><%= label %></span>
+            </label>
+          <% end %>
+          <%= a.text_area :other_needs, class: "portal-textarea", placeholder: "Other accessibility or communication needs" %>
+          <%= a.text_area :mobility_needs, class: "portal-textarea", placeholder: "Mobility details" %>
+          <%= a.text_area :sensory_needs, class: "portal-textarea", placeholder: "Sensory details" %>
+          <%= a.text_area :communication_needs, class: "portal-textarea", placeholder: "Communication details" %>
+          <%= a.text_area :religious_practices, class: "portal-textarea", placeholder: "Religious or cultural practices" %>
+          <%= a.text_area :distance_limitations, class: "portal-textarea", placeholder: "Distance limitations" %>
+          <%= a.text_area :unavailable_times, class: "portal-textarea", placeholder: "Unavailable times" %>
+          <% [
+            [:light_sensitivity, "Light sensitivity"],
+            [:noise_sensitivity, "Noise sensitivity"],
+            [:strobe_sensitivity, "Strobe sensitivity"],
+            [:prayer_space_required, "Prayer space"],
+            [:requires_private_space, "Private space"]
+          ].each do |field, label| %>
+            <label class="flex items-center gap-2"><%= a.check_box field, class: "portal-check" %><span><%= label %></span></label>
+          <% end %>
+        </fieldset>
+      <% end %>
+      <%= f.submit "Save health information", class: "portal-button-primary" %>
+    <% end %>
+  <% elsif @section == "emergency" %>
+    <% if @participant_event.requires_guardian? %>
+      <div class="portal-note portal-note-info">
+        <p>Your emergency contacts are guardian-managed. Event staff can help with a correction.</p>
+        <%= link_to "Send a private request", edit_dashboard_event_correction_path(@participant_event, section: :support), class: "inline-block mt-2 font-medium underline" %>
+      </div>
+    <% else %>
+      <%= form_with model: @emergency_contact, url: dashboard_event_correction_path(@participant_event, section: :emergency), method: :patch, class: "portal-card p-5 space-y-4" do |f| %>
+        <%= f.text_field :name, class: "portal-input", placeholder: "Full name", required: true %><%= f.text_field :relationship, class: "portal-input", placeholder: "Relationship" %><%= f.telephone_field :phone, class: "portal-input", placeholder: "Phone", required: true %><%= f.email_field :email, class: "portal-input", placeholder: "Email" %><%= f.submit "Save emergency contact", class: "portal-button-primary" %>
+      <% end %>
+    <% end %>
+  <% elsif @section == "guardian" %>
+    <p class="portal-hint text-sm mb-6">Replacing a guardian invalidates the previous guardian's signatures. The replacement guardian must verify their details and sign again, and your registration may stop being complete.</p>
+    <%= form_with url: dashboard_event_registration_change_requests_path(@participant_event), scope: :registration_change_request, class: "portal-card p-5 space-y-4" do |f| %>
+      <%= f.hidden_field :kind, value: "guardian" %>
+      <%= f.fields_for :requested_changes do |g| %><%= g.text_field :legal_first_name, class: "portal-input", placeholder: "Guardian legal first name", required: true %><%= g.text_field :legal_last_name, class: "portal-input", placeholder: "Guardian legal last name", required: true %><%= g.email_field :email, class: "portal-input", placeholder: "Guardian email", required: true %><%= g.telephone_field :phone, class: "portal-input", placeholder: "Guardian phone", required: true %><%= g.text_field :relationship, class: "portal-input", placeholder: "Relationship", required: true %><% end %>
+      <%= f.text_area :requester_note, class: "portal-textarea", placeholder: "Why does this need changing?" %><%= f.submit "Request guardian replacement", class: "portal-button-primary" %>
+    <% end %>
+  <% else %>
+    <%= form_with url: dashboard_event_registration_change_requests_path(@participant_event), scope: :registration_change_request, class: "portal-card p-5 space-y-4" do |f| %>
+      <%= f.hidden_field :kind, value: "support" %><%= f.select :staff_audience, [["Event administrators", "event_admin"], ["Operations", "operations"], ["Safeguarding", "safeguarding"]], {}, class: "portal-select" %><%= f.text_area :requester_note, class: "portal-textarea", required: true, placeholder: "Describe what you need help correcting" %><%= f.submit "Send private request", class: "portal-button-primary" %>
+    <% end %>
+  <% end %>
+
+  <% if @change_requests.any? %>
+    <h2 class="portal-heading text-base mt-8 mb-3">Request history</h2>
+    <% @change_requests.each do |request_record| %>
+      <%= link_to dashboard_event_registration_change_request_path(@participant_event, request_record), class: "block portal-card p-4 mb-2" do %><span class="font-medium"><%= request_record.kind.titleize %></span><span class="float-right"><%= request_record.status.titleize %></span><% end %>
+    <% end %>
+  <% end %>
+</div>

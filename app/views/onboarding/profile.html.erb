@@ -4,6 +4,7 @@
   <header class="mb-6">
     <h1 class="portal-title text-2xl">Profile Information</h1>
     <p class="portal-hint text-sm mt-2">Fields marked with <span class="portal-required" aria-hidden="true">*</span> are required.</p>
+    <p class="portal-hint text-sm mt-2">Your contact and identity details are used for registration and safeguarding. They are visible to relevant event staff. <%= "Your parent or guardian can also see and edit these details in their portal." if @participant_event.requires_guardian? %></p>
   </header>
 
   <%= form_with model: @participant, url: onboarding_step_path(step: @step, event_id: current_event.id), scope: :participant, method: :patch, local: true, multipart: true, data: { turbo: false, controller: "phone-input autosave", autosave_url_value: onboarding_step_path(step: @step, event_id: current_event.id), action: "input->autosave#input change->autosave#change" } do |f| %>

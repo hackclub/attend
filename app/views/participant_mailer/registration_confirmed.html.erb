@@ -1,0 +1,7 @@
+<p>Hi <%= @preferred_name %>!</p>
+
+<p>Your registration for <strong><%= @event_name %></strong> is confirmed and your entry ticket is ready.</p>
+
+<p style="margin: 24px 0;"><%= mail_button "Open your entry ticket", @dashboard_link %></p>
+
+<p>Keep the QR code from your ticket available when you arrive. If you need help, email <%= mail_to @support_email %>.</p>

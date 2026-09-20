@@ -11,7 +11,7 @@
       <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.852l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/>
     </svg>
     <p class="portal-body text-sm">
-      This information is required for participants under 18 years of age. A guardian will need to provide consent for your participation.
+      This information is required for participants who will be under 18 when the event starts. After you submit, we will send the guardian invitation to the email address below. Your parent or guardian must complete their information and sign the required documents before your registration can be confirmed and your entry ticket becomes available.
     </p>
   </div>
 
@@ -33,7 +33,7 @@
       <div>
         <%= f.label :guardian_email, label_text("Guardian Email", required: true), class: "portal-label" %>
         <%= f.email_field :guardian_email, value: @guardian.email, class: "portal-input", required: true %>
-        <p class="mt-1 portal-hint text-sm">We'll send consent forms and important updates to this email</p>
+        <p class="mt-1 portal-hint text-sm">We'll send the guardian's information form, consent forms, and signing instructions to this email after you submit.</p>
       </div>
 
       <div>

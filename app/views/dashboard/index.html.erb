@@ -59,7 +59,7 @@
     <!-- Featured / next event hero -->
     <% if next_event %>
       <% ev = next_event.event %>
-      <% ds = next_event.display_status %>
+      <% completion = @completion_presenters.fetch(next_event) %>
       <% days_until = ev.starts_at.present? ? (ev.starts_at.to_date - Date.current).to_i : nil %>
       <% progress = next_event.onboarding_progress %>
       <% done_count = progress[:steps].count { |s| s[:done] } %>
@@ -129,19 +129,12 @@
                 <div class="h-1.5 rounded-full bg-(--text-on-dark)/10 overflow-hidden">
                   <div class="h-full rounded-full bg-[#33d6a6] transition-all w-(--pct)" style="--pct: <%= pct %>%"></div>
                 </div>
-                <p class="mt-2 text-sm text-(--text-on-dark)/80 truncate">
-                  <% if ds == "Complete" %>
-                    ✓ All set — boarding pass ready
-                  <% elsif progress[:blocking_step] %>
-                    Next: <%= progress[:blocking_step].titleize %>
-                  <% else %>
-                    <%= ds %>
-                  <% end %>
-                </p>
+                <p class="mt-2 text-sm font-medium text-(--text-on-dark)"><%= completion.label %></p>
+                <p class="mt-1 text-sm text-(--text-on-dark)/75"><%= completion.body %></p>
               </div>
             </div>
 
-            <% if ds != "Complete" && next_event_is_upcoming %>
+            <% if next_event_is_upcoming %>
               <div class="mt-6 flex flex-wrap gap-2 pointer-events-auto relative z-30">
                 <% waiver_consent = next_event.consents.find { |c| c.consent_type == "waiver" } %>
                 <% if waiver_consent&.guardian_signed? && !waiver_consent&.participant_signed? %>
@@ -149,8 +142,14 @@
                       class: "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-(--text-on-dark) text-(--bg-darker) text-sm font-semibold hover:bg-(--text-on-dark)/90 transition-colors" %>
                 <% elsif next_event.onboarding_held? %>
                   <span class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-(--text-on-dark)/10 text-(--text-on-dark) text-sm font-medium">Registration opens soon — we'll email you</span>
-                <% elsif ds == "Awaiting Participant" %>
+                <% elsif completion.state == :information_needed %>
                   <%= link_to "Continue registration", onboarding_path(event_id: next_event.event_id),
+                      class: "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-(--text-on-dark) text-(--bg-darker) text-sm font-semibold hover:bg-(--text-on-dark)/90 transition-colors" %>
+                <% elsif completion.state == :action_needed && completion.next_task&.kind == :waiver %>
+                  <%= link_to "Sign the event waiver", onboarding_waiver_path(event_id: next_event.event_id),
+                      class: "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-(--text-on-dark) text-(--bg-darker) text-sm font-semibold hover:bg-(--text-on-dark)/90 transition-colors" %>
+                <% elsif completion.state == :action_needed && completion.next_task&.custom_document %>
+                  <%= link_to "Sign #{completion.next_task.name}", dashboard_sign_document_path(next_event, completion.next_task.custom_document),
                       class: "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-(--text-on-dark) text-(--bg-darker) text-sm font-semibold hover:bg-(--text-on-dark)/90 transition-colors" %>
                 <% end %>
               </div>
@@ -171,7 +170,7 @@
         <h2 class="text-sm font-semibold uppercase tracking-wide text-(--text-muted) mb-3">Other events</h2>
         <div class="rounded-2xl border border-(--border-card) bg-(--bg-elev) divide-y divide-(--border-soft) overflow-hidden">
           <% other_events.each do |participant_event| %>
-            <% ds = participant_event.display_status %>
+            <% completion = @completion_presenters.fetch(participant_event) %>
             <% ev = participant_event.event %>
             <%= link_to dashboard_event_path(participant_event),
                 class: "group flex items-center gap-4 p-4 hover:bg-(--bg-elev-2) transition-colors" do %>
@@ -184,8 +183,8 @@
                   <%= ev.starts_at&.strftime("%b %d") %><%= " – #{ev.ends_at.strftime('%b %d, %Y')}" if ev.ends_at %>
                 </p>
               </div>
-              <span class="hidden sm:inline-flex shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium <%= display_status_badge_class(ds) %>">
-                <%= ds %>
+              <span class="hidden sm:inline-flex shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium <%= completion_status_badge_class(completion.state) %>">
+                <%= completion.label %>
               </span>
               <svg class="size-5 text-(--text-faint) group-hover:text-[#ec3750] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -218,7 +217,7 @@
           </svg>
           Get the Attend app
         </h2>
-        <p class="mt-1 text-sm text-(--text-muted)">Keep your boarding pass and event info handy on your phone.</p>
+        <p class="mt-1 text-sm text-(--text-muted)">Keep your entry ticket and event info handy on your phone.</p>
       </div>
       <%= render "shared/app_download_badges" %>
     </div>

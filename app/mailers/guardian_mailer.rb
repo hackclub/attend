@@ -70,6 +70,11 @@ class GuardianMailer < ApplicationMailer
     @event_name = @event.name
     @waiver_link = consent.guardian_signing_url
     @support_email = @event.effective_support_email
+    completion = RegistrationCompletionPresenter.new(@participant_event, viewer: :guardian,
+      guardian_participant_event: @guardian_participant_event)
+    @waiver_is_final_task = completion.outstanding_tasks.none? do |task|
+      task.consent != consent
+    end
 
     mail(
       to: @guardian.email,

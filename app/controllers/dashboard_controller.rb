@@ -22,12 +22,15 @@ class DashboardController < ApplicationController
     @participant_events = @participant.participant_events.includes(
       :consents, :travel_inbound, :travel_outbound, :accommodation,
       :medical, :dietary, :accessibility, :emergency_contacts,
-      guardian_participant_events: :emergency_contacts,
+      guardian_participant_events: [ :emergency_contacts, :guardian ],
       event: [ :custom_documents, { logo_attachment: :blob, event_series: { logo_attachment: :blob } } ]
     )
     @pending_invitations = @participant.pending_invitations.includes(
       event: [ { logo_attachment: :blob, event_series: { logo_attachment: :blob } } ]
     )
+    @completion_presenters = @participant_events.index_with do |participant_event|
+      RegistrationCompletionPresenter.new(participant_event, viewer: :participant)
+    end
   end
 
   def profile
@@ -170,6 +173,7 @@ class DashboardController < ApplicationController
       .find(params[:id])
     authorize @participant_event
     @event = @participant_event.event
+    @completion = RegistrationCompletionPresenter.new(@participant_event, viewer: :participant)
     @scans = @participant_event.scans.includes(:user).recent.limit(20)
     @messages = @participant_event.message_deliveries
       .includes(message: :sent_by_user)
@@ -188,12 +192,9 @@ class DashboardController < ApplicationController
     @custom_document_consents = @participant_event.consents
       .select(&:custom_document_id)
       .index_by(&:custom_document_id)
-
-    waiver_consent = @participant_event.consents.find { |c| c.consent_type == "waiver" }
-    if waiver_consent&.guardian_signed? && !waiver_consent&.participant_signed?
-      set_current_event(@event)
-      redirect_to onboarding_waiver_path, alert: "Please sign your waiver to complete your registration."
-    end
+    @registration_change_requests = policy_scope(RegistrationChangeRequest)
+      .where(participant_event: @participant_event)
+      .pending_first
   end
 
   def sign_document
@@ -428,16 +429,24 @@ class DashboardController < ApplicationController
     @travel_outbound = @participant_event.travel_outbound || @participant_event.build_travel_outbound
 
     Travel.transaction do
-      inbound_saved = @travel_inbound.update(travel_params(:inbound))
-      outbound_saved = @travel_outbound.update(travel_params(:outbound))
+      @travel_inbound.assign_attributes(travel_params(:inbound))
+      @travel_outbound.assign_attributes(travel_params(:outbound))
+      inbound_saved = @travel_inbound.valid?
+      outbound_saved = @travel_outbound.valid?
 
       if inbound_saved && outbound_saved
+        @travel_inbound.save!
+        @travel_outbound.save!
         redirect_to dashboard_event_path(@participant_event), notice: "Travel information updated successfully."
       else
+        raise ActiveRecord::Rollback
+      end
+    end
+
+    unless performed?
         @travel_inbound.travel_legs.build(position: 0) if @travel_inbound.plane? && @travel_inbound.travel_legs.reject(&:marked_for_destruction?).empty?
         @travel_outbound.travel_legs.build(position: 0) if @travel_outbound.plane? && @travel_outbound.travel_legs.reject(&:marked_for_destruction?).empty?
         render :edit_travel, status: :unprocessable_entity
-      end
     end
   end
 
@@ -547,7 +556,7 @@ class DashboardController < ApplicationController
     return { direction: direction } unless params[key].present?
 
     permitted = params.require(key).permit(
-      :mode, :carrier, :flight_number, :departure_city, :departure_time,
+      :arrangement_status, :mode, :carrier, :flight_number, :departure_city, :departure_time,
       :arrival_city, :arrival_time, :arrival_location, :booking_reference,
       :visa_status, :visa_notes, :notes,
       :train_departure_station, :train_arrival_station,

@@ -73,6 +73,15 @@
         Participants
       <% end %>
 
+      <% if current_user.global_admin? || current_user.event_admin_for?(current_event) || current_user.ops_for?(current_event) || current_user.safeguarding_lead_for?(current_event) %>
+        <%= link_to admin_event_registration_change_requests_path(current_event), class: "nav-item #{request.path.include?('/registration_change_requests') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h8m-8 4h8m-8 4h5m-7 5h8a2 2 0 002-2V6a2 2 0 00-2-2h-1.5a2.5 2.5 0 00-5 0H8a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+          Change Requests
+        <% end %>
+      <% end %>
+
       <%= link_to admin_event_incidents_path(current_event), class: "nav-item #{request.path.include?('/incidents') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>

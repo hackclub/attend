@@ -211,6 +211,17 @@ class Event < ApplicationRecord
     ActiveSupport::TimeZone[timezone.to_s.presence || "UTC"] || Time.zone
   end
 
+  # The dashboard uses the event's local clock for phase labels. A multi-day
+  # event remains live until its configured end timestamp, even when its start
+  # date is yesterday.
+  def phase_at(time = Time.current)
+    local_time = time.in_time_zone(event_time_zone)
+    return :upcoming if starts_at.blank? || local_time < starts_at.in_time_zone(event_time_zone)
+    return :ended if ends_at.present? && local_time >= ends_at.in_time_zone(event_time_zone)
+
+    :live
+  end
+
   # IANA identifier (e.g. "America/Los_Angeles") for API clients — `timezone`
   # holds a Rails zone name like "Pacific Time (US & Canada)", which JS's
   # Intl APIs don't understand.

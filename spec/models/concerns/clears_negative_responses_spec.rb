@@ -5,7 +5,7 @@ RSpec.describe ClearsNegativeResponses do
   let(:medical) { Medical.new(participant_event: participant_event) }
 
   describe "answers that mean nothing" do
-    [ "NO", "No", "none", "None", "N/A", "n/a", "NA", "na", "  None  ", "None." ].each do |answer|
+    [ "N/A", "n/a", "NA", "na", "Not Applicable", " not applicable ", "  N/A  " ].each do |answer|
       it "clears #{answer.inspect}" do
         medical.allergies = answer
 
@@ -15,7 +15,7 @@ RSpec.describe ClearsNegativeResponses do
   end
 
   describe "answers that mean something" do
-    [ "No known allergies", "none that need refrigeration", "Peanuts", "Nasal spray" ].each do |answer|
+    [ "No", "none", "nil", "-", "n/a.", "No known allergies", "none that need refrigeration", "Peanuts", "Nasal spray" ].each do |answer|
       it "keeps #{answer.inspect}" do
         medical.allergies = answer
 
@@ -23,31 +23,26 @@ RSpec.describe ClearsNegativeResponses do
       end
     end
 
-    it "keeps ambiguous single characters rather than guessing" do
-      medical.allergies = "-"
+    it "keeps a meaningful sentence verbatim" do
+      answer = "n/a for medication, but i need step-free access"
+      medical.allergies = answer
 
-      expect(medical.allergies).to eq("-")
-    end
-
-    it "strips surrounding whitespace from a real answer" do
-      medical.allergies = "  Penicillin  "
-
-      expect(medical.allergies).to eq("Penicillin")
+      expect(medical.allergies).to eq(answer)
     end
   end
 
   it "clears every free-text field on the medical form" do
     medical.update!(
-      allergies: "none", medical_conditions: "N/A", medications: "No",
-      emergency_action_plan: "na", additional_notes: "None."
+      allergies: "n/a", medical_conditions: "Not Applicable", medications: "NA",
+      emergency_action_plan: "na", additional_notes: " N/A "
     )
     dietary = Dietary.create!(
       participant_event: participant_event,
-      intolerances: "none", life_threatening_allergies: "N/A", notes: "NA"
+      intolerances: "not applicable", life_threatening_allergies: "N/A", notes: "NA"
     )
     accessibility = Accessibility.create!(
       participant_event: participant_event,
-      mobility_needs: "none", sensory_needs: "N/A", communication_needs: "No",
+      mobility_needs: "not applicable", sensory_needs: "N/A", communication_needs: "No",
       religious_practices: "na", other_needs: "None.", neurodivergent_notes: "none",
       distance_limitations: "N/A", unavailable_times: "NA"
     )
@@ -58,10 +53,11 @@ RSpec.describe ClearsNegativeResponses do
     expect(dietary.reload.attributes.values_at(
       "intolerances", "life_threatening_allergies", "notes"
     )).to all(be_nil)
-    expect(accessibility.reload.attributes.values_at(
+    accessibility.reload
+    expect(accessibility.attributes.values_at(
       "mobility_needs", "sensory_needs", "communication_needs", "religious_practices",
       "other_needs", "neurodivergent_notes", "distance_limitations", "unavailable_times"
-    )).to all(be_nil)
+    )).to eq([ nil, nil, "No", nil, "None.", "none", nil, nil ])
   end
 
   it "leaves text already in the database alone until the record is saved again" do

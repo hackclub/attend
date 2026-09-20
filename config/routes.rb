@@ -124,6 +124,10 @@ Rails.application.routes.draw do
   post "dashboard/events/:id/resend_guardian_invite", to: "dashboard#resend_guardian_invite", as: :dashboard_resend_guardian_invite
   get "dashboard/events/:id/travel/edit", to: "dashboard#edit_travel", as: :dashboard_event_travel_edit
   patch "dashboard/events/:id/travel", to: "dashboard#update_travel", as: :dashboard_event_travel
+  get "dashboard/events/:participant_event_id/corrections/:section/edit", to: "registration_corrections#edit", as: :edit_dashboard_event_correction
+  patch "dashboard/events/:participant_event_id/corrections/:section", to: "registration_corrections#update", as: :dashboard_event_correction
+  post "dashboard/events/:participant_event_id/change_requests", to: "registration_change_requests#create", as: :dashboard_event_registration_change_requests
+  get "dashboard/events/:participant_event_id/change_requests/:id", to: "registration_change_requests#show", as: :dashboard_event_registration_change_request
 
   scope "/dashboard" do
     resources :messages, only: [ :index, :show ], controller: "dashboard/messages", as: :dashboard_messages
@@ -263,6 +267,12 @@ Rails.application.routes.draw do
           end
         end
       resources :staff, only: [ :index, :new, :create, :destroy ], controller: "event_staff"
+      resources :registration_change_requests, only: [ :index, :show ] do
+        member do
+          patch :approve
+          patch :request_follow_up
+        end
+      end
       resources :slack_blasts, only: [ :index, :show, :new, :create ] do
         member do
           post :retry_failed

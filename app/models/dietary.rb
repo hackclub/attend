@@ -1,5 +1,6 @@
 class Dietary < ApplicationRecord
   include ClearsNegativeResponses
+  include HealthSectionResponse
 
   has_paper_trail
 
@@ -30,5 +31,10 @@ class Dietary < ApplicationRecord
 
   def dietary_restrictions?
     !omnivore? || intolerances.present?
+  end
+
+  def health_section_has_details?
+    [ diet_type, intolerances, life_threatening_allergies, notes ].any?(&:present?) ||
+      cross_contamination_risk?
   end
 end

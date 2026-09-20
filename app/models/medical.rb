@@ -1,5 +1,6 @@
 class Medical < ApplicationRecord
   include ClearsNegativeResponses
+  include HealthSectionResponse
 
   has_paper_trail
 
@@ -34,6 +35,12 @@ class Medical < ApplicationRecord
 
   def needs_medication_storage?
     requires_refrigeration
+  end
+
+  def health_section_has_details?
+    [ allergies, allergy_severity, medical_conditions, medications,
+      emergency_action_plan, additional_notes ].any?(&:present?) ||
+      has_anaphylaxis_risk? || requires_refrigeration?
   end
 
   private

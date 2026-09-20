@@ -1,6 +1,44 @@
 require "rails_helper"
 
 RSpec.describe GuardianMailer, type: :mailer do
+  describe "#waiver_signing" do
+    let(:event) { create(:event, freedom_waivers_enabled: false, name: "Midnight") }
+    let(:participant_event) do
+      create(:participant_event, event: event, status: :awaiting_guardian,
+        code_of_conduct_accepted_at: Time.current)
+    end
+    let(:guardian_participant_event) do
+      create(:guardian_participant_event, participant_event: participant_event,
+        status: :completed, completed_at: Time.current)
+    end
+    let!(:waiver) do
+      create(:consent, participant_event: participant_event, status: :sent,
+        participant_signed_at: Time.current, docuseal_guardian_slug: "guardian")
+    end
+
+    it "does not promise completion while another document remains" do
+      document = create(:custom_document, event: event, name: "Hotel waiver")
+      create(:consent, participant_event: participant_event, consent_type: :custom_document,
+        custom_document: document, docuseal_participant_slug: "participant")
+
+      mail = described_class.waiver_signing(
+        guardian_participant_event: guardian_participant_event, consent: waiver
+      )
+
+      expect(mail.body.encoded).to include("remaining steps")
+      expect(mail.body.encoded).not_to include("finalize everything")
+      expect(mail.body.encoded).not_to include("registration will be complete")
+    end
+
+    it "says the final waiver will be processed when it is the only remaining task" do
+      mail = described_class.waiver_signing(
+        guardian_participant_event: guardian_participant_event, consent: waiver
+      )
+
+      expect(mail.body.encoded).to include("process the completed waiver")
+    end
+  end
+
   describe "#optional_document_added" do
     let(:event) { create(:event, name: "Midnight") }
     let(:participant_event) { create(:participant_event, event: event) }

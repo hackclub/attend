@@ -70,6 +70,12 @@
 
       <%= fields_for :travel_inbound, @travel_inbound do |f| %>
         <div class="space-y-4">
+          <div>
+            <%= f.label :arrangement_status, "Arrangement status", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.select :arrangement_status, Travel.arrangement_statuses.keys.map { |status| [status.titleize, status] },
+                { include_blank: "Select status..." }, class: "w-full rounded-md border border-gray-300 px-3 py-2",
+                data: { action: "change->travel-form#updateFields", travel_form_target: "inboundStatus" } %>
+          </div>
           <!-- Mode -->
           <div>
             <%= f.label :mode, "Travel Mode", class: "block text-sm font-medium text-gray-700 mb-1" %>
@@ -190,6 +196,12 @@
 
       <%= fields_for :travel_outbound, @travel_outbound do |f| %>
         <div class="space-y-4">
+          <div>
+            <%= f.label :arrangement_status, "Arrangement status", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.select :arrangement_status, Travel.arrangement_statuses.keys.map { |status| [status.titleize, status] },
+                { include_blank: "Select status..." }, class: "w-full rounded-md border border-gray-300 px-3 py-2",
+                data: { action: "change->travel-form#updateFields", travel_form_target: "outboundStatus" } %>
+          </div>
           <!-- Mode -->
           <div>
             <%= f.label :mode, "Travel Mode", class: "block text-sm font-medium text-gray-700 mb-1" %>

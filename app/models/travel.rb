@@ -19,11 +19,18 @@ class Travel < ApplicationRecord
 
   enum :direction, { inbound: "inbound", outbound: "outbound" }
   enum :mode, { plane: "plane", train: "train", car: "car", bus: "bus", other: "other" }
+  enum :arrangement_status, {
+    unknown: "unknown",
+    not_arranged: "not_arranged",
+    provisional: "provisional",
+    confirmed: "confirmed"
+  }
   enum :visa_status, { not_required: "not_required", pending: "not_applied", applied: "applied", approved: "approved", denied: "denied" }
 
   validates :participant_event_id, presence: true
   validates :direction, presence: true
-
+  validates :mode, presence: true, if: -> { provisional? || confirmed? }
+  validate :confirmed_details_are_complete, if: :confirmed?
 
   def flight?
     plane?
@@ -104,6 +111,29 @@ class Travel < ApplicationRecord
   end
 
   private
+
+  def confirmed_details_are_complete
+    case mode
+    when "plane"
+      active_legs = travel_legs.reject(&:marked_for_destruction?)
+      errors.add(:travel_legs, "must include at least one complete flight") if active_legs.empty?
+    when "train"
+      errors.add(:train_departure_station, :blank) if train_departure_station.blank?
+      errors.add(:train_arrival_station, :blank) if train_arrival_station.blank?
+      errors.add(inbound? ? :arrival_time : :departure_time, :blank) if (inbound? ? arrival_time : departure_time).blank?
+    when "bus"
+      errors.add(:bus_departure_location, :blank) if bus_departure_location.blank?
+      errors.add(:bus_arrival_location, :blank) if bus_arrival_location.blank?
+      errors.add(:departure_time, :blank) if departure_time.blank?
+      errors.add(:arrival_time, :blank) if arrival_time.blank?
+    when "car"
+      errors.add(:origin_address, :blank) if origin_address.blank?
+      field = inbound? ? :expected_arrival_time : :departure_time
+      errors.add(field, :blank) if public_send(field).blank?
+    when "other"
+      errors.add(:other_details, :blank) if other_details.blank?
+    end
+  end
 
   def travel_calendar_event_ids
     participant_event_ids = [ participant_event_id, saved_change_to_participant_event_id&.first ].compact

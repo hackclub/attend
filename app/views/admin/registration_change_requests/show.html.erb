@@ -1,0 +1,14 @@
+<% content_for :title, "Change request – #{current_event.name} – Attend" %>
+<%= link_to "← Change requests", admin_event_registration_change_requests_path(current_event), class: "text-sm text-[#ec3750]" %>
+<div class="bg-white border border-gray-200 rounded-lg p-6 mt-5 space-y-5">
+  <div><h1 class="text-xl font-bold"><%= @change_request.participant.display_name %></h1><p class="text-sm text-gray-500"><%= @change_request.kind.titleize %> · <%= @change_request.status.titleize %></p></div>
+  <% if @change_request.requested_changes.present? %><dl class="space-y-2"><% @change_request.requested_changes.each do |field, value| %><div><dt class="text-xs text-gray-500"><%= field.titleize %></dt><dd><%= value %></dd></div><% end %></dl><% end %>
+  <% if @change_request.requester_note.present? %><div><h2 class="text-sm font-semibold">Attendee note</h2><%= simple_format(@change_request.requester_note) %></div><% end %>
+  <% if @change_request.staff_response.present? %><div><h2 class="text-sm font-semibold">Staff response</h2><%= simple_format(@change_request.staff_response) %></div><% end %>
+  <% if @change_request.pending? %>
+    <div class="border-t pt-5 space-y-4">
+      <% if @change_request.signed_identity? || @change_request.guardian? %><p class="text-sm text-amber-800 bg-amber-50 p-3 rounded">Approval may reset signed documents and make the registration incomplete. A replacement guardian must verify and sign again.</p><%= button_to "Approve request", approve_admin_event_registration_change_request_path(current_event, @change_request), method: :patch, class: "px-4 py-2 bg-green-700 text-white rounded", data: { turbo_confirm: "Approve this request and apply the documented resets?" } %><% else %><%= button_to "Mark resolved", approve_admin_event_registration_change_request_path(current_event, @change_request), method: :patch, class: "px-4 py-2 bg-green-700 text-white rounded" %><% end %>
+      <%= form_with url: request_follow_up_admin_event_registration_change_request_path(current_event, @change_request), scope: :registration_change_request, method: :patch, class: "space-y-2" do |f| %><%= f.text_area :staff_response, class: "w-full border rounded p-2", required: true, placeholder: "Explain what the attendee needs to provide" %><%= f.submit "Request follow-up", class: "px-4 py-2 bg-amber-600 text-white rounded" %><% end %>
+    </div>
+  <% end %>
+</div>

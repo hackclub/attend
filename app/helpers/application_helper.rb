@@ -338,9 +338,8 @@ def admin_tool(class_name = "", element = "div", **options, &block)
   # Wall-clock value (YYYY-MM-DDThh:mm) for a stored-UTC leg time, rendered in
   # the airport's local zone so a `datetime-local` input shows the booked time.
   def flight_local_input_value(time, airport_code, default_date: nil)
-    if time.blank?
-      return default_date.present? ? "#{default_date}T00:00" : nil
-    end
+    return nil if time.blank?
+
     tz = FlightTrackingService.airport_timezone(airport_code)
     (tz ? time.in_time_zone(tz) : time).strftime("%Y-%m-%dT%H:%M")
   end

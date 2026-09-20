@@ -23,6 +23,8 @@ class AuditLog < ApplicationRecord
     event_select: "select",
     reset_waiver: "reset_waiver",
     reset_freedom_waiver: "reset_freedom_waiver",
+    approve_registration_change_request: "approve",
+    request_follow_up: "request_follow_up",
     send_travel_update_reminder: "send_travel_update_reminder",
     approve_um: "approve_um",
     reject_um: "reject_um",

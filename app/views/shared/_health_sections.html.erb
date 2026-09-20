@@ -1,0 +1,104 @@
+<div class="space-y-4" data-controller="health-sections">
+  <% guardian_visible = local_assigns.fetch(:guardian_visible, false) %>
+  <% private_support_path = local_assigns[:private_support_path] %>
+  <% private_support_email = local_assigns[:private_support_email] %>
+  <% sections = [
+    [ :medical, medical, "Medical needs" ],
+    [ :dietary, dietary, "Food requirements" ],
+    [ :accessibility, accessibility, "Accessibility or support needs" ]
+  ] %>
+  <% sections.each do |kind, record, label| %>
+    <% scope = kind.to_s %>
+    <% open = health_section_details_open?(record) %>
+    <% has_details = record&.health_section_has_details? %>
+    <section class="portal-card p-5 sm:p-6" data-health-sections-target="section" data-section="<%= scope %>" data-has-details="<%= has_details %>">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h2 class="portal-heading text-base"><%= label %></h2>
+          <% if kind == :medical %>
+            <p class="portal-hint text-sm mt-1">Put medication, environmental, and other allergies here. Put food allergies in Food requirements.</p>
+          <% elsif kind == :dietary %>
+            <p class="portal-hint text-sm mt-1">Include food allergies, intolerances, and cross-contamination risks.</p>
+          <% else %>
+            <p class="portal-hint text-sm mt-1">Tell us what would help you. A diagnosis is never required to request support.</p>
+          <% end %>
+          <p class="portal-hint text-sm mt-3">
+            These answers are used to plan safety, food service, and event support. They are visible to event staff with a relevant health, operations, or safeguarding role and are not shown to other attendees.
+            <% if guardian_visible %>
+              You can see and edit these answers here because you are the listed parent or guardian.
+            <% else %>
+              <% if local_assigns.fetch(:guardian_required, false) %>Your listed parent or guardian can also see and edit these answers in their portal.<% end %>
+            <% end %>
+          </p>
+        </div>
+        <span class="portal-meta text-xs text-right" data-health-sections-target="summary"><%= health_section_summary(record) %></span>
+      </div>
+
+      <fieldset class="mt-4">
+        <legend class="portal-label">How would you like to answer?</legend>
+        <div class="flex flex-col sm:flex-row gap-2 mt-2">
+          <% [ [ "nothing_to_add", "Nothing to add" ], [ "details", "Add details" ], [ "private", "Prefer to discuss privately" ] ].each do |value, text| %>
+            <label class="portal-check-row border rounded px-3 py-2">
+              <input type="radio" name="<%= scope %>[section_response]" value="<%= value %>" class="portal-check" data-action="change->health-sections#responseChanged" <%= "checked" if record&.effective_section_response == value %>>
+              <span class="text-sm"><%= text %></span>
+            </label>
+          <% end %>
+        </div>
+      </fieldset>
+      <p class="portal-hint text-sm mt-3">
+        If you would rather explain something directly, you can
+        <% if private_support_path %>
+          <%= link_to "send a private request to event staff", private_support_path, class: "portal-link" %>.
+        <% elsif private_support_email %>
+          <%= mail_to private_support_email, "email the event team", class: "portal-link" %>.
+        <% else %>
+          ask the event team for a private conversation.
+        <% end %>
+        A private request is routed to the event staff audience you choose; it does not confirm an accommodation.
+      </p>
+
+      <div class="mt-4 <%= 'hidden' unless open %>" data-health-sections-target="details">
+        <% if kind == :medical %>
+          <div class="space-y-4">
+            <div><label for="medical_allergies" class="portal-label">Medication, environmental, or other allergies</label><textarea name="medical[allergies]" id="medical_allergies" rows="2" class="portal-textarea" data-action="blur->health-sections#normalizePlaceholder"><%= record&.allergies %></textarea></div>
+            <div><label for="medical_medical_conditions" class="portal-label">Medical conditions</label><textarea name="medical[medical_conditions]" id="medical_medical_conditions" rows="2" class="portal-textarea" data-action="blur->health-sections#normalizePlaceholder"><%= record&.medical_conditions %></textarea></div>
+            <div><label for="medical_allergy_severity" class="portal-label">Allergy severity</label><select name="medical[allergy_severity]" id="medical_allergy_severity" class="portal-select"><option value="">Select severity</option><% %w[mild moderate severe].each do |value| %><option value="<%= value %>" <%= "selected" if record&.allergy_severity == value %>><%= value.humanize %></option><% end %></select></div>
+            <div><label for="medical_medications" class="portal-label">Current medications</label><textarea name="medical[medications]" id="medical_medications" rows="2" class="portal-textarea" data-action="blur->health-sections#normalizePlaceholder"><%= record&.medications %></textarea></div>
+            <div><label for="medical_emergency_action_plan" class="portal-label">Emergency action plan</label><textarea name="medical[emergency_action_plan]" id="medical_emergency_action_plan" rows="2" class="portal-textarea" data-action="blur->health-sections#normalizePlaceholder"><%= record&.emergency_action_plan %></textarea></div>
+            <div><label for="medical_additional_notes" class="portal-label">Additional medical notes</label><textarea name="medical[additional_notes]" id="medical_additional_notes" rows="2" class="portal-textarea" data-action="blur->health-sections#normalizePlaceholder"><%= record&.additional_notes %></textarea></div>
+            <label class="portal-check-row"><input type="hidden" name="medical[has_anaphylaxis_risk]" value="0"><input type="checkbox" name="medical[has_anaphylaxis_risk]" value="1" class="portal-check" <%= "checked" if record&.has_anaphylaxis_risk %>><span class="text-sm">I am at risk of anaphylaxis</span></label>
+            <label class="portal-check-row"><input type="hidden" name="medical[requires_refrigeration]" value="0"><input type="checkbox" name="medical[requires_refrigeration]" value="1" class="portal-check" <%= "checked" if record&.requires_refrigeration %>><span class="text-sm">I need refrigeration for medication</span></label>
+          </div>
+        <% elsif kind == :dietary %>
+          <div class="space-y-4">
+            <div><label for="dietary_diet_type" class="portal-label">Diet type</label><select name="dietary[diet_type]" id="dietary_diet_type" class="portal-select"><option value="">No specific diet</option><% %w[vegetarian vegan halal kosher other].each do |value| %><option value="<%= value %>" <%= "selected" if record&.diet_type == value %>><%= value.humanize %></option><% end %></select></div>
+            <div><label for="dietary_intolerances" class="portal-label">Food intolerances</label><textarea name="dietary[intolerances]" id="dietary_intolerances" rows="2" class="portal-textarea" data-action="blur->health-sections#normalizePlaceholder"><%= record&.intolerances %></textarea></div>
+            <div><label for="dietary_life_threatening_allergies" class="portal-label">Life-threatening food allergies</label><textarea name="dietary[life_threatening_allergies]" id="dietary_life_threatening_allergies" rows="2" class="portal-textarea" data-action="blur->health-sections#normalizePlaceholder"><%= record&.life_threatening_allergies %></textarea><p class="portal-hint text-sm mt-1">This helps catering take extra precautions.</p></div>
+            <div><label for="dietary_notes" class="portal-label">Food notes</label><textarea name="dietary[notes]" id="dietary_notes" rows="2" class="portal-textarea" data-action="blur->health-sections#normalizePlaceholder"><%= record&.notes %></textarea></div>
+            <label class="portal-check-row"><input type="hidden" name="dietary[cross_contamination_risk]" value="0"><input type="checkbox" name="dietary[cross_contamination_risk]" value="1" class="portal-check" <%= "checked" if record&.cross_contamination_risk %>><span class="text-sm">I need protection from cross-contamination</span></label>
+          </div>
+        <% else %>
+          <div class="space-y-4">
+            <div><label for="accessibility_other_needs" class="portal-label">What support would help you?</label><textarea name="accessibility[other_needs]" id="accessibility_other_needs" rows="3" class="portal-textarea" data-action="blur->health-sections#normalizePlaceholder"><%= record&.other_needs %></textarea></div>
+            <fieldset><legend class="portal-label">Optional learning and cognitive details</legend><div class="space-y-2 mt-2"><% [ [ :has_adhd, "ADHD" ], [ :has_dyslexia, "Dyslexia" ], [ :has_autism, "Autism" ] ].each do |field, text| %><label class="portal-check-row"><input type="hidden" name="accessibility[<%= field %>]" value="0"><input type="checkbox" name="accessibility[<%= field %>]" value="1" class="portal-check" <%= "checked" if record&.public_send(field) %>><span class="text-sm"><%= text %></span></label><% end %></div></fieldset>
+            <div><label for="accessibility_neurodivergent_notes" class="portal-label">Learning or cognitive support notes</label><textarea name="accessibility[neurodivergent_notes]" id="accessibility_neurodivergent_notes" rows="2" class="portal-textarea" data-action="blur->health-sections#normalizePlaceholder"><%= record&.neurodivergent_notes %></textarea></div>
+            <fieldset><legend class="portal-label">Access requirements</legend><div class="space-y-2 mt-2"><% [ [ :uses_wheelchair, "Wheelchair accessible room or venue" ], [ :step_free_required, "Step-free access" ], [ :needs_captioning, "Captioning or hearing assistance" ], [ :needs_large_print, "Large print materials" ], [ :needs_sign_language, "Sign language interpreter" ], [ :light_sensitivity, "Light sensitivity" ], [ :noise_sensitivity, "Noise sensitivity" ], [ :strobe_sensitivity, "Strobe sensitivity" ], [ :requires_private_space, "Private space" ], [ :prayer_space_required, "Prayer space" ] ].each do |field, text| %><label class="portal-check-row"><input type="hidden" name="accessibility[<%= field %>]" value="0"><input type="checkbox" name="accessibility[<%= field %>]" value="1" class="portal-check" <%= "checked" if record&.public_send(field) %>><span class="text-sm"><%= text %></span></label><% end %></div></fieldset>
+            <div><label for="accessibility_mobility_needs" class="portal-label">Mobility details</label><textarea name="accessibility[mobility_needs]" id="accessibility_mobility_needs" rows="2" class="portal-textarea" data-action="blur->health-sections#normalizePlaceholder"><%= record&.mobility_needs %></textarea></div>
+            <div><label for="accessibility_sensory_needs" class="portal-label">Sensory details</label><textarea name="accessibility[sensory_needs]" id="accessibility_sensory_needs" rows="2" class="portal-textarea" data-action="blur->health-sections#normalizePlaceholder"><%= record&.sensory_needs %></textarea></div>
+            <div><label for="accessibility_communication_needs" class="portal-label">Communication details</label><textarea name="accessibility[communication_needs]" id="accessibility_communication_needs" rows="2" class="portal-textarea" data-action="blur->health-sections#normalizePlaceholder"><%= record&.communication_needs %></textarea></div>
+            <div><label for="accessibility_religious_practices" class="portal-label">Religious or cultural practices</label><textarea name="accessibility[religious_practices]" id="accessibility_religious_practices" rows="2" class="portal-textarea" data-action="blur->health-sections#normalizePlaceholder"><%= record&.religious_practices %></textarea></div>
+            <div><label for="accessibility_distance_limitations" class="portal-label">Distance limitations</label><textarea name="accessibility[distance_limitations]" id="accessibility_distance_limitations" rows="2" class="portal-textarea" data-action="blur->health-sections#normalizePlaceholder"><%= record&.distance_limitations %></textarea></div>
+            <div><label for="accessibility_unavailable_times" class="portal-label">Unavailable times</label><textarea name="accessibility[unavailable_times]" id="accessibility_unavailable_times" rows="2" class="portal-textarea" data-action="blur->health-sections#normalizePlaceholder"><%= record&.unavailable_times %></textarea></div>
+          </div>
+        <% end %>
+      </div>
+
+      <div class="hidden mt-3" data-health-sections-target="clearControl">
+        <label class="portal-check-row"><input type="checkbox" name="<%= scope %>[clear_details]" value="1" class="portal-check"><span class="text-sm">Clear the saved details and confirm nothing to add</span></label>
+      </div>
+      <% if kind == :medical || kind == :dietary || kind == :accessibility %>
+        <p class="text-sm portal-hint mt-4" data-health-sections-target="explanation" aria-live="polite"></p>
+      <% end %>
+    </section>
+  <% end %>
+</div>

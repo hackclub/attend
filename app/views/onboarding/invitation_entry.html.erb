@@ -1,0 +1,96 @@
+<% event_name = @invitation_event&.name %>
+<% content_for :title, event_name ? "Register for #{event_name} - Attend" : "Invitation unavailable - Attend" %>
+
+<div class="mx-auto max-w-2xl">
+  <div class="rounded-xl border border-[#e0e6ed] bg-white p-6 shadow-[var(--shadow-sm)] sm:p-8">
+    <% if @invitation_entry_state == :invalid %>
+      <h1 class="text-2xl font-bold text-[#1f2d3d]">This invitation link is invalid</h1>
+      <p class="mt-3 text-[#3c4858]">The link may be incomplete or may have been replaced. Email <%= mail_to @invitation_support_email %> to ask for help.</p>
+    <% else %>
+      <p class="text-sm font-semibold uppercase tracking-wide text-[#ec3750]">Event registration</p>
+      <h1 class="mt-2 text-3xl font-bold text-[#1f2d3d]">Register for <%= event_name %></h1>
+
+      <dl class="mt-6 grid gap-4 text-sm sm:grid-cols-2">
+        <% if @invitation_event.formatted_date_range.present? %>
+          <div>
+            <dt class="font-semibold text-[#1f2d3d]">Dates</dt>
+            <dd class="mt-1 text-[#3c4858]"><%= @invitation_event.formatted_date_range %></dd>
+          </div>
+        <% end %>
+        <% if @invitation_location.present? %>
+          <div>
+            <dt class="font-semibold text-[#1f2d3d]">Location</dt>
+            <dd class="mt-1 text-[#3c4858]"><%= @invitation_location %></dd>
+          </div>
+        <% end %>
+        <% if @invitation_deadline.present? %>
+          <div>
+            <dt class="font-semibold text-[#1f2d3d]">Registration deadline</dt>
+            <dd class="mt-1 text-[#3c4858]"><%= @invitation_deadline %></dd>
+          </div>
+        <% end %>
+      </dl>
+
+      <% if @invitation_entry_state == :expired %>
+        <div class="mt-6 rounded-lg border border-[#ec3750]/30 bg-[#ec3750]/10 p-4">
+          <h2 class="font-semibold text-[#1f2d3d]">This invitation has expired</h2>
+          <p class="mt-1 text-sm text-[#3c4858]">If you have not started registering, email <%= mail_to @invitation_support_email %> to request a new invitation.</p>
+        </div>
+      <% elsif @invitation_entry_state == :used %>
+        <div class="mt-6 rounded-lg border border-[#ec3750]/30 bg-[#ec3750]/10 p-4">
+          <h2 class="font-semibold text-[#1f2d3d]">This invitation has already been used</h2>
+          <% if @invitation_account_mismatch %>
+            <p class="mt-1 text-sm text-[#3c4858]">It was sent to <strong><%= @invitation.email %></strong>, but you're signed in as <strong><%= current_user.email %></strong>. Switch accounts to resume an existing registration.</p>
+          <% elsif user_signed_in? %>
+            <p class="mt-1 text-sm text-[#3c4858]">Attend could not find an existing registration for this event. Email <%= mail_to @invitation_support_email %> for help.</p>
+          <% else %>
+            <p class="mt-1 text-sm text-[#3c4858]">If you already started registering, sign in with <strong><%= @invitation.email %></strong> to resume. Otherwise, email <%= mail_to @invitation_support_email %> for help.</p>
+          <% end %>
+        </div>
+      <% elsif @invitation_entry_state == :email_mismatch %>
+        <div class="mt-6 rounded-lg border border-[#ec3750]/30 bg-[#ec3750]/10 p-4">
+          <h2 class="font-semibold text-[#1f2d3d]">This invitation belongs to a different account</h2>
+          <p class="mt-1 text-sm text-[#3c4858]">This invitation was sent to <%= @invitation.email %>. You're signed in as <%= current_user.email %>.</p>
+          <p class="mt-2 text-sm text-[#3c4858]">Switch to the Hack Club Account connected to the invited email, or email <%= mail_to @invitation_support_email %> if the invitation address is wrong.</p>
+        </div>
+      <% else %>
+        <p class="mt-6 text-[#3c4858]">Use the Hack Club Account connected to <strong><%= @invitation.email %></strong> so Attend can match you to this event.</p>
+        <p class="mt-2 text-sm text-[#3c4858]">Need help? Email <%= mail_to @invitation_support_email %>.</p>
+      <% end %>
+
+      <% unless @invitation_entry_state == :email_mismatch %>
+        <div class="mt-6">
+          <h2 class="font-semibold text-[#1f2d3d]">What to have ready</h2>
+          <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-[#3c4858]">
+            <li>Your contact details and date of birth.</li>
+            <li>A clear photo of your face for event identification.</li>
+            <li>Any health, dietary, accessibility, or support information the event team should know.</li>
+            <% if @invitation_event.travel_enabled? %><li>Your travel details.</li><% end %>
+            <% if @invitation_event.accommodation_enabled? %><li>Your accommodation requirements.</li><% end %>
+            <% if @invitation_guardian_requirement == :minor %>
+              <li>Your guardian contact details. They will receive a separate invitation for their details and required signatures after you submit.</li>
+            <% elsif @invitation_guardian_requirement == :unknown_age %>
+              <li>Your guardian contact details if you will be under 18 when the event starts. They will receive a separate invitation for their details and required signatures after you submit.</li>
+            <% end %>
+          </ul>
+          <p class="mt-3 text-sm text-[#3c4858]">You can save your progress and sign back in later to resume.</p>
+        </div>
+      <% end %>
+
+      <div class="mt-8 flex flex-wrap items-center gap-3">
+        <% if @invitation_entry_state == :email_mismatch || @invitation_account_mismatch %>
+          <%= button_to "Switch Hack Club Account", destroy_user_session_path,
+                method: :delete,
+                params: { invite: @invitation.token },
+                class: "rounded-lg bg-[#d42f46] px-5 py-3 font-semibold text-white hover:bg-[#b82840]" %>
+        <% elsif !user_signed_in? %>
+          <%= button_to(%i[expired used].include?(@invitation_entry_state) ? "Sign in to resume" : "Continue with Hack Club",
+                user_hack_club_omniauth_authorize_path,
+                method: :post,
+                data: { turbo: false },
+                class: "rounded-lg bg-[#d42f46] px-5 py-3 font-semibold text-white hover:bg-[#b82840]") %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>
