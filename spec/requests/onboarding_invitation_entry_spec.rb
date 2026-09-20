@@ -12,7 +12,7 @@ RSpec.describe "onboarding invitation entry", type: :request do
       location_city: "Oakland",
       support_email: "trailblazer@hackclub.com")
   end
-  let(:invitation) { create(:invitation, event: event, email: "invited@example.com") }
+  let(:invitation) { create(:invitation, event: event, email: "invited@example.com", sent_at: Time.current) }
 
   it "shows the invited event before authentication" do
     get onboarding_path(invite: invitation.token)
