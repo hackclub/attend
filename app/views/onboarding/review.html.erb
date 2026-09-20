@@ -443,13 +443,13 @@
           </div>
         </div>
 
-        <a href="https://hackclub.com/safety" target="_blank"
-           class="portal-note portal-note-info mt-4">
+        <a href="https://hackclub.com/safety" target="_blank" rel="noopener"
+           class="portal-note portal-note-info mt-4 group cursor-pointer hover:border-blue-400 transition-colors">
           <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
           <span>
-            <span class="block portal-heading text-sm">Need help or want to read the policies?</span>
+            <span class="block portal-heading text-sm underline decoration-1 underline-offset-4 group-hover:text-blue-700">Need help or want to read the policies? <span aria-hidden="true">↗</span></span>
             <span class="block portal-body text-sm">Visit our safety hub for the full Code of Conduct, Safeguarding Policy, and how to report a concern.</span>
           </span>
         </a>
@@ -457,7 +457,7 @@
 
       <!-- Terms acceptance -->
       <% if @participant_event.requires_guardian? %>
-        <div class="portal-note portal-note-warn p-4 mb-6">
+        <div class="portal-note portal-note-warn p-4 mb-6 block">
           <h2 class="portal-heading text-base mb-2">Your parent or guardian still has to finish</h2>
           <% guardian = @guardians&.first %>
           <p class="portal-body text-sm">Submitting your part does not finish registration. We will send <%= guardian&.guardian&.full_name.presence || "your parent or guardian" %> an invitation at <strong><%= guardian&.guardian&.email.presence || "the email you provided" %></strong> to complete their information and sign the required documents. Your entry ticket becomes available only after every required attendee, guardian, and staff processing task is complete.</p>
