@@ -2061,6 +2061,8 @@ components:
         ends_at: { type: string, format: date-time, nullable: true }
         registration_open_at: { type: string, format: date-time, nullable: true }
         registration_close_at: { type: string, format: date-time, nullable: true }
+        arrival_opens_at: { type: string, format: date-time, nullable: true }
+        arrival_closes_at: { type: string, format: date-time, nullable: true }
         venue_name: { type: string, nullable: true }
         location_city: { type: string, nullable: true }
         location_country: { type: string, nullable: true }
@@ -2142,6 +2144,8 @@ components:
         ends_at: { type: string, format: date-time, nullable: true }
         registration_open_at: { type: string, format: date-time, nullable: true }
         registration_close_at: { type: string, format: date-time, nullable: true }
+        arrival_opens_at: { type: string, format: date-time, nullable: true }
+        arrival_closes_at: { type: string, format: date-time, nullable: true }
         venue_name: { type: string, nullable: true, example: Kaapelitehdas }
         location_city: { type: string, nullable: true, example: Helsinki }
         location_country: { type: string, nullable: true, example: Finland }

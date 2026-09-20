@@ -25,6 +25,8 @@ module Api
           ends_at: event.ends_at&.iso8601,
           registration_open_at: event.registration_open_at&.iso8601,
           registration_close_at: event.registration_close_at&.iso8601,
+          arrival_opens_at: event.arrival_opens_at&.iso8601,
+          arrival_closes_at: event.arrival_closes_at&.iso8601,
           venue_name: event.venue_name,
           location_city: event.location_city,
           location_country: event.location_country,

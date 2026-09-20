@@ -52,6 +52,24 @@ RSpec.describe "Registration corrections", type: :request do
     expect(participant.reload.legal_first_name).not_to eq("Corrected")
   end
 
+  it "creates a support request that carries no field changes" do
+    staff = create(:user)
+    create(:event_role_assignment, event: event, user: staff, role: :event_admin)
+
+    expect {
+      post dashboard_event_registration_change_requests_path(participant_event), params: {
+        registration_change_request: {
+          kind: "support",
+          staff_audience: "event_admin",
+          requester_note: "I need to talk to someone"
+        }
+      }
+    }.to change(RegistrationChangeRequest, :count).by(1)
+
+    expect(response).to redirect_to(dashboard_event_path(participant_event))
+    expect(RegistrationChangeRequest.last.requested_changes).to eq({})
+  end
+
   it "does not let another attendee open the correction form" do
     other = create(:user)
     other_participant = create(:participant, user: other)

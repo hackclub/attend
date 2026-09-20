@@ -129,7 +129,8 @@ class Event < ApplicationRecord
   # string here and re-parse it in the event's timezone once validation runs
   # (by which point a timezone submitted in the same form has been assigned).
   NAIVE_DATETIME_PATTERN = /\A\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?\z/
-  SCHEDULE_TIME_ATTRIBUTES = %i[starts_at ends_at registration_open_at registration_close_at].freeze
+  SCHEDULE_TIME_ATTRIBUTES = %i[starts_at ends_at registration_open_at registration_close_at
+                                arrival_opens_at arrival_closes_at].freeze
 
   SCHEDULE_TIME_ATTRIBUTES.each do |attr|
     define_method(:"#{attr}=") do |value|
@@ -237,6 +238,28 @@ class Event < ApplicationRecord
   # event's timezone, so admins always see and edit event-local times.
   def schedule_time_field_value(attr)
     public_send(attr)&.in_time_zone(event_time_zone)&.strftime("%Y-%m-%dT%H:%M")
+  end
+
+  # One-line "when to arrive" summary for the participant dashboard, in the
+  # event's timezone. Nil when neither end of the arrival window is published,
+  # so callers can fall back to "contact the team" copy.
+  def formatted_arrival_window
+    tz = event_time_zone
+    opens = arrival_opens_at&.in_time_zone(tz)
+    closes = arrival_closes_at&.in_time_zone(tz)
+    return nil if opens.nil? && closes.nil?
+
+    if opens && closes
+      if opens.to_date == closes.to_date
+        "Arrive between #{opens.strftime('%-I:%M %p')} and #{closes.strftime('%-I:%M %p %Z')} on #{opens.strftime('%A, %B %-d')}."
+      else
+        "Arrive between #{opens.strftime('%A, %B %-d at %-I:%M %p')} and #{closes.strftime('%A, %B %-d at %-I:%M %p %Z')}."
+      end
+    elsif opens
+      "Arrive from #{opens.strftime('%A, %B %-d at %-I:%M %p %Z')}."
+    else
+      "Arrive by #{closes.strftime('%A, %B %-d at %-I:%M %p %Z')}."
+    end
   end
 
   def formatted_date_range

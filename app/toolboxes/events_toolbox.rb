@@ -54,6 +54,8 @@ class EventsToolbox < ApplicationToolbox
     param :location_country, :string, "Country", optional: true
     param :venue_name, :string, "Venue", optional: true
     param :support_email, :string, "Support email (@hackclub.com or @events.hackclub.com)", optional: true
+    param :arrival_opens_at, :string, "Arrival window opens (ISO8601)", optional: true
+    param :arrival_closes_at, :string, "Arrival window closes (ISO8601)", optional: true
     param :travel_enabled, :boolean, "Enable travel collection", optional: true
     param :accommodation_enabled, :boolean, "Enable accommodation", optional: true
     param :groups_enabled, :boolean, "Enable groups", optional: true
@@ -69,7 +71,7 @@ class EventsToolbox < ApplicationToolbox
 
   WRITABLE = %i[name slug starts_at ends_at timezone location_city location_country
                 location_address venue_name support_email registration_open_at
-                registration_close_at].freeze
+                registration_close_at arrival_opens_at arrival_closes_at].freeze
   FLAGS = %i[travel_enabled accommodation_enabled groups_enabled nfc_badges_enabled
              visa_options_enabled roommate_preferences_enabled freedom_waivers_enabled].freeze
 
@@ -93,6 +95,8 @@ class EventsToolbox < ApplicationToolbox
       support_email: e.support_email,
       registration_open_at: e.registration_open_at,
       registration_close_at: e.registration_close_at,
+      arrival_opens_at: e.arrival_opens_at,
+      arrival_closes_at: e.arrival_closes_at,
       participant_count: e.participant_events.count,
       confirmed_count: e.participant_events.where(status: "complete").count,
       features: {

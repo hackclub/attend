@@ -33,6 +33,23 @@ RSpec.describe "Admin::EventSetup", type: :request do
       expect(Event.find_by(slug: "outside-con")).to be_nil
       expect(response.body).to include("@hackclub.com or @events.hackclub.com")
     end
+
+    # The audit log used to choke on the unsaved event (no id, so AuditLog's
+    # record_id validation failed) and re-raise in development, replacing the
+    # 422 form with an exception page that Turbo full-reloaded — the admin saw
+    # the form reset with no error at all. Stubbing find_changed_record leaves
+    # @event as the only audit candidate, which is what a real browser session
+    # hits (the signed-in user there carries no pending changes).
+    it "still renders the errors when the audit log has only the unsaved event" do
+      allow_any_instance_of(Admin::BaseController).to receive(:find_changed_record).and_return(nil)
+
+      post admin_events_path, params: {
+        event: { name: "Outside Con", slug: "outside-con", support_email: "hi@gmail.com" }
+      }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.body).to include("@hackclub.com or @events.hackclub.com")
+    end
   end
 
   describe "GET setup (resume)" do
@@ -102,6 +119,19 @@ RSpec.describe "Admin::EventSetup", type: :request do
 
       expect(event.reload.starts_at).to be_present
       expect(response).to redirect_to(admin_event_setup_modules_path(event))
+    end
+
+    it "stores the arrival window in the event's timezone" do
+      event.update!(timezone: "America/New_York")
+
+      patch admin_event_setup_schedule_path(event), params: {
+        event: { arrival_opens_at: "2026-08-01T09:00", arrival_closes_at: "2026-08-01T11:30" }
+      }
+
+      event.reload
+      tz = ActiveSupport::TimeZone["America/New_York"]
+      expect(event.arrival_opens_at.in_time_zone(tz).strftime("%Y-%m-%dT%H:%M")).to eq("2026-08-01T09:00")
+      expect(event.arrival_closes_at.in_time_zone(tz).strftime("%Y-%m-%dT%H:%M")).to eq("2026-08-01T11:30")
     end
   end
 

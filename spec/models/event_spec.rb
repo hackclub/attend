@@ -45,6 +45,43 @@ RSpec.describe Event, type: :model do
     end
   end
 
+  describe "#formatted_arrival_window" do
+    let(:event) { build(:event, timezone: "Europe/London") }
+
+    it "is nil when neither end of the window is published" do
+      expect(event.formatted_arrival_window).to be_nil
+    end
+
+    it "reads times in the event's timezone and collapses a same-day window" do
+      event.arrival_opens_at = "2026-08-01T09:00"
+      event.arrival_closes_at = "2026-08-01T11:30"
+      event.validate
+
+      expect(event.formatted_arrival_window)
+        .to eq("Arrive between 9:00 AM and 11:30 AM BST on Saturday, August 1.")
+    end
+
+    it "spells out both dates when the window spans days" do
+      event.arrival_opens_at = "2026-08-01T21:00"
+      event.arrival_closes_at = "2026-08-02T01:00"
+      event.validate
+
+      expect(event.formatted_arrival_window)
+        .to eq("Arrive between Saturday, August 1 at 9:00 PM and Sunday, August 2 at 1:00 AM BST.")
+    end
+
+    it "handles a half-published window" do
+      event.arrival_opens_at = "2026-08-01T09:00"
+      event.validate
+      expect(event.formatted_arrival_window).to eq("Arrive from Saturday, August 1 at 9:00 AM BST.")
+
+      event.arrival_opens_at = nil
+      event.arrival_closes_at = "2026-08-01T11:30"
+      event.validate
+      expect(event.formatted_arrival_window).to eq("Arrive by Saturday, August 1 at 11:30 AM BST.")
+    end
+  end
+
   describe "#phase_at" do
     let(:event) do
       create(:event, timezone: "Europe/London",

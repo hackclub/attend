@@ -55,7 +55,11 @@ class RegistrationChangeRequestsController < ApplicationController
 
   def permitted_changes
     fields = CHANGE_FIELDS.fetch(request_params[:kind].to_s, [])
-    request_params.fetch(:requested_changes, {}).to_h.slice(*fields)
+    # Parameters#fetch wraps a Hash default in a fresh *unpermitted* Parameters,
+    # which then raises UnfilteredParameters on #to_h — so read the key and fall
+    # back to a plain Hash. A support request sends no changes at all.
+    changes = request_params[:requested_changes] || {}
+    changes.to_h.slice(*fields)
   end
 
   def staff_audience

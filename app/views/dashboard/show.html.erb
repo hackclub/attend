@@ -104,7 +104,13 @@
       <div>
         <dt class="text-(--text-muted)">When to arrive</dt>
         <dd class="font-medium text-(--text-strong) mt-1">
-          <% if event_start_local.present? %>
+          <% arrival_window = @event.formatted_arrival_window %>
+          <% if arrival_window.present? %>
+            <%= arrival_window %>
+            <% if event_start_local.present? %>
+              <span class="block text-(--text-muted) font-normal mt-1">Event starts <%= event_start_local.strftime("%A, %B %-d at %-I:%M %p %Z") %>.</span>
+            <% end %>
+          <% elsif event_start_local.present? %>
             Event starts <%= event_start_local.strftime("%A, %B %-d at %-I:%M %p %Z") %>.
             <span class="block text-(--text-muted) font-normal mt-1">An arrival window has not been published. Contact <%= mail_to @event.effective_support_email, @event.effective_support_email, class: "portal-link" %> if you need arrival guidance.</span>
           <% else %>
