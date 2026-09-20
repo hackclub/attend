@@ -88,9 +88,9 @@
     <% end %>
   <% elsif @section == "emergency" %>
     <% if @participant_event.requires_guardian? %>
-      <div class="portal-note portal-note-info">
-        <p>Your emergency contacts are guardian-managed. Event staff can help with a correction.</p>
-        <%= link_to "Send a private request", edit_dashboard_event_correction_path(@participant_event, section: :support), class: "inline-block mt-2 font-medium underline" %>
+      <div class="portal-note portal-note-info block space-y-3">
+        <p class="portal-body">Your emergency contacts are guardian-managed. Event staff can help with a correction.</p>
+        <%= link_to "Send a private request ↗", edit_dashboard_event_correction_path(@participant_event, section: :support), class: "inline-block font-medium underline underline-offset-4 portal-link" %>
       </div>
     <% else %>
       <%= form_with model: @emergency_contact, url: dashboard_event_correction_path(@participant_event, section: :emergency), method: :patch, class: "portal-card p-5 space-y-4" do |f| %>
