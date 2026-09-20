@@ -88,6 +88,15 @@ class Accommodation < ApplicationRecord
     gender_bucket == "nb_trans"
   end
 
+  def preferences_submitted?
+    persisted? && (
+      gender_identity.present? ||
+      preferred_roommate_genders.present? ||
+      roommate_preferences.present? ||
+      roommate_exclusions.present?
+    )
+  end
+
   def allowed_roommate_gender_buckets
     return [ "male", "female", "nb_trans" ] if preferred_roommate_genders&.include?("any")
     return [ gender_bucket ].compact if preferred_roommate_genders.blank?

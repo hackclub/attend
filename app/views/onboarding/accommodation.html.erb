@@ -11,7 +11,7 @@
         <p class="portal-body text-sm mt-2">Your room assignment is recorded as <strong><%= @accommodation.assigned_room %></strong>.</p>
       <% elsif @accommodation.roommate_links_reviewed? %>
         <p class="portal-body text-sm mt-2">The rooming team has reviewed your roommate preferences. A placement is not confirmed until an assigned room appears here.</p>
-      <% else %>
+      <% elsif @accommodation.preferences_submitted? %>
         <p class="portal-body text-sm mt-2">Your rooming preferences have been saved and are awaiting review by the rooming team.</p>
       <% end %>
     </div>
