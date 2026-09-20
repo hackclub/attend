@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_20_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_20_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -416,6 +416,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_090000) do
     t.string "airtable_sync_table_id"
     t.datetime "airtable_synced_at"
     t.string "api_key_digest"
+    t.datetime "arrival_closes_at"
+    t.datetime "arrival_opens_at"
     t.jsonb "config", default: {}
     t.datetime "created_at", null: false
     t.string "docuseal_adult_waiver_template_id"

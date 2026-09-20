@@ -119,8 +119,13 @@ module Admin
 
       changed_record = find_changed_record
       record = changed_record || @record || @event || @participant_event
-      # Skip audit logging for actions without a record (e.g., impersonation)
-      return if record.nil?
+      # Skip audit logging for actions without a record (e.g., impersonation),
+      # and for records that were never persisted — a create that failed
+      # validation re-renders the form with an id-less object, which AuditLog
+      # rejects. In development that rejection re-raises (see below) and
+      # replaces the 422 form (errors and all) with an exception page that
+      # Turbo full-reloads, so the admin just sees the form silently reset.
+      return if record.nil? || record.id.blank?
 
       changed_fields = if changed_record
         changed_record.previous_changes.except("updated_at", "created_at")
