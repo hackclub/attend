@@ -76,7 +76,7 @@
       <% if current_user.global_admin? || current_user.event_admin_for?(current_event) || current_user.ops_for?(current_event) || current_user.safeguarding_lead_for?(current_event) %>
         <%= link_to admin_event_registration_change_requests_path(current_event), class: "nav-item #{request.path.include?('/registration_change_requests') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h8m-8 4h8m-8 4h5m-7 5h8a2 2 0 002-2V6a2 2 0 00-2-2h-1.5a2.5 2.5 0 00-5 0H8a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.862 4.487l1.651-1.651a2.121 2.121 0 013 3l-1.651 1.651m-3-3L7.5 12.198V16.5H11.8l8.362-8.362m-3-3L20.162 7.5M5 20.25h14A2.25 2.25 0 0021.25 18V6A2.25 2.25 0 0019 3.75H5A2.25 2.25 0 002.75 6v12A2.25 2.25 0 005 20.25z"/>
           </svg>
           Change Requests
         <% end %>
