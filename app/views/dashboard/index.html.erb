@@ -142,7 +142,7 @@
                       class: "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-(--text-on-dark) text-(--bg-darker) text-sm font-semibold hover:bg-(--text-on-dark)/90 transition-colors" %>
                 <% elsif next_event.onboarding_held? %>
                   <span class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-(--text-on-dark)/10 text-(--text-on-dark) text-sm font-medium">Registration opens soon — we'll email you</span>
-                <% elsif completion.state == :information_needed || ds == "Awaiting Participant" %>
+                <% elsif completion.state == :information_needed %>
                   <%= link_to "Continue registration", onboarding_path(event_id: next_event.event_id),
                       class: "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-(--text-on-dark) text-(--bg-darker) text-sm font-semibold hover:bg-(--text-on-dark)/90 transition-colors" %>
                 <% elsif completion.state == :action_needed && completion.next_task&.kind == :waiver %>
