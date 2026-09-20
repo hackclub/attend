@@ -238,16 +238,24 @@ module Admin
       @travel_outbound = @participant_event.travel_outbound || @participant_event.build_travel_outbound
 
       Travel.transaction do
-        inbound_saved = @travel_inbound.update(travel_params(:inbound))
-        outbound_saved = @travel_outbound.update(travel_params(:outbound))
+        @travel_inbound.assign_attributes(travel_params(:inbound))
+        @travel_outbound.assign_attributes(travel_params(:outbound))
+        inbound_saved = @travel_inbound.valid?
+        outbound_saved = @travel_outbound.valid?
 
         if inbound_saved && outbound_saved
+          @travel_inbound.save!
+          @travel_outbound.save!
           redirect_to travel_admin_event_participant_path(current_event, @participant_event), notice: "Travel information updated."
         else
-          @travel_inbound.travel_legs.build(position: 0) if @travel_inbound.plane? && @travel_inbound.travel_legs.reject(&:marked_for_destruction?).empty?
-          @travel_outbound.travel_legs.build(position: 0) if @travel_outbound.plane? && @travel_outbound.travel_legs.reject(&:marked_for_destruction?).empty?
-          render :travel, status: :unprocessable_entity
+          raise ActiveRecord::Rollback
         end
+      end
+
+      unless performed?
+        @travel_inbound.travel_legs.build(position: 0) if @travel_inbound.plane? && @travel_inbound.travel_legs.reject(&:marked_for_destruction?).empty?
+        @travel_outbound.travel_legs.build(position: 0) if @travel_outbound.plane? && @travel_outbound.travel_legs.reject(&:marked_for_destruction?).empty?
+        render :travel, status: :unprocessable_entity
       end
     end
 
@@ -543,6 +551,7 @@ module Admin
       keys << [ "Travel", pe.travels.pluck(:id) ]
       keys << [ "TravelLeg", TravelLeg.where(travel_id: pe.travels.pluck(:id)).pluck(:id) ]
       keys << [ "Consent", pe.consents.pluck(:id) ]
+      keys << [ "RegistrationChangeRequest", pe.registration_change_requests.pluck(:id) ]
       keys << [ "Note", pe.notes.pluck(:id) ]
       keys << [ "EmergencyContact", EmergencyContact.where(participant_event_id: pe.id).or(EmergencyContact.where(guardian_participant_event_id: gpe_ids)).pluck(:id) ]
       keys << [ "RoomAssignment", Array(pe.room_assignment&.id) ]
@@ -986,7 +995,7 @@ module Admin
       return { direction: direction } unless params[key].present?
 
       allowed = [
-        :mode, :carrier, :flight_number, :departure_city, :departure_time,
+        :arrangement_status, :mode, :carrier, :flight_number, :departure_city, :departure_time,
         :arrival_city, :arrival_time, :arrival_location, :booking_reference,
         :visa_status, :visa_notes, :is_unaccompanied_minor, :notes,
         :train_departure_station, :train_arrival_station,

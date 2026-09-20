@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static targets = [
-    "inboundMode", "outboundMode",
+    "inboundStatus", "outboundStatus", "inboundMode", "outboundMode",
     "inboundPlane", "inboundTrain", "inboundBus", "inboundCar", "inboundOther",
     "outboundPlane", "outboundTrain", "outboundBus", "outboundCar", "outboundOther",
     "inboundLegs", "outboundLegs", "legTemplate",
@@ -63,19 +63,25 @@ export default class extends Controller {
   }
 
   updateDirection(direction) {
+    const statusTarget = direction === "inbound" ? this.inboundStatusTarget : this.outboundStatusTarget
     const modeTarget = direction === "inbound" ? this.inboundModeTarget : this.outboundModeTarget
+    const detailsEnabled = statusTarget.value === "provisional" || statusTarget.value === "confirmed"
+    const confirmed = statusTarget.value === "confirmed"
     const mode = modeTarget.value
+
+    modeTarget.disabled = !detailsEnabled
+    modeTarget.required = detailsEnabled
 
     const modes = ["plane", "train", "bus", "car", "other"]
     modes.forEach(m => {
       const targetName = `${direction}${m.charAt(0).toUpperCase() + m.slice(1)}Target`
       if (this[`has${targetName.charAt(0).toUpperCase() + targetName.slice(1)}`]) {
         const target = this[targetName]
-        if (m === mode) {
+        if (confirmed && m === mode) {
           target.classList.remove("hidden")
           // Enable required fields in visible section
           target.querySelectorAll("[data-required]").forEach(el => {
-            el.setAttribute("required", "")
+            if (confirmed) el.setAttribute("required", "")
           })
           // Re-enable all inputs in visible section
           target.querySelectorAll("input, select, textarea").forEach(el => {
@@ -105,6 +111,8 @@ export default class extends Controller {
     
     const legCount = legsContainer.querySelectorAll("[data-travel-form-target='legTemplate']").length
     const newLeg = template.content.cloneNode(true)
+    const newLegElement = newLeg.querySelector("[data-travel-form-target='legTemplate']")
+    newLegElement.dataset.autosaveNew = "true"
     
     // Update the leg number display
     newLeg.querySelector(".leg-number").textContent = `Leg ${legCount + 1}`
@@ -122,17 +130,9 @@ export default class extends Controller {
     newLeg.querySelector(".leg-departure-tz").name = `${prefix}[departure_time_zone]`
     newLeg.querySelector(".leg-arrival-tz").name = `${prefix}[arrival_time_zone]`
 
-    // Seed a sensible date on the new leg's time pickers from a sibling leg, so
-    // travellers only adjust the time rather than re-entering the whole date.
-    const siblingTime = legsContainer.querySelector(".leg-departure-time")?.value
-    if (siblingTime) {
-      const siblingDate = siblingTime.slice(0, 10)
-      newLeg.querySelector(".leg-departure-time").value = `${siblingDate}T00:00`
-      newLeg.querySelector(".leg-arrival-time").value = `${siblingDate}T00:00`
-    }
-
     legsContainer.appendChild(newLeg)
     this.updateLegNumbers(legsContainer)
+    this.notifyAutosave()
   }
 
   removeLeg(event) {
@@ -148,11 +148,13 @@ export default class extends Controller {
       idHidden.type = "hidden"
       idHidden.name = idField.name
       idHidden.value = idField.value
+      idHidden.dataset.autosavePendingDeletion = "true"
       
       const destroyField = document.createElement("input")
       destroyField.type = "hidden"
       destroyField.name = idField.name.replace("[id]", "[_destroy]")
       destroyField.value = "1"
+      destroyField.dataset.autosavePendingDeletion = "true"
       
       legsContainer.appendChild(idHidden)
       legsContainer.appendChild(destroyField)
@@ -160,6 +162,11 @@ export default class extends Controller {
     
     legElement.remove()
     this.updateLegNumbers(legsContainer)
+    this.notifyAutosave()
+  }
+
+  notifyAutosave() {
+    this.element.dispatchEvent(new Event("change", { bubbles: true }))
   }
 
   updateLegNumbers(container) {

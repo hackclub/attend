@@ -9,7 +9,8 @@ module Admin
 
     layout "admin"
 
-    helper_method :current_event, :available_events, :can_view_participant_pii?
+    helper_method :current_event, :available_events, :can_view_participant_pii?,
+      :registration_change_request_pending_count
 
     # Views that render an exact date of birth or a home address gate on this;
     # PII-restricted roles (Limited) get age and no address instead.
@@ -27,6 +28,12 @@ module Admin
       @available_events ||= policy_scope(Event)
         .includes(logo_attachment: :blob, event_series: { logo_attachment: :blob })
         .order(starts_at: :desc)
+    end
+
+    def registration_change_request_pending_count
+      return 0 unless current_event
+
+      @registration_change_request_pending_count ||= policy_scope(RegistrationChangeRequest).pending.count
     end
 
     private

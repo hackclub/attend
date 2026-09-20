@@ -45,6 +45,29 @@ RSpec.describe Event, type: :model do
     end
   end
 
+  describe "#phase_at" do
+    let(:event) do
+      create(:event, timezone: "Europe/London",
+        starts_at: Time.zone.parse("2026-09-19 09:00"),
+        ends_at: Time.zone.parse("2026-09-21 17:00"))
+    end
+
+    it "keeps the second day of a multi-day event live" do
+      expect(event.phase_at(Time.zone.parse("2026-09-20 12:00"))).to eq(:live)
+    end
+
+    it "distinguishes before start and after end" do
+      expect(event.phase_at(Time.zone.parse("2026-09-18 12:00"))).to eq(:upcoming)
+      expect(event.phase_at(Time.zone.parse("2026-09-21 17:00"))).to eq(:ended)
+    end
+
+    it "treats an event without a start as upcoming until configured" do
+      event.update_columns(starts_at: nil)
+
+      expect(event.phase_at).to eq(:upcoming)
+    end
+  end
+
   describe "#airtable_sync_stale?" do
     def configured_event(**attrs)
       build(

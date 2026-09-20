@@ -85,6 +85,9 @@ class GuardianPortalController < ApplicationController
   end
 
   def confirmed
+    @completion = RegistrationCompletionPresenter.new(@participant_event, viewer: :guardian,
+      guardian_participant_event: @guardian_participant_event)
+    @documents_paused = waivers_paused?
   end
 
   def waiver
@@ -300,6 +303,8 @@ class GuardianPortalController < ApplicationController
     @participant_event = @guardian_participant_event.participant_event
     @participant = @participant_event.participant
     @event = @participant_event.event
+    @completion = RegistrationCompletionPresenter.new(@participant_event, viewer: :guardian,
+      guardian_participant_event: @guardian_participant_event)
   end
 
   def mark_accepted_if_needed
@@ -336,15 +341,21 @@ class GuardianPortalController < ApplicationController
           :city, :state, :postal_code, :country_of_residence, :tshirt_size
         ),
         medical: params.fetch(:medical, {}).permit(
-          :allergies, :medical_conditions, :medications, :has_anaphylaxis_risk, :requires_refrigeration
+          :allergies, :medical_conditions, :medications, :allergy_severity, :emergency_action_plan, :additional_notes,
+          :has_anaphylaxis_risk, :requires_refrigeration, :section_response, :clear_details
         ),
         dietary: params.fetch(:dietary, {}).permit(
-          :diet_type, :intolerances, :life_threatening_allergies
+          :diet_type, :intolerances, :life_threatening_allergies, :notes, :cross_contamination_risk,
+          :section_response, :clear_details
         ),
         accessibility: params.fetch(:accessibility, {}).permit(
           :has_adhd, :has_dyslexia, :has_autism, :neurodivergent_notes,
           :uses_wheelchair, :step_free_required, :needs_large_print,
-          :needs_captioning, :needs_sign_language, :other_needs
+          :needs_captioning, :needs_sign_language, :other_needs, :mobility_needs,
+          :sensory_needs, :communication_needs, :religious_practices,
+          :distance_limitations, :unavailable_times, :light_sensitivity,
+          :noise_sensitivity, :prayer_space_required, :requires_private_space,
+          :strobe_sensitivity, :section_response, :clear_details
         ),
         travel_inbound: params.fetch(:travel_inbound, {}).permit(
           :mode, :is_unaccompanied_minor,
@@ -554,18 +565,26 @@ class GuardianPortalController < ApplicationController
   def save_participant_info_data
     all_params = step_params("participant_info")
 
-    participant_saved = @participant.update(all_params[:participant])
-
     medical = @participant_event.medical || @participant_event.build_medical
-    medical_saved = medical.update(all_params[:medical])
-
     dietary = @participant_event.dietary || @participant_event.build_dietary
-    dietary_params = all_params[:dietary]
-    dietary_params[:diet_type] = nil if dietary_params[:diet_type].blank?
-    dietary_saved = dietary.update(dietary_params)
-
     accessibility = @participant_event.accessibility || @participant_event.build_accessibility
-    accessibility_saved = accessibility.update(all_params[:accessibility])
+    health_records = [
+      [ medical, guardian_health_record_params(medical, all_params[:medical]), "Medical information" ],
+      [ dietary, guardian_health_record_params(dietary, all_params[:dietary]), "Dietary information" ],
+      [ accessibility, guardian_health_record_params(accessibility, all_params[:accessibility]), "Accessibility information" ]
+    ]
+    health_records.each { |record, attributes, _label| record.assign_attributes(attributes) }
+    health_valid = health_records.all? { |record, _attributes, _label| record.valid? }
+    unless health_valid
+      health_records.each do |record, _attributes, label|
+        record.errors.full_messages.each { |error| @participant.errors.add(:base, "#{label}: #{error}") }
+      end
+      return false
+    end
+    ActiveRecord::Base.transaction { health_records.each { |record, _attributes, _label| record.save! } }
+
+    participant_saved = @participant.update(all_params[:participant])
+    medical_saved = dietary_saved = accessibility_saved = true
 
     # Save travel data
     inbound_saved = outbound_saved = true
@@ -606,6 +625,18 @@ class GuardianPortalController < ApplicationController
     @guardian_participant_event.update(participant_info_reviewed_at: Time.current)
 
     participant_saved && medical_saved && dietary_saved && accessibility_saved && inbound_saved && outbound_saved
+  end
+
+  def guardian_health_record_params(record, attributes)
+    values = attributes.to_h.symbolize_keys
+    clear = ActiveModel::Type::Boolean.new.cast(values.delete(:clear_details))
+    if values[:section_response] == "nothing_to_add" && clear
+      record.class.health_section_detail_fields.each do |field|
+        values[field] = record.class.health_section_boolean_fields.include?(field) ? false : nil
+      end
+    end
+    values[:diet_type] = nil if record.is_a?(Dietary) && values[:diet_type].blank?
+    values
   end
 
   def um_declared_in?(travel_params)

@@ -1,7 +1,4 @@
 <% content_for :title, "Thank you – Guardian portal – Attend" %>
-<% @consent = @participant_event.consents.waiver.first %>
-<% first_name = @participant.legal_first_name %>
-<% guardian_signed = @consent&.guardian_signed_at.present? %>
 
 <div class="w-full max-w-2xl mx-auto">
   <%= render "shared/portal_masthead", subtitle: @event.name %>
@@ -13,12 +10,16 @@
       </svg>
     </span>
 
-    <h1 class="portal-title text-2xl mb-3">Thank you</h1>
+    <h1 class="portal-title text-2xl mb-3"><%= @completion.confirmed? ? "Registration confirmed" : "Thank you" %></h1>
 
     <p class="portal-body text-lg max-w-prose">
-      You've completed the guardian portion of
-      <strong class="portal-heading"><%= @participant.legal_first_name %> <%= @participant.legal_last_name %></strong>'s
-      registration for <strong class="portal-heading"><%= @event.name %></strong>.
+      <% if @completion.confirmed? %>
+        <%= @completion.body %>
+      <% else %>
+        Your information for
+        <strong class="portal-heading"><%= @participant.legal_first_name %> <%= @participant.legal_last_name %></strong>'s
+        registration for <strong class="portal-heading"><%= @event.name %></strong> is submitted.
+      <% end %>
     </p>
 
     <% if @guardian_participant_event.completed_at %>
@@ -28,47 +29,35 @@
     <% end %>
   </div>
 
-  <% if @consent&.docuseal_guardian_slug.present? && !guardian_signed %>
-    <div class="portal-note portal-note-warn mb-6">
+  <% unless @completion.confirmed? %>
+    <div class="portal-note <%= @completion.state.in?([:action_needed, :paused, :staff_attention]) ? 'portal-note-warn' : 'portal-note-success' %> mb-6">
       <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
-      </svg>
-      <div>
-        <h2 class="portal-heading text-sm">One thing left: sign the waiver</h2>
-        <p class="portal-body text-sm mt-1 mb-3">
-          <%= first_name %>'s registration isn't finished until the waiver is signed.
-        </p>
-        <%= link_to "Sign the waiver", guardian_portal_waiver_path(token: @token), class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
-      </div>
-    </div>
-  <% elsif guardian_signed %>
-    <div class="portal-note portal-note-success mb-6">
-      <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
-      </svg>
-      <div>
-        <h2 class="portal-heading text-sm">Waiver signed</h2>
-        <p class="portal-body text-sm mt-1">
-          Your portion is done. <%= first_name %> still needs to sign theirs from their own onboarding portal.
-        </p>
-      </div>
-    </div>
-  <% else %>
-    <section class="portal-card p-5 sm:p-6 mb-6" aria-labelledby="next-heading">
-      <h2 id="next-heading" class="portal-heading text-base mb-3">What happens next</h2>
-      <ol class="space-y-3">
-        <% [
-             "We'll email you a waiver to sign.",
-             "After you sign, #{first_name} signs their portion.",
-             "We'll get in touch if anything else is needed."
-           ].each_with_index do |line, index| %>
-          <li class="flex items-start gap-3">
-            <span class="portal-step-marker shrink-0"><%= index + 1 %></span>
-            <p class="portal-body text-sm pt-0.5"><%= line %></p>
-          </li>
+        <% if @completion.state.in?([ :action_needed, :paused, :staff_attention ]) %>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+        <% else %>
+          <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
         <% end %>
-      </ol>
-    </section>
+      </svg>
+      <div>
+        <h2 class="portal-heading text-sm">
+          <% if @completion.state == :action_needed %>
+            Next: sign the <%= @completion.next_task.name %>
+          <% else %>
+            <%= @completion.headline %>
+          <% end %>
+        </h2>
+        <p class="portal-body text-sm mt-1 <%= 'mb-3' if @completion.state == :action_needed %>"><%= @completion.body %></p>
+        <% if @completion.state == :action_needed && @completion.next_task.kind == :waiver %>
+          <%= link_to "Sign the waiver", guardian_portal_waiver_path(token: @token), class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+        <% elsif @completion.state == :action_needed && @completion.next_task.kind == :freedom_waiver %>
+          <%= link_to "Sign the Freedom Waiver", guardian_portal_freedom_waiver_path(token: @token), class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+        <% elsif @completion.state == :action_needed && @completion.next_task.custom_document %>
+          <%= link_to "Sign #{@completion.next_task.name}",
+                guardian_portal_custom_document_path(token: @token, custom_document_id: @completion.next_task.custom_document.id),
+                class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+        <% end %>
+      </div>
+    </div>
   <% end %>
 
   <%= render "custom_documents" %>

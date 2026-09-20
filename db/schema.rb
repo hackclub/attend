@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_09_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_20_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -35,6 +35,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_120000) do
     t.boolean "prayer_space_required", default: false
     t.text "religious_practices"
     t.boolean "requires_private_space", default: false
+    t.string "section_response"
     t.text "sensory_needs"
     t.boolean "step_free_required", default: false
     t.boolean "strobe_sensitivity", default: false
@@ -311,6 +312,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_120000) do
     t.text "life_threatening_allergies"
     t.text "notes"
     t.uuid "participant_event_id", null: false
+    t.string "section_response"
     t.datetime "updated_at", null: false
     t.index ["participant_event_id"], name: "index_dietaries_on_participant_event_id"
   end
@@ -777,6 +779,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_120000) do
     t.text "medications"
     t.uuid "participant_event_id", null: false
     t.boolean "requires_refrigeration", default: false
+    t.string "section_response"
     t.datetime "updated_at", null: false
     t.index ["last_updated_by_user_id"], name: "index_medicals_on_last_updated_by_user_id"
     t.index ["participant_event_id"], name: "index_medicals_on_participant_event_id"
@@ -1010,6 +1013,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_120000) do
     t.uuid "user_id", null: false
     t.index ["token"], name: "index_push_tokens_on_token", unique: true
     t.index ["user_id"], name: "index_push_tokens_on_user_id"
+  end
+
+  create_table "registration_change_requests", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "kind", null: false
+    t.uuid "participant_event_id", null: false
+    t.uuid "requested_by_id", null: false
+    t.jsonb "requested_changes", default: {}, null: false
+    t.text "requester_note"
+    t.datetime "resolved_at"
+    t.uuid "resolved_by_id"
+    t.string "staff_audience", null: false
+    t.text "staff_response"
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.index ["participant_event_id", "kind"], name: "index_pending_registration_change_requests", unique: true, where: "((status)::text = 'pending'::text)"
+    t.index ["participant_event_id"], name: "index_registration_change_requests_on_participant_event_id"
+    t.index ["requested_by_id"], name: "index_registration_change_requests_on_requested_by_id"
+    t.index ["resolved_by_id"], name: "index_registration_change_requests_on_resolved_by_id"
+    t.index ["status", "created_at"], name: "index_registration_change_requests_on_status_and_created_at"
   end
 
   create_table "room_assignments", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1319,6 +1342,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_120000) do
   end
 
   create_table "travels", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "arrangement_status", default: "unknown", null: false
     t.string "arrival_city"
     t.string "arrival_station"
     t.datetime "arrival_time"
@@ -1472,6 +1496,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_09_120000) do
   add_foreign_key "passports", "users", column: "paired_by_id"
   add_foreign_key "passports", "users", column: "revoked_by_id"
   add_foreign_key "push_tokens", "users"
+  add_foreign_key "registration_change_requests", "participant_events"
+  add_foreign_key "registration_change_requests", "users", column: "requested_by_id"
+  add_foreign_key "registration_change_requests", "users", column: "resolved_by_id"
   add_foreign_key "room_assignments", "participant_events"
   add_foreign_key "room_assignments", "rooms"
   add_foreign_key "rooming_plans", "events"

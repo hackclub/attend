@@ -4,6 +4,17 @@
   <header class="mb-6">
     <h1 class="portal-title text-2xl">Accommodation</h1>
     <p class="portal-hint text-sm mt-2">Fields marked with <span class="portal-required" aria-hidden="true">*</span> are required.</p>
+    <div class="portal-note portal-note-info mt-4">
+      <p class="portal-body text-sm"><strong class="portal-heading">Who sees this?</strong> Rooming details are used by the event team to plan assignments and are visible to staff managing accommodation. Other attendees cannot see them. Your selections are recorded as requests, not confirmed placements.</p>
+      <p class="portal-body text-sm mt-2">If a rooming concern is sensitive, <%= link_to "send a private request to event staff", edit_dashboard_event_correction_path(@participant_event, section: :support), class: "portal-link" %>. You can choose event administrators, operations, or safeguarding staff for that request.</p>
+      <% if @accommodation.assigned_room.present? %>
+        <p class="portal-body text-sm mt-2">Your room assignment is recorded as <strong><%= @accommodation.assigned_room %></strong>.</p>
+      <% elsif @accommodation.roommate_links_reviewed? %>
+        <p class="portal-body text-sm mt-2">The rooming team has reviewed your roommate preferences. A placement is not confirmed until an assigned room appears here.</p>
+      <% else %>
+        <p class="portal-body text-sm mt-2">Your rooming preferences have been saved and are awaiting review by the rooming team.</p>
+      <% end %>
+    </div>
   </header>
 
   <script nonce="<%= content_security_policy_nonce %>">

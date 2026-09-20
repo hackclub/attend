@@ -44,8 +44,17 @@
 
         <div class="space-y-4">
           <div>
+            <label for="travel_inbound_arrangement_status" class="portal-label">How ready are your arrival plans? <span class="portal-required" aria-hidden="true">*</span></label>
+            <select name="travel_inbound[arrangement_status]" id="travel_inbound_arrangement_status" data-action="change->travel-form#updateFields" data-travel-form-target="inboundStatus" class="portal-select" required>
+              <option value="">Choose a status</option>
+              <option value="not_arranged" <%= "selected" if @travel_inbound&.not_arranged? %>>I haven't arranged this yet</option>
+              <option value="provisional" <%= "selected" if @travel_inbound&.provisional? %>>I know how I intend to travel, but it is not booked</option>
+              <option value="confirmed" <%= "selected" if @travel_inbound&.confirmed? %>>My travel is confirmed</option>
+            </select>
+          </div>
+          <div>
             <label for="travel_inbound_mode" class="portal-label">How are you travelling to <%= current_event.location_city || "the event" %>? <span class="portal-required" aria-hidden="true">*</span></label>
-            <select name="travel_inbound[mode]" id="travel_inbound_mode" data-action="change->travel-form#updateFields" data-travel-form-target="inboundMode" class="portal-select" required>
+            <select name="travel_inbound[mode]" id="travel_inbound_mode" data-action="change->travel-form#updateFields" data-travel-form-target="inboundMode" class="portal-select">
               <option value="">Select travel mode</option>
               <option value="plane" <%= "selected" if @travel_inbound&.plane? %>>Flight</option>
               <option value="train" <%= "selected" if @travel_inbound&.train? %>>Train</option>
@@ -96,7 +105,7 @@
               </div>
               <div>
                 <label class="portal-label">Arrival Time in <%= current_event.location_city || "the event" %></label>
-                <input type="datetime-local" name="travel_inbound[arrival_time]" value="<%= @travel_inbound&.arrival_time&.strftime('%Y-%m-%dT%H:%M') || (@default_inbound_date ? "#{@default_inbound_date}T00:00" : nil) %>" class="portal-input">
+                <input type="datetime-local" name="travel_inbound[arrival_time]" value="<%= @travel_inbound&.arrival_time&.strftime('%Y-%m-%dT%H:%M') %>" class="portal-input">
               </div>
             </div>
           </div>
@@ -117,11 +126,11 @@
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label class="portal-label">Departure Time</label>
-                  <input type="datetime-local" name="travel_inbound[departure_time]" value="<%= @travel_inbound&.departure_time&.strftime('%Y-%m-%dT%H:%M') || (@default_inbound_date ? "#{@default_inbound_date}T00:00" : nil) %>" class="portal-input">
+                  <input type="datetime-local" name="travel_inbound[departure_time]" value="<%= @travel_inbound&.departure_time&.strftime('%Y-%m-%dT%H:%M') %>" class="portal-input">
                 </div>
                 <div>
                   <label class="portal-label">Arrival Time</label>
-                  <input type="datetime-local" name="travel_inbound[arrival_time]" value="<%= @travel_inbound&.arrival_time&.strftime('%Y-%m-%dT%H:%M') || (@default_inbound_date ? "#{@default_inbound_date}T00:00" : nil) %>" class="portal-input">
+                  <input type="datetime-local" name="travel_inbound[arrival_time]" value="<%= @travel_inbound&.arrival_time&.strftime('%Y-%m-%dT%H:%M') %>" class="portal-input">
                 </div>
               </div>
             </div>
@@ -136,7 +145,7 @@
               </div>
               <div>
                 <label class="portal-label">Expected Arrival Time in <%= current_event.location_city || "the event" %></label>
-                <input type="datetime-local" name="travel_inbound[expected_arrival_time]" value="<%= @travel_inbound&.expected_arrival_time&.strftime('%Y-%m-%dT%H:%M') || (@default_inbound_date ? "#{@default_inbound_date}T00:00" : nil) %>" class="portal-input">
+                <input type="datetime-local" name="travel_inbound[expected_arrival_time]" value="<%= @travel_inbound&.expected_arrival_time&.strftime('%Y-%m-%dT%H:%M') %>" class="portal-input">
               </div>
             </div>
           </div>
@@ -157,8 +166,17 @@
 
         <div class="space-y-4">
           <div>
+            <label for="travel_outbound_arrangement_status" class="portal-label">How ready are your departure plans? <span class="portal-required" aria-hidden="true">*</span></label>
+            <select name="travel_outbound[arrangement_status]" id="travel_outbound_arrangement_status" data-action="change->travel-form#updateFields" data-travel-form-target="outboundStatus" class="portal-select" required>
+              <option value="">Choose a status</option>
+              <option value="not_arranged" <%= "selected" if @travel_outbound&.not_arranged? %>>I haven't arranged this yet</option>
+              <option value="provisional" <%= "selected" if @travel_outbound&.provisional? %>>I know how I intend to travel, but it is not booked</option>
+              <option value="confirmed" <%= "selected" if @travel_outbound&.confirmed? %>>My travel is confirmed</option>
+            </select>
+          </div>
+          <div>
             <label for="travel_outbound_mode" class="portal-label">How are you leaving <%= current_event.location_city || "the event" %>? <span class="portal-required" aria-hidden="true">*</span></label>
-            <select name="travel_outbound[mode]" id="travel_outbound_mode" data-action="change->travel-form#updateFields" data-travel-form-target="outboundMode" class="portal-select" required>
+            <select name="travel_outbound[mode]" id="travel_outbound_mode" data-action="change->travel-form#updateFields" data-travel-form-target="outboundMode" class="portal-select">
               <option value="">Select travel mode</option>
               <option value="plane" <%= "selected" if @travel_outbound&.plane? %>>Flight</option>
               <option value="train" <%= "selected" if @travel_outbound&.train? %>>Train</option>
@@ -209,7 +227,7 @@
               </div>
               <div>
                 <label class="portal-label">Departure Time from <%= current_event.location_city || "the event" %></label>
-                <input type="datetime-local" name="travel_outbound[departure_time]" value="<%= @travel_outbound&.departure_time&.strftime('%Y-%m-%dT%H:%M') || (@default_outbound_date ? "#{@default_outbound_date}T00:00" : nil) %>" class="portal-input">
+                <input type="datetime-local" name="travel_outbound[departure_time]" value="<%= @travel_outbound&.departure_time&.strftime('%Y-%m-%dT%H:%M') %>" class="portal-input">
               </div>
             </div>
           </div>
@@ -230,11 +248,11 @@
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label class="portal-label">Departure Time</label>
-                  <input type="datetime-local" name="travel_outbound[departure_time]" value="<%= @travel_outbound&.departure_time&.strftime('%Y-%m-%dT%H:%M') || (@default_outbound_date ? "#{@default_outbound_date}T00:00" : nil) %>" class="portal-input">
+                  <input type="datetime-local" name="travel_outbound[departure_time]" value="<%= @travel_outbound&.departure_time&.strftime('%Y-%m-%dT%H:%M') %>" class="portal-input">
                 </div>
                 <div>
                   <label class="portal-label">Arrival Time</label>
-                  <input type="datetime-local" name="travel_outbound[arrival_time]" value="<%= @travel_outbound&.arrival_time&.strftime('%Y-%m-%dT%H:%M') || (@default_outbound_date ? "#{@default_outbound_date}T00:00" : nil) %>" class="portal-input">
+                  <input type="datetime-local" name="travel_outbound[arrival_time]" value="<%= @travel_outbound&.arrival_time&.strftime('%Y-%m-%dT%H:%M') %>" class="portal-input">
                 </div>
               </div>
             </div>
@@ -249,7 +267,7 @@
               </div>
               <div>
                 <label class="portal-label">Expected Departure Time from <%= current_event.location_city || "the event" %></label>
-                <input type="datetime-local" name="travel_outbound[departure_time]" value="<%= @travel_outbound&.departure_time&.strftime('%Y-%m-%dT%H:%M') || (@default_outbound_date ? "#{@default_outbound_date}T00:00" : nil) %>" class="portal-input">
+                <input type="datetime-local" name="travel_outbound[departure_time]" value="<%= @travel_outbound&.departure_time&.strftime('%Y-%m-%dT%H:%M') %>" class="portal-input">
               </div>
             </div>
           </div>

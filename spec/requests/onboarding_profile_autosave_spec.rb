@@ -21,7 +21,23 @@ RSpec.describe "Onboarding profile autosave", type: :request do
     autosave(participant: { preferred_name: "New" })
 
     expect(response).to have_http_status(:ok)
+    expect(response.parsed_body).to include("success" => true)
     expect(participant.reload.preferred_name).to eq("New")
+  end
+
+  it "reports validation errors instead of claiming an invalid update was saved" do
+    original_phone = participant.phone
+
+    autosave(participant: { preferred_name: "Unsaved", phone: "not-a-phone" })
+
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(response.parsed_body["success"]).to be(false)
+    expect(response.parsed_body["errors"])
+      .to include(a_string_including("Phone is not a valid phone number"))
+    expect(participant.reload).to have_attributes(
+      preferred_name: "Old",
+      phone: original_phone
+    )
   end
 
   # Re-attaching on every autosave purges and recreates the attachment row, which

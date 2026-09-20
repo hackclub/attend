@@ -18,15 +18,16 @@ module ClearsNegativeResponses
 
   # Deliberately narrow. Ambiguous answers ("nil", "-", "0") are left for a
   # human to read rather than silently dropped from a medical record.
-  BLANK_EQUIVALENTS = %w[no none n/a na].freeze
+  BLANK_EQUIVALENTS = [ "n/a", "na", "not applicable" ].freeze
 
-  # A trailing full stop is tolerated ("None.") because it is punctuation, not
-  # content. Anything else keeps the participant's own text, stripped.
+  # Only exact, case-insensitive placeholders are cleared. Anything else,
+  # including punctuation variants and ambiguous answers, remains data.
   NORMALIZER = lambda do |value|
-    text = value.to_s.strip
-    return nil if text.empty?
+    text = value.to_s
+    trimmed = text.strip
+    return nil if trimmed.empty?
 
-    BLANK_EQUIVALENTS.include?(text.downcase.delete_suffix(".")) ? nil : text
+    BLANK_EQUIVALENTS.include?(trimmed.downcase) ? nil : text
   end
 
   class_methods do

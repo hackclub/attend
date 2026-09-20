@@ -208,9 +208,14 @@ RSpec.describe ParticipantEvent, type: :model do
       expect(pe.reload).not_to be_complete
 
       create(:consent, :signed, participant_event: pe)
-      expect(pe.reload.mark_complete_if_eligible!).to be true
+      expect {
+        expect(pe.reload.mark_complete_if_eligible!).to be true
+      }.to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
       expect(pe.reload).to be_complete
       expect(pe.onboarding_completed_at).to be_present
+      expect {
+        pe.reload.mark_complete_if_eligible!
+      }.not_to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
     end
 
     it "refuses to complete before the registration is submitted" do

@@ -12,6 +12,7 @@ class ApplicationController < ActionController::Base
   before_action :reset_query_counter
   before_action :check_maintenance_mode
   before_action :check_impersonation_timeout
+  before_action :preserve_invitation_token_for_sign_out
   before_action :set_current_attributes
   before_action :set_paper_trail_whodunnit
 
@@ -33,7 +34,23 @@ class ApplicationController < ActionController::Base
     @current_event = event
   end
 
+  def after_sign_out_path_for(resource_or_scope)
+    token = params[:invite].presence || request.env["attend.invitation_token"] || session[:invitation_token]
+    if token.present?
+      session[:invitation_token] = token
+      return onboarding_path(invite: token)
+    end
+
+    super
+  end
+
   private
+
+  def preserve_invitation_token_for_sign_out
+    return unless devise_controller? && action_name == "destroy"
+
+    request.env["attend.invitation_token"] = session[:invitation_token]
+  end
 
   def set_current_attributes
     Current.user = current_user if respond_to?(:current_user, true)

@@ -1,19 +1,36 @@
 <p>Hi <%= @first_name %>!</p>
 
-<p>We're super excited to invite you to complete your onboarding materials for Hack Club's <%= @event_name %>. We can't wait to welcome you to <%= @location %> for an amazing hackathon.</p>
+<p>You've been invited to register for Hack Club's <strong><%= @event_name %></strong>. Complete your information and required signatures to confirm your attendance.</p>
+
+<% if @event_dates.present? || @location.present? %>
+  <p>
+    <% if @event_dates.present? %><strong>Dates:</strong> <%= @event_dates %><br><% end %>
+    <% if @location.present? %><strong>Location:</strong> <%= @location %><% end %>
+  </p>
+<% end %>
+
+<% if @registration_deadline.present? %>
+  <p><strong>Complete your registration by <%= @registration_deadline %>.</strong></p>
+<% end %>
 
 <p style="margin: 24px 0;">
-  <%= mail_button "Complete your onboarding using Attend", @onboarding_url %>
+  <%= mail_button "Complete your registration in Attend", @onboarding_url %>
 </p>
 
-<p><strong>What does this include?</strong></p>
+<p><strong>What to have ready</strong></p>
 <ul>
-  <li>You'll be asked to sign in with Hack Club Account - if you don't have one, it'll run you through the process automatically.</li>
-  <li>You'll add information like your name, birthday, and your contact info as well as your medical information.</li>
-  <li>You'll let us know how you're getting to <%= @location %> - plane, bus, car etc.</li>
-  <li>You'll let us know your parent/guardian's email & contact details in case of emergency.</li>
+  <li>Your contact details and date of birth.</li>
+  <li>A clear photo of your face for event identification.</li>
+  <li>Any health, dietary, accessibility, or support information the event team should know.</li>
+  <% if @travel_required %><li>Your travel details, including bookings you already know.</li><% end %>
+  <% if @accommodation_required %><li>Your accommodation requirements.</li><% end %>
+  <% if @guardian_requirement == :minor %>
+    <li>Your guardian contact details. After you submit, your guardian will receive a separate invitation to provide their details and required signatures.</li>
+  <% elsif @guardian_requirement == :unknown_age %>
+    <li>If you'll be under 18 when <%= @event_name %> starts, your guardian contact details. After you submit, your guardian will receive a separate invitation to provide their details and required signatures.</li>
+  <% end %>
 </ul>
 
-<p>If you have any questions about this process, don't hesitate to email us at <%= mail_to @support_email %>, or just hit reply to this email!</p>
+<p>You can save your progress, leave Attend, and sign back in later to resume your registration.</p>
 
-<p>We can't wait to see you at <%= @event_name %>!</p>
+<p>Use the Hack Club Account connected to the email address that received this invitation. If you use a different account or the link expires, email <%= mail_to @support_email %> or reply to this email for help.</p>

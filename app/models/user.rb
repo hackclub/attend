@@ -62,6 +62,14 @@ class User < ApplicationRecord
   has_many :event_api_tokens, dependent: :nullify
   has_many :series_api_tokens, dependent: :nullify
   has_many :global_api_tokens, dependent: :destroy
+  has_many :requested_registration_change_requests,
+    class_name: "RegistrationChangeRequest",
+    foreign_key: :requested_by_id,
+    dependent: :destroy
+  has_many :resolved_registration_change_requests,
+    class_name: "RegistrationChangeRequest",
+    foreign_key: :resolved_by_id,
+    dependent: :nullify
 
   validates :email, presence: true, uniqueness: true
 

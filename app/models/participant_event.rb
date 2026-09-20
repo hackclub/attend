@@ -48,6 +48,7 @@ class ParticipantEvent < ApplicationRecord
   has_many :scans, dependent: :destroy
   has_many :slack_blast_recipients, dependent: :destroy
   has_many :message_deliveries, dependent: :destroy
+  has_many :registration_change_requests, dependent: :destroy
   has_many :group_memberships, dependent: :destroy
   has_many :groups, through: :group_memberships
 
@@ -117,6 +118,16 @@ class ParticipantEvent < ApplicationRecord
       consents.any?
   end
 
+  def travel_ready?
+    return true unless event.travel_enabled?
+
+    travel_inbound&.confirmed? && travel_outbound&.confirmed?
+  end
+
+  def travel_outstanding?
+    !travel_ready?
+  end
+
   # Resending the onboarding invitation only helps while the participant still
   # owes us their own information. Once they've submitted, what's outstanding
   # is the guardian's part, chased by resending the guardian invite instead.
@@ -136,6 +147,10 @@ class ParticipantEvent < ApplicationRecord
     return true unless participant.date_of_birth.present?
 
     participant.minor_on?(event.starts_at&.to_date || Date.current)
+  end
+
+  def guardian_replacement_eligible?
+    requires_guardian? && guardian_participant_events.exists?
   end
 
   def age_on_event
@@ -250,6 +265,7 @@ class ParticipantEvent < ApplicationRecord
     return false unless eligible_for_completion?
 
     update!(status: :complete, onboarding_completed_at: onboarding_completed_at || Time.current)
+    ParticipantMailer.registration_confirmed(participant_event: self).deliver_later
     true
   end
 
