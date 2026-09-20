@@ -38,6 +38,7 @@ module Admin
         @change_request.update!(status: :follow_up_needed, staff_response: response,
           resolved_by: current_user, resolved_at: Time.current)
       end
+      RegistrationCorrectionMailer.participant_follow_up(change_request: @change_request).deliver_later
       redirect_to admin_event_registration_change_request_path(current_event, @change_request),
         notice: "Follow-up requested."
     rescue ArgumentError => e

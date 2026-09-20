@@ -28,8 +28,11 @@ RSpec.describe "Admin registration change requests", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Private operational question")
 
-    patch request_follow_up_admin_event_registration_change_request_path(event, request_record),
-      params: { registration_change_request: { staff_response: "Please add a time we can call." } }
+    expect {
+      patch request_follow_up_admin_event_registration_change_request_path(event, request_record),
+        params: { registration_change_request: { staff_response: "Please add a time we can call." } },
+        headers: { "HOST" => "attend.test" }
+    }.to have_enqueued_mail(RegistrationCorrectionMailer, :participant_follow_up)
 
     expect(response).to redirect_to(admin_event_registration_change_request_path(event, request_record))
     expect(request_record.reload).to be_follow_up_needed
