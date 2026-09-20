@@ -32,10 +32,17 @@
         <%= file_field_tag :csv_file, accept: ".csv", class: "hidden", data: { dropzone_target: "input", action: "change->dropzone#fileSelected" } %>
       </div>
 
-      <div class="flex items-center gap-2">
-        <%= check_box_tag :send_invitations, "1", true, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" %>
-        <%= label_tag :send_invitations, "Send invitation emails to imported participants", class: "text-sm text-gray-700" %>
-      </div>
+      <% if current_event.onboarding_invites_held? %>
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+          <strong>Onboarding invitations are held for this event.</strong> Imported participants are added without an email; their invitations go out when the event's held invitations are sent.
+        </div>
+      <% else %>
+        <div class="flex items-center gap-2">
+          <%= check_box_tag :send_invitations, "1", true, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" %>
+          <%= label_tag :send_invitations, "Send invitation emails to imported participants", class: "text-sm text-gray-700" %>
+        </div>
+        <p class="-mt-4 ml-6 text-xs text-gray-500">Untick to add them silently. Their invitations are kept on the pending invitations tab and can be sent later in one go.</p>
+      <% end %>
 
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div class="flex items-center justify-between">

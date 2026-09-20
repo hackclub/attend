@@ -124,7 +124,16 @@
   </section>
 
   <!-- Registration state and next action -->
-  <% unless @completion.confirmed? %>
+  <% if @participant_event.onboarding_held? %>
+    <section class="mb-8">
+      <div class="rounded-2xl border border-(--border-card) bg-(--bg-elev) p-5 sm:p-6">
+        <h2 class="text-lg font-semibold text-(--text-strong)">Registration opens soon</h2>
+        <p class="text-sm text-(--text-soft) mt-1">
+          You're on the list for <%= @event.name %>. We'll email you at <%= @participant.email %> as soon as registration is open.
+        </p>
+      </div>
+    </section>
+  <% elsif !@completion.confirmed? %>
     <section class="mb-8">
       <div class="rounded-2xl border-2 border-[#ec3750]/30 bg-[#ec3750]/5 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4">
         <div class="flex-1 min-w-0">

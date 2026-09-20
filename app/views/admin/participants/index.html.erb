@@ -21,20 +21,56 @@
           Sync Slack
         </button>
       <% end %>
-      <%= link_to new_admin_event_import_path(current_event), class: "text-sm font-medium text-gray-700 bg-white border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5" do %>
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-        </svg>
-        Import
-      <% end %>
-      <%= link_to new_invite_admin_event_participants_path(current_event), class: "text-sm font-medium text-white bg-[#d42f46] px-3 py-1.5 rounded-md hover:bg-[#b82840] transition-colors inline-flex items-center gap-1.5" do %>
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-        </svg>
-        Add participant
+      <% if policy(current_event).invite_participants? %>
+        <%= link_to new_admin_event_import_path(current_event), class: "text-sm font-medium text-gray-700 bg-white border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5" do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+          </svg>
+          Import
+        <% end %>
+        <%= link_to new_invite_admin_event_participants_path(current_event), class: "text-sm font-medium text-white bg-[#d42f46] px-3 py-1.5 rounded-md hover:bg-[#b82840] transition-colors inline-flex items-center gap-1.5" do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          Add participant
+        <% end %>
       <% end %>
     </div>
   </div>
+
+  <% held_count = current_event.held_invitations_count %>
+  <% if current_event.onboarding_invites_held? || held_count.positive? %>
+    <%# Holding is the event's state, not the tab's, so this sits above both
+        tabs: the All tab shows imported participants whose email hasn't gone
+        out, and nothing in their row says so. %>
+    <div class="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3" data-testid="held-invitations-banner">
+      <div class="flex-1 min-w-0 text-sm text-amber-800">
+        <% if current_event.onboarding_invites_held? %>
+          <p class="font-semibold">Onboarding invitations are held for this event.</p>
+          <p class="mt-0.5">
+            Participants you add or import are recorded without an email.
+            <% if held_count.positive? %>
+              <%= pluralize(held_count, "invitation") %> <%= held_count == 1 ? "is" : "are" %> waiting to be sent.
+            <% else %>
+              Nothing is waiting to be sent yet.
+            <% end %>
+          </p>
+        <% else %>
+          <p class="font-semibold"><%= pluralize(held_count, "invitation") %> <%= held_count == 1 ? "hasn't" : "haven't" %> been sent.</p>
+          <p class="mt-0.5">These participants were added without an email.</p>
+        <% end %>
+      </div>
+      <% if policy(current_event).invite_participants? %>
+        <%= button_to send_held_invitations_admin_event_participants_path(current_event),
+            method: :post,
+            data: { turbo_confirm: held_count.positive? ? "Email #{pluralize(held_count, 'held invitation')} now? New participants will be emailed as they're added from here on." : "Stop holding onboarding invitations? New participants will be emailed as they're added." },
+            class: "shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-white bg-[#d42f46] px-3 py-1.5 rounded-md hover:bg-[#b82840] transition-colors cursor-pointer" do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          <%= held_count.positive? ? "Send #{pluralize(held_count, 'held invitation')}" : "Stop holding invitations" %>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
 
   <!-- Tabs -->
   <div class="mb-5 border-b border-gray-200">
@@ -150,13 +186,24 @@
             <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
               <td class="px-4 py-3 text-sm font-medium text-gray-900"><%= invitation.email %></td>
               <td class="px-4 py-3">
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">Pending</span>
+                <% if invitation.held? %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-600" title="Recorded but not emailed yet">Held</span>
+                <% else %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">Pending</span>
+                <% end %>
               </td>
-              <td class="px-4 py-3 text-sm text-gray-500"><%= time_ago_in_words(invitation.created_at) %> ago</td>
-              <td class="px-4 py-3 text-sm text-gray-500"><%= time_ago_in_words(invitation.expires_at) %></td>
+              <% if invitation.held? %>
+                <td class="px-4 py-3 text-sm text-gray-500">Not sent <span class="text-gray-400">· added <%= time_ago_in_words(invitation.created_at) %> ago</span></td>
+                <td class="px-4 py-3 text-sm text-gray-400" title="The link is valid for 30 days from when it is sent">—</td>
+              <% else %>
+                <td class="px-4 py-3 text-sm text-gray-500"><%= time_ago_in_words(invitation.sent_at) %> ago</td>
+                <td class="px-4 py-3 text-sm text-gray-500"><%= time_ago_in_words(invitation.expires_at) %></td>
+              <% end %>
               <td class="px-4 py-3 text-right text-sm space-x-3">
-                <%= button_to "Resend", send_invite_admin_event_participants_path(current_event, invite: { email: invitation.email }), method: :post, class: "text-[#ec3750] hover:text-[#d42f46] text-sm font-medium" %>
-                <%= button_to "Revoke", revoke_invite_admin_event_participants_path(current_event, id: invitation.id), method: :delete, data: { confirm: "Are you sure you want to revoke the invitation for #{invitation.email}?" }, class: "text-gray-500 hover:text-red-600 text-sm" %>
+                <% if policy(current_event).invite_participants? %>
+                  <%= button_to invitation.held? ? "Send now" : "Resend", send_invite_admin_event_participants_path(current_event, invite: { email: invitation.email, send_now: "1" }), method: :post, class: "text-[#ec3750] hover:text-[#d42f46] text-sm font-medium" %>
+                  <%= button_to "Revoke", revoke_invite_admin_event_participants_path(current_event, id: invitation.id), method: :delete, data: { confirm: "Are you sure you want to revoke the invitation for #{invitation.email}?" }, class: "text-gray-500 hover:text-red-600 text-sm" %>
+                <% end %>
               </td>
             </tr>
           <% end %>

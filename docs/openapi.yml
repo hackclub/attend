@@ -38,7 +38,8 @@ info:
     - **Event API key** — per-event key (`EventApiToken`, or the legacy
       `Event#api_key`). Does **not** set a current user, so it only works on the
       subset of endpoints that don't require one (participant `lookup`,
-      `roster`, `create`, and the travel calendar).
+      `roster`, `create`, `update` and `delete`, event setup, event staff, and
+      the travel calendar).
 
     Missing or invalid credentials return `401 { "error": "Unauthorized" }`.
 
@@ -53,6 +54,8 @@ info:
     | `GET/POST /series/…` | ✅ its own series | ❌ `403` |
     | `POST /series/{id}/events` | ✅ its own series | ❌ `403` |
     | Participant `lookup`, `roster`, `create` | ✅ any event in the series | ✅ its own event |
+    | `PATCH`/`DELETE` a participant | ✅ any event in the series | ✅ its own event |
+    | `/events/{id}/setup/…` and `/events/{id}/staff` | ✅ any event in the series | ✅ its own event |
     | `GET /events/{id}/travel` | ✅ any event in the series | ✅ its own event |
     | `GET /events/{id}/participants` (full payload) | ❌ `403` | ❌ `403` |
     | Notes, scans, scan contexts, Slack blasts, NFC badges | ❌ `403` | ❌ `403` |
@@ -66,7 +69,12 @@ info:
     - All timestamps are ISO 8601 strings and may be `null` where noted.
     - Errors use the envelope `{ "error": "<message>" }`.
     - `:event_id` path segments accept a numeric id or the event slug on the
-      participants endpoints; other endpoints accept the numeric id only.
+      participants, setup, and staff endpoints; other endpoints accept the
+      numeric id only.
+    - A caller that may *write* a field cannot always *read* it back: dates of
+      birth, phone numbers, addresses and the details of the people around a
+      participant are omitted (not nulled) for API keys and PII-restricted
+      roles, in responses to writes just as in responses to reads.
 
     > **Note:** Inbound webhook receivers (Postmark, Help Scout, DocuSeal,
     > Slack events) also live under `/api/v1` but are called by third parties,
@@ -91,6 +99,12 @@ tags:
       Event series, and the events inside one, addressed with a single series
       API key. Creating an event lives here — an event has to belong to a
       series, and only a series key names one unambiguously.
+  - name: Event Setup
+    description: >-
+      The tail of the setup wizard — waiver configuration and taking an event
+      out of draft — for events created through the API.
+  - name: Event Staff
+    description: Who has access to an event, and what they can do there.
   - name: Participants
     description: Participant registrations for an event.
   - name: Notes
@@ -114,11 +128,25 @@ tags:
       Airport and flight lookups. These endpoints authenticate with the web
       session cookie (Devise), not a bearer token.
 
+# Every operation pins its documentation URL with `x-mint.href`.
+#
+# Mintlify builds the endpoint pages in docs/ from this file, and by default it
+# derives each page's URL from the operation's tag and summary. That makes the
+# summary load-bearing: retitling "Create a mobile token" would silently move
+# its page and 404 every existing link to it. Pinning the href decouples the
+# two, so summaries stay free to change.
+#
+# The hrefs below were generated from the summaries as they stood when the docs
+# first went live, so they match the URLs already in the wild. A new operation
+# needs its own href — keep the /api-reference/<tag>/<summary> shape for
+# consistency, but nothing enforces it, and nothing breaks if you don't.
 paths:
   /session:
     post:
       tags: [Authentication]
       summary: Create a mobile token
+      x-mint:
+        href: /api-reference/authentication/create-a-mobile-token
       description: >-
         Exchange a Hack Club OAuth authorization code, or a signed session
         token, for a mobile bearer token. Public — no bearer token required.
@@ -159,6 +187,8 @@ paths:
     delete:
       tags: [Authentication]
       summary: Revoke the current token (log out)
+      x-mint:
+        href: /api-reference/authentication/revoke-the-current-token-log-out
       responses:
         "200":
           description: Token revoked.
@@ -175,6 +205,8 @@ paths:
     post:
       tags: [Authentication]
       summary: Rotate the current token
+      x-mint:
+        href: /api-reference/authentication/rotate-the-current-token
       description: Revoke the current mobile token and issue a fresh one.
       responses:
         "200":
@@ -197,6 +229,8 @@ paths:
     get:
       tags: [Account]
       summary: Current user profile
+      x-mint:
+        href: /api-reference/account/current-user-profile
       responses:
         "200":
           description: The authenticated user.
@@ -213,6 +247,8 @@ paths:
     get:
       tags: [Account]
       summary: List accessible events
+      x-mint:
+        href: /api-reference/account/list-accessible-events
       description: >-
         All events for a global admin, otherwise the events the user is
         assigned to, ordered by start date.
@@ -237,6 +273,8 @@ paths:
     post:
       tags: [Push Tokens]
       summary: Register a push token
+      x-mint:
+        href: /api-reference/push-tokens/register-a-push-token
       description: >-
         Upsert a push-notification token for the current user. Platform is
         auto-detected (`expo` for Expo tokens, otherwise `unknown`).
@@ -267,6 +305,8 @@ paths:
     delete:
       tags: [Push Tokens]
       summary: Delete a push token
+      x-mint:
+        href: /api-reference/push-tokens/delete-a-push-token
       parameters:
         - name: token
           in: path
@@ -289,6 +329,8 @@ paths:
     post:
       tags: [Bans]
       summary: Add emails to the ban list
+      x-mint:
+        href: /api-reference/bans/add-emails-to-the-ban-list
       description: >-
         Ban one person from every event. A ban holds one or more emails, so
         send all of a person's addresses in a single call rather than creating
@@ -374,6 +416,8 @@ paths:
     get:
       tags: [Series]
       summary: List series
+      x-mint:
+        href: /api-reference/series/list-series
       description: |
         With a **series API key**, returns exactly one series — the one the key
         belongs to. This is how a client discovers its own series when all it
@@ -401,6 +445,8 @@ paths:
     get:
       tags: [Series]
       summary: Get one series
+      x-mint:
+        href: /api-reference/series/get-one-series
       description: >-
         The series plus a compact list of its events. Pass `current` as the id
         to mean "whichever series this key belongs to".
@@ -435,6 +481,8 @@ paths:
     get:
       tags: [Series]
       summary: List the events in a series
+      x-mint:
+        href: /api-reference/series/list-the-events-in-a-series
       description: >-
         Summary records for every event in the series, earliest start first
         (events with no start date last).
@@ -458,6 +506,8 @@ paths:
     post:
       tags: [Series]
       summary: Create an event in the series
+      x-mint:
+        href: /api-reference/series/create-an-event-in-the-series
       description: |
         **Requires a series API key.** A mobile token, a global API token and an
         event API key are all refused with `403` — an event has to land in a
@@ -576,6 +626,8 @@ paths:
     get:
       tags: [Series]
       summary: Get one event in the series
+      x-mint:
+        href: /api-reference/series/get-one-event-in-the-series
       description: >-
         An event outside the series returns `404`, not `403` — from this key's
         point of view it does not exist.
@@ -602,6 +654,8 @@ paths:
     patch:
       tags: [Series]
       summary: Update an event in the series
+      x-mint:
+        href: /api-reference/series/update-an-event-in-the-series
       description: |
         One series key updates any event in its series — that is the point of a
         series key. Accepts the same fields as the web's event settings form and
@@ -657,10 +711,276 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
 
+  /events/{event_id}/setup:
+    get:
+      tags: [Event Setup]
+      summary: Setup progress
+      x-mint:
+        href: /api-reference/event-setup/setup-progress
+      description: >-
+        Which steps of the setup wizard this event has left. `remaining` lists
+        the keys of `steps` that are still false; an event whose setup was
+        never completed stays a draft.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Setup state.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  setup: { $ref: "#/components/schemas/EventSetup" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/setup/waivers:
+    put:
+      tags: [Event Setup]
+      summary: Configure waivers
+      x-mint:
+        href: /api-reference/event-setup/configure-waivers
+      description: |
+        Points the event at its DocuSeal waiver templates.
+
+        - `mode=auto` clones Hack Club's blueprint templates and wires up the
+          default field mappings — nothing else to do. The freedom waiver is
+          only set up when that module is enabled on the event.
+        - `mode=manual` stores template ids you created yourself. Field
+          mappings are **not** configured, so set them from the event's
+          integrations page before opening registration (the response says so
+          too). Only the ids you send are written, so setting one never clears
+          the other; send an empty string to detach one.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode: { type: string, enum: [auto, manual] }
+                docuseal_waiver_template_id:
+                  type: string
+                  description: Manual mode only.
+                docuseal_freedom_waiver_template_id:
+                  type: string
+                  description: Manual mode only.
+      responses:
+        "200":
+          description: Waivers configured.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  waivers: { $ref: "#/components/schemas/EventWaivers" }
+                  created:
+                    type: array
+                    description: Auto mode — which templates were cloned.
+                    items: { type: string, enum: [waiver, freedom_waiver] }
+                  warning:
+                    type: string
+                    description: Manual mode — field mappings still need configuring.
+        "422":
+          description: Unknown mode, or manual mode with no template ids.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502":
+          description: >-
+            DocuSeal refused or was unreachable. Nothing about the request was
+            wrong — retry it. `created` lists any templates that did land.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  created:
+                    type: array
+                    items: { type: string }
+                  waivers: { $ref: "#/components/schemas/EventWaivers" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/setup/complete:
+    post:
+      tags: [Event Setup]
+      summary: Finish setup
+      x-mint:
+        href: /api-reference/event-setup/finish-setup
+      description: >-
+        Takes the event out of draft. Idempotent — an event that is already set
+        up keeps its original completion time. Requires a support email: it is
+        the from and reply-to address on every participant and guardian email,
+        so without one the event cannot open.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Setup complete.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  setup: { $ref: "#/components/schemas/EventSetup" }
+        "422":
+          description: No support email on the event.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/staff:
+    get:
+      tags: [Event Staff]
+      summary: List staff
+      x-mint:
+        href: /api-reference/event-staff/list-staff
+      description: >-
+        Everyone with a role on this event, plus the catalogue of roles so a
+        client never has to hardcode them. Event admins only (global admins and
+        series members count as event admins).
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Staff and roles.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  staff:
+                    type: array
+                    items: { $ref: "#/components/schemas/StaffMember" }
+                  roles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        role: { type: string }
+                        label: { type: string }
+                        summary: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Event Staff]
+      summary: Add a staff member
+      x-mint:
+        href: /api-reference/event-staff/add-a-staff-member
+      description: >-
+        Gives someone a role on the event and emails them about it. Someone who
+        has never signed in to Attend gets a shell account now, which links up
+        on their first sign-in — `account_created` says whether that happened.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email }
+                role: { $ref: "#/components/schemas/EventRole" }
+      responses:
+        "201":
+          description: Staff member added.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  staff_member: { $ref: "#/components/schemas/StaffMember" }
+                  account_created:
+                    type: boolean
+                    description: Whether a new Attend account was created for this email.
+        "422":
+          description: >-
+            Invalid email, unknown role, or this person already holds that role.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/staff/{id}:
+    patch:
+      tags: [Event Staff]
+      summary: Change a staff member's role
+      x-mint:
+        href: /api-reference/event-staff/change-a-staff-members-role
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/StaffAssignmentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { $ref: "#/components/schemas/EventRole" }
+      responses:
+        "200":
+          description: Role changed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  staff_member: { $ref: "#/components/schemas/StaffMember" }
+        "422":
+          description: Unknown role.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Event Staff]
+      summary: Remove a staff member
+      x-mint:
+        href: /api-reference/event-staff/remove-a-staff-member
+      description: >-
+        Removes this event role. Access that comes from a *series* role can't be
+        removed here — it is inherited, so removing the row would either do
+        nothing or silently contradict the series.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/StaffAssignmentId"
+      responses:
+        "204": { description: Removed. }
+        "409":
+          description: Access is inherited from the series. Manage it on the series.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /events/{event_id}/participants:
     get:
       tags: [Participants]
       summary: List participants
+      x-mint:
+        href: /api-reference/participants/list-participants
       description: >-
         Full per-participant records for an event. Sensitive medical,
         dietary, safeguarding, and contact fields are only included for global
@@ -690,9 +1010,17 @@ paths:
     post:
       tags: [Participants]
       summary: Invite a participant
+      x-mint:
+        href: /api-reference/participants/invite-a-participant
       description: >-
         Send an event invitation email. Does not create a participant record
         directly — it enqueues an invitation.
+
+
+        While the event is holding onboarding invitations
+        (`modules.onboarding_invites_held`), the invitation is recorded but not
+        emailed: it goes out when the event's held invitations are released
+        from the dashboard. The response says which happened.
       parameters:
         - $ref: "#/components/parameters/EventId"
       requestBody:
@@ -708,13 +1036,19 @@ paths:
                 last_name: { type: string }
       responses:
         "201":
-          description: Invitation enqueued.
+          description: Invitation enqueued, or recorded as held.
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   success: { type: boolean, example: true }
+                  held:
+                    type: boolean
+                    example: false
+                    description: >-
+                      True when the event is holding onboarding invitations and
+                      this one was recorded without an email.
                   message: { type: string, example: Invitation sent to jane@example.com }
                   event: { type: string, example: My Event }
         "409":
@@ -735,6 +1069,8 @@ paths:
     get:
       tags: [Participants]
       summary: Search participants
+      x-mint:
+        href: /api-reference/participants/search-participants
       description: >-
         Case-insensitive search by name, email, or id. Returns up to 20
         matches. Not available to event API keys.
@@ -764,6 +1100,8 @@ paths:
     get:
       tags: [Participants]
       summary: Look up a registration by email
+      x-mint:
+        href: /api-reference/participants/look-up-a-registration-by-email
       description: >-
         Read-only check of whether an email is registered for the event. Safe
         to call on every sign-in; never mutates. Available to event API keys.
@@ -800,6 +1138,8 @@ paths:
     get:
       tags: [Participants]
       summary: Minimal roster
+      x-mint:
+        href: /api-reference/participants/minimal-roster
       description: >-
         Identity-only roster (no sensitive PII), excluding withdrawn and
         rejected registrations. Available to event API keys.
@@ -825,6 +1165,8 @@ paths:
     get:
       tags: [Participants]
       summary: Get a participant
+      x-mint:
+        href: /api-reference/participants/get-a-participant
       description: >-
         Full detailed record for one registration, including personal,
         accommodation, consent, and guardian sections (and sensitive medical /
@@ -849,11 +1191,91 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Participants]
+      summary: Update a participant
+      x-mint:
+        href: /api-reference/participants/update-a-participant
+      description: |
+        Edits the person and/or where their registration stands. Only the keys
+        you send are written.
+
+        `status` is the API form of the withdraw and reinstate buttons:
+        `withdrawn` withdraws them, `in_progress` reinstates them — after which
+        the displayed status is recomputed from their onboarding progress.
+
+        Date of birth and phone number are writable by every caller that gets
+        this far, including API keys and PII-restricted roles, which cannot
+        read them back: the response is redacted exactly as a read would be.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/RegistrationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [invited, in_progress, awaiting_guardian, complete, withdrawn, rejected]
+                participant:
+                  type: object
+                  properties:
+                    legal_first_name: { type: string }
+                    legal_last_name: { type: string }
+                    preferred_name: { type: string }
+                    email: { type: string, format: email }
+                    date_of_birth: { type: string, format: date }
+                    phone:
+                      type: string
+                      description: E.164 format, e.g. +12025550100
+                    pronouns: { type: string }
+                    tshirt_size: { type: string }
+      responses:
+        "200":
+          description: The updated participant.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  participant: { $ref: "#/components/schemas/Participant" }
+        "422":
+          description: >-
+            Nothing to update, an unknown status, or the model rejected the
+            change (nothing is written in that case).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Participants]
+      summary: Remove a participant from the event
+      x-mint:
+        href: /api-reference/participants/remove-a-participant-from-the-event
+      description: >-
+        Deletes this registration — the profile, travel, consents and scans
+        attached to it — and nothing else. The person's Attend account and
+        their registrations for other events survive. Event admins only.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/RegistrationId"
+      responses:
+        "204": { description: Registration removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /events/{event_id}/participants/{participant_id}/notes:
     get:
       tags: [Notes]
       summary: List notes
+      x-mint:
+        href: /api-reference/notes/list-notes
       description: Notes on a participant's registration, newest first. User tokens only.
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
@@ -879,6 +1301,8 @@ paths:
     post:
       tags: [Notes]
       summary: Create a note
+      x-mint:
+        href: /api-reference/notes/create-a-note
       description: Add a note authored by the current user. User tokens only.
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
@@ -926,6 +1350,8 @@ paths:
     get:
       tags: [Scans]
       summary: List scans
+      x-mint:
+        href: /api-reference/scans/list-scans
       description: >-
         Recent scans for the event. Pass `since` for incremental sync
         (oldest-first, up to 500); otherwise the latest 100 are returned.
@@ -960,6 +1386,8 @@ paths:
     post:
       tags: [Scans]
       summary: Record a scan
+      x-mint:
+        href: /api-reference/scans/record-a-scan
       description: >-
         Record a QR / NFC / manual scan for a participant. Pass `client_scan_id`
         for idempotency — a repeat returns the existing scan with
@@ -1017,6 +1445,8 @@ paths:
     delete:
       tags: [Scans]
       summary: Undo scans for a participant
+      x-mint:
+        href: /api-reference/scans/undo-scans-for-a-participant
       description: >-
         Delete a participant's scans (all, or just one context) and clear their
         check-in if no check-in scans remain. Despite the name, `id` is a
@@ -1062,6 +1492,8 @@ paths:
     get:
       tags: [Scan Contexts]
       summary: List scan contexts
+      x-mint:
+        href: /api-reference/scan-contexts/list-scan-contexts
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
       responses:
@@ -1083,6 +1515,8 @@ paths:
     get:
       tags: [Travel Calendar]
       summary: Show the travel calendar
+      x-mint:
+        href: /api-reference/travel-calendar/show-the-travel-calendar
       description: >-
         Day-grouped inbound and outbound travel for participants with completed
         registrations, across all transport modes. Includes pickup-state
@@ -1103,6 +1537,8 @@ paths:
     get:
       tags: [Travel Calendar]
       summary: Show the travel calendar (legacy path)
+      x-mint:
+        href: /api-reference/travel-calendar/show-the-travel-calendar-legacy-path
       description: Deprecated alias for `/events/{event_id}/travel`.
       deprecated: true
       parameters:
@@ -1121,6 +1557,8 @@ paths:
     get:
       tags: [Slack Blasts]
       summary: List Slack blasts
+      x-mint:
+        href: /api-reference/slack-blasts/list-slack-blasts
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
       responses:
@@ -1140,6 +1578,8 @@ paths:
     post:
       tags: [Slack Blasts]
       summary: Send a Slack blast
+      x-mint:
+        href: /api-reference/slack-blasts/send-a-slack-blast
       description: >-
         Broadcast a message to every completed participant with a linked Slack
         account, and enqueue delivery.
@@ -1176,6 +1616,8 @@ paths:
     get:
       tags: [Slack Blasts]
       summary: Get a Slack blast
+      x-mint:
+        href: /api-reference/slack-blasts/get-a-slack-blast
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
         - name: id
@@ -1199,6 +1641,8 @@ paths:
     post:
       tags: [NFC Badges]
       summary: Ensure an NFC badge token
+      x-mint:
+        href: /api-reference/nfc-badges/ensure-an-nfc-badge-token
       description: Create an event-scoped badge token for the participant if one does not exist.
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
@@ -1223,6 +1667,8 @@ paths:
     post:
       tags: [NFC Badges]
       summary: Confirm an NFC badge assignment
+      x-mint:
+        href: /api-reference/nfc-badges/confirm-an-nfc-badge-assignment
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
         - $ref: "#/components/parameters/ParticipantEventId"
@@ -1259,6 +1705,8 @@ paths:
     post:
       tags: [NFC Badges]
       summary: Reset an NFC badge token
+      x-mint:
+        href: /api-reference/nfc-badges/reset-an-nfc-badge-token
       parameters:
         - $ref: "#/components/parameters/EventIdNumeric"
         - $ref: "#/components/parameters/ParticipantEventId"
@@ -1281,6 +1729,8 @@ paths:
     get:
       tags: [Travel]
       summary: Search airports
+      x-mint:
+        href: /api-reference/travel/search-airports
       description: >-
         Search airports by keyword. **Authenticated with the web session
         cookie, not a bearer token.** Returns an empty list for terms shorter
@@ -1308,6 +1758,8 @@ paths:
     post:
       tags: [Travel]
       summary: Validate a flight
+      x-mint:
+        href: /api-reference/travel/validate-a-flight
       description: >-
         Validate a flight code + date and return matching legs and airline
         info. **Authenticated with the web session cookie, not a bearer token.**
@@ -1376,6 +1828,20 @@ components:
       required: true
       schema: { type: string }
       description: Event UUID or slug. Must belong to the series in the path.
+    StaffAssignmentId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: >-
+        The role assignment id from `GET /events/{event_id}/staff` — not an
+        email address; those don't belong in a URL.
+    RegistrationId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
+      description: The participant_event id — one person's registration for this event.
     EventIdNumeric:
       name: event_id
       in: path
@@ -1432,6 +1898,70 @@ components:
       type: object
       properties:
         success: { type: boolean, example: true }
+
+    EventRole:
+      type: string
+      enum: [event_admin, ops, limited, safeguarding_lead, read_only]
+      description: >-
+        `event_admin` runs the event; `ops` handles day-to-day logistics;
+        `limited` is ops without a participant's most identifying details;
+        `safeguarding_lead` sees full medical and safeguarding records;
+        `read_only` looks and touches nothing.
+
+    StaffMember:
+      type: object
+      properties:
+        id: { type: string }
+        role: { $ref: "#/components/schemas/EventRole" }
+        role_label: { type: string, example: Event Admin }
+        inherited_from_series:
+          type: boolean
+          description: >-
+            True when this person also holds a role on the event's series, which
+            grants access to every event in it. Such access can't be removed
+            from the event.
+        series_role: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        user:
+          type: object
+          properties:
+            id: { type: string }
+            email: { type: string, format: email }
+            name: { type: string, nullable: true }
+            global_admin: { type: boolean }
+
+    EventWaivers:
+      type: object
+      properties:
+        docuseal_waiver_template_id: { type: string, nullable: true }
+        docuseal_freedom_waiver_template_id: { type: string, nullable: true }
+        freedom_waivers_enabled: { type: boolean }
+
+    EventSetup:
+      type: object
+      properties:
+        complete: { type: boolean }
+        completed_at: { type: string, format: date-time, nullable: true }
+        steps:
+          type: object
+          properties:
+            basics:
+              type: boolean
+              description: Name and support email are set.
+            schedule:
+              type: boolean
+              description: Start and end times are set.
+            waivers:
+              type: boolean
+              description: A DocuSeal waiver template is configured.
+            team:
+              type: boolean
+              description: At least one person has a role on the event.
+        remaining:
+          type: array
+          description: The keys of `steps` that are still false.
+          items: { type: string }
+        waivers: { $ref: "#/components/schemas/EventWaivers" }
 
     Ban:
       type: object
@@ -1567,6 +2097,12 @@ components:
         accommodation_enabled: { type: boolean }
         roommate_preferences_enabled: { type: boolean }
         guardian_invites_locked: { type: boolean }
+        onboarding_invites_held:
+          type: boolean
+          description: >-
+            While true, participants added by any route (dashboard, import,
+            this API) are recorded without an onboarding email. Releasing the
+            hold sends every held invitation.
         nfc_badges_enabled: { type: boolean }
         nfc_badge_write_on_checkin_enabled: { type: boolean }
         groups_enabled: { type: boolean }
@@ -1626,6 +2162,11 @@ components:
         accommodation_enabled: { type: boolean, description: "Defaults to true on create." }
         roommate_preferences_enabled: { type: boolean, description: "Defaults to true on create." }
         guardian_invites_locked: { type: boolean }
+        onboarding_invites_held:
+          type: boolean
+          description: >-
+            Setting this from true to false sends every held invitation on the
+            event, exactly like the dashboard's release button.
         nfc_badges_enabled: { type: boolean }
         nfc_badge_write_on_checkin_enabled: { type: boolean }
         groups_enabled: { type: boolean }

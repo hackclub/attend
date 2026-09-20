@@ -5,16 +5,15 @@ class ParticipantMailer < ApplicationMailer
     @emailable = participant
 
     invitation = Invitation.pending.find_or_create_by!(email: (participant&.email || email).downcase, event: event)
-
-    if group_ids.is_a?(Array)
-      valid_group_ids = event.groups.where(id: group_ids).pluck(:id)
-      invitation.update!(group_ids: valid_group_ids) if valid_group_ids.any?
-    end
+    invitation.assign_group_ids!(group_ids) if group_ids.is_a?(Array)
+    # This is the moment the participant learns about the event, so it is
+    # where the send is recorded — a held invitation stops being held here.
+    invitation.mark_sent!
 
     @first_name = if participant
       participant.preferred_name.presence || participant.legal_first_name
     else
-      name.presence&.split&.first || email.split("@").first
+      (name.presence || invitation.name.presence)&.split&.first || email.split("@").first
     end
 
     @event_name = event.name

@@ -1,6 +1,6 @@
 module Admin
   class EventSeriesController < BaseController
-    before_action :set_series, only: [ :show, :edit, :update ]
+    before_action :set_series, only: [ :show, :edit, :update, :send_held_invitations ]
 
     def index
       authorize EventSeries, :index?
@@ -21,6 +21,25 @@ module Admin
 
       @dashboard = SeriesDashboard.new(@series, events: @events, user: current_user)
       @event_rows = @dashboard.event_rows
+    end
+
+    # The series HQ button: every event that is holding onboarding
+    # invitations, or has some recorded but unsent, sends them now and stops
+    # holding. Events with nothing held are left alone.
+    def send_held_invitations
+      authorize @series
+
+      events = @series.events.select { |event| event.onboarding_invites_held? || event.invitations.held.exists? }
+      count = Invitation.where(event_id: events.map(&:id)).held.count
+      events.each(&:release_onboarding_invites!)
+      @record = @series
+
+      if events.empty?
+        redirect_to admin_series_path(@series), notice: "No held invitations to send."
+      else
+        redirect_to admin_series_path(@series),
+          notice: "Sending #{helpers.pluralize(count, 'held invitation')} across #{helpers.pluralize(events.size, 'event')}. New participants on those events will be emailed as they're added."
+      end
     end
 
     def new

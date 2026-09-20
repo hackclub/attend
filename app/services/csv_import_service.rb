@@ -161,7 +161,7 @@ class CsvImportService
       create_travel(participant_event, row)
       apply_groups(participant_event, row)
 
-      send_invitation(participant) if @send_invitations
+      record_invitation(participant)
 
       @imported_count += 1
     end
@@ -455,15 +455,14 @@ class CsvImportService
     end
   end
 
-  def send_invitation(participant)
-    ParticipantMailer.invitation(
-      email: participant.email,
-      event: @event,
-      participant: participant
-    ).deliver_later
+  # Emailed now unless the caller asked for a silent import or the event is
+  # holding onboarding invitations; either way the invitation is on record so
+  # it can be sent later from the event or series page.
+  def record_invitation(participant)
+    Invitation.issue!(event: @event, email: participant.email, participant: participant, send: @send_invitations)
   rescue StandardError => e
-    Rails.logger.error("[CsvImportService] Failed to send invitation to #{participant.email}: #{e.message}")
-    @errors << { email: participant.email, error: "Imported but failed to send invitation: #{e.message}" }
+    Rails.logger.error("[CsvImportService] Failed to record invitation for #{participant.email}: #{e.message}")
+    @errors << { email: participant.email, error: "Imported but failed to record invitation: #{e.message}" }
   end
 
   # Returns E.164, or nil when the cell isn't a real number. It deliberately

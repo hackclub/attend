@@ -66,6 +66,9 @@
       <% if @event.guardian_invites_locked? %>
         <p class="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">Guardian invites are locked — remember to unlock them once waivers are finalised.</p>
       <% end %>
+      <% if @event.onboarding_invites_held? %>
+        <p class="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">Onboarding invitations are held — participants you add won't be emailed until you send them from the participants page or the series page.</p>
+      <% end %>
     </div>
 
     <div class="bg-white border border-gray-200 rounded-lg p-6">
@@ -81,7 +84,11 @@
       <% else %>
         <p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
           Waivers aren't configured yet — participants can't complete onboarding without them.
-          Set them up from the <%= link_to "waivers step", admin_event_setup_waivers_path(@event), class: "font-medium underline" %> or the <%= link_to "integrations page", admin_event_integrations_path(@event), class: "font-medium underline" %>.
+          <% if policy(@event).manage_integrations? %>
+            Set them up from the <%= link_to "waivers step", admin_event_setup_waivers_path(@event), class: "font-medium underline" %> or the <%= link_to "integrations page", admin_event_integrations_path(@event), class: "font-medium underline" %>.
+          <% else %>
+            Ask an event admin to set them up.
+          <% end %>
         </p>
       <% end %>
     </div>

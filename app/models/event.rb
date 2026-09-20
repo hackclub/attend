@@ -16,6 +16,7 @@ class Event < ApplicationRecord
     :accommodation_enabled,
     :roommate_preferences_enabled,
     :guardian_invites_locked,
+    :onboarding_invites_held,
     :nfc_badges_enabled,
     :nfc_badge_write_on_checkin_enabled,
     :groups_enabled,
@@ -140,6 +141,7 @@ class Event < ApplicationRecord
   end
   after_save :geocode_location, if: :should_geocode?
   after_save :send_pending_guardian_invites, if: :guardian_invites_just_unlocked?
+  after_save :send_held_onboarding_invites, if: :onboarding_invites_just_released?
 
   attr_accessor :api_key
 
@@ -276,6 +278,29 @@ class Event < ApplicationRecord
 
   def guardian_invites_locked?
     ActiveModel::Type::Boolean.new.cast(guardian_invites_locked)
+  end
+
+  # While held, adding a participant (admin form, API, CSV import) records
+  # their onboarding invitation without emailing it, so organizers can build
+  # the list and remove people before anyone hears about the event. Series HQ
+  # releases them all at once.
+  def onboarding_invites_held?
+    ActiveModel::Type::Boolean.new.cast(onboarding_invites_held)
+  end
+
+  def held_invitations_count
+    invitations.held.count
+  end
+
+  # Emails every invitation recorded while onboarding invitations were held,
+  # and stops holding new ones. Also the way to send invitations a CSV import
+  # added silently on an event that never held — the job just finds fewer.
+  def release_onboarding_invites!
+    if onboarding_invites_held?
+      update!(onboarding_invites_held: false) # after_save enqueues the job
+    else
+      SendHeldOnboardingInvitesJob.perform_later(id)
+    end
   end
 
   def roommate_preferences_enabled?
@@ -523,6 +548,19 @@ class Event < ApplicationRecord
     now_unlocked = !guardian_invites_locked?
 
     was_locked && now_unlocked
+  end
+
+  def onboarding_invites_just_released?
+    return false unless saved_change_to_config?
+
+    old_config = config_before_last_save || {}
+    was_held = ActiveModel::Type::Boolean.new.cast(old_config["onboarding_invites_held"])
+
+    was_held && !onboarding_invites_held?
+  end
+
+  def send_held_onboarding_invites
+    SendHeldOnboardingInvitesJob.perform_later(id)
   end
 
   def send_pending_guardian_invites

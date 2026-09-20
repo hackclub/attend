@@ -25,6 +25,7 @@
     <meta name="current-event-id" content="<%= current_event&.id %>">
     <meta name="current-event-slug" content="<%= current_event&.slug %>">
     <meta name="global-admin" content="<%= current_user&.global_admin? %>">
+    <meta name="can-manage-integrations" content="<%= current_event.present? && policy(current_event).manage_integrations? %>">
 
     <link rel="icon" href="/icon-32.png?v=3" type="image/png" sizes="32x32">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3">

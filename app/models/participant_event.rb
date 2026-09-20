@@ -139,6 +139,18 @@ class ParticipantEvent < ApplicationRecord
     display_status == "Awaiting Participant"
   end
 
+  # An imported participant sits at `invited` until they open the wizard.
+  # While the event is holding onboarding invitations and theirs hasn't gone
+  # out, they haven't been told about the event, so the wizard stays shut even
+  # if they find the event on their dashboard. A staff member sending their
+  # invitation individually opens it for them.
+  def onboarding_held?
+    return false unless invited?
+    return false unless event.onboarding_invites_held?
+
+    !event.invitations.sent.for_email(participant.email).exists?
+  end
+
   def awaiting_guardian_completion?
     onboarding_complete? && guardian_participant_events.any? { |gpe| !gpe.complete? }
   end

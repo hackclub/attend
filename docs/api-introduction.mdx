@@ -39,6 +39,41 @@ Mobile tokens come from `POST /session`. Series and event keys are issued from
 the Attend dashboard by someone who owns the series or administers the event.
 Global API tokens are issued by a superadmin.
 
+## Setting up an event end to end
+
+An event can be provisioned without anyone opening the dashboard. Everything
+below takes a series API key, which is also the only credential that can create
+an event in the first place.
+
+```bash
+# 1. Create it. Name and support email are required; schedule, location and
+#    module toggles can all come in the same call, or later via PATCH.
+curl -X POST https://attend.hackclub.com/api/v1/series/current/events \
+  -H "Authorization: Bearer $ATTEND_KEY" -H "Content-Type: application/json" \
+  -d '{"event":{"name":"Sunbeam Summer","support_email":"sunbeam@hackclub.com",
+       "starts_at":"2026-10-01T09:00:00Z","ends_at":"2026-10-04T17:00:00Z"}}'
+
+# 2. Waivers. `auto` clones the standard templates and wires up their field
+#    mappings; `manual` takes DocuSeal template ids you made yourself.
+curl -X PUT https://attend.hackclub.com/api/v1/events/sunbeam-summer/setup/waivers \
+  -H "Authorization: Bearer $ATTEND_KEY" -H "Content-Type: application/json" \
+  -d '{"mode":"auto"}'
+
+# 3. Staff. Someone who has never signed in gets an account that links up on
+#    their first sign-in, and an email telling them what they can now do.
+curl -X POST https://attend.hackclub.com/api/v1/events/sunbeam-summer/staff \
+  -H "Authorization: Bearer $ATTEND_KEY" -H "Content-Type: application/json" \
+  -d '{"email":"organizer@example.com","role":"event_admin"}'
+
+# 4. Take it out of draft. GET /setup first if you want to see what's left.
+curl -X POST https://attend.hackclub.com/api/v1/events/sunbeam-summer/setup/complete \
+  -H "Authorization: Bearer $ATTEND_KEY"
+```
+
+Participants are then invited with `POST /events/{id}/participants`, corrected
+with `PATCH /events/{id}/participants/{id}` (which also withdraws and reinstates
+them), and removed from the event with `DELETE` on the same path.
+
 ## Rate limits and errors
 
 Errors are JSON, with an `error` key describing what went wrong. A `401` means

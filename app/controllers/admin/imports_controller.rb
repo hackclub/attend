@@ -1,6 +1,7 @@
 module Admin
   class ImportsController < BaseController
     before_action :require_event_selected
+    before_action :authorize_import
 
     COLUMN_MAPPING = CsvImportService::COLUMN_MAPPING
 
@@ -23,7 +24,9 @@ module Admin
       end
 
       csv_content = params[:csv_file].read
-      send_invitations = params[:send_invitations] != "0"
+      # A held event never emails on import, whatever the box says: the
+      # invitations are recorded and go out when the hold is released.
+      send_invitations = params[:send_invitations] != "0" && !current_event.onboarding_invites_held?
 
       rows = parse_csv(csv_content)
 
@@ -44,7 +47,7 @@ module Admin
     end
 
     def preview
-      @import_batch = ImportBatch.find(params[:id])
+      @import_batch = current_event.import_batches.find(params[:id])
 
       unless @import_batch.previewing?
         redirect_to progress_admin_event_import_path(current_event, @import_batch)
@@ -81,7 +84,7 @@ module Admin
     end
 
     def confirm
-      @import_batch = ImportBatch.find(params[:id])
+      @import_batch = current_event.import_batches.find(params[:id])
 
       unless @import_batch.previewing?
         redirect_to progress_admin_event_import_path(current_event, @import_batch), alert: "This import has already been started."
@@ -95,11 +98,11 @@ module Admin
     end
 
     def progress
-      @import_batch = ImportBatch.find(params[:id])
+      @import_batch = current_event.import_batches.find(params[:id])
     end
 
     def cancel
-      @import_batch = ImportBatch.find(params[:id])
+      @import_batch = current_event.import_batches.find(params[:id])
 
       if @import_batch.previewing? || @import_batch.pending?
         @import_batch.destroy
@@ -110,6 +113,12 @@ module Admin
     end
 
     private
+
+    # Importing a CSV invites everyone in it, so it takes the same permission as
+    # the invite form: event admins only.
+    def authorize_import
+      authorize current_event, :invite_participants?
+    end
 
     def parse_csv(csv_content)
       csv_content = csv_content.force_encoding("UTF-8")

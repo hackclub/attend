@@ -12,7 +12,7 @@ class ProcessImportBatchJob < ApplicationJob
 
     begin
       import_participants
-      send_invitations_with_rate_limit if @batch.send_invitations
+      record_invitations
       complete_batch
     rescue StandardError => e
       fail_batch(e)
@@ -77,24 +77,31 @@ class ProcessImportBatchJob < ApplicationJob
     { imported: true, participant: participant }
   end
 
-  def send_invitations_with_rate_limit
+  # Every imported participant gets an invitation on record. It is emailed
+  # now when the batch asked for emails and the event isn't holding onboarding
+  # invitations; otherwise it sits as held, visible on the pending invitations
+  # tab, until the event's held invitations are sent.
+  def record_invitations
     return if @participants_to_invite.empty?
 
-    @batch.update!(status: :sending_invites)
-    @batch.broadcast_progress
+    sending = @batch.send_invitations && !@event.onboarding_invites_held?
+
+    if sending
+      @batch.update!(status: :sending_invites)
+      @batch.broadcast_progress
+    end
 
     @participants_to_invite.each do |participant|
       begin
-        ParticipantMailer.invitation(
-          email: participant.email,
-          event: @event,
-          participant: participant
-        ).deliver_later
-        @batch.increment!(:invites_sent_count)
+        Invitation.issue!(event: @event, email: participant.email, participant: participant, send: sending)
+        @batch.increment!(:invites_sent_count) if sending
       rescue StandardError => e
-        add_error(nil, participant.email, "Failed to send invitation: #{e.message}")
-        Rails.logger.error("[ProcessImportBatchJob] Failed to send invitation to #{participant.email}: #{e.message}")
+        verb = sending ? "send" : "record"
+        add_error(nil, participant.email, "Failed to #{verb} invitation: #{e.message}")
+        Rails.logger.error("[ProcessImportBatchJob] Failed to #{verb} invitation for #{participant.email}: #{e.message}")
       end
+
+      next unless sending
 
       @batch.broadcast_progress
       sleep(INVITE_DELAY_SECONDS)

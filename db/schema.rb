@@ -739,6 +739,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_090000) do
     t.uuid "event_id", null: false
     t.datetime "expires_at", null: false
     t.uuid "group_ids", default: [], array: true
+    t.string "name"
+    t.datetime "sent_at"
     t.string "token", null: false
     t.datetime "updated_at", null: false
     t.index ["email", "event_id"], name: "index_invitations_on_email_and_event_id"

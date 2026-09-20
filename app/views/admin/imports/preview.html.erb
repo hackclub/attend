@@ -101,6 +101,18 @@
     </div>
   <% end %>
 
+  <% unless @import_batch.send_invitations %>
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+      <h3 class="font-semibold text-amber-800">No emails will be sent</h3>
+      <p class="text-sm text-amber-700 mt-1">
+        <% if current_event.onboarding_invites_held? %>
+          This event is holding onboarding invitations.
+        <% end %>
+        <%= @valid_rows.count %> <%= "invitation".pluralize(@valid_rows.count) %> will be recorded as held and can be sent later from the participants page or the series page.
+      </p>
+    </div>
+  <% end %>
+
   <% if @import_batch.send_invitations %>
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
       <div class="flex items-start gap-3">

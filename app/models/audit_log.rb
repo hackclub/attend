@@ -89,6 +89,7 @@ class AuditLog < ApplicationRecord
     refresh_flight_tracking: "refresh_flight_tracking",
     resync_airtable: "resync_airtable",
     revoke_invite: "revoke_invite",
+    send_held_invitations: "send_held_invitations",
     destroy_avatar: "destroy_avatar",
     toggle_maintenance: "toggle_maintenance",
     toggle_twilio: "toggle_twilio",

@@ -5,7 +5,14 @@ module Api
       before_action :authorize_token_scope!
 
       attr_reader :current_user, :current_token, :current_event_from_api_key,
-                  :current_series_from_api_key, :current_series_api_token
+                  :current_series_from_api_key, :current_series_api_token,
+                  :current_event_api_token
+
+      # An id that doesn't resolve is a 404 with a JSON body, not the HTML
+      # error page ActionController::API would otherwise hand a client.
+      rescue_from ActiveRecord::RecordNotFound do
+        render json: { error: "Not found" }, status: :not_found
+      end
 
       class_attribute :required_scope, instance_writer: false, default: nil
 
@@ -59,6 +66,9 @@ module Api
 
         event_token = EventApiToken.find_by_token(token)
         if event_token
+          # Deliberately not @current_token: that reader is the mobile-token
+          # contract (revoke!/refresh!), and an API key is not refreshable.
+          @current_event_api_token = event_token
           @current_event_from_api_key = event_token.event
           event_token.touch_last_used!
           return

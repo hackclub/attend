@@ -2,6 +2,7 @@ module Api
   module V1
     class ParticipantsController < BaseController
       include Pundit::Authorization
+      include Api::V1::ApiAuditing
 
       # Roles without participant API access (read_only, limited) would
       # otherwise surface Pundit's exception as a 500 to the mobile app.
@@ -11,7 +12,7 @@ module Api
 
       before_action :restrict_api_key_actions
       before_action :set_event
-      before_action :set_participant_event, only: [ :show ]
+      before_action :set_participant_event, only: [ :show, :update, :destroy ]
 
       def index
         sync_cutoff = Time.current
@@ -71,6 +72,12 @@ module Api
       end
 
       def create
+        # API keys are event-scoped credentials issued by an event admin, so
+        # they may invite. A signed-in person needs the event admin role;
+        # api_participants? alone (checked in set_event) lets ops, limited, and
+        # safeguarding leads read the roster, not add to it.
+        authorize @event, :invite_participants? unless api_key_request?
+
         email = params[:email]&.strip&.downcase
         first_name = params[:first_name]&.strip
         last_name = params[:last_name]&.strip
@@ -90,7 +97,8 @@ module Api
 
         existing_invitation = @event.invitations.find_by(email: email)
         if existing_invitation
-          return render json: { success: false, error: "An invitation has already been sent to this email" }, status: :conflict
+          error = existing_invitation.held? ? "This email has already been added; its invitation is held" : "An invitation has already been sent to this email"
+          return render json: { success: false, error: error }, status: :conflict
         end
 
         existing_participant = @event.participants.find_by(email: email)
@@ -99,15 +107,15 @@ module Api
         end
 
         begin
-          ParticipantMailer.invitation(
-            email: email,
-            name: name,
-            event: @event
-          ).deliver_later
+          # Honours the event's hold: while onboarding invitations are held,
+          # the invitation is recorded and goes out when they're released.
+          Invitation.issue!(event: @event, email: email, name: name)
+          held = @event.onboarding_invites_held?
 
           render json: {
             success: true,
-            message: "Invitation sent to #{email}",
+            held: held,
+            message: held ? "Invitation held for #{email}" : "Invitation sent to #{email}",
             event: @event.name
           }, status: :created
         rescue ActiveRecord::RecordInvalid => e
@@ -133,6 +141,52 @@ module Api
           participant_id: participant&.id,
           status: participant_event&.status
         }
+      end
+
+      # Edits the person (name, contact details, sizing) and, with `status`,
+      # where their registration stands. Sending status=withdrawn is the
+      # withdraw button; status=in_progress is the reinstate button, after
+      # which #display_status recomputes the real state from their progress.
+      def update
+        authorize @participant_event, :update? unless api_key_request?
+
+        status = params[:status].presence
+        if status && !ParticipantEvent.statuses.key?(status.to_s)
+          return render_error("#{status} is not a valid status. Valid statuses: #{ParticipantEvent.statuses.keys.join(', ')}")
+        end
+
+        participant = @participant_event.participant
+        attributes = participant_update_params
+
+        if attributes.empty? && status.nil?
+          return render_error("Nothing to update. Send a `participant` object and/or a `status`.")
+        end
+
+        ActiveRecord::Base.transaction do
+          participant.update!(attributes) if attributes.any?
+          @participant_event.update!(status: status) if status
+        end
+
+        audit_api_change!(:record_update, participant) if attributes.any?
+        audit_api_change!(status_audit_action(status), @participant_event, metadata: { status: status }) if status
+
+        render json: { participant: participant_json(@participant_event.reload) }
+      rescue ActiveRecord::RecordInvalid => e
+        render_error(e.record.errors.full_messages.to_sentence)
+      end
+
+      # Removes this person's registration for this event — their profile,
+      # travel, consents and scans for it — and nothing else. The Participant
+      # row survives, along with their registrations for other events, so
+      # someone deleted from one event is not deleted from Attend.
+      def destroy
+        authorize @participant_event, :destroy? unless api_key_request?
+
+        name = @participant_event.participant.display_name
+        @participant_event.destroy!
+        audit_api_change!(:record_destroy, @participant_event, changed_fields: {}, metadata: { participant_name: name })
+
+        head :no_content
       end
 
       # Minimal roster for external integrations: just enough to build an
@@ -162,18 +216,53 @@ module Api
 
       private
 
-      # An API key may only send invitations and read minimal
-      # identity/registration data (lookup, roster) — never the full
-      # participant payload from index/show, which includes sensitive
-      # medical/safeguarding/travel PII. Applies to event and series keys
-      # alike: a series key is broader in reach, not in what it may read.
-      API_KEY_ALLOWED_ACTIONS = %w[create lookup roster].freeze
+      # An API key may send invitations, read minimal identity/registration
+      # data (lookup, roster), and manage a registration (update, destroy) —
+      # never the full participant payload from index/show, which includes
+      # sensitive medical/safeguarding/travel PII. Applies to event and series
+      # keys alike: a series key is broader in reach, not in what it may read.
+      #
+      # update is on this list even though it *writes* fields a key can't read
+      # back: an integration that owns the source of truth for someone's name
+      # or phone number should be able to correct Attend, and the response is
+      # redacted for keys exactly as index/show would be (see include_pii?).
+      API_KEY_ALLOWED_ACTIONS = %w[create lookup roster update destroy].freeze
 
       def restrict_api_key_actions
         return unless api_key_request?
         return if API_KEY_ALLOWED_ACTIONS.include?(action_name)
 
         render json: { error: "API key is not authorized for this action" }, status: :forbidden
+      end
+
+      # Mirrors Admin::ParticipantsController#participant_params, minus the
+      # headshot (a file upload has no place in a JSON API). Only the keys
+      # actually sent are written, so a one-field PATCH stays a one-field PATCH.
+      #
+      # Date of birth and phone are writable by every caller that gets this
+      # far, including PII-restricted roles and API keys, which cannot read
+      # them back — an integration correcting a record it owns doesn't need to
+      # see what was there before.
+      PARTICIPANT_WRITABLE_FIELDS = %i[
+        legal_first_name legal_last_name preferred_name email
+        date_of_birth phone pronouns tshirt_size
+      ].freeze
+
+      def participant_update_params
+        return {} if params[:participant].blank?
+
+        params.require(:participant).permit(*PARTICIPANT_WRITABLE_FIELDS).to_h.symbolize_keys
+      end
+
+      # The web has dedicated withdraw/unwithdraw buttons that audit under
+      # their own action names; a status change through the API is the same
+      # event and should read the same way in the audit log.
+      def status_audit_action(status)
+        case status.to_s
+        when "withdrawn" then :withdraw
+        when "in_progress" then :unwithdraw
+        else :record_update
+        end
       end
 
       def set_event
@@ -532,13 +621,18 @@ module Api
       # Whether this caller gets exact dates of birth, addresses, phone numbers,
       # and the people around a participant (guardian and emergency contact
       # details). A participant's own email address is not gated. Memoized
-      # for the same reason as can_view_sensitive_data? below. A nil
-      # current_user means an event API key, which never reaches the actions
-      # that serve these fields (see API_KEY_ALLOWED_ACTIONS).
+      # for the same reason as can_view_sensitive_data? below. An API key
+      # never gets any of it: it may write these fields through #update, but
+      # what comes back is the same redacted shape a PII-restricted role sees.
       def include_pii?
         return @include_pii if defined?(@include_pii)
 
-        @include_pii = current_user.nil? || current_user.can_view_participant_pii?(@event)
+        @include_pii =
+          if api_key_request?
+            false
+          else
+            current_user.nil? || current_user.can_view_participant_pii?(@event)
+          end
       end
 
       # Memoized per request: participant_json calls this once per participant,

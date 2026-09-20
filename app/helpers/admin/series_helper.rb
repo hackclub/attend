@@ -55,6 +55,19 @@ module Admin::SeriesHelper
     end
   end
 
+  # vote.hackclub.com decides its own admin and gallery URLs and we store
+  # whatever it sends, so they are external input by the time a view renders
+  # them: anything but http(s) — a `javascript:` URL above all — must never
+  # reach an href. Returns nil when there is nothing safe to link to, so the
+  # caller can drop the link entirely.
+  def external_http_url(url)
+    return nil if url.blank?
+
+    URI.parse(url).is_a?(URI::HTTP) ? url : nil
+  rescue URI::InvalidURIError
+    nil
+  end
+
   # The participant list for one event, filtered to the people stuck at a stage.
   # Passing the event slug in the path is what switches the admin event picker
   # (Admin::BaseController#switch_event_if_needed), so these links land on a

@@ -3,7 +3,7 @@ module Admin
     include TravelLegDateMerging
 
     before_action :require_event_selected
-    before_action :set_participant_event, except: [ :index, :table, :new_invite, :send_invite, :revoke_invite, :sync_slack_channel_preview, :sync_slack_channel ]
+    before_action :set_participant_event, except: [ :index, :table, :new_invite, :send_invite, :revoke_invite, :send_held_invitations, :sync_slack_channel_preview, :sync_slack_channel ]
     before_action :set_participant_header_data, only: [ :show, :travel, :update_travel, :accommodation, :update_accommodation, :medical, :update_medical, :safeguarding, :update_safeguarding, :consents, :notes, :history, :slack_invite_link, :merge ]
     before_action :require_safeguarding_access, only: [ :safeguarding ]
 
@@ -706,6 +706,10 @@ module Admin
     # Re-send the participant's onboarding invitation. The mailer reuses the
     # pending Invitation when there is one, so the link they were already sent
     # keeps working; an expired one is replaced with a fresh token.
+    #
+    # Deliberately sends even while the event is holding onboarding
+    # invitations: this is one named person, chosen by a staff member, not the
+    # bulk send the hold exists to time.
     def resend_invitation
       authorize @participant_event, :update?
 
@@ -717,6 +721,8 @@ module Admin
         return
       end
 
+      was_held = current_event.invitations.held.for_email(participant.email).exists?
+
       ParticipantMailer.invitation(
         email: participant.email,
         event: current_event,
@@ -724,7 +730,7 @@ module Admin
       ).deliver_later
 
       redirect_to admin_event_participant_path(current_event, @participant_event),
-        notice: "Invitation resent to #{participant.email}."
+        notice: "Invitation #{was_held ? 'sent' : 'resent'} to #{participant.email}."
     end
 
     def update_groups
@@ -748,10 +754,14 @@ module Admin
     end
 
     def new_invite
+      authorize current_event, :invite_participants?
+
       @invite = Struct.new(:email, :name, :group_ids).new("", "", [])
     end
 
     def send_invite
+      authorize current_event, :invite_participants?
+
       email = params[:invite][:email]&.strip&.downcase
       name = params[:invite][:name]
       group_ids = Array(params[:invite][:group_ids]).reject(&:blank?)
@@ -767,13 +777,23 @@ module Admin
       end
 
       begin
-        ParticipantMailer.invitation(
-          email: email,
-          name: name,
-          event: current_event,
-          group_ids: group_ids
-        ).deliver_later
-        redirect_to admin_event_participants_path(current_event), notice: "Invitation sent to #{email}."
+        if params[:invite][:send_now].present?
+          # The pending-invitations tab's per-row Send/Resend. It emails even
+          # while the event is holding onboarding invitations: the hold is the
+          # event's default, and this is a staff member overriding it for one
+          # named person.
+          Invitation.issue!(event: current_event, email: email, name: name, group_ids: group_ids, send: false)
+          participant = Participant.find_by("LOWER(email) = ?", email)
+          ParticipantMailer.invitation(email: email, name: name, event: current_event, participant: participant).deliver_later
+          redirect_to admin_event_participants_path(current_event, status: "pending_invitations"), notice: "Invitation sent to #{email}."
+        elsif current_event.onboarding_invites_held?
+          Invitation.issue!(event: current_event, email: email, name: name, group_ids: group_ids)
+          redirect_to admin_event_participants_path(current_event, status: "pending_invitations"),
+            notice: "#{email} added. Their invitation is held until this event's onboarding invitations are sent."
+        else
+          Invitation.issue!(event: current_event, email: email, name: name, group_ids: group_ids)
+          redirect_to admin_event_participants_path(current_event), notice: "Invitation sent to #{email}."
+        end
       rescue ActiveRecord::RecordInvalid => e
         redirect_to new_invite_admin_event_participants_path(current_event), alert: e.record.errors.full_messages.join(", ")
       rescue ArgumentError => e
@@ -781,7 +801,23 @@ module Admin
       end
     end
 
+    # Emails every invitation this event recorded while holding onboarding
+    # invitations, and stops holding new ones. The series page has the same
+    # button for every event at once.
+    def send_held_invitations
+      authorize current_event, :invite_participants?
+
+      count = current_event.held_invitations_count
+      current_event.release_onboarding_invites!
+      @record = current_event
+
+      redirect_to admin_event_participants_path(current_event, status: "pending_invitations"),
+        notice: "Sending #{helpers.pluralize(count, 'held invitation')}. New participants will be emailed as they're added."
+    end
+
     def revoke_invite
+      authorize current_event, :invite_participants?
+
       invitation = current_event.invitations.find(params[:id])
       email = invitation.email
       invitation.destroy!
