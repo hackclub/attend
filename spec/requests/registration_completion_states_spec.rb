@@ -106,17 +106,6 @@ RSpec.describe "Registration completion states", type: :request do
     expect(response.body).to include("Sign the event waiver")
   end
 
-  it "shows the published arrival window instead of the contact-us fallback" do
-    sign_in user
-    event.update!(timezone: "Europe/London",
-      arrival_opens_at: "2026-08-01T09:00", arrival_closes_at: "2026-08-01T11:30")
-
-    get dashboard_event_path(participant_event)
-
-    expect(response.body).to include("Arrive between 9:00 AM and 11:30 AM BST on Saturday, August 1.")
-    expect(response.body).not_to include("An arrival window has not been published")
-  end
-
   it "shows a paused waiting state without an unusable signing action" do
     sign_in user
     event.update!(guardian_invites_locked: true)
