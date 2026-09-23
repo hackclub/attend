@@ -107,16 +107,27 @@ module Api
         end
 
         begin
-          # Honours the event's hold: while onboarding invitations are held,
-          # the invitation is recorded and goes out when they're released.
-          Invitation.issue!(event: @event, email: email, name: name)
+          participant_event = nil
+
+          # One unit: an invitation nobody is on the roster for, or a roster
+          # entry nobody was invited to, are both worse than neither.
+          ActiveRecord::Base.transaction do
+            # Honours the event's hold: while onboarding invitations are held,
+            # the invitation is recorded and goes out when they're released.
+            Invitation.issue!(event: @event, email: email, name: name)
+            participant_event = register_invitee(email: email, first_name: first_name, last_name: last_name)
+          end
+
           held = @event.onboarding_invites_held?
 
           render json: {
             success: true,
             held: held,
             message: held ? "Invitation held for #{email}" : "Invitation sent to #{email}",
-            event: @event.name
+            event: @event.name,
+            participant_id: participant_event.participant_id,
+            participant_event_id: participant_event.id,
+            status: participant_event.status
           }, status: :created
         rescue ActiveRecord::RecordInvalid => e
           render json: { success: false, error: e.record.errors.full_messages.join(", ") }, status: :unprocessable_entity
@@ -215,6 +226,34 @@ module Api
       end
 
       private
+
+      # Puts the invitee on the roster immediately, in the same `invited` state
+      # a CSV import leaves them in, so staff can see them and the "Incomplete
+      # Onboarding" message audience can reach them before they ever sign in.
+      # Onboarding links the person to their account by email and moves them to
+      # `in_progress` the moment they open the wizard.
+      #
+      # `invited` specifically, never `in_progress`: ParticipantEvent#onboarding_held?
+      # keys off that status, and it is what keeps the wizard shut for someone
+      # whose invitation is still held by the event.
+      def register_invitee(email:, first_name:, last_name:)
+        # LOWER() rather than an exact match: participant emails are not
+        # normalized on write, so an existing person may be stored in another
+        # case. Missing them here would fork the same human into two records.
+        participant = Participant.find_by("LOWER(participants.email) = ?", email)
+
+        participant ||= Participant.create!(
+          email: email,
+          # Legal names are validated on every save, but an invitation only
+          # carries an address. "Unknown" is the placeholder the onboarding OIDC
+          # backfill looks for, so the real name lands on first sign-in.
+          legal_first_name: first_name.presence || "Unknown",
+          legal_last_name: last_name.presence || "Unknown"
+        )
+
+        ParticipantEvent.create_with(status: :invited)
+                        .find_or_create_by!(participant: participant, event: @event)
+      end
 
       # An API key may send invitations, read minimal identity/registration
       # data (lookup, roster), and manage a registration (update, destroy) —

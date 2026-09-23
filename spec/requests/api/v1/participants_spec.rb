@@ -293,6 +293,120 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(response).to have_http_status(:created)
     end
 
+    it "puts the invitee on the roster as invited, reusing a person who already exists" do
+      existing = create(:participant, email: "Returning@Example.com", legal_first_name: "Rey", legal_last_name: "Turner")
+
+      post "/api/v1/events/#{event.id}/participants",
+        params: { email: "returning@example.com" }, headers: sign_in_headers_for("event_admin")
+
+      expect(response).to have_http_status(:created)
+      body = JSON.parse(response.body)
+      expect(body["participant_id"]).to eq(existing.id)
+      expect(body["status"]).to eq("invited")
+
+      pe = ParticipantEvent.find(body["participant_event_id"])
+      expect(pe.participant).to eq(existing)
+      expect(pe).to be_invited
+      # Reused, not forked into a second person by the case difference.
+      expect(Participant.where("LOWER(email) = ?", "returning@example.com").count).to eq(1)
+      expect(existing.reload.legal_first_name).to eq("Rey")
+    end
+
+    it "creates the person with replaceable placeholder names when none are sent" do
+      post "/api/v1/events/#{event.id}/participants",
+        params: { email: "nameless@example.com" }, headers: sign_in_headers_for("event_admin")
+
+      expect(response).to have_http_status(:created)
+      participant = Participant.find(JSON.parse(response.body)["participant_id"])
+      # "Unknown" is what OnboardingController#backfill_participant_from_oidc
+      # overwrites on first sign-in.
+      expect(participant.legal_first_name).to eq("Unknown")
+      expect(participant.legal_last_name).to eq("Unknown")
+    end
+
+    it "uses the names it was sent" do
+      post "/api/v1/events/#{event.id}/participants",
+        params: { email: "named@example.com", first_name: "Ada", last_name: "Lovelace" },
+        headers: sign_in_headers_for("event_admin")
+
+      participant = Participant.find(JSON.parse(response.body)["participant_id"])
+      expect(participant.legal_first_name).to eq("Ada")
+      expect(participant.legal_last_name).to eq("Lovelace")
+    end
+
+    it "creates the registration even while the event holds its invitations, leaving the wizard shut" do
+      event.update!(onboarding_invites_held: true)
+
+      expect {
+        post "/api/v1/events/#{event.id}/participants",
+          params: { email: "held@example.com" }, headers: sign_in_headers_for("event_admin")
+      }.not_to have_enqueued_mail(ParticipantMailer, :invitation)
+
+      expect(response).to have_http_status(:created)
+      body = JSON.parse(response.body)
+      expect(body["held"]).to be(true)
+
+      pe = ParticipantEvent.find(body["participant_event_id"])
+      expect(pe).to be_invited
+      expect(pe.onboarding_held?).to be(true)
+    end
+
+    it "makes the invitee reachable by broadcast once their invitation has gone out" do
+      post "/api/v1/events/#{event.id}/participants",
+        params: { email: "reachable@example.com" }, headers: sign_in_headers_for("event_admin")
+      pe = ParticipantEvent.find(JSON.parse(response.body)["participant_event_id"])
+      perform_enqueued_jobs # the mailer is what stamps the invitation as sent
+
+      incomplete = Message.new(event: event, audience: "attendees_incomplete", channels: [ "email" ], sent_by_user: admin)
+      everyone = Message.new(event: event, audience: "all_attendees", channels: [ "email" ], sent_by_user: admin)
+
+      expect(incomplete.recipients).to include(pe)
+      expect(everyone.recipients).to include(pe)
+    end
+
+    it "keeps a held invitee out of All Attendees until their invitation is released" do
+      event.update!(onboarding_invites_held: true)
+
+      post "/api/v1/events/#{event.id}/participants",
+        params: { email: "quiet@example.com" }, headers: sign_in_headers_for("event_admin")
+      pe = ParticipantEvent.find(JSON.parse(response.body)["participant_event_id"])
+
+      everyone = Message.new(event: event, audience: "all_attendees", channels: [ "email" ], sent_by_user: admin)
+      expect(everyone.recipients).not_to include(pe)
+
+      # Releasing the hold sends the held invitations, which is what admits
+      # them to the audience. Two drains: the release job enqueues the mailer,
+      # and it is the mailer that stamps the invitation as sent.
+      event.release_onboarding_invites!
+      2.times { perform_enqueued_jobs }
+
+      expect(everyone.recipients).to include(pe)
+    end
+
+    it "writes neither the invitation nor the registration when the registration cannot be created" do
+      allow(ParticipantEvent).to receive(:create_with).and_raise(ActiveRecord::RecordInvalid.new(ParticipantEvent.new))
+
+      expect {
+        post "/api/v1/events/#{event.id}/participants",
+          params: { email: "doomed@example.com" }, headers: sign_in_headers_for("event_admin")
+      }.not_to change(Invitation, :count)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(Participant.where(email: "doomed@example.com")).to be_empty
+    end
+
+    it "409s on a second invitation rather than a duplicate registration" do
+      headers = sign_in_headers_for("event_admin")
+      post "/api/v1/events/#{event.id}/participants", params: { email: "twice@example.com" }, headers: headers
+      expect(response).to have_http_status(:created)
+
+      expect {
+        post "/api/v1/events/#{event.id}/participants", params: { email: "twice@example.com" }, headers: headers
+      }.not_to change(ParticipantEvent, :count)
+
+      expect(response).to have_http_status(:conflict)
+    end
+
     %w[limited ops safeguarding_lead].each do |role|
       it "forbids #{role}, who can read the roster but not add to it" do
         headers = sign_in_headers_for(role)
