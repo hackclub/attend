@@ -34,7 +34,7 @@ class EventsToolbox < ApplicationToolbox
     param :location_city, :string, "City", optional: true
     param :location_country, :string, "Country", optional: true
     param :venue_name, :string, "Venue", optional: true
-    param :support_email, :string, "Support email (@hackclub.com or @events.hackclub.com)"
+    param :support_email, :string, "Support email (#{Event::SUPPORT_EMAIL_DOMAINS_SENTENCE})"
   end
   def create
     @event = Event.new(params.permit(*WRITABLE).to_h)
@@ -53,7 +53,7 @@ class EventsToolbox < ApplicationToolbox
     param :location_city, :string, "City", optional: true
     param :location_country, :string, "Country", optional: true
     param :venue_name, :string, "Venue", optional: true
-    param :support_email, :string, "Support email (@hackclub.com or @events.hackclub.com)", optional: true
+    param :support_email, :string, "Support email (#{Event::SUPPORT_EMAIL_DOMAINS_SENTENCE})", optional: true
     param :arrival_opens_at, :string, "Arrival window opens (ISO8601)", optional: true
     param :arrival_closes_at, :string, "Arrival window closes (ISO8601)", optional: true
     param :travel_enabled, :boolean, "Enable travel collection", optional: true

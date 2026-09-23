@@ -116,7 +116,7 @@
   <% if @event.support_email.blank? %>
     <p class="mt-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
       This event needs a support email before setup can be finished — it's the from and reply-to address on participant and guardian emails.
-      Set a @hackclub.com or @events.hackclub.com address from <%= link_to "event settings", edit_admin_event_path(@event), class: "font-medium underline" %>.
+      Set a <%= Event::SUPPORT_EMAIL_DOMAINS_SENTENCE %> address from <%= link_to "event settings", edit_admin_event_path(@event), class: "font-medium underline" %>.
     </p>
   <% end %>
 

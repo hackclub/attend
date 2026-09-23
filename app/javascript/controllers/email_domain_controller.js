@@ -55,7 +55,7 @@ export default class extends Controller {
   get errorMessage() {
     const domains = this.domainsValue.map((domain) => `@${domain}`)
     const list = domains.length > 1
-      ? `${domains.slice(0, -1).join(", ")} or ${domains[domains.length - 1]}`
+      ? `${domains.slice(0, -1).join(", ")}${domains.length > 2 ? "," : ""} or ${domains[domains.length - 1]}`
       : domains[0]
     return `Must be a ${list} address.`
   }

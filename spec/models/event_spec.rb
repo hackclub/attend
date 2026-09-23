@@ -8,20 +8,21 @@ RSpec.describe Event, type: :model do
       expect(event.errors[:support_email]).to include("can't be blank")
     end
 
-    it "accepts @hackclub.com and @events.hackclub.com addresses" do
+    it "accepts @hackclub.com, @events.hackclub.com, and @haven.hackclub.com addresses" do
       expect(build(:event, support_email: "sunbeam@hackclub.com")).to be_valid
       expect(build(:event, support_email: "sunbeam@events.hackclub.com")).to be_valid
+      expect(build(:event, support_email: "sunbeam@haven.hackclub.com")).to be_valid
     end
 
     it "rejects addresses on any other domain" do
       event = build(:event, support_email: "sunbeam@gmail.com")
       expect(event).not_to be_valid
       expect(event.errors[:support_email])
-        .to include("must be a @hackclub.com or @events.hackclub.com address")
+        .to include("must be a @hackclub.com, @events.hackclub.com, or @haven.hackclub.com address")
     end
 
     it "rejects lookalike domains" do
-      %w[sunbeam@nothackclub.com sunbeam@hackclub.com.evil.com sunbeam@sub.events.hackclub.com]
+      %w[sunbeam@nothackclub.com sunbeam@hackclub.com.evil.com sunbeam@sub.events.hackclub.com sunbeam@sub.haven.hackclub.com]
         .each do |address|
           expect(build(:event, support_email: address)).not_to be_valid
         end

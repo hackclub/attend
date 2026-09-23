@@ -31,7 +31,7 @@ RSpec.describe "Admin::EventSetup", type: :request do
 
       expect(response).to have_http_status(:unprocessable_entity)
       expect(Event.find_by(slug: "outside-con")).to be_nil
-      expect(response.body).to include("@hackclub.com or @events.hackclub.com")
+      expect(response.body).to include("@hackclub.com, @events.hackclub.com, or @haven.hackclub.com")
     end
 
     # The audit log used to choke on the unsaved event (no id, so AuditLog's
@@ -48,7 +48,7 @@ RSpec.describe "Admin::EventSetup", type: :request do
       }
 
       expect(response).to have_http_status(:unprocessable_entity)
-      expect(response.body).to include("@hackclub.com or @events.hackclub.com")
+      expect(response.body).to include("@hackclub.com, @events.hackclub.com, or @haven.hackclub.com")
     end
   end
 
