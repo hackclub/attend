@@ -620,7 +620,7 @@ paths:
                 missing_required:
                   value: { error: name and support_email are required }
                 bad_support_email:
-                  value: { error: Support email must be a @hackclub.com, @events.hackclub.com, or @haven.hackclub.com address }
+                  value: { error: "Support email must be a @hackclub.com, @events.hackclub.com, or @haven.hackclub.com address" }
 
   /series/{series_id}/events/{id}:
     get:
