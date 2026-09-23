@@ -101,7 +101,9 @@ class Event < ApplicationRecord
   # email, so it has to be an address we actually control. Required from setup
   # onwards; older events created before this rule keep passing validation until
   # someone edits the field (hence allow_blank on the format check).
-  SUPPORT_EMAIL_DOMAINS = %w[hackclub.com events.hackclub.com].freeze
+  SUPPORT_EMAIL_DOMAINS = %w[hackclub.com events.hackclub.com haven.hackclub.com].freeze
+  SUPPORT_EMAIL_DOMAINS_SENTENCE = SUPPORT_EMAIL_DOMAINS.map { |d| "@#{d}" }
+    .to_sentence(two_words_connector: " or ", last_word_connector: ", or ").freeze
   SUPPORT_EMAIL_FORMAT = /\A[^@\s]+@(?:#{SUPPORT_EMAIL_DOMAINS.map { |d| Regexp.escape(d) }.join("|")})\z/i
 
   normalizes :support_email, with: ->(v) { v.strip.downcase.presence }
@@ -111,7 +113,7 @@ class Event < ApplicationRecord
   validates :support_email,
             format: {
               with: SUPPORT_EMAIL_FORMAT,
-              message: "must be a #{SUPPORT_EMAIL_DOMAINS.map { |d| "@#{d}" }.join(" or ")} address"
+              message: "must be a #{SUPPORT_EMAIL_DOMAINS_SENTENCE} address"
             },
             allow_blank: true
 

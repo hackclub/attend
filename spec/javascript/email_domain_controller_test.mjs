@@ -34,6 +34,15 @@ function buildController(value) {
   return { controller, input, message }
 }
 
+test("lists three or more domains with a serial comma", () => {
+  const { controller, input } = buildController("hi@gmail.com")
+  controller.domainsValue = [ "hackclub.com", "events.hackclub.com", "haven.hackclub.com" ]
+
+  controller.validate()
+
+  assert.equal(input.customValidity, "Must be a @hackclub.com, @events.hackclub.com, or @haven.hackclub.com address.")
+})
+
 test("rejects an address outside the allowed domains", () => {
   const { controller, input, message } = buildController("hi@gmail.com")
 

@@ -522,10 +522,10 @@ paths:
         ### Required fields
 
         `name` and `support_email` — exactly what the web's new-event form
-        requires. `support_email` must be on `@hackclub.com` or
-        `@events.hackclub.com`: it is the from and reply-to address on every
-        participant and guardian email, so it has to be an address Hack Club
-        controls.
+        requires. `support_email` must be on `@hackclub.com`,
+        `@events.hackclub.com`, or `@haven.hackclub.com`: it is the from and
+        reply-to address on every participant and guardian email, so it has to
+        be an address Hack Club controls.
 
         Everything else is optional here because it is optional on the web too:
 
@@ -620,7 +620,7 @@ paths:
                 missing_required:
                   value: { error: name and support_email are required }
                 bad_support_email:
-                  value: { error: Support email must be a @hackclub.com or @events.hackclub.com address }
+                  value: { error: "Support email must be a @hackclub.com, @events.hackclub.com, or @haven.hackclub.com address" }
 
   /series/{series_id}/events/{id}:
     get:
@@ -2129,8 +2129,9 @@ components:
           type: string
           format: email
           description: >-
-            Must be `@hackclub.com` or `@events.hackclub.com` — it is the from
-            and reply-to address on every participant and guardian email.
+            Must be `@hackclub.com`, `@events.hackclub.com`, or
+            `@haven.hackclub.com` — it is the from and reply-to address on every
+            participant and guardian email.
           example: sunbeam@hackclub.com
         timezone:
           type: string
