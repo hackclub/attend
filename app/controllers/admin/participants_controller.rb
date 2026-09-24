@@ -630,7 +630,10 @@ module Admin
     def destroy
       authorize @participant_event
       participant_name = @participant_event.participant.display_name
-      @participant_event.destroy!
+      ActiveRecord::Base.transaction do
+        @participant_event.revoke_invitations!
+        @participant_event.destroy!
+      end
       redirect_to admin_event_participants_path(current_event), notice: "#{participant_name} has been removed from this event."
     end
 

@@ -549,6 +549,31 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(AuditLog.where(action: "destroy", event: event)).to exist
     end
 
+    it "revokes the invitation, so the old link cannot re-create the registration" do
+      participant = create(:participant, email: "removed@example.com", user: create(:user, email: "removed@example.com"))
+      create(:invitation, event: event, email: "removed@example.com", sent_at: Time.current)
+      pe = create(:participant_event, participant: participant, event: event, status: :complete)
+
+      expect {
+        delete "/api/v1/events/#{event.id}/participants/#{pe.id}", headers: auth_headers
+      }.to change(Invitation, :count).by(-1)
+
+      expect(response).to have_http_status(:no_content)
+      # The route that previously re-registered them: no surviving invitation,
+      # so OnboardingController has nothing to rebuild from.
+      expect(Invitation.where(event: event).for_email("removed@example.com")).to be_empty
+    end
+
+    it "records how many invitations it revoked in the audit log" do
+      participant = create(:participant, email: "audited@example.com")
+      create(:invitation, event: event, email: "audited@example.com", sent_at: Time.current)
+      pe = create(:participant_event, participant: participant, event: event)
+
+      delete "/api/v1/events/#{event.id}/participants/#{pe.id}", headers: auth_headers
+
+      expect(AuditLog.last.metadata["invitations_revoked"]).to eq(1)
+    end
+
     it "refuses a role that isn't an event admin" do
       ops = create(:event_role_assignment, event: event, role: "ops").user
 

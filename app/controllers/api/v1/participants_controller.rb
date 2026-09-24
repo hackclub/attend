@@ -194,8 +194,13 @@ module Api
         authorize @participant_event, :destroy? unless api_key_request?
 
         name = @participant_event.participant.display_name
-        @participant_event.destroy!
-        audit_api_change!(:record_destroy, @participant_event, changed_fields: {}, metadata: { participant_name: name })
+        revoked = nil
+        ActiveRecord::Base.transaction do
+          revoked = @participant_event.revoke_invitations!.size
+          @participant_event.destroy!
+        end
+        audit_api_change!(:record_destroy, @participant_event, changed_fields: {},
+          metadata: { participant_name: name, invitations_revoked: revoked })
 
         head :no_content
       end

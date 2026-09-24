@@ -1279,8 +1279,14 @@ paths:
         href: /api-reference/participants/remove-a-participant-from-the-event
       description: >-
         Deletes this registration — the profile, travel, consents and scans
-        attached to it — and nothing else. The person's Attend account and
-        their registrations for other events survive. Event admins only.
+        attached to it — and revokes this event's invitation for their email,
+        so the original invitation link can no longer re-create the
+        registration. The person's Attend account and their registrations for
+        other events survive. Event admins only.
+
+
+        To remove someone without revoking their invitation, set their status
+        to `withdrawn` instead.
       parameters:
         - $ref: "#/components/parameters/EventId"
         - $ref: "#/components/parameters/RegistrationId"
