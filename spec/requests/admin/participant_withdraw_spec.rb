@@ -53,7 +53,16 @@ RSpec.describe "Admin::Participants withdraw authorization", type: :request do
       it "is not offered the Withdraw button" do
         get admin_event_participant_path(event.slug, participant_event)
 
-        expect(response.body).not_to include("Withdraw")
+        if role == "read_only"
+          # read_only cannot open the page at all, so there is no button to
+          # check for; pin the redirect rather than a body that trivially
+          # lacks "Withdraw".
+          expect(response).to have_http_status(:redirect)
+          expect(flash[:alert]).to include("not authorized")
+        else
+          expect(response).to have_http_status(:ok)
+          expect(response.body).not_to include("Withdraw")
+        end
       end
 
       it "cannot withdraw by posting directly" do
@@ -74,15 +83,32 @@ RSpec.describe "Admin::Participants withdraw authorization", type: :request do
     end
   end
 
-  # withdraw? is reached through Current.event, but the record comes from the
-  # URL: an ops user on event A must not withdraw someone from event B.
-  it "does not let a role holder reach a participant from another event" do
-    sign_in_with_role("ops")
-    other_event = create(:event)
-    other_pe = create(:participant_event, event: other_event)
+  # An ops user on event A must not withdraw someone from event B. The
+  # controller scopes the lookup to the current event, so the request 404s
+  # before the policy runs; the policy's own Current.event guard is pinned
+  # separately so it still holds if that lookup ever widens.
+  describe "cross-event access" do
+    let(:other_event) { create(:event) }
+    let(:other_pe) { create(:participant_event, event: other_event) }
 
-    post withdraw_admin_event_participant_path(event.slug, other_pe)
+    it "does not let a role holder reach a participant from another event" do
+      sign_in_with_role("ops")
 
-    expect(other_pe.reload.status).not_to eq("withdrawn")
+      post withdraw_admin_event_participant_path(event.slug, other_pe)
+
+      expect(response).to have_http_status(:redirect)
+      expect(flash[:alert]).to include("could not be found")
+      expect(other_pe.reload.status).not_to eq("withdrawn")
+    end
+
+    it "denies withdraw? in the policy when the record is outside Current.event" do
+      user = User.create!(email: "ops-cross-event@example.com", name: "Ops")
+      EventRoleAssignment.create!(user: user, event: event, role: "ops")
+
+      Current.set(event: event) do
+        expect(ParticipantEventPolicy.new(user, participant_event).withdraw?).to be(true)
+        expect(ParticipantEventPolicy.new(user, other_pe).withdraw?).to be(false)
+      end
+    end
   end
 end
