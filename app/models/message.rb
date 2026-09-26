@@ -58,7 +58,14 @@ class Message < ApplicationRecord
   def base_recipients
     case audience.to_sym
     when :all_attendees
-      event.participant_events.where(status: %w[in_progress awaiting_guardian complete])
+      # Everyone who has at least opened the wizard, plus invitees who have
+      # been told the event exists. Held invitations are deliberately excluded:
+      # their recipient has not been contacted yet (see
+      # ParticipantEvent#onboarding_held?), so broadcasting event detail to
+      # them is precisely what the hold exists to prevent.
+      event.participant_events
+        .where(status: %w[in_progress awaiting_guardian complete])
+        .or(event.participant_events.where(id: notified_invitee_ids))
     when :confirmed_attendees
       event.participant_events.complete
     when :attendees_with_flights
@@ -96,6 +103,22 @@ class Message < ApplicationRecord
     else
       ParticipantEvent.none
     end
+  end
+
+  # Invited registrations whose invitation has actually gone out. Matched on
+  # email rather than a foreign key because that is the only link between the
+  # two — an Invitation belongs to an event and an address, not to a person.
+  def notified_invitee_ids
+    event.participant_events
+      .invited
+      .joins(:participant)
+      .where(
+        "EXISTS (SELECT 1 FROM invitations " \
+        "WHERE invitations.event_id = participant_events.event_id " \
+        "AND invitations.sent_at IS NOT NULL " \
+        "AND LOWER(invitations.email) = LOWER(participants.email))"
+      )
+      .select(:id)
   end
 
   # Optional group filter applied on top of the base audience.

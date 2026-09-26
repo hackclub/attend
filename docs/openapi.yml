@@ -1013,14 +1013,22 @@ paths:
       x-mint:
         href: /api-reference/participants/invite-a-participant
       description: >-
-        Send an event invitation email. Does not create a participant record
-        directly — it enqueues an invitation.
+        Send an event invitation email and put the person on the roster.
+
+
+        The registration is created with status `invited` — the same state a
+        CSV import leaves people in. They move to `in_progress` on their own
+        when they first open the onboarding wizard. `first_name`/`last_name`
+        are optional; when omitted the participant is created with placeholder
+        legal names that are replaced from their account on first sign-in.
 
 
         While the event is holding onboarding invitations
         (`modules.onboarding_invites_held`), the invitation is recorded but not
         emailed: it goes out when the event's held invitations are released
-        from the dashboard. The response says which happened.
+        from the dashboard. The response says which happened. A held invitation
+        still creates the `invited` registration, and the wizard stays shut to
+        them until it is released.
       parameters:
         - $ref: "#/components/parameters/EventId"
       requestBody:
@@ -1051,6 +1059,18 @@ paths:
                       this one was recorded without an email.
                   message: { type: string, example: Invitation sent to jane@example.com }
                   event: { type: string, example: My Event }
+                  participant_id:
+                    type: string
+                    format: uuid
+                    description: The person created or matched for this invitation.
+                  participant_event_id:
+                    type: string
+                    format: uuid
+                    description: Their registration for this event.
+                  status:
+                    type: string
+                    example: invited
+                    description: Registration status, `invited` on creation.
         "409":
           description: Already invited, or already registered for this event.
           content:
@@ -1259,8 +1279,14 @@ paths:
         href: /api-reference/participants/remove-a-participant-from-the-event
       description: >-
         Deletes this registration — the profile, travel, consents and scans
-        attached to it — and nothing else. The person's Attend account and
-        their registrations for other events survive. Event admins only.
+        attached to it — and revokes this event's invitation for their email,
+        so the original invitation link can no longer re-create the
+        registration. The person's Attend account and their registrations for
+        other events survive. Event admins only.
+
+
+        To remove someone without revoking their invitation, set their status
+        to `withdrawn` instead.
       parameters:
         - $ref: "#/components/parameters/EventId"
         - $ref: "#/components/parameters/RegistrationId"
