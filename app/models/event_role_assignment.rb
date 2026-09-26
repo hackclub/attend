@@ -51,6 +51,7 @@ class EventRoleAssignment < ApplicationRecord
         "Manage groups and rooming",
         "View limited medical info (allergies, dietary needs)",
         "View consents and notes",
+        "Withdraw and reinstate participants",
         "Manage integrations: waivers, custom documents, Airtable sync"
       ],
       cannot: [
@@ -68,6 +69,7 @@ class EventRoleAssignment < ApplicationRecord
         "Manage groups and rooming",
         "View full medical records, so they can help in an incident",
         "View consents and notes",
+        "Withdraw and reinstate participants",
         "See age at the event, instead of a date of birth",
         "See attendee email addresses, and search by them",
         "See the first name and phone number of an emergency contact"
