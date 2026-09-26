@@ -101,22 +101,30 @@ module Api
           return render json: { success: false, error: error }, status: :conflict
         end
 
-        existing_participant = @event.participants.find_by(email: email)
-        if existing_participant
+        # LOWER() to match how register_invitee finds people: an attendee who
+        # self-registered in another case is still already registered.
+        if @event.participants.where("LOWER(participants.email) = ?", email).exists?
           return render json: { success: false, error: "This email is already registered for this event" }, status: :conflict
         end
 
         begin
+          invitation = nil
           participant_event = nil
 
           # One unit: an invitation nobody is on the roster for, or a roster
           # entry nobody was invited to, are both worse than neither.
           ActiveRecord::Base.transaction do
-            # Honours the event's hold: while onboarding invitations are held,
-            # the invitation is recorded and goes out when they're released.
-            Invitation.issue!(event: @event, email: email, name: name)
+            invitation = Invitation.issue!(event: @event, email: email, name: name, send: false)
             participant_event = register_invitee(email: email, first_name: first_name, last_name: last_name)
           end
+
+          # Only once both rows are committed. The mail job is enqueued
+          # immediately rather than on commit, and the mailer find-or-creates
+          # the invitation, so sending from inside the transaction would
+          # resurrect and email an invitation the rollback had just undone.
+          # Honours the event's hold: while onboarding invitations are held,
+          # the invitation is recorded and goes out when they're released.
+          invitation.deliver_later
 
           held = @event.onboarding_invites_held?
 
@@ -245,7 +253,9 @@ module Api
         # LOWER() rather than an exact match: participant emails are not
         # normalized on write, so an existing person may be stored in another
         # case. Missing them here would fork the same human into two records.
-        participant = Participant.find_by("LOWER(participants.email) = ?", email)
+        # Oldest first: duplicate rows for one address exist in production,
+        # and without an order the pick would vary between invitations.
+        participant = Participant.where("LOWER(participants.email) = ?", email).order(:created_at).first
 
         participant ||= Participant.create!(
           email: email,

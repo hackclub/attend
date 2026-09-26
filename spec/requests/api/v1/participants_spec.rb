@@ -389,10 +389,54 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect {
         post "/api/v1/events/#{event.id}/participants",
           params: { email: "doomed@example.com" }, headers: sign_in_headers_for("event_admin")
-      }.not_to change(Invitation, :count)
+      }.not_to have_enqueued_mail(ParticipantMailer, :invitation)
 
       expect(response).to have_http_status(:unprocessable_entity)
+      expect(Invitation.where(event: event).for_email("doomed@example.com")).to be_empty
       expect(Participant.where(email: "doomed@example.com")).to be_empty
+    end
+
+    it "does not email a registration link when a real validation rejects the registration" do
+      # Someone already on file who will be too old by the end of the event:
+      # ParticipantEvent#participant_not_too_old fails the roster entry after
+      # the invitation row has been written inside the same transaction.
+      create(:participant, email: "aged-out@example.com", date_of_birth: event.ends_at.to_date - 25.years)
+
+      post "/api/v1/events/#{event.id}/participants",
+        params: { email: "aged-out@example.com" }, headers: sign_in_headers_for("event_admin")
+      expect(response).to have_http_status(:unprocessable_entity)
+
+      # The mailer find-or-creates the invitation, so a job that survived the
+      # rollback would resurrect it and send the link the API said it hadn't.
+      perform_enqueued_jobs
+      expect(Invitation.where(event: event).for_email("aged-out@example.com")).to be_empty
+      expect(ActionMailer::Base.deliveries).to be_empty
+    end
+
+    it "409s for someone already registered under another casing of the address" do
+      participant = create(:participant, email: "Done@Example.com")
+      create(:participant_event, participant: participant, event: event, status: :complete)
+
+      expect {
+        post "/api/v1/events/#{event.id}/participants",
+          params: { email: "done@example.com" }, headers: sign_in_headers_for("event_admin")
+      }.to not_change(Invitation, :count).and not_change(ParticipantEvent, :count)
+
+      expect(response).to have_http_status(:conflict)
+      expect(JSON.parse(response.body)["error"]).to eq("This email is already registered for this event")
+    end
+
+    it "attaches to the oldest of duplicate participant rows for an address" do
+      # Duplicate rows for one address are a known production state; the pick
+      # must not vary from one invitation to the next.
+      oldest = create(:participant, email: "dupe@example.com", created_at: 2.days.ago)
+      create(:participant, email: "Dupe@Example.com", created_at: 1.day.ago)
+
+      post "/api/v1/events/#{event.id}/participants",
+        params: { email: "dupe@example.com" }, headers: sign_in_headers_for("event_admin")
+
+      expect(response).to have_http_status(:created)
+      expect(JSON.parse(response.body)["participant_id"]).to eq(oldest.id)
     end
 
     it "409s on a second invitation rather than a duplicate registration" do

@@ -43,11 +43,23 @@ class Invitation < ApplicationRecord
     invitation.update!(name: name) if name.present? && invitation.name.blank?
     invitation.assign_group_ids!(group_ids) if group_ids.is_a?(Array)
 
-    if send && !event.onboarding_invites_held?
-      ParticipantMailer.invitation(email: address, name: invitation.name, event: event, participant: participant).deliver_later
-    end
+    invitation.deliver_later(participant: participant) if send
 
     invitation
+  end
+
+  # Enqueues the invitation email, unless the event is holding onboarding
+  # invitations — then it stays `held` for SendHeldOnboardingInvitesJob.
+  #
+  # Callers that issue an invitation inside a transaction should pass
+  # `send: false` to .issue! and call this once the transaction has committed:
+  # the job is enqueued immediately, not on commit, and the mailer
+  # find-or-creates the invitation row, so a rolled-back issue would still be
+  # recreated and emailed by the job.
+  def deliver_later(participant: nil)
+    return if event.onboarding_invites_held?
+
+    ParticipantMailer.invitation(email: email, name: name, event: event, participant: participant).deliver_later
   end
 
   def assign_group_ids!(ids)
