@@ -2,6 +2,11 @@
 return unless ActiveRecord::Base.connection.table_exists?("solid_cache_entries") rescue false
 
 class Rack::Attack
+  # Health probes hit /up every few seconds from the same node IPs. Counting
+  # them means a cache-DB read + locked increment per probe, so a slow cache
+  # DB turned into slow (and eventually failing) liveness checks.
+  safelist("health-check") { |req| req.path == "/up" }
+
   throttle("req/ip", limit: 300, period: 5.minutes) do |req|
     # The Slack events webhook is exempt: it's HMAC-authenticated (Slack
     # signing secret), Slack retries throttled deliveries (amplifying load),
