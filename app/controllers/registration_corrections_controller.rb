@@ -5,6 +5,7 @@ class RegistrationCorrectionsController < ApplicationController
 
   before_action :authenticate_user!
   before_action :load_participant_event
+  before_action :redirect_if_onboarding_held
   before_action :load_section
   before_action :load_records
 
@@ -22,6 +23,16 @@ class RegistrationCorrectionsController < ApplicationController
   end
 
   private
+
+  # A held registration hasn't been opened to the participant yet (see
+  # ParticipantEvent#onboarding_held?), so there is nothing to correct and no
+  # reason to email staff about it.
+  def redirect_if_onboarding_held
+    return unless @participant_event.onboarding_held?
+
+    redirect_to dashboard_event_path(@participant_event),
+      alert: "Registration for #{@event.name} isn't open yet. We'll email you as soon as it is."
+  end
 
   def render_not_found
     head :not_found

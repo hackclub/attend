@@ -1000,7 +1000,8 @@
     </details>
   </section>
 
-  <!-- Registration corrections -->
+  <!-- Registration corrections (shut while the registration is held, like the wizard) -->
+  <% unless @participant_event.onboarding_held? %>
   <section class="mb-8">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
       <div>
@@ -1042,6 +1043,7 @@
       </div>
     <% end %>
   </section>
+  <% end %>
 
   <!-- Messages -->
   <% if @messages.any? %>
