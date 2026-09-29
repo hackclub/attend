@@ -30,4 +30,55 @@ RSpec.describe "Api::V1::Events", type: :request do
     expect(JSON.parse(response.body)["events"].size).to eq(12)
     expect(grown).to eq(baseline)
   end
+
+  describe "capability flags" do
+    def event_payload(event)
+      get api_v1_events_path, headers: headers
+      JSON.parse(response.body)["events"].find { |e| e["id"] == event.id }
+    end
+
+    it "keeps read-only staff away from participants" do
+      event = create(:event)
+      EventRoleAssignment.create!(user: user, event: event, role: "read_only")
+
+      expect(event_payload(event)).to include(
+        "role" => "read_only",
+        "can_view_participants" => false,
+        "can_view_sensitive_data" => false
+      )
+    end
+
+    it "lets limited staff see participants without PII or sensitive data" do
+      event = create(:event)
+      EventRoleAssignment.create!(user: user, event: event, role: "limited")
+
+      expect(event_payload(event)).to include(
+        "can_view_participants" => true,
+        "can_view_participant_pii" => false,
+        "can_view_sensitive_data" => false
+      )
+    end
+
+    it "gives safeguarding leads sensitive data" do
+      event = create(:event)
+      EventRoleAssignment.create!(user: user, event: event, role: "safeguarding_lead")
+
+      expect(event_payload(event)).to include(
+        "can_view_participants" => true,
+        "can_view_sensitive_data" => true
+      )
+    end
+
+    it "reports whether the event runs travel" do
+      with_travel = create(:event)
+      without_travel = create(:event)
+      without_travel.update!(travel_enabled: false)
+      [ with_travel, without_travel ].each do |event|
+        EventRoleAssignment.create!(user: user, event: event, role: "ops")
+      end
+
+      expect(event_payload(with_travel)["travel_enabled"]).to be(true)
+      expect(event_payload(without_travel)["travel_enabled"]).to be(false)
+    end
+  end
 end
