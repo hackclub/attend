@@ -96,6 +96,48 @@ RSpec.describe Participant, type: :model do
     end
   end
 
+  # Onboarding stores "Unknown" in both name fields when the sign-in claims
+  # carry no name, which used to surface as "Unknown Unknown".
+  describe "names for a participant who hasn't registered yet" do
+    def build_named(first, last, **attrs)
+      build(:participant, legal_first_name: first, legal_last_name: last, **attrs)
+    end
+
+    it "shows a pending label instead of the placeholder" do
+      participant = build_named("Unknown", "Unknown")
+
+      expect(participant).to be_name_pending
+      expect(participant.full_name).to eq("Not registered yet")
+      expect(participant.display_name).to eq("Not registered yet")
+      expect(participant.greeting_name).to be_nil
+      expect(participant.initials).to eq("?")
+    end
+
+    it "keeps the half of the name it knows" do
+      participant = build_named("Robin", "Unknown")
+
+      expect(participant).not_to be_name_pending
+      expect(participant.full_name).to eq("Robin")
+      expect(participant.greeting_name).to eq("Robin")
+      expect(participant.initials).to eq("R")
+    end
+
+    it "uses a preferred name when one has been given" do
+      participant = build_named("Unknown", "Unknown", preferred_name: "Robin")
+
+      expect(participant.display_name).to eq("Robin")
+      expect(participant.greeting_name).to eq("Robin")
+    end
+
+    it "leaves a full name alone" do
+      participant = build_named("Robin", "Example")
+
+      expect(participant).not_to be_name_pending
+      expect(participant.full_name).to eq("Robin Example")
+      expect(participant.initials).to eq("RE")
+    end
+  end
+
   describe "#hca_verified?" do
     it "is true only when the linked user is HCA-verified" do
       expect(create(:participant)).not_to be_hca_verified

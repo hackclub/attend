@@ -13,12 +13,12 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <%= f.label :legal_first_name, label_text("Legal First Name", required: true), class: "portal-label" %>
-          <%= f.text_field :legal_first_name, class: "portal-input", required: true %>
+          <%= f.text_field :legal_first_name, value: (@participant.legal_first_name unless Participant.name_placeholder?(@participant.legal_first_name)), class: "portal-input", required: true %>
         </div>
 
         <div>
           <%= f.label :legal_last_name, label_text("Legal Last Name", required: true), class: "portal-label" %>
-          <%= f.text_field :legal_last_name, class: "portal-input", required: true %>
+          <%= f.text_field :legal_last_name, value: (@participant.legal_last_name unless Participant.name_placeholder?(@participant.legal_last_name)), class: "portal-input", required: true %>
         </div>
       </div>
 

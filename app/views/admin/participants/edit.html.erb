@@ -27,7 +27,7 @@
               <%= image_tag @participant.headshot, class: "w-20 h-20 rounded-full object-cover border-2 border-gray-200" %>
             <% else %>
               <div class="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-medium text-2xl">
-                <%= @participant.legal_first_name[0] %><%= @participant.legal_last_name[0] %>
+                <%= @participant.initials %>
               </div>
             <% end %>
             <div class="flex-1">

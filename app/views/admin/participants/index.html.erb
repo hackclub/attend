@@ -233,7 +233,7 @@
           <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
             <td class="px-4 py-3">
               <div>
-                <%= link_to pe.participant.display_name, admin_event_participant_path(current_event, pe), class: "text-sm font-medium text-gray-900 hover:text-[#ec3750]" %>
+                <%= link_to participant_name(pe.participant), admin_event_participant_path(current_event, pe), class: "text-sm font-medium text-gray-900 hover:text-[#ec3750]" %>
                 <div class="text-xs text-gray-500 truncate max-w-[200px]" title="<%= pe.participant.email %>"><%= pe.participant.email %></div>
                 <% if current_event.groups_enabled? && pe.groups.any? %>
                   <div class="flex flex-wrap gap-1 mt-1">

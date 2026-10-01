@@ -22,6 +22,18 @@ RSpec.describe ParticipantMailer, type: :mailer do
     end
   end
 
+  it "greets a participant with no name on file as 'there'" do
+    participant = create(:participant, legal_first_name: "Unknown", legal_last_name: "Unknown")
+    participant_event = create(:participant_event, participant: participant)
+
+    mail = described_class.slack_link_reminder(participant_event: participant_event)
+
+    [ mail.html_part.body.decoded, mail.text_part.body.decoded ].each do |body|
+      expect(body).to include("Hi there,")
+      expect(body).not_to include("Unknown")
+    end
+  end
+
   describe "#registration_confirmed" do
     it "tells the attendee that the entry ticket is ready" do
       event = create(:event, name: "Trailblazer")

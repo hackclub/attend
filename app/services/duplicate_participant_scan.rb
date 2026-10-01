@@ -22,8 +22,7 @@ class DuplicateParticipantScan
     end
   end
 
-  # Onboarding writes this when OIDC claims are missing a name.
-  PLACEHOLDER = "Unknown"
+  PLACEHOLDER = Participant::NAME_PLACEHOLDER
 
   def initialize(emails: nil)
     @emails = emails&.map { |email| email.to_s.downcase.strip }&.reject(&:empty?)

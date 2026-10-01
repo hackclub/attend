@@ -4,12 +4,12 @@
       <%= image_tag @participant.headshot, class: "w-20 h-20 rounded-full object-cover border-2 border-gray-200" %>
     <% else %>
       <div class="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-medium text-2xl">
-        <%= @participant.legal_first_name[0] %><%= @participant.legal_last_name[0] %>
+        <%= @participant.initials %>
       </div>
     <% end %>
     <div>
       <div class="flex flex-wrap items-center gap-2 sm:gap-4">
-        <h1 class="text-2xl font-bold"><%= @participant.display_name %></h1>
+        <h1 class="text-2xl font-bold"><%= participant_name(@participant) %></h1>
         <%= render_display_status_badge(@participant_event) %>
         <%= render_blocking_step_badge(@participant_event) %>
         <% if current_event.groups_enabled? %>
@@ -31,7 +31,7 @@
         <% end %>
       </div>
       <% if @participant.preferred_name.present? %>
-        <p class="text-gray-600">Legal name: <%= @participant.full_name %></p>
+        <p class="text-gray-600">Legal name: <%= participant_name(@participant, legal: true) %></p>
       <% end %>
       <p class="text-gray-600">
         <%= @participant.email %>

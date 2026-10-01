@@ -11,7 +11,7 @@ class ParticipantMailer < ApplicationMailer
     invitation.mark_sent!
 
     @first_name = if participant
-      participant.preferred_name.presence || participant.legal_first_name
+      participant.greeting_name || "there"
     else
       (name.presence || invitation.name.presence)&.split&.first || email.split("@").first
     end
@@ -40,7 +40,7 @@ class ParticipantMailer < ApplicationMailer
     @event = participant_event.event
     @emailable = @participant
 
-    @preferred_name = @participant.preferred_name.presence || @participant.legal_first_name
+    @preferred_name = @participant.greeting_name || "there"
     @event_name = @event.name
     @action_link = travel_update_url(participant_event)
 
@@ -64,7 +64,7 @@ class ParticipantMailer < ApplicationMailer
     @waiver_is_final_task = completion.outstanding_tasks.none? do |task|
       task.consent != waiver_consent
     end
-    @preferred_name = @participant.preferred_name.presence || @participant.legal_first_name
+    @preferred_name = @participant.greeting_name || "there"
     @event_name = @event.name
     @support_email = @event.effective_support_email
 
@@ -102,7 +102,7 @@ class ParticipantMailer < ApplicationMailer
     @participant = participant_event.participant
     @event = participant_event.event
     @emailable = @participant
-    @preferred_name = @participant.preferred_name.presence || @participant.legal_first_name
+    @preferred_name = @participant.greeting_name || "there"
     @event_name = @event.name
     @dashboard_link = event_dashboard_url(participant_event)
     @support_email = @event.effective_support_email
@@ -122,7 +122,7 @@ class ParticipantMailer < ApplicationMailer
     @emailable = @participant
 
     @pending_documents = participant_event.pending_custom_documents
-    @preferred_name = @participant.preferred_name.presence || @participant.legal_first_name
+    @preferred_name = @participant.greeting_name || "there"
     @event_name = @event.name
     @documents_link = event_dashboard_url(participant_event)
     @support_email = @event.effective_support_email
@@ -141,7 +141,7 @@ class ParticipantMailer < ApplicationMailer
     @event = participant_event.event
     @emailable = @participant
 
-    @preferred_name = @participant.preferred_name.presence || @participant.legal_first_name
+    @preferred_name = @participant.greeting_name || "there"
     @event_name = @event.name
     @support_email = @event.effective_support_email
 

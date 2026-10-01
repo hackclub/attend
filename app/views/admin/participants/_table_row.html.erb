@@ -5,10 +5,10 @@
     <input type="checkbox" class="rounded border-gray-300 text-[#ec3750]" data-action="change->data-table#selectRow">
   </td>
   <td class="px-2 py-1.5 font-medium whitespace-nowrap" data-column="first_name">
-    <%= link_to pe.participant.legal_first_name, admin_event_participant_path(current_event, pe), class: "text-gray-900 hover:text-[#ec3750]" %>
+    <%= link_to legal_name_part(pe.participant.legal_first_name), admin_event_participant_path(current_event, pe), class: "text-gray-900 hover:text-[#ec3750]" %>
   </td>
   <td class="px-2 py-1.5 whitespace-nowrap" data-column="last_name">
-    <%= pe.participant.legal_last_name %>
+    <%= legal_name_part(pe.participant.legal_last_name, dash: true) %>
   </td>
   <td class="px-2 py-1.5 text-gray-500 whitespace-nowrap" data-column="preferred_name">
     <%= pe.participant.preferred_name.presence || "—" %>

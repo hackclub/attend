@@ -5,13 +5,13 @@
         <%= image_tag participant.headshot, class: "w-12 h-12 rounded-full object-cover" %>
       <% else %>
         <div class="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 font-medium text-lg">
-          <%= participant.legal_first_name[0] %><%= participant.legal_last_name[0] %>
+          <%= participant.initials %>
         </div>
       <% end %>
       <div>
-        <h3 class="font-semibold text-gray-900"><%= participant.display_name %></h3>
+        <h3 class="font-semibold text-gray-900"><%= participant_name(participant) %></h3>
         <% if participant.preferred_name.present? %>
-          <p class="text-sm text-gray-500">Legal: <%= participant.full_name %></p>
+          <p class="text-sm text-gray-500">Legal: <%= participant_name(participant, legal: true) %></p>
         <% end %>
         <p class="text-sm text-gray-600"><%= participant.email %></p>
       </div>

@@ -3,11 +3,11 @@
     <%= image_tag participant.headshot.variant(resize_to_fill: [48, 48]), class: "w-12 h-12 rounded-full object-cover" %>
   <% else %>
     <div class="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-sm font-medium">
-      <%= participant.legal_first_name[0] %><%= participant.legal_last_name[0] %>
+      <%= participant.initials %>
     </div>
   <% end %>
   <div class="flex-1 min-w-0">
-    <p class="font-medium text-gray-900"><%= participant.full_name %></p>
+    <p class="font-medium text-gray-900"><%= participant_name(participant, legal: true) %></p>
     <p class="text-xs text-gray-500"><%= participant.email %></p>
     <% if participant.date_of_birth %>
       <p class="text-xs text-gray-500">Age: <%= participant.age_on(Date.current) %></p>

@@ -21,10 +21,6 @@ class ParticipantMergeService
     engagement_notes slack_user_id
   ].freeze
 
-  # Placeholder onboarding writes for required name fields when OIDC claims
-  # are missing — treated the same as blank.
-  PLACEHOLDER = "Unknown"
-
   # When both rows registered for the same event, the more-progressed
   # registration is kept and the other destroyed. Ties keep the primary's.
   STATUS_PRIORITY = {
@@ -140,6 +136,6 @@ class ParticipantMergeService
   end
 
   def missing?(value)
-    value.blank? || value == PLACEHOLDER
+    Participant.name_placeholder?(value)
   end
 end
