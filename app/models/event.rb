@@ -142,6 +142,7 @@ class Event < ApplicationRecord
       super(value)
     end
   end
+  before_update :flag_waiver_dates_stale, if: :local_event_dates_changed?
   after_save :geocode_location, if: :should_geocode?
   after_save :send_pending_guardian_invites, if: :guardian_invites_just_unlocked?
   after_save :send_held_onboarding_invites, if: :onboarding_invites_just_released?
@@ -280,6 +281,26 @@ class Event < ApplicationRecord
     else
       "#{start_date.strftime('%B %-d, %Y')} - #{end_date.strftime('%B %-d, %Y')}"
     end
+  end
+
+  # DocuSeal waiver templates have the event dates printed on them when they're
+  # cloned (Docuseal::DefaultTemplateSetup), and each sent waiver snapshots its
+  # template. Moving the event's dates after waivers have gone out leaves those
+  # waivers showing the old dates until the Attend team fixes them by hand.
+  def waiver_dates_stale?
+    waiver_dates_stale_since.present?
+  end
+
+  def waivers_issued?
+    Consent.joins(:participant_event)
+      .where(participant_events: { event_id: id })
+      .where(consent_type: %w[waiver freedom_waiver])
+      .where.not(docuseal_envelope_id: nil)
+      .exists?
+  end
+
+  def clear_waiver_dates_stale!
+    update!(waiver_dates_stale_since: nil)
   end
 
   def freedom_waivers_enabled?
@@ -535,6 +556,26 @@ class Event < ApplicationRecord
     self.visa_options_enabled = true if visa_options_enabled.nil?
     self.accommodation_enabled = true if accommodation_enabled.nil?
     self.roommate_preferences_enabled = true if roommate_preferences_enabled.nil?
+  end
+
+  # Compares the calendar days in the event's timezone, since that's what the
+  # waivers print — moving the start time within the same day changes nothing.
+  # Setting dates for the first time isn't a change.
+  def local_event_dates_changed?
+    return false unless will_save_change_to_starts_at? || will_save_change_to_ends_at? || will_save_change_to_timezone?
+    return false if starts_at_in_database.nil? || ends_at_in_database.nil?
+
+    old_tz = ActiveSupport::TimeZone[timezone_in_database.to_s.presence || "UTC"] || Time.zone
+    old_dates = [ starts_at_in_database, ends_at_in_database ].map { |t| t.in_time_zone(old_tz).to_date }
+    new_dates = [ starts_at, ends_at ].map { |t| t&.in_time_zone(event_time_zone)&.to_date }
+    old_dates != new_dates
+  end
+
+  def flag_waiver_dates_stale
+    return if waiver_dates_stale?
+    return unless waivers_issued?
+
+    self.waiver_dates_stale_since = Time.current
   end
 
   def should_geocode?

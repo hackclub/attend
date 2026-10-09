@@ -197,6 +197,7 @@ Rails.application.routes.draw do
         post :select
         post :regenerate_api_key
         patch :attach_image
+        patch :clear_waiver_dates_warning
       end
       resources :participants, only: [ :index, :show, :edit, :update, :destroy ] do
         collection do

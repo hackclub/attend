@@ -47,6 +47,7 @@ class AuditLog < ApplicationRecord
     passport_pair: "passport_pair",
     passport_revoke: "passport_revoke",
     regenerate_api_key: "regenerate_api_key",
+    clear_waiver_dates_warning: "clear_waiver_dates_warning",
     attach_image: "attach_image",
     update_groups: "update_groups",
     use_default_docuseal_template: "use_default",
