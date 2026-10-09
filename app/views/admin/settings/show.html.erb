@@ -144,4 +144,50 @@
       </div>
     </div>
   </div>
+
+  <h2 class="text-xl font-bold mt-8 mb-4">Admin Help Slack Channel</h2>
+
+  <div class="bg-white border border-gray-200 rounded-lg ">
+    <div class="p-6 border-b border-gray-200">
+      <h3 class="text-lg font-semibold">Channel</h3>
+      <p class="text-gray-600 text-sm mt-1 mb-3">
+        Where event admins ask questions about Attend. Global admins are invited when they're made one, and
+        Event Admins, Ops, Safeguarding Leads, and series members when they're given a role on an event that hasn't ended.
+        Limited and Read Only staff are never invited. The Attend Slack bot must be in the channel.
+      </p>
+      <%= form_with url: update_admin_help_slack_channel_admin_settings_path, method: :post, class: "flex flex-wrap items-center gap-2" do |f| %>
+        <%= f.text_field :admin_help_slack_channel_id,
+              value: @admin_help_slack_channel_id,
+              placeholder: "C0123ABCD",
+              class: "px-3 py-2 border border-gray-300 rounded-md text-sm font-mono focus:ring-2 focus:ring-[#ec3750] focus:border-[#ec3750]" %>
+        <%= f.submit "Save", class: "px-4 py-2 bg-[#d42f46] hover:bg-[#b82840] text-white rounded-md font-medium transition-colors cursor-pointer" %>
+      <% end %>
+    </div>
+
+    <div class="p-6">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h3 class="text-lg font-semibold">Sync Global and Active Event Admins</h3>
+          <p class="text-gray-600 text-sm mt-1">
+            <%= pluralize(@admin_help_member_count, "eligible person", plural: "eligible people") %>,
+            <%= @admin_help_members_without_slack %> without a linked Slack account (they can't be invited).
+          </p>
+          <% if @admin_help_last_sync["at"].present? %>
+            <p class="text-gray-500 text-sm mt-1">
+              Last synced <%= time_ago_in_words(Time.zone.parse(@admin_help_last_sync["at"])) %> ago:
+              <%= @admin_help_last_sync["added"] %> added,
+              <%= @admin_help_last_sync["already_member"] %> already in the channel,
+              <%= @admin_help_last_sync["failed"] %> failed,
+              <%= @admin_help_last_sync["no_slack"] %> without Slack.
+            </p>
+          <% end %>
+        </div>
+        <%= button_to "Sync to channel", sync_admin_help_slack_channel_admin_settings_path,
+              method: :post,
+              disabled: @admin_help_slack_channel_id.blank?,
+              class: "px-4 py-2 bg-[#d42f46] hover:bg-[#b82840] text-white rounded-md font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+              data: { turbo_confirm: "Invite all #{@admin_help_member_count - @admin_help_members_without_slack} people with Slack accounts to the channel?" } %>
+      </div>
+    </div>
+  </div>
 </div>

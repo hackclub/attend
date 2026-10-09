@@ -190,6 +190,7 @@ class Event < ApplicationRecord
   # Events whose staff may still work the shared support inbox: anytime before
   # the event through 7 days after it ends.
   scope :within_support_window, -> { where(ends_at: 7.days.ago..) }
+  scope :not_ended, -> { where(ends_at: nil).or(where(ends_at: Time.current..)) }
 
   def setup_complete?
     setup_completed_at.present?

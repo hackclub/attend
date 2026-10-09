@@ -394,6 +394,8 @@ Rails.application.routes.draw do
       post :toggle_waiver_sending
       post :toggle_support_sms
       post :update_support_sms_numbers
+      post :update_admin_help_slack_channel
+      post :sync_admin_help_slack_channel
     end
 
     # Global incident reports (public form submissions)
