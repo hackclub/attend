@@ -427,6 +427,14 @@ class User < ApplicationRecord
     slack_user_id.presence || oidc_claims&.dig("slack_id")
   end
 
+  # The Slack ID Hack Club Auth vouches for, ignoring the profile override —
+  # anyone can type someone else's ID (or a comma-separated list) into that,
+  # so it must not decide who gets invited to a channel.
+  def verified_slack_id
+    id = oidc_claims&.dig("slack_id").to_s
+    id if id.match?(/\A[UW][A-Z0-9]+\z/)
+  end
+
   def phone
     phone_number.presence || oidc_claims&.dig("phone_number")
   end

@@ -14,8 +14,12 @@ RSpec.describe SyncAdminHelpSlackChannelJob, type: :job do
     stub_const("SyncAdminHelpSlackChannelJob::INVITE_PAUSE", 0)
   end
 
-  def staff(role, event: upcoming_event, slack_user_id: "U#{SecureRandom.hex(3).upcase}")
-    user = create(:user, slack_user_id: slack_user_id)
+  def slack_user(slack_id = "U#{SecureRandom.hex(3).upcase}", **attrs)
+    create(:user, oidc_claims: slack_id ? { "slack_id" => slack_id } : {}, **attrs)
+  end
+
+  def staff(role, event: upcoming_event, slack_id: "U#{SecureRandom.hex(3).upcase}")
+    user = slack_user(slack_id)
     create(:event_role_assignment, user: user, event: event, role: role)
     user
   end
@@ -26,7 +30,7 @@ RSpec.describe SyncAdminHelpSlackChannelJob, type: :job do
     described_class.perform_now
 
     invited.each do |user|
-      expect(slack_service).to have_received(:invite_to_channel).with(channel_id: "CHELP", user_id: user.slack_user_id)
+      expect(slack_service).to have_received(:invite_to_channel).with(channel_id: "CHELP", user_id: user.verified_slack_id)
     end
   end
 
@@ -34,7 +38,7 @@ RSpec.describe SyncAdminHelpSlackChannelJob, type: :job do
     limited = staff("limited")
     read_only = staff("read_only")
     past = staff("event_admin", event: past_event)
-    staff("event_admin", slack_user_id: nil)
+    staff("event_admin", slack_id: nil)
 
     described_class.perform_now
 
@@ -44,19 +48,19 @@ RSpec.describe SyncAdminHelpSlackChannelJob, type: :job do
   end
 
   it "includes global admins but not global read-only users" do
-    admin = create(:user, global_role: "global_admin", slack_user_id: "UADMIN")
-    viewer = create(:user, global_role: "read_only", slack_user_id: "UVIEWER")
+    admin = slack_user("UADMIN", global_role: "global_admin")
+    viewer = slack_user("UVIEWER", global_role: "read_only")
 
     described_class.perform_now
 
-    expect(slack_service).to have_received(:invite_to_channel).with(channel_id: "CHELP", user_id: admin.slack_user_id)
-    expect(slack_service).not_to have_received(:invite_to_channel).with(channel_id: "CHELP", user_id: viewer.slack_user_id)
+    expect(slack_service).to have_received(:invite_to_channel).with(channel_id: "CHELP", user_id: admin.verified_slack_id)
+    expect(slack_service).not_to have_received(:invite_to_channel).with(channel_id: "CHELP", user_id: viewer.verified_slack_id)
   end
 
   it "includes series members with an event still to come" do
     series = create(:event_series)
     create(:event, event_series: series)
-    member = create(:user, slack_user_id: "USERIES")
+    member = slack_user("USERIES")
     create(:series_role_assignment, user: member, event_series: series)
 
     described_class.perform_now
@@ -68,15 +72,27 @@ RSpec.describe SyncAdminHelpSlackChannelJob, type: :job do
     added = staff("event_admin")
     member = staff("ops")
     failing = staff("safeguarding_lead")
-    allow(slack_service).to receive(:invite_to_channel).with(channel_id: "CHELP", user_id: member.slack_user_id)
+    allow(slack_service).to receive(:invite_to_channel).with(channel_id: "CHELP", user_id: member.verified_slack_id)
       .and_return({ success: true, already_member: true })
-    allow(slack_service).to receive(:invite_to_channel).with(channel_id: "CHELP", user_id: failing.slack_user_id)
+    allow(slack_service).to receive(:invite_to_channel).with(channel_id: "CHELP", user_id: failing.verified_slack_id)
       .and_raise(SlackService::Error, "nope")
 
     described_class.perform_now
 
-    expect(slack_service).to have_received(:invite_to_channel).with(channel_id: "CHELP", user_id: added.slack_user_id)
+    expect(slack_service).to have_received(:invite_to_channel).with(channel_id: "CHELP", user_id: added.verified_slack_id)
     expect(Setting.admin_help_slack_last_sync).to include("added" => 1, "already_member" => 1, "failed" => 1, "no_slack" => 0)
+  end
+
+  it "only trusts the Slack ID from Hack Club Auth, never the profile override" do
+    typed_over = staff("event_admin", slack_id: nil)
+    typed_over.update!(slack_user_id: "UVICTIM1,UVICTIM2")
+    malformed = staff("ops", slack_id: "U1,U2")
+
+    described_class.perform_now
+
+    expect(slack_service).not_to have_received(:invite_to_channel)
+    expect(malformed.verified_slack_id).to be_nil
+    expect(Setting.admin_help_slack_last_sync).to include("no_slack" => 2)
   end
 
   it "does nothing without a channel configured" do
@@ -136,7 +152,7 @@ RSpec.describe SyncAdminHelpSlackChannelJob, type: :job do
       described_class.perform_now([ target.id ])
 
       expect(slack_service).to have_received(:invite_to_channel).once
-      expect(slack_service).to have_received(:invite_to_channel).with(channel_id: "CHELP", user_id: target.slack_user_id)
+      expect(slack_service).to have_received(:invite_to_channel).with(channel_id: "CHELP", user_id: target.verified_slack_id)
       expect(Setting.admin_help_slack_last_sync["added"]).to eq(5)
     end
   end

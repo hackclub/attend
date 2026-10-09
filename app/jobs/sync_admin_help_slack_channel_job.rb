@@ -20,7 +20,7 @@ class SyncAdminHelpSlackChannelJob < ApplicationJob
     counts = { "added" => 0, "already_member" => 0, "failed" => 0, "no_slack" => 0 }
 
     users.find_each do |user|
-      slack_id = user.slack_id
+      slack_id = user.verified_slack_id
       if slack_id.blank?
         counts["no_slack"] += 1
         next

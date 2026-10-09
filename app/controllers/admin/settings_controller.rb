@@ -12,7 +12,7 @@ module Admin
       @admin_help_slack_channel_id = Setting.admin_help_slack_channel_id
       admin_help_members = User.admin_help_channel_members.to_a
       @admin_help_member_count = admin_help_members.size
-      @admin_help_members_without_slack = admin_help_members.count { |user| user.slack_id.blank? }
+      @admin_help_members_without_slack = admin_help_members.count { |user| user.verified_slack_id.nil? }
       @admin_help_last_sync = Setting.admin_help_slack_last_sync
     end
 

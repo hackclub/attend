@@ -170,7 +170,7 @@
           <h3 class="text-lg font-semibold">Sync Global and Active Event Admins</h3>
           <p class="text-gray-600 text-sm mt-1">
             <%= pluralize(@admin_help_member_count, "eligible person", plural: "eligible people") %>,
-            <%= @admin_help_members_without_slack %> without a linked Slack account (they can't be invited).
+            <%= @admin_help_members_without_slack %> without a Slack account linked through Hack Club Auth (they can't be invited).
           </p>
           <% if @admin_help_last_sync["at"].present? %>
             <p class="text-gray-500 text-sm mt-1">
