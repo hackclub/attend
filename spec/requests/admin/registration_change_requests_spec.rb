@@ -37,6 +37,13 @@ RSpec.describe "Admin registration change requests", type: :request do
     expect(response).to redirect_to(admin_event_registration_change_request_path(event, request_record))
     expect(request_record.reload).to be_follow_up_needed
     expect(request_record.resolved_by).to eq(ops)
+
+    # staff_response is an encrypted column; it must not land readable in the
+    # audit log's filtered params or changed_fields.
+    log = AuditLog.where(record: request_record).order(:created_at).last
+    expect(log).to be_present
+    expect(log.metadata.to_json).not_to include("Please add a time we can call.")
+    expect(log.changed_fields.to_json).not_to include("Please add a time we can call.")
   end
 
   it "does not expose a consequential request to ops" do

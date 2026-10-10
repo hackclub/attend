@@ -33,6 +33,7 @@ Rails.application.config.filter_parameters += [
   # Safeguarding
   :high_support_notes, :high_support_flag, :freedom_waiver_granted, :can_leave_unaccompanied,
   :summary, :details, :actions_taken, :body,
+  :staff_response, :requester_note, :requested_changes,
 
   # Legal
   :code_of_conduct_signature,

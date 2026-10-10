@@ -269,10 +269,6 @@ class ApplicationToolbox < Toolchest::Toolbox
   end
 
   def redact_encrypted_audit_fields(record, changed_fields)
-    encrypted = record.class.try(:encrypted_attributes)
-    return changed_fields if encrypted.blank?
-
-    names = encrypted.map(&:to_s)
-    changed_fields.to_h { |field, change| [ field, names.include?(field.to_s) ? "[REDACTED]" : change ] }
+    AuditLog.redact_encrypted_fields(record, changed_fields)
   end
 end

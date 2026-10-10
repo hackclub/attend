@@ -18,7 +18,9 @@ module Api
           record: record,
           actor: current_user || current_series_api_token&.user || current_event_api_token&.user,
           event: @event,
-          changed_fields: changed_fields || record.previous_changes.except("created_at", "updated_at"),
+          changed_fields: AuditLog.redact_encrypted_fields(
+            record, changed_fields || record.previous_changes.except("created_at", "updated_at")
+          ),
           metadata: {
             ip: request.remote_ip,
             user_agent: request.user_agent,

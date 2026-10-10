@@ -190,18 +190,8 @@ module Admin
       candidates.max_by { |_, _, change_count, _| change_count }[1]
     end
 
-    # Values of `encrypts`-declared attributes are plaintext in
-    # previous_changes; keep them out of the audit_logs jsonb so encrypted-at-
-    # rest content (incident narratives, medical notes, etc.) never lands
-    # there readable.
     def redact_encrypted_audit_fields(record, changed_fields)
-      encrypted = record.class.try(:encrypted_attributes)
-      return changed_fields if encrypted.blank?
-
-      encrypted_names = encrypted.map(&:to_s)
-      changed_fields.to_h do |field, change|
-        [ field, encrypted_names.include?(field.to_s) ? "[REDACTED]" : change ]
-      end
+      AuditLog.redact_encrypted_fields(record, changed_fields)
     end
   end
 end
