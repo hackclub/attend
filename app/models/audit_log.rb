@@ -105,6 +105,17 @@ class AuditLog < ApplicationRecord
   scope :by_actor, ->(user) { where(actor_user_id: user.id) }
   scope :recent, -> { order(created_at: :desc).limit(100) }
 
+  # Values of `encrypts`-declared attributes are plaintext in previous_changes;
+  # keep them out of the audit_logs jsonb so encrypted-at-rest content never
+  # lands there readable. Every audit writer (admin, MCP, API) goes through this.
+  def self.redact_encrypted_fields(record, changed_fields)
+    encrypted = record.class.try(:encrypted_attributes)
+    return changed_fields if encrypted.blank? || changed_fields.blank?
+
+    names = encrypted.map(&:to_s)
+    changed_fields.to_h { |field, change| [ field, names.include?(field.to_s) ? "[REDACTED]" : change ] }
+  end
+
   def self.log!(action:, record:, actor: nil, event: nil, changed_fields: {}, metadata: {})
     create!(
       action: action,

@@ -387,6 +387,18 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(log.metadata["source"]).to eq("event_api")
     end
 
+    it "redacts the encrypted phone from the audit log like the web path does" do
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        params: { participant: { phone: "+12025550199", preferred_name: "Rob" } }, headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      log = AuditLog.find_by(action: "update", record: participant)
+      expect(log.changed_fields["phone"]).to eq("[REDACTED]")
+      expect(log.changed_fields["preferred_name"]).to eq([ nil, "Rob" ])
+      expect(log.changed_fields.to_json).not_to include("2025550199")
+      expect(log.changed_fields.to_json).not_to include("2025550100")
+    end
+
     it "refuses an API key issued for another event" do
       other_event = create(:event)
       other_pe = create(:participant_event, event: other_event)
