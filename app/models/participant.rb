@@ -105,12 +105,42 @@ class Participant < ApplicationRecord
   before_validation :generate_public_profile_slug, if: -> { public_profile_enabled? && public_profile_slug.blank? }
   after_update_commit :touch_participant_events
 
+  # Onboarding writes this into the required name fields when OIDC claims
+  # arrive without a name, so a row can carry it until the person registers.
+  NAME_PLACEHOLDER = "Unknown"
+  PENDING_NAME_LABEL = "Not registered yet"
+
+  def self.name_placeholder?(value)
+    value.blank? || value == NAME_PLACEHOLDER
+  end
+
+  # True until the participant has given us any real legal name.
+  def name_pending?
+    known_legal_names.empty?
+  end
+
+  # Drops the placeholder so pending rows don't read "Unknown Unknown". The
+  # fallback is a neutral label rather than the email, since names end up in
+  # exports, badges and other places an address shouldn't.
   def full_name
-    "#{legal_first_name} #{legal_last_name}"
+    name_pending? ? PENDING_NAME_LABEL : known_legal_names.join(" ")
   end
 
   def display_name
     preferred_name.presence || full_name
+  end
+
+  # nil when we don't know what to call them, so mailers can fall back to
+  # "Hi there".
+  def greeting_name
+    preferred_name.presence || (legal_first_name unless self.class.name_placeholder?(legal_first_name))
+  end
+
+  # "?" for a pending participant, for avatar placeholders.
+  def initials
+    return "?" if name_pending?
+
+    known_legal_names.map { |name| name[0] }.join.upcase
   end
 
   def age_on(date)
@@ -211,6 +241,10 @@ class Participant < ApplicationRecord
   end
 
   private
+
+  def known_legal_names
+    [ legal_first_name, legal_last_name ].reject { |name| self.class.name_placeholder?(name) }
+  end
 
   def travel_calendar_event_ids
     ParticipantEvent.where(participant_id: id).distinct.pluck(:event_id)

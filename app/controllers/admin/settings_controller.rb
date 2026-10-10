@@ -9,6 +9,11 @@ module Admin
       @waiver_sending_paused = Setting.waiver_sending_paused?
       @support_sms_notifications_enabled = Setting.support_sms_notifications_enabled?
       @support_sms_notification_numbers = Setting.support_sms_notification_number_list
+      @admin_help_slack_channel_id = Setting.admin_help_slack_channel_id
+      admin_help_members = User.admin_help_channel_members.to_a
+      @admin_help_member_count = admin_help_members.size
+      @admin_help_members_without_slack = admin_help_members.count { |user| user.verified_slack_id.nil? }
+      @admin_help_last_sync = Setting.admin_help_slack_last_sync
     end
 
     def toggle_maintenance
@@ -76,6 +81,28 @@ module Admin
 
       Setting.support_sms_notification_numbers = numbers
       redirect_to admin_settings_path, notice: "Support SMS notification numbers updated."
+    end
+
+    def update_admin_help_slack_channel
+      channel_id = params[:admin_help_slack_channel_id].to_s.strip
+      unless channel_id.blank? || channel_id.match?(/\A[CG][A-Z0-9]+\z/)
+        redirect_to admin_settings_path, alert: "That doesn't look like a Slack channel ID (e.g. C0123ABCD)."
+        return
+      end
+
+      Setting.admin_help_slack_channel_id = channel_id
+      redirect_to admin_settings_path, notice: "Admin help channel updated."
+    end
+
+    def sync_admin_help_slack_channel
+      if Setting.admin_help_slack_channel_id.blank?
+        redirect_to admin_settings_path, alert: "Set the admin help channel ID before syncing."
+        return
+      end
+
+      SyncAdminHelpSlackChannelJob.perform_later
+      redirect_to admin_settings_path,
+        notice: "Syncing global and active event admins to the Slack channel. Refresh in a minute to see the results."
     end
 
     private

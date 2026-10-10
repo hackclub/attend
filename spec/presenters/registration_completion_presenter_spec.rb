@@ -41,6 +41,18 @@ RSpec.describe RegistrationCompletionPresenter do
     expect(guardian_presentation).to be_viewer_tasks_complete
   end
 
+  it "names the attendee to their guardian by legal name, not preferred name" do
+    participant.update!(legal_first_name: "Robin", preferred_name: "Birdie")
+    create(:consent, participant_event: participant_event, status: :sent,
+      guardian_signed_at: Time.current, docuseal_participant_slug: "participant",
+      docuseal_guardian_slug: "guardian")
+
+    body = presentation(:guardian, guardian_participant_event: guardian_participant_event).body
+
+    expect(body).to include("Robin still needs to")
+    expect(body).not_to include("Birdie")
+  end
+
   it "reports processing when every signer finished but DocuSeal has not closed the submission" do
     create(:consent, participant_event: participant_event, status: :sent,
       participant_signed_at: Time.current, guardian_signed_at: Time.current,

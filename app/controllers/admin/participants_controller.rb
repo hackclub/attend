@@ -612,14 +612,14 @@ module Admin
     end
 
     def withdraw
-      authorize @participant_event, :update?
+      authorize @participant_event, :withdraw?
       @participant_event.withdrawn!
       redirect_to admin_event_participant_path(current_event, @participant_event),
         notice: "#{@participant_event.participant.display_name} has been marked as withdrawn."
     end
 
     def unwithdraw
-      authorize @participant_event, :update?
+      authorize @participant_event, :withdraw?
       # Reset to a non-terminal status; #display_status recomputes the real state
       # (Awaiting Participant / Awaiting Parent / Complete) from onboarding progress.
       @participant_event.in_progress!
@@ -630,7 +630,10 @@ module Admin
     def destroy
       authorize @participant_event
       participant_name = @participant_event.participant.display_name
-      @participant_event.destroy!
+      ActiveRecord::Base.transaction do
+        @participant_event.revoke_invitations!
+        @participant_event.destroy!
+      end
       redirect_to admin_event_participants_path(current_event), notice: "#{participant_name} has been removed from this event."
     end
 

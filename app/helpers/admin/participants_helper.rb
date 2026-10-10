@@ -84,6 +84,29 @@ module Admin::ParticipantsHelper
       title: "Phone numbers and guardian contact details are hidden for your role")
   end
 
+  # A participant's name, or a muted label for someone who signed in but hasn't
+  # given us one yet (see Participant#name_pending?). legal: shows the legal
+  # name rather than the preferred one.
+  def participant_name(participant, legal: false)
+    return pending_name_label if participant.name_pending? && (legal || participant.preferred_name.blank?)
+
+    legal ? participant.full_name : participant.display_name
+  end
+
+  # One half of a legal name for table columns, with the onboarding
+  # placeholder shown as the pending label (or a dash, for the second column
+  # so a pending row doesn't say it twice).
+  def legal_name_part(value, dash: false)
+    return value unless Participant.name_placeholder?(value)
+
+    dash ? content_tag(:span, "—", class: "text-gray-400") : pending_name_label
+  end
+
+  def pending_name_label
+    content_tag(:span, Participant::PENDING_NAME_LABEL, class: "italic font-normal text-gray-400",
+      title: "Signed in, but hasn't filled in their name yet")
+  end
+
   def render_sort_icon(field, current_sort, current_direction)
     return "" unless current_sort == field
 

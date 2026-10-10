@@ -310,4 +310,34 @@ RSpec.describe "Admin::Participants", type: :request do
       }.to change { AuditLog.where(action: "resend_invitation").count }.by(1)
     end
   end
+  describe "DELETE destroy" do
+    it "revokes the invitation so the removal cannot be undone by the old link" do
+      participant = create(:participant, email: "removed@example.com")
+      create(:invitation, event: event, email: "removed@example.com", sent_at: Time.current)
+      participant_event = create(:participant_event, participant: participant, event: event)
+
+      sign_in global_admin
+
+      expect {
+        delete admin_event_participant_path(event, participant_event)
+      }.to change(Invitation, :count).by(-1)
+
+      expect(ParticipantEvent.exists?(participant_event.id)).to be(false)
+      expect(Invitation.where(event: event).for_email("removed@example.com")).to be_empty
+    end
+
+    it "keeps the invitation when the registration is only withdrawn" do
+      participant = create(:participant, email: "staying@example.com")
+      create(:invitation, event: event, email: "staying@example.com", sent_at: Time.current)
+      participant_event = create(:participant_event, participant: participant, event: event)
+
+      sign_in global_admin
+
+      expect {
+        post withdraw_admin_event_participant_path(event, participant_event)
+      }.not_to change(Invitation, :count)
+
+      expect(participant_event.reload).to be_withdrawn
+    end
+  end
 end

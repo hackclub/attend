@@ -37,6 +37,18 @@ RSpec.describe GuardianMailer, type: :mailer do
 
       expect(mail.body.encoded).to include("process the completed waiver")
     end
+
+    it "names the participant by legal name, not preferred name" do
+      participant_event.participant.update!(legal_first_name: "Robin", preferred_name: "Birdie")
+
+      mail = described_class.waiver_signing(
+        guardian_participant_event: guardian_participant_event, consent: waiver
+      )
+
+      expect(mail.subject).to start_with("Robin signed their waiver")
+      expect(mail.body.encoded).to include("Robin has completed their portion")
+      expect(mail.body.encoded).not_to include("Birdie")
+    end
   end
 
   describe "#optional_document_added" do

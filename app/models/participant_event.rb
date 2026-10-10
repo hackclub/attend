@@ -139,6 +139,20 @@ class ParticipantEvent < ApplicationRecord
     display_status == "Awaiting Participant"
   end
 
+  # Removing someone from an event has to take their invitation with it. An
+  # Invitation is keyed by email, not by registration, so one left behind is a
+  # live key: OnboardingController re-creates the registration from it on the
+  # next visit, and its `accepted_at IS NOT NULL` branch ignores expiry, so an
+  # invitation anyone has ever clicked never stops working.
+  #
+  # Deliberately not a destroy callback. ParticipantMergeService and an event
+  # teardown both destroy registrations without meaning "uninvite this person"
+  # — in the merge case the registration is replaced, not withdrawn — so this
+  # is called from the two places that do mean it.
+  def revoke_invitations!
+    event.invitations.for_email(participant.email).destroy_all
+  end
+
   # An imported participant sits at `invited` until they open the wizard.
   # While the event is holding onboarding invitations and theirs hasn't gone
   # out, they haven't been told about the event, so the wizard stays shut even

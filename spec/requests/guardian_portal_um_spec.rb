@@ -30,6 +30,15 @@ RSpec.describe "Guardian portal UM confirmation", type: :request do
     }.merge(confirm.nil? ? {} : { um_guardian_confirmation: confirm })
   end
 
+  it "names the participant by legal name in the UM confirmation" do
+    participant_event.participant.update!(legal_first_name: "Robin", preferred_name: "Birdie")
+
+    get guardian_portal_step_path(token: token, step: "participant_info")
+
+    expect(response.body).to include("I confirm that Robin is formally booked")
+    expect(response.body).not_to include("I confirm that Birdie")
+  end
+
   it "blocks saving when UM is declared without the adult's confirmation" do
     patch guardian_portal_update_step_path(token: token, step: "participant_info"),
       params: participant_info_params(um: true, confirm: "0")

@@ -357,8 +357,8 @@ class OnboardingController < ApplicationController
       backfill_participant_from_oidc(participant)
     else
       # Use placeholder values for required fields if OIDC claims are missing
-      participant.legal_first_name ||= "Unknown"
-      participant.legal_last_name ||= "Unknown"
+      participant.legal_first_name ||= Participant::NAME_PLACEHOLDER
+      participant.legal_last_name ||= Participant::NAME_PLACEHOLDER
       participant.save(validate: false)
     end
 
@@ -1419,8 +1419,8 @@ class OnboardingController < ApplicationController
     updates = {}
 
     # Only backfill fields that are blank/placeholder
-    updates[:legal_first_name] = oidc_attrs[:legal_first_name] if participant.legal_first_name.blank? || participant.legal_first_name == "Unknown"
-    updates[:legal_last_name] = oidc_attrs[:legal_last_name] if participant.legal_last_name.blank? || participant.legal_last_name == "Unknown"
+    updates[:legal_first_name] = oidc_attrs[:legal_first_name] if Participant.name_placeholder?(participant.legal_first_name)
+    updates[:legal_last_name] = oidc_attrs[:legal_last_name] if Participant.name_placeholder?(participant.legal_last_name)
     updates[:preferred_name] = oidc_attrs[:preferred_name] if participant.preferred_name.blank? && oidc_attrs[:preferred_name].present?
     updates[:phone] = oidc_attrs[:phone] if participant.phone.blank? && oidc_attrs[:phone].present?
     updates[:date_of_birth] = oidc_attrs[:date_of_birth] if participant.date_of_birth.blank? && oidc_attrs[:date_of_birth].present?

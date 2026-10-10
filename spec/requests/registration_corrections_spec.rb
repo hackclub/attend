@@ -52,6 +52,24 @@ RSpec.describe "Registration corrections", type: :request do
     expect(participant.reload.legal_first_name).not_to eq("Corrected")
   end
 
+  it "creates a support request that carries no field changes" do
+    staff = create(:user)
+    create(:event_role_assignment, event: event, user: staff, role: :event_admin)
+
+    expect {
+      post dashboard_event_registration_change_requests_path(participant_event), params: {
+        registration_change_request: {
+          kind: "support",
+          staff_audience: "event_admin",
+          requester_note: "I need to talk to someone"
+        }
+      }
+    }.to change(RegistrationChangeRequest, :count).by(1)
+
+    expect(response).to redirect_to(dashboard_event_path(participant_event))
+    expect(RegistrationChangeRequest.last.requested_changes).to eq({})
+  end
+
   it "does not let another attendee open the correction form" do
     other = create(:user)
     other_participant = create(:participant, user: other)
@@ -136,5 +154,60 @@ RSpec.describe "Registration corrections", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).not_to include("Parent or guardian")
     expect(response.body).not_to include(edit_dashboard_event_correction_path(participant_event, section: :guardian))
+  end
+
+  context "while the event is holding the participant's onboarding invitation" do
+    let(:event) { create(:event, onboarding_invites_held: true) }
+    let(:participant_event) { create(:participant_event, event: event, participant: participant, status: :invited) }
+
+    before do
+      create(:event_role_assignment, event: event, user: create(:user), role: :event_admin)
+      Invitation.issue!(event: event, email: participant.email, participant: participant)
+    end
+
+    it "hides the corrections section on the dashboard" do
+      get dashboard_event_path(participant_event)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include(edit_dashboard_event_correction_path(participant_event, section: :contact))
+    end
+
+    it "does not open the correction form" do
+      get edit_dashboard_event_correction_path(participant_event, section: "contact")
+
+      expect(response).to redirect_to(dashboard_event_path(participant_event))
+    end
+
+    it "does not apply a direct edit or email staff" do
+      expect {
+        patch dashboard_event_correction_path(participant_event, section: "contact"), params: {
+          participant: { preferred_name: "After" }
+        }
+      }.not_to have_enqueued_mail(RegistrationCorrectionMailer, :staff_notification)
+
+      expect(response).to redirect_to(dashboard_event_path(participant_event))
+      expect(participant.reload.preferred_name).to eq("Before")
+    end
+
+    it "does not accept a change request" do
+      expect {
+        post dashboard_event_registration_change_requests_path(participant_event), params: {
+          registration_change_request: {
+            kind: "signed_identity",
+            requested_changes: { legal_first_name: "Corrected" }
+          }
+        }
+      }.not_to change(RegistrationChangeRequest, :count)
+
+      expect(response).to redirect_to(dashboard_event_path(participant_event))
+    end
+
+    it "opens corrections once the participant's invitation has been sent" do
+      event.invitations.for_email(participant.email).first.mark_sent!
+
+      get edit_dashboard_event_correction_path(participant_event, section: "contact")
+
+      expect(response).to have_http_status(:ok)
+    end
   end
 end

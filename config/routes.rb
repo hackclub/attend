@@ -197,6 +197,7 @@ Rails.application.routes.draw do
         post :select
         post :regenerate_api_key
         patch :attach_image
+        patch :clear_waiver_dates_warning
       end
       resources :participants, only: [ :index, :show, :edit, :update, :destroy ] do
         collection do
@@ -393,6 +394,8 @@ Rails.application.routes.draw do
       post :toggle_waiver_sending
       post :toggle_support_sms
       post :update_support_sms_numbers
+      post :update_admin_help_slack_channel
+      post :sync_admin_help_slack_channel
     end
 
     # Global incident reports (public form submissions)

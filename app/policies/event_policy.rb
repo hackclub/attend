@@ -50,6 +50,12 @@ class EventPolicy < ApplicationPolicy
     manage_api_tokens?
   end
 
+  # Only the Attend team can fix waivers after a date change (by editing the
+  # DocuSeal templates and resending), so only they can clear the warning.
+  def clear_waiver_dates_warning?
+    user.global_admin?
+  end
+
   # The Integrations & API page: waiver and custom document templates, DocuSeal
   # field mappings, Airtable sync, Slack, and event API tokens. Changing any of
   # these changes what participants are asked to sign or who can pull their

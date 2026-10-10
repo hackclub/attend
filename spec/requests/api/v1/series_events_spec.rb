@@ -97,7 +97,7 @@ RSpec.describe "Api::V1::Series::Events", type: :request do
         headers: series_headers
 
       expect(response).to have_http_status(:unprocessable_entity)
-      expect(JSON.parse(response.body)["error"]).to match(/@hackclub.com or @events.hackclub.com/)
+      expect(JSON.parse(response.body)["error"]).to match(/@hackclub.com, @events.hackclub.com, or @haven.hackclub.com/)
     end
 
     it "surfaces model validation failures rather than a 500" do

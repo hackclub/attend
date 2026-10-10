@@ -367,7 +367,7 @@
         <label class="portal-check-row">
           <input type="hidden" name="um_guardian_confirmation" value="0">
           <input type="checkbox" name="um_guardian_confirmation" value="1" <%= "checked" if @participant_event.um_guardian_confirmed_at.present? %> class="portal-check mt-0.5">
-          <span class="text-sm font-medium">I confirm that <%= @participant.preferred_name.presence || @participant.legal_first_name %> is formally booked with the airline's unaccompanied minor service for the flights above.</span>
+          <span class="text-sm font-medium">I confirm that <%= @participant.legal_first_name %> is formally booked with the airline's unaccompanied minor service for the flights above.</span>
         </label>
       </div>
     </section>

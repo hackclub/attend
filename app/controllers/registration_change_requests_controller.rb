@@ -7,6 +7,7 @@ class RegistrationChangeRequestsController < ApplicationController
 
   before_action :authenticate_user!
   before_action :load_participant_event
+  before_action :redirect_if_onboarding_held, only: :create
 
   def create
     if request_params[:kind] == "guardian" && !@participant_event.guardian_replacement_eligible?
@@ -41,6 +42,16 @@ class RegistrationChangeRequestsController < ApplicationController
 
   private
 
+  # A held registration hasn't been opened to the participant yet (see
+  # ParticipantEvent#onboarding_held?), so there is nothing to correct and no
+  # reason to email staff about it.
+  def redirect_if_onboarding_held
+    return unless @participant_event.onboarding_held?
+
+    redirect_to dashboard_event_path(@participant_event),
+      alert: "Registration for #{@event.name} isn't open yet. We'll email you as soon as it is."
+  end
+
   def load_participant_event
     @participant_event = current_user.participant.participant_events.includes(:event).find(params[:participant_event_id])
     @event = @participant_event.event
@@ -55,7 +66,11 @@ class RegistrationChangeRequestsController < ApplicationController
 
   def permitted_changes
     fields = CHANGE_FIELDS.fetch(request_params[:kind].to_s, [])
-    request_params.fetch(:requested_changes, {}).to_h.slice(*fields)
+    # Parameters#fetch wraps a Hash default in a fresh *unpermitted* Parameters,
+    # which then raises UnfilteredParameters on #to_h — so read the key and fall
+    # back to a plain Hash. A support request sends no changes at all.
+    changes = request_params[:requested_changes] || {}
+    changes.to_h.slice(*fields)
   end
 
   def staff_audience

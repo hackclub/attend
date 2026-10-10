@@ -406,4 +406,59 @@ RSpec.describe ParticipantEvent, type: :model do
       expect(queries).to eq(0)
     end
   end
+  describe "#revoke_invitations!" do
+    let(:event) { create(:event) }
+
+    it "destroys the event's invitation for that email, closing the re-entry route" do
+      participant = create(:participant, email: "leaving@example.com")
+      invitation = create(:invitation, event: event, email: "leaving@example.com", sent_at: Time.current)
+      pe = create(:participant_event, participant: participant, event: event)
+
+      expect { pe.revoke_invitations! }.to change(Invitation, :count).by(-1)
+      expect(Invitation.exists?(invitation.id)).to be(false)
+    end
+
+    it "matches the invitation across email casing" do
+      participant = create(:participant, email: "Mixed@Example.com")
+      create(:invitation, event: event, email: "mixed@example.com", sent_at: Time.current)
+      pe = create(:participant_event, participant: participant, event: event)
+
+      expect { pe.revoke_invitations! }.to change(Invitation, :count).by(-1)
+    end
+
+    it "leaves the same person's invitation to another event alone" do
+      participant = create(:participant, email: "two@example.com")
+      other_event = create(:event)
+      keep = create(:invitation, event: other_event, email: "two@example.com", sent_at: Time.current)
+      create(:invitation, event: event, email: "two@example.com", sent_at: Time.current)
+      pe = create(:participant_event, participant: participant, event: event)
+
+      pe.revoke_invitations!
+
+      expect(Invitation.exists?(keep.id)).to be(true)
+    end
+
+    it "leaves other people's invitations to this event alone" do
+      participant = create(:participant, email: "mine@example.com")
+      keep = create(:invitation, event: event, email: "someone-else@example.com", sent_at: Time.current)
+      create(:invitation, event: event, email: "mine@example.com", sent_at: Time.current)
+      pe = create(:participant_event, participant: participant, event: event)
+
+      pe.revoke_invitations!
+
+      expect(Invitation.exists?(keep.id)).to be(true)
+    end
+
+    it "is not fired by a merge, which destroys a registration without uninviting anyone" do
+      primary = create(:participant, email: "primary@example.com")
+      duplicate = create(:participant, email: "duplicate@example.com")
+      create(:invitation, event: event, email: "primary@example.com", sent_at: Time.current)
+      create(:participant_event, participant: primary, event: event, status: :invited)
+      create(:participant_event, participant: duplicate, event: event, status: :complete)
+
+      expect {
+        ParticipantMergeService.new(primary: primary, duplicate: duplicate).merge!
+      }.not_to change(Invitation, :count)
+    end
+  end
 end

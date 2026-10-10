@@ -34,7 +34,7 @@ class RegistrationCorrectionMailer < ApplicationMailer
     @event = @participant_event.event
     @emailable = @participant
     @event_name = @event.name
-    @preferred_name = @participant.preferred_name.presence || @participant.legal_first_name
+    @preferred_name = @participant.greeting_name || "there"
     @support_email = @event.effective_support_email
     @dashboard_link = Rails.application.routes.url_helpers.dashboard_event_registration_change_request_url(
       @participant_event,

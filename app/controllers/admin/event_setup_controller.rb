@@ -102,7 +102,7 @@ module Admin
     def complete
       if @event.support_email.blank?
         redirect_to edit_admin_event_path(@event),
-          alert: "Set a support email (@hackclub.com or @events.hackclub.com) before finishing setup — it's the from and reply-to address on every participant and guardian email."
+          alert: "Set a support email (#{Event::SUPPORT_EMAIL_DOMAINS_SENTENCE}) before finishing setup — it's the from and reply-to address on every participant and guardian email."
         return
       end
 
@@ -172,6 +172,7 @@ module Admin
       params.require(:event).permit(
         :starts_at, :ends_at,
         :registration_open_at, :registration_close_at,
+        :arrival_opens_at, :arrival_closes_at,
         :location_city, :location_country, :location_address,
         :location_latitude, :location_longitude,
         :venue_name

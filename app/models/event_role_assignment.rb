@@ -51,6 +51,7 @@ class EventRoleAssignment < ApplicationRecord
         "Manage groups and rooming",
         "View limited medical info (allergies, dietary needs)",
         "View consents and notes",
+        "Withdraw and reinstate participants",
         "Manage integrations: waivers, custom documents, Airtable sync"
       ],
       cannot: [
@@ -68,6 +69,7 @@ class EventRoleAssignment < ApplicationRecord
         "Manage groups and rooming",
         "View full medical records, so they can help in an incident",
         "View consents and notes",
+        "Withdraw and reinstate participants",
         "See age at the event, instead of a date of birth",
         "See attendee email addresses, and search by them",
         "See the first name and phone number of an emergency contact"
@@ -117,6 +119,8 @@ class EventRoleAssignment < ApplicationRecord
   validates :event_id, presence: true
   validates :role, presence: true, uniqueness: { scope: %i[user_id event_id] }
 
+  after_commit :invite_to_admin_help_channel, on: %i[create update], if: :saved_change_to_role?
+
   # Series owners and organizers act as event admins on every event in their
   # series, so their access to this event is inherited from the series rather
   # than granted by this row. Inherited members are managed from the series
@@ -129,5 +133,15 @@ class EventRoleAssignment < ApplicationRecord
     return nil if event.event_series_id.blank?
 
     SeriesRoleAssignment.find_by(user_id: user_id, event_series_id: event.event_series_id)&.role
+  end
+
+  private
+
+  # The job re-checks eligibility, so a role on an event that's already over
+  # is skipped there.
+  def invite_to_admin_help_channel
+    return unless User::ADMIN_HELP_CHANNEL_ROLES.include?(role)
+
+    SyncAdminHelpSlackChannelJob.perform_later([ user_id ])
   end
 end

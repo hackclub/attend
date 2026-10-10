@@ -101,7 +101,9 @@ class Event < ApplicationRecord
   # email, so it has to be an address we actually control. Required from setup
   # onwards; older events created before this rule keep passing validation until
   # someone edits the field (hence allow_blank on the format check).
-  SUPPORT_EMAIL_DOMAINS = %w[hackclub.com events.hackclub.com].freeze
+  SUPPORT_EMAIL_DOMAINS = %w[hackclub.com events.hackclub.com haven.hackclub.com].freeze
+  SUPPORT_EMAIL_DOMAINS_SENTENCE = SUPPORT_EMAIL_DOMAINS.map { |d| "@#{d}" }
+    .to_sentence(two_words_connector: " or ", last_word_connector: ", or ").freeze
   SUPPORT_EMAIL_FORMAT = /\A[^@\s]+@(?:#{SUPPORT_EMAIL_DOMAINS.map { |d| Regexp.escape(d) }.join("|")})\z/i
 
   normalizes :support_email, with: ->(v) { v.strip.downcase.presence }
@@ -111,7 +113,7 @@ class Event < ApplicationRecord
   validates :support_email,
             format: {
               with: SUPPORT_EMAIL_FORMAT,
-              message: "must be a #{SUPPORT_EMAIL_DOMAINS.map { |d| "@#{d}" }.join(" or ")} address"
+              message: "must be a #{SUPPORT_EMAIL_DOMAINS_SENTENCE} address"
             },
             allow_blank: true
 
@@ -129,7 +131,8 @@ class Event < ApplicationRecord
   # string here and re-parse it in the event's timezone once validation runs
   # (by which point a timezone submitted in the same form has been assigned).
   NAIVE_DATETIME_PATTERN = /\A\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?\z/
-  SCHEDULE_TIME_ATTRIBUTES = %i[starts_at ends_at registration_open_at registration_close_at].freeze
+  SCHEDULE_TIME_ATTRIBUTES = %i[starts_at ends_at registration_open_at registration_close_at
+                                arrival_opens_at arrival_closes_at].freeze
 
   SCHEDULE_TIME_ATTRIBUTES.each do |attr|
     define_method(:"#{attr}=") do |value|
@@ -139,6 +142,7 @@ class Event < ApplicationRecord
       super(value)
     end
   end
+  before_update :flag_waiver_dates_stale, if: :local_event_dates_changed?
   after_save :geocode_location, if: :should_geocode?
   after_save :send_pending_guardian_invites, if: :guardian_invites_just_unlocked?
   after_save :send_held_onboarding_invites, if: :onboarding_invites_just_released?
@@ -186,6 +190,7 @@ class Event < ApplicationRecord
   # Events whose staff may still work the shared support inbox: anytime before
   # the event through 7 days after it ends.
   scope :within_support_window, -> { where(ends_at: 7.days.ago..) }
+  scope :not_ended, -> { where(ends_at: nil).or(where(ends_at: Time.current..)) }
 
   def setup_complete?
     setup_completed_at.present?
@@ -239,6 +244,28 @@ class Event < ApplicationRecord
     public_send(attr)&.in_time_zone(event_time_zone)&.strftime("%Y-%m-%dT%H:%M")
   end
 
+  # One-line "when to arrive" summary for the participant dashboard, in the
+  # event's timezone. Nil when neither end of the arrival window is published,
+  # so callers can fall back to "contact the team" copy.
+  def formatted_arrival_window
+    tz = event_time_zone
+    opens = arrival_opens_at&.in_time_zone(tz)
+    closes = arrival_closes_at&.in_time_zone(tz)
+    return nil if opens.nil? && closes.nil?
+
+    if opens && closes
+      if opens.to_date == closes.to_date
+        "Arrive between #{opens.strftime('%-I:%M %p')} and #{closes.strftime('%-I:%M %p %Z')} on #{opens.strftime('%A, %B %-d')}."
+      else
+        "Arrive between #{opens.strftime('%A, %B %-d at %-I:%M %p')} and #{closes.strftime('%A, %B %-d at %-I:%M %p %Z')}."
+      end
+    elsif opens
+      "Arrive from #{opens.strftime('%A, %B %-d at %-I:%M %p %Z')}."
+    else
+      "Arrive by #{closes.strftime('%A, %B %-d at %-I:%M %p %Z')}."
+    end
+  end
+
   def formatted_date_range
     return nil if starts_at.nil? || ends_at.nil?
 
@@ -255,6 +282,26 @@ class Event < ApplicationRecord
     else
       "#{start_date.strftime('%B %-d, %Y')} - #{end_date.strftime('%B %-d, %Y')}"
     end
+  end
+
+  # DocuSeal waiver templates have the event dates printed on them when they're
+  # cloned (Docuseal::DefaultTemplateSetup), and each sent waiver snapshots its
+  # template. Moving the event's dates after waivers have gone out leaves those
+  # waivers showing the old dates until the Attend team fixes them by hand.
+  def waiver_dates_stale?
+    waiver_dates_stale_since.present?
+  end
+
+  def waivers_issued?
+    Consent.joins(:participant_event)
+      .where(participant_events: { event_id: id })
+      .where(consent_type: %w[waiver freedom_waiver])
+      .where.not(docuseal_envelope_id: nil)
+      .exists?
+  end
+
+  def clear_waiver_dates_stale!
+    update!(waiver_dates_stale_since: nil)
   end
 
   def freedom_waivers_enabled?
@@ -510,6 +557,26 @@ class Event < ApplicationRecord
     self.visa_options_enabled = true if visa_options_enabled.nil?
     self.accommodation_enabled = true if accommodation_enabled.nil?
     self.roommate_preferences_enabled = true if roommate_preferences_enabled.nil?
+  end
+
+  # Compares the calendar days in the event's timezone, since that's what the
+  # waivers print — moving the start time within the same day changes nothing.
+  # Setting dates for the first time isn't a change.
+  def local_event_dates_changed?
+    return false unless will_save_change_to_starts_at? || will_save_change_to_ends_at? || will_save_change_to_timezone?
+    return false if starts_at_in_database.nil? || ends_at_in_database.nil?
+
+    old_tz = ActiveSupport::TimeZone[timezone_in_database.to_s.presence || "UTC"] || Time.zone
+    old_dates = [ starts_at_in_database, ends_at_in_database ].map { |t| t.in_time_zone(old_tz).to_date }
+    new_dates = [ starts_at, ends_at ].map { |t| t&.in_time_zone(event_time_zone)&.to_date }
+    old_dates != new_dates
+  end
+
+  def flag_waiver_dates_stale
+    return if waiver_dates_stale?
+    return unless waivers_issued?
+
+    self.waiver_dates_stale_since = Time.current
   end
 
   def should_geocode?

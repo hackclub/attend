@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_20_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_09_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -416,6 +416,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_090000) do
     t.string "airtable_sync_table_id"
     t.datetime "airtable_synced_at"
     t.string "api_key_digest"
+    t.datetime "arrival_closes_at"
+    t.datetime "arrival_opens_at"
     t.jsonb "config", default: {}
     t.datetime "created_at", null: false
     t.string "docuseal_adult_waiver_template_id"
@@ -446,6 +448,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_20_090000) do
     t.string "timezone", default: "UTC"
     t.datetime "updated_at", null: false
     t.string "venue_name"
+    t.datetime "waiver_dates_stale_since"
     t.index ["airtable_config_updated_by_id"], name: "index_events_on_airtable_config_updated_by_id"
     t.index ["event_series_id"], name: "index_events_on_event_series_id"
     t.index ["hotel_scan_context_id"], name: "index_events_on_hotel_scan_context_id"

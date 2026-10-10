@@ -125,6 +125,8 @@ module Api
             :ends_at,
             :registration_open_at,
             :registration_close_at,
+            :arrival_opens_at,
+            :arrival_closes_at,
             :location_city,
             :location_country,
             :location_address,

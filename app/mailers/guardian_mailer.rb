@@ -66,7 +66,7 @@ class GuardianMailer < ApplicationMailer
     @emailable = @guardian
 
     @first_name = @guardian.legal_first_name
-    @child_first_name = @participant.preferred_name.presence || @participant.legal_first_name
+    @child_first_name = @participant.legal_first_name
     @event_name = @event.name
     @waiver_link = consent.guardian_signing_url
     @support_email = @event.effective_support_email
@@ -104,7 +104,7 @@ class GuardianMailer < ApplicationMailer
     guardian_participant_event.update!(invite_token_sent_at: Time.current)
 
     @first_name = @guardian.legal_first_name
-    @child_first_name = @participant.preferred_name.presence || @participant.legal_first_name
+    @child_first_name = @participant.legal_first_name
     @event_name = @event.name
     @document_name = custom_document.name
     @physical = custom_document.physical?
@@ -136,7 +136,7 @@ class GuardianMailer < ApplicationMailer
     guardian_participant_event.update!(invite_token_sent_at: Time.current)
 
     @first_name = @guardian.legal_first_name
-    @child_first_name = @participant.preferred_name.presence || @participant.legal_first_name
+    @child_first_name = @participant.legal_first_name
     @event_name = @event.name
     @waiver_type = waiver_type
     @waiver_type_name = waiver_type == :freedom_waiver ? "Freedom Waiver" : "Waiver"

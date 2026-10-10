@@ -20,6 +20,15 @@ class User < ApplicationRecord
   # role may see (see EventRoleAssignment::PII_RESTRICTED_ROLES).
   SUPPORT_ROLES = %w[event_admin ops].freeze
 
+  # Event roles that get invited to the Slack channel where event admins ask
+  # questions about Attend. Limited and read-only staff are deliberately left
+  # out; series owners and organizers count too, as they act as event admins,
+  # and so do global admins, who answer the questions.
+  ADMIN_HELP_CHANNEL_ROLES = %w[event_admin ops safeguarding_lead].freeze
+
+  after_commit :invite_to_admin_help_channel, on: %i[create update],
+    if: -> { saved_change_to_global_role? && global_admin? }
+
   # `oidc_claims` holds PII straight from Hack Club Auth (phone number,
   # birthdate, home address). Encrypting the whole jsonb blob works because the
   # Active Record encryption envelope is itself JSON, so it round-trips through
@@ -289,6 +298,19 @@ class User < ApplicationRecord
     save(validate: false)
   end
 
+  # Global admins, plus staff holding an ADMIN_HELP_CHANNEL_ROLES role (or a
+  # series role) on an event that hasn't ended. Undated drafts count, since
+  # setting an event up is when people most need help.
+  def self.admin_help_channel_members
+    events = Event.not_ended
+    via_event = EventRoleAssignment.where(role: ADMIN_HELP_CHANNEL_ROLES, event_id: events.select(:id))
+    via_series = SeriesRoleAssignment.where(event_series_id: events.where.not(event_series_id: nil).select(:event_series_id))
+
+    where(global_role: "global_admin")
+      .or(where(id: via_event.select(:user_id)))
+      .or(where(id: via_series.select(:user_id)))
+  end
+
   def self.extract_oidc_claims(auth)
     raw = auth.extra&.raw_info&.to_h&.with_indifferent_access || {}
 
@@ -405,6 +427,14 @@ class User < ApplicationRecord
     slack_user_id.presence || oidc_claims&.dig("slack_id")
   end
 
+  # The Slack ID Hack Club Auth vouches for, ignoring the profile override —
+  # anyone can type someone else's ID (or a comma-separated list) into that,
+  # so it must not decide who gets invited to a channel.
+  def verified_slack_id
+    id = oidc_claims&.dig("slack_id").to_s
+    id if id.match?(/\A[UW][A-Z0-9]+\z/)
+  end
+
   def phone
     phone_number.presence || oidc_claims&.dig("phone_number")
   end
@@ -422,6 +452,10 @@ class User < ApplicationRecord
   end
 
   private
+
+  def invite_to_admin_help_channel
+    SyncAdminHelpSlackChannelJob.perform_later([ id ])
+  end
 
   def acceptable_avatar
     return unless attachment_changes["avatar"].present?

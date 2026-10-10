@@ -47,6 +47,7 @@ class AuditLog < ApplicationRecord
     passport_pair: "passport_pair",
     passport_revoke: "passport_revoke",
     regenerate_api_key: "regenerate_api_key",
+    clear_waiver_dates_warning: "clear_waiver_dates_warning",
     attach_image: "attach_image",
     update_groups: "update_groups",
     use_default_docuseal_template: "use_default",
@@ -94,7 +95,9 @@ class AuditLog < ApplicationRecord
     toggle_maintenance: "toggle_maintenance",
     toggle_twilio: "toggle_twilio",
     toggle_waiver_sending: "toggle_waiver_sending",
-    update_twilio_from_number: "update_twilio_from_number"
+    update_twilio_from_number: "update_twilio_from_number",
+    update_admin_help_slack_channel: "update_admin_help_slack_channel",
+    sync_admin_help_slack_channel: "sync_admin_help_slack_channel"
   }
 
   validates :record_type, presence: true

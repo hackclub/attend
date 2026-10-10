@@ -25,8 +25,16 @@ class ParticipantEventPolicy < ApplicationPolicy
     user.global_admin? || has_role?("event_admin")
   end
 
+  # Withdrawing is reversible (#unwithdraw puts the registration back) and is
+  # day-to-day work for whoever is running the event on the ground, so it sits
+  # below the destroy? bar: ops and limited get it, unlike removing a
+  # participant outright. Guarded on Current.event the way can_edit? is, since
+  # has_role? only scopes the assignment lookup, not the record.
   def withdraw?
-    user.global_admin? || has_role?("event_admin")
+    return true if user.global_admin?
+    return false unless record.event == Current.event
+
+    has_role?("event_admin", "ops", "limited")
   end
 
   # Merging pulls another Participant row's data (possibly from other events)

@@ -283,7 +283,7 @@ class RegistrationCompletionPresenter
   end
 
   def first_name
-    participant.preferred_name.presence || participant.legal_first_name
+    participant.legal_first_name
   end
 
   def action_needed_body

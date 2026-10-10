@@ -87,6 +87,14 @@ module Admin
       redirect_to admin_event_integrations_path(@event), notice: "API key generated successfully."
     end
 
+    def clear_waiver_dates_warning
+      @event = Event.find_by!(slug: params[:slug])
+      authorize @event
+
+      @event.clear_waiver_dates_stale!
+      redirect_back fallback_location: admin_event_dashboard_path(@event), notice: "Waiver date warning cleared."
+    end
+
     def destroy
       @event = Event.find_by!(slug: params[:slug])
       authorize @event
@@ -126,6 +134,8 @@ module Admin
         :ends_at,
         :registration_open_at,
         :registration_close_at,
+        :arrival_opens_at,
+        :arrival_closes_at,
         :location_city,
         :location_country,
         :location_address,

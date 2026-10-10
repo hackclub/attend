@@ -47,7 +47,7 @@ module Api
       def complete
         if @event.support_email.blank?
           return render_error(
-            "Set a support email (@hackclub.com or @events.hackclub.com) before finishing setup — " \
+            "Set a support email (#{Event::SUPPORT_EMAIL_DOMAINS_SENTENCE}) before finishing setup — " \
             "it's the from and reply-to address on every participant and guardian email."
           )
         end
