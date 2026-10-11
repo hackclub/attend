@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_09_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_11_211500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1008,6 +1008,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_120000) do
     t.index ["serial_number"], name: "index_passports_on_serial_number", unique: true
     t.index ["token"], name: "index_passports_on_token", unique: true
     t.index ["user_id"], name: "index_passports_on_user_id"
+  end
+
+  create_table "privacy_token_uses", primary_key: "jti", id: :string, force: :cascade do |t|
+    t.datetime "used_at", null: false
+    t.index ["used_at"], name: "index_privacy_token_uses_on_used_at"
   end
 
   create_table "push_tokens", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
