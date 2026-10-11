@@ -22,4 +22,4 @@ Rails 8.1 app with PostgreSQL, Hotwire, Tailwind. UUID primary keys (set `self.i
 - Admin UI elements on user pages: wrap in `border-2 border-dashed border-orange-400`
 
 ## Test Users (dev)
-admin@hackclub.com / eventadmin@hackclub.com / ops@hackclub.com / safeguarding@hackclub.com / participant@example.com (all use password123)
+admin@hackclub.com / eventadmin@hackclub.com / ops@hackclub.com / safeguarding@hackclub.com / participant@example.com (no passwords; sign in via the dev-only email sign-in on the home page)
