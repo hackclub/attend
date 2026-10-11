@@ -691,7 +691,7 @@ class GuardianPortalController < ApplicationController
     return if waivers_paused?
 
     # Create and trigger the main waiver
-    waiver = @participant_event.consents.find_or_create_by!(consent_type: :waiver) do |c|
+    waiver = @participant_event.find_or_create_consent!(:waiver) do |c|
       c.status = :pending
       c.guardian_participant_event = @guardian_participant_event
     end
@@ -708,7 +708,7 @@ class GuardianPortalController < ApplicationController
     # Create and trigger the freedom waiver (only if enabled for this event)
     return unless @event.freedom_waivers_enabled?
 
-    freedom_waiver = @participant_event.consents.find_or_create_by!(consent_type: :freedom_waiver) do |c|
+    freedom_waiver = @participant_event.find_or_create_consent!(:freedom_waiver) do |c|
       c.status = :pending
       c.guardian_participant_event = @guardian_participant_event
     end

@@ -195,6 +195,17 @@ class ParticipantEvent < ApplicationRecord
     signed_consent_of_type?("waiver")
   end
 
+  # Waiver-type consents are unique per participant event (DB index), but
+  # find_or_create_by! isn't atomic — concurrent portal/onboarding requests can
+  # both miss the find. The loser of the insert race picks up the winner's row.
+  def find_or_create_consent!(consent_type, &block)
+    Consent.transaction(requires_new: true) do
+      consents.find_or_create_by!(consent_type: consent_type, &block)
+    end
+  rescue ActiveRecord::RecordNotUnique
+    consents.find_by!(consent_type: consent_type)
+  end
+
   def freedom_waiver_signed?
     signed_consent_of_type?("freedom_waiver")
   end

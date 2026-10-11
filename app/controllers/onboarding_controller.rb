@@ -1106,7 +1106,7 @@ class OnboardingController < ApplicationController
   end
 
   def trigger_adult_waiver
-    consent = @participant_event.consents.find_or_create_by!(consent_type: :waiver) do |c|
+    consent = @participant_event.find_or_create_consent!(:waiver) do |c|
       c.status = :pending
     end
 
@@ -1125,7 +1125,7 @@ class OnboardingController < ApplicationController
     guardian_participant_event = @participant_event.guardian_participant_events.first
     return unless guardian_participant_event
 
-    consent = @participant_event.consents.find_or_create_by!(consent_type: :waiver) do |c|
+    consent = @participant_event.find_or_create_consent!(:waiver) do |c|
       c.status = :pending
       c.guardian_participant_event = guardian_participant_event
     end
@@ -1243,7 +1243,7 @@ class OnboardingController < ApplicationController
       guardian_participant_event = @participant_event.guardian_participant_events.first
       return unless guardian_participant_event
 
-      consent = @participant_event.consents.find_or_create_by!(consent_type: :waiver) do |c|
+      consent = @participant_event.find_or_create_consent!(:waiver) do |c|
         c.status = :pending
         c.guardian_participant_event = guardian_participant_event
       end
@@ -1252,7 +1252,7 @@ class OnboardingController < ApplicationController
         DocusealJobs::CreateMinorWaiverJob.perform_later(consent.id)
       end
     else
-      consent = @participant_event.consents.find_or_create_by!(consent_type: :waiver) do |c|
+      consent = @participant_event.find_or_create_consent!(:waiver) do |c|
         c.status = :pending
       end
 
