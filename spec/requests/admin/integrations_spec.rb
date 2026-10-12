@@ -60,6 +60,32 @@ RSpec.describe "Admin::Integrations", type: :request do
 
       expect(response.body).not_to include("Stale")
     end
+
+    it "lists the event's active API tokens" do
+      EventApiToken.generate_for(event, user: admin, name: "fictional-widget-sync")
+
+      get admin_event_integrations_path(event)
+
+      expect(response.body).to include("admin-integrations@fictional-widget-sync")
+      expect(response.body).not_to include("No API tokens yet")
+    end
+
+    it "leaves revoked tokens and other events' tokens out of the list" do
+      EventApiToken.generate_for(event, user: admin, name: "fictional-retired-sync").revoke!
+      EventApiToken.generate_for(create(:event), user: admin, name: "fictional-elsewhere-sync")
+
+      get admin_event_integrations_path(event)
+
+      expect(response.body).not_to include("fictional-retired-sync")
+      expect(response.body).not_to include("fictional-elsewhere-sync")
+      expect(response.body).to include("No API tokens yet")
+    end
+
+    it "shows the empty state when the event has no API tokens" do
+      get admin_event_integrations_path(event)
+
+      expect(response.body).to include("No API tokens yet")
+    end
   end
 
   describe "PATCH /admin/:slug/integrations" do

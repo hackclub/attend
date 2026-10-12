@@ -99,7 +99,7 @@ module Admin
 
       respond_to do |format|
         format.turbo_stream do
-          render turbo_stream: turbo_stream.replace(
+          render turbo_stream: turbo_stream.update(
             "preference_links_#{participant_event.id}",
             partial: "admin/rooming_wizard/preference_links",
             locals: { participant_event: participant_event }
@@ -175,7 +175,7 @@ module Admin
           render turbo_stream: [
             turbo_stream.replace("summary_bar", partial: "admin/rooming_wizard/summary_bar"),
             turbo_stream.replace("unassigned_sidebar", partial: "admin/rooming_wizard/unassigned_sidebar"),
-            turbo_stream.replace("rooms_container", partial: "admin/rooming_wizard/rooms_container")
+            turbo_stream.update("rooms_container", partial: "admin/rooming_wizard/rooms_container")
           ]
         end
         format.json { head :ok }
@@ -323,7 +323,7 @@ module Admin
           render turbo_stream: [
             turbo_stream.replace("summary_bar", partial: "admin/rooming_wizard/summary_bar"),
             turbo_stream.replace("unassigned_sidebar", partial: "admin/rooming_wizard/unassigned_sidebar"),
-            turbo_stream.replace("rooms_container", partial: "admin/rooming_wizard/rooms_container")
+            turbo_stream.update("rooms_container", partial: "admin/rooming_wizard/rooms_container")
           ]
         end
         format.html { redirect_to assignments_admin_event_rooming_wizard_path(@event.slug) }

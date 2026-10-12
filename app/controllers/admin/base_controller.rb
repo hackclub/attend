@@ -80,7 +80,7 @@ module Admin
 
     def require_event_selected
       unless current_event
-        redirect_to admin_events_path, alert: "Please select an event first."
+        redirect_to admin_root_path, alert: "Please select an event first."
       end
     end
 
@@ -98,7 +98,7 @@ module Admin
       Current.event = nil
       @current_event = nil
 
-      redirect_to admin_events_path,
+      redirect_to admin_root_path,
         alert: "You no longer have access to that event."
     end
 

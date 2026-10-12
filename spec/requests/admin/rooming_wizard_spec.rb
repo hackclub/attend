@@ -44,4 +44,97 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
       expect(response).to redirect_to(assignments_admin_event_rooming_wizard_path(event.slug))
     end
   end
+
+  # A `replace` swaps out the target element itself, so the streamed template's
+  # root must carry the target's id or every later stream at that id no-ops.
+  # An `update` keeps the target and only swaps its contents.
+  describe "assignments board turbo streams" do
+    let(:turbo_headers) { { "Accept" => "text/vnd.turbo-stream.html" } }
+    let!(:room) { event.rooms.create!(capacity: 2) }
+    let!(:participant_event) do
+      create(:participant_event, event: event).tap(&:create_accommodation!)
+    end
+
+    def streams
+      Nokogiri::HTML5.fragment(response.body).css("turbo-stream")
+    end
+
+    def expect_targets_survive(*targets)
+      expect(streams.map { |s| s["target"] }).to include(*targets)
+
+      streams.each do |stream|
+        next unless stream["action"] == "replace"
+
+        # The room card partial ships a trailing <script>, so ignore those.
+        roots = stream.at_css("template").children.select(&:element?).reject { |el| el.name == "script" }
+        expect(roots.map { |el| el["id"] }).to eq([ stream["target"] ]),
+          "replace of ##{stream["target"]} would drop the target id"
+      end
+    end
+
+    def rooms_container_stream
+      streams.find { |s| s["target"] == "rooms_container" }
+    end
+
+    it "keeps #rooms_container after a participant is moved into a room" do
+      post move_assignment_admin_event_rooming_wizard_path(event.slug),
+        params: { participant_event_id: participant_event.id, room_id: room.id },
+        headers: turbo_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(rooms_container_stream["action"]).to eq("update")
+      expect(rooms_container_stream.at_css("template #rooms_list #room_#{room.id}[data-room-id='#{room.id}']")).to be_present
+      expect_targets_survive("summary_bar", "unassigned_sidebar", "rooms_container")
+    end
+
+    it "keeps #rooms_container after toggling an exemption" do
+      post toggle_exempt_admin_event_rooming_wizard_path(event.slug),
+        params: { participant_event_id: participant_event.id },
+        headers: turbo_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(rooms_container_stream["action"]).to eq("update")
+      expect_targets_survive("summary_bar", "unassigned_sidebar", "rooms_container")
+    end
+
+    it "keeps the room card id when a room is updated" do
+      patch update_room_admin_event_rooming_wizard_path(event.slug),
+        params: { room_id: room.id, name: "Room Narwhal" },
+        headers: turbo_headers
+
+      expect(response).to have_http_status(:ok)
+      expect_targets_survive("summary_bar", "room_#{room.id}")
+    end
+
+    it "keeps the room card id when staff are added" do
+      post add_staff_admin_event_rooming_wizard_path(event.slug),
+        params: { room_id: room.id, staff_name: "Captain Placeholder" },
+        headers: turbo_headers
+
+      expect(response).to have_http_status(:ok)
+      expect_targets_survive("summary_bar", "room_#{room.id}")
+    end
+
+    it "renders #rooms_container exactly once on the initial page" do
+      get assignments_admin_event_rooming_wizard_path(event.slug)
+
+      page = Nokogiri::HTML5(response.body)
+      expect(page.css("#rooms_container").size).to eq(1)
+      expect(page.css("#rooms_container > #rooms_list").size).to eq(1)
+    end
+  end
+
+  describe "POST link_preference" do
+    it "updates the preference links wrapper instead of replacing it" do
+      participant_event = create(:participant_event, event: event).tap(&:create_accommodation!)
+      target = create(:participant_event, event: event).tap(&:create_accommodation!)
+
+      post link_preference_admin_event_rooming_wizard_path(event.slug),
+        params: { participant_event_id: participant_event.id, target_participant_event_id: target.id, kind: "preference", rank: 1 },
+        headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+      stream = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='preference_links_#{participant_event.id}']")
+      expect(stream["action"]).to eq("update")
+    end
+  end
 end

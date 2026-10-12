@@ -1,4 +1,6 @@
-<% pagination_params = params.permit(:search, :role) %>
+<%# The filters carried onto pagination links. Built by hand rather than with
+    params.permit: these are query-string filters, not model attributes. %>
+<% pagination_params = { search: params[:search].presence, role: params[:role].presence }.compact %>
 
 <div class="cs-stack">
   <div class="cs-header mb-0!">
