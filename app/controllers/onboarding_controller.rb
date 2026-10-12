@@ -708,7 +708,7 @@ class OnboardingController < ApplicationController
     return false unless guardian.legal_last_name.to_s.strip.casecmp?(attrs[:legal_last_name].to_s.strip)
     return true if attrs[:phone].blank?
 
-    PhoneNormalizer.normalize(attrs[:phone]) == guardian.phone
+    PhoneNormalizer.normalize(attrs[:phone]) == PhoneNormalizer.normalize(guardian.phone)
   end
 
   def guardian_autosave_email_locked?(guardian, requested_email)
