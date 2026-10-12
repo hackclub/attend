@@ -9,7 +9,7 @@
      "merge" => "Merge duplicate",
      "slack_invite_link" => "Slack invite"
    } %>
-<% content_for :breadcrumbs, cs_breadcrumbs(
+<% content_for :breadcrumbs, cs_event_breadcrumbs(
      [ "Participants", admin_event_participants_path(current_event) ],
      *(participant_tab_labels.key?(action_name) ?
        [ [ participant_name(@participant), admin_event_participant_path(current_event, @participant_event) ], [ participant_tab_labels[action_name], nil ] ] :

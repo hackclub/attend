@@ -1,4 +1,4 @@
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Slack blasts", admin_event_slack_blasts_path(current_event) ], [ "Blast details", nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Messages", admin_event_messages_path(current_event) ], [ "Slack blasts", admin_event_slack_blasts_path(current_event) ], [ "Slack blast details", nil ]) %>
 <% blast_status_types = { "pending" => :pending, "in_progress" => :in_progress, "completed" => :success, "failed" => :error } %>
 <% recipient_status_types = { "pending" => :pending, "sent" => :success, "failed" => :error } %>
 

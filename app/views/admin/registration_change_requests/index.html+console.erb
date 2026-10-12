@@ -1,5 +1,5 @@
 <% content_for :title, "Change requests – #{current_event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ current_event.name, admin_event_dashboard_path(current_event.slug) ], [ "Change requests", nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Change requests", nil ]) %>
 <% change_request_status_types = { "pending" => :pending, "approved" => :success, "follow_up_needed" => :warning } %>
 
 <div class="cs-stack">

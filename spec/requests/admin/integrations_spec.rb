@@ -61,30 +61,37 @@ RSpec.describe "Admin::Integrations", type: :request do
       expect(response.body).not_to include("Stale")
     end
 
-    it "lists the event's active API tokens" do
-      EventApiToken.generate_for(event, user: admin, name: "fictional-widget-sync")
+    # The token list exists in both admin UIs, so pin it in each.
+    { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+      context ui do
+        before { admin.update!(admin_console_beta: console) }
 
-      get admin_event_integrations_path(event)
+        it "lists the event's active API tokens" do
+          EventApiToken.generate_for(event, user: admin, name: "fictional-widget-sync")
 
-      expect(response.body).to include("admin-integrations@fictional-widget-sync")
-      expect(response.body).not_to include("No API tokens yet")
-    end
+          get admin_event_integrations_path(event)
 
-    it "leaves revoked tokens and other events' tokens out of the list" do
-      EventApiToken.generate_for(event, user: admin, name: "fictional-retired-sync").revoke!
-      EventApiToken.generate_for(create(:event), user: admin, name: "fictional-elsewhere-sync")
+          expect(response.body).to include("admin-integrations@fictional-widget-sync")
+          expect(response.body).not_to include("No API tokens yet")
+        end
 
-      get admin_event_integrations_path(event)
+        it "leaves revoked tokens and other events' tokens out of the list" do
+          EventApiToken.generate_for(event, user: admin, name: "fictional-retired-sync").revoke!
+          EventApiToken.generate_for(create(:event), user: admin, name: "fictional-elsewhere-sync")
 
-      expect(response.body).not_to include("fictional-retired-sync")
-      expect(response.body).not_to include("fictional-elsewhere-sync")
-      expect(response.body).to include("No API tokens yet")
-    end
+          get admin_event_integrations_path(event)
 
-    it "shows the empty state when the event has no API tokens" do
-      get admin_event_integrations_path(event)
+          expect(response.body).not_to include("fictional-retired-sync")
+          expect(response.body).not_to include("fictional-elsewhere-sync")
+          expect(response.body).to include("No API tokens yet")
+        end
 
-      expect(response.body).to include("No API tokens yet")
+        it "shows the empty state when the event has no API tokens" do
+          get admin_event_integrations_path(event)
+
+          expect(response.body).to include("No API tokens yet")
+        end
+      end
     end
   end
 

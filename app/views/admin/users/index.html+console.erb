@@ -1,3 +1,4 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Users", nil ]) %>
 <%# The filters carried onto pagination links. Built by hand rather than with
     params.permit: these are query-string filters, not model attributes. %>
 <% pagination_params = { search: params[:search].presence, role: params[:role].presence }.compact %>

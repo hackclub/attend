@@ -1,5 +1,5 @@
 <% content_for :title, "Scanner – #{current_event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Check-ins", admin_event_scans_path(current_event) ], [ "Scanner", nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Check-ins", admin_event_scans_path(current_event) ], [ "Scanner", nil ]) %>
 
 <%= content_for :head do %>
   <script src="<%= asset_path("vendor/zxing.min.js") %>"></script>

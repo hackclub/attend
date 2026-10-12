@@ -11,7 +11,8 @@
    ]
    current_index = steps.index { |s| s[:key] == current_step } %>
 
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Participants", admin_event_participants_path(@event.slug) ], [ "Rooming wizard", nil ]) %>
+<%# The step list below names the step, so the trail stops at the section. %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Rooming", nil ], event: @event) %>
 
 <div class="cs-wizard">
   <nav class="cs-wizard-nav" aria-label="Rooming wizard steps">

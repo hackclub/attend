@@ -1,4 +1,4 @@
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Groups", admin_event_groups_path(current_event) ], [ @group.name, nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Groups", admin_event_groups_path(current_event) ], [ @group.name_was.presence || @group.name, nil ]) %>
 
 <div class="max-w-3xl">
   <div class="cs-header">

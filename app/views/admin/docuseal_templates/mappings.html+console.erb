@@ -1,14 +1,11 @@
 <% content_for :title, "#{@display_name} Mappings – #{current_event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Integrations", admin_event_integrations_path(current_event) ], [ "#{@display_name} field mappings", nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs(cs_gated_crumb("Integrations", admin_event_integrations_path(current_event), policy(current_event).manage_integrations?), [ "#{@display_name} field mappings", nil ]) %>
 
 <div class="cs-stack">
   <div class="cs-header">
     <div class="cs-header-text">
       <h1 class="cs-h1"><%= @display_name %> field mappings</h1>
       <p class="cs-description">Map DocuSeal form fields to Attend data for auto-fill</p>
-    </div>
-    <div class="cs-actions">
-      <%= link_to "Back to integrations", admin_event_integrations_path(current_event), class: "cs-btn" %>
     </div>
   </div>
 

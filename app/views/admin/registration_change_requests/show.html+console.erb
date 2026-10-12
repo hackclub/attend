@@ -1,5 +1,5 @@
 <% content_for :title, "Change request – #{current_event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ current_event.name, admin_event_dashboard_path(current_event.slug) ], [ "Change requests", admin_event_registration_change_requests_path(current_event) ], [ @change_request.participant.display_name, nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Change requests", admin_event_registration_change_requests_path(current_event) ], [ @change_request.participant.display_name, nil ]) %>
 <% change_request_status_types = { "pending" => :pending, "approved" => :success, "follow_up_needed" => :warning } %>
 
 <div class="cs-stack max-w-3xl">
@@ -10,9 +10,6 @@
         <span><%= @change_request.kind.humanize %></span>
         <%= cs_status(change_request_status_types.fetch(@change_request.status, :info), @change_request.status.humanize) %>
       </p>
-    </div>
-    <div class="cs-actions">
-      <%= link_to "Back to change requests", admin_event_registration_change_requests_path(current_event), class: "cs-btn cs-btn-link" %>
     </div>
   </div>
 

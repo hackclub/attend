@@ -1,3 +1,11 @@
+<%# Filtered to one event (the sidebar's "Event audit log"), the trail sits under that event. %>
+<%# An event the viewer can't open falls back to the plain trail, so its name never leaks. %>
+<% audit_event = Event.find_by(id: params[:event_id]) if params[:event_id].present? %>
+<% if audit_event && policy(audit_event).show? %>
+  <% content_for :breadcrumbs, cs_event_breadcrumbs([ "Event audit log", nil ], event: audit_event) %>
+<% else %>
+  <% content_for :breadcrumbs, cs_breadcrumbs([ "Audit log", nil ]) %>
+<% end %>
 <% audit_action_badge = { "create" => "green", "update" => "blue", "delete" => "red" } %>
 
 <div class="cs-stack">

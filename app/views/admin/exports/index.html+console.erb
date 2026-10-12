@@ -6,7 +6,7 @@
   prefill_filters = @prefill ? @prefill[:filters] : []
   prefill_row_mode = @prefill ? @prefill[:row_mode] : "participant"
 %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Dashboard", admin_root_path ], [ "Export data", nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Exports", nil ]) %>
 
 <div>
   <div class="cs-header">

@@ -10,7 +10,7 @@
 <% stage_rows = @dashboard.stage_rows %>
 <% arrival_row = @dashboard.arrival_row %>
 
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Series", admin_series_index_path ], [ @series.name, nil ]) %>
+<% content_for :breadcrumbs, cs_breadcrumbs(cs_gated_crumb("Event series", admin_series_index_path, policy(EventSeries).index?), [ @series.name, nil ]) %>
 
 <div class="cs-stack">
   <% if @series.banner.attached? %>

@@ -1,3 +1,4 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Email logs", nil ]) %>
 <% email_status_types = { "sent" => :in_progress, "delivered" => :success, "opened" => :success, "bounced" => :error, "failed" => :error } %>
 
 <%# Global-admin-only page: the dashed orange border is the project's admin-only marker. %>

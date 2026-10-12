@@ -1,5 +1,5 @@
 <% content_for :title, "Export rooming list – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Participants", admin_event_participants_path(@event.slug) ], [ "Rooming wizard", finalize_admin_event_rooming_wizard_path(@event.slug) ], [ "Export", nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Rooming", admin_event_rooming_wizard_path(@event.slug) ], [ "Export", nil ], event: @event) %>
 
 <div class="cs-header">
   <div class="cs-header-text">

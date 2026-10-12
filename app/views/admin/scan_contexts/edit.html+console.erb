@@ -1,4 +1,4 @@
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Check-ins", admin_event_scans_path(current_event) ], [ "Scan contexts", admin_event_scan_contexts_path(current_event) ], [ @scan_context.name_was.presence || @scan_context.name, nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Check-ins", admin_event_scans_path(current_event) ], [ "Scan contexts", admin_event_scan_contexts_path(current_event) ], [ @scan_context.name_was.presence || @scan_context.name, nil ]) %>
 
 <div class="max-w-2xl">
   <div class="cs-header">

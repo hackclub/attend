@@ -1,8 +1,5 @@
 <% content_for :title, "Invite Participant – #{current_event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs(
-     [ "Participants", admin_event_participants_path(current_event) ],
-     [ "Invite participant", nil ]
-   ) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Participants", admin_event_participants_path(current_event) ], [ "Invite participant", nil ]) %>
 
 <div class="max-w-2xl">
   <div class="cs-header">

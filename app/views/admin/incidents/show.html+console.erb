@@ -1,5 +1,5 @@
 <% content_for :title, "Incident Details – #{current_event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ current_event.name, admin_event_dashboard_path(current_event.slug) ], [ "Incidents", admin_event_incidents_path(current_event) ], [ "Incident details", nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Incidents", admin_event_incidents_path(current_event) ], [ "Incident details", nil ]) %>
 
 <div class="cs-stack max-w-4xl">
   <div class="cs-header">
@@ -12,7 +12,6 @@
       </div>
     </div>
     <div class="cs-actions">
-      <%= link_to "Back to incidents", admin_event_incidents_path(current_event), class: "cs-btn cs-btn-link" %>
       <% if @incident.behavior? || @incident.safeguarding? || @incident.other? %>
         <%= button_to "Send to Slack", send_to_slack_admin_event_incident_path(current_event, @incident), method: :post, class: "cs-btn", data: { turbo_confirm: "Send this conduct report to Slack?" } %>
       <% end %>

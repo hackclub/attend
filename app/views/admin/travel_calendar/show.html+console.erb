@@ -1,4 +1,5 @@
 <% content_for :title, "Travel Calendar – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Travel calendar", nil ]) %>
 
 <div class="cs-stack" data-controller="travel-calendar-filter">
   <header class="cs-header mb-0!">

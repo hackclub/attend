@@ -16,8 +16,20 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
       get preferences_admin_event_rooming_wizard_path(event.slug)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Assign manually")
+      expect(response.body).to include("Assign Manually")
       expect(response.body).to include(manual_assign_admin_event_rooming_wizard_path(event.slug))
+    end
+
+    context "with the admin console beta" do
+      before { admin.update!(admin_console_beta: true) }
+
+      it "offers sentence-case manual assignment without auto-assigning" do
+        get preferences_admin_event_rooming_wizard_path(event.slug)
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("Assign manually")
+        expect(response.body).to include(manual_assign_admin_event_rooming_wizard_path(event.slug))
+      end
     end
   end
 
@@ -76,65 +88,79 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
       streams.find { |s| s["target"] == "rooms_container" }
     end
 
-    it "keeps #rooms_container after a participant is moved into a room" do
-      post move_assignment_admin_event_rooming_wizard_path(event.slug),
-        params: { participant_event_id: participant_event.id, room_id: room.id },
-        headers: turbo_headers
+    # The original and console assignments boards both wrap the room list in
+    # #rooms_container > #rooms_list, so the streams must hold for either UI.
+    { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+      context ui do
+        before { admin.update!(admin_console_beta: console) }
 
-      expect(response).to have_http_status(:ok)
-      expect(rooms_container_stream["action"]).to eq("update")
-      expect(rooms_container_stream.at_css("template #rooms_list #room_#{room.id}[data-room-id='#{room.id}']")).to be_present
-      expect_targets_survive("summary_bar", "unassigned_sidebar", "rooms_container")
-    end
+        it "keeps #rooms_container after a participant is moved into a room" do
+          post move_assignment_admin_event_rooming_wizard_path(event.slug),
+            params: { participant_event_id: participant_event.id, room_id: room.id },
+            headers: turbo_headers
 
-    it "keeps #rooms_container after toggling an exemption" do
-      post toggle_exempt_admin_event_rooming_wizard_path(event.slug),
-        params: { participant_event_id: participant_event.id },
-        headers: turbo_headers
+          expect(response).to have_http_status(:ok)
+          expect(rooms_container_stream["action"]).to eq("update")
+          expect(rooms_container_stream.at_css("template #rooms_list #room_#{room.id}[data-room-id='#{room.id}']")).to be_present
+          expect_targets_survive("summary_bar", "unassigned_sidebar", "rooms_container")
+        end
 
-      expect(response).to have_http_status(:ok)
-      expect(rooms_container_stream["action"]).to eq("update")
-      expect_targets_survive("summary_bar", "unassigned_sidebar", "rooms_container")
-    end
+        it "keeps #rooms_container after toggling an exemption" do
+          post toggle_exempt_admin_event_rooming_wizard_path(event.slug),
+            params: { participant_event_id: participant_event.id },
+            headers: turbo_headers
 
-    it "keeps the room card id when a room is updated" do
-      patch update_room_admin_event_rooming_wizard_path(event.slug),
-        params: { room_id: room.id, name: "Room Narwhal" },
-        headers: turbo_headers
+          expect(response).to have_http_status(:ok)
+          expect(rooms_container_stream["action"]).to eq("update")
+          expect_targets_survive("summary_bar", "unassigned_sidebar", "rooms_container")
+        end
 
-      expect(response).to have_http_status(:ok)
-      expect_targets_survive("summary_bar", "room_#{room.id}")
-    end
+        it "keeps the room card id when a room is updated" do
+          patch update_room_admin_event_rooming_wizard_path(event.slug),
+            params: { room_id: room.id, name: "Room Narwhal" },
+            headers: turbo_headers
 
-    it "keeps the room card id when staff are added" do
-      post add_staff_admin_event_rooming_wizard_path(event.slug),
-        params: { room_id: room.id, staff_name: "Captain Placeholder" },
-        headers: turbo_headers
+          expect(response).to have_http_status(:ok)
+          expect_targets_survive("summary_bar", "room_#{room.id}")
+        end
 
-      expect(response).to have_http_status(:ok)
-      expect_targets_survive("summary_bar", "room_#{room.id}")
-    end
+        it "keeps the room card id when staff are added" do
+          post add_staff_admin_event_rooming_wizard_path(event.slug),
+            params: { room_id: room.id, staff_name: "Captain Placeholder" },
+            headers: turbo_headers
 
-    it "renders #rooms_container exactly once on the initial page" do
-      get assignments_admin_event_rooming_wizard_path(event.slug)
+          expect(response).to have_http_status(:ok)
+          expect_targets_survive("summary_bar", "room_#{room.id}")
+        end
 
-      page = Nokogiri::HTML5(response.body)
-      expect(page.css("#rooms_container").size).to eq(1)
-      expect(page.css("#rooms_container > #rooms_list").size).to eq(1)
+        it "renders #rooms_container exactly once on the initial page" do
+          get assignments_admin_event_rooming_wizard_path(event.slug)
+
+          page = Nokogiri::HTML5(response.body)
+          expect(page.css("#rooms_container").size).to eq(1)
+          expect(page.css("#rooms_container > #rooms_list").size).to eq(1)
+        end
+      end
     end
   end
 
   describe "POST link_preference" do
-    it "updates the preference links wrapper instead of replacing it" do
-      participant_event = create(:participant_event, event: event).tap(&:create_accommodation!)
-      target = create(:participant_event, event: event).tap(&:create_accommodation!)
+    { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+      context ui do
+        before { admin.update!(admin_console_beta: console) }
 
-      post link_preference_admin_event_rooming_wizard_path(event.slug),
-        params: { participant_event_id: participant_event.id, target_participant_event_id: target.id, kind: "preference", rank: 1 },
-        headers: { "Accept" => "text/vnd.turbo-stream.html" }
+        it "updates the preference links wrapper instead of replacing it" do
+          participant_event = create(:participant_event, event: event).tap(&:create_accommodation!)
+          target = create(:participant_event, event: event).tap(&:create_accommodation!)
 
-      stream = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='preference_links_#{participant_event.id}']")
-      expect(stream["action"]).to eq("update")
+          post link_preference_admin_event_rooming_wizard_path(event.slug),
+            params: { participant_event_id: participant_event.id, target_participant_event_id: target.id, kind: "preference", rank: 1 },
+            headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+          stream = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='preference_links_#{participant_event.id}']")
+          expect(stream["action"]).to eq("update")
+        end
+      end
     end
   end
 end

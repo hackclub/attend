@@ -1,4 +1,5 @@
 <% content_for :title, "Participants – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Participants", nil ]) %>
 
 <div<% if current_event.slack_channel_id.present? %> data-controller="sync-slack" data-sync-slack-preview-url-value="<%= sync_slack_channel_preview_admin_event_participants_path(current_event) %>" data-sync-slack-form-url-value="<%= sync_slack_channel_admin_event_participants_path(current_event) %>"<% end %>>
   <% if current_event.slack_channel_id.present? %>

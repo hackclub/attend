@@ -17,8 +17,30 @@ module ConsoleHelper
     stopped: '<circle cx="8" cy="8" r="7"/><path d="M5 8h6"/>'
   }.freeze
 
-  def admin_console_theme
+  # True when this request renders the +console template variant. Helpers
+  # shared by both admin UIs branch on it, so the original templates keep
+  # their Tailwind markup and the console gets cs-* markup.
+  def console_ui?
+    respond_to?(:request) && request.present? && Array(request.variant).include?(:console)
+  end
+
+  SYSTEM_THEME = "system".freeze
+
+  # The console's theme setting: "light", "dark" or "system". Any of the
+  # nine app themes collapses to light or dark; "system" follows the OS.
+  def admin_console_theme_mode
+    raw = (current_user.respond_to?(:theme) && current_user&.theme.presence) || cookies[:attend_theme].presence
+    return SYSTEM_THEME if raw == SYSTEM_THEME
+
     LIGHT_THEMES.include?(current_theme) ? "light" : "dark"
+  end
+
+  # What the server renders into data-theme. "system" can only be resolved
+  # in the browser, so it renders light and the layout's pre-paint script
+  # switches to dark when the OS asks for it.
+  def admin_console_theme
+    mode = admin_console_theme_mode
+    mode == SYSTEM_THEME ? "light" : mode
   end
 
   # Cloudscape's status indicator: an icon plus a coloured word. The word
@@ -62,6 +84,19 @@ module ConsoleHelper
         end)
       end
     end
+  end
+
+  # The trail for any page under an event: Events › {event} › *crumbs.
+  # `event_name` lets a form page keep the saved name while an edit is invalid.
+  #   content_for :breadcrumbs, cs_event_breadcrumbs([ "Incidents", admin_event_incidents_path(current_event) ], [ "New incident", nil ])
+  def cs_event_breadcrumbs(*crumbs, event: current_event, event_name: event.name, event_slug: event.slug)
+    cs_breadcrumbs([ "Events", admin_root_path ], [ event_name, admin_event_dashboard_path(event_slug) ], *crumbs)
+  end
+
+  # A crumb whose target is policy-gated: links only when the viewer passes
+  # the gate, otherwise it renders as plain text so it never dead-ends.
+  def cs_gated_crumb(label, path, allowed)
+    [ label, (path if allowed) ]
   end
 
   # Cloudscape severity badge for incidents and other graded things.

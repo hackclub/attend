@@ -1,5 +1,5 @@
 <% content_for :title, "Edit #{@series.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Series", admin_series_index_path ], [ @series.name, admin_series_path(@series) ], [ "Settings", nil ]) %>
+<% content_for :breadcrumbs, cs_breadcrumbs(cs_gated_crumb("Event series", admin_series_index_path, policy(EventSeries).index?), [ @series.name, admin_series_path(@series) ], [ "Settings", nil ]) %>
 
 <div class="cs-stack max-w-3xl">
   <div class="cs-header">

@@ -1,5 +1,5 @@
 <% content_for :title, "Incident Report – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Incident reports", admin_incidents_path ], [ "Incident report", nil ]) %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Incident reports", admin_incidents_path ], [ truncate(@incident_report.summary.presence || "Incident report", length: 60), nil ]) %>
 
 <div class="cs-stack max-w-3xl">
   <div class="cs-header">
@@ -10,9 +10,6 @@
         <%= incident_status(@incident_report.status) %>
         <%= incident_report_priority_badge(@incident_report.priority) %>
       </p>
-    </div>
-    <div class="cs-actions">
-      <%= link_to "Back to all reports", admin_incidents_path, class: "cs-btn cs-btn-link" %>
     </div>
   </div>
 

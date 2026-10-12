@@ -1,5 +1,5 @@
 <% content_for :title, "Edit #{@event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Events", admin_root_path ], [ @event.name_was.presence || @event.name, admin_event_dashboard_path(@event.slug_was.presence || @event.slug) ], [ "Settings", nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Event settings", nil ], event: @event, event_name: @event.name_was.presence || @event.name, event_slug: @event.slug_was.presence || @event.slug) %>
 
 <div class="cs-header">
   <div class="cs-header-text">

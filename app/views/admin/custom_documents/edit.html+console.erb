@@ -1,5 +1,5 @@
 <% content_for :title, "Edit #{@custom_document.name} – #{current_event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Integrations", admin_event_integrations_path(current_event) ], [ "Edit #{@custom_document.name}", nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs(cs_gated_crumb("Integrations", admin_event_integrations_path(current_event), policy(current_event).manage_integrations?), [ @custom_document.name_was.presence || @custom_document.name, nil ]) %>
 <% locked = @custom_document.consents.exists? %>
 
 <div class="cs-stack max-w-3xl">

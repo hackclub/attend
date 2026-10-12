@@ -1,4 +1,5 @@
 <% content_for :title, "Messages – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Messages", nil ]) %>
 
 <% message_status_types = {
      "draft" => :stopped,

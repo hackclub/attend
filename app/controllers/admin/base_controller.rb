@@ -1,6 +1,7 @@
 module Admin
   class BaseController < ApplicationController
     before_action :authenticate_user!
+    before_action :set_admin_ui_variant
     before_action :authorize_admin_access
     before_action :set_current_event_from_session
     before_action :switch_event_if_needed
@@ -37,6 +38,14 @@ module Admin
     end
 
     private
+
+    # Staff who opt into the beta (Admin::ConsoleBetaController) get the
+    # console redesign: every *.html+console.erb template, layout included,
+    # wins over its *.html.erb original. Set before any action runs so
+    # renders, Turbo Stream responses and render_to_string all see it.
+    def set_admin_ui_variant
+      request.variant = :console if current_user&.admin_console_beta?
+    end
 
     def authorize_admin_access
       unless current_user&.admin?

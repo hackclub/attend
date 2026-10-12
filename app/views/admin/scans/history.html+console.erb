@@ -1,13 +1,10 @@
 <% content_for :title, "Scan History – #{current_event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Check-ins", admin_event_scans_path(current_event) ], [ "Scan history", nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Check-ins", admin_event_scans_path(current_event) ], [ "Scan history", nil ]) %>
 
 <div class="cs-header">
   <div class="cs-header-text">
     <h1 class="cs-h1">Scan history <span class="cs-counter">(<%= @total_count %>)</span></h1>
     <p class="cs-description"><%= @total_count %> total scans</p>
-  </div>
-  <div class="cs-actions">
-    <%= link_to "Back to check-ins", admin_event_scans_path(current_event), class: "cs-btn" %>
   </div>
 </div>
 

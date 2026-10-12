@@ -13,6 +13,11 @@
    ]
    current_index = steps.index { |s| s[:key] == current_step } %>
 
+<%# The step list below names the step, so the trail stops at "Setup". %>
+<% content_for :breadcrumbs, persisted ?
+     cs_event_breadcrumbs([ "Setup", nil ], event: @event) :
+     cs_breadcrumbs([ "Events", admin_root_path ], [ "New event", nil ]) %>
+
 <div class="cs-wizard">
   <nav class="cs-wizard-nav" aria-label="Event setup steps">
     <ol>

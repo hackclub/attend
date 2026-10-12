@@ -1,4 +1,5 @@
 <% content_for :title, "Participants Table – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Participants", nil ]) %>
 
 <div data-controller="data-table"
      data-data-table-base-url-value="<%= table_admin_event_participants_path(current_event) %>"

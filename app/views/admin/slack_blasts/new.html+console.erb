@@ -1,4 +1,4 @@
-<% content_for :breadcrumbs, cs_breadcrumbs([ current_event.name, admin_event_dashboard_path(current_event.slug) ], [ "Send Slack blast", nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Messages", admin_event_messages_path(current_event) ], [ "Slack blasts", admin_event_slack_blasts_path(current_event) ], [ "Send Slack blast", nil ]) %>
 
 <div class="max-w-2xl">
   <div class="cs-header">

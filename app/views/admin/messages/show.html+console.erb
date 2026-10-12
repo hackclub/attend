@@ -1,5 +1,5 @@
 <% content_for :title, "#{@message.subject.presence || 'Message'} – #{current_event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Messages", admin_event_messages_path(current_event) ], [ @message.subject.presence || "No subject", nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Messages", admin_event_messages_path(current_event) ], [ @message.subject.presence || "No subject", nil ]) %>
 
 <% message_status_types = {
      "draft" => :stopped,

@@ -15,7 +15,20 @@ RSpec.describe "Admin::Messages", type: :request do
       }.not_to change(Message, :count)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Compose message")
+      expect(response.body).to include("Compose Message")
+    end
+
+    context "with the admin console beta" do
+      before { admin.update!(admin_console_beta: true) }
+
+      it "renders the sentence-case compose form without creating a draft" do
+        expect {
+          get new_admin_event_message_path(event_slug: event.slug)
+        }.not_to change(Message, :count)
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("Compose message")
+      end
     end
   end
 

@@ -532,7 +532,9 @@
  * pages. Cloudscape's app layout gives every page the same content area,
  * left-aligned against the side nav, so top-level wrappers are released
  * and the area gets one cap for very wide screens. */
-.cs-main > * { max-width: 1680px; }
+/* Fixed overlays (modals and their backdrops) sit at this level too and must
+ * still cover the whole viewport, so they're left out of the cap. */
+.cs-main > :not(.cs-modal-overlay, .fixed) { max-width: 1680px; }
 
 :root.cs-console .cs-main > [class*="max-w-"] {
   max-width: 1680px;
@@ -2465,4 +2467,55 @@
   /* Cloudscape's "primary" link: underlined, for a link that sits inside
    * a run of text outside a paragraph (a key-value line, a table cell). */
   .cs-link-inline { text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+}
+
+@layer components {
+  /* The opt-in beta notice under the top nav (layouts/admin.html+console.erb).
+   * Cloudscape's info treatment, one quiet line that wraps on phones. Its
+   * gutters match .cs-breadcrumbs and .cs-main so the text lines up with the
+   * page below it. */
+  .cs-beta-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 16px;
+    padding: 11px 16px;
+    background-color: var(--cs-info-bg);
+    border-bottom: 1px solid var(--cs-border-divider-secondary);
+    color: var(--cs-text-body);
+    font-size: 14px;
+    line-height: 20px;
+
+    p { margin: 0; min-width: 0; }
+    form { display: inline-flex; }
+  }
+
+  .cs-beta-bar-actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 16px;
+  }
+
+  @media (min-width: 640px) {
+    .cs-beta-bar { padding-left: 24px; padding-right: 24px; }
+  }
+
+  @media (min-width: 1024px) {
+    .cs-beta-bar { padding-left: 40px; padding-right: 40px; }
+  }
+
+  .cs-beta-bar-link {
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--cs-info);
+    font: inherit;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover { text-decoration: underline; text-underline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--cs-info); outline-offset: 2px; border-radius: 2px; }
+  }
 }

@@ -1,4 +1,4 @@
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Participants", admin_event_participants_path(current_event) ], [ "Import progress", nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Participants", admin_event_participants_path(current_event) ], [ "Import participants", new_admin_event_import_path(current_event) ], [ "Import progress", nil ]) %>
 <% progress_state_class = @import_batch.completed? ? "cs-progress-success" : (@import_batch.failed? ? "cs-progress-error" : nil) %>
 
 <div data-controller="import-progress" data-import-progress-import-batch-id-value="<%= @import_batch.id %>">

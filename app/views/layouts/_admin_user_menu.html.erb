@@ -17,10 +17,15 @@
       <span class="cs-menu-item-label">Profile settings</span>
     <% end %>
     <div class="cs-menu-divider"></div>
-    <div class="px-4 py-2">
-      <p class="cs-kv-label mb-1">Theme</p>
-      <%= render "shared/theme_picker", compact: true %>
-      <p class="cs-small cs-muted mt-1">The console shows light themes in light mode and the rest in dark.</p>
+    <div class="px-4 py-2" data-controller="console-theme" data-console-theme-url-value="<%= update_theme_path %>">
+      <p class="cs-kv-label mb-2" id="cs-theme-label">Theme</p>
+      <div class="cs-segmented flex flex-nowrap w-full" role="group" aria-labelledby="cs-theme-label">
+        <% [ %w[light Light], %w[dark Dark], %w[system System] ].each do |mode, label| %>
+          <button type="button" class="cs-segment flex-1 px-2 text-center" data-mode="<%= mode %>"
+                  data-console-theme-target="option" data-action="console-theme#choose"
+                  aria-pressed="<%= admin_console_theme_mode == mode %>"><%= label %></button>
+        <% end %>
+      </div>
     </div>
     <div class="cs-menu-divider"></div>
     <%= button_to destroy_user_session_path, method: :delete, class: "cs-menu-item", form: { class: "block" } do %>

@@ -1,13 +1,10 @@
 <% content_for :title, "New Incident – #{current_event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ current_event.name, admin_event_dashboard_path(current_event.slug) ], [ "Incidents", admin_event_incidents_path(current_event) ], [ "New incident", nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Incidents", admin_event_incidents_path(current_event) ], [ "New incident", nil ]) %>
 
 <div class="cs-stack max-w-3xl">
   <div class="cs-header">
     <div class="cs-header-text">
       <h1 class="cs-h1">New incident</h1>
-    </div>
-    <div class="cs-actions">
-      <%= link_to "Back to incidents", admin_event_incidents_path(current_event), class: "cs-btn cs-btn-link" %>
     </div>
   </div>
 

@@ -1,10 +1,5 @@
 <% content_for :title, "Edit Emergency Contact – #{@participant_event.participant.display_name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs(
-     [ "Participants", admin_event_participants_path(current_event) ],
-     [ @participant_event.participant.display_name, admin_event_participant_path(current_event, @participant_event) ],
-     [ "Safeguarding", safeguarding_admin_event_participant_path(current_event, @participant_event) ],
-     [ "Edit emergency contact", nil ]
-   ) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Participants", admin_event_participants_path(current_event) ], [ participant_name(@participant_event.participant), admin_event_participant_path(current_event, @participant_event) ], cs_gated_crumb("Safeguarding", safeguarding_admin_event_participant_path(current_event, @participant_event), policy(@participant_event).view_safeguarding?), [ "Edit emergency contact", nil ]) %>
 
 <div class="max-w-3xl">
   <div class="cs-header">

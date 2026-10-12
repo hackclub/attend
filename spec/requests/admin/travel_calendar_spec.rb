@@ -85,7 +85,7 @@ RSpec.describe "Admin::TravelCalendar", type: :request do
         get "/admin/events/#{event.slug}/travel"
 
         expect(response).to have_http_status(:ok)
-        context = Nokogiri::HTML(response.body).at_css("main header p")&.text&.squish
+        context = Nokogiri::HTML(response.body).at_css("header p")&.text&.squish
         expect(context).to eq("#{event.name} · times in #{expected_label}")
         expect(context).not_to end_with("times in")
       end
@@ -141,7 +141,7 @@ RSpec.describe "Admin::TravelCalendar", type: :request do
       get "/admin/events/#{event.slug}/travel"
 
       nav = Nokogiri::HTML(response.body).at_css("nav[aria-label='Travel filters']")
-      expect(nav["class"].split).to include("cs-container", "sticky", "top-(--cs-topnav-height)", "z-20")
+      expect(nav["class"].split).to include("sticky", "top-12", "lg:top-0", "z-20", "bg-(--bg-elev-2)")
     end
 
     it "indexes free-form travel details for client-side search" do
@@ -277,16 +277,61 @@ RSpec.describe "Admin::TravelCalendar", type: :request do
     it "marks the sidebar link active only on the canonical travel calendar path" do
       get admin_event_travel_path(event)
 
-      calendar_links = Nokogiri::HTML(response.body).css("a").select { |link| link.text.strip == "Travel calendar" }
+      calendar_links = Nokogiri::HTML(response.body).css("a").select { |link| link.text.strip == "Travel Calendar" }
       expect(calendar_links).not_to be_empty
-      expect(calendar_links).to all(satisfy { |link| link["aria-current"] == "page" })
+      expect(calendar_links).to all(satisfy { |link| link["class"].split.include?("nav-item-active") })
 
       participant_event = create(:participant_event, event: event)
       get travel_admin_event_participant_path(event, participant_event)
 
-      calendar_links = Nokogiri::HTML(response.body).css("a").select { |link| link.text.strip == "Travel calendar" }
+      calendar_links = Nokogiri::HTML(response.body).css("a").select { |link| link.text.strip == "Travel Calendar" }
       expect(calendar_links).not_to be_empty
-      expect(calendar_links).to all(satisfy { |link| link["aria-current"].nil? })
+      expect(calendar_links).to all(satisfy { |link| link["class"].split.exclude?("nav-item-active") })
+    end
+
+    context "with the admin console beta" do
+      before { admin.update!(admin_console_beta: true) }
+
+      it "renders the effective event timezone in the page header for valid, blank, and invalid values" do
+        {
+          "America/Los_Angeles" => "America/Los_Angeles",
+          "" => "Etc/UTC",
+          "Not/A_Timezone" => "Etc/UTC"
+        }.each do |stored_timezone, expected_label|
+          event.update_column(:timezone, stored_timezone)
+
+          get "/admin/events/#{event.slug}/travel"
+
+          expect(response).to have_http_status(:ok)
+          context = Nokogiri::HTML(response.body).at_css("main header p")&.text&.squish
+          expect(context).to eq("#{event.name} · times in #{expected_label}")
+          expect(context).not_to end_with("times in")
+        end
+      end
+
+      it "keeps the filters below the console top navigation while scrolling" do
+        create_journey(mode: "train", direction: "inbound", arrival_time: Time.utc(2026, 8, 24, 17))
+
+        get "/admin/events/#{event.slug}/travel"
+
+        nav = Nokogiri::HTML(response.body).at_css("nav[aria-label='Travel filters']")
+        expect(nav["class"].split).to include("cs-container", "sticky", "top-(--cs-topnav-height)", "z-20")
+      end
+
+      it "marks the side navigation link current only on the canonical travel calendar path" do
+        get admin_event_travel_path(event)
+
+        calendar_links = Nokogiri::HTML(response.body).css("a").select { |link| link.text.strip == "Travel calendar" }
+        expect(calendar_links).not_to be_empty
+        expect(calendar_links).to all(satisfy { |link| link["aria-current"] == "page" })
+
+        participant_event = create(:participant_event, event: event)
+        get travel_admin_event_participant_path(event, participant_event)
+
+        calendar_links = Nokogiri::HTML(response.body).css("a").select { |link| link.text.strip == "Travel calendar" }
+        expect(calendar_links).not_to be_empty
+        expect(calendar_links).to all(satisfy { |link| link["aria-current"].nil? })
+      end
     end
   end
 

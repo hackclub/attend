@@ -4,6 +4,11 @@
 
 <% if params[:return_to] == "integrations" %>
   <%# Reached from the integrations page, outside of setup: no step list. %>
+  <% content_for :breadcrumbs, cs_event_breadcrumbs(
+       cs_gated_crumb("Integrations", admin_event_integrations_path(@event), policy(@event).manage_integrations?),
+       [ "Set up waivers", nil ],
+       event: @event
+     ) %>
   <div class="cs-header">
     <div class="cs-header-text">
       <h1 class="cs-h1">Set up waivers</h1>

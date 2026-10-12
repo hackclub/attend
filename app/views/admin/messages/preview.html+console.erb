@@ -1,4 +1,4 @@
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Messages", admin_event_messages_path(current_event) ], [ "Compose message", edit_admin_event_message_path(current_event, @message) ], [ "Preview and send", nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Messages", admin_event_messages_path(current_event) ], [ "Compose message", edit_admin_event_message_path(current_event, @message) ], [ "Preview and send", nil ]) %>
 
 <div class="max-w-4xl">
   <div class="cs-header">

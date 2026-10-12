@@ -1,5 +1,5 @@
 <% content_for :title, "Dashboard – #{@event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Events", admin_root_path ], [ @event.name, nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs(event: @event) %>
 
 <% phase_status_types = { active: :success, starting: :success, upcoming: :info, planning: :pending, draft: :pending, ended: :stopped } %>
 <% awaiting_count = (@display_status_counts["Awaiting Participant"] || 0) + (@display_status_counts["Awaiting Parent"] || 0) %>

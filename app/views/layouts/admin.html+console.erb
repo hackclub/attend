@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <%# The admin console. Its look is AWS's Cloudscape design system, tuned to
     Hack Club red — see app/assets/stylesheets/console.css. %>
-<html lang="en" class="h-full cs-console" data-theme="<%= admin_console_theme %>" data-console-light-themes="<%= ConsoleHelper::LIGHT_THEMES.to_json %>">
+<html lang="en" class="h-full cs-console" data-theme="<%= admin_console_theme %>" data-theme-mode="<%= admin_console_theme_mode %>" data-console-light-themes="<%= ConsoleHelper::LIGHT_THEMES.to_json %>">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -42,9 +42,11 @@
     <%= stylesheet_link_tag "hackclub", "data-turbo-track": "reload" %>
     <%= stylesheet_link_tag "themes", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
-    <%# Applied before first paint so a collapsed side nav doesn't flash open. %>
+    <%# Applied before first paint so a collapsed side nav doesn't flash open,
+        and a "system" theme doesn't flash light on a dark-mode machine. %>
     <%= javascript_tag nonce: true do %>
       try { if (localStorage.getItem("attend-console-nav") === "collapsed") document.documentElement.classList.add("cs-nav-collapsed") } catch (e) {}
+      if (document.documentElement.dataset.themeMode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches) document.documentElement.dataset.theme = "dark"
     <% end %>
   </head>
 
@@ -122,6 +124,19 @@
         </aside>
 
         <div class="cs-content">
+          <%# Staff opt in from the original admin (Admin::ConsoleBetaController).
+              Switching back skips Turbo so the redirect is a full page load. %>
+          <div class="cs-beta-bar" role="region" aria-label="New admin beta">
+            <p>You're testing the new admin.</p>
+            <div class="cs-beta-bar-actions">
+              <%# mail_to URL-encodes subject and body with ERB::Util.url_encode. %>
+              <%= mail_to "attend@hackclub.com", "Give feedback", class: "cs-beta-bar-link",
+                    subject: "New admin feedback", body: "Page: #{request.path}\n\n" %>
+              <%= button_to "Switch back", admin_console_beta_path, method: :patch, params: { enabled: false },
+                    class: "cs-beta-bar-link", form: { data: { turbo: false } } %>
+            </div>
+          </div>
+
           <% if content_for?(:breadcrumbs) %>
             <div class="cs-breadcrumbs">
               <%= yield :breadcrumbs %>
