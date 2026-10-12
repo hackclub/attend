@@ -92,13 +92,14 @@ RSpec.describe Privacy::Eraser do
 
   it "keeps a consent the guardian signed for a child who stays, with its uploads" do
     consent = registration.consents.create!(consent_type: "waiver", status: "signed", guardian_participant_event: guardian_link,
-      docuseal_envelope_id: "fake-envelope")
+      docuseal_envelope_id: "fake-envelope", docuseal_guardian_slug: "fake-guardian-slug", docuseal_participant_slug: "fake-participant-slug")
     consent.physical_uploads.attach(io: file_fixture("headshot.png").open, filename: "signed.png", content_type: "image/png")
 
     result = described_class.new(subject_for(emails: [ "parent@example.com" ])).call(dry_run: false)
 
     expect(Guardian.exists?(guardian.id)).to be(false)
-    expect(consent.reload).to have_attributes(guardian_participant_event_id: nil, status: "signed")
+    expect(consent.reload).to have_attributes(guardian_participant_event_id: nil, status: "signed",
+      docuseal_guardian_slug: nil, docuseal_participant_slug: "fake-participant-slug")
     expect(consent.physical_uploads).to be_attached
     expect(result.retained).to include(a_hash_including(type: "guardian-signed documents", count: 1))
   end
@@ -122,6 +123,17 @@ RSpec.describe Privacy::Eraser do
   end
 
   describe "matching only the subject" do
+    it "doesn't follow a Slack ID on a registration to the participant's account" do
+      participant.update!(slack_user_id: nil)
+      user.update!(slack_user_id: nil)
+      registration.update!(slack_user_id: "U0TYPO1")
+
+      described_class.new(subject_for(slack_id: "U0TYPO1")).call(dry_run: false)
+
+      expect(Participant.exists?(participant.id)).to be(false)
+      expect(User.exists?(user.id)).to be(true)
+    end
+
     it "leaves blank-email rows alone when the hub sends no emails" do
       other = create(:participant_event, event: past_event)
       blank = other.emergency_contacts.create!(name: "Fictional Contact", phone: "+12025550102", email: "")

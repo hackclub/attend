@@ -100,7 +100,7 @@ commits.
 | Kept | Why |
 | --- | --- |
 | Signed documents in DocuSeal | Liability records. Attend's own consent rows go, so it no longer links to them |
-| Documents a guardian signed for a child who stays registered | The consent and any paper upload belong to the child's registration; only the link to the erased guardian is removed |
+| Documents a guardian signed for a child who stays registered | The consent and any paper upload belong to the child's registration; only the link to the erased guardian and their DocuSeal signing reference are removed |
 | Airtable copies | Synced to event organisers' Airtable bases, which aren't touched here |
 
 ## Dry runs

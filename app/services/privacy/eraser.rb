@@ -61,7 +61,7 @@ module Privacy
     DOCUSEAL_REASON = "signed waivers and documents stay in DocuSeal as liability records; " \
                       "Attend's copy of the signing status and its link to them are removed".freeze
     GUARDIAN_CONSENT_REASON = "documents a guardian signed for a child who stays registered remain on the child's record, " \
-                              "with the link to the guardian removed".freeze
+                              "with the link to the guardian and their DocuSeal signing reference removed".freeze
     AIRTABLE_REASON = "copies synced to event organisers' Airtable bases are not touched here".freeze
 
     def initialize(subject, now: Time.current)
@@ -120,9 +120,12 @@ module Privacy
                                    .or(Participant.where(id: ParticipantEvent.where(slack_user_id: slack_id).select(:participant_id)))
       end
       participant_ids = participants.pluck(:id)
-      # a participant matched on Slack alone still brings the account it
-      # belongs to
-      user_ids |= Participant.where(id: participant_ids).where.not(user_id: nil).pluck(:user_id)
+      # a participant matched on their own email or Slack ID brings the
+      # account it belongs to. A Slack ID on a registration doesn't: an
+      # organiser may have typed it, so it's not enough to delete an account
+      owned = email_in(Participant, :email, emails)
+      owned = owned.or(Participant.where(slack_user_id: slack_id)) if slack_id
+      user_ids |= owned.where.not(user_id: nil).pluck(:user_id)
       participant_event_ids = ParticipantEvent.where(participant_id: participant_ids).pluck(:id)
 
       # guardians matched directly, plus anyone whose only reason to be here
@@ -273,6 +276,9 @@ module Privacy
       PaperTrail::Version.where(whodunnit: users).update_all(whodunnit: nil) if users.any?
       AuditLog.where(actor_user_id: users).update_all(actor_user_id: nil) if users.any?
 
+      # before the guardian links go, while these can still be found
+      surviving_guardian_consents.update_all(docuseal_guardian_slug: nil)
+
       # these hang off a registration or account without a dependent: :destroy
       Note.where(participant_event_id: pes).or(Note.where(ticket_id: people.tickets)).delete_all
       # hospitality and nfc_tokens are tables from features since removed, with no models left
@@ -319,7 +325,8 @@ module Privacy
     end
 
     # consents a guardian being erased signed for a child who isn't. The
-    # guardian link is nullified and the consent, with its uploads, stays
+    # guardian link is nullified and their signing slug cleared; the consent,
+    # with its uploads, stays
     def surviving_guardian_consents
       Consent.where(guardian_participant_event_id: people.guardian_links).where.not(participant_event_id: people.participant_events)
     end
