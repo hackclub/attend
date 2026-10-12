@@ -270,7 +270,7 @@ Rails.application.routes.draw do
             delete :cancel
           end
         end
-      resources :staff, only: [ :index, :new, :create, :destroy ], controller: "event_staff"
+      resources :staff, only: [ :index, :new, :create, :update, :destroy ], controller: "event_staff"
       resources :registration_change_requests, only: [ :index, :show ] do
         member do
           patch :approve
