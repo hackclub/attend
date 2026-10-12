@@ -550,6 +550,26 @@ class OnboardingController < ApplicationController
     autosave_success
   end
 
+  # Saves records one at a time in a single transaction, so a later record can
+  # depend on an earlier one's id. Pass a lambda for a record that has to be
+  # built after the records before it are saved. The first failure rolls back.
+  def persist_autosave_records_in_order(records)
+    errors = nil
+
+    ActiveRecord::Base.transaction do
+      records.each do |record, attributes, label|
+        record = record.call if record.respond_to?(:call)
+        record.assign_attributes(attributes)
+        next if record.save
+
+        errors = autosave_record_errors(record, label)
+        raise ActiveRecord::Rollback
+      end
+    end
+
+    errors ? { success: false, errors: errors } : autosave_success
+  end
+
   def autosave_record_errors(record, label)
     errors = record.errors.full_messages.map { |error| "#{label}: #{error}" }
 
@@ -672,10 +692,11 @@ class OnboardingController < ApplicationController
         persist_autosave_records([ [ gpe, {}, "Guardian relationship" ] ])
       else
         guardian = Guardian.new
-        gpe = @participant_event.guardian_participant_events.build(guardian: guardian, relationship: relationship)
-        persist_autosave_records([
+        # The link validates guardian_id, which a new guardian only has once
+        # saved, so the link is built after the guardian rather than alongside it.
+        persist_autosave_records_in_order([
           [ guardian, guardian_attrs, "Guardian" ],
-          [ gpe, {}, "Guardian relationship" ]
+          [ -> { @participant_event.guardian_participant_events.build(guardian: guardian, relationship: relationship) }, {}, "Guardian relationship" ]
         ])
       end
     end
