@@ -1,0 +1,115 @@
+<% content_for :title, "#{@series.name} API Keys – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Series", admin_series_index_path ], [ @series.name, admin_series_path(@series) ], [ "API keys", nil ]) %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text flex items-center gap-3 min-w-0">
+      <%= render "admin/events/avatar", event: @series, size: 32, rounded: "rounded-lg" %>
+      <h1 class="cs-h1 truncate"><%= @series.name %> API keys</h1>
+    </div>
+    <div class="cs-actions">
+      <%= link_to "Members", admin_series_members_path(@series), class: "cs-btn cs-btn-full" %>
+    </div>
+  </div>
+
+  <% if flash[:series_api_token] %>
+    <div class="cs-alert cs-alert-success" role="status">
+      <%= cs_status_icon(:success) %>
+      <div class="min-w-0">
+        <p class="cs-alert-title">Your new API key</p>
+        <p class="flex flex-wrap items-center gap-2 my-1">
+          <span class="cs-copy">
+            <span class="cs-copy-value"><%= flash[:series_api_token] %></span>
+          </span>
+          <button type="button" class="cs-btn"
+                  data-controller="clipboard"
+                  data-clipboard-content-value="<%= flash[:series_api_token] %>"
+                  data-action="click->clipboard#copy">Copy</button>
+        </p>
+        <p>Copy this now — it won't be shown again. Send it as <code>Authorization: Bearer &lt;key&gt;</code>.</p>
+      </div>
+    </div>
+  <% end %>
+
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided">
+      <h2 class="cs-h2">Keys <span class="cs-counter">(<%= @series_api_tokens.size %>)</span></h2>
+    </div>
+    <% if @series_api_tokens.any? %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Last used</th>
+              <th scope="col">Created</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @series_api_tokens.each do |token| %>
+              <tr>
+                <td>
+                  <div class="font-mono break-all"><%= token.name %></div>
+                  <% if token.user %>
+                    <div class="cs-small cs-secondary">Created by <%= token.user.email %></div>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap">
+                  <% if token.last_used_at %>
+                    <%= "#{time_ago_in_words(token.last_used_at)} ago" %>
+                  <% else %>
+                    <%= cs_status(:pending, "Never") %>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap"><%= token.created_at.strftime("%B %d, %Y") %></td>
+                <td class="whitespace-nowrap text-right">
+                  <div class="flex items-center justify-end gap-2">
+                    <%= button_to "Rotate", rotate_admin_series_api_token_path(@series, token), method: :post,
+                          class: "cs-btn",
+                          data: { turbo_confirm: "Rotating issues a new secret and invalidates the current one. Integrations using this key will stop working until updated. Continue?" } %>
+                    <%= button_to "Revoke", admin_series_api_token_path(@series, token), method: :delete,
+                          class: "cs-btn cs-btn-link",
+                          data: { turbo_confirm: "This permanently revokes the key. Any integration using it will stop working. Continue?" } %>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="cs-empty">
+        <p class="cs-empty-title">No API keys for this series yet</p>
+        <p>One key covers every event in the series — and it's the only credential that can create new ones.</p>
+      </div>
+    <% end %>
+
+    <div class="cs-container-footer">
+      <%= form_with url: admin_series_api_tokens_path(@series), method: :post, class: "flex flex-col sm:flex-row items-stretch sm:items-end gap-2" do |f| %>
+        <div class="cs-field flex-1">
+          <%= f.label :name, "Key name", class: "cs-field-label" %>
+          <div class="flex items-center gap-1">
+            <span class="cs-secondary font-mono select-none"><%= current_user.email.to_s.split("@").first %>@</span>
+            <%= f.text_field :name, placeholder: "series-ops-integration", required: true, class: "cs-input font-mono" %>
+          </div>
+        </div>
+        <%= f.button "Create API key", class: "cs-btn cs-btn-primary" %>
+      <% end %>
+    </div>
+  </section>
+
+  <div class="cs-alert">
+    <%= cs_status_icon(:info) %>
+    <div>
+      <p class="cs-alert-title">What a series API key can do</p>
+      <ul class="mt-1 space-y-1">
+        <li><strong>Create events</strong> in this series, and only this series — the series is taken from the key, not the request</li>
+        <li><strong>Read and update</strong> every event in this series (schedule, location, module toggles)</li>
+        <li><strong>Act as an event API key</strong> on every event in the series: participant lookup, roster, invitations, travel calendar</li>
+        <li><strong>Not</strong> read medical, safeguarding or note data — those need a signed-in person, whatever key you hold</li>
+      </ul>
+      <p class="mt-2">Full reference: <%= link_to "API docs", docs_path, class: "cs-link" %> (Series section).</p>
+    </div>
+  </div>
+</div>

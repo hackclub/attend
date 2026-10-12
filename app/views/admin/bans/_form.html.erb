@@ -1,8 +1,7 @@
-<%= form_with model: [:admin, ban], class: "cs-stack" do |f| %>
+<%= form_with model: [:admin, ban], class: "space-y-6" do |f| %>
   <% if ban.errors.any? %>
-    <div class="cs-alert cs-alert-error" role="alert">
-      <%= cs_status_icon(:error) %>
-      <ul class="list-disc list-inside">
+    <div class="bg-red-50 border border-red-200 rounded-md p-4">
+      <ul class="list-disc list-inside text-sm text-red-600">
         <% ban.errors.full_messages.each do |message| %>
           <li><%= message %></li>
         <% end %>
@@ -10,59 +9,51 @@
     </div>
   <% end %>
 
-  <section class="cs-container">
-    <div class="cs-container-header">
-      <div>
-        <h2 class="cs-h2">Ban details</h2>
-        <p class="cs-container-description">Fields marked with <span class="text-(--cs-error)">*</span> are required.</p>
-      </div>
-    </div>
-    <div class="cs-container-body">
-      <div class="cs-field" data-controller="nested-form">
-        <%= f.label :ban_emails, label_text("Emails", required: true), class: "cs-field-label" %>
-        <p class="cs-field-description">Add the primary email plus any alias addresses. All share this ban's expiry.</p>
+  <p class="text-sm text-gray-500">Fields marked with <span class="text-red-500">*</span> are required.</p>
 
-        <div data-nested-form-target="container" class="space-y-2">
-          <% ban.ban_emails.each do |ban_email| %>
-            <%= f.fields_for :ban_emails, ban_email do |ef| %>
-              <div data-nested-form-target="item" class="flex items-center gap-2 <%= "hidden" if ef.object.marked_for_destruction? %>">
-                <%= ef.email_field :email, class: "cs-input flex-1", placeholder: "person@example.com" %>
-                <% if ef.object.persisted? %>
-                  <%= ef.hidden_field :_destroy, data: { nested_form_target: "destroyField" } %>
-                <% end %>
-                <button type="button" data-action="nested-form#remove" class="cs-btn cs-btn-link">Remove</button>
-              </div>
+  <div data-controller="nested-form">
+    <%= f.label :ban_emails, label_text("Emails", required: true), class: "block text-sm font-medium text-gray-700" %>
+    <p class="text-sm text-gray-500 mb-2">Add the primary email plus any alias addresses. All share this ban's expiry.</p>
+
+    <div data-nested-form-target="container" class="space-y-2">
+      <% ban.ban_emails.each do |ban_email| %>
+        <%= f.fields_for :ban_emails, ban_email do |ef| %>
+          <div data-nested-form-target="item" class="flex items-center gap-2 <%= "hidden" if ef.object.marked_for_destruction? %>">
+            <%= ef.email_field :email, class: "flex-1 rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750]", placeholder: "person@example.com" %>
+            <% if ef.object.persisted? %>
+              <%= ef.hidden_field :_destroy, data: { nested_form_target: "destroyField" } %>
             <% end %>
-          <% end %>
-        </div>
-
-        <template data-nested-form-target="template">
-          <%= f.fields_for :ban_emails, BanEmail.new, child_index: "NEW_RECORD" do |ef| %>
-            <div data-nested-form-target="item" class="flex items-center gap-2">
-              <%= ef.email_field :email, class: "cs-input flex-1", placeholder: "person@example.com" %>
-              <button type="button" data-action="nested-form#remove" class="cs-btn cs-btn-link">Remove</button>
-            </div>
-          <% end %>
-        </template>
-
-        <button type="button" data-action="nested-form#add" class="cs-btn mt-2">Add another email</button>
-      </div>
-
-      <div class="cs-field">
-        <%= f.label :expires_at, "Expires at", class: "cs-field-label" %>
-        <%= f.datetime_local_field :expires_at, value: ban.expires_at&.strftime("%Y-%m-%dT%H:%M"), class: "cs-input" %>
-        <p class="cs-field-hint">Leave blank for an indefinite ban.</p>
-      </div>
-
-      <div class="cs-field">
-        <%= f.label :reason, class: "cs-field-label" %>
-        <%= f.text_area :reason, rows: 3, class: "cs-input" %>
-      </div>
+            <button type="button" data-action="nested-form#remove" class="px-3 py-2 text-sm text-gray-500 hover:text-red-600">Remove</button>
+          </div>
+        <% end %>
+      <% end %>
     </div>
-  </section>
 
-  <div class="flex flex-col sm:flex-row justify-end gap-2">
-    <%= link_to "Cancel", admin_bans_path, class: "cs-btn cs-btn-link cs-btn-full" %>
-    <%= f.button submit_label, class: "cs-btn cs-btn-primary cs-btn-full" %>
+    <template data-nested-form-target="template">
+      <%= f.fields_for :ban_emails, BanEmail.new, child_index: "NEW_RECORD" do |ef| %>
+        <div data-nested-form-target="item" class="flex items-center gap-2">
+          <%= ef.email_field :email, class: "flex-1 rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750]", placeholder: "person@example.com" %>
+          <button type="button" data-action="nested-form#remove" class="px-3 py-2 text-sm text-gray-500 hover:text-red-600">Remove</button>
+        </div>
+      <% end %>
+    </template>
+
+    <button type="button" data-action="nested-form#add" class="mt-2 text-sm text-[#ec3750] hover:text-[#d42f46]">+ Add another email</button>
+  </div>
+
+  <div>
+    <%= f.label :expires_at, "Expires at", class: "block text-sm font-medium text-gray-700" %>
+    <%= f.datetime_local_field :expires_at, value: ban.expires_at&.strftime("%Y-%m-%dT%H:%M"), class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750]" %>
+    <p class="mt-1 text-sm text-gray-500">Leave blank for an indefinite ban.</p>
+  </div>
+
+  <div>
+    <%= f.label :reason, class: "block text-sm font-medium text-gray-700" %>
+    <%= f.text_area :reason, rows: 3, class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750]" %>
+  </div>
+
+  <div class="flex flex-col sm:flex-row justify-end gap-3">
+    <%= link_to "Cancel", admin_bans_path, class: "w-full sm:w-auto text-center px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors" %>
+    <%= f.submit submit_label, class: "w-full sm:w-auto px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] transition-colors cursor-pointer" %>
   </div>
 <% end %>

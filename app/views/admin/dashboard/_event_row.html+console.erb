@@ -1,0 +1,37 @@
+<%# One event row inside an events table. Expects an enclosing <tbody>. %>
+<%# Locals: event, group (optional: the series row group this row belongs
+    to, as { id:, expanded: }; indents the row and lets the group toggle it) %>
+<% group = local_assigns[:group] %>
+<% nested = group.present? %>
+<% if group %>
+  <tr id="<%= group[:id] %>-<%= event.id %>" data-cs-row-group-target="row" data-group="<%= group[:id] %>" <%= "hidden" unless group[:expanded] %>>
+<% else %>
+  <tr>
+<% end %>
+  <td>
+    <div class="flex items-center gap-3 min-w-0 <%= "pl-6" if nested %>">
+      <%= render "admin/events/avatar", event: event, size: 24, rounded: "rounded" %>
+      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+        <%= link_to event.name, admin_event_dashboard_path(event.slug), class: "cs-link cs-link-strong" %>
+        <% if event.registration_open? %>
+          <%= cs_badge("Registration open", "green") %>
+        <% end %>
+        <%# A finished event is never going to have its setup completed, so
+            the nag only belongs on events still ahead of the team. %>
+        <% if !event.completed? && !event.setup_complete? %>
+          <%= cs_badge("Setup incomplete", "yellow") %>
+        <% end %>
+      </div>
+    </div>
+  </td>
+  <td class="whitespace-nowrap"><%= event_phase_status(event) %></td>
+  <td class="whitespace-nowrap"><%= event_date_range(event.starts_at, event.ends_at) %></td>
+  <td class="whitespace-nowrap tabular-nums"><%= pluralize(event_participant_count(event), "participant") %></td>
+  <td>
+    <% if event.location_city.present? %>
+      <%= [ event.location_city, event.location_country ].compact.join(", ") %>
+    <% else %>
+      <span class="cs-muted">-</span>
+    <% end %>
+  </td>
+</tr>

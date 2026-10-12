@@ -1,0 +1,13 @@
+<% if current_event.groups_enabled? && current_event.groups.any? %>
+  <div class="mb-5 flex flex-wrap items-center gap-3">
+    <span class="cs-kv-label" id="rooming-group-filter-label">Group</span>
+    <div class="cs-segmented" role="group" aria-labelledby="rooming-group-filter-label">
+      <%= link_to "All", url_for(request.params.except(:group_id).merge(only_path: true)),
+          class: "cs-segment", "aria-current": ("page" if selected_group.nil?) %>
+      <% current_event.groups.ordered.each do |g| %>
+        <%= link_to g.name, url_for(request.params.merge(group_id: g.id, only_path: true)),
+            class: "cs-segment", "aria-current": ("page" if selected_group&.id == g.id) %>
+      <% end %>
+    </div>
+  </div>
+<% end %>

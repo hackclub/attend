@@ -1,0 +1,143 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Participants", admin_event_participants_path(current_event) ], [ "Import participants", new_admin_event_import_path(current_event) ], [ "Review import", nil ]) %>
+
+<div>
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Review import</h1>
+      <p class="cs-description">Review the participants before importing</p>
+    </div>
+    <div class="cs-actions">
+      <%= link_to "Cancel import", cancel_admin_event_import_path(current_event, @import_batch), data: { turbo_method: :delete, turbo_confirm: "Are you sure you want to cancel this import?" }, class: "cs-btn" %>
+    </div>
+  </div>
+
+  <div class="cs-stack">
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Summary</h2>
+      </div>
+      <div class="cs-container-body">
+        <dl class="cs-kv cs-kv-3 cs-kv-divided">
+          <div><dt class="cs-kv-label">Total rows</dt><dd class="cs-kv-value-lg"><%= @import_batch.total_count %></dd></div>
+          <div><dt class="cs-kv-label">Will be imported</dt><dd class="cs-kv-value-lg"><%= @valid_rows.count %></dd></div>
+          <div><dt class="cs-kv-label">Will be skipped</dt><dd class="cs-kv-value-lg"><%= @skipped_rows.count %></dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <% if @valid_rows.any? %>
+      <section class="cs-container">
+        <div class="cs-container-header cs-container-header-divided">
+          <h2 class="cs-h2">Participants to import <span class="cs-counter">(<%= @valid_rows.count %>)</span></h2>
+        </div>
+        <div class="cs-table-wrap">
+          <table class="cs-table cs-table-compact">
+            <thead>
+              <tr>
+                <th scope="col">Row</th>
+                <th scope="col">Name</th>
+                <th scope="col">Email</th>
+                <th scope="col">Parent email</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @valid_rows.first(100).each do |row| %>
+                <tr>
+                  <td class="cs-muted"><%= row[:row_number] %></td>
+                  <td class="font-bold"><%= row[:name].presence || "—" %></td>
+                  <td><%= row[:email] %></td>
+                  <td>
+                    <%= row[:parent_email].presence || "—" %>
+                    <% if row[:parent_email_conflict] %>
+                      <span class="block"><%= cs_status(:warning, "Same as participant email — no guardian will be created") %></span>
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+              <% if @valid_rows.count > 100 %>
+                <tr>
+                  <td colspan="4" class="cs-muted text-center">
+                    ... and <%= @valid_rows.count - 100 %> more
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    <% end %>
+
+    <% if @skipped_rows.any? %>
+      <section class="cs-container">
+        <div class="cs-container-header cs-container-header-divided">
+          <h2 class="cs-h2">Participants to skip <span class="cs-counter">(<%= @skipped_rows.count %>)</span></h2>
+        </div>
+        <div class="cs-table-wrap">
+          <table class="cs-table cs-table-compact">
+            <thead>
+              <tr>
+                <th scope="col">Row</th>
+                <th scope="col">Name</th>
+                <th scope="col">Email</th>
+                <th scope="col">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @skipped_rows.first(50).each do |row| %>
+                <tr>
+                  <td class="cs-muted"><%= row[:row_number] %></td>
+                  <td class="font-bold"><%= row[:name].presence || "—" %></td>
+                  <td><%= row[:email] %></td>
+                  <td><%= cs_status(:warning, row[:reason]) %></td>
+                </tr>
+              <% end %>
+              <% if @skipped_rows.count > 50 %>
+                <tr>
+                  <td colspan="4" class="cs-muted text-center">
+                    ... and <%= @skipped_rows.count - 50 %> more
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    <% end %>
+
+    <% unless @import_batch.send_invitations %>
+      <div class="cs-alert cs-alert-warning">
+        <%= cs_status_icon(:warning) %>
+        <div>
+          <p class="cs-alert-title">No emails will be sent</p>
+          <p>
+            <% if current_event.onboarding_invites_held? %>
+              This event is holding onboarding invitations.
+            <% end %>
+            <%= @valid_rows.count %> <%= "invitation".pluralize(@valid_rows.count) %> will be recorded as held and can be sent later from the participants page or the series page.
+          </p>
+        </div>
+      </div>
+    <% end %>
+
+    <% if @import_batch.send_invitations %>
+      <div class="cs-alert">
+        <%= cs_status_icon(:info) %>
+        <div>
+          <p class="cs-alert-title">Invitation emails will be sent</p>
+          <p>
+            <%= @valid_rows.count %> invitation emails will be sent after import completes.
+            Emails are sent at a rate of ~1 per second to avoid rate limits.
+            <strong>Estimated time: ~<%= (@valid_rows.count / 60.0).ceil %> minutes</strong>
+          </p>
+        </div>
+      </div>
+    <% end %>
+
+    <div class="flex justify-end gap-2">
+      <%= link_to "Cancel", cancel_admin_event_import_path(current_event, @import_batch), data: { turbo_method: :delete, turbo_confirm: "Are you sure?" }, class: "cs-btn cs-btn-link" %>
+      <%= form_with url: confirm_admin_event_import_path(current_event, @import_batch), method: :post, class: "inline" do %>
+        <%= button_tag "Start import", type: "submit", name: "commit", value: "Start Import", class: "cs-btn cs-btn-primary", disabled: @valid_rows.empty? %>
+      <% end %>
+    </div>
+  </div>
+</div>

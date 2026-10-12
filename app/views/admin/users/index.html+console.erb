@@ -1,0 +1,178 @@
+<%# The filters carried onto pagination links. Built by hand rather than with
+    params.permit: these are query-string filters, not model attributes. %>
+<% pagination_params = { search: params[:search].presence, role: params[:role].presence }.compact %>
+
+<div class="cs-stack">
+  <div class="cs-header mb-0!">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Users <span class="cs-counter">(<%= @total_count %>)</span></h1>
+      <p class="cs-description"><%= pluralize(@total_count, "user") %> total</p>
+    </div>
+    <div class="cs-actions">
+      <%= link_to "Add user", new_admin_user_path, class: "cs-btn cs-btn-primary" %>
+    </div>
+  </div>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Accounts</h2>
+    </div>
+    <%= form_with url: admin_users_path, method: :get, class: "cs-filter-bar", data: { turbo_frame: "_top" } do |f| %>
+      <label class="cs-search flex-1 min-w-[14rem]">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+        <%= f.search_field :search, value: params[:search], placeholder: "Find users by email or name", "aria-label": "Find users by email or name", class: "cs-input" %>
+      </label>
+      <%= f.select :role, [ [ "All roles", "" ], [ "Global admin", "global_admin" ], [ "Read only", "read_only" ], [ "No role", "none" ] ], { selected: params[:role] }, class: "cs-select w-auto!", "aria-label": "Global role" %>
+      <%= f.button "Search", name: "commit", value: "Search", class: "cs-btn" %>
+    <% end %>
+
+    <div class="cs-table-wrap border-t border-(--cs-border-divider-secondary)">
+      <table class="cs-table">
+        <thead>
+          <tr>
+            <th scope="col">User</th>
+            <th scope="col">Global role</th>
+            <th scope="col">Event roles</th>
+            <th scope="col">Last sign in</th>
+            <th scope="col" class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+        <% @users.each do |user| %>
+          <tr>
+            <td class="whitespace-nowrap">
+              <div class="flex items-center gap-3">
+                <% if user.avatar_displayable? %>
+                  <%= image_tag user.avatar.variant(resize_to_fill: [ 32, 32 ]), class: "w-8 h-8 rounded-full object-cover flex-shrink-0", alt: "" %>
+                <% else %>
+                  <span class="cs-avatar cs-small w-8! h-8! flex-shrink-0" aria-hidden="true"><%= user.initials %></span>
+                <% end %>
+                <div>
+                  <%= link_to user.display_name_or_fallback, admin_user_path(user), class: "cs-link cs-link-strong" %>
+                  <div class="cs-small cs-muted truncate max-w-[160px]" title="<%= user.email %>"><%= user.email %></div>
+                </div>
+              </div>
+            </td>
+            <td class="whitespace-nowrap">
+              <% if user.global_admin? %>
+                <%= cs_badge("Global admin", "red") %>
+              <% elsif user.read_only? %>
+                <%= cs_badge("Read only") %>
+              <% else %>
+                <span class="cs-muted">—</span>
+              <% end %>
+            </td>
+            <td class="whitespace-nowrap">
+              <%= pluralize(user.event_role_assignments.size, "role") %>
+              <% records = @participant_records_by_user[user.id] || [] %>
+              <% attendee_event_count = records.sum { |record| record.participant_events.size } %>
+              <% if attendee_event_count > 0 %>
+                <div class="cs-small cs-muted">Attendee at <%= pluralize(attendee_event_count, "event") %></div>
+              <% end %>
+              <% if records.any? { |record| record.user_id != user.id } %>
+                <div class="cs-small"><%= cs_status(:warning, "Unlinked participant record") %></div>
+              <% end %>
+            </td>
+            <td class="whitespace-nowrap cs-secondary">
+              <%= user.last_sign_in_at ? time_ago_in_words(user.last_sign_in_at) + " ago" : "Never" %>
+            </td>
+            <td class="whitespace-nowrap text-right">
+              <%= link_to "View", admin_user_path(user), class: "cs-link" %>
+              <%= link_to "Edit", edit_admin_user_path(user), class: "cs-link ml-4" %>
+            </td>
+          </tr>
+        <% end %>
+        </tbody>
+      </table>
+      <% if @users.empty? %>
+        <div class="cs-empty">
+          <% if params[:search].present? %>
+            <p class="cs-empty-title">No user account matches &ldquo;<%= params[:search] %>&rdquo;.</p>
+            <p>Accounts are created the first time someone signs in with Hack Club Auth.</p>
+          <% else %>
+            <p class="cs-empty-title">No users yet.</p>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <% if @total_pages > 1 %>
+      <div class="cs-container-footer flex flex-wrap items-center justify-between gap-3">
+        <span>
+          Showing <%= (@page - 1) * @per_page + 1 %> to <%= [ (@page * @per_page), @total_count ].min %> of <%= @total_count %> users
+        </span>
+        <nav class="cs-pagination" aria-label="Pagination">
+          <% if @page > 1 %>
+            <%= link_to admin_users_path(pagination_params.merge(page: @page - 1)), "aria-label": "Previous page" do %>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg>
+            <% end %>
+          <% else %>
+            <span aria-disabled="true" aria-label="Previous page"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg></span>
+          <% end %>
+          <span aria-current="page"><%= @page %></span>
+          <span class="cs-muted">of <%= @total_pages %></span>
+          <% if @page < @total_pages %>
+            <%= link_to admin_users_path(pagination_params.merge(page: @page + 1)), "aria-label": "Next page" do %>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>
+            <% end %>
+          <% else %>
+            <span aria-disabled="true" aria-label="Next page"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></span>
+          <% end %>
+        </nav>
+      </div>
+    <% end %>
+  </section>
+
+  <% if @unlinked_participants.any? %>
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <div>
+          <h2 class="cs-h2">Participants without an account <span class="cs-counter">(<%= @unlinked_participants.size %>)</span></h2>
+          <p class="cs-container-description">
+            <%= pluralize(@unlinked_participants.size, "participant") %> matching &ldquo;<%= params[:search] %>&rdquo;
+            <%= @unlinked_participants.size == 1 ? "has" : "have" %> never signed in, so
+            <%= @unlinked_participants.size == 1 ? "there is" : "there are" %> no user
+            <%= "account".pluralize(@unlinked_participants.size) %> to show above.
+          </p>
+        </div>
+      </div>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Participant</th>
+              <th scope="col">Events</th>
+              <th scope="col" class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @unlinked_participants.each do |participant| %>
+              <% participant_events = participant.participant_events.select(&:event).sort_by { |pe| pe.event.starts_at || Time.at(0) }.reverse %>
+              <tr>
+                <td class="whitespace-nowrap">
+                  <div class="font-bold"><%= participant.full_name %></div>
+                  <div class="cs-small cs-muted truncate max-w-[220px]" title="<%= participant.email %>"><%= participant.email %></div>
+                </td>
+                <td>
+                  <% if participant_events.any? %>
+                    <%= participant_events.map { |pe| pe.event.name }.join(", ") %>
+                  <% else %>
+                    <span class="cs-muted">Not registered for any event</span>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap text-right">
+                  <% latest = participant_events.first %>
+                  <% if latest %>
+                    <%= link_to "View participant", admin_event_participant_path(latest.event, latest), class: "cs-link" %>
+                  <% else %>
+                    <span class="cs-muted">—</span>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% end %>
+</div>

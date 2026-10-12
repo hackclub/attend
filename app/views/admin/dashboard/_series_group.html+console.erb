@@ -1,0 +1,45 @@
+<%# A series' events as an expandable row group in the events table: the
+    header row's caret button shows or hides the event rows under it. The
+    group starts collapsed unless it holds the event being managed. %>
+<%# Locals: series, events (this series' events, in list order) %>
+<% group = { id: "series-#{series.id}-#{SecureRandom.hex(3)}", expanded: current_event.present? && events.any? { |event| event.id == current_event.id } } %>
+<% series_start = events.filter_map(&:starts_at).min %>
+<% series_end = events.filter_map(&:ends_at).max %>
+<% series_participants = events.sum { |event| event_participant_count(event) } %>
+<% live_count = events.count(&:active?) %>
+<tr>
+  <td>
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+        <button type="button"
+                class="group inline-flex items-center gap-2 text-left font-bold cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cs-focus)"
+                aria-expanded="<%= group[:expanded] %>"
+                aria-controls="<%= events.map { |event| "#{group[:id]}-#{event.id}" }.join(" ") %>"
+                data-action="cs-row-group#toggle"
+                data-cs-row-group-group-param="<%= group[:id] %>">
+          <svg class="w-4 h-4 shrink-0 text-(--cs-text-secondary) transition-transform group-aria-expanded:rotate-90" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l5 4-5 4z"/></svg>
+          <%= render "admin/events/avatar", event: series, size: 24, rounded: "rounded" %>
+          <span><%= series.name %></span>
+        </button>
+        <%= cs_badge("Series") %>
+        <span class="cs-muted"><%= pluralize(events.count, "event") %></span>
+        <% if policy(series).show? %>
+          <%= link_to "View series", admin_series_path(series), class: "cs-link" %>
+        <% end %>
+      </div>
+    </div>
+  </td>
+  <td class="whitespace-nowrap">
+    <%# The series row summarises its events, so surface the one thing worth
+        interrupting for: an event running right now. %>
+    <% if live_count.positive? %>
+      <%= cs_status(:success, "#{live_count} active") %>
+    <% end %>
+  </td>
+  <td class="whitespace-nowrap"><%= event_date_range(series_start, series_end) %></td>
+  <td class="whitespace-nowrap tabular-nums"><%= pluralize(series_participants, "participant") %></td>
+  <td></td>
+</tr>
+<% events.each do |event| %>
+  <%= render "admin/dashboard/event_row", event: event, group: group %>
+<% end %>

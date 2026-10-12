@@ -1,0 +1,134 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Users", admin_users_path ], [ @user.display_name_or_fallback, admin_user_path(@user) ], [ "Edit", nil ]) %>
+
+<div class="cs-stack">
+  <div class="cs-header mb-0!">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Edit user: <%= @user.email %></h1>
+    </div>
+  </div>
+
+  <%= form_with model: [ :admin, @user ], class: "cs-stack", data: { controller: "avatar-preview", avatar_preview_remove_confirm_value: "Are you sure you want to remove this profile picture?" } do |f| %>
+    <%= hidden_field_tag "user[remove_avatar]", "0", data: { avatar_preview_target: "removeField" } %>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Profile</h2>
+      </div>
+      <div class="cs-container-body">
+        <dl class="cs-kv cs-kv-2 mb-5">
+          <div><dt class="cs-kv-label">Email</dt><dd class="cs-kv-value"><%= @user.email %></dd></div>
+          <div><dt class="cs-kv-label">Name (from OIDC)</dt><dd class="cs-kv-value"><%= @user.name || "—" %></dd></div>
+        </dl>
+
+        <div class="cs-field">
+          <span class="cs-field-label">Profile picture</span>
+          <div class="flex items-center gap-6">
+            <div class="relative" data-avatar-preview-target="container">
+              <% if @user.avatar_displayable? %>
+                <%= image_tag @user.avatar.variant(resize_to_fill: [ 96, 96 ]), class: "h-24 w-24 rounded-full object-cover", alt: "", data: { avatar_preview_target: "image" } %>
+              <% else %>
+                <div class="h-24 w-24 rounded-full bg-(--cs-badge-grey) text-(--cs-badge-on) flex items-center justify-center" data-avatar-preview-target="placeholder">
+                  <span class="text-2xl font-bold"><%= @user.initials %></span>
+                </div>
+                <img src="" alt="" class="h-24 w-24 rounded-full object-cover hidden" data-avatar-preview-target="image">
+              <% end %>
+            </div>
+            <div class="flex-1">
+              <%= f.file_field :avatar, accept: "image/jpeg,image/png,image/gif,image/webp", class: "cs-file", "aria-label": "Profile picture", data: { action: "change->avatar-preview#preview", avatar_preview_target: "input" } %>
+              <p class="cs-field-hint">JPG, PNG, GIF, or WebP up to 5MB</p>
+              <% if @user.avatar.attached? %>
+                <button type="button" class="cs-btn cs-btn-link mt-2 -ml-3" data-action="avatar-preview#remove">Remove picture</button>
+              <% end %>
+            </div>
+          </div>
+        </div>
+
+        <div class="cs-field">
+          <%= f.label :display_name, class: "cs-field-label" %>
+          <p class="cs-field-description">This name will be shown on comments, audit logs, and other activity. If left blank, the OIDC name or email will be used.</p>
+          <%= f.text_field :display_name, placeholder: @user.name || @user.email, class: "cs-input" %>
+        </div>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Access</h2>
+      </div>
+      <div class="cs-container-body">
+        <div class="cs-field">
+          <%= f.label :global_role, "Global role", class: "cs-field-label" %>
+          <%= f.select :global_role, [ [ "No role", "no_role" ], [ "Global admin", "global_admin" ], [ "Read only", "read_only" ] ], {}, class: "cs-select" %>
+          <p class="cs-field-hint">
+            <strong>Global admin:</strong> Full access to all events and settings.<br>
+            <strong>Read only:</strong> Can view all events but cannot make changes.<br>
+            <strong>No role:</strong> Only has access to specifically assigned events.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <div class="flex flex-col-reverse sm:flex-row justify-end gap-2">
+      <%= link_to "Cancel", admin_user_path(@user), class: "cs-btn cs-btn-link cs-btn-full" %>
+      <%= f.button "Save changes", class: "cs-btn cs-btn-primary cs-btn-full" %>
+    </div>
+  <% end %>
+
+  <% if @event_role_assignments.any? %>
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <h2 class="cs-h2">Event roles <span class="cs-counter">(<%= @event_role_assignments.size %>)</span></h2>
+      </div>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Event</th>
+              <th scope="col">Role</th>
+              <th scope="col">Assigned</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @event_role_assignments.each do |assignment| %>
+              <tr>
+                <td class="whitespace-nowrap">
+                  <%= link_to assignment.event.name, admin_event_dashboard_path(assignment.event.slug), class: "cs-link" %>
+                </td>
+                <td class="whitespace-nowrap"><%= assignment.role.titleize %></td>
+                <td class="whitespace-nowrap cs-secondary"><%= assignment.created_at.strftime("%B %d, %Y") %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% end %>
+
+  <% if @participant_events.any? %>
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <h2 class="cs-h2">Event attendance <span class="cs-counter">(<%= @participant_events.size %>)</span></h2>
+      </div>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Event</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @participant_events.each do |pe| %>
+              <tr>
+                <td class="whitespace-nowrap">
+                  <%= link_to pe.event.name, admin_event_dashboard_path(pe.event.slug), class: "cs-link" %>
+                </td>
+                <td class="whitespace-nowrap"><%= pe.status.titleize %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% end %>
+</div>

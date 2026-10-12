@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<%# The admin console. Its look is AWS's Cloudscape design system, tuned to
+    Hack Club red — see app/assets/stylesheets/console.css. %>
+<html lang="en" class="h-full cs-console" data-theme="<%= admin_console_theme %>" data-console-light-themes="<%= ConsoleHelper::LIGHT_THEMES.to_json %>">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="Attend">
+    <meta name="theme-color" content="<%= ConsoleHelper::CONSOLE_THEME_COLOR %>">
+    <%# Turbo swaps <body> but never <html>'s attributes, and the console is
+        switched on by html.cs-console and a collapsed data-theme. A tracked
+        element only this layout carries makes Turbo do a full load whenever a
+        visit crosses between the console and any other layout. %>
+    <meta name="attend-shell" content="console" data-turbo-track="reload">
+    <link rel="manifest" href="<%= pwa_manifest_path(format: :json) %>">
+
+    <title><%= content_for(:title) || "Admin – Attend – Hack Club" %></title>
+
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%= render "shared/plausible" %>
+
+    <%= yield :head %>
+
+    <% if google_maps_api_key.present? %>
+      <meta name="google-maps-api-key" content="<%= google_maps_api_key %>">
+    <% end %>
+
+    <meta name="current-event-id" content="<%= current_event&.id %>">
+    <meta name="current-event-slug" content="<%= current_event&.slug %>">
+    <meta name="global-admin" content="<%= current_user&.global_admin? %>">
+    <meta name="can-manage-integrations" content="<%= current_event.present? && policy(current_event).manage_integrations? %>">
+
+    <link rel="icon" href="/icon-32.png?v=3" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3">
+    <link rel="preload" href="<%= asset_path("open-sans-normal.woff2") %>" as="font" type="font/woff2" crossorigin>
+
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "hackclub", "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "themes", "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+    <%# Applied before first paint so a collapsed side nav doesn't flash open. %>
+    <%= javascript_tag nonce: true do %>
+      try { if (localStorage.getItem("attend-console-nav") === "collapsed") document.documentElement.classList.add("cs-nav-collapsed") } catch (e) {}
+    <% end %>
+  </head>
+
+  <body class="cs-body" data-controller="command-palette" data-command-palette-search-url-value="<%= admin_search_path %>">
+    <% if impersonating? %>
+      <div class="cs-impersonation" role="status">
+        <span>You are impersonating <strong><%= current_user.display_name_or_fallback %></strong>.</span>
+        <%= button_to "Stop impersonating", stop_impersonation_path, method: :delete, form: { class: "inline" } %>
+      </div>
+    <% end %>
+
+    <div class="contents" data-controller="mobile-menu">
+      <header class="cs-topnav">
+        <button type="button" class="cs-topnav-icon-button lg:hidden" data-action="mobile-menu#toggle" aria-label="Open navigation">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+
+        <%= link_to admin_root_path, class: "cs-topnav-identity" do %>
+          <img src="/flag.png" alt="Hack Club">
+          <span class="cs-topnav-title">Attend</span>
+        <% end %>
+
+        <button type="button" class="cs-topnav-search" data-action="command-palette#open" aria-label="Search participants, events and pages">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <span>Search participants, events, pages</span>
+          <kbd>⌘K</kbd>
+        </button>
+
+        <div class="cs-topnav-spacer"></div>
+
+        <button type="button" class="cs-topnav-icon-button sm:hidden" data-action="command-palette#open" aria-label="Search">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        </button>
+
+        <div class="hidden sm:block">
+          <%= render "layouts/admin_event_switcher", variant: :topnav, close_action: nil %>
+        </div>
+
+        <%= render "layouts/admin_user_menu" %>
+      </header>
+
+      <%# Mobile navigation drawer %>
+      <div class="hidden cs-drawer-overlay lg:hidden" data-mobile-menu-target="overlay" data-action="click->mobile-menu#close"></div>
+      <div class="hidden cs-drawer lg:hidden" data-mobile-menu-target="panel">
+        <div class="cs-drawer-header">
+          <span class="cs-topnav-title">Navigation</span>
+          <button type="button" class="cs-topnav-icon-button" data-action="mobile-menu#close" aria-label="Close navigation">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="cs-drawer-event sm:hidden">
+          <%= render "layouts/admin_event_switcher", variant: :drawer, close_action: "click->mobile-menu#close" %>
+        </div>
+        <%# The footer scrolls with the links here: a phone can't spare the
+            height to pin it. %>
+        <div class="cs-sidenav-scroll">
+          <%= render "layouts/admin_sidebar_nav", close_action: "click->mobile-menu#close" %>
+          <%= render "layouts/admin_sidebar_footer" %>
+        </div>
+      </div>
+
+      <div class="cs-applayout">
+        <aside class="cs-sidenav" aria-label="Admin navigation" data-controller="console-nav">
+          <button type="button" class="cs-sidenav-toggle" data-action="console-nav#toggle" data-console-nav-target="toggle" aria-expanded="true" aria-controls="cs-sidenav-panel" title="Hide navigation">
+            <svg class="cs-sidenav-toggle-close" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <svg class="cs-sidenav-toggle-open" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            <span class="sr-only" data-console-nav-target="label">Hide navigation</span>
+          </button>
+          <div class="cs-sidenav-panel" id="cs-sidenav-panel">
+            <div class="cs-sidenav-scroll">
+              <%= render "layouts/admin_sidebar_nav", close_action: nil %>
+            </div>
+            <%= render "layouts/admin_sidebar_footer" %>
+          </div>
+        </aside>
+
+        <div class="cs-content">
+          <% if content_for?(:breadcrumbs) %>
+            <div class="cs-breadcrumbs">
+              <%= yield :breadcrumbs %>
+            </div>
+          <% end %>
+
+          <% if flash[:notice] || flash[:alert] %>
+            <div class="cs-flashbar" aria-live="polite">
+              <% { notice: "success", alert: "error" }.each do |key, kind| %>
+                <% next unless flash[key] %>
+                <div class="cs-flash cs-flash-<%= kind %>" role="<%= kind == "error" ? "alert" : "status" %>" data-controller="flash" data-flash-target="container">
+                  <%= cs_status_icon(kind == "error" ? :error : :success) %>
+                  <p><%= flash[key] %></p>
+                  <button type="button" data-action="flash#dismiss" aria-label="Dismiss">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  </button>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+
+          <% if current_event&.waiver_dates_stale? %>
+            <%= render "layouts/waiver_dates_banner", event: current_event %>
+          <% end %>
+
+          <main class="cs-main" id="main" data-controller="cs-date-picker">
+            <%= yield %>
+          </main>
+        </div>
+      </div>
+    </div>
+
+    <!-- Command palette -->
+    <div class="hidden fixed inset-0 z-50 overflow-y-auto"
+         data-command-palette-target="modal"
+         data-action="click->command-palette#closeOnOverlay">
+      <div class="flex items-start justify-center min-h-screen pt-20 px-4">
+        <div class="fixed inset-0 bg-gray-900/50 transition-opacity" data-action="click->command-palette#close"></div>
+
+        <div class="cs-palette relative w-full max-w-xl" role="dialog" aria-label="Search">
+          <div class="flex items-center px-4 border-b border-gray-200">
+            <svg class="h-5 w-5 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <input type="text"
+                   class="w-full px-3 py-4 border-0 focus:ring-0 focus:outline-none"
+                   placeholder="Search participants, events, or navigate..."
+                   aria-label="Search"
+                   data-command-palette-target="input"
+                   data-action="input->command-palette#search"
+                   autocomplete="off"
+                   spellcheck="false">
+            <kbd class="hidden sm:inline-flex items-center px-2 py-1 text-xs font-medium rounded">esc</kbd>
+          </div>
+
+          <div class="max-h-80 overflow-y-auto py-2" data-command-palette-target="results"></div>
+
+          <div class="flex items-center justify-between px-4 py-2 border-t border-gray-200 text-xs text-gray-500">
+            <div class="flex items-center space-x-3">
+              <span class="flex items-center"><kbd class="px-1.5 py-0.5 rounded mr-1">↑</kbd><kbd class="px-1.5 py-0.5 rounded mr-1">↓</kbd> to navigate</span>
+              <span class="flex items-center"><kbd class="px-1.5 py-0.5 rounded mr-1">↵</kbd> to select</span>
+            </div>
+            <span class="hidden sm:inline"><kbd class="px-1.5 py-0.5 rounded">⌘</kbd><kbd class="px-1.5 py-0.5 rounded ml-0.5">K</kbd> to open</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <%= render "shared/staging_frame" %>
+    <%= render "shared/mintlify_assistant" %>
+  </body>
+</html>

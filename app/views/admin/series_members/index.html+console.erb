@@ -1,0 +1,67 @@
+<% content_for :title, "#{@series.name} Members – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Series", admin_series_index_path ], [ @series.name, admin_series_path(@series) ], [ "Members", nil ]) %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text flex items-center gap-3 min-w-0">
+      <%= render "admin/events/avatar", event: @series, size: 32, rounded: "rounded-lg" %>
+      <h1 class="cs-h1 truncate"><%= @series.name %> members</h1>
+    </div>
+    <div class="cs-actions">
+      <%= link_to "Add member", new_admin_series_member_path(@series), class: "cs-btn cs-btn-primary cs-btn-full" %>
+    </div>
+  </div>
+
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided">
+      <h2 class="cs-h2">Members <span class="cs-counter">(<%= @series_role_assignments.size %>)</span></h2>
+    </div>
+    <% if @series_role_assignments.any? %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">User</th>
+              <th scope="col">Role</th>
+              <th scope="col">Added</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @series_role_assignments.each do |assignment| %>
+              <tr>
+                <td class="whitespace-nowrap">
+                  <div><%= assignment.user.display_name_or_fallback %></div>
+                  <div class="cs-small cs-secondary"><%= assignment.user.email %></div>
+                </td>
+                <td class="whitespace-nowrap">
+                  <%= cs_badge(assignment.role.titleize, assignment.role == "owner" ? "red" : "blue") %>
+                </td>
+                <td class="whitespace-nowrap"><%= assignment.created_at.strftime("%B %d, %Y") %></td>
+                <td class="whitespace-nowrap text-right">
+                  <%= button_to "Remove", admin_series_member_path(@series, assignment), method: :delete, class: "cs-btn cs-btn-link", data: { turbo_confirm: "Are you sure you want to remove #{assignment.user.email} from this series?" } %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="cs-empty">
+        <p class="cs-empty-title">No members in this series yet</p>
+        <p>Members can create and manage events within this series without needing global admin.</p>
+      </div>
+    <% end %>
+  </section>
+
+  <div class="cs-alert">
+    <%= cs_status_icon(:info) %>
+    <div>
+      <p class="cs-alert-title">Role permissions</p>
+      <ul class="mt-1 space-y-1">
+        <li><strong>Owner:</strong> Edits the series and manages members, plus everything organizers can do</li>
+        <li><strong>Organizer:</strong> Creates events in this series and acts as event admin on all of them</li>
+      </ul>
+    </div>
+  </div>
+</div>

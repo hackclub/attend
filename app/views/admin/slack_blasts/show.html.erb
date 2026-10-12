@@ -1,101 +1,104 @@
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Slack blasts", admin_event_slack_blasts_path(current_event) ], [ "Blast details", nil ]) %>
-<% blast_status_types = { "pending" => :pending, "in_progress" => :in_progress, "completed" => :success, "failed" => :error } %>
-<% recipient_status_types = { "pending" => :pending, "sent" => :success, "failed" => :error } %>
+<div class="max-w-4xl mx-auto">
+  <div class="mb-6">
+    <%= link_to "← Back to Blast History", admin_event_slack_blasts_path(current_event), class: "text-gray-600 hover:text-gray-900" %>
+  </div>
 
-<div class="max-w-4xl">
-  <div class="cs-header">
-    <div class="cs-header-text">
-      <h1 class="cs-h1">Slack blast details</h1>
+  <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+    <div class="flex justify-between items-start mb-4">
+      <h1 class="text-2xl font-bold">Slack Blast Details</h1>
+      <% case @slack_blast.status %>
+      <% when "pending" %>
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">Pending</span>
+      <% when "in_progress" %>
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">In Progress</span>
+      <% when "completed" %>
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">Completed</span>
+      <% when "failed" %>
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">Failed</span>
+      <% end %>
+    </div>
+
+    <dl class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div>
+        <dt class="text-sm font-medium text-gray-500">Sent By</dt>
+        <dd class="mt-1 text-gray-900"><%= @slack_blast.sent_by_user.display_name_or_fallback %></dd>
+      </div>
+      <div>
+        <dt class="text-sm font-medium text-gray-500">Date</dt>
+        <dd class="mt-1 text-gray-900"><%= @slack_blast.created_at.strftime("%B %d, %Y at %l:%M %p") %></dd>
+      </div>
+      <div>
+        <dt class="text-sm font-medium text-gray-500">Recipients</dt>
+        <dd class="mt-1 text-gray-900">
+          <span class="text-green-600 font-medium"><%= @slack_blast.sent_count %></span> sent,
+          <span class="text-red-600 font-medium"><%= @slack_blast.failed_count %></span> failed
+          of <span class="font-medium"><%= @slack_blast.recipient_count %></span> total
+        </dd>
+      </div>
+    </dl>
+
+    <div>
+      <dt class="text-sm font-medium text-gray-500 mb-2">Message</dt>
+      <dd class="bg-gray-50 rounded-lg p-4 text-gray-900 prose prose-sm max-w-none"><%= @slack_blast.message_as_html.html_safe %></dd>
     </div>
   </div>
 
-  <div class="cs-stack">
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <h2 class="cs-h2">Overview</h2>
-      </div>
-      <div class="cs-container-body cs-stack">
-        <dl class="cs-kv cs-kv-4">
-          <div>
-            <dt class="cs-kv-label">Status</dt>
-            <dd class="cs-kv-value"><%= cs_status(blast_status_types[@slack_blast.status], @slack_blast.status.humanize) if blast_status_types.key?(@slack_blast.status) %></dd>
-          </div>
-          <div>
-            <dt class="cs-kv-label">Sent by</dt>
-            <dd class="cs-kv-value"><%= @slack_blast.sent_by_user.display_name_or_fallback %></dd>
-          </div>
-          <div>
-            <dt class="cs-kv-label">Date</dt>
-            <dd class="cs-kv-value"><%= @slack_blast.created_at.strftime("%B %d, %Y at %l:%M %p") %></dd>
-          </div>
-          <div>
-            <dt class="cs-kv-label">Recipients</dt>
-            <dd class="cs-kv-value">
-              <strong><%= @slack_blast.sent_count %></strong> sent,
-              <strong><%= @slack_blast.failed_count %></strong> failed
-              of <strong><%= @slack_blast.recipient_count %></strong> total
-            </dd>
-          </div>
-        </dl>
-        <dl>
-          <dt class="cs-kv-label">Message</dt>
-          <dd class="cs-kv-value prose prose-sm max-w-none"><%= @slack_blast.message_as_html.html_safe %></dd>
-        </dl>
-      </div>
-    </section>
-
-    <section class="cs-container">
-      <div class="cs-container-header cs-container-header-divided">
-        <h2 class="cs-h2">Recipients <span class="cs-counter">(<%= @recipients.size %>)</span></h2>
-        <% if @slack_blast.slack_blast_recipients.failed.any? %>
-          <div class="cs-actions">
-            <%= button_to "Retry all failed",
-                retry_failed_admin_event_slack_blast_path(current_event, @slack_blast),
-                method: :post,
-                class: "cs-btn",
-                data: { confirm: "Retry sending to all #{@slack_blast.failed_count} failed recipients?" } %>
-          </div>
+  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+      <h2 class="text-lg font-semibold">Recipients</h2>
+      <% if @slack_blast.slack_blast_recipients.failed.any? %>
+        <%= button_to "Retry All Failed", 
+            retry_failed_admin_event_slack_blast_path(current_event, @slack_blast),
+            method: :post,
+            class: "bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-medium py-1.5 px-3 rounded",
+            data: { confirm: "Retry sending to all #{@slack_blast.failed_count} failed recipients?" } %>
+      <% end %>
+    </div>
+    <table class="min-w-full divide-y divide-gray-100">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Participant</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Slack ID</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Error</th>
+          <th class="px-6 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-100">
+        <% @recipients.each do |recipient| %>
+          <tr>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <%= link_to recipient.participant.display_name, 
+                  admin_event_participant_path(current_event, recipient.participant_event),
+                  class: "text-[#ec3750] hover:text-blue-800" %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <%= link_to "slack://user?team=T0266FRGM&id=#{recipient.participant_event.participant.slack_user_id}", class: "hover:underline" do %><code class="bg-gray-100 px-1.5 py-0.5 rounded"><%= recipient.participant_event.participant.slack_user_id %></code><% end %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <% case recipient.status %>
+              <% when "pending" %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">Pending</span>
+              <% when "sent" %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Sent</span>
+              <% when "failed" %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Failed</span>
+              <% end %>
+            </td>
+            <td class="px-6 py-4 text-sm text-red-600">
+              <%= recipient.error_message %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
+              <% if recipient.failed? %>
+                <%= button_to "Retry",
+                    retry_recipient_admin_event_slack_blast_path(current_event, @slack_blast, recipient_id: recipient.id),
+                    method: :post,
+                    class: "text-yellow-600 hover:text-yellow-800 font-medium" %>
+              <% end %>
+            </td>
+          </tr>
         <% end %>
-      </div>
-      <div class="cs-table-wrap">
-        <table class="cs-table">
-          <thead>
-            <tr>
-              <th scope="col">Participant</th>
-              <th scope="col">Slack ID</th>
-              <th scope="col">Status</th>
-              <th scope="col">Error</th>
-              <th scope="col"><span class="sr-only">Actions</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            <% @recipients.each do |recipient| %>
-              <tr>
-                <td class="whitespace-nowrap">
-                  <%= link_to recipient.participant.display_name,
-                      admin_event_participant_path(current_event, recipient.participant_event),
-                      class: "cs-link" %>
-                </td>
-                <td class="whitespace-nowrap">
-                  <%= link_to "slack://user?team=T0266FRGM&id=#{recipient.participant_event.participant.slack_user_id}", class: "cs-link" do %><code class="cs-copy-value"><%= recipient.participant_event.participant.slack_user_id %></code><% end %>
-                </td>
-                <td class="whitespace-nowrap">
-                  <%= cs_status(recipient_status_types[recipient.status], recipient.status.humanize) if recipient_status_types.key?(recipient.status) %>
-                </td>
-                <td class="text-(--cs-error)"><%= recipient.error_message %></td>
-                <td class="whitespace-nowrap text-right">
-                  <% if recipient.failed? %>
-                    <%= button_to "Retry",
-                        retry_recipient_admin_event_slack_blast_path(current_event, @slack_blast, recipient_id: recipient.id),
-                        method: :post,
-                        class: "cs-btn cs-btn-link" %>
-                  <% end %>
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
-      </div>
-    </section>
+      </tbody>
+    </table>
   </div>
 </div>

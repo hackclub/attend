@@ -1,0 +1,135 @@
+<% content_for :title, "Accommodation – #{@participant_event.participant.full_name} – #{current_event.name} – Attend" %>
+
+<div>
+  <%= render "header" %>
+
+  <%= form_with model: @accommodation, url: accommodation_admin_event_participant_path(current_event, @participant_event), method: :patch, local: true, class: "cs-stack" do |f| %>
+    <% if @accommodation.errors.any? %>
+      <div class="cs-alert cs-alert-error" role="alert">
+        <%= cs_status_icon(:error) %>
+        <div>
+          <p class="cs-alert-title"><%= pluralize(@accommodation.errors.count, "error") %> stopped this accommodation from saving</p>
+          <ul class="mt-1 list-disc list-inside">
+            <% @accommodation.errors.full_messages.each do |msg| %>
+              <li><%= msg %></li>
+            <% end %>
+          </ul>
+        </div>
+      </div>
+    <% end %>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Accommodation details</h2>
+      </div>
+      <div class="cs-container-body">
+        <div class="cs-field-grid mb-4">
+          <div>
+            <%= f.label :check_in_date, "Check-in date", class: "cs-field-label" %>
+            <%= f.date_field :check_in_date, class: "cs-input" %>
+          </div>
+          <div>
+            <%= f.label :check_out_date, "Check-out date", class: "cs-field-label" %>
+            <%= f.date_field :check_out_date, class: "cs-input" %>
+          </div>
+        </div>
+
+        <div class="cs-field">
+          <%= f.label :gender_base, "Gender identity", class: "cs-field-label" %>
+          <div class="cs-tiles">
+            <label class="cs-tile">
+              <span class="cs-option">
+                <%= f.radio_button :gender_base, "female", { id: "gender_base_female" } %>
+                <span class="cs-option-label">Woman</span>
+              </span>
+            </label>
+            <label class="cs-tile">
+              <span class="cs-option">
+                <%= f.radio_button :gender_base, "male", { id: "gender_base_male" } %>
+                <span class="cs-option-label">Man</span>
+              </span>
+            </label>
+            <label class="cs-tile">
+              <span class="cs-option">
+                <%= f.radio_button :gender_base, "non_binary", { id: "gender_base_non_binary" } %>
+                <span class="cs-option-label">Non-binary</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="cs-field">
+          <div class="cs-option">
+            <%= f.check_box :is_transgender, { id: "is_transgender_checkbox" }, "true", "false" %>
+            <div><label class="cs-option-label" for="is_transgender_checkbox">Transgender</label></div>
+          </div>
+        </div>
+
+        <fieldset class="cs-field">
+          <legend class="cs-field-label">Preferred roommate genders</legend>
+          <div class="flex flex-wrap gap-x-6 gap-y-2">
+            <% Accommodation::ROOMMATE_GENDER_OPTIONS.each do |key, value| %>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <%= check_box_tag "accommodation[preferred_roommate_genders][]",
+                  value,
+                  @accommodation.preferred_roommate_genders&.include?(value),
+                  id: "preferred_roommate_genders_#{key}",
+                  class: "w-4 h-4 accent-(--cs-accent)" %>
+                <span><%= key.to_s.titleize %></span>
+              </label>
+            <% end %>
+          </div>
+        </fieldset>
+
+        <div class="cs-field">
+          <%= f.label :roommate_preferences, class: "cs-field-label" %>
+          <%= f.text_area :roommate_preferences, rows: 3, class: "cs-input" %>
+          <p class="cs-field-hint">Names of requested roommates</p>
+        </div>
+
+        <div class="cs-field">
+          <%= f.label :roommate_exclusions, class: "cs-field-label" %>
+          <%= f.text_area :roommate_exclusions, rows: 3, class: "cs-input" %>
+          <p class="cs-field-hint">People this participant should NOT be roomed with</p>
+        </div>
+
+        <div class="cs-field">
+          <%= f.label :accessibility_needs, class: "cs-field-label" %>
+          <%= f.text_area :accessibility_needs, rows: 3, class: "cs-input" %>
+        </div>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Room assignment (admin only)</h2>
+      </div>
+      <div class="cs-container-body">
+        <div class="cs-field">
+          <div class="cs-option">
+            <%= f.check_box :rooming_exempt %>
+            <div>
+              <%= f.label :rooming_exempt, "Exempt from rooming", class: "cs-option-label" %>
+              <p class="cs-option-description">Check if this participant doesn't need a room (e.g., staying at home)</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="cs-field">
+          <%= f.label :assigned_room, class: "cs-field-label" %>
+          <%= f.text_field :assigned_room, class: "cs-input" %>
+        </div>
+
+        <div class="cs-field">
+          <%= f.label :notes, "Admin notes", class: "cs-field-label" %>
+          <%= f.text_area :notes, rows: 3, class: "cs-input" %>
+        </div>
+      </div>
+    </section>
+
+    <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+      <%= link_to "Cancel", admin_event_participant_path(current_event, @participant_event), class: "cs-btn cs-btn-link cs-btn-full" %>
+      <%= f.button "Save accommodation", class: "cs-btn cs-btn-primary cs-btn-full" %>
+    </div>
+  <% end %>
+</div>

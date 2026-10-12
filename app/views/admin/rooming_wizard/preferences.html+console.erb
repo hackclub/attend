@@ -1,0 +1,219 @@
+<% content_for :title, "Rooming wizard: Roommate preferences – Attend" %>
+<% participant_count = @participant_events.count %>
+
+<%= render layout: "wizard", locals: {
+      current_step: "preferences",
+      title: "Roommate preferences",
+      description: "Link roommate preferences to participants."
+    } do %>
+  <%= render "group_filter" %>
+
+  <div class="cs-stack">
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Review progress</h2>
+        </div>
+      </div>
+      <div class="cs-container-body">
+        <dl class="cs-kv cs-kv-2 cs-kv-divided">
+          <div>
+            <dt class="cs-kv-label">Participants to review</dt>
+            <dd class="cs-kv-value-lg"><%= participant_count %></dd>
+          </div>
+          <div>
+            <dt class="cs-kv-label">Unreviewed</dt>
+            <dd class="cs-kv-value-lg"><%= @unreviewed_count %></dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <div>
+          <h2 class="cs-h2">Participants <span class="cs-counter">(<%= participant_count %>)</span></h2>
+        </div>
+      </div>
+      <div>
+        <% @participant_events.each do |pe| %>
+          <div class="px-5 py-4 border-b border-(--cs-border-divider-secondary) last:border-b-0" id="participant_row_<%= pe.id %>">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
+              <div class="flex-1 min-w-0">
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <h3 class="cs-h3"><%= pe.participant.full_name %></h3>
+                  <span class="cs-secondary inline-flex items-center gap-1">
+                    Age: <%= pe.age_on_event %>
+                    <% if pe.is_18_on_event? %>
+                      <%= cs_badge("18", "yellow") %>
+                    <% end %>
+                  </span>
+                  <span class="cs-secondary inline-flex items-center gap-1">
+                    <%= pe.accommodation&.gender_identity&.titleize || "No gender" %>
+                    <% if pe.accommodation&.trans_or_nb? %>
+                      <%= cs_badge("Trans/NB", "blue") %>
+                    <% end %>
+                  </span>
+                  <% if pe.accommodation&.roommate_links_reviewed? %>
+                    <%= cs_status(:success, "Reviewed") %>
+                  <% end %>
+                </div>
+
+                <dl class="cs-kv cs-kv-2 mt-3">
+                  <div>
+                    <dt class="cs-kv-label">Preferred roommates (raw)</dt>
+                    <dd class="cs-kv-value whitespace-pre-wrap"><%= pe.accommodation&.roommate_preferences.presence || "None specified" %></dd>
+                  </div>
+                  <div>
+                    <dt class="cs-kv-label">Excluded roommates (raw)</dt>
+                    <dd class="cs-kv-value whitespace-pre-wrap"><%= pe.accommodation&.roommate_exclusions.presence || "None specified" %></dd>
+                  </div>
+                  <div>
+                    <dt class="cs-kv-label">Willing to room with</dt>
+                    <dd class="cs-kv-value"><%= pe.accommodation&.preferred_roommate_genders&.map(&:titleize)&.join(", ").presence || "Same gender only" %></dd>
+                  </div>
+                </dl>
+              </div>
+
+              <div class="w-full lg:w-80 lg:flex-shrink-0" id="preference_links_<%= pe.id %>">
+                <%= render partial: "admin/rooming_wizard/preference_links", locals: { participant_event: pe } %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+        <% if participant_count.zero? %>
+          <div class="cs-empty">
+            <p class="cs-empty-title">No participants to review</p>
+          </div>
+        <% end %>
+      </div>
+    </section>
+  </div>
+
+  <div class="cs-wizard-actions">
+    <%= link_to "Previous", setup_admin_event_rooming_wizard_path(@event.slug), class: "cs-btn" %>
+    <%= form_with url: manual_assign_admin_event_rooming_wizard_path(@event.slug), method: :post, class: "contents" do %>
+      <button type="submit" class="cs-btn">
+        Assign manually
+      </button>
+    <% end %>
+    <%= form_with url: auto_assign_admin_event_rooming_wizard_path(@event.slug), method: :post, class: "contents" do %>
+      <button type="submit" class="cs-btn cs-btn-primary">
+        Continue to auto-assign
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+      </button>
+    <% end %>
+  </div>
+<% end %>
+
+<!-- Link Preference Modal (reusable) -->
+<div id="link-modal" class="hidden cs-modal-overlay">
+  <div class="fixed inset-0" data-close-link-modal></div>
+
+  <div class="cs-modal relative" role="dialog" aria-modal="true" aria-labelledby="link-modal-title">
+    <form id="link-form">
+      <div class="cs-modal-header">
+        <h2 id="link-modal-title">Link to participant</h2>
+        <button type="button" class="cs-modal-close" data-close-link-modal aria-label="Close">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8m0-8l-8 8"/></svg>
+        </button>
+      </div>
+      <div class="cs-modal-body">
+        <input type="hidden" name="participant_event_id" id="link-pe-id">
+        <input type="hidden" name="kind" id="link-kind">
+
+        <div class="cs-field">
+          <label class="cs-field-label" for="link-search">Search participants</label>
+          <label class="cs-search">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+            <input type="text" id="link-search" placeholder="Type to search..."
+                   class="cs-input"
+                   data-filter-link-participants>
+          </label>
+        </div>
+
+        <div id="link-participants" class="cs-field max-h-60 overflow-y-auto rounded-lg border border-(--cs-border-input)">
+          <% @participant_events.each do |pe| %>
+            <label class="link-participant-option flex items-center gap-2.5 px-3 py-2 cursor-pointer border-b border-(--cs-border-divider-secondary) last:border-b-0 hover:bg-(--cs-bg-hover)" data-name="<%= pe.participant.full_name.downcase %>">
+              <input type="radio" name="target_participant_event_id" value="<%= pe.id %>" class="accent-(--cs-accent)">
+              <span class="text-sm">
+                <%= pe.participant.full_name %>
+                <span class="cs-muted">- Age <%= pe.age_on_event %>, <%= pe.accommodation&.gender_identity&.titleize %></span>
+              </span>
+            </label>
+          <% end %>
+        </div>
+
+        <div id="link-rank-field" class="hidden cs-field">
+          <label class="cs-field-label" for="link-rank">Preference rank</label>
+          <select name="rank" id="link-rank" class="cs-select">
+            <option value="1">1st choice</option>
+            <option value="2">2nd choice</option>
+            <option value="3">3rd choice</option>
+          </select>
+        </div>
+      </div>
+      <div class="cs-modal-footer">
+        <button type="button" data-close-link-modal class="cs-btn cs-btn-link">
+          Cancel
+        </button>
+        <button type="submit" class="cs-btn cs-btn-primary">
+          Link
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script nonce="<%= content_security_policy_nonce %>">
+function openLinkModal(peId, kind) {
+  document.getElementById('link-pe-id').value = peId;
+  document.getElementById('link-kind').value = kind;
+  document.getElementById('link-search').value = '';
+  document.getElementById('link-rank-field').classList.toggle('hidden', kind !== 'preference');
+  filterLinkParticipants('');
+  document.getElementById('link-modal').classList.remove('hidden');
+}
+
+function closeLinkModal() {
+  document.getElementById('link-modal').classList.add('hidden');
+}
+
+function filterLinkParticipants(query) {
+  const options = document.querySelectorAll('.link-participant-option');
+  const lowerQuery = query.toLowerCase();
+  options.forEach(opt => {
+    const name = opt.dataset.name;
+    opt.classList.toggle('hidden', lowerQuery && !name.includes(lowerQuery));
+  });
+}
+
+document.getElementById('link-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const formData = new FormData(this);
+
+  const response = await fetch('<%= link_preference_admin_event_rooming_wizard_path(@event.slug) %>', {
+    method: 'POST',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'text/vnd.turbo-stream.html'
+    },
+    body: formData
+  });
+
+  if (response.ok) {
+    closeLinkModal();
+    const html = await response.text();
+    Turbo.renderStreamMessage(html);
+  }
+});
+
+document.querySelectorAll('[data-close-link-modal]').forEach((el) => {
+  el.addEventListener('click', closeLinkModal);
+});
+
+document.querySelector('[data-filter-link-participants]')
+  ?.addEventListener('input', (event) => filterLinkParticipants(event.target.value));
+</script>

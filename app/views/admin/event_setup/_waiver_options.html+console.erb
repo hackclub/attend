@@ -1,0 +1,70 @@
+<%= form_with url: admin_event_setup_waivers_path(event, return_to: return_to), method: :patch, class: "cs-stack", data: { controller: "wizard-reveal" } do |f| %>
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Waiver templates</h2>
+    </div>
+    <div class="cs-container-body">
+      <div class="cs-tiles" role="radiogroup" aria-label="Waiver setup">
+        <label class="cs-tile">
+          <span class="cs-option">
+            <%= radio_button_tag :waiver_mode, "auto", true, data: { wizard_reveal_target: "input", action: "change->wizard-reveal#update" } %>
+            <span>
+              <span class="cs-option-label font-bold">Use the standard Hack Club waivers</span>
+              <%= cs_badge "Recommended", "green" %>
+              <span class="cs-option-description block mt-1">
+                We'll create <%= event.freedom_waivers_enabled? ? "waiver and freedom waiver templates" : "a waiver template" %> for this event on DocuSeal and wire up all the field mappings automatically. Nothing else to configure.
+              </span>
+            </span>
+          </span>
+        </label>
+
+        <label class="cs-tile">
+          <span class="cs-option">
+            <%= radio_button_tag :waiver_mode, "manual", false, data: { wizard_reveal_target: "input", action: "change->wizard-reveal#update" } %>
+            <span class="w-full">
+              <span class="cs-option-label font-bold">Use custom waivers</span>
+              <span class="cs-option-description block mt-1">
+                Bring your own DocuSeal templates, for example if your event needs different legal language.
+                Read the <%= link_to "custom waivers guide", "https://docs.hackclub.com/hack-club-playbook/events/attend/custom-waivers", target: "_blank", rel: "noopener", class: "cs-link" %> to create your templates, then enter their IDs below.
+              </span>
+              <span class="block mt-4 space-y-4" data-wizard-reveal-target="panel" data-show-when="manual">
+                <span class="block">
+                  <label for="event_docuseal_waiver_template_id" class="cs-field-label">Waiver template ID</label>
+                  <%= text_field_tag "event[docuseal_waiver_template_id]", event.docuseal_waiver_template_id, id: "event_docuseal_waiver_template_id", class: "cs-input", placeholder: "e.g. 2274072" %>
+                </span>
+                <% if event.freedom_waivers_enabled? %>
+                  <span class="block">
+                    <label for="event_docuseal_freedom_waiver_template_id" class="cs-field-label">Freedom waiver template ID</label>
+                    <%= text_field_tag "event[docuseal_freedom_waiver_template_id]", event.docuseal_freedom_waiver_template_id, id: "event_docuseal_freedom_waiver_template_id", class: "cs-input" %>
+                  </span>
+                <% end %>
+                <span class="cs-field-hint block">After saving, sync and map your template fields on the <strong>Configure mappings</strong> screen (linked from the integrations page) so participant details fill in automatically.</span>
+              </span>
+            </span>
+          </span>
+        </label>
+
+        <label class="cs-tile">
+          <span class="cs-option">
+            <%= radio_button_tag :waiver_mode, "skip", false, data: { wizard_reveal_target: "input", action: "change->wizard-reveal#update" } %>
+            <span>
+              <span class="cs-option-label font-bold">Skip for now</span>
+              <span class="cs-option-description block mt-1">Set waivers up later from the integrations page. Participants can't finish onboarding until waivers are configured.</span>
+            </span>
+          </span>
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <div class="cs-wizard-actions">
+    <% if return_to == "integrations" %>
+      <%= link_to "Cancel", admin_event_integrations_path(event), class: "cs-btn cs-btn-link" %>
+      <%= f.button "Save waivers", class: "cs-btn cs-btn-primary" %>
+    <% else %>
+      <%= link_to "Exit setup", admin_event_dashboard_path(event.slug), class: "cs-btn cs-btn-link" %>
+      <%= link_to "Previous", admin_event_setup_modules_path(event), class: "cs-btn" %>
+      <%= f.button "Next", class: "cs-btn cs-btn-primary" %>
+    <% end %>
+  </div>
+<% end %>

@@ -1,113 +1,87 @@
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Incident reports", admin_incidents_path ], [ "Notification settings", nil ]) %>
+<div class="max-w-4xl mx-auto px-4 py-6">
+  <h1 class="text-3xl font-bold mb-2">Incident Report Settings</h1>
+  <p class="text-gray-600 mb-6">
+    Configure where public incident reports (filed at
+    <code class="text-sm bg-gray-100 px-1 py-0.5 rounded">/incident</code>) are delivered.
+    These settings are global and only editable by global admins.
+  </p>
 
-<div class="cs-stack max-w-4xl">
-  <div class="cs-header">
-    <div class="cs-header-text">
-      <h1 class="cs-h1">Incident report settings</h1>
-      <p class="cs-description">
-        Configure where public incident reports (filed at
-        <code class="font-mono">/incident</code>) are delivered.
-        These settings are global and only editable by global admins.
-      </p>
-    </div>
-  </div>
+  <%= form_with url: admin_incident_settings_path, method: :patch do %>
+    <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-6">
+      <div>
+        <span class="block text-lg font-semibold mb-1">Incident responders</span>
+        <p class="text-gray-600 text-sm mb-3">
+          Select the global admins who respond to incident reports. Each new report is
+          emailed and direct-messaged to everyone selected, and <strong>Emergency</strong>
+          reports also phone anyone with a number on their profile. Contact details come
+          from each person's <%= link_to "Attend profile", dashboard_profile_path(anchor: "staff-settings"), class: "text-[#ec3750] hover:underline" %>.
+        </p>
 
-  <%= form_with url: admin_incident_settings_path, method: :patch, class: "cs-stack" do %>
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <div>
-          <h2 class="cs-h2">Incident responders</h2>
-          <p class="cs-container-description">
-            Select the global admins who respond to incident reports. Each new report is
-            emailed and direct-messaged to everyone selected, and <strong>Emergency</strong>
-            reports also phone anyone with a number on their profile. Contact details come
-            from each person's <%= link_to "Attend profile", dashboard_profile_path(anchor: "staff-settings"), class: "cs-link" %>.
-          </p>
-        </div>
-      </div>
-      <% if @selectable_users.any? %>
-        <div class="cs-table-wrap">
-          <table class="cs-table">
-            <thead>
-              <tr>
-                <th scope="col"><span class="sr-only">Responder</span></th>
-                <th scope="col">Name</th>
-                <th scope="col">Channels</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% @selectable_users.each do |user| %>
-                <tr>
-                  <td class="w-8">
-                    <%= check_box_tag "responder_user_ids[]", user.id, @selected_user_ids.include?(user.id),
-                          class: "size-4 accent-(--cs-accent)", "aria-label": "Responder: #{user.display_name_or_fallback}" %>
-                  </td>
-                  <td>
-                    <span class="block"><%= user.display_name_or_fallback %></span>
-                    <span class="block cs-small cs-muted"><%= user.email %></span>
-                  </td>
-                  <td>
-                    <span class="flex flex-wrap items-center gap-1.5">
-                      <%= cs_badge("email", user.email.present? ? "green" : nil) %>
-                      <%= cs_badge("Slack", user.slack_id.present? ? "green" : nil) %>
-                      <%= cs_badge("phone", user.phone.present? ? "green" : nil) %>
-                    </span>
-                  </td>
-                </tr>
-              <% end %>
-            </tbody>
-          </table>
-        </div>
-        <div class="cs-container-footer">
-          A greyed-out badge means that detail is missing from the user's profile, so that
-          channel is skipped for them. Phone numbers usually need to be added manually.
-        </div>
-      <% else %>
-        <div class="cs-container-body">
-          <div class="cs-empty">
-            <p class="cs-empty-title">No global admins found.</p>
+        <% if @selectable_users.any? %>
+          <div class="border border-gray-200 rounded-md divide-y divide-gray-100">
+            <% @selectable_users.each do |user| %>
+              <label class="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 cursor-pointer">
+                <%= check_box_tag "responder_user_ids[]", user.id, @selected_user_ids.include?(user.id),
+                      class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+                <span class="flex-1 min-w-0">
+                  <span class="block text-sm font-medium text-gray-900"><%= user.display_name_or_fallback %></span>
+                  <span class="block text-xs text-gray-500"><%= user.email %></span>
+                </span>
+                <span class="flex items-center gap-1.5 text-xs">
+                  <span class="px-2 py-0.5 rounded-full <%= user.email.present? ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500' %>">email</span>
+                  <span class="px-2 py-0.5 rounded-full <%= user.slack_id.present? ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400' %>">Slack</span>
+                  <span class="px-2 py-0.5 rounded-full <%= user.phone.present? ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400' %>">phone</span>
+                </span>
+              </label>
+            <% end %>
           </div>
-        </div>
-      <% end %>
-    </section>
-
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <h2 class="cs-h2">Delivery</h2>
+          <p class="text-xs text-gray-500 mt-2">
+            A greyed-out badge means that detail is missing from the user's profile, so that
+            channel is skipped for them. Phone numbers usually need to be added manually.
+          </p>
+        <% else %>
+          <p class="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-3 py-4">
+            No global admins found.
+          </p>
+        <% end %>
       </div>
-      <div class="cs-container-body">
-        <div class="cs-field">
-          <label for="incident_reports_slack_channel_id" class="cs-field-label">Slack channel ID</label>
-          <p class="cs-field-description">
-            A summary of each report is posted to this Slack channel. Use the channel ID
-            (e.g. <code class="font-mono">C0123ABCD</code>), not the name.
-            Leave blank to fall back to the default.
-          </p>
-          <input type="text" id="incident_reports_slack_channel_id" name="incident_reports_slack_channel_id"
-            value="<%= @slack_channel_id %>"
-            class="cs-input"
-            placeholder="C0123ABCD">
-          <p class="cs-field-hint">
-            Currently posting to: <strong><%= @effective_channel_id %></strong>
-          </p>
-        </div>
 
-        <div class="cs-field">
-          <label for="incident_reports_custom_events" class="cs-field-label">Custom events</label>
-          <p class="cs-field-description">
-            Names of past events that never ran on Attend. These appear in the incident form's
-            event dropdown so people can report on them. One per line. Reports filed against a
-            custom event can't use Emergency priority (no calls are placed).
-          </p>
-          <textarea id="incident_reports_custom_events" name="incident_reports_custom_events" rows="3"
-            class="cs-input"
-            placeholder="Assemble 2023&#10;Summer Hackathon 2022"><%= @custom_events %></textarea>
-        </div>
+      <div class="border-t border-gray-200 pt-6">
+        <label for="incident_reports_slack_channel_id" class="block text-lg font-semibold mb-1">
+          Slack channel ID
+        </label>
+        <p class="text-gray-600 text-sm mb-2">
+          A summary of each report is posted to this Slack channel. Use the channel ID
+          (e.g. <code class="text-sm bg-gray-100 px-1 py-0.5 rounded">C0123ABCD</code>), not the name.
+          Leave blank to fall back to the default.
+        </p>
+        <input type="text" id="incident_reports_slack_channel_id" name="incident_reports_slack_channel_id"
+          value="<%= @slack_channel_id %>"
+          class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="C0123ABCD">
+        <p class="text-xs text-gray-500 mt-1">
+          Currently posting to: <span class="font-medium"><%= @effective_channel_id %></span>
+        </p>
       </div>
-    </section>
 
-    <div class="flex justify-end">
-      <%= button_tag "Save settings", class: "cs-btn cs-btn-primary cs-btn-full" %>
+      <div class="border-t border-gray-200 pt-6">
+        <label for="incident_reports_custom_events" class="block text-lg font-semibold mb-1">
+          Custom events
+        </label>
+        <p class="text-gray-600 text-sm mb-2">
+          Names of past events that never ran on Attend. These appear in the incident form's
+          event dropdown so people can report on them. One per line. Reports filed against a
+          custom event can't use Emergency priority (no calls are placed).
+        </p>
+        <textarea id="incident_reports_custom_events" name="incident_reports_custom_events" rows="3"
+          class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Assemble 2023&#10;Summer Hackathon 2022"><%= @custom_events %></textarea>
+      </div>
+
+      <div class="pt-2">
+        <%= submit_tag "Save settings",
+              class: "bg-[#d42f46] hover:bg-[#b82840] text-white font-medium px-5 py-2 rounded-md cursor-pointer" %>
+      </div>
     </div>
   <% end %>
 </div>

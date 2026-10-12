@@ -1,82 +1,66 @@
 <% content_for :title, "Incidents – #{current_event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ current_event.name, admin_event_dashboard_path(current_event.slug) ], [ "Incidents", nil ]) %>
 
-<div class="cs-stack">
-  <div class="cs-header">
-    <div class="cs-header-text">
-      <h1 class="cs-h1">Incidents <span class="cs-counter">(<%= @incidents.size %>)</span></h1>
-    </div>
-    <div class="cs-actions">
-      <%= link_to "New incident", new_admin_event_incident_path(current_event), class: "cs-btn cs-btn-primary" %>
-    </div>
+<div class="w-full">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <h1 class="text-2xl font-bold">Incidents</h1>
+    <%= link_to "New Incident", new_admin_event_incident_path(current_event), class: "bg-[#d42f46] text-white px-4 py-2 rounded-md hover:bg-[#b82840]" %>
   </div>
 
-  <section class="cs-container" data-controller="multiselect">
-    <div class="cs-container-header">
-      <h2 class="cs-h2">Incident log</h2>
-    </div>
-    <% if @incidents.any? %>
-      <div class="cs-filter-bar">
-        <label class="cs-search w-full sm:max-w-sm">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
-          <input type="search" class="cs-input" placeholder="Find incidents" aria-label="Find incidents"
-                 data-multiselect-target="search" data-action="input->multiselect#filter">
-        </label>
-      </div>
-      <div class="cs-table-wrap">
-        <table class="cs-table">
-          <thead>
+  <% if @incidents.any? %>
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div class="overflow-x-auto -mx-4 sm:mx-0">
+        <table class="min-w-full divide-y divide-gray-100">
+          <thead class="bg-gray-50">
             <tr>
-              <th scope="col">Date</th>
-              <th scope="col">Category</th>
-              <th scope="col">Severity</th>
-              <th scope="col">Status</th>
-              <th scope="col">Participant</th>
-              <th scope="col">Reported by</th>
-              <th scope="col"><span class="sr-only">Actions</span></th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Participant</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reported By</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody data-multiselect-target="list">
+          <tbody class="bg-white divide-y divide-gray-100 text-xs sm:text-sm">
             <% @incidents.each do |incident| %>
-              <% participant_names = incident.participants.map { |p| p.preferred_name || p.legal_first_name } %>
-              <tr data-name="<%= [ incident.category.humanize, incident.severity.humanize, incident.status.humanize, *participant_names, incident.reported_by.display_name_or_fallback ].join(" ").downcase %>">
-                <td class="whitespace-nowrap">
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <%= incident.occurred_at&.strftime("%b %d, %Y %H:%M") || incident.created_at.strftime("%b %d, %Y %H:%M") %>
                 </td>
-                <td><%= render_category_badge(incident.category) %></td>
-                <td><%= render_severity_badge(incident.severity) %></td>
-                <td><%= incident_status(incident.status) %></td>
-                <td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <%= render_category_badge(incident.category) %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <%= render_severity_badge(incident.severity) %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <%= render_status_badge(incident.status) %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <% if incident.participants.any? %>
-                    <%= participant_names.join(", ") %>
+                    <%= incident.participants.map { |p| p.preferred_name || p.legal_first_name }.join(", ") %>
                     <% if incident.participants.size > 1 %>
-                      <span class="cs-small cs-muted">(+<%= incident.participants.size - 1 %> more)</span>
+                      <span class="text-gray-400 text-xs">(+<%= incident.participants.size - 1 %> more)</span>
                     <% end %>
                   <% else %>
-                    <span class="cs-muted">—</span>
+                    <span class="text-gray-400">—</span>
                   <% end %>
                 </td>
-                <td class="truncate max-w-[160px]" title="<%= incident.reported_by.display_name_or_fallback %>">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 truncate max-w-[160px]" title="<%= incident.reported_by.display_name_or_fallback %>">
                   <%= incident.reported_by.display_name_or_fallback %>
                 </td>
-                <td class="text-right">
-                  <%= link_to "View", admin_event_incident_path(current_event, incident), class: "cs-link" %>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <%= link_to "View", admin_event_incident_path(current_event, incident), class: "text-[#ec3750] hover:text-blue-800" %>
                 </td>
               </tr>
             <% end %>
           </tbody>
         </table>
       </div>
-    <% else %>
-      <div class="cs-container-body">
-        <div class="cs-empty">
-          <p class="cs-empty-title">No incidents</p>
-          <p>No incidents reported for this event.</p>
-          <div class="cs-actions">
-            <%= link_to "New incident", new_admin_event_incident_path(current_event), class: "cs-btn" %>
-          </div>
-        </div>
-      </div>
-    <% end %>
-  </section>
+    </div>
+  <% else %>
+    <div class="bg-white border border-gray-200 rounded-lg p-6 text-center text-gray-500">
+      No incidents reported for this event.
+    </div>
+  <% end %>
 </div>

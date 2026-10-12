@@ -1,0 +1,54 @@
+<% content_for :title, "Export rooming list – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Participants", admin_event_participants_path(@event.slug) ], [ "Rooming wizard", finalize_admin_event_rooming_wizard_path(@event.slug) ], [ "Export", nil ]) %>
+
+<div class="cs-header">
+  <div class="cs-header-text">
+    <h1 class="cs-h1">Export rooming list</h1>
+    <p class="cs-description">Download the final rooming assignments</p>
+  </div>
+</div>
+
+<div class="cs-stack">
+  <div class="cs-alert cs-alert-success">
+    <%= cs_status_icon(:success) %>
+    <div>
+      <p class="cs-alert-title">Rooming complete!</p>
+      <p>The rooming assignments have been finalized.</p>
+    </div>
+  </div>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2">Rooming list</h2>
+        <p class="cs-container-description">The CSV contains only legal names for privacy compliance.</p>
+      </div>
+      <div class="cs-actions">
+        <%= link_to finalize_admin_event_rooming_wizard_path(@event.slug), class: "cs-btn" do %>
+          View room list
+        <% end %>
+        <%= link_to export_csv_admin_event_rooming_wizard_path(@event.slug, format: :csv), class: "cs-btn cs-btn-primary" do %>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          Download CSV
+        <% end %>
+      </div>
+    </div>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2">Quick links</h2>
+      </div>
+    </div>
+    <div class="cs-container-body">
+      <ul class="flex flex-wrap gap-x-6 gap-y-2">
+        <li><%= link_to "Start over (setup)", setup_admin_event_rooming_wizard_path(@event.slug), class: "cs-link" %></li>
+        <li><%= link_to "View assignments", assignments_admin_event_rooming_wizard_path(@event.slug), class: "cs-link" %></li>
+        <li><%= link_to "Back to participants", admin_event_participants_path(@event.slug), class: "cs-link" %></li>
+      </ul>
+    </div>
+  </section>
+</div>

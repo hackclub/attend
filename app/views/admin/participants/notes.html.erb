@@ -3,72 +3,67 @@
 <div>
   <%= render "header" %>
 
-  <div class="cs-stack">
-  <section class="cs-container">
-    <div class="cs-container-header">
-      <h2 class="cs-h2">Add note</h2>
-    </div>
+  <section class="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+    <h2 class="text-lg font-semibold mb-4">Add Note</h2>
 
     <%= form_with model: Note.new, url: admin_event_participant_notes_path(current_event, @participant_event), method: :post, local: true do |f| %>
-      <div class="cs-container-body">
-        <div class="cs-field">
-          <%= f.label :body, "Note", class: "cs-field-label" %>
-          <%= f.text_area :body, rows: 4, class: "cs-input", required: true %>
+      <div class="space-y-4">
+        <div>
+          <%= f.label :body, "Note", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_area :body, rows: 4, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", required: true %>
         </div>
 
-        <div class="cs-field-grid mt-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <%= f.label :note_type, "Type", class: "cs-field-label" %>
-            <%= f.select :note_type, Note.note_types.keys.map { |t| [t.titleize, t] }, {}, class: "cs-select" %>
+            <%= f.label :note_type, "Type", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.select :note_type, Note.note_types.keys.map { |t| [t.titleize, t] }, {}, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
           </div>
 
           <div>
-            <%= f.label :sensitivity, class: "cs-field-label" %>
-            <%= f.select :sensitivity, Note.sensitivities.keys.map { |s| [s.titleize, s] }, {}, class: "cs-select" %>
+            <%= f.label :sensitivity, class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.select :sensitivity, Note.sensitivities.keys.map { |s| [s.titleize, s] }, {}, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
           </div>
         </div>
-      </div>
-      <div class="cs-container-footer flex justify-end">
-        <%= f.button "Add note", class: "cs-btn cs-btn-primary" %>
+
+        <div>
+          <%= f.submit "Add Note", class: "bg-[#d42f46] text-white px-6 py-2 rounded-md hover:bg-[#b82840] cursor-pointer" %>
+        </div>
       </div>
     <% end %>
   </section>
 
-  <section class="cs-container">
-    <div class="cs-container-header cs-container-header-divided">
-      <h2 class="cs-h2">Notes <span class="cs-counter">(<%= @notes.size %>)</span></h2>
-    </div>
+  <section class="space-y-4">
     <% if @notes.any? %>
-      <ul class="divide-y divide-(--cs-border-divider-secondary)">
-        <% @notes.each do |note| %>
-          <li class="px-5 py-4 <%= note.restricted? ? 'border-l-4 border-l-(--cs-accent)' : '' %>">
-            <div class="flex justify-between items-start gap-3 mb-2">
-              <div class="flex flex-wrap items-center gap-2">
-                <%= cs_badge(note.note_type.titleize) %>
-                <% if note.restricted? %>
-                  <%= cs_badge("Restricted", "red") %>
-                <% end %>
-              </div>
-              <%= button_to "Delete", admin_event_participant_note_path(current_event, @participant_event, note),
-                  method: :delete,
-                  data: { turbo_confirm: "Are you sure you want to delete this note?" },
-                  class: "cs-btn cs-btn-link" %>
+      <% @notes.each do |note| %>
+        <div class="bg-white rounded-lg border border-gray-200 p-4 <%= note.restricted? ? 'border-l-4 border-purple-500' : '' %>">
+          <div class="flex justify-between items-start mb-2">
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                <%= note.note_type.titleize %>
+              </span>
+              <% if note.restricted? %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                  Restricted
+                </span>
+              <% end %>
             </div>
+            <%= button_to "Delete", admin_event_participant_note_path(current_event, @participant_event, note),
+                method: :delete,
+                data: { turbo_confirm: "Are you sure you want to delete this note?" },
+                class: "text-sm text-red-600 hover:text-red-800" %>
+          </div>
 
-            <p class="whitespace-pre-wrap"><%= note.body %></p>
+          <p class="text-gray-900 whitespace-pre-wrap"><%= note.body %></p>
 
-            <div class="mt-3 cs-small cs-muted">
-              <%= note.author&.email || "Unknown" %> · <%= note.created_at.strftime("%B %d, %Y at %H:%M") %>
-            </div>
-          </li>
-        <% end %>
-      </ul>
+          <div class="mt-3 text-sm text-gray-500">
+            <%= note.author&.email || "Unknown" %> · <%= note.created_at.strftime("%B %d, %Y at %H:%M") %>
+          </div>
+        </div>
+      <% end %>
     <% else %>
-      <div class="cs-empty">
-        <p class="cs-empty-title">No notes yet.</p>
-        <p>Add one above.</p>
+      <div class="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-500">
+        No notes yet. Add one above.
       </div>
     <% end %>
   </section>
-  </div>
 </div>

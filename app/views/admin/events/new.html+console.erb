@@ -1,0 +1,77 @@
+<% content_for :title, "New Event – Attend" %>
+
+<%= render layout: "admin/event_setup/wizard", locals: {
+      current_step: "basics",
+      title: "Event basics",
+      description: "You can change any of this later."
+    } do %>
+  <%= form_with model: [ :admin, @event ], class: "cs-stack", multipart: true do |f| %>
+    <% if @event.errors.any? %>
+      <div class="cs-alert cs-alert-error" role="alert">
+        <%= cs_status_icon(:error) %>
+        <div>
+          <p class="cs-alert-title"><%= pluralize(@event.errors.count, "error") %> stopped this event from being created</p>
+          <ul class="mt-1 list-disc list-inside">
+            <% @event.errors.full_messages.each do |message| %>
+              <li><%= message %></li>
+            <% end %>
+          </ul>
+        </div>
+      </div>
+    <% end %>
+
+    <% if @event.event_series %>
+      <%= f.hidden_field :event_series_id %>
+      <div class="cs-alert">
+        <%= cs_status_icon(:info) %>
+        <p>This event will be part of the <strong><%= @event.event_series.name %></strong> series and will inherit its branding unless you set its own.</p>
+      </div>
+    <% end %>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Event details</h2>
+      </div>
+      <div class="cs-container-body">
+        <div class="cs-field-grid">
+          <div>
+            <%= f.label :name, class: "cs-field-label" %>
+            <%= f.text_field :name, class: "cs-input" %>
+          </div>
+          <div>
+            <%= f.label :slug, class: "cs-field-label" %>
+            <%= f.text_field :slug, class: "cs-input", placeholder: "auto-generated from name" %>
+            <p class="cs-field-hint">Lowercase letters, numbers and dashes only.</p>
+          </div>
+          <div data-controller="email-domain" data-email-domain-domains-value="<%= Event::SUPPORT_EMAIL_DOMAINS.to_json %>">
+            <%= f.label :support_email, "Support email", class: "cs-field-label" %>
+            <%= f.email_field :support_email, required: true, class: "cs-input", placeholder: "team@hackclub.com", data: { email_domain_target: "input", action: "input->email-domain#validate blur->email-domain#validate" } %>
+            <p class="cs-field-hint text-red-600 hidden" data-email-domain-target="message"></p>
+            <p class="cs-field-hint">Required. Sends and receives replies for participant and guardian emails, so it must be a <%= Event::SUPPORT_EMAIL_DOMAINS_SENTENCE %> address.</p>
+          </div>
+          <div>
+            <%= f.label :timezone, class: "cs-field-label" %>
+            <%= f.time_zone_select :timezone, nil, {}, class: "cs-select" %>
+          </div>
+          <% if !@event.event_series && current_user.global_admin? && EventSeries.any? %>
+            <div>
+              <%= f.label :event_series_id, "Series", class: "cs-field-label" %>
+              <%= f.collection_select :event_series_id, EventSeries.order(:name), :id, :name, { include_blank: "No series (standalone event)" }, class: "cs-select" %>
+              <p class="cs-field-hint">Optional. Events in a series inherit its branding and can be managed by series members.</p>
+            </div>
+          <% end %>
+          <div>
+            <%= f.label :logo, "Logo", class: "cs-field-label" %>
+            <%= f.file_field :logo, accept: "image/jpeg,image/png,image/gif,image/webp,image/svg+xml", class: "block text-sm file:mr-3 file:py-1 file:px-4 file:rounded-full file:border-2 file:border-solid file:border-(--cs-accent) file:bg-transparent file:text-sm file:font-bold file:text-(--cs-accent) file:cursor-pointer" %>
+            <p class="cs-field-hint">Optional. JPEG, PNG, GIF, WebP or SVG, up to 5MB. Shown in the side navigation and event picker.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="cs-wizard-actions">
+      <%= link_to "Cancel", admin_root_path, class: "cs-btn cs-btn-link" %>
+      <%= f.button "Create event and continue", class: "cs-btn cs-btn-primary" %>
+    </div>
+  <% end %>
+<% end %>

@@ -1,0 +1,207 @@
+<% content_for :title, "#{@display_name} Mappings – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Integrations", admin_event_integrations_path(current_event) ], [ "#{@display_name} field mappings", nil ]) %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1"><%= @display_name %> field mappings</h1>
+      <p class="cs-description">Map DocuSeal form fields to Attend data for auto-fill</p>
+    </div>
+    <div class="cs-actions">
+      <%= link_to "Back to integrations", admin_event_integrations_path(current_event), class: "cs-btn" %>
+    </div>
+  </div>
+
+  <% if @template_id.blank? %>
+    <div class="cs-alert cs-alert-warning">
+      <%= cs_status_icon(:warning) %>
+      <div>
+        <p class="cs-alert-title">No template configured</p>
+        <p>You need to use the default template first before configuring field mappings.</p>
+        <p class="mt-2"><%= link_to "Back to integrations", admin_event_integrations_path(current_event), class: "cs-link" %></p>
+      </div>
+    </div>
+  <% elsif @template_snapshot.blank? %>
+    <div class="cs-alert">
+      <%= cs_status_icon(:info) %>
+      <div class="flex-1">
+        <p class="cs-alert-title">Sync template fields</p>
+        <p>Template #<%= @template_id %> is configured. Sync fields from DocuSeal to configure mappings.</p>
+        <div class="mt-2">
+          <%= button_to "Sync fields from DocuSeal",
+              admin_event_docuseal_template_sync_path(current_event, @template_type),
+              method: :post,
+              class: "cs-btn" %>
+        </div>
+      </div>
+    </div>
+  <% else %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Template</h2>
+        <div class="cs-actions">
+          <%= button_to "Re-sync fields",
+              admin_event_docuseal_template_sync_path(current_event, @template_type),
+              method: :post,
+              class: "cs-btn" %>
+        </div>
+      </div>
+      <div class="cs-container-body">
+        <dl class="cs-kv cs-kv-2">
+          <div>
+            <dt class="cs-kv-label">Template ID</dt>
+            <dd class="cs-kv-value font-mono"><%= @template_id %></dd>
+          </div>
+          <div>
+            <dt class="cs-kv-label">Last synced</dt>
+            <dd class="cs-kv-value"><%= Time.parse(@template_snapshot["synced_at"]).strftime("%b %d, %Y %H:%M") rescue "Unknown" %></dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <%= form_with url: admin_event_docuseal_template_mappings_path(current_event, @template_type), method: :patch, local: true, class: "cs-stack" do |f| %>
+      <% if @template_type == "freedom_waiver" %>
+        <section class="cs-container">
+          <div class="cs-container-header">
+            <div>
+              <h2 class="cs-h2">Freedom waiver checkbox configuration</h2>
+              <p class="cs-container-description">
+                Select which checkbox fields represent "granted" and "rejected" for the freedom waiver.
+                When the guardian signs, these values will be used to set the freedom waiver status.
+              </p>
+            </div>
+          </div>
+          <div class="cs-container-body">
+            <div class="cs-field-grid">
+              <div class="cs-field">
+                <label for="freedom_granted_field" class="cs-field-label">Granted checkbox field</label>
+                <select id="freedom_granted_field" name="freedom_granted_field" class="cs-select">
+                  <option value="">-- Select Field --</option>
+                  <% (@template_snapshot["fields"] || []).reject { |f| f["readonly"] }.each do |field| %>
+                    <option value="<%= field["name"] %>" <%= "selected" if @freedom_checkbox_config["granted_field"] == field["name"] %>>
+                      <%= field["name"] %>
+                    </option>
+                  <% end %>
+                </select>
+              </div>
+              <div class="cs-field">
+                <label for="freedom_rejected_field" class="cs-field-label">Rejected checkbox field</label>
+                <select id="freedom_rejected_field" name="freedom_rejected_field" class="cs-select">
+                  <option value="">-- Select Field --</option>
+                  <% (@template_snapshot["fields"] || []).reject { |f| f["readonly"] }.each do |field| %>
+                    <option value="<%= field["name"] %>" <%= "selected" if @freedom_checkbox_config["rejected_field"] == field["name"] %>>
+                      <%= field["name"] %>
+                    </option>
+                  <% end %>
+                </select>
+              </div>
+            </div>
+          </div>
+        </section>
+      <% end %>
+
+      <% submitters = @template_snapshot["submitters"] || [] %>
+      <% fields = (@template_snapshot["fields"] || []).reject { |f| f["readonly"] } %>
+      <section class="cs-container">
+        <div class="cs-container-header cs-container-header-divided">
+          <div>
+            <h2 class="cs-h2">Field mappings <span class="cs-counter">(<%= fields.size %>)</span></h2>
+            <p class="cs-container-description">Map template fields to Attend data sources for auto-fill. Leave unmapped fields blank.</p>
+          </div>
+        </div>
+
+        <% if fields.empty? %>
+          <div class="cs-empty">
+            <p class="cs-empty-title">No fields found in this template</p>
+            <p>Add fields in the builder first.</p>
+          </div>
+        <% else %>
+          <div class="cs-table-wrap">
+            <table class="cs-table">
+              <thead>
+                <tr>
+                  <th scope="col">Template field</th>
+                  <th scope="col">Attend data source</th>
+                  <th scope="col">Read-only</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% fields.each_with_index do |field, index| %>
+                  <%
+                    field_name = field["name"]
+                    existing_mapping = @current_mappings.find { |m| m["field_name"] == field_name }
+                    field_role = field["submitter_uuid"] ? submitters.find { |s| s["uuid"] == field["submitter_uuid"] }&.dig("name") : nil
+                  %>
+                  <tr>
+                    <td>
+                      <div class="font-bold"><%= field_name %></div>
+                      <div class="cs-small cs-secondary">
+                        <%= field["type"]&.capitalize || "Text" %>
+                        <% if field_role %>
+                          · <%= field_role %>
+                        <% end %>
+                      </div>
+                      <input type="hidden" name="mappings[][field_name]" value="<%= field_name %>">
+                      <input type="hidden" name="mappings[][role]" value="<%= field_role %>">
+                    </td>
+                    <td class="min-w-56">
+                      <select name="mappings[][source_key]" class="cs-select" aria-label="Data source for <%= field_name %>">
+                        <option value="">-- Not Mapped --</option>
+                        <optgroup label="Participant">
+                          <% @data_sources.select { |k, _| k.start_with?("participant.") }.each do |key, label| %>
+                            <option value="<%= key %>" <%= "selected" if existing_mapping&.dig("source_key") == key %>>
+                              <%= label %>
+                            </option>
+                          <% end %>
+                        </optgroup>
+                        <optgroup label="Guardian">
+                          <% @data_sources.select { |k, _| k.start_with?("guardian.") }.each do |key, label| %>
+                            <option value="<%= key %>" <%= "selected" if existing_mapping&.dig("source_key") == key %>>
+                              <%= label %>
+                            </option>
+                          <% end %>
+                        </optgroup>
+                        <optgroup label="Emergency Contact">
+                          <% @data_sources.select { |k, _| k.start_with?("emergency_contact.") }.each do |key, label| %>
+                            <option value="<%= key %>" <%= "selected" if existing_mapping&.dig("source_key") == key %>>
+                              <%= label %>
+                            </option>
+                          <% end %>
+                        </optgroup>
+                        <optgroup label="Event">
+                          <% @data_sources.select { |k, _| k.start_with?("event.") }.each do |key, label| %>
+                            <option value="<%= key %>" <%= "selected" if existing_mapping&.dig("source_key") == key %>>
+                              <%= label %>
+                            </option>
+                          <% end %>
+                        </optgroup>
+                      </select>
+                    </td>
+                    <td>
+                      <div class="cs-option">
+                        <input type="checkbox"
+                               id="mapping_readonly_<%= index %>"
+                               name="mappings[][readonly]"
+                               value="1"
+                               <%= "checked" if existing_mapping&.dig("readonly") %>>
+                        <div>
+                          <label for="mapping_readonly_<%= index %>" class="cs-option-label">Read-only</label>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% end %>
+      </section>
+
+      <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+        <%= link_to "Cancel", admin_event_integrations_path(current_event), class: "cs-btn cs-btn-link cs-btn-full" %>
+        <button type="submit" class="cs-btn cs-btn-primary cs-btn-full">Save mappings</button>
+      </div>
+    <% end %>
+  <% end %>
+</div>

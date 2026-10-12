@@ -1,38 +1,36 @@
-<section id="unassigned_sidebar" class="cs-container lg:sticky lg:top-4">
-  <div class="cs-container-header">
-    <div>
-      <h2 class="cs-h2">Unassigned <span class="cs-counter">(<%= @unassigned.size %>)</span></h2>
-    </div>
-  </div>
-  <div class="cs-container-body">
+<div id="unassigned_sidebar" class="bg-white border border-gray-200 rounded-lg p-4 sticky top-4 space-y-4">
+  <div>
+    <h2 class="font-medium text-gray-900 mb-3">Unassigned (<%= @unassigned.size %>)</h2>
     <div id="unassigned_container">
       <%= render partial: "admin/rooming_wizard/unassigned_container" %>
     </div>
   </div>
 
   <% if @exempt.any? %>
-    <div class="cs-container-header border-t border-(--cs-border-divider-secondary)">
-      <div>
-        <h2 class="cs-h2">Exempt <span class="cs-counter">(<%= @exempt.size %>)</span></h2>
-        <p class="cs-container-description">Not assigned to rooms (e.g., staying at home)</p>
+    <div class="border-t pt-4">
+      <h2 class="font-medium text-gray-900 mb-3">
+        <span class="text-gray-500">Exempt</span> (<%= @exempt.size %>)
+      </h2>
+      <p class="text-xs text-gray-500 mb-2">Not assigned to rooms (e.g., staying at home)</p>
+      <div class="space-y-2">
+        <% @exempt.each do |pe| %>
+          <div class="bg-gray-100 rounded p-2 border border-gray-200">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium text-gray-600"><%= pe.participant.full_name %></p>
+                <p class="text-xs text-gray-400">Age <%= pe.age_on_event %></p>
+              </div>
+              <% unless @rooming_plan.locked? %>
+                <%= button_to "Unexempt",
+                  toggle_exempt_admin_event_rooming_wizard_path(@event.slug, participant_event_id: pe.id),
+                  method: :post,
+                  class: "text-xs text-[#ec3750] hover:text-blue-800",
+                  data: { turbo: true } %>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
       </div>
     </div>
-    <div class="cs-container-body space-y-2">
-      <% @exempt.each do |pe| %>
-        <div class="flex items-center justify-between gap-2 rounded-(--cs-radius-item) border border-(--cs-border-divider-secondary) p-2">
-          <div class="min-w-0">
-            <p class="text-sm font-bold cs-secondary"><%= pe.participant.full_name %></p>
-            <p class="cs-small cs-muted">Age <%= pe.age_on_event %></p>
-          </div>
-          <% unless @rooming_plan.locked? %>
-            <%= button_to "Unexempt",
-              toggle_exempt_admin_event_rooming_wizard_path(@event.slug, participant_event_id: pe.id),
-              method: :post,
-              class: "cs-btn cs-btn-link",
-              data: { turbo: true } %>
-          <% end %>
-        </div>
-      <% end %>
-    </div>
   <% end %>
-</section>
+</div>

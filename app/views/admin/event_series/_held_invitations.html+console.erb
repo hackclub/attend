@@ -1,0 +1,51 @@
+<%# Held onboarding invitations are HQ's own pending action, not something to
+    chase: nobody has been emailed, so nobody is late. Hence a callout of its
+    own above the chase list, with the one button that releases them. Rendered
+    only when an event is holding or has something held, so a series that
+    doesn't use the hold never sees it. %>
+<% held_rows = event_rows.select { |row| row[:held_invitations].positive? || row[:event].onboarding_invites_held? } %>
+<% held_total = totals[:held_invitations] %>
+<% holding_events = totals[:holding_events] %>
+
+<section class="cs-alert cs-alert-warning" data-testid="series-held-invitations">
+  <%= cs_status_icon(:warning) %>
+  <div class="flex-1 min-w-0">
+    <div class="flex flex-col sm:flex-row sm:items-start gap-3">
+      <div class="flex-1 min-w-0">
+        <p class="cs-alert-title">
+          <% if held_total.positive? %>
+            <%= pluralize(held_total, "onboarding invitation") %> held across <%= pluralize(held_rows.length, "event") %>
+          <% else %>
+            <%= pluralize(holding_events, "event") %> holding onboarding invitations
+          <% end %>
+        </p>
+        <p>
+          <% if held_total.positive? %>
+            These participants have been added but not emailed. Sending releases every held invitation and stops the hold on those events.
+          <% else %>
+            Nothing has been added yet. Participants added to these events will be recorded without an email until you send.
+          <% end %>
+        </p>
+      </div>
+      <% if policy(series).send_held_invitations? %>
+        <%= button_to send_held_invitations_admin_series_path(series),
+            method: :post,
+            data: { turbo_confirm: held_total.positive? ? "Email #{pluralize(held_total, 'held invitation')} across #{pluralize(held_rows.length, 'event')} now? Those events will email new participants as they're added from here on." : "Stop holding onboarding invitations on #{pluralize(holding_events, 'event')}? They will email new participants as they're added." },
+            class: "cs-btn shrink-0" do %>
+          <%= held_total.positive? ? "Send #{pluralize(held_total, 'held invitation')}" : "Stop holding invitations" %>
+        <% end %>
+      <% end %>
+    </div>
+    <ul class="mt-2 space-y-1">
+      <% held_rows.sort_by { |row| -row[:held_invitations] }.each do |row| %>
+        <li class="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span class="font-bold tabular-nums w-8 text-right shrink-0"><%= row[:held_invitations] %></span>
+          <%= link_to row[:event].name, admin_event_participants_path(row[:event].slug, status: "pending_invitations"), class: "cs-link truncate" %>
+          <% if row[:event].onboarding_invites_held? %>
+            <%= cs_status(:pending, "Holding") %>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+</section>

@@ -1,0 +1,20 @@
+<% content_for :title, "Event Setup: Waivers – Attend" %>
+
+<% description = "Participants and their guardians sign waivers digitally through DocuSeal during onboarding. Choose how to set them up." %>
+
+<% if params[:return_to] == "integrations" %>
+  <%# Reached from the integrations page, outside of setup: no step list. %>
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Set up waivers</h1>
+      <p class="cs-description"><%= description %></p>
+    </div>
+  </div>
+  <div class="max-w-[960px]">
+    <%= render "waiver_options", event: @event, return_to: "integrations" %>
+  </div>
+<% else %>
+  <%= render layout: "wizard", locals: { current_step: "waivers", title: "Waivers", description: description } do %>
+    <%= render "waiver_options", event: @event, return_to: params[:return_to].presence %>
+  <% end %>
+<% end %>

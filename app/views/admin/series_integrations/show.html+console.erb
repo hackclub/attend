@@ -1,0 +1,108 @@
+<% content_for :title, "#{@series.name} Integrations – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Series", admin_series_index_path ], [ @series.name, admin_series_path(@series) ], [ "Integrations", nil ]) %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <div class="flex items-center gap-3 min-w-0">
+        <%= render "admin/events/avatar", event: @series, size: 32, rounded: "rounded-lg" %>
+        <h1 class="cs-h1 truncate"><%= @series.name %> integrations</h1>
+      </div>
+      <p class="cs-description">
+        Where this series' events get their projects judged. A gallery is per event, so a series
+        running satellites gets one each — create them here rather than event by event.
+      </p>
+    </div>
+    <div class="cs-actions">
+      <%= link_to "API keys", admin_series_api_tokens_path(@series), class: "cs-btn cs-btn-full" %>
+    </div>
+  </div>
+
+  <% unless @vote_client.configured? %>
+    <div class="cs-alert cs-alert-warning">
+      <%= cs_status_icon(:warning) %>
+      <p>
+        No vote.hackclub.com API key is configured on this server, so nothing can be created.
+        Set <code class="font-mono">VOTE_API_KEY</code> (or the <code class="font-mono">vote.api_key</code> credential) first.
+      </p>
+    </div>
+  <% end %>
+
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided">
+      <div>
+        <h2 class="cs-h2">vote.hackclub.com <span class="cs-counter">(<%= @events.size %>)</span></h2>
+        <p class="cs-container-description">
+          A peer-voting gallery for one event at a time. Creates a <strong>DRAFT</strong> vote event from an Attend event's name, slug, logo and banner,
+          with its event admins as admins over there — you finish setting it up on vote.hackclub.com.
+          An event that already exists for the same slug is linked rather than duplicated.
+        </p>
+      </div>
+    </div>
+
+    <% if @events.any? %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Event</th>
+              <th scope="col">Gallery</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @events.each do |event| %>
+              <% artwork_ready = event.logo.attached? && event.banner.attached? %>
+              <%# vote.hackclub.com sends these; only an http(s) one gets linked. %>
+              <% gallery_url = external_http_url(event.vote_event_gallery_url) %>
+              <% admin_url = external_http_url(event.vote_event_admin_url) %>
+              <tr>
+                <td>
+                  <div><%= event.name %></div>
+                  <div class="cs-small cs-secondary font-mono"><%= event.slug %></div>
+                </td>
+                <td>
+                  <% if event.vote_event_linked? %>
+                    <div class="flex flex-wrap items-center gap-3">
+                      <%= cs_status(:success, "Linked") %>
+                      <% if gallery_url %>
+                        <%= link_to "View gallery", gallery_url, target: "_blank", rel: "noopener", class: "cs-link" %>
+                      <% end %>
+                    </div>
+                  <% elsif artwork_ready %>
+                    <%= cs_status(:pending, "Not created yet") %>
+                  <% else %>
+                    <%# Same bar as the event's own page: vote.hackclub.com fetches both
+                        images itself, so it cannot be created without them. %>
+                    <%= cs_status(:warning, "Needs a logo and a banner first") %>
+                  <% end %>
+                </td>
+                <td class="text-right">
+                  <div class="flex items-center justify-end gap-2">
+                    <% if event.vote_event_linked? %>
+                      <% if admin_url %>
+                        <%= link_to "Manage", admin_url, target: "_blank", rel: "noopener", class: "cs-btn cs-btn-link" %>
+                      <% end %>
+                    <% else %>
+                      <%= button_to "Create gallery",
+                            create_vote_event_admin_series_integrations_path(@series, event_id: event.slug),
+                            method: :post,
+                            disabled: !artwork_ready || !@vote_client.configured?,
+                            data: { turbo_confirm: "Create a DRAFT vote.hackclub.com event for \"#{event.name}\"?" },
+                            class: "cs-btn" %>
+                    <% end %>
+                    <%= link_to "Event page", admin_event_integrations_path(event), class: "cs-btn cs-btn-link" %>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="cs-empty">
+        <p class="cs-empty-title">This series has no events yet.</p>
+      </div>
+    <% end %>
+  </section>
+</div>

@@ -1,0 +1,68 @@
+<% content_for :title, "Edit #{@event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Events", admin_root_path ], [ @event.name_was.presence || @event.name, admin_event_dashboard_path(@event.slug_was.presence || @event.slug) ], [ "Settings", nil ]) %>
+
+<div class="cs-header">
+  <div class="cs-header-text">
+    <h1 class="cs-h1">Edit <%= @event.name %></h1>
+  </div>
+</div>
+
+<div class="cs-stack">
+  <%= render "form", event: @event %>
+
+  <% if policy(@event).destroy? %>
+    <section class="border-2 border-dashed border-(--cs-error) rounded-2xl p-5" data-controller="delete-event">
+      <h2 class="cs-h2">Danger zone</h2>
+      <p class="cs-secondary mt-1 mb-4">
+        Permanently delete this event and all associated data. This action cannot be undone.
+      </p>
+      <button type="button"
+              data-action="click->delete-event#showConfirmation"
+              class="cs-btn">
+        Delete event
+      </button>
+
+      <div data-delete-event-target="modal" class="hidden cs-modal-overlay">
+        <div class="cs-modal" role="dialog" aria-modal="true" aria-labelledby="delete-event-title">
+          <div class="cs-modal-header">
+            <h2 id="delete-event-title">Delete "<%= @event.name %>"?</h2>
+            <button type="button" class="cs-modal-close" aria-label="Close" data-action="click->delete-event#hideConfirmation">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 16 16" aria-hidden="true"><path stroke-linecap="round" stroke-width="2" d="M3 3l10 10M13 3L3 13"/></svg>
+            </button>
+          </div>
+          <%= form_with url: admin_event_path(@event), method: :delete do |f| %>
+            <div class="cs-modal-body">
+              <div class="cs-alert cs-alert-warning">
+                <%= cs_status_icon(:warning) %>
+                <p>
+                  This will permanently delete the event and all associated participants, incidents, messages, and other data.
+                  <strong>This action cannot be undone.</strong>
+                </p>
+              </div>
+              <div class="cs-field mt-4">
+                <label for="delete-event-confirmation" class="cs-field-label">Type <strong class="font-mono"><%= @event.name %></strong> to confirm:</label>
+                <input type="text"
+                       id="delete-event-confirmation"
+                       name="confirmation"
+                       required
+                       autocomplete="off"
+                       placeholder="<%= @event.name %>"
+                       class="cs-input">
+              </div>
+            </div>
+            <div class="cs-modal-footer">
+              <button type="button"
+                      data-action="click->delete-event#hideConfirmation"
+                      class="cs-btn cs-btn-link">
+                Cancel
+              </button>
+              <button type="submit" class="cs-btn cs-btn-primary">
+                Permanently delete
+              </button>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </section>
+  <% end %>
+</div>

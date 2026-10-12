@@ -1,0 +1,98 @@
+<% content_for :title, "Merge Duplicate – #{@participant.display_name} – #{current_event.name} – Attend" %>
+
+<%= render "header" %>
+
+<div class="max-w-3xl cs-stack">
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2">Merge a duplicate record into this one</h2>
+        <p class="cs-container-description">
+          Use this when the same person has two participant records — usually from
+          registering under two different email addresses. Event registrations, the
+          Slack link, headshot, sign-in account, and missing profile details move
+          onto <strong><%= @participant.display_name %> (<%= @participant.email %>)</strong>,
+          then the duplicate record is deleted. This cannot be undone.
+        </p>
+      </div>
+    </div>
+    <div class="cs-container-body">
+      <%= form_with url: merge_admin_event_participant_path(current_event, @participant_event), method: :get, local: true do |f| %>
+        <label for="q" class="cs-field-label">Find the duplicate record</label>
+        <div class="flex gap-2">
+          <div class="cs-search flex-1">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <%= f.text_field :q, value: @query, placeholder: "Search by name or email…", class: "cs-input" %>
+          </div>
+          <%= f.button "Search", class: "cs-btn" %>
+        </div>
+      <% end %>
+
+      <% if @candidates %>
+        <% if @candidates.any? %>
+          <ul class="mt-4 divide-y divide-(--cs-border-divider-secondary)">
+            <% @candidates.each do |candidate| %>
+              <li class="py-3 flex items-center justify-between gap-4">
+                <div class="min-w-0">
+                  <p class="font-bold truncate"><%= candidate.display_name %></p>
+                  <p class="cs-secondary truncate"><%= candidate.email %></p>
+                  <p class="cs-small cs-muted">
+                    <%= candidate.date_of_birth&.strftime("%b %-d, %Y") || "No DOB" %>
+                    · <%= candidate.slack_user_id.present? ? "Slack linked" : "No Slack" %>
+                    · <%= candidate.user_id.present? ? "Sign-in linked" : "No sign-in" %>
+                    <% if candidate.participant_events.any? %>
+                      · <%= candidate.participant_events.map { |pe| "#{pe.event.name}: #{pe.status}" }.join(", ") %>
+                    <% else %>
+                      · No event registrations
+                    <% end %>
+                  </p>
+                </div>
+                <%= link_to "Select", merge_admin_event_participant_path(current_event, @participant_event, q: @query, duplicate_id: candidate.id),
+                    class: "cs-btn shrink-0" %>
+              </li>
+            <% end %>
+          </ul>
+        <% else %>
+          <p class="mt-4 cs-muted">No other participants match "<%= @query %>".</p>
+        <% end %>
+      <% end %>
+    </div>
+  </section>
+
+  <% if @duplicate %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">
+            Merge <%= @duplicate.display_name %> (<%= @duplicate.email %>) into this record?
+          </h2>
+          <p class="cs-container-description">The duplicate record will be deleted after its data is transferred.</p>
+        </div>
+      </div>
+      <div class="cs-container-body">
+        <div class="cs-alert cs-alert-warning">
+          <%= cs_status_icon(:warning) %>
+          <div>
+            <% if @merge_preview.any? %>
+              <ul class="list-disc list-inside space-y-1">
+                <% @merge_preview.each do |action| %>
+                  <li><%= action %></li>
+                <% end %>
+              </ul>
+            <% else %>
+              <p>Nothing to transfer — the duplicate record will simply be deleted.</p>
+            <% end %>
+          </div>
+        </div>
+      </div>
+      <div class="cs-container-footer flex justify-end">
+        <%= button_to "Merge & delete duplicate",
+            merge_duplicate_admin_event_participant_path(current_event, @participant_event),
+            method: :post,
+            params: { duplicate_id: @duplicate.id },
+            data: { turbo_confirm: "Merge #{@duplicate.display_name} (#{@duplicate.email}) into #{@participant.display_name} and delete the duplicate? This cannot be undone." },
+            class: "cs-btn" %>
+      </div>
+    </section>
+  <% end %>
+</div>

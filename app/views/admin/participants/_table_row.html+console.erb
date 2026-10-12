@@ -1,0 +1,244 @@
+<tr
+    data-searchable
+    <%= "data-group=#{group_id}" if group_id.present? %>>
+  <td class="sticky left-0 bg-(--cs-bg-container)">
+    <input type="checkbox" aria-label="Select row" class="accent-(--cs-accent)" data-action="change->data-table#selectRow">
+  </td>
+  <td class="font-medium whitespace-nowrap" data-column="first_name">
+    <%= link_to legal_name_part(pe.participant.legal_first_name), admin_event_participant_path(current_event, pe), class: "cs-link cs-link-strong" %>
+  </td>
+  <td class="whitespace-nowrap" data-column="last_name">
+    <%= legal_name_part(pe.participant.legal_last_name, dash: true) %>
+  </td>
+  <td class="cs-secondary whitespace-nowrap" data-column="preferred_name">
+    <%= pe.participant.preferred_name.presence || "—" %>
+  </td>
+  <td class="cs-secondary max-w-[160px] truncate" data-column="email" title="<%= pe.participant.email %>">
+    <%= pe.participant.email %>
+  </td>
+  <% if can_view_participant_pii? %>
+    <td class="cs-secondary whitespace-nowrap" data-column="phone">
+      <%= pe.participant.phone.presence || "—" %>
+    </td>
+  <% end %>
+  <td class="cs-secondary whitespace-nowrap" data-column="pronouns">
+    <%= pe.participant.pronouns.presence || "—" %>
+  </td>
+  <% if can_view_participant_pii? %>
+    <td class="cs-secondary whitespace-nowrap" data-column="dob">
+      <%= pe.participant.date_of_birth&.strftime("%Y-%m-%d") || "—" %>
+    </td>
+  <% end %>
+  <td class="whitespace-nowrap" data-column="age">
+    <% age = pe.participant.age_on(current_event.starts_at&.to_date || Date.current) %>
+    <% if age %>
+      <% if age < 18 %>
+        <span title="Under 18"><%= cs_badge(age, "yellow") %></span>
+      <% else %>
+        <%= age %>
+      <% end %>
+    <% else %>
+      <span class="cs-muted">—</span>
+    <% end %>
+  </td>
+  <td class="whitespace-nowrap" data-column="status">
+    <div class="flex flex-col items-start gap-0.5">
+      <%= render_display_status_badge(pe) %>
+      <%= render_blocking_step_badge(pe) %>
+    </div>
+  </td>
+  <td class="whitespace-nowrap" data-column="tshirt">
+    <%= pe.participant.tshirt_size&.upcase || "—" %>
+  </td>
+  <% if current_event.groups_enabled? %>
+    <td class="whitespace-nowrap" data-column="groups">
+      <% if pe.groups.any? %>
+        <div class="flex flex-wrap gap-1">
+          <% pe.groups.each do |g| %>
+            <span class="cs-badge"
+                  style="background-color: <%= g.normalized_color || "#e5e7eb" %>; color: <%= g.color.present? ? "white" : "#1f2d3d" %>;"
+                  title="<%= g.description %>">
+              <%= g.name %>
+            </span>
+          <% end %>
+        </div>
+      <% else %>
+        <span class="cs-muted">—</span>
+      <% end %>
+    </td>
+  <% end %>
+  <td class="cs-secondary whitespace-nowrap" data-column="engagement">
+    <%= pe.participant.engagement_preference&.titleize || "—" %>
+  </td>
+  <% if current_event.travel_enabled? %>
+  <td class="whitespace-nowrap" data-column="travel_mode">
+    <% if pe.travel_inbound %>
+      <%= cs_badge(pe.travel_inbound.mode&.titleize) %>
+    <% else %>
+      <span class="cs-muted">—</span>
+    <% end %>
+  </td>
+  <td class="whitespace-nowrap" data-column="visa">
+    <% if pe.travel_inbound&.visa_status %>
+      <% visa_type = case pe.travel_inbound.visa_status
+        when "approved" then :success
+        when "denied" then :error
+        when "applied" then :in_progress
+        when "pending" then :pending
+        else :info
+      end %>
+      <%= cs_status(visa_type, pe.travel_inbound.visa_status.titleize) %>
+    <% else %>
+      <span class="cs-muted">—</span>
+    <% end %>
+  </td>
+  <td class="cs-secondary whitespace-nowrap" data-column="arrival">
+    <% if pe.travel_inbound&.last_arrival_time %>
+      <div><%= pe.travel_inbound.last_arrival_time.strftime("%b %d %H:%M") %></div>
+    <% else %>
+      <span class="cs-muted">—</span>
+    <% end %>
+  </td>
+  <td class="cs-secondary whitespace-nowrap" data-column="departure">
+    <% if pe.travel_outbound&.first_departure_time %>
+      <div><%= pe.travel_outbound.first_departure_time.strftime("%b %d %H:%M") %></div>
+    <% else %>
+      <span class="cs-muted">—</span>
+    <% end %>
+  </td>
+  <% end %>
+  <td class="whitespace-nowrap" data-column="room">
+    <% if pe.room.present? %>
+      <%= link_to pe.room.display_name, finalize_admin_event_rooming_wizard_path(current_event), class: "cs-link" %>
+    <% else %>
+      <span class="cs-muted">—</span>
+    <% end %>
+  </td>
+  <td class="cs-secondary whitespace-nowrap" data-column="roommate">
+    <% if pe.room.present? %>
+      <% roommates = pe.room.participant_events.reject { |r| r.id == pe.id } %>
+      <% if roommates.any? %>
+        <% roommates.each_with_index do |r, i| %>
+          <%= link_to (r.participant.preferred_name.presence || r.participant.legal_first_name), admin_event_participant_path(current_event, r), class: "cs-link" %><%= ", " unless i == roommates.size - 1 %>
+        <% end %>
+      <% else %>
+        <span class="cs-muted">—</span>
+      <% end %>
+    <% else %>
+      <span class="cs-muted">—</span>
+    <% end %>
+  </td>
+  <td class="cs-secondary whitespace-nowrap" data-column="gender_identity">
+    <%= pe.accommodation&.gender_identity&.titleize || "—" %>
+  </td>
+  <td class="whitespace-nowrap" data-column="diet">
+    <% if pe.dietary&.diet_type %>
+      <%= cs_badge(pe.dietary.diet_type.titleize) %>
+    <% else %>
+      <span class="cs-muted">—</span>
+    <% end %>
+  </td>
+  <td class="cs-secondary max-w-[120px] truncate" data-column="intolerances" title="<%= pe.dietary&.intolerances %>">
+    <%= pe.dietary&.intolerances.presence || "—" %>
+  </td>
+  <td class="cs-secondary max-w-[120px] truncate" data-column="allergies" title="<%= pe.medical&.allergies %>">
+    <%= pe.medical&.allergies.presence || "—" %>
+  </td>
+  <td class="whitespace-nowrap" data-column="anaphylaxis">
+    <% if pe.medical&.has_anaphylaxis_risk %>
+      <%= cs_badge("Yes", "red") %>
+    <% else %>
+      <span class="cs-muted">No</span>
+    <% end %>
+  </td>
+  <td class="cs-secondary max-w-[120px] truncate" data-column="medical" title="<%= pe.medical&.medical_conditions %>">
+    <%= pe.medical&.medical_conditions.presence || "—" %>
+  </td>
+  <td class="cs-secondary max-w-[100px] truncate" data-column="medications" title="<%= pe.medical&.medications %>">
+    <%= pe.medical&.medications.presence || "—" %>
+  </td>
+  <td class="whitespace-nowrap" data-column="accessibility">
+    <% acc = pe.accessibility %>
+    <% has_access = acc && (acc.uses_wheelchair || acc.step_free_required || acc.needs_captioning || acc.needs_sign_language || acc.has_adhd || acc.has_autism || acc.has_dyslexia || acc.mobility_needs.present? || acc.sensory_needs.present? || acc.other_needs.present?) %>
+    <% if has_access %>
+      <span title="Has accessibility needs"><%= cs_badge("Yes", "blue") %></span>
+    <% else %>
+      <span class="cs-muted">No</span>
+    <% end %>
+  </td>
+  <td class="whitespace-nowrap" data-column="high_support">
+    <% if pe.safeguarding_info&.high_support? %>
+      <%= cs_badge("Yes", "blue") %>
+    <% else %>
+      <span class="cs-muted">No</span>
+    <% end %>
+  </td>
+  <td class="whitespace-nowrap" data-column="freedom">
+    <% if pe.safeguarding_info&.freedom_waiver_granted %>
+      <%= cs_status(:success, "Yes") %>
+    <% else %>
+      <span class="cs-muted">No</span>
+    <% end %>
+  </td>
+  <td class="whitespace-nowrap" data-column="waiver">
+    <% if pe.waiver_signed? %>
+      <%= cs_status(:success, "Signed") %>
+    <% else %>
+      <%= cs_status(:pending, "Pending") %>
+    <% end %>
+  </td>
+  <% Array(local_assigns[:optional_documents]).each do |doc| %>
+    <td class="whitespace-nowrap" data-column="optional_doc_<%= doc.id %>">
+      <%= render_optional_document_badge(pe, doc) %>
+    </td>
+  <% end %>
+  <td class="cs-secondary max-w-[120px] truncate whitespace-nowrap" data-column="guardian">
+    <% primary = pe.primary_guardian %>
+    <% if primary %>
+      <%= primary.guardian.full_name %>
+    <% elsif pe.requires_guardian? %>
+      <%= cs_status(:warning, "Required") %>
+    <% else %>
+      <span class="cs-muted">N/A</span>
+    <% end %>
+  </td>
+  <td class="whitespace-nowrap" data-column="slack">
+    <% if pe.participant.slack_user_id.present? %>
+      <%= cs_status(:success, "Linked") %>
+    <% else %>
+      <span class="cs-muted">—</span>
+    <% end %>
+  </td>
+  <td class="whitespace-nowrap" data-column="onboarding">
+    <% progress = pe.onboarding_progress %>
+    <div class="flex gap-0.5">
+      <% progress[:steps].each do |step| %>
+        <span class="cs-status cs-status-<%= step[:done] ? 'success' : 'stopped' %>" title="<%= step[:name].titleize %>"><%= cs_status_icon(step[:done] ? :success : :stopped) %><span class="sr-only"><%= step[:name].titleize %>: <%= step[:done] ? "done" : "not done" %></span></span>
+      <% end %>
+    </div>
+  </td>
+  <td class="whitespace-nowrap" data-column="checked_in">
+    <% if pe.checked_in? %>
+      <%= cs_status(:success, "Yes") %>
+    <% else %>
+      <span class="cs-muted">No</span>
+    <% end %>
+  </td>
+  <td class="whitespace-nowrap" data-column="last_scan">
+    <% last_scan = pe.scans.max_by(&:scanned_at) %>
+    <% if last_scan %>
+      <div><%= last_scan.scanned_at.strftime("%b %d %H:%M") %></div>
+      <div class="cs-small cs-muted"><%= last_scan.scan_context.name %> · <%= last_scan.user.name %></div>
+    <% else %>
+      <span class="cs-muted">—</span>
+    <% end %>
+  </td>
+  <td class="cs-secondary whitespace-nowrap" data-column="created">
+    <%= pe.created_at.strftime("%Y-%m-%d") %>
+  </td>
+  <td class="text-right sticky right-0 bg-(--cs-bg-container) whitespace-nowrap">
+    <%= link_to admin_event_participant_path(current_event, pe), class: "cs-link" do %>
+      View
+    <% end %>
+  </td>
+</tr>

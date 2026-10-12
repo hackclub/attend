@@ -1,118 +1,114 @@
 <% content_for :title, "Event Setup: Modules – Attend" %>
 
-<%= render layout: "wizard", locals: {
-      current_step: "modules",
-      title: "Modules",
-      description: "Modules you turn off are hidden from onboarding and the dashboards."
-    } do %>
-  <%= form_with model: @event, url: admin_event_setup_modules_path(@event, return_to: params[:return_to].presence), method: :patch, class: "cs-stack" do |f| %>
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <div>
-          <h2 class="cs-h2">Participant onboarding</h2>
-          <p class="cs-container-description">What participants and guardians are asked for.</p>
-        </div>
-      </div>
-      <div class="cs-container-body">
-        <div class="cs-option">
-          <%= f.check_box :travel_enabled, { checked: f.object.travel_enabled? } %>
-          <div>
-            <%= f.label :travel_enabled, "Travel", class: "cs-option-label" %>
-            <p class="cs-option-description">Collect travel information from participants. Turning this off hides the travel onboarding step, travel dashboards and the travel calendar.</p>
-          </div>
-        </div>
-        <div data-controller="wizard-reveal">
-          <div class="cs-option">
-            <%= f.check_box :visa_options_enabled, checked: f.object.visa_options_enabled?, data: { wizard_reveal_target: "input", action: "change->wizard-reveal#update" } %>
-            <div>
-              <%= f.label :visa_options_enabled, "Visa options", class: "cs-option-label" %>
-              <p class="cs-option-description">Show visa requirement fields in travel information for international participants.</p>
-            </div>
-          </div>
-          <div class="ml-7 mt-3" data-wizard-reveal-target="panel" data-show-when="checked">
-            <%= f.label :visa_application_url, "Visa letter application URL", class: "cs-field-label" %>
-            <%= f.url_field :visa_application_url, placeholder: "https://visas.hackclub.com/...", class: "cs-input" %>
-            <p class="cs-field-hint">The Envoy (visas.hackclub.com) form participants are pointed to when they need a visa letter.</p>
-          </div>
-        </div>
-        <div class="cs-option">
-          <%= f.check_box :accommodation_enabled, { checked: f.object.accommodation_enabled? } %>
-          <div>
-            <%= f.label :accommodation_enabled, "Accommodation", class: "cs-option-label" %>
-            <p class="cs-option-description">Show accommodation and housing preferences in onboarding, for events with overnight stays.</p>
-          </div>
-        </div>
-        <div class="cs-option">
-          <%= f.check_box :roommate_preferences_enabled, { checked: f.object.roommate_preferences_enabled? } %>
-          <div>
-            <%= f.label :roommate_preferences_enabled, "Roommate preferences", class: "cs-option-label" %>
-            <p class="cs-option-description">Show roommate preference fields on the accommodation onboarding step.</p>
-          </div>
-        </div>
-        <div class="cs-option">
-          <%= f.check_box :freedom_waivers_enabled, { checked: f.object.freedom_waivers_enabled? } %>
-          <div>
-            <%= f.label :freedom_waivers_enabled, "Freedom waivers", class: "cs-option-label" %>
-            <p class="cs-option-description">Let guardians grant extra freedom permissions for minor participants. Affects the waiver setup in the next step.</p>
-          </div>
-        </div>
-      </div>
-    </section>
+<div class="w-full max-w-3xl">
+  <%= render "progress", current_step: "modules" %>
 
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <div>
-          <h2 class="cs-h2">On-site operations</h2>
-          <p class="cs-container-description">Tools for running the event itself.</p>
-        </div>
-      </div>
-      <div class="cs-container-body">
-        <div class="cs-option">
-          <%= f.check_box :groups_enabled, { checked: f.object.groups_enabled? } %>
-          <div>
-            <%= f.label :groups_enabled, "Groups", class: "cs-option-label" %>
-            <p class="cs-option-description">Tag participants with named groups (e.g. "Hardware", "General Attendance") to tell cohorts apart within one event.</p>
-          </div>
-        </div>
-        <div class="cs-option">
-          <%= f.check_box :nfc_badges_enabled, { checked: f.object.nfc_badges_enabled? } %>
-          <div>
-            <%= f.label :nfc_badges_enabled, "NFC badges", class: "cs-option-label" %>
-            <p class="cs-option-description">Check participants in by scanning NFC badges or wristbands. Write-on-check-in can be turned on later in event settings.</p>
-          </div>
-        </div>
-      </div>
-    </section>
+  <h1 class="text-2xl font-bold mb-1">Which modules does <%= @event.name %> need?</h1>
+  <p class="text-gray-500 mb-6">Turn off anything you won't use — it hides those steps from participant onboarding and keeps your dashboards focused. All of this can be changed later.</p>
 
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <div>
-          <h2 class="cs-h2">Invitation holds</h2>
-          <p class="cs-container-description">Pause outgoing emails while the event is still being set up.</p>
+  <%= form_with model: @event, url: admin_event_setup_modules_path(@event, return_to: params[:return_to].presence), method: :patch, class: "space-y-6" do |f| %>
+    <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-5">
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :travel_enabled, { checked: f.object.travel_enabled?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :travel_enabled, "Travel", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Collect travel information from participants. Disabling hides the travel onboarding step, travel dashboards, and Travel Calendar.</p>
         </div>
       </div>
-      <div class="cs-container-body">
-        <div class="cs-option">
-          <%= f.check_box :guardian_invites_locked, { checked: f.object.guardian_invites_locked? } %>
-          <div>
-            <%= f.label :guardian_invites_locked, "Lock guardian invites", class: "cs-option-label" %>
-            <p class="cs-option-description">Hold off sending guardian invitations while waiver details are being finalised. Useful until your waivers are set up.</p>
-          </div>
-        </div>
-        <div class="cs-option">
-          <%= f.check_box :onboarding_invites_held, { checked: f.object.onboarding_invites_held? } %>
-          <div>
-            <%= f.label :onboarding_invites_held, "Hold onboarding invitations", class: "cs-option-label" %>
-            <p class="cs-option-description">Add and import participants without emailing them, then send every invitation at once from the participants page or the series page. Useful when the series decides launch day.</p>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <div class="cs-wizard-actions">
-      <%= link_to "Exit setup", admin_event_dashboard_path(@event.slug), class: "cs-btn cs-btn-link" %>
-      <%= link_to "Previous", admin_event_setup_schedule_path(@event), class: "cs-btn" %>
-      <%= f.button "Next", class: "cs-btn cs-btn-primary" %>
+      <div data-controller="wizard-reveal">
+        <div class="flex items-start">
+          <div class="flex items-center h-5">
+            <%= f.check_box :visa_options_enabled, checked: f.object.visa_options_enabled?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded", data: { wizard_reveal_target: "input", action: "change->wizard-reveal#update" } %>
+          </div>
+          <div class="ml-3">
+            <%= f.label :visa_options_enabled, "Visa Options", class: "text-sm font-medium text-gray-700" %>
+            <p class="text-sm text-gray-500">Show visa requirement fields in travel information for international participants.</p>
+          </div>
+        </div>
+        <div class="ml-7 mt-3" data-wizard-reveal-target="panel" data-show-when="checked">
+          <%= f.label :visa_application_url, "Visa letter application URL", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.url_field :visa_application_url, placeholder: "https://visas.hackclub.com/...", class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+          <p class="text-xs text-gray-500 mt-1">Envoy (visas.hackclub.com) application form participants are pointed to when they need a visa letter.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :accommodation_enabled, { checked: f.object.accommodation_enabled?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :accommodation_enabled, "Accommodation", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Show accommodation/housing preferences in onboarding for events with overnight stays.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :roommate_preferences_enabled, { checked: f.object.roommate_preferences_enabled?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :roommate_preferences_enabled, "Roommate Preferences", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Show roommate preference fields on the accommodation onboarding step.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :freedom_waivers_enabled, { checked: f.object.freedom_waivers_enabled?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :freedom_waivers_enabled, "Freedom Waivers", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Allow guardians to grant additional freedom permissions for minor participants. Affects the next step's waiver setup.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :groups_enabled, { checked: f.object.groups_enabled?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :groups_enabled, "Groups", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Tag participants with named groups (e.g. "Hardware", "General Attendance") to distinguish cohorts within the same event.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :nfc_badges_enabled, { checked: f.object.nfc_badges_enabled?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :nfc_badges_enabled, "NFC Badges", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Check participants in by scanning NFC badges or wristbands. You can enable write-on-check-in later in event settings.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :guardian_invites_locked, { checked: f.object.guardian_invites_locked?, class: "h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :guardian_invites_locked, "Lock Guardian Invites", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Hold off sending guardian invitations while waiver details are being finalised. Useful until your waivers are set up.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :onboarding_invites_held, { checked: f.object.onboarding_invites_held?, class: "h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :onboarding_invites_held, "Hold Onboarding Invitations", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Add and import participants without emailing them, then send every invitation at once from the participants page or the series page. Useful when the series decides launch day.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-col sm:flex-row justify-between gap-3">
+      <%= link_to "Back", admin_event_setup_schedule_path(@event), class: "w-full sm:w-auto text-center text-gray-500 hover:text-gray-700 font-medium py-2 px-4" %>
+      <%= f.submit "Continue", class: "w-full sm:w-auto bg-[#d42f46] hover:bg-[#b82840] text-white font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer" %>
     </div>
   <% end %>
-<% end %>
+</div>

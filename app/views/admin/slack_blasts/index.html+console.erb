@@ -1,0 +1,59 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ current_event.name, admin_event_dashboard_path(current_event.slug) ], [ "Slack blasts", nil ]) %>
+<% blast_status_types = { "pending" => :pending, "in_progress" => :in_progress, "completed" => :success, "failed" => :error } %>
+
+<div class="max-w-4xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Slack blast history</h1>
+    </div>
+    <div class="cs-actions">
+      <%= link_to "Send new blast", new_admin_event_slack_blast_path(current_event), class: "cs-btn cs-btn-primary" %>
+    </div>
+  </div>
+
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided">
+      <h2 class="cs-h2">Blasts <span class="cs-counter">(<%= @slack_blasts.size %>)</span></h2>
+    </div>
+    <% if @slack_blasts.any? %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">Sent by</th>
+              <th scope="col">Message</th>
+              <th scope="col">Status</th>
+              <th scope="col">Recipients</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @slack_blasts.each do |blast| %>
+              <tr>
+                <td class="whitespace-nowrap"><%= blast.created_at.strftime("%b %d, %Y %l:%M %p") %></td>
+                <td class="whitespace-nowrap"><%= blast.sent_by_user.display_name_or_fallback %></td>
+                <td class="max-w-xs truncate"><%= truncate(blast.message, length: 50) %></td>
+                <td><%= cs_status(blast_status_types.fetch(blast.status, :info), blast.status.humanize) if blast_status_types.key?(blast.status) %></td>
+                <td class="whitespace-nowrap">
+                  <%= blast.sent_count %> / <span class="cs-muted"><%= blast.recipient_count %></span>
+                  <% if blast.failed_count > 0 %>
+                    <span class="text-(--cs-error)">(<%= blast.failed_count %> failed)</span>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap text-right">
+                  <%= link_to "View", admin_event_slack_blast_path(current_event, blast), class: "cs-link" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="cs-empty">
+        <p class="cs-empty-title">No Slack blasts</p>
+        <p>No Slack blasts have been sent yet.</p>
+      </div>
+    <% end %>
+  </section>
+</div>

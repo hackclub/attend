@@ -1,0 +1,182 @@
+<% row_divider = "border-t border-(--cs-border-divider-secondary) mt-4 pt-4" %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Global settings</h1>
+    </div>
+    <div class="cs-actions">
+      <%= link_to "Incident report settings", admin_incident_settings_path, class: "cs-btn" %>
+    </div>
+  </div>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Site</h2>
+    </div>
+    <div class="cs-container-body">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="cs-setting-title">Maintenance mode</h3>
+          <p class="cs-setting-description">When enabled, non-admin users will see a maintenance page instead of the site.</p>
+        </div>
+        <div class="flex items-center gap-4 shrink-0">
+          <%= @maintenance_mode ? cs_status(:warning, "Enabled") : cs_status(:stopped, "Disabled") %>
+          <%= button_to toggle_maintenance_admin_settings_path,
+                method: :post,
+                class: "cs-btn",
+                data: { turbo_confirm: @maintenance_mode ? "Are you sure you want to disable maintenance mode? The site will be accessible to all users." : "Are you sure you want to enable maintenance mode? Non-admin users will be locked out." } do %>
+            <%= @maintenance_mode ? 'Disable' : 'Enable' %>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="<%= row_divider %> flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="cs-setting-title">Pause waiver sending</h3>
+          <p class="cs-setting-description">When paused, no waivers will be sent to participants or guardians. Participants will see a message that waivers are not yet available.</p>
+        </div>
+        <div class="flex items-center gap-4 shrink-0">
+          <%= @waiver_sending_paused ? cs_status(:warning, "Paused") : cs_status(:success, "Active") %>
+          <%= button_to toggle_waiver_sending_admin_settings_path,
+                method: :post,
+                class: "cs-btn",
+                data: { turbo_confirm: @waiver_sending_paused ? "Resume waiver sending? Participants will be able to sign waivers again." : "Pause all waiver sending? Participants will not be able to sign waivers until resumed." } do %>
+            <%= @waiver_sending_paused ? 'Resume' : 'Pause' %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Twilio SMS</h2>
+    </div>
+    <div class="cs-container-body">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="cs-setting-title">Enable SMS</h3>
+          <p class="cs-setting-description">When enabled, SMS notifications will be sent via Twilio.</p>
+        </div>
+        <div class="flex items-center gap-4 shrink-0">
+          <%= @twilio_enabled ? cs_status(:success, "Enabled") : cs_status(:stopped, "Disabled") %>
+          <%= button_to toggle_twilio_admin_settings_path,
+                method: :post,
+                class: "cs-btn",
+                data: { turbo_confirm: @twilio_enabled ? "Are you sure you want to disable Twilio? SMS notifications will stop being sent." : "Are you sure you want to enable Twilio? SMS notifications will be sent." } do %>
+            <%= @twilio_enabled ? 'Disable' : 'Enable' %>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="<%= row_divider %>">
+        <%= form_with url: update_twilio_from_number_admin_settings_path, method: :post, data: { controller: "phone-input" } do |f| %>
+          <div class="cs-field">
+            <%= f.label :twilio_from_number, "From phone number", class: "cs-field-label" %>
+            <p class="cs-field-description">The phone number used to send SMS messages. Format: +1234567890</p>
+            <div class="flex flex-wrap items-center gap-2">
+              <%= f.telephone_field :twilio_from_number,
+                    value: @twilio_from_number,
+                    placeholder: "+1234567890",
+                    class: "cs-input max-w-xs" %>
+              <%= f.button "Save", class: "cs-btn" %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Support inbox notifications</h2>
+    </div>
+    <div class="cs-container-body">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="cs-setting-title">Text notifications</h3>
+          <p class="cs-setting-description">
+            When enabled, the numbers below get a text when a new support ticket comes in,
+            and assignees get texts about replies on their tickets (at most one per ticket every 15 minutes).
+            Sending also requires Twilio SMS to be enabled above.
+          </p>
+        </div>
+        <div class="flex items-center gap-4 shrink-0">
+          <%= @support_sms_notifications_enabled ? cs_status(:success, "Enabled") : cs_status(:stopped, "Disabled") %>
+          <%= button_to toggle_support_sms_admin_settings_path,
+                method: :post,
+                class: "cs-btn" do %>
+            <%= @support_sms_notifications_enabled ? 'Disable' : 'Enable' %>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="<%= row_divider %>">
+        <%= form_with url: update_support_sms_numbers_admin_settings_path, method: :post do |f| %>
+          <div class="cs-field">
+            <%= f.label :support_sms_notification_numbers, "Notification numbers", class: "cs-field-label" %>
+            <p class="cs-field-description">Phone numbers texted when a new ticket is opened. One per line (or comma-separated), E.164 format: +14155551234</p>
+            <%= f.text_area :support_sms_notification_numbers,
+                  value: @support_sms_notification_numbers.join("\n"),
+                  rows: 4,
+                  placeholder: "+14155551234\n+447700900123",
+                  class: "cs-input max-w-md font-mono" %>
+          </div>
+          <div class="mt-2">
+            <%= f.button "Save", class: "cs-btn" %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Admin help Slack channel</h2>
+    </div>
+    <div class="cs-container-body">
+      <%= form_with url: update_admin_help_slack_channel_admin_settings_path, method: :post do |f| %>
+        <div class="cs-field">
+          <%= f.label :admin_help_slack_channel_id, "Channel", class: "cs-field-label" %>
+          <p class="cs-field-description">
+            Where event admins ask questions about Attend. Global admins are invited when they're made one, and
+            Event Admins, Ops, Safeguarding Leads, and series members when they're given a role on an event that hasn't ended.
+            Limited and Read Only staff are never invited. The Attend Slack bot must be in the channel.
+          </p>
+          <div class="flex flex-wrap items-center gap-2">
+            <%= f.text_field :admin_help_slack_channel_id,
+                  value: @admin_help_slack_channel_id,
+                  placeholder: "C0123ABCD",
+                  class: "cs-input max-w-xs font-mono" %>
+            <%= f.button "Save", class: "cs-btn" %>
+          </div>
+        </div>
+      <% end %>
+
+      <div class="<%= row_divider %> flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="cs-setting-title">Sync global and active event admins</h3>
+          <p class="cs-setting-description">
+            <%= pluralize(@admin_help_member_count, "eligible person", plural: "eligible people") %>,
+            <%= @admin_help_members_without_slack %> without a Slack account linked through Hack Club Auth (they can't be invited).
+          </p>
+          <% if @admin_help_last_sync["at"].present? %>
+            <p class="cs-field-description mt-1">
+              Last synced <%= time_ago_in_words(Time.zone.parse(@admin_help_last_sync["at"])) %> ago:
+              <%= @admin_help_last_sync["added"] %> added,
+              <%= @admin_help_last_sync["already_member"] %> already in the channel,
+              <%= @admin_help_last_sync["failed"] %> failed,
+              <%= @admin_help_last_sync["no_slack"] %> without Slack.
+            </p>
+          <% end %>
+        </div>
+        <%= button_to "Sync to channel", sync_admin_help_slack_channel_admin_settings_path,
+              method: :post,
+              disabled: @admin_help_slack_channel_id.blank?,
+              class: "cs-btn shrink-0",
+              data: { turbo_confirm: "Invite all #{@admin_help_member_count - @admin_help_members_without_slack} people with Slack accounts to the channel?" } %>
+      </div>
+    </div>
+  </section>
+</div>

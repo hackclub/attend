@@ -1,15 +1,12 @@
 <% content_for :title, "Edit Incident – #{current_event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ current_event.name, admin_event_dashboard_path(current_event.slug) ], [ "Incidents", admin_event_incidents_path(current_event) ], [ "Incident", admin_event_incident_path(current_event, @incident) ], [ "Edit", nil ]) %>
 
-<div class="cs-stack max-w-3xl">
-  <div class="cs-header">
-    <div class="cs-header-text">
-      <h1 class="cs-h1">Edit incident</h1>
-    </div>
-    <div class="cs-actions">
-      <%= link_to "Back to incident", admin_event_incident_path(current_event, @incident), class: "cs-btn cs-btn-link" %>
-    </div>
+<div class="w-full max-w-3xl mx-auto">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <h1 class="text-2xl font-bold">Edit Incident</h1>
+    <%= link_to "Back to Incident", admin_event_incident_path(current_event, @incident), class: "text-gray-600 hover:text-gray-800" %>
   </div>
 
-  <%= render "form", incident: @incident %>
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <%= render "form", incident: @incident %>
+  </div>
 </div>

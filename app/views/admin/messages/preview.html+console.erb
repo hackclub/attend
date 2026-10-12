@@ -1,0 +1,138 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Messages", admin_event_messages_path(current_event) ], [ "Compose message", edit_admin_event_message_path(current_event, @message) ], [ "Preview and send", nil ]) %>
+
+<div class="max-w-4xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Preview &amp; send</h1>
+      <p class="cs-description">Step 2 of 2 — Review and send your message</p>
+    </div>
+  </div>
+
+  <div class="cs-stack">
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Audience: <%= @message.audience_label %></h2>
+      </div>
+      <div class="cs-container-body">
+        <p class="mb-3">
+          <strong><%= @total_count %></strong> recipient<%= @total_count == 1 ? '' : 's' %> will receive this message via
+          <strong><%= @message.channel_labels %></strong>.
+        </p>
+
+        <% if @recipients.any? %>
+          <div class="cs-token-group">
+            <% @recipients.each do |recipient| %>
+              <span class="cs-token cs-token-readonly">
+                <% if recipient.respond_to?(:participant) %>
+                  <%= recipient.participant.display_name %>
+                <% else %>
+                  <%= recipient.full_name %>
+                <% end %>
+              </span>
+            <% end %>
+            <% if @total_count > 20 %>
+              <span class="cs-token cs-token-readonly cs-muted">+<%= @total_count - 20 %> more</span>
+            <% end %>
+          </div>
+        <% else %>
+          <div class="cs-alert cs-alert-warning">
+            <%= cs_status_icon(:warning) %>
+            <p>No recipients match this criteria. The message won't be sent to anyone.</p>
+          </div>
+        <% end %>
+      </div>
+    </section>
+
+    <% if @message.channels.include?("slack") %>
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">Slack preview</h2>
+        </div>
+        <div class="cs-container-body">
+          <%# A mock of Slack's own dark message view, so it keeps Slack's colours. %>
+          <div class="bg-[#1a1d21] rounded-lg p-4 text-white">
+            <div class="flex items-start gap-3">
+              <div class="w-9 h-9 rounded bg-[#d42f46] flex items-center justify-center flex-shrink-0">
+                <span class="text-white font-bold text-sm">HC</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline gap-2">
+                  <span class="font-bold text-white">Hack Club Attend</span>
+                  <span class="text-xs text-gray-400">App</span>
+                </div>
+                <div class="mt-1 text-[15px] text-gray-100 whitespace-pre-wrap break-words"><%= @message.body_as_slack_preview_html %></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    <% end %>
+
+    <% if @message.channels.include?("email") %>
+      <section class="cs-container">
+        <div class="cs-container-header cs-container-header-divided">
+          <div>
+            <h2 class="cs-h2">Email preview</h2>
+            <p class="cs-container-description">
+              Subject: <strong><%= @message.subject.presence || "You have a new message from #{current_event.name}" %></strong>
+            </p>
+          </div>
+        </div>
+        <div class="cs-container-body">
+          <div class="prose prose-sm max-w-none">
+            <%= sanitize @message.body_as_html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
+          </div>
+        </div>
+      </section>
+    <% end %>
+
+    <% if @message.channels.include?("sms") %>
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">SMS preview</h2>
+        </div>
+        <div class="cs-container-body">
+          <%# A mock of a phone's message bubble. %>
+          <div class="max-w-xs">
+            <div class="bg-green-500 text-white rounded-2xl rounded-bl-sm px-4 py-2 text-sm">
+              <%= @message.body_as_plain %>
+            </div>
+            <p class="cs-small cs-muted mt-2 text-right">
+              <%= @message.body_as_plain.length %> characters
+              <% if @message.body_as_plain.length > 160 %>
+                <%= cs_status(:warning, "(~#{(@message.body_as_plain.length / 160.0).ceil} segments)") %>
+              <% end %>
+            </p>
+          </div>
+        </div>
+      </section>
+    <% end %>
+
+    <% if @message.scheduled_at.present? %>
+      <div class="cs-alert cs-alert-warning">
+        <%= cs_status_icon(:pending) %>
+        <p>
+          <strong>Scheduled:</strong> This message will be sent on
+          <strong><%= @message.scheduled_at.strftime("%B %d, %Y at %l:%M %p") %></strong>
+        </p>
+      </div>
+    <% end %>
+
+    <div class="flex flex-wrap justify-end items-center gap-2">
+      <%= link_to "Edit message", edit_admin_event_message_path(current_event, @message), class: "cs-btn cs-btn-link" %>
+      <% if @message.scheduled_at.present? && @message.scheduled_at > Time.current %>
+        <%= button_to "Schedule message", send_now_admin_event_message_path(current_event, @message),
+            method: :post,
+            data: { confirm: "Schedule this message to be sent on #{@message.scheduled_at.strftime("%B %d at %l:%M %p")}?" },
+            class: "cs-btn cs-btn-primary",
+            disabled: @total_count == 0 %>
+      <% else %>
+        <%= button_to "Send now", send_now_admin_event_message_path(current_event, @message),
+            method: :post,
+            data: { confirm: "Send this message to #{@total_count} recipients now?" },
+            class: "cs-btn cs-btn-primary",
+            disabled: @total_count == 0 %>
+      <% end %>
+    </div>
+  </div>
+</div>

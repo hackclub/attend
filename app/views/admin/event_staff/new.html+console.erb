@@ -1,0 +1,70 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Event staff", admin_event_staff_index_path(current_event) ], [ "Add staff member", nil ]) %>
+
+<div class="cs-stack max-w-3xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Add staff member</h1>
+    </div>
+  </div>
+
+  <%= form_with url: admin_event_staff_index_path(current_event), method: :post, class: "cs-stack" do |f| %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Staff details</h2>
+      </div>
+      <div class="cs-container-body">
+        <div class="cs-field">
+          <%= label_tag :email, "User email", class: "cs-field-label" %>
+          <%= email_field_tag :email, params[:email], class: "cs-input", placeholder: "user@example.com", required: true %>
+          <p class="cs-field-hint">If they don't have an account yet, one will be created for them and linked when they first sign in.</p>
+        </div>
+
+        <%= fields_for :event_role_assignment do |era| %>
+          <div class="cs-field" data-controller="role-info">
+            <%= era.label :role, "Role", class: "cs-field-label" %>
+            <%= era.select :role,
+              EventRoleAssignment::ROLE_DETAILS.map { |role, details| [details[:label], role] },
+              {},
+              class: "cs-select",
+              data: { role_info_target: "select", action: "change->role-info#update" } %>
+
+            <% EventRoleAssignment::ROLE_DETAILS.each do |role, details| %>
+              <div data-role-info-target="panel" data-role="<%= role %>" class="cs-alert mt-3 hidden">
+                <%= cs_status_icon(:info) %>
+                <div class="w-full">
+                  <p class="cs-alert-title"><%= details[:label] %></p>
+                  <p><%= details[:summary] %></p>
+                  <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <p class="cs-kv-label">Can</p>
+                      <ul class="mt-1 space-y-1">
+                        <% details[:can].each do |perm| %>
+                          <li><%= cs_status(:success, perm) %></li>
+                        <% end %>
+                      </ul>
+                    </div>
+                    <% if details[:cannot].any? %>
+                      <div>
+                        <p class="cs-kv-label">Cannot</p>
+                        <ul class="mt-1 space-y-1">
+                          <% details[:cannot].each do |perm| %>
+                            <li><%= cs_status(:stopped, perm) %></li>
+                          <% end %>
+                        </ul>
+                      </div>
+                    <% end %>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </section>
+
+    <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+      <%= link_to "Cancel", admin_event_staff_index_path(current_event), class: "cs-btn cs-btn-link cs-btn-full" %>
+      <%= f.button "Add staff member", class: "cs-btn cs-btn-primary cs-btn-full" %>
+    </div>
+  <% end %>
+</div>

@@ -1,0 +1,71 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Ban list", nil ]) %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Ban list <span class="cs-counter">(<%= @bans.size %>)</span></h1>
+      <p class="cs-description">Emails on this list are blocked from being added to any event.</p>
+    </div>
+    <div class="cs-actions">
+      <%= link_to "Add ban", new_admin_ban_path, class: "cs-btn cs-btn-primary" %>
+    </div>
+  </div>
+
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided">
+      <h2 class="cs-h2">Bans</h2>
+    </div>
+    <% if @bans.empty? %>
+      <div class="cs-empty">
+        <p class="cs-empty-title">No bans yet.</p>
+        <div class="cs-actions">
+          <%= link_to "Add ban", new_admin_ban_path, class: "cs-btn" %>
+        </div>
+      </div>
+    <% else %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Emails</th>
+              <th scope="col">Status</th>
+              <th scope="col">Expires</th>
+              <th scope="col">Added by</th>
+              <th scope="col" class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @bans.each do |ban| %>
+              <tr>
+                <td>
+                  <div><%= ban.ban_emails.map(&:email).join(", ") %></div>
+                  <% if ban.reason.present? %>
+                    <div class="cs-small cs-muted truncate max-w-[280px]" title="<%= ban.reason %>"><%= ban.reason %></div>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap">
+                  <% case ban.status %>
+                  <% when "Active", "Indefinite" %>
+                    <%= cs_status(:error, ban.status) %>
+                  <% when "Revoked" %>
+                    <%= cs_status(:warning, "Revoked") %>
+                  <% else %>
+                    <%= cs_status(:stopped, "Expired") %>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap">
+                  <%= ban.expires_at ? l(ban.expires_at, format: :long) : "—" %>
+                </td>
+                <td class="whitespace-nowrap"><%= ban.created_by&.email || "—" %></td>
+                <td class="whitespace-nowrap text-right">
+                  <%= link_to "View", admin_ban_path(ban), class: "cs-link" %>
+                  <%= link_to "Edit", edit_admin_ban_path(ban), class: "cs-link ml-4" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </section>
+</div>

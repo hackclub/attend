@@ -7,32 +7,31 @@
 <% ribbon = series_funnel_ribbon(stage_rows) %>
 <% columns = ribbon ? "repeat(#{ribbon[:segments]}, minmax(0, 1fr))" : nil %>
 
-<section class="cs-container">
-  <div class="cs-container-header">
-    <h2 class="cs-h2">How far participants have got</h2>
+<section class="bg-(--bg-elev) border border-(--border-card) rounded-lg overflow-hidden">
+  <div class="px-4 py-3 border-b border-(--border)">
+    <h2 class="text-sm font-semibold text-(--text-strong)">How far participants have got</h2>
   </div>
 
   <% if totals[:active].zero? %>
-    <div class="cs-empty">
-      <p class="cs-empty-title">No participants yet</p>
-      <p>The funnel fills in as people are invited and start onboarding.</p>
-    </div>
+    <p class="px-4 py-10 text-sm text-(--text-soft) text-center">
+      No participants yet. The funnel fills in as people are invited and start onboarding.
+    </p>
   <% elsif ribbon.nil? %>
-    <div class="cs-empty">
-      <p>No onboarding stages apply to these events yet.</p>
-    </div>
+    <p class="px-4 py-10 text-sm text-(--text-soft) text-center">
+      No onboarding stages apply to these events yet.
+    </p>
   <% else %>
     <%# The ribbon's two endpoints get the large treatment; the nine stages in
         between stay small, or they all shout at once. The completion percentage
         is not repeated here — the last stage's column below is the same figure. %>
-    <div class="px-5 flex items-start justify-between gap-6">
+    <div class="px-4 pt-4 flex items-start justify-between gap-6">
       <div>
-        <div class="cs-kv-value-lg tabular-nums"><%= totals[:active] %></div>
-        <div class="cs-small cs-secondary">started onboarding</div>
+        <div class="text-2xl font-bold text-(--text-strong) tabular-nums tracking-[-0.02em]"><%= totals[:active] %></div>
+        <div class="text-xs text-(--text-soft) mt-0.5">started onboarding</div>
       </div>
       <div class="text-right">
-        <div class="cs-kv-value-lg tabular-nums"><%= totals[:cleared] %></div>
-        <div class="cs-small cs-secondary">cleared every stage</div>
+        <div class="text-2xl font-bold text-(--text-strong) tabular-nums tracking-[-0.02em]"><%= totals[:cleared] %></div>
+        <div class="text-xs text-(--text-soft) mt-0.5">cleared every stage</div>
       </div>
     </div>
 
@@ -41,12 +40,12 @@
         already carries all of this as plain text, so nothing here is the only
         route to the number — but a nested scroller with no affordance is a trap,
         hence the hint at the widths where the ribbon actually overflows. %>
-    <p class="md:hidden px-5 mt-3 cs-small cs-secondary">
+    <p class="md:hidden px-4 mt-3 text-[11px] text-(--text-soft)">
       Scroll sideways for all <%= stage_rows.length %> stages — the chase list above has the same figures as text.
     </p>
 
     <div class="mt-3 overflow-x-auto">
-      <div class="min-w-[44rem] px-5 pb-4">
+      <div class="min-w-[44rem] px-4 pb-4">
         <div class="relative">
           <svg class="series-ribbon w-full h-36 sm:h-44 block" viewBox="0 0 1000 180"
                preserveAspectRatio="none" role="img"
@@ -59,7 +58,7 @@
               1px line drawn inside it. %>
           <div class="absolute inset-0 grid pointer-events-none" style="grid-template-columns: <%= columns %>" aria-hidden="true">
             <% stage_rows.each_with_index do |_row, index| %>
-              <div class="<%= "border-r border-(--cs-border-divider-secondary)" unless index == stage_rows.length - 1 %>"></div>
+              <div class="<%= "border-r border-(--border)" unless index == stage_rows.length - 1 %>"></div>
             <% end %>
           </div>
         </div>
@@ -72,17 +71,17 @@
         <div class="grid mt-2" style="grid-template-columns: <%= columns %>" aria-hidden="true">
           <% stage_rows.each do |row| %>
             <div class="px-1 text-center">
-              <div class="cs-small font-bold leading-tight"><%= row[:stage].label %></div>
-              <div class="cs-small cs-secondary tabular-nums mt-0.5"><%= row[:percent] %>% cleared</div>
+              <div class="text-[11px] font-medium text-(--text-strong) leading-tight"><%= row[:stage].label %></div>
+              <div class="text-[11px] text-(--text-soft) tabular-nums mt-0.5"><%= row[:percent] %>% cleared</div>
               <% if row[:stalled].positive? %>
-                <div class="cs-small font-bold text-(--cs-warning) tabular-nums mt-0.5">
+                <div class="text-[11px] font-semibold text-(--warning-text) tabular-nums mt-0.5">
                   −<%= row[:stalled] %> stuck
                 </div>
               <% else %>
-                <div class="cs-small cs-secondary mt-0.5">—</div>
+                <div class="text-[11px] text-(--text-soft) mt-0.5">—</div>
               <% end %>
               <% if row[:partial_events] %>
-                <div class="cs-small cs-secondary mt-0.5"><%= row[:partial_events] %>/<%= totals[:events] %> events</div>
+                <div class="text-[11px] text-(--text-soft) mt-0.5"><%= row[:partial_events] %>/<%= totals[:events] %> events</div>
               <% end %>
             </div>
           <% end %>
@@ -117,7 +116,7 @@
     <%# "Freedom waiver" is internal shorthand everywhere else in the app; this
         is the one place a series lead meets it without context. %>
     <% if stage_rows.any? { |row| row[:stage].key == :freedom_waiver } %>
-      <p class="px-5 pb-4 cs-small cs-secondary">
+      <p class="px-4 pb-4 text-[11px] text-(--text-soft)">
         Freedom waiver: a guardian's permission for a minor to leave the venue unsupervised during the event.
       </p>
     <% end %>
@@ -126,16 +125,21 @@
         and can record a scan, so it sits outside the ribbon rather than counting
         a future event's participants as arrived. %>
     <% if arrival_row %>
-      <div class="cs-container-footer">
-        <div class="cs-progress-field">
-          <div class="cs-progress-label">
-            <span><%= arrival_row[:stage].label %> <span class="cs-secondary">· of <%= arrival_row[:applicable] %> cleared to travel</span></span>
-            <span class="tabular-nums"><%= arrival_row[:percent] %>%</span>
-          </div>
-          <div class="cs-progress" aria-hidden="true"><span style="width: <%= arrival_row[:percent] %>%"></span></div>
-          <p class="cs-progress-hint tabular-nums">
-            <%= arrival_row[:cleared] %> checked in<% if arrival_row[:stalled].positive? %> · <%= arrival_row[:stalled] %> not yet scanned<% end %>
-          </p>
+      <div class="border-t border-(--border) bg-(--bg-elev-2) px-4 py-3">
+        <div class="flex items-baseline gap-2">
+          <span class="text-sm font-medium text-(--text-strong)"><%= arrival_row[:stage].label %></span>
+          <span class="text-xs text-(--text-soft)">· of <%= arrival_row[:applicable] %> cleared to travel</span>
+          <span class="ml-auto text-sm font-semibold text-(--text-strong) tabular-nums"><%= arrival_row[:percent] %>%</span>
+        </div>
+        <div class="series-bar-track mt-2" aria-hidden="true">
+          <div class="series-bar-fill" style="width: <%= arrival_row[:percent] %>%"></div>
+        </div>
+        <div class="flex items-baseline gap-2 mt-1.5 text-xs">
+          <span class="text-(--text-soft) tabular-nums"><%= arrival_row[:cleared] %> checked in</span>
+          <% if arrival_row[:stalled].positive? %>
+            <span class="text-(--text-soft)">·</span>
+            <span class="text-(--text-soft) tabular-nums"><%= arrival_row[:stalled] %> not yet scanned</span>
+          <% end %>
         </div>
       </div>
     <% end %>

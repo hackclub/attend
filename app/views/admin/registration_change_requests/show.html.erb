@@ -1,93 +1,14 @@
 <% content_for :title, "Change request – #{current_event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ current_event.name, admin_event_dashboard_path(current_event.slug) ], [ "Change requests", admin_event_registration_change_requests_path(current_event) ], [ @change_request.participant.display_name, nil ]) %>
-<% change_request_status_types = { "pending" => :pending, "approved" => :success, "follow_up_needed" => :warning } %>
-
-<div class="cs-stack max-w-3xl">
-  <div class="cs-header">
-    <div class="cs-header-text">
-      <h1 class="cs-h1"><%= @change_request.participant.display_name %></h1>
-      <p class="cs-description flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span><%= @change_request.kind.humanize %></span>
-        <%= cs_status(change_request_status_types.fetch(@change_request.status, :info), @change_request.status.humanize) %>
-      </p>
-    </div>
-    <div class="cs-actions">
-      <%= link_to "Back to change requests", admin_event_registration_change_requests_path(current_event), class: "cs-btn cs-btn-link" %>
-    </div>
-  </div>
-
-  <% if @change_request.requested_changes.present? %>
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <h2 class="cs-h2">Requested changes</h2>
-      </div>
-      <div class="cs-container-body">
-        <dl class="cs-kv cs-kv-2">
-          <% @change_request.requested_changes.each do |field, value| %>
-            <div>
-              <dt class="cs-kv-label"><%= field.humanize %></dt>
-              <dd class="cs-kv-value"><%= value %></dd>
-            </div>
-          <% end %>
-        </dl>
-      </div>
-    </section>
-  <% end %>
-
-  <% if @change_request.requester_note.present? || @change_request.staff_response.present? %>
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <h2 class="cs-h2">Notes</h2>
-      </div>
-      <div class="cs-container-body">
-        <dl class="cs-kv">
-          <% if @change_request.requester_note.present? %>
-            <div>
-              <dt class="cs-kv-label">Attendee note</dt>
-              <dd class="cs-kv-value"><%= simple_format(@change_request.requester_note) %></dd>
-            </div>
-          <% end %>
-          <% if @change_request.staff_response.present? %>
-            <div>
-              <dt class="cs-kv-label">Staff response</dt>
-              <dd class="cs-kv-value"><%= simple_format(@change_request.staff_response) %></dd>
-            </div>
-          <% end %>
-        </dl>
-      </div>
-    </section>
-  <% end %>
-
+<%= link_to "← Change requests", admin_event_registration_change_requests_path(current_event), class: "text-sm text-[#ec3750]" %>
+<div class="bg-white border border-gray-200 rounded-lg p-6 mt-5 space-y-5">
+  <div><h1 class="text-xl font-bold"><%= @change_request.participant.display_name %></h1><p class="text-sm text-gray-500"><%= @change_request.kind.titleize %> · <%= @change_request.status.titleize %></p></div>
+  <% if @change_request.requested_changes.present? %><dl class="space-y-2"><% @change_request.requested_changes.each do |field, value| %><div><dt class="text-xs text-gray-500"><%= field.titleize %></dt><dd><%= value %></dd></div><% end %></dl><% end %>
+  <% if @change_request.requester_note.present? %><div><h2 class="text-sm font-semibold">Attendee note</h2><%= simple_format(@change_request.requester_note) %></div><% end %>
+  <% if @change_request.staff_response.present? %><div><h2 class="text-sm font-semibold">Staff response</h2><%= simple_format(@change_request.staff_response) %></div><% end %>
   <% if @change_request.pending? %>
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <h2 class="cs-h2">Review</h2>
-      </div>
-      <div class="cs-container-body cs-stack">
-        <% if @change_request.signed_identity? || @change_request.guardian? %>
-          <div class="cs-alert cs-alert-warning">
-            <%= cs_status_icon(:warning) %>
-            <p>Approval may reset signed documents and make the registration incomplete. A replacement guardian must verify and sign again.</p>
-          </div>
-          <div>
-            <%= button_to "Approve request", approve_admin_event_registration_change_request_path(current_event, @change_request), method: :patch, class: "cs-btn cs-btn-primary", data: { turbo_confirm: "Approve this request and apply the documented resets?" } %>
-          </div>
-        <% else %>
-          <div>
-            <%= button_to "Mark resolved", approve_admin_event_registration_change_request_path(current_event, @change_request), method: :patch, class: "cs-btn cs-btn-primary" %>
-          </div>
-        <% end %>
-
-        <%= form_with url: request_follow_up_admin_event_registration_change_request_path(current_event, @change_request), scope: :registration_change_request, method: :patch do |f| %>
-          <div class="cs-field">
-            <%= f.label :staff_response, "Request follow-up", class: "cs-field-label" %>
-            <%= f.text_area :staff_response, class: "cs-input", required: true, placeholder: "Explain what the attendee needs to provide" %>
-          </div>
-          <div class="mt-3">
-            <%= f.button "Request follow-up", class: "cs-btn" %>
-          </div>
-        <% end %>
-      </div>
-    </section>
+    <div class="border-t pt-5 space-y-4">
+      <% if @change_request.signed_identity? || @change_request.guardian? %><p class="text-sm text-amber-800 bg-amber-50 p-3 rounded">Approval may reset signed documents and make the registration incomplete. A replacement guardian must verify and sign again.</p><%= button_to "Approve request", approve_admin_event_registration_change_request_path(current_event, @change_request), method: :patch, class: "px-4 py-2 bg-green-700 text-white rounded", data: { turbo_confirm: "Approve this request and apply the documented resets?" } %><% else %><%= button_to "Mark resolved", approve_admin_event_registration_change_request_path(current_event, @change_request), method: :patch, class: "px-4 py-2 bg-green-700 text-white rounded" %><% end %>
+      <%= form_with url: request_follow_up_admin_event_registration_change_request_path(current_event, @change_request), scope: :registration_change_request, method: :patch, class: "space-y-2" do |f| %><%= f.text_area :staff_response, class: "w-full border rounded p-2", required: true, placeholder: "Explain what the attendee needs to provide" %><%= f.submit "Request follow-up", class: "px-4 py-2 bg-amber-600 text-white rounded" %><% end %>
+    </div>
   <% end %>
 </div>

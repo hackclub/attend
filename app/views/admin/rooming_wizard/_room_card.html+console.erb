@@ -1,0 +1,300 @@
+<% close_icon = capture do %><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8m0-8l-8 8"/></svg><% end %>
+<div id="room_<%= room.id %>" class="cs-card room-card" data-room-id="<%= room.id %>" draggable="<%= !@rooming_plan.locked? %>">
+  <!-- Room Header -->
+  <div class="pb-3 border-b border-(--cs-border-divider-secondary) <%= 'cursor-move' unless @rooming_plan.locked? %>">
+    <div class="flex items-start justify-between gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <% unless @rooming_plan.locked? %>
+          <span class="cs-muted select-none" title="Drag to reorder" aria-hidden="true">⋮⋮</span>
+        <% end %>
+        <% if @rooming_plan.locked? %>
+          <h3 class="cs-card-title truncate">
+            <%= room.display_name %>
+          </h3>
+        <% else %>
+          <h3 class="cs-card-title truncate rounded hover:bg-(--cs-bg-hover) hover:px-1 cursor-text room-name-display"
+              title="Click to rename">
+            <%= room.display_name %>
+          </h3>
+          <input type="text"
+                 class="hidden min-w-0 rounded-(--cs-radius-item) border border-(--cs-border-input) bg-(--cs-bg-input) px-2 py-0.5 text-sm font-bold room-name-input"
+                 value="<%= room.name %>"
+                 placeholder="Room name"
+                 aria-label="Room name"
+                 >
+        <% end %>
+        <span class="cs-counter text-sm whitespace-nowrap">
+          (<%= room.total_occupancy %>/<%= room.capacity %>)
+        </span>
+      </div>
+      <% unless @rooming_plan.locked? %>
+        <button type="button" data-delete-room="<%= room.id %>" class="cs-btn-inline-icon" aria-label="Delete room">
+          <%= close_icon %>
+        </button>
+      <% end %>
+    </div>
+    <% if room.has_staff? || room.age_gap > 2 || room.has_trans_nb_pairing? %>
+      <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <% if room.has_staff? %>
+          <%= cs_badge("Has staff", "yellow") %>
+        <% end %>
+        <% if room.age_gap > 2 %>
+          <span title="Age gap exceeds 2 years"><%= cs_status(:warning, "Age gap: #{room.age_gap}y") %></span>
+        <% end %>
+        <% if room.has_trans_nb_pairing? %>
+          <% needs_ack = room.room_assignments.any? { |ra| ra.trans_nb_flagged? && !ra.trans_nb_acknowledged } %>
+          <% if needs_ack %>
+            <%= cs_status(:warning, "Trans/NB - Needs review") %>
+          <% else %>
+            <%= cs_status(:success, "Trans/NB - Acknowledged") %>
+          <% end %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Room Drop Zone -->
+  <div class="<%= room.can_add_participants? ? 'room-drop-zone' : '' %> min-h-[120px] -m-1 p-1 space-y-2 rounded-(--cs-radius-item) border-2 border-transparent transition" data-room-id="<%= room.id %>">
+
+    <!-- Staff Cards -->
+    <% room.staff_names_list.each do |staff_name| %>
+      <div class="rounded-(--cs-radius-item) p-2 border border-(--cs-border-divider-secondary) bg-(--cs-bg-shaded)">
+        <div class="flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <p class="text-sm font-bold">
+              <%= staff_name %>
+            </p>
+            <%= cs_badge("Staff", "yellow") %>
+          </div>
+          <% unless @rooming_plan.locked? %>
+            <button type="button"
+                    data-remove-staff="<%= room.id %>" data-staff-name="<%= staff_name %>"
+                    class="cs-btn-inline-icon" aria-label="Remove <%= staff_name %>">
+              <%= close_icon %>
+            </button>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <!-- Participant Cards -->
+    <% room.room_assignments.each do |assignment| %>
+      <% pe = assignment.participant_event %>
+      <div class="<%= 'draggable-participant cursor-move hover:border-(--cs-accent)' unless @rooming_plan.locked? %> rounded-(--cs-radius-item) p-2 border border-(--cs-border-divider-secondary) bg-(--cs-bg-container) transition"
+           draggable="<%= !@rooming_plan.locked? %>"
+           data-pe-id="<%= pe.id %>">
+        <div class="flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <p class="text-sm font-bold">
+              <%= pe.participant.full_name %>
+              <% if assignment.staff_override? %>
+                <span class="cs-small font-normal text-(--cs-warning)">(override)</span>
+              <% end %>
+            </p>
+            <p class="cs-small cs-muted flex flex-wrap items-center gap-1">
+              Age <%= pe.age_on_event %>
+              <% if pe.is_18_on_event? %>
+                <%= cs_badge("18", "yellow") %>
+              <% end %>
+              · <%= pe.accommodation&.gender_identity&.titleize || "?" %>
+              <% if pe.accommodation&.trans_or_nb? %>
+                <%= cs_badge("T/NB", "blue") %>
+              <% end %>
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center justify-end gap-1">
+            <% if pe.participant.sibling_groups.any? %>
+              <span title="Has siblings in event"><%= cs_badge("Sib") %></span>
+            <% end %>
+            <% if room.room_assignments.size >= 2 %>
+              <% assignment.display_flags.each do |flag| %>
+                <%= cs_badge(flag, "yellow") %>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+
+        <% if assignment.trans_nb_flagged? && !assignment.trans_nb_acknowledged && room.room_assignments.size >= 2 %>
+          <div class="cs-alert cs-alert-warning mt-2">
+            <%= cs_status_icon(:warning) %>
+            <div class="cs-small">
+              <p>Trans/NB pairing requires acknowledgment</p>
+              <button type="button" data-acknowledge-trans-nb="<%= assignment.id %>" class="cs-link cs-link-strong cursor-pointer">
+                Mark as acknowledged
+              </button>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <!-- Empty State / Add Staff Button -->
+    <% if room.total_occupancy == 0 %>
+      <div class="cs-empty">
+        <p class="cs-empty-title"><%= @rooming_plan.locked? ? 'Empty room' : 'Drag participants here' %></p>
+        <% unless @rooming_plan.locked? %>
+          <p>or</p>
+          <div class="cs-actions">
+            <button type="button"
+                    data-add-staff-room="<%= room.id %>"
+                    class="cs-btn">
+              Add staff
+            </button>
+          </div>
+        <% end %>
+      </div>
+    <% elsif room.has_staff? && room.remaining_capacity > 0 && !@rooming_plan.locked? %>
+      <button type="button"
+              data-add-staff-room="<%= room.id %>"
+              class="cs-btn w-full">
+        Add another staff (<%= room.remaining_capacity %> spots left)
+      </button>
+    <% end %>
+  </div>
+</div>
+
+<script nonce="<%= content_security_policy_nonce %>">
+async function deleteRoom(roomId) {
+  await fetch('<%= destroy_room_admin_event_rooming_wizard_path(@event.slug) %>', {
+    method: 'DELETE',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: 'room_id=' + roomId
+  });
+  document.getElementById('room_' + roomId)?.remove();
+}
+
+async function removeStaff(roomId, staffName) {
+  if (!confirm('Remove ' + staffName + ' from this room?')) return;
+  
+  const response = await fetch('<%= remove_staff_admin_event_rooming_wizard_path(@event.slug) %>', {
+    method: 'DELETE',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'text/vnd.turbo-stream.html',
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: 'room_id=' + roomId + '&staff_name=' + encodeURIComponent(staffName)
+  });
+  
+  if (response.ok) {
+    const html = await response.text();
+    Turbo.renderStreamMessage(html);
+  }
+}
+
+function showAddStaffModal(roomId) {
+  document.getElementById('add-staff-room-id').value = roomId;
+  document.getElementById('add-staff-name').value = '';
+  document.getElementById('add-staff-modal').classList.remove('hidden');
+  document.getElementById('add-staff-name').focus();
+}
+
+function startEditRoomName(event, roomId) {
+  event.stopPropagation();
+  const card = document.getElementById('room_' + roomId);
+  if (!card) return;
+  const display = card.querySelector('.room-name-display');
+  const input = card.querySelector('.room-name-input');
+  if (!display || !input) return;
+  display.classList.add('hidden');
+  input.classList.remove('hidden');
+  input.focus();
+  input.select();
+}
+
+function handleRoomNameKey(event, roomId) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    event.target.blur();
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    const card = document.getElementById('room_' + roomId);
+    const display = card.querySelector('.room-name-display');
+    const input = card.querySelector('.room-name-input');
+    input.value = input.defaultValue;
+    input.classList.add('hidden');
+    display.classList.remove('hidden');
+  }
+}
+
+async function saveRoomName(roomId, name) {
+  const card = document.getElementById('room_' + roomId);
+  const display = card.querySelector('.room-name-display');
+  const input = card.querySelector('.room-name-input');
+  input.classList.add('hidden');
+  display.classList.remove('hidden');
+
+  if (input.defaultValue === name) return;
+
+  const response = await fetch('<%= update_room_admin_event_rooming_wizard_path(@event.slug) %>', {
+    method: 'PATCH',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'text/vnd.turbo-stream.html',
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: 'room_id=' + roomId + '&name=' + encodeURIComponent(name)
+  });
+
+  if (response.ok) {
+    const html = await response.text();
+    Turbo.renderStreamMessage(html);
+    if (typeof initDragAndDrop === 'function') setTimeout(initDragAndDrop, 100);
+    if (typeof initRoomReorder === 'function') setTimeout(initRoomReorder, 100);
+  } else {
+    alert('Failed to rename room');
+  }
+}
+
+// This partial renders once per room, so the script block repeats. Delegate
+// from document and install only once, which also survives the Turbo Stream
+// re-renders above replacing the cards.
+if (!window.roomCardHandlersInstalled) {
+  window.roomCardHandlersInstalled = true;
+
+  const roomIdOf = (el) => el.closest('[data-room-id]')?.dataset.roomId;
+
+  document.addEventListener('click', (event) => {
+    const deleteButton = event.target.closest('[data-delete-room]');
+    if (deleteButton) {
+      if (confirm('Delete this room?')) deleteRoom(deleteButton.dataset.deleteRoom);
+      return;
+    }
+
+    const removeStaffButton = event.target.closest('[data-remove-staff]');
+    if (removeStaffButton) {
+      removeStaff(removeStaffButton.dataset.removeStaff, removeStaffButton.dataset.staffName);
+      return;
+    }
+
+    const acknowledgeButton = event.target.closest('[data-acknowledge-trans-nb]');
+    if (acknowledgeButton) {
+      acknowledgeTransNb(acknowledgeButton.dataset.acknowledgeTransNb);
+      return;
+    }
+
+    const addStaffButton = event.target.closest('[data-add-staff-room]');
+    if (addStaffButton) {
+      showAddStaffModal(addStaffButton.dataset.addStaffRoom);
+      return;
+    }
+
+    const nameDisplay = event.target.closest('.room-name-display');
+    if (nameDisplay) startEditRoomName(event, roomIdOf(nameDisplay));
+  });
+
+  // focusout rather than blur: blur doesn't bubble, so it never reaches document.
+  document.addEventListener('focusout', (event) => {
+    const input = event.target.closest('.room-name-input');
+    if (input) saveRoomName(roomIdOf(input), input.value);
+  });
+
+  document.addEventListener('keydown', (event) => {
+    const input = event.target.closest('.room-name-input');
+    if (input) handleRoomNameKey(event, roomIdOf(input));
+  });
+}
+</script>

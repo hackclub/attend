@@ -1,0 +1,165 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Audit logs", admin_audit_logs_path ], [ "Audit log details", nil ]) %>
+<% audit_action_badge = { "create" => "green", "update" => "blue", "delete" => "red" } %>
+<% version_badge = { "create" => "green", "update" => "blue", "destroy" => "red" } %>
+
+<div class="cs-stack">
+  <div class="cs-header mb-0!">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Audit log details</h1>
+    </div>
+  </div>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Summary</h2>
+    </div>
+    <div class="cs-container-body">
+      <dl class="cs-kv cs-kv-3">
+        <div>
+          <dt class="cs-kv-label">Timestamp</dt>
+          <dd class="cs-kv-value"><%= @audit_log.created_at.strftime("%B %d, %Y at %I:%M:%S %p") %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Actor</dt>
+          <dd class="cs-kv-value">
+            <% if @audit_log.actor %>
+              <%= link_to @audit_log.actor.email, admin_user_path(@audit_log.actor), class: "cs-link" %>
+            <% else %>
+              System
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Action</dt>
+          <dd class="cs-kv-value"><%= cs_badge(@audit_log.action&.titleize, audit_action_badge[@audit_log.action]) %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Record type</dt>
+          <dd class="cs-kv-value"><%= @audit_log.record_type %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Record ID</dt>
+          <dd class="cs-kv-value font-mono"><%= @audit_log.record_id %></dd>
+        </div>
+        <% if @audit_log.event %>
+          <div>
+            <dt class="cs-kv-label">Event</dt>
+            <dd class="cs-kv-value">
+              <%= link_to @audit_log.event.name, admin_event_dashboard_path(@audit_log.event.slug), class: "cs-link" %>
+            </dd>
+          </div>
+        <% end %>
+      </dl>
+    </div>
+  </section>
+
+  <% if @audit_log.changed_fields.present? %>
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <h2 class="cs-h2">Changes</h2>
+      </div>
+      <div class="divide-y divide-(--cs-border-divider-secondary)">
+        <% audit_changed_field_pairs(@audit_log.changed_fields).each do |field, old_value, new_value| %>
+          <div class="px-5 py-4">
+            <div class="cs-kv-label mb-2"><%= audit_field_label(field) %></div>
+            <% if @audit_log.action == "create" %>
+              <div class="rounded px-3 py-2 border border-(--cs-success) bg-(--cs-success-bg)">
+                <%= audit_format_value(field, new_value) %>
+              </div>
+            <% elsif @audit_log.action == "destroy" %>
+              <div class="rounded px-3 py-2 border border-(--cs-error) bg-(--cs-error-bg) line-through">
+                <%= audit_format_value(field, old_value) %>
+              </div>
+            <% else %>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <div class="cs-small cs-secondary mb-1">Before</div>
+                  <div class="rounded px-3 py-2 border border-(--cs-error) bg-(--cs-error-bg)">
+                    <%= audit_format_value(field, old_value) %>
+                  </div>
+                </div>
+                <div>
+                  <div class="cs-small cs-secondary mb-1">After</div>
+                  <div class="rounded px-3 py-2 border border-(--cs-success) bg-(--cs-success-bg)">
+                    <%= audit_format_value(field, new_value) %>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+      <div class="cs-container-footer">
+        <details class="cs-expandable">
+          <summary>Show raw JSON</summary>
+          <div class="cs-expandable-content">
+            <pre class="cs-copy-value block rounded p-3 bg-(--cs-bg-shaded) border border-(--cs-border-divider-secondary) overflow-x-auto"><%= JSON.pretty_generate(@audit_log.changed_fields) %></pre>
+          </div>
+        </details>
+      </div>
+    </section>
+  <% end %>
+
+  <% if @audit_log.metadata.present? %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Metadata</h2>
+      </div>
+      <div class="cs-container-body">
+        <pre class="cs-copy-value block rounded p-4 bg-(--cs-bg-shaded) overflow-x-auto"><%= JSON.pretty_generate(@audit_log.metadata) %></pre>
+      </div>
+    </section>
+  <% end %>
+
+  <% if @record_versions&.any? %>
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <h2 class="cs-h2">Full record history <span class="cs-counter">(<%= @record_versions.size %>)</span></h2>
+        <% if current_user.global_admin? %>
+          <div class="cs-actions">
+            <%= link_to "View all versions", versions_admin_audit_logs_path(item_type: @audit_log.record_type, item_id: @audit_log.record_id), class: "cs-btn" %>
+          </div>
+        <% end %>
+      </div>
+      <div class="divide-y divide-(--cs-border-divider-secondary)">
+        <% @record_versions.each do |version| %>
+          <% changes = audit_version_changes(version) %>
+          <details class="cs-expandable">
+            <summary class="px-5 py-2 font-normal! hover:bg-(--cs-bg-hover)">
+              <span class="cs-small cs-secondary font-mono w-40 flex-shrink-0"><%= version.created_at.strftime("%Y-%m-%d %H:%M:%S") %></span>
+              <span class="w-20 flex-shrink-0"><%= cs_badge(version.event.titleize, version_badge[version.event]) %></span>
+              <span class="cs-secondary flex-1 truncate"><%= audit_user_label(version.whodunnit) %></span>
+              <span class="cs-small cs-muted">
+                <% if changes.any? %><%= pluralize(changes.size, "field") %> changed<% else %>—<% end %>
+              </span>
+            </summary>
+            <div class="cs-expandable-content px-5 pb-4 pl-10">
+              <% if changes.any? %>
+                <div class="space-y-3">
+                  <% changes.each do |field, change| %>
+                    <% old_value, new_value = change.is_a?(Array) ? change : [ nil, change ] %>
+                    <div>
+                      <div class="cs-kv-label mb-1"><%= audit_field_label(field) %></div>
+                      <% if version.event == "create" %>
+                        <div class="cs-small rounded px-2 py-1 border border-(--cs-success) bg-(--cs-success-bg)"><%= audit_format_value(field, new_value) %></div>
+                      <% elsif version.event == "destroy" %>
+                        <div class="cs-small rounded px-2 py-1 border border-(--cs-error) bg-(--cs-error-bg) line-through"><%= audit_format_value(field, old_value) %></div>
+                      <% else %>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 cs-small">
+                          <div class="rounded px-2 py-1 border border-(--cs-error) bg-(--cs-error-bg)"><span class="sr-only">Before: </span><%= audit_format_value(field, old_value) %></div>
+                          <div class="rounded px-2 py-1 border border-(--cs-success) bg-(--cs-success-bg)"><span class="sr-only">After: </span><%= audit_format_value(field, new_value) %></div>
+                        </div>
+                      <% end %>
+                    </div>
+                  <% end %>
+                </div>
+              <% else %>
+                <p class="cs-small cs-muted italic py-2">No tracked field changes recorded for this version.</p>
+              <% end %>
+            </div>
+          </details>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+</div>

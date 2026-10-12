@@ -1,76 +1,74 @@
-<% email_status_types = { "sent" => :in_progress, "delivered" => :success, "opened" => :success, "bounced" => :error, "failed" => :error } %>
-
-<%# Global-admin-only page: the dashed orange border is the project's admin-only marker. %>
-<%# The whole page is global-admin only (see the controller), so it carries no
-    admin-only outline: that marks admin bits inside pages others can see. %>
-<div class="cs-stack">
-  <div class="cs-header mb-0!">
-    <div class="cs-header-text">
-      <h1 class="cs-h1">Email logs</h1>
-    </div>
+<div class="space-y-6 border-2 border-dashed border-orange-400 p-4 rounded-lg">
+  <div class="flex justify-between items-center">
+    <h1 class="text-2xl font-bold text-gray-900">Email Logs</h1>
+    <span class="text-sm text-orange-600 font-medium">Global Admin Only</span>
   </div>
 
-  <section class="cs-container">
-    <div class="cs-container-header">
-      <h2 class="cs-h2">Sent emails</h2>
-    </div>
-    <%= form_with url: admin_email_logs_path, method: :get, class: "px-5 pb-4", data: { turbo_frame: "_top" } do |f| %>
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
+  <div class="bg-white border border-gray-200 rounded-lg">
+    <div class="p-4 border-b border-gray-200">
+      <%= form_with url: admin_email_logs_path, method: :get, class: "grid grid-cols-2 md:grid-cols-3 gap-4", data: { turbo_frame: "_top" } do |f| %>
         <div>
-          <%= f.label :search, "Search email", class: "cs-field-label" %>
-          <label class="cs-search">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
-            <%= f.search_field :search, value: params[:search], placeholder: "email@example.com", class: "cs-input" %>
-          </label>
+          <%= f.label :search, "Search Email", class: "block text-sm font-medium text-gray-700" %>
+          <%= f.text_field :search, value: params[:search], placeholder: "email@example.com", class: "mt-1 block w-full px-3 py-2 rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] text-sm" %>
         </div>
         <div>
-          <%= f.label :status, "Status", class: "cs-field-label" %>
-          <%= f.select :status, [ [ "All statuses", "" ], [ "Sent", "sent" ], [ "Delivered", "delivered" ], [ "Opened", "opened" ], [ "Bounced", "bounced" ], [ "Failed", "failed" ] ], { selected: params[:status] }, class: "cs-select" %>
+          <%= f.label :status, "Status", class: "block text-sm font-medium text-gray-700" %>
+          <%= f.select :status, [["All Statuses", ""], ["Sent", "sent"], ["Delivered", "delivered"], ["Opened", "opened"], ["Bounced", "bounced"], ["Failed", "failed"]], { selected: params[:status] }, class: "mt-1 block w-full px-3 py-2 rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] text-sm" %>
         </div>
         <div class="flex items-end gap-2">
-          <%= link_to "Clear", admin_email_logs_path, class: "cs-btn cs-btn-link" %>
-          <%= f.button "Filter", name: "commit", value: "Filter", class: "cs-btn" %>
+          <%= link_to "Clear", admin_email_logs_path, class: "px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors" %>
+          <%= f.submit "Filter", class: "px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] transition-colors cursor-pointer" %>
         </div>
-      </div>
-    <% end %>
+      <% end %>
+    </div>
 
     <% if @email_logs.any? %>
-      <div class="cs-table-wrap border-t border-(--cs-border-divider-secondary)">
-        <table class="cs-table">
-          <thead>
+      <div class="overflow-x-auto -mx-4 sm:mx-0">
+        <table class="min-w-full divide-y divide-gray-100">
+          <thead class="bg-gray-50">
             <tr>
-              <th scope="col">Sent at</th>
-              <th scope="col">To</th>
-              <th scope="col">Subject</th>
-              <th scope="col">Mailer</th>
-              <th scope="col">Status</th>
-              <th scope="col">Event</th>
-              <th scope="col" class="text-right">Details</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sent At</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mailer</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody class="bg-white divide-y divide-gray-100 text-xs sm:text-sm">
             <% @email_logs.each do |log| %>
               <tr>
-                <td class="whitespace-nowrap cs-secondary font-mono">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   <%= log.created_at.strftime("%Y-%m-%d %H:%M:%S") %>
                 </td>
-                <td class="whitespace-nowrap truncate max-w-[180px]" title="<%= log.to_address %>">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 truncate max-w-[180px]" title="<%= log.to_address %>">
                   <%= log.to_address %>
                 </td>
-                <td class="truncate max-w-[200px]" title="<%= log.subject %>">
+                <td class="px-6 py-4 text-sm text-gray-900 truncate max-w-[200px]" title="<%= log.subject %>">
                   <%= log.subject %>
                 </td>
-                <td class="whitespace-nowrap">
-                  <span class="cs-copy-value"><%= log.mailer_action %></span>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <span class="font-mono text-xs"><%= log.mailer_action %></span>
                 </td>
-                <td class="whitespace-nowrap">
-                  <%= cs_status(email_status_types.fetch(log.status, :pending), log.status.titleize) %>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <% status_color = case log.status
+                     when "sent" then "bg-yellow-100 text-yellow-800"
+                     when "delivered" then "bg-blue-100 text-blue-800"
+                     when "opened" then "bg-green-100 text-green-800"
+                     when "bounced" then "bg-red-100 text-red-800"
+                     when "failed" then "bg-red-100 text-red-800"
+                     else "bg-gray-100 text-gray-800"
+                     end %>
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <%= status_color %>">
+                    <%= log.status.titleize %>
+                  </span>
                 </td>
-                <td class="whitespace-nowrap cs-secondary">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   <%= log.event&.name || "—" %>
                 </td>
-                <td class="whitespace-nowrap text-right">
-                  <%= link_to "View", admin_email_log_path(log), class: "cs-link" %>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <%= link_to "View", admin_email_log_path(log), class: "text-[#ec3750] hover:text-blue-900" %>
                 </td>
               </tr>
             <% end %>
@@ -78,10 +76,9 @@
         </table>
       </div>
     <% else %>
-      <div class="cs-empty border-t border-(--cs-border-divider-secondary)">
-        <p class="cs-empty-title">No email logs</p>
-        <p>No email logs found matching your criteria.</p>
+      <div class="px-6 py-12 text-center">
+        <p class="text-gray-500">No email logs found matching your criteria.</p>
       </div>
     <% end %>
-  </section>
+  </div>
 </div>

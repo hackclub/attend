@@ -1,0 +1,317 @@
+<% content_for :title, "Rooming wizard: Room assignments – Attend" %>
+
+<%= render layout: "wizard", locals: {
+      current_step: "assignments",
+      title: "Room assignments",
+      description: "Review and adjust room assignments.",
+      wide: true
+    } do %>
+  <div data-controller="rooming-assignments">
+    <%= render "group_filter" %>
+
+    <div class="cs-stack">
+      <!-- Summary Bar -->
+      <%= render partial: "admin/rooming_wizard/summary_bar" %>
+
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-4">
+        <!-- Unassigned Participants Sidebar -->
+        <div class="lg:col-span-1">
+          <%= render partial: "admin/rooming_wizard/unassigned_sidebar" %>
+        </div>
+
+        <!-- Rooms Grid -->
+        <div class="lg:col-span-3 min-w-0">
+          <div id="rooms_container">
+            <%= render partial: "admin/rooming_wizard/rooms_container" %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cs-wizard-actions">
+      <%= link_to "Previous", preferences_admin_event_rooming_wizard_path(@event.slug), class: "cs-btn" %>
+      <%= link_to finalize_admin_event_rooming_wizard_path(@event.slug), class: "cs-btn cs-btn-primary" do %>
+        Continue to finalize
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<!-- Add Room Modal -->
+<div id="add-room-modal" class="hidden cs-modal-overlay">
+  <div class="fixed inset-0" data-hide="add-room-modal"></div>
+
+  <div class="cs-modal relative" role="dialog" aria-modal="true" aria-labelledby="add-room-modal-title">
+    <%= form_with url: create_room_admin_event_rooming_wizard_path(@event.slug), method: :post, data: { turbo: false } do |f| %>
+      <div class="cs-modal-header">
+        <h2 id="add-room-modal-title">Add room</h2>
+        <button type="button" class="cs-modal-close" data-hide="add-room-modal" aria-label="Close">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8m0-8l-8 8"/></svg>
+        </button>
+      </div>
+      <div class="cs-modal-body">
+        <div class="cs-field">
+          <label class="cs-field-label" for="add-room-name">Room name/number</label>
+          <input type="text" id="add-room-name" name="name" placeholder="e.g., Room 101" class="cs-input">
+        </div>
+        <div class="cs-field">
+          <label class="cs-field-label" for="add-room-capacity">Capacity</label>
+          <input type="number" id="add-room-capacity" name="capacity" value="<%= @rooming_plan.room_capacity %>" min="1" class="cs-input">
+        </div>
+        <div class="cs-field">
+          <label class="cs-field-label" for="add-room-notes">Notes</label>
+          <textarea id="add-room-notes" name="notes" rows="2" class="cs-input"></textarea>
+        </div>
+      </div>
+      <div class="cs-modal-footer">
+        <button type="button" data-hide="add-room-modal" class="cs-btn cs-btn-link">
+          Cancel
+        </button>
+        <button type="submit" class="cs-btn cs-btn-primary">
+          Create room
+        </button>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<script nonce="<%= content_security_policy_nonce %>">
+document.addEventListener('DOMContentLoaded', function() {
+  initDragAndDrop();
+  initRoomReorder();
+});
+
+let draggedRoomId = null;
+
+function initRoomReorder() {
+  document.querySelectorAll('.room-card').forEach(card => {
+    if (card.getAttribute('draggable') !== 'true') return;
+
+    card.addEventListener('dragstart', handleRoomDragStart);
+    card.addEventListener('dragend', handleRoomDragEnd);
+    card.addEventListener('dragover', handleRoomDragOver);
+    card.addEventListener('drop', handleRoomDrop);
+  });
+}
+
+function handleRoomDragStart(e) {
+  // Skip if the drag started from inside a participant card (those have their own handler)
+  if (e.target.closest('.draggable-participant')) return;
+  draggedRoomId = e.currentTarget.dataset.roomId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/room-id', draggedRoomId);
+  e.currentTarget.classList.add('opacity-50');
+}
+
+function handleRoomDragEnd(e) {
+  e.currentTarget.classList.remove('opacity-50');
+  draggedRoomId = null;
+}
+
+function handleRoomDragOver(e) {
+  if (!draggedRoomId) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+async function handleRoomDrop(e) {
+  if (!draggedRoomId) return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  const targetId = e.currentTarget.dataset.roomId;
+  if (!targetId || targetId === draggedRoomId) return;
+
+  const list = document.getElementById('rooms_list');
+  const dragged = document.getElementById('room_' + draggedRoomId);
+  const target = e.currentTarget;
+  if (!list || !dragged || !target) return;
+
+  const cards = Array.from(list.children);
+  const draggedIndex = cards.indexOf(dragged);
+  const targetIndex = cards.indexOf(target);
+  if (draggedIndex < targetIndex) {
+    list.insertBefore(dragged, target.nextSibling);
+  } else {
+    list.insertBefore(dragged, target);
+  }
+
+  await persistRoomOrder();
+}
+
+async function persistRoomOrder() {
+  const ids = Array.from(document.querySelectorAll('#rooms_list .room-card')).map(c => c.dataset.roomId);
+  const formData = new FormData();
+  ids.forEach(id => formData.append('room_ids[]', id));
+
+  await fetch('<%= reorder_rooms_admin_event_rooming_wizard_path(@event.slug) %>', {
+    method: 'POST',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+    },
+    body: formData
+  });
+}
+
+function initDragAndDrop() {
+  document.querySelectorAll('.draggable-participant').forEach(el => {
+    el.addEventListener('dragstart', handleDragStart);
+    el.addEventListener('dragend', handleDragEnd);
+  });
+  
+  document.querySelectorAll('.room-drop-zone').forEach(zone => {
+    zone.addEventListener('dragover', handleDragOver);
+    zone.addEventListener('drop', handleDrop);
+    zone.addEventListener('dragleave', handleDragLeave);
+  });
+  
+  document.getElementById('unassigned-drop-zone')?.addEventListener('dragover', handleDragOver);
+  document.getElementById('unassigned-drop-zone')?.addEventListener('drop', handleDropToUnassigned);
+  document.getElementById('unassigned-drop-zone')?.addEventListener('dragleave', handleDragLeave);
+}
+
+function handleDragStart(e) {
+  e.dataTransfer.setData('text/plain', e.target.dataset.peId);
+  e.target.classList.add('opacity-50');
+}
+
+function handleDragEnd(e) {
+  e.target.classList.remove('opacity-50');
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('bg-(--cs-bg-selected)', 'border-(--cs-accent)');
+}
+
+function handleDragLeave(e) {
+  e.currentTarget.classList.remove('bg-(--cs-bg-selected)', 'border-(--cs-accent)');
+}
+
+async function handleDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('bg-(--cs-bg-selected)', 'border-(--cs-accent)');
+  
+  const peId = e.dataTransfer.getData('text/plain');
+  const roomId = e.currentTarget.dataset.roomId;
+  
+  await moveAssignment(peId, roomId);
+}
+
+async function handleDropToUnassigned(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('bg-(--cs-bg-selected)', 'border-(--cs-accent)');
+  
+  const peId = e.dataTransfer.getData('text/plain');
+  await moveAssignment(peId, null);
+}
+
+async function moveAssignment(peId, roomId) {
+  const formData = new FormData();
+  formData.append('participant_event_id', peId);
+  if (roomId) formData.append('room_id', roomId);
+  
+  const response = await fetch('<%= move_assignment_admin_event_rooming_wizard_path(@event.slug) %>', {
+    method: 'POST',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'text/vnd.turbo-stream.html'
+    },
+    body: formData
+  });
+  
+  if (response.ok) {
+    const html = await response.text();
+    Turbo.renderStreamMessage(html);
+    setTimeout(initDragAndDrop, 100);
+  } else {
+    const data = await response.json();
+    alert(data.error || 'Failed to move participant');
+  }
+}
+
+async function acknowledgeTransNb(assignmentId) {
+  await fetch('<%= acknowledge_trans_nb_admin_event_rooming_wizard_path(@event.slug) %>', {
+    method: 'POST',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: 'assignment_id=' + assignmentId
+  });
+  location.reload();
+}
+
+async function addStaff(e) {
+  e.preventDefault();
+  const roomId = document.getElementById('add-staff-room-id').value;
+  const staffName = document.getElementById('add-staff-name').value.trim();
+  
+  if (!staffName) {
+    alert('Please enter a staff name');
+    return;
+  }
+  
+  const response = await fetch('<%= add_staff_admin_event_rooming_wizard_path(@event.slug) %>', {
+    method: 'POST',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'text/vnd.turbo-stream.html',
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: 'room_id=' + roomId + '&staff_name=' + encodeURIComponent(staffName)
+  });
+  
+  if (response.ok) {
+    document.getElementById('add-staff-modal').classList.add('hidden');
+    const html = await response.text();
+    Turbo.renderStreamMessage(html);
+    setTimeout(initDragAndDrop, 100);
+  } else {
+    const data = await response.json();
+    alert(data.error || 'Failed to add staff');
+  }
+}
+
+// Delegated because the form markup comes after this script in the page, and
+// submit bubbles, so ordering doesn't matter.
+document.addEventListener('submit', (event) => {
+  if (event.target.id === 'add-staff-form') addStaff(event);
+});
+</script>
+
+<!-- Add Staff Modal -->
+<div id="add-staff-modal" class="hidden cs-modal-overlay">
+  <div class="fixed inset-0" data-hide="add-staff-modal"></div>
+
+  <div class="cs-modal relative" role="dialog" aria-modal="true" aria-labelledby="add-staff-modal-title">
+    <form id="add-staff-form">
+      <div class="cs-modal-header">
+        <h2 id="add-staff-modal-title">Add staff member</h2>
+        <button type="button" class="cs-modal-close" data-hide="add-staff-modal" aria-label="Close">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8m0-8l-8 8"/></svg>
+        </button>
+      </div>
+      <div class="cs-modal-body">
+        <input type="hidden" id="add-staff-room-id">
+
+        <div class="cs-field">
+          <label class="cs-field-label" for="add-staff-name">Staff name</label>
+          <input type="text" id="add-staff-name" placeholder="e.g., Deven" class="cs-input">
+          <p class="cs-field-hint">Once a staff member is added to a room, participants cannot be assigned to it.</p>
+        </div>
+      </div>
+      <div class="cs-modal-footer">
+        <button type="button" data-hide="add-staff-modal" class="cs-btn cs-btn-link">
+          Cancel
+        </button>
+        <button type="submit" class="cs-btn cs-btn-primary">
+          Add staff
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

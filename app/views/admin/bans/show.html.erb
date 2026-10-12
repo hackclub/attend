@@ -1,132 +1,89 @@
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Ban list", admin_bans_path ], [ "Ban", nil ]) %>
-
-<div class="cs-stack">
-  <div class="cs-header">
-    <div class="cs-header-text">
-      <h1 class="cs-h1">Ban</h1>
-    </div>
-    <div class="cs-actions">
-      <%= link_to "Edit", edit_admin_ban_path(@ban), class: "cs-btn" %>
+<div class="space-y-6">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <h1 class="text-2xl font-bold text-gray-900">Ban</h1>
+    <div class="flex gap-3">
+      <%= link_to "Edit", edit_admin_ban_path(@ban), class: "px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors" %>
       <% if @ban.revoked? %>
-        <%= button_to "Reinstate", reinstate_admin_ban_path(@ban), method: :patch, class: "cs-btn cs-btn-primary", data: { turbo_confirm: "Reinstate this ban? Its emails will be blocked from events again." } %>
+        <%= button_to "Reinstate", reinstate_admin_ban_path(@ban), method: :patch, class: "px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] transition-colors", data: { turbo_confirm: "Reinstate this ban? Its emails will be blocked from events again." } %>
       <% else %>
-        <%= button_to "Revoke", revoke_admin_ban_path(@ban), method: :patch, class: "cs-btn", data: { turbo_confirm: "Revoke this ban? Its emails will be allowed into events again, but the record is kept." } %>
+        <%= button_to "Revoke", revoke_admin_ban_path(@ban), method: :patch, class: "px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors", data: { turbo_confirm: "Revoke this ban? Its emails will be allowed into events again, but the record is kept." } %>
       <% end %>
-      <%= button_to "Delete", admin_ban_path(@ban), method: :delete, class: "cs-btn", data: { turbo_confirm: "Permanently delete this ban record? This cannot be undone." } %>
+      <%= button_to "Delete", admin_ban_path(@ban), method: :delete, class: "px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors", data: { turbo_confirm: "Permanently delete this ban record? This cannot be undone." } %>
     </div>
   </div>
 
   <% if @ban.revoked? %>
-    <div class="cs-alert cs-alert-warning">
-      <%= cs_status_icon(:warning) %>
-      <p>This ban is revoked and no longer blocks anyone. Reinstate it to enforce again, or delete it to remove the record.</p>
+    <div class="bg-amber-50 border border-amber-200 rounded-md p-4 text-sm text-amber-800">
+      This ban is revoked and no longer blocks anyone. Reinstate it to enforce again, or delete it to remove the record.
     </div>
   <% end %>
 
-  <section class="cs-container">
-    <div class="cs-container-header">
-      <h2 class="cs-h2">Ban details</h2>
-    </div>
-    <div class="cs-container-body cs-stack">
-      <dl class="cs-kv cs-kv-3 cs-kv-divided">
-        <div>
-          <dt class="cs-kv-label">Status</dt>
-          <dd class="cs-kv-value">
-            <% case @ban.status %>
-            <% when "Active", "Indefinite" %>
-              <%= cs_status(:error, @ban.status) %>
-            <% when "Revoked" %>
-              <%= cs_status(:warning, @ban.status) %>
-            <% else %>
-              <%= cs_status(:stopped, @ban.status) %>
-            <% end %>
-          </dd>
-        </div>
-        <div>
-          <dt class="cs-kv-label">Expires</dt>
-          <dd class="cs-kv-value"><%= @ban.expires_at ? l(@ban.expires_at, format: :long) : "Indefinite" %></dd>
-        </div>
-        <div>
-          <dt class="cs-kv-label">Added by</dt>
-          <dd class="cs-kv-value"><%= @ban.created_by&.email || "—" %></dd>
-        </div>
-      </dl>
-
-      <dl class="cs-kv">
-        <div>
-          <dt class="cs-kv-label">Banned emails</dt>
-          <dd class="cs-kv-value">
-            <ul class="space-y-0.5">
-              <% @ban.ban_emails.each do |ban_email| %>
-                <li><%= ban_email.email %></li>
-              <% end %>
-            </ul>
-          </dd>
-        </div>
-
-        <% if @ban.revoked? %>
-          <div>
-            <dt class="cs-kv-label">Revoked</dt>
-            <dd class="cs-kv-value">
-              <%= l(@ban.revoked_at, format: :long) %><%= " by #{@ban.revoked_by.email}" if @ban.revoked_by %>
-            </dd>
-          </div>
+  <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+    <div>
+      <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Banned emails</h2>
+      <ul class="mt-1 text-sm text-gray-900 list-disc list-inside">
+        <% @ban.ban_emails.each do |ban_email| %>
+          <li><%= ban_email.email %></li>
         <% end %>
-
-        <% if @ban.reason.present? %>
-          <div>
-            <dt class="cs-kv-label">Reason</dt>
-            <dd class="cs-kv-value whitespace-pre-line"><%= @ban.reason %></dd>
-          </div>
-        <% end %>
-      </dl>
+      </ul>
     </div>
-  </section>
 
-  <section class="cs-container">
-    <div class="cs-container-header cs-container-header-divided">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div>
-        <h2 class="cs-h2">Existing event enrollments <span class="cs-counter">(<%= @affected_participants.size %>)</span></h2>
-        <p class="cs-container-description">This ban does not remove anyone already added. Review and withdraw these manually if needed.</p>
+        <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Status</h2>
+        <p class="mt-1 text-sm text-gray-900"><%= @ban.status %></p>
+      </div>
+      <div>
+        <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Expires</h2>
+        <p class="mt-1 text-sm text-gray-900"><%= @ban.expires_at ? l(@ban.expires_at, format: :long) : "Indefinite" %></p>
+      </div>
+      <div>
+        <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Added by</h2>
+        <p class="mt-1 text-sm text-gray-900"><%= @ban.created_by&.email || "—" %></p>
       </div>
     </div>
 
-    <% if @affected_participants.empty? %>
-      <div class="cs-empty">
-        <p>No existing participants match these emails.</p>
-      </div>
-    <% else %>
-      <div class="cs-table-wrap">
-        <table class="cs-table">
-          <thead>
-            <tr>
-              <th scope="col">Participant</th>
-              <th scope="col">Events</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% @affected_participants.each do |participant| %>
-              <tr>
-                <td>
-                  <div><%= participant.display_name %></div>
-                  <div class="cs-small cs-muted"><%= participant.email %></div>
-                </td>
-                <td>
-                  <% if participant.events.any? %>
-                    <div class="cs-token-group">
-                      <% participant.events.each do |event| %>
-                        <span class="cs-token cs-token-readonly"><%= event.name %></span>
-                      <% end %>
-                    </div>
-                  <% else %>
-                    <span class="cs-muted">Not enrolled in any events.</span>
-                  <% end %>
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
+    <% if @ban.revoked? %>
+      <div>
+        <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Revoked</h2>
+        <p class="mt-1 text-sm text-gray-900">
+          <%= l(@ban.revoked_at, format: :long) %><%= " by #{@ban.revoked_by.email}" if @ban.revoked_by %>
+        </p>
       </div>
     <% end %>
-  </section>
+
+    <% if @ban.reason.present? %>
+      <div>
+        <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Reason</h2>
+        <p class="mt-1 text-sm text-gray-900 whitespace-pre-line"><%= @ban.reason %></p>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-1">Existing event enrollments</h2>
+    <p class="text-sm text-gray-500 mb-4">This ban does not remove anyone already added. Review and withdraw these manually if needed.</p>
+
+    <% if @affected_participants.empty? %>
+      <p class="text-sm text-gray-500">No existing participants match these emails.</p>
+    <% else %>
+      <ul class="divide-y divide-gray-100">
+        <% @affected_participants.each do |participant| %>
+          <li class="py-3">
+            <div class="text-sm font-medium text-gray-900"><%= participant.display_name %></div>
+            <div class="text-sm text-gray-500"><%= participant.email %></div>
+            <% if participant.events.any? %>
+              <div class="mt-1 flex flex-wrap gap-1">
+                <% participant.events.each do |event| %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700"><%= event.name %></span>
+                <% end %>
+              </div>
+            <% else %>
+              <div class="text-xs text-gray-400">Not enrolled in any events.</div>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </div>
 </div>

@@ -1,0 +1,157 @@
+<% content_for :title, "Event Setup: Schedule – Attend" %>
+
+<%= render layout: "wizard", locals: {
+      current_step: "schedule",
+      title: "Schedule and location",
+      description: "You can change these later in event settings."
+    } do %>
+  <%= form_with model: @event, url: admin_event_setup_schedule_path(@event), method: :patch, class: "cs-stack" do |f| %>
+    <% if @event.errors.any? %>
+      <div class="cs-alert cs-alert-error" role="alert">
+        <%= cs_status_icon(:error) %>
+        <div>
+          <p class="cs-alert-title"><%= pluralize(@event.errors.count, "error") %> stopped this step from saving</p>
+          <ul class="mt-1 list-disc list-inside">
+            <% @event.errors.full_messages.each do |message| %>
+              <li><%= message %></li>
+            <% end %>
+          </ul>
+        </div>
+      </div>
+    <% end %>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+        <h2 class="cs-h2">Event dates</h2>
+        </div>
+      </div>
+      <div class="cs-container-body">
+        <div class="cs-field-grid">
+          <div>
+            <%= f.label :starts_at, class: "cs-field-label" %>
+            <%= f.datetime_local_field :starts_at, value: f.object.schedule_time_field_value(:starts_at), class: "cs-input" %>
+          </div>
+          <div>
+            <%= f.label :ends_at, class: "cs-field-label" %>
+            <%= f.datetime_local_field :ends_at, value: f.object.schedule_time_field_value(:ends_at), class: "cs-input" %>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+        <h2 class="cs-h2">Registration period</h2>
+        </div>
+      </div>
+      <div class="cs-container-body">
+        <div class="cs-field-grid">
+          <div>
+            <%= f.label :registration_open_at, class: "cs-field-label" %>
+            <%= f.datetime_local_field :registration_open_at, value: f.object.schedule_time_field_value(:registration_open_at), class: "cs-input" %>
+          </div>
+          <div>
+            <%= f.label :registration_close_at, class: "cs-field-label" %>
+            <%= f.datetime_local_field :registration_close_at, value: f.object.schedule_time_field_value(:registration_close_at), class: "cs-input" %>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+        <h2 class="cs-h2">Arrival window</h2>
+        <p class="cs-container-description">Optional. Shown to attendees as "when to arrive" on their dashboard. Leave blank if check-in times aren't decided yet.</p>
+        </div>
+      </div>
+      <div class="cs-container-body">
+        <div class="cs-field-grid">
+          <div>
+            <%= f.label :arrival_opens_at, "Arrival opens at", class: "cs-field-label" %>
+            <%= f.datetime_local_field :arrival_opens_at, value: f.object.schedule_time_field_value(:arrival_opens_at), class: "cs-input" %>
+          </div>
+          <div>
+            <%= f.label :arrival_closes_at, "Arrival closes at", class: "cs-field-label" %>
+            <%= f.datetime_local_field :arrival_closes_at, value: f.object.schedule_time_field_value(:arrival_closes_at), class: "cs-input" %>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+        <h2 class="cs-h2">Location</h2>
+        </div>
+      </div>
+      <div class="cs-container-body">
+        <div class="cs-field-grid">
+          <div>
+            <%= f.label :location_city, class: "cs-field-label" %>
+            <%= f.text_field :location_city, class: "cs-input" %>
+          </div>
+          <div>
+            <%= f.label :location_country, class: "cs-field-label" %>
+            <%= f.text_field :location_country, class: "cs-input" %>
+          </div>
+          <div>
+            <%= f.label :venue_name, "Venue name", class: "cs-field-label" %>
+            <%= f.text_field :venue_name, class: "cs-input", placeholder: "e.g. Reaktor" %>
+          </div>
+          <div>
+            <%= f.label :location_address, "Venue address", class: "cs-field-label" %>
+            <%= f.text_field :location_address,
+                id: "venue-address-input",
+                class: "cs-input",
+                placeholder: "Start typing to search…",
+                autocomplete: "off" %>
+            <p class="cs-field-hint">Search for a place using Google Places.</p>
+          </div>
+        </div>
+        <p class="cs-field-hint mt-3">Venue name and address are optional, but both are needed for venue info on Google Wallet passes.</p>
+        <%= f.hidden_field :location_latitude, id: "venue-latitude" %>
+        <%= f.hidden_field :location_longitude, id: "venue-longitude" %>
+      </div>
+    </section>
+
+    <div class="cs-wizard-actions">
+      <%= link_to "Exit setup", admin_event_dashboard_path(@event.slug), class: "cs-btn cs-btn-link" %>
+      <%= link_to "Skip this step", admin_event_setup_modules_path(@event), class: "cs-btn cs-btn-link" %>
+      <%= link_to "Previous", edit_admin_event_path(@event, return_to: "setup"), class: "cs-btn" %>
+      <%= f.button "Next", class: "cs-btn cs-btn-primary" %>
+    </div>
+  <% end %>
+<% end %>
+
+<script nonce="<%= content_security_policy_nonce %>">
+  (function() {
+    var script = document.createElement('script');
+    script.src = 'https://maps.googleapis.com/maps/api/js?key=<%= Rails.application.credentials.dig(:google, :key) %>&libraries=places&callback=initPlacesAutocomplete';
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+  })();
+
+  function initPlacesAutocomplete() {
+    var input = document.getElementById('venue-address-input');
+    if (!input) return;
+
+    var autocomplete = new google.maps.places.Autocomplete(input, {
+      types: ['establishment', 'geocode']
+    });
+
+    autocomplete.addListener('place_changed', function() {
+      var place = autocomplete.getPlace();
+      if (place.geometry) {
+        document.getElementById('venue-latitude').value = place.geometry.location.lat();
+        document.getElementById('venue-longitude').value = place.geometry.location.lng();
+      }
+      if (place.formatted_address) {
+        input.value = place.formatted_address;
+      }
+    });
+  }
+</script>

@@ -1,0 +1,72 @@
+<%= form_with model: [:admin, current_event, scan_context], local: true do |f| %>
+  <div class="cs-stack">
+    <% if scan_context.errors.any? %>
+      <div class="cs-alert cs-alert-error" role="alert">
+        <%= cs_status_icon(:error) %>
+        <div>
+          <p class="cs-alert-title"><%= pluralize(scan_context.errors.count, "error") %> prohibited this context from being saved:</p>
+          <ul class="mt-1 list-disc list-inside space-y-1">
+            <% scan_context.errors.full_messages.each do |message| %>
+              <li><%= message %></li>
+            <% end %>
+          </ul>
+        </div>
+      </div>
+    <% end %>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Context settings</h2>
+      </div>
+      <div class="cs-container-body space-y-5">
+        <div class="cs-field">
+          <%= f.label :name, "Location name", class: "cs-field-label" %>
+          <p class="cs-field-description">A descriptive name for this scanning location</p>
+          <%= f.text_field :name, class: "cs-input#{" cs-input-invalid" if scan_context.errors[:name].any?}", placeholder: "e.g., Main Entrance, Central Station, Registration Desk" %>
+        </div>
+
+        <div class="space-y-3">
+          <div class="cs-option">
+            <%= f.check_box :checks_in %>
+            <div>
+              <%= f.label :checks_in, "Checks person in to event", class: "cs-option-label" %>
+              <p class="cs-option-description">When scanned at this location, mark the participant as checked in to the event</p>
+            </div>
+          </div>
+
+          <div class="cs-option">
+            <%= f.check_box :is_travel_pickup %>
+            <div>
+              <%= f.label :is_travel_pickup, "Travel pickup location", class: "cs-option-label" %>
+              <p class="cs-option-description">When scanned at this location, mark the participant as collected from their travel arrival point</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="cs-field-grid">
+          <div class="cs-field">
+            <%= f.label :starts_at, "Starts at", class: "cs-field-label" %>
+            <%= f.datetime_local_field :starts_at, class: "cs-input" %>
+            <p class="cs-field-hint">Optional — when scanning at this location opens</p>
+          </div>
+          <div class="cs-field">
+            <%= f.label :ends_at, "Ends at", class: "cs-field-label" %>
+            <%= f.datetime_local_field :ends_at, class: "cs-input" %>
+            <p class="cs-field-hint">Optional — when scanning at this location closes</p>
+          </div>
+        </div>
+
+        <div class="cs-field">
+          <%= f.label :position, "Display order", class: "cs-field-label" %>
+          <%= f.number_field :position, class: "cs-input w-32!", min: 0 %>
+          <p class="cs-field-hint">Lower numbers appear first in the dropdown</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="flex flex-col-reverse sm:flex-row justify-end gap-2">
+      <%= link_to "Cancel", admin_event_scan_contexts_path(current_event), class: "cs-btn cs-btn-link" %>
+      <%= f.button scan_context.persisted? ? "Update context" : "Create context", class: "cs-btn cs-btn-primary cs-btn-full" %>
+    </div>
+  </div>
+<% end %>

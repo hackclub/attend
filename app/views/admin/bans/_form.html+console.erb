@@ -1,0 +1,68 @@
+<%= form_with model: [:admin, ban], class: "cs-stack" do |f| %>
+  <% if ban.errors.any? %>
+    <div class="cs-alert cs-alert-error" role="alert">
+      <%= cs_status_icon(:error) %>
+      <ul class="list-disc list-inside">
+        <% ban.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2">Ban details</h2>
+        <p class="cs-container-description">Fields marked with <span class="text-(--cs-error)">*</span> are required.</p>
+      </div>
+    </div>
+    <div class="cs-container-body">
+      <div class="cs-field" data-controller="nested-form">
+        <%= f.label :ban_emails, label_text("Emails", required: true), class: "cs-field-label" %>
+        <p class="cs-field-description">Add the primary email plus any alias addresses. All share this ban's expiry.</p>
+
+        <div data-nested-form-target="container" class="space-y-2">
+          <% ban.ban_emails.each do |ban_email| %>
+            <%= f.fields_for :ban_emails, ban_email do |ef| %>
+              <div data-nested-form-target="item" class="flex items-center gap-2 <%= "hidden" if ef.object.marked_for_destruction? %>">
+                <%= ef.email_field :email, class: "cs-input flex-1", placeholder: "person@example.com" %>
+                <% if ef.object.persisted? %>
+                  <%= ef.hidden_field :_destroy, data: { nested_form_target: "destroyField" } %>
+                <% end %>
+                <button type="button" data-action="nested-form#remove" class="cs-btn cs-btn-link">Remove</button>
+              </div>
+            <% end %>
+          <% end %>
+        </div>
+
+        <template data-nested-form-target="template">
+          <%= f.fields_for :ban_emails, BanEmail.new, child_index: "NEW_RECORD" do |ef| %>
+            <div data-nested-form-target="item" class="flex items-center gap-2">
+              <%= ef.email_field :email, class: "cs-input flex-1", placeholder: "person@example.com" %>
+              <button type="button" data-action="nested-form#remove" class="cs-btn cs-btn-link">Remove</button>
+            </div>
+          <% end %>
+        </template>
+
+        <button type="button" data-action="nested-form#add" class="cs-btn mt-2">Add another email</button>
+      </div>
+
+      <div class="cs-field">
+        <%= f.label :expires_at, "Expires at", class: "cs-field-label" %>
+        <%= f.datetime_local_field :expires_at, value: ban.expires_at&.strftime("%Y-%m-%dT%H:%M"), class: "cs-input" %>
+        <p class="cs-field-hint">Leave blank for an indefinite ban.</p>
+      </div>
+
+      <div class="cs-field">
+        <%= f.label :reason, class: "cs-field-label" %>
+        <%= f.text_area :reason, rows: 3, class: "cs-input" %>
+      </div>
+    </div>
+  </section>
+
+  <div class="flex flex-col sm:flex-row justify-end gap-2">
+    <%= link_to "Cancel", admin_bans_path, class: "cs-btn cs-btn-link cs-btn-full" %>
+    <%= f.button submit_label, class: "cs-btn cs-btn-primary cs-btn-full" %>
+  </div>
+<% end %>

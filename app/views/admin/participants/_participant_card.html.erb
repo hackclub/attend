@@ -2,7 +2,7 @@
   <div class="flex items-start justify-between">
     <div class="flex items-center gap-4">
       <% if participant.headshot.attached? && participant.headshot.blob.persisted? %>
-        <%= image_tag participant.headshot, alt: "", class: "w-12 h-12 rounded-full object-cover" %>
+        <%= image_tag participant.headshot, class: "w-12 h-12 rounded-full object-cover" %>
       <% else %>
         <div class="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 font-medium text-lg">
           <%= participant.initials %>

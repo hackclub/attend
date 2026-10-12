@@ -1,80 +1,73 @@
-<% content_for :title, "Rooming wizard: Room assignments – Attend" %>
-
-<%= render layout: "wizard", locals: {
-      current_step: "assignments",
-      title: "Room assignments",
-      description: "Review and adjust room assignments.",
-      wide: true
-    } do %>
-  <div data-controller="rooming-assignments">
-    <%= render "group_filter" %>
-
-    <div class="cs-stack">
-      <!-- Summary Bar -->
-      <%= render partial: "admin/rooming_wizard/summary_bar" %>
-
-      <div class="grid grid-cols-1 gap-5 lg:grid-cols-4">
-        <!-- Unassigned Participants Sidebar -->
-        <div class="lg:col-span-1">
-          <%= render partial: "admin/rooming_wizard/unassigned_sidebar" %>
-        </div>
-
-        <!-- Rooms Grid -->
-        <div class="lg:col-span-3 min-w-0">
-          <div id="rooms_container">
-            <%= render partial: "admin/rooming_wizard/rooms_container" %>
-          </div>
-        </div>
-      </div>
+<div class="space-y-6" data-controller="rooming-assignments">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Rooming Wizard</h1>
+      <p class="mt-1 text-sm text-gray-600">Step 3: Review and adjust room assignments</p>
     </div>
-
-    <div class="cs-wizard-actions">
-      <%= link_to "Previous", preferences_admin_event_rooming_wizard_path(@event.slug), class: "cs-btn" %>
-      <%= link_to finalize_admin_event_rooming_wizard_path(@event.slug), class: "cs-btn cs-btn-primary" do %>
-        Continue to finalize
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-        </svg>
+    <div class="flex items-center gap-4">
+      <span class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
+        Step 3 of 4
+      </span>
+      <%= link_to preferences_admin_event_rooming_wizard_path(@event.slug), class: "text-sm text-gray-500 hover:text-gray-700" do %>
+        ← Back to Preferences
       <% end %>
     </div>
   </div>
-<% end %>
+
+  <%= render "group_filter" %>
+
+  <!-- Summary Bar -->
+  <%= render partial: "admin/rooming_wizard/summary_bar" %>
+
+  <div class="grid grid-cols-4 gap-6">
+    <!-- Unassigned Participants Sidebar -->
+    <div class="col-span-1">
+      <%= render partial: "admin/rooming_wizard/unassigned_sidebar" %>
+    </div>
+
+    <!-- Rooms Grid -->
+    <div class="col-span-3">
+      <div id="rooms_container">
+        <%= render partial: "admin/rooming_wizard/rooms_container" %>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Add Room Modal -->
-<div id="add-room-modal" class="hidden cs-modal-overlay">
-  <div class="fixed inset-0" data-hide="add-room-modal"></div>
-
-  <div class="cs-modal relative" role="dialog" aria-modal="true" aria-labelledby="add-room-modal-title">
-    <%= form_with url: create_room_admin_event_rooming_wizard_path(@event.slug), method: :post, data: { turbo: false } do |f| %>
-      <div class="cs-modal-header">
-        <h2 id="add-room-modal-title">Add room</h2>
-        <button type="button" class="cs-modal-close" data-hide="add-room-modal" aria-label="Close">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8m0-8l-8 8"/></svg>
-        </button>
-      </div>
-      <div class="cs-modal-body">
-        <div class="cs-field">
-          <label class="cs-field-label" for="add-room-name">Room name/number</label>
-          <input type="text" id="add-room-name" name="name" placeholder="e.g., Room 101" class="cs-input">
+<div id="add-room-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true">
+  <div class="flex min-h-screen items-center justify-center p-4">
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-hide="add-room-modal"></div>
+    
+    <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+      <h3 class="text-lg font-medium text-gray-900 mb-4">Add Room</h3>
+      
+      <%= form_with url: create_room_admin_event_rooming_wizard_path(@event.slug), method: :post, data: { turbo: false } do |f| %>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Room Name/Number</label>
+            <input type="text" name="name" placeholder="e.g., Room 101" class="mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750]">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Capacity</label>
+            <input type="number" name="capacity" value="<%= @rooming_plan.room_capacity %>" min="1" class="mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750]">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Notes</label>
+            <textarea name="notes" rows="2" class="mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750]"></textarea>
+          </div>
         </div>
-        <div class="cs-field">
-          <label class="cs-field-label" for="add-room-capacity">Capacity</label>
-          <input type="number" id="add-room-capacity" name="capacity" value="<%= @rooming_plan.room_capacity %>" min="1" class="cs-input">
+        
+        <div class="mt-6 flex justify-end gap-3">
+          <button type="button" data-hide="add-room-modal" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md">
+            Cancel
+          </button>
+          <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-[#d42f46] hover:bg-[#b82840] rounded-md">
+            Create Room
+          </button>
         </div>
-        <div class="cs-field">
-          <label class="cs-field-label" for="add-room-notes">Notes</label>
-          <textarea id="add-room-notes" name="notes" rows="2" class="cs-input"></textarea>
-        </div>
-      </div>
-      <div class="cs-modal-footer">
-        <button type="button" data-hide="add-room-modal" class="cs-btn cs-btn-link">
-          Cancel
-        </button>
-        <button type="submit" class="cs-btn cs-btn-primary">
-          Create room
-        </button>
-      </div>
-    <% end %>
+      <% end %>
+    </div>
   </div>
 </div>
 
@@ -184,16 +177,16 @@ function handleDragEnd(e) {
 
 function handleDragOver(e) {
   e.preventDefault();
-  e.currentTarget.classList.add('bg-(--cs-bg-selected)', 'border-(--cs-accent)');
+  e.currentTarget.classList.add('bg-blue-50', 'border-blue-300');
 }
 
 function handleDragLeave(e) {
-  e.currentTarget.classList.remove('bg-(--cs-bg-selected)', 'border-(--cs-accent)');
+  e.currentTarget.classList.remove('bg-blue-50', 'border-blue-300');
 }
 
 async function handleDrop(e) {
   e.preventDefault();
-  e.currentTarget.classList.remove('bg-(--cs-bg-selected)', 'border-(--cs-accent)');
+  e.currentTarget.classList.remove('bg-blue-50', 'border-blue-300');
   
   const peId = e.dataTransfer.getData('text/plain');
   const roomId = e.currentTarget.dataset.roomId;
@@ -203,7 +196,7 @@ async function handleDrop(e) {
 
 async function handleDropToUnassigned(e) {
   e.preventDefault();
-  e.currentTarget.classList.remove('bg-(--cs-bg-selected)', 'border-(--cs-accent)');
+  e.currentTarget.classList.remove('bg-blue-50', 'border-blue-300');
   
   const peId = e.dataTransfer.getData('text/plain');
   await moveAssignment(peId, null);
@@ -284,34 +277,36 @@ document.addEventListener('submit', (event) => {
 </script>
 
 <!-- Add Staff Modal -->
-<div id="add-staff-modal" class="hidden cs-modal-overlay">
-  <div class="fixed inset-0" data-hide="add-staff-modal"></div>
-
-  <div class="cs-modal relative" role="dialog" aria-modal="true" aria-labelledby="add-staff-modal-title">
-    <form id="add-staff-form">
-      <div class="cs-modal-header">
-        <h2 id="add-staff-modal-title">Add staff member</h2>
-        <button type="button" class="cs-modal-close" data-hide="add-staff-modal" aria-label="Close">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8m0-8l-8 8"/></svg>
-        </button>
-      </div>
-      <div class="cs-modal-body">
+<div id="add-staff-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true">
+  <div class="flex min-h-screen items-center justify-center p-4">
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75" data-hide="add-staff-modal"></div>
+    
+    <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+      <h3 class="text-lg font-medium text-gray-900 mb-4">Add Staff Member</h3>
+      
+      <form id="add-staff-form">
         <input type="hidden" id="add-staff-room-id">
-
-        <div class="cs-field">
-          <label class="cs-field-label" for="add-staff-name">Staff name</label>
-          <input type="text" id="add-staff-name" placeholder="e.g., Deven" class="cs-input">
-          <p class="cs-field-hint">Once a staff member is added to a room, participants cannot be assigned to it.</p>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Staff Name</label>
+            <input type="text" id="add-staff-name" placeholder="e.g., Deven" 
+                   class="mt-1 block w-full rounded-md border-gray-300  focus:border-orange-500 focus:ring-orange-500">
+          </div>
+          <p class="text-sm text-gray-500">
+            Once a staff member is added to a room, participants cannot be assigned to it.
+          </p>
         </div>
-      </div>
-      <div class="cs-modal-footer">
-        <button type="button" data-hide="add-staff-modal" class="cs-btn cs-btn-link">
-          Cancel
-        </button>
-        <button type="submit" class="cs-btn cs-btn-primary">
-          Add staff
-        </button>
-      </div>
-    </form>
+        
+        <div class="mt-6 flex justify-end gap-3">
+          <button type="button" data-hide="add-staff-modal" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md">
+            Cancel
+          </button>
+          <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-md">
+            Add Staff
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>

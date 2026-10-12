@@ -1,0 +1,312 @@
+<% content_for :title, "Participants Table – #{current_event.name} – Attend" %>
+
+<div data-controller="data-table"
+     data-data-table-base-url-value="<%= table_admin_event_participants_path(current_event) %>"
+     data-data-table-scan-contexts-value="<%= @scan_contexts.map { |sc| { id: sc.id, name: sc.name } }.to_json %>"
+     data-data-table-groups-value="<%= (current_event.groups_enabled? ? current_event.groups.ordered.map { |g| { id: g.id, name: g.name } } : []).to_json %>"
+     data-data-table-optional-documents-value="<%= @optional_documents.map { |d| { id: d.id, name: d.name } }.to_json %>">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Participants <span class="cs-counter">(<%= @participant_events.size %>)</span></h1>
+      <p class="cs-description"><%= @participant_events.size %> total</p>
+    </div>
+    <div class="cs-actions">
+      <div class="cs-segmented" role="group" aria-label="View">
+        <%= link_to admin_event_participants_path(current_event), class: "cs-segment", title: "List view" do %>
+          List
+        <% end %>
+        <%= link_to table_admin_event_participants_path(current_event), class: "cs-segment", title: "Table view", "aria-current": "page" do %>
+          Table
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <section class="cs-container">
+  <div class="cs-container-header cs-container-header-divided sticky top-12 lg:top-0 z-20 bg-(--cs-bg-container) rounded-t-[inherit]">
+    <div class="flex flex-wrap items-center gap-3 w-full">
+      <label class="cs-search flex-1 min-w-[200px]">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <span class="sr-only">Find participants</span>
+        <input type="search"
+               placeholder="Find participants"
+               class="cs-input"
+               data-data-table-target="searchInput"
+               data-action="input->data-table#search">
+      </label>
+
+      <button type="button"
+              class="cs-btn"
+              data-action="click->data-table#toggleFilterPanel">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+        </svg>
+        Filter
+        <% if params[:filters].present? %>
+          <%= cs_badge(params[:filters].keys.count, "red") %>
+        <% end %>
+      </button>
+
+      <div class="relative">
+        <button type="button"
+                class="cs-btn"
+                data-action="click->data-table#toggleGroupDropdown">
+          Group
+          <% if @group_by.present? && @group_by != "none" %>
+            <span class="font-normal">: <%= group_by_label(@group_by, @optional_documents) %></span>
+          <% end %>
+          <svg class="cs-btn-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
+        </button>
+        <div class="hidden cs-menu cs-menu-right cs-menu-scroll"
+             data-data-table-target="groupDropdown">
+          <button type="button" data-action="click->data-table#clearGrouping"
+                  class="cs-menu-item" <%= 'aria-current=true' if @group_by == 'none' %>>
+            <span class="cs-menu-item-label">No grouping</span>
+          </button>
+          <div class="cs-menu-divider"></div>
+          <% group_by_options = [ ["status", "Status"], *(current_event.travel_enabled? ? [["travel_mode", "Travel mode"]] : []), ["tshirt_size", "T-shirt size"], ["is_minor", "Minor/adult"], ["onboarding_complete", "Onboarding"], ["waiver_signed", "Waiver"], ["freedom_waiver_granted", "Freedom waiver"], ["has_anaphylaxis", "Anaphylaxis risk"], ["high_support", "High support"], ["diet_type", "Diet type"] ] %>
+          <% group_by_options << ["group", "Group"] if current_event.groups_enabled? %>
+          <% @optional_documents.each { |doc| group_by_options << ["optional_document:#{doc.id}", doc.name] } %>
+          <% group_by_options.each do |value, label| %>
+            <button type="button"
+                    data-action="click->data-table#groupBy"
+                    data-value="<%= value %>"
+                    class="cs-menu-item" <%= 'aria-current=true' if @group_by == value %>>
+              <span class="cs-menu-item-label"><%= label %></span>
+            </button>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="relative">
+        <button type="button"
+                class="cs-btn"
+                data-action="click->data-table#toggleColumnToggle">
+          Columns
+          <svg class="cs-btn-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
+        </button>
+        <div class="hidden cs-menu cs-menu-right"
+             data-data-table-target="columnToggle">
+          <p class="cs-menu-header">Toggle columns</p>
+          <div class="cs-menu-scroll py-2 px-4">
+            <% [
+              ["first_name", "First name"],
+              ["last_name", "Last name"],
+              ["preferred_name", "Preferred name"],
+              ["email", "Email"],
+              *(can_view_participant_pii? ? [["phone", "Phone"]] : []),
+              ["pronouns", "Pronouns"],
+              *(can_view_participant_pii? ? [["dob", "Date of birth"]] : []),
+              ["age", "Age"],
+              ["status", "Status"],
+              ["tshirt", "T-shirt"],
+              *(current_event.groups_enabled? ? [["groups", "Groups"]] : []),
+              ["engagement", "Engagement pref"],
+              *(current_event.travel_enabled? ? [["travel_mode", "Travel mode"], ["visa", "Visa status"], ["arrival", "Arrival"], ["departure", "Departure"]] : []),
+              ["room", "Room"],
+              ["roommate", "Roommate"],
+              ["gender_identity", "Gender identity"],
+              ["diet", "Diet type"],
+              ["intolerances", "Intolerances"],
+              ["allergies", "Allergies"],
+              ["anaphylaxis", "Anaphylaxis"],
+              ["medical", "Medical conditions"],
+              ["medications", "Medications"],
+              ["accessibility", "Accessibility"],
+              ["high_support", "High support"],
+              ["freedom", "Freedom waiver"],
+              ["waiver", "Waiver status"],
+              *@optional_documents.map { |doc| [ "optional_doc_#{doc.id}", doc.name ] },
+              ["guardian", "Guardian"],
+              ["slack", "Slack"],
+              ["onboarding", "Onboarding"],
+              ["checked_in", "Checked in"],
+              ["last_scan", "Last scanned"],
+              ["created", "Created at"]
+            ].each do |column, label| %>
+              <label class="cs-option cursor-pointer">
+                <input type="checkbox" checked
+                       data-column="<%= column %>"
+                       data-action="change->data-table#toggleColumn">
+                <span class="cs-option-label"><%= label %></span>
+              </label>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hidden" data-data-table-target="filterPanel">
+    <div class="px-5 py-4 border-b border-(--cs-border-divider-secondary)">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <div class="flex flex-wrap items-center gap-4">
+          <h3 class="cs-h3">Filters</h3>
+          <div class="flex items-center gap-2">
+            <span class="cs-secondary">Match</span>
+            <div class="w-36">
+              <select class="cs-select" aria-label="Match"
+                      data-action="change->data-table#setFilterLogic">
+                <option value="and" <%= 'selected' if params[:filter_logic] != 'or' %>>All (AND)</option>
+                <option value="or" <%= 'selected' if params[:filter_logic] == 'or' %>>Any (OR)</option>
+              </select>
+            </div>
+            <span class="cs-secondary">conditions</span>
+          </div>
+        </div>
+        <div class="cs-actions">
+          <button type="button"
+                  class="cs-btn cs-btn-link"
+                  data-action="click->data-table#clearFilters">
+            Clear all
+          </button>
+          <button type="button"
+                  class="cs-btn cs-btn-primary"
+                  data-action="click->data-table#applyFilters">
+            Apply filters
+          </button>
+        </div>
+      </div>
+      <div class="space-y-2" data-data-table-target="filterList">
+        <!-- Filter rows will be added here dynamically -->
+      </div>
+      <button type="button"
+              class="cs-btn cs-btn-link mt-3 -ml-3"
+              data-action="click->data-table#addFilter">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Add filter
+      </button>
+    </div>
+  </div>
+
+    <div class="cs-table-wrap">
+      <table class="cs-table cs-table-compact" data-data-table-target="table">
+        <thead>
+          <tr>
+            <th scope="col" class="w-8 sticky left-0 z-10">
+              <input type="checkbox" aria-label="Select all" class="accent-(--cs-accent)" data-action="change->data-table#selectAll">
+            </th>
+            <th scope="col" class="cursor-pointer"
+                data-column="first_name" data-action="click->data-table#sort" data-sort-field="legal_first_name" <%= tag.attributes("aria-sort": sort_aria("legal_first_name", @sort_field, @sort_direction)) %>>
+              <span class="cs-sort">First name <%= render_sort_icon("legal_first_name", @sort_field, @sort_direction) %></span>
+            </th>
+            <th scope="col" class="cursor-pointer"
+                data-column="last_name" data-action="click->data-table#sort" data-sort-field="legal_last_name" <%= tag.attributes("aria-sort": sort_aria("legal_last_name", @sort_field, @sort_direction)) %>>
+              <span class="cs-sort">Last name <%= render_sort_icon("legal_last_name", @sort_field, @sort_direction) %></span>
+            </th>
+            <th scope="col" data-column="preferred_name">Preferred</th>
+            <th scope="col" class="cursor-pointer"
+                data-column="email" data-action="click->data-table#sort" data-sort-field="email" <%= tag.attributes("aria-sort": sort_aria("email", @sort_field, @sort_direction)) %>>
+              <span class="cs-sort">Email <%= render_sort_icon("email", @sort_field, @sort_direction) %></span>
+            </th>
+            <% if can_view_participant_pii? %>
+              <th scope="col" data-column="phone">Phone</th>
+            <% end %>
+            <th scope="col" class="cursor-pointer"
+                data-column="pronouns" data-action="click->data-table#sort" data-sort-field="pronouns" <%= tag.attributes("aria-sort": sort_aria("pronouns", @sort_field, @sort_direction)) %>>
+              <span class="cs-sort">Pronouns <%= render_sort_icon("pronouns", @sort_field, @sort_direction) %></span>
+            </th>
+            <% if can_view_participant_pii? %>
+              <th scope="col" class="cursor-pointer"
+                  data-column="dob" data-action="click->data-table#sort" data-sort-field="date_of_birth" <%= tag.attributes("aria-sort": sort_aria("date_of_birth", @sort_field, @sort_direction)) %>>
+                <span class="cs-sort">DOB <%= render_sort_icon("date_of_birth", @sort_field, @sort_direction) %></span>
+              </th>
+            <% end %>
+            <th scope="col" data-column="age">Age</th>
+            <th scope="col" class="cursor-pointer"
+                data-column="status" data-action="click->data-table#sort" data-sort-field="status" <%= tag.attributes("aria-sort": sort_aria("status", @sort_field, @sort_direction)) %>>
+              <span class="cs-sort">Status <%= render_sort_icon("status", @sort_field, @sort_direction) %></span>
+            </th>
+            <th scope="col" data-column="tshirt">T-shirt</th>
+            <% if current_event.groups_enabled? %>
+              <th scope="col" data-column="groups">Groups</th>
+            <% end %>
+            <th scope="col" data-column="engagement">Engagement</th>
+            <% if current_event.travel_enabled? %>
+              <th scope="col" data-column="travel_mode">Travel</th>
+              <th scope="col" data-column="visa">Visa</th>
+              <th scope="col" class="cursor-pointer"
+                  data-column="arrival" data-action="click->data-table#sort" data-sort-field="arrival_time" <%= tag.attributes("aria-sort": sort_aria("arrival_time", @sort_field, @sort_direction)) %>>
+                <span class="cs-sort">Arrival <%= render_sort_icon("arrival_time", @sort_field, @sort_direction) %></span>
+              </th>
+              <th scope="col" class="cursor-pointer"
+                  data-column="departure" data-action="click->data-table#sort" data-sort-field="departure_time" <%= tag.attributes("aria-sort": sort_aria("departure_time", @sort_field, @sort_direction)) %>>
+                <span class="cs-sort">Departure <%= render_sort_icon("departure_time", @sort_field, @sort_direction) %></span>
+              </th>
+            <% end %>
+            <th scope="col" data-column="room">Room</th>
+            <th scope="col" data-column="roommate">Roommate</th>
+            <th scope="col" class="cursor-pointer"
+                data-column="gender_identity" data-action="click->data-table#sort" data-sort-field="gender_identity" <%= tag.attributes("aria-sort": sort_aria("gender_identity", @sort_field, @sort_direction)) %>>
+              <span class="cs-sort">Gender <%= render_sort_icon("gender_identity", @sort_field, @sort_direction) %></span>
+            </th>
+            <th scope="col" data-column="diet">Diet</th>
+            <th scope="col" data-column="intolerances">Intolerances</th>
+            <th scope="col" data-column="allergies">Allergies</th>
+            <th scope="col" data-column="anaphylaxis">Anaphy.</th>
+            <th scope="col" data-column="medical">Medical</th>
+            <th scope="col" data-column="medications">Meds</th>
+            <th scope="col" data-column="accessibility">Access.</th>
+            <th scope="col" data-column="high_support">High sup.</th>
+            <th scope="col" data-column="freedom">Freedom</th>
+            <th scope="col" data-column="waiver">Waiver</th>
+            <% @optional_documents.each do |doc| %>
+              <th scope="col" class="cursor-pointer"
+                  data-column="optional_doc_<%= doc.id %>" data-action="click->data-table#sort" data-sort-field="optional_document:<%= doc.id %>" <%= tag.attributes("aria-sort": sort_aria("optional_document:#{doc.id}", @sort_field, @sort_direction)) %>>
+                <span class="cs-sort"><%= doc.name %> <%= render_sort_icon("optional_document:#{doc.id}", @sort_field, @sort_direction) %></span>
+              </th>
+            <% end %>
+            <th scope="col" data-column="guardian">Guardian</th>
+            <th scope="col" data-column="slack">Slack</th>
+            <th scope="col" data-column="onboarding">Onboard.</th>
+            <th scope="col" data-column="checked_in">Checked in</th>
+            <th scope="col" data-column="last_scan">Last scanned</th>
+            <th scope="col" class="cursor-pointer"
+                data-column="created" data-action="click->data-table#sort" data-sort-field="created_at" <%= tag.attributes("aria-sort": sort_aria("created_at", @sort_field, @sort_direction)) %>>
+              <span class="cs-sort">Created <%= render_sort_icon("created_at", @sort_field, @sort_direction) %></span>
+            </th>
+            <th scope="col" class="text-right sticky right-0 z-10">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if @grouped_participants.present? %>
+            <% @grouped_participants.each do |group_name, participants| %>
+              <tr class="cursor-pointer" data-action="click->data-table#collapseGroup" data-group-id="<%= group_name.to_s.parameterize %>">
+                <td colspan="<%= 35 + @optional_documents.size %>" class="bg-(--cs-bg-shaded)">
+                  <div class="flex items-center gap-2 font-bold">
+                    <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                    <span><%= group_name.to_s.titleize %></span>
+                    <span class="cs-counter">(<%= participants.size %>)</span>
+                  </div>
+                </td>
+              </tr>
+              <% participants.each do |pe| %>
+                <%= render partial: "table_row", locals: { pe: pe, group_id: group_name.to_s.parameterize, optional_documents: @optional_documents } %>
+              <% end %>
+            <% end %>
+          <% else %>
+            <% @participant_events.each do |pe| %>
+              <%= render partial: "table_row", locals: { pe: pe, group_id: nil, optional_documents: @optional_documents } %>
+            <% end %>
+          <% end %>
+
+          <% if @participant_events.empty? %>
+            <tr>
+              <td colspan="35">
+                <div class="cs-empty">
+                  <p class="cs-empty-title">No participants found.</p>
+                </div>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>

@@ -1,139 +1,159 @@
 <% content_for :title, "#{@message.subject.presence || 'Message'} – #{current_event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Messages", admin_event_messages_path(current_event) ], [ @message.subject.presence || "No subject", nil ]) %>
 
-<% message_status_types = {
-     "draft" => :stopped,
-     "scheduled" => :pending,
-     "sending" => :in_progress,
-     "completed" => :success,
-     "failed" => :error,
-     "cancelled" => :stopped
-   } %>
-<% delivery_status_types = { "pending" => :pending, "sending" => :in_progress, "delivered" => :success, "failed" => :error } %>
-<% channel_badge_colors = { "email" => "blue", "sms" => "green" } %>
+<div class="max-w-4xl mx-auto">
+  <div class="mb-6">
+    <%= link_to "← Back to Messages", admin_event_messages_path(current_event), class: "text-gray-600 hover:text-gray-900" %>
+  </div>
 
-<div class="max-w-4xl">
-  <div class="cs-header">
-    <div class="cs-header-text">
-      <% if @message.subject.present? %>
-        <h1 class="cs-h1"><%= @message.subject %></h1>
-      <% else %>
-        <h1 class="cs-h1 cs-muted">No subject</h1>
-      <% end %>
-      <p class="cs-description">
-        Sent by <%= @message.sent_by_user.display_name_or_fallback %>
-        <% if @message.sent_at.present? %>
-          on <%= @message.sent_at.strftime("%B %d, %Y at %l:%M %p") %>
-        <% elsif @message.scheduled_at.present? %>
-          · Scheduled for <%= @message.scheduled_at.strftime("%B %d, %Y at %l:%M %p") %>
+  <!-- Message Header -->
+  <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+    <div class="flex justify-between items-start mb-4">
+      <div>
+        <% if @message.subject.present? %>
+          <h1 class="text-2xl font-bold"><%= @message.subject %></h1>
         <% else %>
-          · Draft
+          <h1 class="text-2xl font-bold text-gray-500">No Subject</h1>
         <% end %>
-      </p>
+        <p class="text-gray-600">
+          Sent by <%= @message.sent_by_user.display_name_or_fallback %> 
+          <% if @message.sent_at.present? %>
+            on <%= @message.sent_at.strftime("%B %d, %Y at %l:%M %p") %>
+          <% elsif @message.scheduled_at.present? %>
+            · Scheduled for <%= @message.scheduled_at.strftime("%B %d, %Y at %l:%M %p") %>
+          <% else %>
+            · Draft
+          <% end %>
+        </p>
+      </div>
+      <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+        <%= case @message.status
+            when 'draft' then 'bg-gray-100 text-gray-800'
+            when 'scheduled' then 'bg-yellow-100 text-yellow-800'
+            when 'sending' then 'bg-blue-100 text-blue-800'
+            when 'completed' then 'bg-green-100 text-green-800'
+            when 'failed' then 'bg-red-100 text-red-800'
+            when 'cancelled' then 'bg-gray-100 text-gray-500'
+            end %>">
+        <%= @message.status.titleize %>
+      </span>
     </div>
-    <div class="cs-actions">
+
+    <!-- Stats -->
+    <div class="grid grid-cols-5 gap-4 mb-6">
+      <div class="bg-gray-50 rounded-lg p-3 text-center">
+        <div class="text-2xl font-bold text-gray-900"><%= @message.recipient_count %></div>
+        <div class="text-sm text-gray-500">Recipients</div>
+      </div>
+      <div class="bg-green-50 rounded-lg p-3 text-center">
+        <div class="text-2xl font-bold text-green-600"><%= @message.sent_count %></div>
+        <div class="text-sm text-gray-500">Delivered</div>
+      </div>
+      <% if @message.channels.include?("email") %>
+        <div class="bg-purple-50 rounded-lg p-3 text-center">
+          <div class="text-2xl font-bold text-purple-600"><%= @message.message_deliveries.for_channel("email").read.count %></div>
+          <div class="text-sm text-gray-500">Opened</div>
+        </div>
+      <% end %>
+      <div class="bg-red-50 rounded-lg p-3 text-center">
+        <div class="text-2xl font-bold text-red-600"><%= @message.failed_count %></div>
+        <div class="text-sm text-gray-500">Failed</div>
+      </div>
+      <div class="bg-gray-50 rounded-lg p-3 text-center">
+        <div class="text-2xl font-bold text-gray-600"><%= @message.message_deliveries.pending.count %></div>
+        <div class="text-sm text-gray-500">Pending</div>
+      </div>
+    </div>
+
+    <!-- Meta Info -->
+    <div class="flex flex-wrap gap-4 text-sm text-gray-600 mb-4">
+      <div>
+        <span class="font-medium">Audience:</span> <%= @message.audience_label %>
+      </div>
+      <div>
+        <span class="font-medium">Channels:</span>
+        <% @message.channels.each do |channel| %>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ml-1
+            <%= case channel
+                when 'slack' then 'bg-purple-100 text-purple-800'
+                when 'email' then 'bg-blue-100 text-blue-800'
+                when 'sms' then 'bg-green-100 text-green-800'
+                end %>">
+            <%= channel.titleize %>
+          </span>
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Message Content -->
+    <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+      <h3 class="text-sm font-medium text-gray-700 mb-2">Message Content</h3>
+      <div class="prose prose-sm max-w-none">
+        <%= sanitize @message.body_as_html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex gap-3 mt-6 pt-4 border-t border-gray-200">
+      <% if @message.draft? || @message.scheduled? %>
+        <%= link_to "Edit", edit_admin_event_message_path(current_event, @message), 
+            class: "bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg" %>
+        
+        <%= button_to "Send Now", send_now_admin_event_message_path(current_event, @message), 
+            method: :post,
+            data: { confirm: "Are you sure you want to send this message now?" },
+            class: "bg-[#d42f46] hover:bg-[#b82840] text-white font-semibold py-2 px-4 rounded-lg" %>
+      <% end %>
+
       <% if @message.scheduled? %>
-        <%= button_to "Cancel", cancel_admin_event_message_path(current_event, @message),
+        <%= button_to "Cancel", cancel_admin_event_message_path(current_event, @message), 
             method: :post,
             data: { confirm: "Are you sure you want to cancel this scheduled message?" },
-            class: "cs-btn" %>
+            class: "bg-red-100 hover:bg-red-200 text-red-800 font-semibold py-2 px-4 rounded-lg" %>
       <% end %>
 
       <% if @message.failed_count > 0 %>
-        <%= button_to "Retry failed (#{@message.failed_count})", retry_failed_admin_event_message_path(current_event, @message),
+        <%= button_to "Retry Failed (#{@message.failed_count})", retry_failed_admin_event_message_path(current_event, @message), 
             method: :post,
-            class: "cs-btn" %>
-      <% end %>
-
-      <% if @message.draft? || @message.scheduled? %>
-        <%= link_to "Edit", edit_admin_event_message_path(current_event, @message), class: "cs-btn" %>
-
-        <%= button_to "Send now", send_now_admin_event_message_path(current_event, @message),
-            method: :post,
-            data: { confirm: "Are you sure you want to send this message now?" },
-            class: "cs-btn cs-btn-primary" %>
+            class: "bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg" %>
       <% end %>
     </div>
   </div>
 
-  <div class="cs-stack">
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <h2 class="cs-h2">Overview</h2>
-      </div>
-      <div class="cs-container-body cs-stack">
-        <dl class="cs-kv cs-kv-3">
-          <div><dt class="cs-kv-label">Status</dt><dd class="cs-kv-value"><%= cs_status(message_status_types.fetch(@message.status, :info), @message.status.titleize) %></dd></div>
-          <div><dt class="cs-kv-label">Audience</dt><dd class="cs-kv-value"><%= @message.audience_label %></dd></div>
-          <div>
-            <dt class="cs-kv-label">Channels</dt>
-            <dd class="cs-kv-value flex flex-wrap gap-1">
-              <% @message.channels.each do |channel| %>
-                <%= cs_badge(channel.titleize, channel_badge_colors[channel]) %>
-              <% end %>
-            </dd>
-          </div>
-        </dl>
+  <!-- Deliveries Table -->
+  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200">
+      <h2 class="text-lg font-semibold">Delivery Status</h2>
+    </div>
 
-        <%# Five counters when email is on, so they wrap rather than divide. %>
-        <dl class="cs-kv cs-kv-4 <%= "cs-kv-divided" unless @message.channels.include?("email") %>">
-          <div><dt class="cs-kv-label">Recipients</dt><dd class="cs-kv-value-lg"><%= @message.recipient_count %></dd></div>
-          <div><dt class="cs-kv-label">Delivered</dt><dd class="cs-kv-value-lg"><%= @message.sent_count %></dd></div>
-          <% if @message.channels.include?("email") %>
-            <div><dt class="cs-kv-label">Opened</dt><dd class="cs-kv-value-lg"><%= @message.message_deliveries.for_channel("email").read.count %></dd></div>
-          <% end %>
-          <div><dt class="cs-kv-label">Failed</dt><dd class="cs-kv-value-lg"><%= @message.failed_count %></dd></div>
-          <div><dt class="cs-kv-label">Pending</dt><dd class="cs-kv-value-lg"><%= @message.message_deliveries.pending.count %></dd></div>
-        </dl>
-      </div>
-    </section>
-
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <h2 class="cs-h2">Message content</h2>
-      </div>
-      <div class="cs-container-body">
-        <div class="prose prose-sm max-w-none">
-          <%= sanitize @message.body_as_html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
-        </div>
-      </div>
-    </section>
-
-    <section class="cs-container">
-      <div class="cs-container-header cs-container-header-divided">
-        <h2 class="cs-h2">Delivery status</h2>
-      </div>
-
-      <% if @deliveries.any? %>
-        <% grouped_deliveries = @deliveries.group_by { |d| d.participant_event_id || d.guardian_id } %>
-        <div class="cs-table-wrap">
-          <table class="cs-table">
-            <thead>
-              <tr>
-                <th scope="col">Recipient</th>
-                <th scope="col">Channel</th>
-                <th scope="col">Sent to</th>
-                <th scope="col">Status</th>
-                <th scope="col"><span class="sr-only">Details</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              <% grouped_deliveries.each do |_recipient_id, deliveries| %>
-                <% first_delivery = deliveries.first %>
-                <% deliveries.each_with_index do |delivery, index| %>
-                  <tr>
-                    <% if index.zero? %>
-                      <td rowspan="<%= deliveries.size %>" class="align-top">
-                        <div class="font-bold"><%= first_delivery.recipient_name %></div>
-                        <% if first_delivery.participant_event.present? %>
-                          <div class="cs-small cs-muted">Attendee</div>
-                        <% elsif first_delivery.guardian.present? %>
-                          <div class="cs-small cs-muted">Guardian</div>
-                        <% end %>
-                      </td>
-                    <% end %>
-                    <td><%= cs_badge(delivery.channel.titleize, channel_badge_colors[delivery.channel]) %></td>
-                    <td class="cs-secondary">
+    <% if @deliveries.any? %>
+      <% grouped_deliveries = @deliveries.group_by { |d| d.participant_event_id || d.guardian_id } %>
+      <div class="divide-y divide-gray-100">
+        <% grouped_deliveries.each do |_recipient_id, deliveries| %>
+          <% first_delivery = deliveries.first %>
+          <div class="px-6 py-4 <%= deliveries.any?(&:failed?) ? 'bg-red-50' : '' %>">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <div class="text-sm font-medium text-gray-900"><%= first_delivery.recipient_name %></div>
+                <% if first_delivery.participant_event.present? %>
+                  <div class="text-xs text-gray-500">Attendee</div>
+                <% elsif first_delivery.guardian.present? %>
+                  <div class="text-xs text-gray-500">Guardian</div>
+                <% end %>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <% deliveries.each do |delivery| %>
+                <div class="flex items-center justify-between text-sm">
+                  <div class="flex items-center gap-3">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium w-16 justify-center
+                      <%= case delivery.channel
+                          when 'slack' then 'bg-purple-100 text-purple-800'
+                          when 'email' then 'bg-blue-100 text-blue-800'
+                          when 'sms' then 'bg-green-100 text-green-800'
+                          end %>">
+                      <%= delivery.channel.titleize %>
+                    </span>
+                    <span class="text-gray-500">
                       <%# For an SMS the identifier is the recipient's phone number, which
                           PII-restricted roles don't get; an email address or Slack ID is
                           fine for them. %>
@@ -142,41 +162,46 @@
                       <% else %>
                         <%= contact_hidden_placeholder %>
                       <% end %>
-                    </td>
-                    <td>
-                      <%= cs_status(delivery_status_types.fetch(delivery.status, :info), delivery.status.titleize) %>
-                      <% if delivery.error_message.present? %>
-                        <div class="cs-small text-(--cs-error) truncate max-w-xs" title="<%= delivery.error_message %>">
-                          <%= truncate(delivery.error_message, length: 80) %>
-                        </div>
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                      <%= case delivery.status
+                          when 'pending' then 'bg-gray-100 text-gray-800'
+                          when 'sending' then 'bg-blue-100 text-blue-800'
+                          when 'delivered' then 'bg-green-100 text-green-800'
+                          when 'failed' then 'bg-red-100 text-red-800'
+                          end %>">
+                      <%= delivery.status.titleize %>
+                    </span>
+                    <% if delivery.failed? %>
+                      <%= button_to "Retry", 
+                          retry_delivery_admin_event_message_path(current_event, @message, delivery_id: delivery.id), 
+                          method: :post,
+                          class: "text-[#ec3750] hover:text-blue-800 text-xs font-medium" %>
+                    <% elsif delivery.delivered? && delivery.delivered_at.present? %>
+                      <% if delivery.channel == "email" && delivery.read? %>
+                        <span class="text-purple-600 text-xs font-medium">Opened <%= time_ago_in_words(delivery.read_at) %> ago</span>
+                      <% else %>
+                        <span class="text-gray-400 text-xs"><%= time_ago_in_words(delivery.delivered_at) %> ago</span>
                       <% end %>
-                    </td>
-                    <td class="text-right whitespace-nowrap">
-                      <% if delivery.failed? %>
-                        <%= button_to "Retry",
-                            retry_delivery_admin_event_message_path(current_event, @message, delivery_id: delivery.id),
-                            method: :post,
-                            class: "cs-btn cs-btn-link" %>
-                      <% elsif delivery.delivered? && delivery.delivered_at.present? %>
-                        <% if delivery.channel == "email" && delivery.read? %>
-                          <%= cs_status(:success, "Opened #{time_ago_in_words(delivery.read_at)} ago") %>
-                        <% else %>
-                          <span class="cs-small cs-muted"><%= time_ago_in_words(delivery.delivered_at) %> ago</span>
-                        <% end %>
-                      <% end %>
-                    </td>
-                  </tr>
+                    <% end %>
+                  </div>
+                </div>
+                <% if delivery.error_message.present? %>
+                  <div class="text-xs text-red-600 ml-19 truncate" title="<%= delivery.error_message %>">
+                    <%= truncate(delivery.error_message, length: 80) %>
+                  </div>
                 <% end %>
               <% end %>
-            </tbody>
-          </table>
-        </div>
-      <% else %>
-        <div class="cs-empty">
-          <p class="cs-empty-title">No deliveries yet</p>
-          <p>Send the message to see delivery status.</p>
-        </div>
-      <% end %>
-    </section>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <div class="px-6 py-12 text-center text-gray-500">
+        No deliveries yet. Send the message to see delivery status.
+      </div>
+    <% end %>
   </div>
 </div>

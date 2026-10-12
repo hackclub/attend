@@ -3,245 +3,221 @@
 <div>
   <%= render "header" %>
 
-  <div class="cs-alert cs-alert-warning mb-5">
-    <%= cs_status_icon(:warning) %>
-    <div>
-      <p class="cs-alert-title">Sensitive information</p>
-      <p>This information is confidential and should only be accessed when necessary for participant safety.</p>
-    </div>
+  <div class="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded mb-6">
+    <strong>⚠️ Sensitive Information</strong>
+    <p class="text-sm mt-1">This information is confidential and should only be accessed when necessary for participant safety.</p>
   </div>
 
-  <%= form_with url: medical_admin_event_participant_path(current_event, @participant_event), method: :patch, local: true, class: "cs-stack", data: { turbo: false } do |form| %>
+  <%= form_with url: medical_admin_event_participant_path(current_event, @participant_event), method: :patch, local: true, data: { turbo: false } do |form| %>
     <% errors = [@medical, @dietary, @accessibility].compact.flat_map { |r| r.errors.full_messages } %>
     <% if errors.any? %>
-      <div class="cs-alert cs-alert-error" role="alert">
-        <%= cs_status_icon(:error) %>
-        <div>
-          <p class="cs-alert-title"><%= pluralize(errors.size, "error") %> stopped this from saving</p>
-          <ul class="mt-1 list-disc list-inside">
-            <% errors.each do |msg| %>
-              <li><%= msg %></li>
-            <% end %>
-          </ul>
-        </div>
+      <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded mb-6">
+        <ul class="list-disc list-inside">
+          <% errors.each do |msg| %>
+            <li><%= msg %></li>
+          <% end %>
+        </ul>
       </div>
     <% end %>
 
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <h2 class="cs-h2">Medical</h2>
-      </div>
-      <div class="cs-container-body">
+    <div class="bg-white rounded-lg border border-gray-200 p-6">
       <%= fields_for :medical, @medical do |f| %>
         <div class="space-y-6">
           <section>
-            <h3 class="cs-h3 mb-3">Allergies</h3>
+            <h3 class="font-medium text-gray-900 mb-4">Allergies</h3>
 
             <div class="space-y-4">
               <div>
-                <%= f.label :allergies, class: "cs-field-label" %>
-                <%= f.text_area :allergies, rows: 3, class: "cs-input" %>
+                <%= f.label :allergies, class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_area :allergies, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
               </div>
 
               <div>
                 <%= f.label :has_anaphylaxis_risk, class: "flex items-center gap-2 cursor-pointer" do %>
-                  <%= f.check_box :has_anaphylaxis_risk, class: "w-4 h-4 accent-(--cs-accent)" %>
-                  <span class="font-bold">Anaphylaxis risk</span>
+                  <%= f.check_box :has_anaphylaxis_risk, class: "w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500" %>
+                  <span class="text-sm font-medium text-red-700">Anaphylaxis Risk</span>
                 <% end %>
-                <p class="ml-6 cs-small cs-muted">Check if participant carries an EpiPen or has severe allergic reactions</p>
+                <p class="ml-6 text-sm text-gray-500">Check if participant carries an EpiPen or has severe allergic reactions</p>
               </div>
             </div>
           </section>
 
           <section>
-            <h3 class="cs-h3 mb-3">Medical conditions</h3>
+            <h3 class="font-medium text-gray-900 mb-4">Medical Conditions</h3>
 
             <div>
-              <%= f.label :medical_conditions, class: "cs-field-label" %>
-              <%= f.text_area :medical_conditions, rows: 4, class: "cs-input" %>
+              <%= f.label :medical_conditions, class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= f.text_area :medical_conditions, rows: 4, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
             </div>
           </section>
 
           <section>
-            <h3 class="cs-h3 mb-3">Medications</h3>
+            <h3 class="font-medium text-gray-900 mb-4">Medications</h3>
 
             <div class="space-y-4">
               <div>
-                <%= f.label :medications, class: "cs-field-label" %>
-                <%= f.text_area :medications, rows: 3, class: "cs-input" %>
+                <%= f.label :medications, class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_area :medications, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
               </div>
 
               <div>
                 <%= f.label :requires_refrigeration, class: "flex items-center gap-2 cursor-pointer" do %>
-                  <%= f.check_box :requires_refrigeration, class: "w-4 h-4 accent-(--cs-accent)" %>
-                  <span class="font-bold">Requires refrigeration</span>
+                  <%= f.check_box :requires_refrigeration, class: "w-4 h-4 rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+                  <span class="text-sm font-medium text-gray-700">Requires Refrigeration</span>
                 <% end %>
-                <p class="ml-6 cs-small cs-muted">Check if any medications need to be stored in a refrigerator</p>
+                <p class="ml-6 text-sm text-gray-500">Check if any medications need to be stored in a refrigerator</p>
               </div>
             </div>
           </section>
 
           <section>
-            <h3 class="cs-h3 mb-3">Emergency action plan</h3>
+            <h3 class="font-medium text-gray-900 mb-4">Emergency Action Plan</h3>
 
             <div>
-              <%= f.label :emergency_action_plan, class: "cs-field-label" %>
-              <%= f.text_area :emergency_action_plan, rows: 4, class: "cs-input" %>
-              <p class="cs-field-hint">Specific instructions for handling medical emergencies</p>
+              <%= f.label :emergency_action_plan, class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= f.text_area :emergency_action_plan, rows: 4, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+              <p class="mt-1 text-sm text-gray-500">Specific instructions for handling medical emergencies</p>
             </div>
           </section>
 
           <section>
-            <h3 class="cs-h3 mb-3">Additional medical notes</h3>
+            <h3 class="font-medium text-gray-900 mb-4">Additional Medical Notes</h3>
 
             <div>
-              <%= f.label :additional_notes, class: "cs-field-label" %>
-              <%= f.text_area :additional_notes, rows: 3, class: "cs-input" %>
+              <%= f.label :additional_notes, class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= f.text_area :additional_notes, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
             </div>
           </section>
 
           <% if @medical.last_updated_by %>
-            <div class="cs-small cs-muted pt-4 border-t border-(--cs-border-divider-secondary)">
+            <div class="text-sm text-gray-500 pt-4 border-t">
               Last updated by <%= @medical.last_updated_by.email %> on <%= @medical.updated_at.strftime("%B %d, %Y at %H:%M") %>
             </div>
           <% end %>
         </div>
       <% end %>
-      </div>
-    </section>
+    </div>
 
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <h2 class="cs-h2">Dietary requirements</h2>
-      </div>
-      <div class="cs-container-body">
+    <div class="bg-white rounded-lg border border-gray-200 p-6 mt-6">
+      <h2 class="text-lg font-semibold mb-4 pb-2 border-b">Dietary Requirements</h2>
 
       <%= fields_for :dietary, @dietary || @participant_event.build_dietary do |f| %>
         <div class="space-y-4">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <%= f.label :diet_type, "Diet type", class: "cs-field-label" %>
-              <%= f.select :diet_type, [["No specific diet", ""], ["Vegetarian", "vegetarian"], ["Vegan", "vegan"], ["Halal", "halal"], ["Kosher", "kosher"], ["Other", "other"]], {}, class: "cs-select" %>
+              <%= f.label :diet_type, "Diet Type", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= f.select :diet_type, [["No specific diet", ""], ["Vegetarian", "vegetarian"], ["Vegan", "vegan"], ["Halal", "halal"], ["Kosher", "kosher"], ["Other", "other"]], {}, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
             </div>
 
             <div class="flex items-center pt-6">
               <%= f.label :cross_contamination_risk, class: "flex items-center gap-2 cursor-pointer" do %>
-                <%= f.check_box :cross_contamination_risk, class: "w-4 h-4 accent-(--cs-accent)" %>
-                <span class="font-bold">Cross-contamination risk</span>
+                <%= f.check_box :cross_contamination_risk, class: "w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500" %>
+                <span class="text-sm font-medium text-gray-700">Cross-Contamination Risk</span>
               <% end %>
             </div>
           </div>
 
           <div>
-            <%= f.label :intolerances, "Food intolerances", class: "cs-field-label" %>
-            <%= f.text_area :intolerances, rows: 2, class: "cs-input", placeholder: "e.g., lactose, gluten, nuts" %>
+            <%= f.label :intolerances, "Food Intolerances", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_area :intolerances, rows: 2, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "e.g., lactose, gluten, nuts" %>
           </div>
 
           <div>
-            <%= f.label :life_threatening_allergies, "Life-threatening food allergies", class: "cs-field-label" %>
-            <%= f.text_area :life_threatening_allergies, rows: 2, class: "cs-input", placeholder: "List any severe food allergies" %>
-            <p class="cs-field-hint">This helps the catering team take extra precautions</p>
+            <%= f.label :life_threatening_allergies, "Life-Threatening Food Allergies", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_area :life_threatening_allergies, rows: 2, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "List any severe food allergies" %>
+            <p class="mt-1 text-sm text-gray-500">This helps the catering team take extra precautions</p>
           </div>
 
           <div>
-            <%= f.label :notes, "Dietary notes", class: "cs-field-label" %>
-            <%= f.text_area :notes, rows: 2, class: "cs-input" %>
+            <%= f.label :notes, "Dietary Notes", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_area :notes, rows: 2, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
           </div>
         </div>
       <% end %>
-      </div>
-    </section>
+    </div>
 
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <h2 class="cs-h2">Learning &amp; cognitive needs</h2>
-      </div>
-      <div class="cs-container-body">
+    <div class="bg-white rounded-lg border border-gray-200 p-6 mt-6">
+      <h2 class="text-lg font-semibold mb-4 pb-2 border-b">Learning & Cognitive Needs</h2>
 
       <%= fields_for :accessibility, @accessibility || @participant_event.build_accessibility do |f| %>
         <div class="space-y-4">
           <fieldset>
-            <legend class="cs-field-label">Neurodivergent conditions</legend>
+            <legend class="text-sm font-medium text-gray-700 mb-2">Neurodivergent Conditions</legend>
             <div class="flex flex-wrap gap-4">
               <%= f.label :has_adhd, class: "flex items-center gap-2 cursor-pointer" do %>
-                <%= f.check_box :has_adhd, class: "w-4 h-4 accent-(--cs-accent)" %>
-                <span>ADHD</span>
+                <%= f.check_box :has_adhd, class: "w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" %>
+                <span class="text-sm text-gray-700">ADHD</span>
               <% end %>
 
               <%= f.label :has_dyslexia, class: "flex items-center gap-2 cursor-pointer" do %>
-                <%= f.check_box :has_dyslexia, class: "w-4 h-4 accent-(--cs-accent)" %>
-                <span>Dyslexia</span>
+                <%= f.check_box :has_dyslexia, class: "w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" %>
+                <span class="text-sm text-gray-700">Dyslexia</span>
               <% end %>
 
               <%= f.label :has_autism, class: "flex items-center gap-2 cursor-pointer" do %>
-                <%= f.check_box :has_autism, class: "w-4 h-4 accent-(--cs-accent)" %>
-                <span>Autism</span>
+                <%= f.check_box :has_autism, class: "w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" %>
+                <span class="text-sm text-gray-700">Autism</span>
               <% end %>
             </div>
           </fieldset>
 
           <div>
-            <%= f.label :neurodivergent_notes, "Accommodation notes", class: "cs-field-label" %>
-            <%= f.text_area :neurodivergent_notes, rows: 3, class: "cs-input", placeholder: "Any specific accommodations or support that would help (e.g., quiet space access, written instructions, extra time)" %>
+            <%= f.label :neurodivergent_notes, "Accommodation Notes", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.text_area :neurodivergent_notes, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "Any specific accommodations or support that would help (e.g., quiet space access, written instructions, extra time)" %>
           </div>
         </div>
-      </div>
-    </section>
+    </div>
 
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <h2 class="cs-h2">Accessibility needs</h2>
-      </div>
-      <div class="cs-container-body">
+    <div class="bg-white rounded-lg border border-gray-200 p-6 mt-6">
+      <h2 class="text-lg font-semibold mb-4 pb-2 border-b">Accessibility Needs</h2>
 
       <div class="space-y-6">
         <fieldset>
-          <legend class="cs-field-label">Mobility needs</legend>
+          <legend class="text-sm font-medium text-gray-700 mb-2">Mobility Needs</legend>
           <div class="flex flex-wrap gap-4">
             <%= f.label :uses_wheelchair, class: "flex items-center gap-2 cursor-pointer" do %>
-              <%= f.check_box :uses_wheelchair, class: "w-4 h-4 accent-(--cs-accent)" %>
-              <span>Wheelchair accessible room/venue</span>
+              <%= f.check_box :uses_wheelchair, class: "w-4 h-4 rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+              <span class="text-sm text-gray-700">Wheelchair accessible room/venue</span>
             <% end %>
 
             <%= f.label :step_free_required, class: "flex items-center gap-2 cursor-pointer" do %>
-              <%= f.check_box :step_free_required, class: "w-4 h-4 accent-(--cs-accent)" %>
-              <span>Step-free access required</span>
+              <%= f.check_box :step_free_required, class: "w-4 h-4 rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+              <span class="text-sm text-gray-700">Step-free access required</span>
             <% end %>
           </div>
         </fieldset>
 
         <fieldset>
-          <legend class="cs-field-label">Sensory needs</legend>
+          <legend class="text-sm font-medium text-gray-700 mb-2">Sensory Needs</legend>
           <div class="flex flex-wrap gap-4">
             <%= f.label :needs_captioning, class: "flex items-center gap-2 cursor-pointer" do %>
-              <%= f.check_box :needs_captioning, class: "w-4 h-4 accent-(--cs-accent)" %>
-              <span>Captioning/hearing assistance</span>
+              <%= f.check_box :needs_captioning, class: "w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500" %>
+              <span class="text-sm text-gray-700">Captioning/hearing assistance</span>
             <% end %>
 
             <%= f.label :needs_large_print, class: "flex items-center gap-2 cursor-pointer" do %>
-              <%= f.check_box :needs_large_print, class: "w-4 h-4 accent-(--cs-accent)" %>
-              <span>Large print materials</span>
+              <%= f.check_box :needs_large_print, class: "w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500" %>
+              <span class="text-sm text-gray-700">Large print materials</span>
             <% end %>
 
             <%= f.label :needs_sign_language, class: "flex items-center gap-2 cursor-pointer" do %>
-              <%= f.check_box :needs_sign_language, class: "w-4 h-4 accent-(--cs-accent)" %>
-              <span>Sign language interpreter needed</span>
+              <%= f.check_box :needs_sign_language, class: "w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500" %>
+              <span class="text-sm text-gray-700">Sign language interpreter needed</span>
             <% end %>
           </div>
         </fieldset>
 
         <div>
-          <%= f.label :other_needs, "Other accessibility or communication needs", class: "cs-field-label" %>
-          <%= f.text_area :other_needs, rows: 3, class: "cs-input", placeholder: "Please describe any additional needs" %>
+          <%= f.label :other_needs, "Other Accessibility or Communication Needs", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_area :other_needs, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "Please describe any additional needs" %>
         </div>
       </div>
       <% end %>
-      </div>
-    </section>
+    </div>
 
-    <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-      <%= link_to "Cancel", admin_event_participant_path(current_event, @participant_event), class: "cs-btn cs-btn-link cs-btn-full" %>
-      <%= form.button "Save all information", class: "cs-btn cs-btn-primary cs-btn-full" %>
+    <div class="mt-6 flex flex-col sm:flex-row gap-3">
+      <%= form.submit "Save All Information", class: "w-full sm:w-auto bg-[#d42f46] text-white px-6 py-2 rounded-md hover:bg-[#b82840] cursor-pointer" %>
+      <%= link_to "Cancel", admin_event_participant_path(current_event, @participant_event), class: "w-full sm:w-auto text-center px-6 py-2 text-gray-600 hover:text-gray-900" %>
     </div>
   <% end %>
 </div>
