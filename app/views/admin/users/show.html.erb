@@ -92,10 +92,8 @@
     </div>
   </section>
 
-  <%# Admin-only tooling: the dashed orange border is the project's marker for it. A
-      cs-container's own border would override the dashed one, so the wrapper
-      carries the background and the container parts sit inside it. %>
-  <div class="border-2 border-dashed border-orange-400 rounded-2xl bg-(--cs-bg-container)"
+  <%# No admin-only outline: this whole page is global-admin only. %>
+  <div class="cs-container"
        data-controller="passport-pairing"
        data-passport-pairing-create-url-value="<%= admin_user_passports_path(@user) %>">
     <div class="cs-container-header cs-container-header-divided">

@@ -343,12 +343,6 @@
  * app layout
  * ==================================================================== */
 
-/* ---------- top navigation ---------- */
-
-/* ---------- dropdown menus (top nav + page actions) ---------- */
-
-/* ---------- side navigation + content ---------- */
-
 /* mobile drawer */
 
 :root.cs-console[data-theme="dark"] .cs-flash-error { background-color: #b30000; }
@@ -359,28 +353,6 @@
 /* ====================================================================
  * components
  * ==================================================================== */
-
-/* ---------- page header ---------- */
-
-/* ---------- container ---------- */
-
-/* ---------- key-value pairs ---------- */
-
-/* ---------- buttons ---------- */
-
-/* ---------- badges + status indicators ---------- */
-
-/* ---------- alerts ---------- */
-
-/* ---------- tables ---------- */
-
-/* ---------- form fields ---------- */
-
-/* ---------- tabs ---------- */
-
-/* ---------- empty state ---------- */
-
-/* ---------- progress bar ---------- */
 
 /* ====================================================================
  * legacy pattern adapter
@@ -577,8 +549,6 @@
   padding-top: 0;
 }
 
-/* ---------- side nav footer: mobile app links in one row ---------- */
-
 /* the build stamp's own wrapper pads for the old sidebar */
 
 /* ====================================================================
@@ -624,36 +594,6 @@
  * names its Cloudscape counterpart so the mapping stays obvious.
  * ==================================================================== */
 
-/* ---------- form field: description, error, info link ---------- */
-
-/* ---------- file upload (Cloudscape file upload's "Choose file" button) ---------- */
-
-/* ---------- toggle ---------- */
-
-/* ---------- segmented control ---------- */
-
-/* ---------- expandable section ---------- */
-
-/* ---------- modal ---------- */
-
-/* ---------- pagination ---------- */
-
-/* ---------- button dropdown caret ---------- */
-
-/* ---------- inline icon button (Cloudscape "inline-icon" button) ---------- */
-
-/* ---------- copy to clipboard (inline variant) ---------- */
-
-/* ---------- spinner ---------- */
-
-/* ---------- progress bar with label ---------- */
-
-/* ---------- tokens ---------- */
-
-/* ---------- steps (cloudscape "steps": a status timeline) ---------- */
-
-/* ---------- cards ---------- */
-
 /* a whole card that links somewhere */
 
 /* ---------- severity badges (cloudscape badge, severity colours) ---------- */
@@ -662,10 +602,6 @@
   .cs-badge-severity-critical { background-color: #d63f38; color: #000000; }
   .cs-badge-severity-high { background-color: #fe6e73; color: #0f141a; }
 }
-
-/* ---------- breadcrumb group (from cs_breadcrumbs) ---------- */
-
-/* ---------- popover (inline "i" explanations, via <details>) ---------- */
 
 /* An expandable's summary spans its container's rounded edge; an offset
  * outline there draws a square box across the corner. Keep the ring
@@ -2415,35 +2351,6 @@
     }
   }
 
-  .cs-popover { position: relative; display: inline-block; }
-
-  .cs-popover > summary {
-    list-style: none;
-    display: inline;
-    border-bottom: 1px dashed currentColor;
-    cursor: pointer;
-
-    &::-webkit-details-marker { display: none; }
-  }
-
-  .cs-popover-body {
-    position: absolute;
-    z-index: 55;
-    top: calc(100% + 8px);
-    left: 0;
-    width: max-content;
-    max-width: 320px;
-    padding: 12px 16px;
-    background-color: var(--cs-bg-container);
-    border: 1px solid var(--cs-border-divider);
-    border-radius: var(--cs-radius-item);
-    box-shadow: var(--cs-shadow-dropdown);
-    font-size: 14px;
-    line-height: 20px;
-    color: var(--cs-text-body);
-    white-space: normal;
-  }
-
   .cs-expandable > summary:focus-visible {
     outline: 2px solid var(--cs-focus);
     outline-offset: -2px;
@@ -2470,18 +2377,6 @@
   @media (min-width: 768px) and (max-width: 1023px) {
     .cs-kv-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
-
-  /* A divided list of rows outside a table (settings rows, people lists). */
-  .cs-list-divided {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-
-    > * + * { border-top: 1px solid var(--cs-border-divider-secondary); }
-    > * { padding: 12px 0; }
-  }
-
-  .cs-container-flush > .cs-list-divided > * { padding-left: 20px; padding-right: 20px; }
 }
 
 @layer components {
@@ -2541,7 +2436,7 @@
 
 /* ---------- links in running text ----------
  * A link inside a sentence can't rely on colour alone (WCAG 1.4.1): the
- * console's red sits under 3:1 against body text. Links in prose get an
+ * console's red is 3.37:1 against body text in light mode and 1.86:1 in dark. Links in prose get an
  * underline; standalone links and link-style buttons don't. Unlayered so it
  * beats the no-underline utilities in older markup. */
 :root.cs-console .cs-main :is(p, .cs-alert, .cs-description, .cs-field-hint, .cs-setting-description, .cs-empty) a:not([class*="cs-btn"]) {
@@ -2552,7 +2447,7 @@
 
 /* ---------- touch targets on phones ----------
  * Cloudscape's 32px controls are a desktop density. Below the sm
- * breakpoint the console's tappable controls grow toward 44px. */
+ * breakpoint the console's tappable controls grow to 40px. */
 @media (max-width: 639px) {
   @layer components {
     .cs-btn { min-height: 40px; }
