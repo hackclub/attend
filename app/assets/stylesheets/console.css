@@ -2722,3 +2722,85 @@
 
   .cs-form-error-list { margin-top: 2px; padding-left: 18px; list-style: disc; }
 }
+
+/* ---------- inline edit ----------
+ * Cloudscape's table inline edit: an editable cell shows its pencil on hover
+ * or focus and becomes a button over the whole cell; a locked cell shows a
+ * lock and explains why on choose. In edit mode the control sits with the
+ * dismiss and confirm icons at the cell's end. See cs_inline_edit_controller. */
+@layer components {
+  .cs-table td.cs-inline-edit-cell { position: relative; padding-top: 6px; padding-bottom: 6px; }
+
+  /* A fixed width keeps the column from jumping as a cell switches modes. */
+  .cs-table th.cs-inline-edit-col { width: 300px; }
+
+  .cs-inline-edit-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 32px;
+    margin: 0 -8px;
+    padding: 0 8px;
+    box-sizing: content-box;
+    border-radius: var(--cs-radius-item);
+    background: none;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover { background-color: var(--cs-bg-selected); }
+    &:focus-visible { outline: 2px solid var(--cs-focus); outline-offset: -2px; }
+    &[aria-disabled="true"] { cursor: default; }
+    &[aria-disabled="true"]:hover { background-color: transparent; }
+  }
+
+  .cs-inline-edit-icon {
+    display: inline-flex;
+    margin-left: auto;
+    color: var(--cs-text-secondary);
+    visibility: hidden;
+
+    svg { width: 16px; height: 16px; }
+  }
+
+  .cs-inline-edit-trigger:hover .cs-inline-edit-icon,
+  .cs-inline-edit-trigger:focus-visible .cs-inline-edit-icon { visibility: visible; }
+
+  .cs-inline-edit-saved { display: inline-flex; color: var(--cs-success); }
+  .cs-inline-edit-saved svg { width: 16px; height: 16px; }
+
+  .cs-inline-edit-reason {
+    position: absolute;
+    z-index: 50;
+    left: 12px;
+    top: calc(100% - 4px);
+    max-width: 280px;
+    padding: 8px 12px;
+    background-color: var(--cs-bg-container);
+    border: 1px solid var(--cs-border-divider);
+    border-radius: var(--cs-radius-item);
+    box-shadow: var(--cs-shadow-dropdown);
+    color: var(--cs-text-body);
+    font-size: 12px;
+    line-height: 16px;
+    white-space: normal;
+  }
+
+  .cs-inline-edit-reason[hidden] { display: none; }
+
+  .cs-inline-edit-form { min-width: 200px; }
+  .cs-inline-edit-form[hidden] { display: none; }
+
+  .cs-inline-edit-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    .cs-select { flex: 1 1 auto; min-width: 0; }
+    .cs-btn-inline-icon:disabled { color: var(--cs-text-disabled); cursor: default; }
+    .cs-spinner[hidden], svg[hidden] { display: none; }
+  }
+
+  .cs-inline-edit-row + .cs-field-error { white-space: normal; max-width: 280px; }
+}

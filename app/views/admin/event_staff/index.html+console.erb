@@ -1,5 +1,4 @@
 <% content_for :breadcrumbs, cs_event_breadcrumbs([ "Staff", nil ]) %>
-<% role_badge_colors = { "event_admin" => "red", "ops" => "blue", "limited" => "green", "safeguarding_lead" => "yellow", "read_only" => nil } %>
 
 <div class="cs-stack">
   <div class="cs-header">
@@ -21,7 +20,7 @@
           <thead>
             <tr>
               <th scope="col">User</th>
-              <th scope="col">Role</th>
+              <th scope="col" class="cs-inline-edit-col">Role</th>
               <th scope="col">Added</th>
               <th scope="col"><span class="sr-only">Actions</span></th>
             </tr>
@@ -33,9 +32,7 @@
                   <div><%= assignment.user.display_name_or_fallback %></div>
                   <div class="cs-small cs-secondary"><%= assignment.user.email %></div>
                 </td>
-                <td class="whitespace-nowrap">
-                  <%= cs_badge(assignment.role.titleize, role_badge_colors[assignment.role]) %>
-                </td>
+                <%= render "admin/event_staff/role_cell", assignment: assignment %>
                 <td class="whitespace-nowrap"><%= cs_relative_time(assignment.created_at) %></td>
                 <td class="whitespace-nowrap text-right">
                   <% if assignment.inherited_from_series? %>

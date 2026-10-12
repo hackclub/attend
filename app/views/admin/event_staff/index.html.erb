@@ -23,16 +23,30 @@
                 <div class="text-sm text-gray-500"><%= assignment.user.email %></div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                  <%= case assignment.role
-                      when 'event_admin' then 'bg-purple-100 text-purple-800'
-                      when 'ops' then 'bg-blue-100 text-blue-800'
-                      when 'limited' then 'bg-teal-100 text-teal-800'
-                      when 'safeguarding_lead' then 'bg-red-100 text-red-800'
-                      when 'read_only' then 'bg-gray-100 text-gray-800'
-                      end %>">
-                  <%= assignment.role.titleize %>
-                </span>
+                <% refusal = role_change_refusal(assignment) %>
+                <% if refusal %>
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                    <%= case assignment.role
+                        when 'event_admin' then 'bg-purple-100 text-purple-800'
+                        when 'ops' then 'bg-blue-100 text-blue-800'
+                        when 'limited' then 'bg-teal-100 text-teal-800'
+                        when 'safeguarding_lead' then 'bg-red-100 text-red-800'
+                        when 'read_only' then 'bg-gray-100 text-gray-800'
+                        end %>" title="<%= refusal %>">
+                    <%= assignment.role.titleize %>
+                  </span>
+                <% else %>
+                  <%= form_with model: assignment, url: admin_event_staff_path(current_event, assignment), method: :patch,
+                        class: "flex items-center gap-2", data: { turbo: false } do |f| %>
+                    <%= f.select :role,
+                          options_for_select(EventRoleAssignment::ROLE_DETAILS.map { |role, details| [ details[:label], role ] }, assignment.role),
+                          {},
+                          class: "text-sm border border-gray-300 rounded-md py-1 pl-2 pr-8",
+                          id: dom_id(assignment, :role_select),
+                          aria: { label: "Role for #{assignment.user.display_name_or_fallback}" } %>
+                    <%= f.button "Save", class: "text-sm font-medium text-[#d42f46] hover:text-[#b82840]" %>
+                  <% end %>
+                <% end %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 <%= assignment.created_at.strftime("%B %d, %Y") %>
