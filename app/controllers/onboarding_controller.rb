@@ -640,25 +640,75 @@ class OnboardingController < ApplicationController
 
     existing_gpe = @participant_event.guardian_participant_events.first
     if existing_gpe
-      if guardian_autosave_email_locked?(existing_gpe.guardian, guardian_attrs[:email])
-        return {
-          success: false,
-          errors: [ "This guardian's email cannot be changed here after access or consent was issued. Please ask event staff to correct it." ]
-        }
+      guardian = existing_gpe.guardian
+
+      if guardian_shared?(guardian)
+        unless guardian_details_match?(guardian, guardian_attrs)
+          return { success: false, errors: [ SHARED_GUARDIAN_MISMATCH_MESSAGE ] }
+        end
+
+        return persist_autosave_records([
+          [ existing_gpe, { relationship: relationship }, "Guardian relationship" ]
+        ])
+      end
+
+      if guardian_autosave_email_locked?(guardian, guardian_attrs[:email])
+        return { success: false, errors: [ GUARDIAN_EMAIL_LOCKED_MESSAGE ] }
       end
 
       persist_autosave_records([
-        [ existing_gpe.guardian, guardian_attrs, "Guardian" ],
+        [ guardian, guardian_attrs, "Guardian" ],
         [ existing_gpe, { relationship: relationship }, "Guardian relationship" ]
       ])
     else
-      guardian = Guardian.find_or_initialize_by(email: guardian_attrs[:email])
-      gpe = @participant_event.guardian_participant_events.build(guardian: guardian, relationship: relationship)
-      persist_autosave_records([
-        [ guardian, guardian_attrs, "Guardian" ],
-        [ gpe, {}, "Guardian relationship" ]
-      ])
+      guardian = find_guardian_by_email(guardian_attrs[:email])
+
+      if guardian
+        unless guardian_details_match?(guardian, guardian_attrs)
+          return { success: false, errors: [ SHARED_GUARDIAN_MISMATCH_MESSAGE ] }
+        end
+
+        gpe = @participant_event.guardian_participant_events.build(guardian: guardian, relationship: relationship)
+        persist_autosave_records([ [ gpe, {}, "Guardian relationship" ] ])
+      else
+        guardian = Guardian.new
+        gpe = @participant_event.guardian_participant_events.build(guardian: guardian, relationship: relationship)
+        persist_autosave_records([
+          [ guardian, guardian_attrs, "Guardian" ],
+          [ gpe, {}, "Guardian relationship" ]
+        ])
+      end
     end
+  end
+
+  GUARDIAN_EMAIL_LOCKED_MESSAGE = "This guardian's email cannot be changed here after access or consent was issued. Please ask event staff to correct it.".freeze
+  SHARED_GUARDIAN_MISMATCH_MESSAGE = "A guardian with this email address is already on file with different details. Please check the address, or ask event staff to correct the guardian's details.".freeze
+
+  # Guardian rows are shared: two siblings registering with the same parent
+  # link to one row, and that row's contact details are what the portal centre
+  # verifies ownership against. Typing a guardian's email proves nothing about
+  # being that guardian, so onboarding may only rewrite a row that is linked to
+  # this registration alone. Anyone else's row is linked to as-is, and only
+  # when the typed details agree with what is already on file.
+  def guardian_shared?(guardian)
+    return false unless guardian.persisted?
+
+    guardian.guardian_participant_events.where.not(participant_event_id: @participant_event.id).exists?
+  end
+
+  def find_guardian_by_email(email)
+    return nil if email.blank?
+
+    Guardian.where("LOWER(email) = ?", email.to_s.strip.downcase).first
+  end
+
+  def guardian_details_match?(guardian, attrs)
+    return false unless guardian.email.to_s.strip.casecmp?(attrs[:email].to_s.strip)
+    return false unless guardian.legal_first_name.to_s.strip.casecmp?(attrs[:legal_first_name].to_s.strip)
+    return false unless guardian.legal_last_name.to_s.strip.casecmp?(attrs[:legal_last_name].to_s.strip)
+    return true if attrs[:phone].blank?
+
+    PhoneNormalizer.normalize(attrs[:phone]) == guardian.phone
   end
 
   def guardian_autosave_email_locked?(guardian, requested_email)
@@ -906,6 +956,23 @@ class OnboardingController < ApplicationController
 
     if existing_gpe
       guardian = existing_gpe.guardian
+
+      # See guardian_shared?: a row other registrations link to is never
+      # rewritten from here, and the typed details have to match it.
+      if guardian_shared?(guardian)
+        unless guardian_details_match?(guardian, guardian_attrs)
+          flash.now[:alert] = SHARED_GUARDIAN_MISMATCH_MESSAGE
+          return false
+        end
+
+        return existing_gpe.update(relationship: relationship)
+      end
+
+      if guardian_autosave_email_locked?(guardian, guardian_attrs[:email])
+        flash.now[:alert] = GUARDIAN_EMAIL_LOCKED_MESSAGE
+        return false
+      end
+
       guardian.assign_attributes(guardian_attrs)
 
       if guardian.save
@@ -916,15 +983,20 @@ class OnboardingController < ApplicationController
         false
       end
     else
-      guardian = Guardian.find_or_initialize_by(email: guardian_attrs[:email])
-      guardian.assign_attributes(guardian_attrs)
+      guardian = find_guardian_by_email(guardian_attrs[:email])
 
-      if guardian.save
-        gpe = @participant_event.guardian_participant_events.create(guardian: guardian, relationship: relationship)
-        gpe.persisted?
+      if guardian
+        unless guardian_details_match?(guardian, guardian_attrs)
+          flash.now[:alert] = SHARED_GUARDIAN_MISMATCH_MESSAGE
+          return false
+        end
       else
-        false
+        guardian = Guardian.new(guardian_attrs)
+        return false unless guardian.save
       end
+
+      gpe = @participant_event.guardian_participant_events.create(guardian: guardian, relationship: relationship)
+      gpe.persisted?
     end
   end
 
