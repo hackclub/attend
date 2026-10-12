@@ -1,0 +1,101 @@
+<% content_for :title, "#{@series.name} – Attend" %>
+<% content_for :head do %>
+  <% if @dashboard.mappable_events.any? %>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <% end %>
+<% end %>
+
+<% totals = @dashboard.totals %>
+<% chase_rows = @dashboard.chase_rows %>
+<% stage_rows = @dashboard.stage_rows %>
+<% arrival_row = @dashboard.arrival_row %>
+
+<% content_for :breadcrumbs, cs_breadcrumbs(cs_gated_crumb("Event series", admin_series_index_path, policy(EventSeries).index?), [ @series.name, nil ]) %>
+
+<div class="cs-stack">
+  <% if @series.banner.attached? %>
+    <div class="cs-container overflow-hidden">
+      <%= image_tag @series.banner, alt: "", class: "w-full h-32 sm:h-40 object-cover" %>
+    </div>
+  <% end %>
+
+  <div class="cs-header">
+    <div class="cs-header-text flex items-center gap-4 min-w-0">
+      <%= render "admin/events/avatar", event: @series, size: 48, rounded: "rounded-lg" %>
+      <div class="min-w-0">
+        <h1 class="cs-h1 truncate"><%= @series.name %></h1>
+        <%# Identity only. Every participant figure lives in the funnel and the
+            chase list, so nothing here repeats a number those two already own —
+            this line answers "which series, how big, is anything running". %>
+        <% if @events.any? %>
+          <% live_events = @dashboard.live_events %>
+          <p class="cs-description flex flex-wrap items-center gap-x-1.5">
+            <span><%= pluralize(totals[:events], "event") %></span>
+            <% if live_events.any? %>
+              <span aria-hidden="true">·</span>
+              <% if live_events.one? %>
+                <%= link_to "1 live", admin_event_dashboard_path(live_events.first.slug), class: "cs-link" %>
+              <% else %>
+                <span><%= live_events.length %> live</span>
+              <% end %>
+            <% elsif @dashboard.next_event %>
+              <span aria-hidden="true">·</span>
+              <span>next event <%= cs_relative_time(@dashboard.next_event.starts_at, inline: true) %></span>
+            <% end %>
+            <% if totals[:inactive].positive? %>
+              <span aria-hidden="true">·</span>
+              <span><%= totals[:inactive] %> withdrawn</span>
+            <% end %>
+          </p>
+        <% end %>
+        <% if @series.description.present? %>
+          <p class="cs-description"><%= @series.description %></p>
+        <% end %>
+      </div>
+    </div>
+    <div class="cs-actions flex-wrap">
+      <% if policy(@series).manage_members? %>
+        <%= link_to "Members", admin_series_members_path(@series), class: "cs-btn" %>
+      <% end %>
+      <% if policy(@series).manage_api_tokens? %>
+        <%= link_to "API keys", admin_series_api_tokens_path(@series), class: "cs-btn" %>
+      <% end %>
+      <% if policy(@series).manage_integrations? %>
+        <%= link_to "Integrations", admin_series_integrations_path(@series), class: "cs-btn" %>
+      <% end %>
+      <% if policy(@series).update? %>
+        <%= link_to "Settings", edit_admin_series_path(@series), class: "cs-btn" %>
+      <% end %>
+      <% if policy(Event.new(event_series_id: @series.id)).create? %>
+        <%# Secondary, like its neighbours: this is a cleanup page, and the work
+            it opens with is chasing people, not adding another event. %>
+        <%= link_to "New event", admin_new_event_path(series: @series.slug), class: "cs-btn" %>
+      <% end %>
+    </div>
+  </div>
+
+  <% if @events.empty? %>
+    <%= render "admin/event_series/empty" %>
+  <% else %>
+    <% if totals[:held_invitations].positive? || totals[:holding_events].positive? %>
+      <%= render "admin/event_series/held_invitations", series: @series, totals: totals, event_rows: @event_rows %>
+    <% end %>
+
+    <%# The chase list leads: it is the page's point of view, so it opens the
+        page rather than sitting under a row of figures the funnel already owns. %>
+    <%= render "admin/event_series/chase", chase_rows: chase_rows, totals: totals, event_rows: @event_rows %>
+
+    <%# The ribbon needs the full width to hold nine stages, so the map moves
+        down beside the events table it indexes. %>
+    <%= render "admin/event_series/funnel", stage_rows: stage_rows, arrival_row: arrival_row, totals: totals %>
+
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
+      <div class="lg:col-span-3 min-w-0">
+        <%= render "admin/event_series/events", event_rows: @event_rows %>
+      </div>
+      <div class="lg:col-span-2 min-w-0">
+        <%= render "admin/event_series/map", dashboard: @dashboard, event_rows: @event_rows %>
+      </div>
+    </div>
+  <% end %>
+</div>

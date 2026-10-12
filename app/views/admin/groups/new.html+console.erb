@@ -1,0 +1,10 @@
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Groups", admin_event_groups_path(current_event) ], [ "New group", nil ]) %>
+
+<div class="max-w-3xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">New group</h1>
+    </div>
+  </div>
+  <%= render "form", group: @group %>
+</div>

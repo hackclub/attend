@@ -1,0 +1,11 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Ban list", admin_bans_path ], [ "Add ban", nil ]) %>
+
+<div class="cs-stack max-w-3xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Add ban</h1>
+    </div>
+  </div>
+
+  <%= render "form", ban: @ban, submit_label: "Create ban" %>
+</div>

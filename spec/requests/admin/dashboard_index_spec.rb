@@ -52,6 +52,38 @@ RSpec.describe "Admin::Dashboard#index", type: :request do
     end
   end
 
+  describe "series groups" do
+    let(:series) { create(:event_series, name: "Example Series") }
+    let!(:first_event) { create(:event, name: "Series Stop One", slug: "series-stop-one", event_series: series, starts_at: 1.week.from_now, ends_at: 1.week.from_now + 2.days) }
+    let!(:second_event) { create(:event, name: "Series Stop Two", slug: "series-stop-two", event_series: series, starts_at: 2.weeks.from_now, ends_at: 2.weeks.from_now + 2.days) }
+
+    it "renders the series as a collapsed group holding both events" do
+      get admin_root_path
+
+      group = Nokogiri::HTML(response.body).at_css("details.group\\/series")
+      expect(group).to be_present
+      expect(group.key?("open")).to be(false)
+      expect(group.at_css("summary").text).to include("Example Series")
+      expect(group.css("a").map { |link| link["href"] }).to include("/admin/series-stop-one", "/admin/series-stop-two")
+    end
+
+    context "with the admin console beta" do
+      before { global_admin.update!(admin_console_beta: true) }
+
+      it "renders the series as a collapsed row group with a toggle" do
+        get admin_root_path
+
+        html = Nokogiri::HTML(response.body)
+        toggle = html.at_css('button[data-action="cs-row-group#toggle"]')
+        expect(toggle["aria-expanded"]).to eq("false")
+        rows = html.css('tr[data-cs-row-group-target="row"]')
+        expect(rows.size).to eq(2)
+        expect(rows).to all(satisfy { |row| row.key?("hidden") })
+        expect(toggle["aria-controls"].split).to match_array(rows.map { |row| row["id"] })
+      end
+    end
+  end
+
   describe "when every visible event has finished" do
     let!(:finished) { create(:event, slug: "finished", starts_at: 1.month.ago, ends_at: 3.weeks.ago) }
 
@@ -60,6 +92,17 @@ RSpec.describe "Admin::Dashboard#index", type: :request do
 
       expect(response.body).to include("Nothing running right now")
       expect(response.body).to include('<details class="mt-6 group/completed" open>')
+    end
+
+    context "with the admin console beta" do
+      before { global_admin.update!(admin_console_beta: true) }
+
+      it "explains the gap and opens the completed section" do
+        get admin_root_path
+
+        expect(response.body).to include("Nothing running right now")
+        expect(response.body).to include('<details class="cs-expandable cs-expandable-container" open>')
+      end
     end
   end
 

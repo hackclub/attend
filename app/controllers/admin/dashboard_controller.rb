@@ -41,6 +41,9 @@ class Admin::DashboardController < Admin::BaseController
 
     set_current_event(@event)
     @events = Event.order(starts_at: :desc)
+    # Revoking is permanent (rotate/destroy only find active tokens), so revoked
+    # rows stay out of the list. The view reads only token columns, no associations.
+    @event_api_tokens = @event.event_api_tokens.active.order(created_at: :desc)
     load_airtable_sync_status
   end
 

@@ -1,0 +1,5 @@
+<%# Console-only: the global role select shared by the console's add and edit user forms. %>
+<%= cs_form_field f, :global_role, label: "Global role", class: "mt-4",
+      constraint: "Global admins have full access to all events and settings. Read only can view all events without making changes. No role only reaches specifically assigned events." do |aria| %>
+  <%= f.select :global_role, [ [ "No role", "no_role" ], [ "Global admin", "global_admin" ], [ "Read only", "read_only" ] ], {}, class: "cs-select", **aria %>
+<% end %>

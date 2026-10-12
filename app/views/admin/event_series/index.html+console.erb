@@ -1,0 +1,54 @@
+<% content_for :title, "Event Series – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Event series", nil ]) %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Event series <span class="cs-counter">(<%= @series_list.count %>)</span></h1>
+      <p class="cs-description">A series groups related events under shared branding and a shared team.</p>
+    </div>
+    <% if policy(EventSeries).create? %>
+      <div class="cs-actions">
+        <%= link_to "Create series", new_admin_series_path, class: "cs-btn cs-btn-primary" %>
+      </div>
+    <% end %>
+  </div>
+
+  <% if @series_list.any? %>
+    <div class="cs-cards">
+      <% @series_list.each do |series| %>
+        <%= link_to admin_series_path(series), class: "cs-card" do %>
+          <div class="flex items-center gap-3 min-w-0">
+            <%= render "admin/events/avatar", event: series, size: 36, rounded: "rounded-lg" %>
+            <span class="cs-card-title truncate"><%= series.name %></span>
+          </div>
+          <dl class="cs-kv cs-kv-2">
+            <div>
+              <dt class="cs-kv-label">Events</dt>
+              <dd class="cs-kv-value"><%= series.events.count %></dd>
+            </div>
+            <div>
+              <dt class="cs-kv-label">Members</dt>
+              <dd class="cs-kv-value"><%= series.series_role_assignments.count %></dd>
+            </div>
+          </dl>
+          <% if series.description.present? %>
+            <p class="cs-small cs-secondary line-clamp-2"><%= series.description %></p>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+  <% else %>
+    <section class="cs-container">
+      <div class="cs-empty">
+        <p class="cs-empty-title">No series yet</p>
+        <p>A series groups related events — like Sunbeam London and Sunbeam NYC — under shared branding and a shared team.</p>
+        <% if policy(EventSeries).create? %>
+          <div class="cs-actions">
+            <%= link_to "Create series", new_admin_series_path, class: "cs-btn" %>
+          </div>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+</div>

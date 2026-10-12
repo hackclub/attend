@@ -1,0 +1,52 @@
+<%# Cloudscape wizard frame for new-event setup (cloudscape.design/components/wizard).
+    Render as a layout: render layout: "admin/event_setup/wizard", locals: { current_step:, title:, description: }
+    Each step still saves on its own route, so organizers can leave and resume;
+    the step list links anywhere once the event exists. %>
+<% persisted = @event.persisted?
+   steps = [
+     { key: "basics", label: "Basics", path: persisted ? edit_admin_event_path(@event, return_to: "setup") : nil },
+     { key: "schedule", label: "Schedule & location", path: persisted ? admin_event_setup_schedule_path(@event) : nil },
+     { key: "modules", label: "Modules", path: persisted ? admin_event_setup_modules_path(@event) : nil },
+     { key: "waivers", label: "Waivers", path: persisted ? admin_event_setup_waivers_path(@event) : nil },
+     { key: "team", label: "Team", path: persisted ? admin_event_setup_team_path(@event) : nil },
+     { key: "review", label: "Review and finish", path: persisted ? admin_event_setup_review_path(@event) : nil }
+   ]
+   current_index = steps.index { |s| s[:key] == current_step } %>
+
+<%# The step list below names the step, so the trail stops at "Setup". %>
+<% content_for :breadcrumbs, persisted ?
+     cs_event_breadcrumbs([ "Setup", nil ], event: @event) :
+     cs_breadcrumbs([ "Events", admin_root_path ], [ "New event", nil ]) %>
+
+<div class="cs-wizard">
+  <nav class="cs-wizard-nav" aria-label="Event setup steps">
+    <ol>
+      <% steps.each_with_index do |step, index| %>
+        <% state = index == current_index ? "current" : (step[:path] ? "available" : "disabled") %>
+        <li class="cs-wizard-nav-step cs-wizard-nav-step-<%= state %>">
+          <span class="cs-wizard-nav-number">Step <%= index + 1 %></span>
+          <% if state == "current" %>
+            <span class="cs-wizard-nav-label" aria-current="step"><%= step[:label] %></span>
+          <% elsif state == "available" %>
+            <%= link_to step[:label], step[:path], class: "cs-wizard-nav-label" %>
+          <% else %>
+            <span class="cs-wizard-nav-label" aria-disabled="true"><%= step[:label] %></span>
+          <% end %>
+        </li>
+      <% end %>
+    </ol>
+  </nav>
+
+  <div class="cs-wizard-main">
+    <p class="cs-wizard-step-count">Step <%= current_index + 1 %> of <%= steps.size %></p>
+    <div class="cs-header">
+      <div class="cs-header-text">
+        <h1 class="cs-h1"><%= title %></h1>
+        <% if local_assigns[:description] %>
+          <p class="cs-description"><%= description %></p>
+        <% end %>
+      </div>
+    </div>
+    <%= yield %>
+  </div>
+</div>

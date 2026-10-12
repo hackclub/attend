@@ -1,0 +1,439 @@
+<% content_for :title, "Participants – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Participants", nil ]) %>
+
+<div<% if current_event.slack_channel_id.present? %> data-controller="sync-slack" data-sync-slack-preview-url-value="<%= sync_slack_channel_preview_admin_event_participants_path(current_event) %>" data-sync-slack-form-url-value="<%= sync_slack_channel_admin_event_participants_path(current_event) %>"<% end %>>
+  <% if current_event.slack_channel_id.present? %>
+    <div data-controller="slack-sync-progress" data-slack-sync-progress-event-id-value="<%= current_event.id %>">
+      <div data-slack-sync-progress-target="banner" class="hidden mb-5">
+        <div class="cs-alert">
+          <span class="cs-spinner" aria-hidden="true"></span>
+          <p data-slack-sync-progress-target="message">Syncing Slack channel…</p>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Participants</h1>
+    </div>
+    <div class="cs-actions">
+      <% if current_event.slack_channel_id.present? %>
+        <button type="button" data-action="click->sync-slack#open" class="cs-btn">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Sync Slack
+        </button>
+      <% end %>
+      <% if policy(current_event).invite_participants? %>
+        <%= link_to new_admin_event_import_path(current_event), class: "cs-btn" do %>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+          </svg>
+          Import
+        <% end %>
+        <%= link_to new_invite_admin_event_participants_path(current_event), class: "cs-btn cs-btn-primary" do %>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          Add participant
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+
+  <% held_count = current_event.held_invitations_count %>
+  <% if current_event.onboarding_invites_held? || held_count.positive? %>
+    <%# Holding is the event's state, not the tab's, so this sits above both
+        tabs: the All tab shows imported participants whose email hasn't gone
+        out, and nothing in their row says so. %>
+    <div class="cs-alert cs-alert-warning mb-5" data-testid="held-invitations-banner">
+      <%= cs_status_icon(:warning) %>
+      <div class="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div class="flex-1 min-w-0">
+          <% if current_event.onboarding_invites_held? %>
+            <p class="cs-alert-title">Onboarding invitations are held for this event.</p>
+            <p>
+              Participants you add or import are recorded without an email.
+              <% if held_count.positive? %>
+                <%= pluralize(held_count, "invitation") %> <%= held_count == 1 ? "is" : "are" %> waiting to be sent.
+              <% else %>
+                Nothing is waiting to be sent yet.
+              <% end %>
+            </p>
+          <% else %>
+            <p class="cs-alert-title"><%= pluralize(held_count, "invitation") %> <%= held_count == 1 ? "hasn't" : "haven't" %> been sent.</p>
+            <p>These participants were added without an email.</p>
+          <% end %>
+        </div>
+        <% if policy(current_event).invite_participants? %>
+          <%= button_to send_held_invitations_admin_event_participants_path(current_event),
+              method: :post,
+              form: { class: "shrink-0" },
+              data: { turbo_confirm: held_count.positive? ? "Email #{pluralize(held_count, 'held invitation')} now? New participants will be emailed as they're added from here on." : "Stop holding onboarding invitations? New participants will be emailed as they're added." },
+              class: "cs-btn" do %>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            <%= held_count.positive? ? "Send #{pluralize(held_count, 'held invitation')}" : "Stop holding invitations" %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="cs-tabs mb-5">
+    <% if @show_pending_invitations %>
+      <%# The pending tab doesn't load participants, so this tab shows no count. %>
+      <%= link_to "All", admin_event_participants_path(current_event), class: "cs-tab" %>
+      <span class="cs-tab" aria-current="page">
+        Pending invitations <span class="cs-counter">(<%= @pending_invitations.count %>)</span>
+      </span>
+    <% else %>
+      <span class="cs-tab" aria-current="page">
+        All <span class="cs-counter">(<%= @participant_events.size %>)</span>
+      </span>
+      <%= link_to admin_event_participants_path(current_event, status: "pending_invitations"), class: "cs-tab" do %>
+        Pending invitations
+      <% end %>
+    <% end %>
+  </div>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <% if @show_pending_invitations %>
+          <h2 class="cs-h2">Pending invitations <span class="cs-counter">(<%= @pending_invitations.count %>)</span></h2>
+        <% else %>
+          <h2 class="cs-h2">Participants <span class="cs-counter">(<%= @participant_events.size %>)</span></h2>
+        <% end %>
+      </div>
+      <div class="cs-actions">
+        <div class="cs-segmented" role="group" aria-label="View">
+          <%= link_to admin_event_participants_path(current_event), class: "cs-segment", title: "List view", "aria-current": ("page" if @show_pending_invitations || !request.path.include?("table")) do %>
+            List
+          <% end %>
+          <%= link_to table_admin_event_participants_path(current_event), class: "cs-segment", title: "Table view" do %>
+            Table
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <%# Cloudscape property filter. The server applies one value per property
+        and ANDs them, so each applied filter is one token joined by a fixed
+        "and". Without JavaScript the plain search box and selects below
+        submit the same GET params; cs-property-filter hides them and drives
+        them from a single autosuggest input instead. %>
+    <% status_options = [
+         ["Pending invitations", "pending_invitations"],
+         ["Awaiting participant", "awaiting_participant"],
+         ["Awaiting parent", "awaiting_parent"],
+         ["Complete", "complete"],
+         ["Withdrawn", "withdrawn"],
+         ["Rejected", "rejected"]
+       ]
+       flag_options = [
+         ["Incomplete onboarding", "incomplete_onboarding"],
+         *(current_event.travel_enabled? ? [["Missing travel", "missing_travel"]] : []),
+         ["Missing medical", "missing_medical"],
+         ["High support", "high_support"],
+         ["Anaphylaxis risk", "anaphylaxis"]
+       ]
+       check_in_options = [["Checked in", "yes"], ["Not checked in", "no"]]
+       show_group_filter = current_event.groups_enabled? && current_event.groups.any?
+       group_options = show_group_filter ? [["No group", "none"]] + current_event.groups.ordered.map { |g| [g.name, g.id] } : []
+       document_options = @optional_documents.flat_map { |doc|
+         [ [ "#{doc.name}: added", "#{doc.id}:added" ],
+           [ "#{doc.name}: awaiting signature", "#{doc.id}:awaiting" ],
+           [ "#{doc.name}: not added", "#{doc.id}:not_added" ] ]
+       }
+       blocked_stage = params[:blocked_on].present? && ([ *SeriesDashboard::STAGES, SeriesDashboard::ARRIVAL_STAGE ].find { |stage| stage.key.to_s == params[:blocked_on].to_s })
+       base_query = @show_pending_invitations ? { status: "pending_invitations" } : {}
+       clear_href = admin_event_participants_path(current_event, base_query)
+       current_query = request.query_parameters.slice("search", "status", "flag", "checked_in", "group_id", "optional_document", "blocked_on")
+       remove_href = ->(key) { admin_event_participants_path(current_event, current_query.except(key)) }
+       value_label = ->(options, value) { options.find { |_, v| v.to_s == value.to_s }&.first }
+       filter_tokens = []
+       filter_tokens << { label: "Name or email", operator: "contains", value: "“#{params[:search]}”", remove_href: remove_href.call("search") } if params[:search].present?
+       if !@show_pending_invitations && (label = value_label.call(status_options, params[:status]))
+         filter_tokens << { label: "Status", operator: "=", value: label, remove_href: remove_href.call("status") }
+       end
+       if (label = value_label.call(flag_options, params[:flag]))
+         filter_tokens << { label: "Flag", operator: "=", value: label, remove_href: remove_href.call("flag") }
+       end
+       if (label = value_label.call(check_in_options, params[:checked_in]))
+         filter_tokens << { label: "Check-in", operator: "=", value: label, remove_href: remove_href.call("checked_in") }
+       end
+       if (label = value_label.call(group_options, params[:group_id]))
+         filter_tokens << { label: "Group", operator: "=", value: label, remove_href: remove_href.call("group_id") }
+       end
+       if (label = value_label.call(document_options, params[:optional_document]))
+         filter_tokens << { label: "Optional document", operator: "=", value: label, remove_href: remove_href.call("optional_document") }
+       end
+       if blocked_stage
+         filter_tokens << { label: "Blocked on", operator: "=", value: blocked_stage.label, remove_href: remove_href.call("blocked_on") }
+       end
+       filtering = filter_tokens.any?
+       match_total = @show_pending_invitations ? @pending_invitations.count : @participant_events.size %>
+    <form action="<%= admin_event_participants_path(current_event) %>" method="get"
+          class="cs-property-filter" role="search" aria-label="Filter participants"
+          data-controller="cs-property-filter"
+          data-cs-property-filter-text-label-value="Name or email"
+          data-testid="participant-property-filter">
+      <div class="cs-property-filter-bar">
+        <div class="cs-property-filter-control" data-cs-property-filter-target="enhanced" hidden>
+          <label class="cs-search">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <span class="sr-only">Find participants</span>
+            <input type="text" class="cs-input" placeholder="Find participants" autocomplete="off" spellcheck="false"
+                   role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="participant-filter-suggestions"
+                   aria-describedby="participant-filter-help"
+                   data-cs-property-filter-target="input"
+                   data-action="focus->cs-property-filter#open input->cs-property-filter#refresh keydown->cs-property-filter#keydown blur->cs-property-filter#close">
+          </label>
+          <span id="participant-filter-help" class="sr-only">Type to filter by name or email, or choose a property and a value. Use the arrow keys to move through suggestions.</span>
+          <ul id="participant-filter-suggestions" class="cs-menu cs-property-filter-menu" role="listbox" aria-label="Filter suggestions" hidden
+              data-cs-property-filter-target="listbox"
+              data-action="mousedown->cs-property-filter#keepFocus"></ul>
+        </div>
+
+        <div class="cs-property-filter-fallback" data-cs-property-filter-target="fallback">
+          <label class="cs-search flex-1 min-w-[200px] max-w-xs">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <span class="sr-only">Find participants</span>
+            <%= search_field_tag :search, params[:search], placeholder: "Find participants", class: "cs-input", id: "participant-filter-search", data: { cs_property_filter_target: "text" } %>
+          </label>
+          <div class="w-44">
+            <%= select_tag :status, options_for_select([["All statuses", ""], *status_options], params[:status]),
+                class: "cs-select", "aria-label": "Status", data: { cs_property_filter_target: "property" } %>
+          </div>
+          <div class="w-44">
+            <%= select_tag :flag, options_for_select([["All flags", ""], *flag_options], params[:flag]),
+                class: "cs-select", "aria-label": "Flag", data: { cs_property_filter_target: "property" } %>
+          </div>
+          <div class="w-40">
+            <%= select_tag :checked_in, options_for_select([["All check-in states", ""], *check_in_options], params[:checked_in]),
+                class: "cs-select", "aria-label": "Check-in", data: { cs_property_filter_target: "property" } %>
+          </div>
+          <% if show_group_filter %>
+            <div class="w-40">
+              <%= select_tag :group_id, options_for_select([["All groups", ""], *group_options], params[:group_id]),
+                  class: "cs-select", "aria-label": "Group", data: { cs_property_filter_target: "property" } %>
+            </div>
+          <% end %>
+          <% if @optional_documents.any? %>
+            <%# Opt-in activities: who's doing each one, and who still owes a signature. %>
+            <div class="w-56">
+              <%= select_tag :optional_document, options_for_select([["All optional documents", ""], *document_options], params[:optional_document]),
+                  class: "cs-select", "aria-label": "Optional document", data: { cs_property_filter_target: "property" } %>
+            </div>
+          <% end %>
+          <% if blocked_stage %>
+            <%= hidden_field_tag :blocked_on, params[:blocked_on], id: nil %>
+          <% end %>
+          <%= button_tag "Filter", type: "submit", name: nil, class: "cs-btn" %>
+        </div>
+
+        <% if filtering %>
+          <span class="cs-property-filter-count" data-testid="filter-match-count"><%= cs_match_count(match_total) %></span>
+        <% end %>
+      </div>
+
+      <%= cs_filter_tokens(filter_tokens, clear_href: clear_href, data: { cs_property_filter_target: "tokens", testid: "participant-filter-tokens" }) %>
+    </form>
+
+    <% if @show_pending_invitations %>
+      <% if @pending_invitations.any? %>
+        <div class="cs-table-wrap">
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th scope="col">Email</th>
+                <th scope="col">Status</th>
+                <th scope="col">Sent</th>
+                <th scope="col">Expires</th>
+                <th scope="col"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @pending_invitations.each do |invitation| %>
+                <tr>
+                  <td><%= invitation.email %></td>
+                  <td>
+                    <% if invitation.held? %>
+                      <span title="Recorded but not emailed yet"><%= cs_status(:stopped, "Held") %></span>
+                    <% else %>
+                      <%= cs_status(:pending, "Pending") %>
+                    <% end %>
+                  </td>
+                  <% if invitation.held? %>
+                    <td class="cs-secondary">Not sent <span class="cs-muted">· added <%= cs_relative_time(invitation.created_at, inline: true) %></span></td>
+                    <td class="cs-muted" title="The link is valid for 30 days from when it is sent">—</td>
+                  <% else %>
+                    <td class="cs-secondary"><%= cs_relative_time(invitation.sent_at) %></td>
+                    <td class="cs-secondary"><%= cs_relative_time(invitation.expires_at) %></td>
+                  <% end %>
+                  <td>
+                    <% if policy(current_event).invite_participants? %>
+                      <div class="flex justify-end gap-1">
+                        <%= button_to invitation.held? ? "Send now" : "Resend", send_invite_admin_event_participants_path(current_event, invite: { email: invitation.email, send_now: "1" }), method: :post, class: "cs-btn cs-btn-link" %>
+                        <%= button_to "Revoke", revoke_invite_admin_event_participants_path(current_event, id: invitation.id), method: :delete, data: { confirm: "Are you sure you want to revoke the invitation for #{invitation.email}?" }, class: "cs-btn cs-btn-link" %>
+                      </div>
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+        <div class="cs-container-footer cs-small"><%= @pending_invitations.count %> <%= "invitation".pluralize(@pending_invitations.count) %></div>
+      <% else %>
+        <% if filtering %>
+          <%= cs_no_match(clear_href: clear_href, data: { testid: "filter-no-match" }) %>
+        <% else %>
+          <div class="cs-empty">
+            <p class="cs-empty-title">No pending invitations</p>
+          </div>
+        <% end %>
+      <% end %>
+    <% else %>
+      <% if @participant_events.any? %>
+        <% progress_dot = ->(done, label) {
+             content_tag(:span, class: "cs-status cs-status-#{done ? 'success' : 'stopped'}", title: label) do
+               cs_status_icon(done ? :success : :stopped) + content_tag(:span, "#{label}: #{done ? 'done' : 'not done'}", class: "sr-only")
+             end
+           } %>
+        <div class="cs-table-wrap">
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th scope="col">Participant</th>
+                <th scope="col">Status</th>
+                <th scope="col">T-shirt</th>
+                <th scope="col">Progress</th>
+                <th scope="col">Flags</th>
+                <th scope="col"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+            <% @participant_events.each do |pe| %>
+              <tr>
+                <td>
+                  <div>
+                    <%= link_to participant_name(pe.participant), admin_event_participant_path(current_event, pe), class: "cs-link cs-link-strong" %>
+                    <div class="cs-small cs-muted truncate max-w-[200px]" title="<%= pe.participant.email %>"><%= pe.participant.email %></div>
+                    <% if current_event.groups_enabled? && pe.groups.any? %>
+                      <div class="flex flex-wrap gap-1 mt-1">
+                        <% pe.groups.each do |g| %>
+                          <span class="cs-badge"
+                                style="background-color: <%= g.normalized_color || '#e5e7eb' %>; color: <%= g.color.present? ? 'white' : '#1f2d3d' %>;"
+                                title="<%= g.description %>">
+                            <%= g.name %>
+                          </span>
+                        <% end %>
+                      </div>
+                    <% end %>
+                  </div>
+                </td>
+                <td>
+                  <%= render_display_status_badge(pe) %>
+                </td>
+                <td class="whitespace-nowrap" data-testid="tshirt-size"><%= pe.participant.tshirt_size&.upcase || "—" %></td>
+                <td>
+                  <div class="flex gap-1">
+                    <% if current_event.travel_enabled? %>
+                      <%= progress_dot.call(pe.travel_inbound.present?, "Inbound travel") %>
+                      <%= progress_dot.call(pe.travel_outbound.present?, "Outbound travel") %>
+                    <% end %>
+                    <% if current_event.accommodation_enabled? %>
+                      <%= progress_dot.call(pe.accommodation.present?, "Accommodation") %>
+                    <% end %>
+                    <%= progress_dot.call(pe.medical.present?, "Medical") %>
+                    <%= progress_dot.call(pe.consents.any?(&:signed?), "Consents") %>
+                  </div>
+                  <div class="cs-small cs-muted mt-0.5">
+                    <%= pe.onboarding_complete? ? "Complete" : "In progress" %>
+                  </div>
+                </td>
+                <td>
+                  <div class="flex flex-wrap gap-1">
+                    <% if pe.medical&.has_anaphylaxis_risk %>
+                      <%= cs_badge("Anaphylaxis", "red") %>
+                    <% end %>
+                    <% if pe.safeguarding_info&.high_support? %>
+                      <%= cs_badge("High support", "blue") %>
+                    <% end %>
+                    <% if pe.participant.minor_on?(current_event.starts_at || Date.current) %>
+                      <%= cs_badge("Minor", "yellow") %>
+                    <% end %>
+                  </div>
+                </td>
+                <td class="text-right whitespace-nowrap">
+                  <%= link_to admin_event_participant_path(current_event, pe), class: "cs-link" do %>View<% end %>
+                  <span class="cs-muted mx-1">·</span>
+                  <%= link_to "Edit", edit_admin_event_participant_path(current_event, pe), class: "cs-link" %>
+                </td>
+              </tr>
+            <% end %>
+            </tbody>
+          </table>
+        </div>
+        <div class="cs-container-footer cs-small"><%= @participant_events.size %> <%= "participant".pluralize(@participant_events.size) %></div>
+      <% else %>
+        <% if filtering %>
+          <%= cs_no_match(clear_href: clear_href, data: { testid: "filter-no-match" }) %>
+        <% else %>
+          <div class="cs-empty">
+            <p class="cs-empty-title">No participants</p>
+            <p>Participants appear here once they're added or imported.</p>
+          </div>
+        <% end %>
+      <% end %>
+    <% end %>
+  </section>
+
+  <% if current_event.slack_channel_id.present? %>
+    <div data-sync-slack-target="modal" class="hidden cs-modal-overlay" data-action="click->sync-slack#closeOnBackdrop">
+      <div class="cs-modal" role="dialog" aria-modal="true" aria-labelledby="sync-slack-title">
+        <div class="cs-modal-header">
+          <h2 id="sync-slack-title">Sync Slack channel</h2>
+          <button type="button" class="cs-modal-close" aria-label="Close" data-action="click->sync-slack#close">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"/></svg>
+          </button>
+        </div>
+
+        <div data-sync-slack-target="loading" class="cs-modal-body flex items-center justify-center py-8">
+          <span class="cs-spinner" aria-hidden="true"></span>
+          <span class="sr-only">Loading</span>
+        </div>
+
+        <div data-sync-slack-target="content" class="hidden">
+          <div class="cs-modal-body">
+            <p class="mb-3">You are about to:</p>
+            <ul class="mb-4 space-y-3">
+              <li data-sync-slack-target="slackRow">
+                <div class="cs-option">
+                  <input type="checkbox" checked disabled id="sync-slack-invite">
+                  <div><label class="cs-option-label" for="sync-slack-invite">Invite <strong data-sync-slack-target="slackCount">0</strong> people to the Slack channel</label></div>
+                </div>
+              </li>
+              <li data-sync-slack-target="emailRow">
+                <div class="cs-option">
+                  <input type="checkbox" checked data-sync-slack-target="emailCheckbox" id="sync-slack-email">
+                  <div><label class="cs-option-label" for="sync-slack-email">Email <strong data-sync-slack-target="emailCount">0</strong> people to connect their Slack</label></div>
+                </div>
+              </li>
+            </ul>
+            <p class="cs-small cs-muted">
+              Last performed <strong data-sync-slack-target="lastSync">never</strong>.
+            </p>
+          </div>
+          <div class="cs-modal-footer">
+            <button type="button" data-action="click->sync-slack#close" class="cs-btn cs-btn-link">Cancel</button>
+            <button type="button" data-action="click->sync-slack#submit" class="cs-btn cs-btn-primary">Confirm</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>

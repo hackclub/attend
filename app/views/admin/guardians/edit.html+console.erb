@@ -1,0 +1,91 @@
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Participants", admin_event_participants_path(current_event) ], [ participant_name(@participant_event.participant), admin_event_participant_path(current_event, @participant_event) ], [ "Edit guardian", nil ]) %>
+
+<div class="max-w-3xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Edit guardian</h1>
+      <p class="cs-description">Editing guardian for <%= @participant_event.participant.display_name %></p>
+    </div>
+  </div>
+
+  <div class="cs-stack">
+    <% unless @guardian_participant_event.completed? %>
+      <div class="cs-alert cs-alert-warning">
+        <%= cs_status_icon(:warning) %>
+        <div>
+          <p class="cs-alert-title">Note</p>
+          <p>If you change the email address, the invite will need to be resent to the new address.</p>
+        </div>
+      </div>
+    <% end %>
+
+    <% if @guardian_participant_event.completed? %>
+      <div class="cs-alert">
+        <%= cs_status_icon(:info) %>
+        <div>
+          <p class="cs-alert-title">Info</p>
+          <p>This guardian has already completed their portal. Changes here will update their information directly.</p>
+        </div>
+      </div>
+    <% end %>
+
+    <%= form_with model: @guardian, url: admin_event_participant_guardian_path(current_event, @participant_event, @guardian_participant_event), method: :patch, local: true, class: "cs-stack", html: { novalidate: true }, data: { controller: "phone-input cs-form-validation" } do |f| %>
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <div>
+            <h2 class="cs-h2">Contact information</h2>
+          </div>
+        </div>
+        <div class="cs-container-body">
+          <div class="cs-field-grid">
+            <%= cs_form_field f, :legal_first_name, label: "First name", input: { required: true } %>
+            <%= cs_form_field f, :legal_last_name, label: "Last name", input: { required: true } %>
+            <%= cs_form_field f, :email, label: "Email",
+                  constraint: (@guardian_participant_event.invited_via_email.present? && @guardian_participant_event.invited_via_email != @guardian.email ? "Originally invited at #{@guardian_participant_event.invited_via_email}." : nil),
+                  messages: { invalid: "Enter a valid email address." } do |aria| %>
+              <%= f.email_field :email, class: "cs-input", required: true, **aria %>
+            <% end %>
+            <%
+              phone_errors = @guardian.errors.where(:phone).map do |error|
+                error.type == E164PhoneValidator::MESSAGE ? "Enter a valid phone number, including the country code." : cs_sentence("Phone number #{error.message}")
+              end
+            %>
+            <%= cs_field id: f.field_id(:phone), label: "Phone number", optional: true, errors: phone_errors,
+                  constraint: "Include the country code. For example: +1 415 555 0132" do |aria| %>
+              <%= f.telephone_field :phone, class: "cs-input", **aria %>
+            <% end %>
+          </div>
+        </div>
+      </section>
+
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <div>
+            <h2 class="cs-h2">Address</h2>
+          </div>
+        </div>
+        <div class="cs-container-body">
+          <div data-controller="address-autocomplete" data-address-autocomplete-fill-components-value="true">
+            <%= cs_form_field f, :address_line_1, label: "Address line 1", optional: true, input: { data: { address_autocomplete_target: "input" } } %>
+            <%= cs_form_field f, :address_line_2, label: "Address line 2", optional: true %>
+
+            <div class="cs-field cs-field-grid grid-cols-2 md:grid-cols-4">
+              <%= cs_form_field f, :city, label: "City", optional: true, class: "col-span-2 md:col-span-1", input: { data: { address_autocomplete_target: "city" } } %>
+              <%= cs_form_field f, :state, label: "State or province", optional: true, input: { data: { address_autocomplete_target: "state" } } %>
+              <%= cs_form_field f, :postal_code, label: "Postal code", optional: true, input: { data: { address_autocomplete_target: "postalCode" } } %>
+            </div>
+
+            <%= cs_form_field f, :country, label: "Country", optional: true, input: { data: { address_autocomplete_target: "country" } } %>
+          </div>
+        </div>
+      </section>
+
+      <%= cs_form_errors f, except: [ :phone ] %>
+
+      <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <%= link_to "Cancel", admin_event_participant_path(current_event, @participant_event), class: "cs-btn cs-btn-link cs-btn-full" %>
+        <%= f.button "Save guardian", class: "cs-btn cs-btn-primary cs-btn-full" %>
+      </div>
+    <% end %>
+  </div>
+</div>

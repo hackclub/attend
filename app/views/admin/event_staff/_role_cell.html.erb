@@ -1,0 +1,76 @@
+<%# Console role cell with Cloudscape inline edit. `saved` shows the success
+    icon after an edit; `error` re-renders the cell still editing, with the
+    message under the select. The controller's update action renders this
+    over the old cell by id, so the id must stay stable. %>
+<% saved = local_assigns.fetch(:saved, false) %>
+<% error = local_assigns[:error] %>
+<% role_badge_colors = { "event_admin" => "red", "ops" => "blue", "limited" => "green", "safeguarding_lead" => "yellow", "read_only" => nil } %>
+<% role_label = EventRoleAssignment::ROLE_DETAILS.dig(assignment.role, :label) || assignment.role.titleize %>
+<% refusal = role_change_refusal(assignment) %>
+<% cell_id = dom_id(assignment, :role_cell) %>
+<% pencil = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 2.5l3 3L5 14H2v-3z"/><path d="M8.5 4.5l3 3"/></svg>'.html_safe %>
+<% lock = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg>'.html_safe %>
+
+<%= tag.td id: cell_id, class: "cs-inline-edit-cell whitespace-nowrap",
+      data: { controller: "cs-inline-edit",
+              action: "keydown->cs-inline-edit#keydown",
+              cs_inline_edit_original_value: assignment.role,
+              cs_inline_edit_editing_value: error.present?,
+              cs_inline_edit_focus_value: saved || error.present? } do %>
+  <% if refusal %>
+    <div class="cs-inline-edit-read">
+      <button type="button" class="cs-inline-edit-trigger" aria-disabled="true"
+              aria-label="Role for <%= assignment.user.display_name_or_fallback %>: <%= role_label %>. Can't be changed here."
+              aria-describedby="<%= cell_id %>_reason"
+              data-cs-inline-edit-target="trigger"
+              data-action="cs-inline-edit#toggleReason">
+        <%= cs_badge(role_label, role_badge_colors[assignment.role]) %>
+        <span class="cs-inline-edit-icon"><%= lock %></span>
+      </button>
+      <div id="<%= cell_id %>_reason" class="cs-inline-edit-reason" role="tooltip" hidden data-cs-inline-edit-target="reason"><%= refusal %></div>
+    </div>
+  <% else %>
+    <div class="cs-inline-edit-read" data-cs-inline-edit-target="read" <%= "hidden" if error.present? %>>
+      <button type="button" class="cs-inline-edit-trigger"
+              aria-label="Edit role for <%= assignment.user.display_name_or_fallback %>, currently <%= role_label %>"
+              data-cs-inline-edit-target="trigger"
+              data-action="cs-inline-edit#edit">
+        <%= cs_badge(role_label, role_badge_colors[assignment.role]) %>
+        <% if saved %>
+          <span class="cs-inline-edit-saved"><%= cs_status_icon(:success) %></span>
+        <% end %>
+        <span class="cs-inline-edit-icon"><%= pencil %></span>
+      </button>
+      <% if saved %>
+        <span class="sr-only" role="status">Role changed to <%= role_label %>.</span>
+      <% end %>
+    </div>
+
+    <%= form_with model: assignment, url: admin_event_staff_path(current_event, assignment), method: :patch,
+          class: "cs-inline-edit-form", html: { hidden: error.blank? },
+          data: { cs_inline_edit_target: "form",
+                  action: "turbo:submit-start->cs-inline-edit#submitting turbo:submit-end->cs-inline-edit#submitted" } do |f| %>
+      <div class="cs-inline-edit-row">
+        <%= f.select :role,
+              options_for_select(EventRoleAssignment::ROLE_DETAILS.map { |role, details| [ details[:label], role ] },
+                EventRoleAssignment.roles.key?(local_assigns[:attempted_role]) ? local_assigns[:attempted_role] : assignment.role),
+              {},
+              class: "cs-select", id: "#{cell_id}_select",
+              aria: { label: "Role for #{assignment.user.display_name_or_fallback}",
+                      invalid: error.present?,
+                      describedby: ("#{cell_id}_error" if error.present?) },
+              data: { cs_inline_edit_target: "input" } %>
+        <button type="button" class="cs-btn-inline-icon" aria-label="Cancel" data-cs-inline-edit-target="cancel" data-action="cs-inline-edit#cancel">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+        </button>
+        <button type="submit" class="cs-btn-inline-icon" aria-label="Submit" data-cs-inline-edit-target="submit">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-cs-inline-edit-target="submitIcon"><path d="M2.5 8.5l3.5 3.5 7.5-8"/></svg>
+          <span class="cs-spinner" hidden data-cs-inline-edit-target="spinner"></span>
+        </button>
+      </div>
+      <% if error.present? %>
+        <p id="<%= cell_id %>_error" class="cs-field-error" data-cs-inline-edit-target="error"><%= cs_status_icon(:error) %><span><%= error %></span></p>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

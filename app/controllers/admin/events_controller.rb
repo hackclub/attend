@@ -25,12 +25,17 @@ module Admin
       authorize @event
     end
 
+    # Where a save from the setup wizard's Basics step goes back to. It rides
+    # on the form as a hidden field, so a later plain edit isn't affected and
+    # a slug change on the same save still lands in setup.
+    SETUP_RETURNS = %w[setup review].freeze
+
     def update
       @event = Event.find_by!(slug: params[:slug])
       authorize @event
 
       if @event.update(event_params)
-        redirect_to admin_event_dashboard_path(@event), notice: "Event was successfully updated."
+        redirect_to after_update_path, notice: params[:return_to].in?(SETUP_RETURNS) ? "Basics saved." : "Event was successfully updated."
       else
         render :edit, status: :unprocessable_entity
       end
@@ -110,6 +115,14 @@ module Admin
     end
 
     private
+
+    def after_update_path
+      case params[:return_to]
+      when "setup" then admin_event_setup_schedule_path(@event)
+      when "review" then admin_event_setup_review_path(@event)
+      else admin_event_dashboard_path(@event)
+      end
+    end
 
     # Series members created this event themselves — give them an explicit
     # event_admin role so per-event tooling (setup wizard team step, staff

@@ -1,0 +1,241 @@
+<% content_for :title, "Scan History – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Check-ins", admin_event_scans_path(current_event) ], [ "Scan history", nil ]) %>
+
+<div class="cs-header">
+  <div class="cs-header-text">
+    <h1 class="cs-h1">Scan history <span class="cs-counter">(<%= @total_count %>)</span></h1>
+    <p class="cs-description"><%= @total_count %> total scans</p>
+  </div>
+</div>
+
+<% total_pages = (@total_count.to_f / @per_page).ceil %>
+<% page_params = params.permit(:search, :scan_context_id, :user_id, :date) %>
+
+<section class="cs-container">
+  <div class="cs-container-header">
+    <h2 class="cs-h2">Scans</h2>
+    <% if total_pages > 1 %>
+      <nav class="cs-pagination" aria-label="Pagination">
+        <% if @page > 1 %>
+          <%= link_to history_admin_event_scans_path(current_event, page_params.merge(page: @page - 1)), "aria-label": "Previous page" do %>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg>
+          <% end %>
+        <% else %>
+          <span aria-disabled="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg></span>
+        <% end %>
+        <span aria-current="page"><%= @page %></span>
+        <span class="cs-small cs-muted">of <%= total_pages %></span>
+        <% if @page < total_pages %>
+          <%= link_to history_admin_event_scans_path(current_event, page_params.merge(page: @page + 1)), "aria-label": "Next page" do %>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>
+          <% end %>
+        <% else %>
+          <span aria-disabled="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></span>
+        <% end %>
+      </nav>
+    <% end %>
+  </div>
+
+  <form action="<%= history_admin_event_scans_path(current_event) %>" method="get" class="cs-filter-bar border-b border-(--cs-border-divider-secondary)">
+    <label class="cs-search min-w-0 flex-1 basis-64">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+      <span class="sr-only">Search</span>
+      <%= text_field_tag :search, params[:search],
+          placeholder: "Find by participant name or email",
+          class: "cs-input" %>
+    </label>
+
+    <label class="w-full sm:w-auto">
+      <span class="sr-only">Location</span>
+      <%= select_tag :scan_context_id,
+          options_for_select(
+            [["All locations", ""]] + @scan_contexts.map { |c| [c.name, c.id] },
+            params[:scan_context_id]
+          ),
+          class: "cs-select" %>
+    </label>
+
+    <label class="w-full sm:w-auto">
+      <span class="sr-only">Scanned by</span>
+      <%= select_tag :user_id,
+          options_for_select(
+            [["All staff", ""]] + @staff_users.map { |u| [u.display_name_or_fallback, u.id] },
+            params[:user_id]
+          ),
+          class: "cs-select" %>
+    </label>
+
+    <label class="w-full sm:w-auto">
+      <span class="sr-only">Date</span>
+      <%= date_field_tag :date, params[:date], class: "cs-input" %>
+    </label>
+
+    <% if current_event.groups_enabled? && current_event.groups.any? %>
+      <label class="w-full sm:w-auto">
+        <span class="sr-only">Group</span>
+        <%= select_tag :group_id,
+            options_for_select(
+              [["All groups", ""], ["No group", "none"]] + current_event.groups.ordered.map { |g| [g.name, g.id] },
+              params[:group_id]
+            ),
+            class: "cs-select" %>
+      </label>
+    <% end %>
+
+    <div class="flex items-center gap-1">
+      <%= button_tag "Filter", type: "submit", name: nil, class: "cs-btn" %>
+      <% if params[:search].present? || params[:scan_context_id].present? || params[:user_id].present? || params[:date].present? || params[:group_id].present? %>
+        <%= link_to "Clear", history_admin_event_scans_path(current_event), class: "cs-btn cs-btn-link" %>
+      <% end %>
+    </div>
+  </form>
+
+  <div class="cs-table-wrap">
+    <table class="cs-table">
+      <thead>
+        <tr>
+          <th scope="col">Participant</th>
+          <th scope="col">Location</th>
+          <th scope="col">Scanned by</th>
+          <th scope="col">Scanned</th>
+          <% if current_user.global_admin? %>
+            <th scope="col" class="text-right"><span class="sr-only">Actions</span></th>
+          <% end %>
+        </tr>
+      </thead>
+      <tbody>
+        <% @scans.each do |scan| %>
+          <tr id="scan-row-<%= scan.id %>">
+            <td>
+              <%= link_to scan.participant.display_name, admin_event_participant_path(current_event, scan.participant_event), class: "cs-link cs-link-strong" %>
+              <div class="cs-small cs-muted"><%= scan.participant.email %></div>
+            </td>
+            <td>
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span><%= scan.scan_context&.name || "Unknown" %></span>
+                <% if scan.scan_context&.is_travel_pickup? %><%= cs_badge("Travel pickup", "blue") %><% end %>
+                <% if scan.scan_context&.checks_in? %><%= cs_badge("Check-in", "green") %><% end %>
+              </div>
+            </td>
+            <td class="cs-secondary">
+              <%= scan.user.display_name_or_fallback %>
+            </td>
+            <td class="cs-secondary whitespace-nowrap">
+              <%= cs_absolute_time_tag(scan.scanned_at, data: { controller: "cs-local-time" }) %>
+            </td>
+            <% if current_user.global_admin? %>
+              <td class="text-right">
+                <button type="button"
+                        data-edit-scan="<%= scan.id %>"
+                        data-scan-context-id="<%= scan.scan_context_id %>"
+                        data-scan-user-id="<%= scan.user_id %>"
+                        class="cs-btn cs-btn-link border-2 border-dashed border-orange-400">
+                  Edit
+                </button>
+              </td>
+            <% end %>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+
+  <% if @scans.empty? %>
+    <div class="cs-empty">
+      <p class="cs-empty-title">No scans</p>
+      <p>No scans found matching your criteria.</p>
+    </div>
+  <% end %>
+
+  <% if total_pages > 1 %>
+    <div class="cs-container-footer">
+      Showing <%= (@page - 1) * @per_page + 1 %> to <%= [(@page * @per_page), @total_count].min %> of <%= @total_count %> scans
+    </div>
+  <% end %>
+</section>
+
+<% if current_user.global_admin? %>
+  <div id="edit-scan-modal" class="cs-modal-overlay hidden">
+    <div class="cs-modal max-w-md! border-2 border-dashed border-orange-400" role="dialog" aria-modal="true" aria-labelledby="edit-scan-modal-title">
+      <div class="cs-modal-header">
+        <div>
+          <h2 id="edit-scan-modal-title">Edit scan</h2>
+          <p class="cs-small cs-muted mt-1">Global admin only</p>
+        </div>
+        <button type="button" data-close-edit-modal class="cs-modal-close" aria-label="Close">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"/></svg>
+        </button>
+      </div>
+
+      <form id="edit-scan-form" method="post">
+        <input type="hidden" name="_method" value="patch">
+        <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+
+        <div class="cs-modal-body">
+          <div class="cs-field">
+            <label for="edit-scan-context" class="cs-field-label">Location</label>
+            <select id="edit-scan-context" name="scan[scan_context_id]" class="cs-select">
+              <% @scan_contexts.each do |context| %>
+                <option value="<%= context.id %>">
+                  <%= context.name %><%= " — Travel pickup" if context.is_travel_pickup? %><% if context.checks_in? %> ✓<% end %>
+                </option>
+              <% end %>
+            </select>
+          </div>
+
+          <div class="cs-field">
+            <label for="edit-scan-user" class="cs-field-label">Scanned by</label>
+            <select id="edit-scan-user" name="scan[user_id]" class="cs-select">
+              <% @staff_users.each do |user| %>
+                <option value="<%= user.id %>"><%= user.display_name_or_fallback %> (<%= user.email %>)</option>
+              <% end %>
+            </select>
+          </div>
+        </div>
+
+        <div class="cs-modal-footer">
+          <button type="button" data-close-edit-modal class="cs-btn cs-btn-link">Cancel</button>
+          <button type="submit" class="cs-btn cs-btn-primary">Save changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script nonce="<%= content_security_policy_nonce %>">
+    function openEditModal(scanId, contextId, userId) {
+      const modal = document.getElementById('edit-scan-modal');
+      const form = document.getElementById('edit-scan-form');
+      const contextSelect = document.getElementById('edit-scan-context');
+      const userSelect = document.getElementById('edit-scan-user');
+      
+      form.action = '<%= admin_event_scans_path(current_event) %>/' + scanId;
+      contextSelect.value = contextId;
+      userSelect.value = userId;
+      
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+    
+    function closeEditModal() {
+      const modal = document.getElementById('edit-scan-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+    
+    document.getElementById('edit-scan-modal').addEventListener('click', function(e) {
+      if (e.target === this) closeEditModal();
+    });
+
+    document.querySelectorAll('[data-close-edit-modal]').forEach((el) => {
+      el.addEventListener('click', closeEditModal);
+    });
+
+    document.querySelectorAll('[data-edit-scan]').forEach((button) => {
+      button.addEventListener('click', () => openEditModal(
+        button.dataset.editScan,
+        button.dataset.scanContextId,
+        button.dataset.scanUserId
+      ));
+    });
+  </script>
+<% end %>

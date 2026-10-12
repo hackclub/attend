@@ -1,0 +1,143 @@
+<%# The funnel as a single tapering ribbon: the band's height at any point is the
+    share of participants still moving, so a stage's loss is the visible
+    narrowing rather than a separate mark. A participant's blocking step is the
+    first one they haven't cleared, so "cleared" and "stalled here" partition
+    everyone who reached a stage — which is why the narrowing at each boundary
+    is exactly the chase count printed beneath it, with nothing to reconcile. %>
+<% ribbon = series_funnel_ribbon(stage_rows) %>
+<% columns = ribbon ? "repeat(#{ribbon[:segments]}, minmax(0, 1fr))" : nil %>
+
+<section class="cs-container">
+  <div class="cs-container-header">
+    <h2 class="cs-h2">How far participants have got</h2>
+  </div>
+
+  <% if totals[:active].zero? %>
+    <div class="cs-empty">
+      <p class="cs-empty-title">No participants yet</p>
+      <p>The funnel fills in as people are invited and start onboarding.</p>
+    </div>
+  <% elsif ribbon.nil? %>
+    <div class="cs-empty">
+      <p>No onboarding stages apply to these events yet.</p>
+    </div>
+  <% else %>
+    <%# The ribbon's two endpoints get the large treatment; the nine stages in
+        between stay small, or they all shout at once. The completion percentage
+        is not repeated here — the last stage's column below is the same figure. %>
+    <div class="px-5 flex items-start justify-between gap-6">
+      <div>
+        <div class="cs-kv-value-lg tabular-nums"><%= totals[:active] %></div>
+        <div class="cs-small cs-secondary">started onboarding</div>
+      </div>
+      <div class="text-right">
+        <div class="cs-kv-value-lg tabular-nums"><%= totals[:cleared] %></div>
+        <div class="cs-small cs-secondary">cleared every stage</div>
+      </div>
+    </div>
+
+    <%# Nine stages need more width than a phone has. Scrolling the chart is
+        honest; squeezing nine labels into 320px is not. The chase list above
+        already carries all of this as plain text, so nothing here is the only
+        route to the number — but a nested scroller with no affordance is a trap,
+        hence the hint at the widths where the ribbon actually overflows. %>
+    <p class="md:hidden px-5 mt-3 cs-small cs-secondary">
+      Scroll sideways for all <%= stage_rows.length %> stages — the chase list above has the same figures as text.
+    </p>
+
+    <div class="mt-3 overflow-x-auto">
+      <div class="min-w-[44rem] px-5 pb-4">
+        <div class="relative">
+          <svg class="series-ribbon w-full h-36 sm:h-44 block" viewBox="0 0 1000 180"
+               preserveAspectRatio="none" role="img"
+               aria-label="<%= totals[:active] %> participants entered onboarding and <%= totals[:cleared] %> cleared every stage. The table that follows gives each stage's figures.">
+            <path d="<%= ribbon[:path] %>" class="series-ribbon-fill" />
+          </svg>
+
+          <%# Hairline stage boundaries drawn in HTML rather than in the SVG: the
+              ribbon scales non-uniformly to fill the width, which would smear a
+              1px line drawn inside it. %>
+          <div class="absolute inset-0 grid pointer-events-none" style="grid-template-columns: <%= columns %>" aria-hidden="true">
+            <% stage_rows.each_with_index do |_row, index| %>
+              <div class="<%= "border-r border-(--cs-border-divider-secondary)" unless index == stage_rows.length - 1 %>"></div>
+            <% end %>
+          </div>
+        </div>
+
+        <%# One centred stack per column — stage, its cleared share, and how many
+            are stuck there — so a figure and its label share a boundary and a
+            reading order instead of sitting half a column apart. Hidden from
+            assistive tech because the table below is the same data in a form a
+            screen reader can navigate. %>
+        <div class="grid mt-2" style="grid-template-columns: <%= columns %>" aria-hidden="true">
+          <% stage_rows.each do |row| %>
+            <div class="px-1 text-center">
+              <div class="cs-small font-bold leading-tight"><%= row[:stage].label %></div>
+              <div class="cs-small cs-secondary tabular-nums mt-0.5"><%= row[:percent] %>% cleared</div>
+              <% if row[:stalled].positive? %>
+                <div class="cs-small font-bold text-(--cs-warning) tabular-nums mt-0.5">
+                  −<%= row[:stalled] %> stuck
+                </div>
+              <% else %>
+                <div class="cs-small cs-secondary mt-0.5">—</div>
+              <% end %>
+              <% if row[:partial_events] %>
+                <div class="cs-small cs-secondary mt-0.5"><%= row[:partial_events] %>/<%= totals[:events] %> events</div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <%# The ribbon's accessible equivalent. role="img" plus a two-endpoint label
+        left every per-stage figure unreachable; this is the same grid above,
+        navigable cell by cell. %>
+    <table class="sr-only">
+      <thead>
+        <tr>
+          <th scope="col">Stage</th>
+          <th scope="col">Cleared</th>
+          <th scope="col">Stuck here</th>
+          <th scope="col">Events</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% stage_rows.each do |row| %>
+          <tr>
+            <th scope="row"><%= row[:stage].label %></th>
+            <td><%= row[:percent] %>%</td>
+            <td><%= row[:stalled] %></td>
+            <td><%= row[:partial_events] ? "#{row[:partial_events]} of #{totals[:events]}" : "all #{totals[:events]}" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+
+    <%# "Freedom waiver" is internal shorthand everywhere else in the app; this
+        is the one place a series lead meets it without context. %>
+    <% if stage_rows.any? { |row| row[:stage].key == :freedom_waiver } %>
+      <p class="px-5 pb-4 cs-small cs-secondary">
+        Freedom waiver: a guardian's permission for a minor to leave the venue unsupervised during the event.
+      </p>
+    <% end %>
+
+    <%# Check-in is measured against the people whose event has actually started
+        and can record a scan, so it sits outside the ribbon rather than counting
+        a future event's participants as arrived. %>
+    <% if arrival_row %>
+      <div class="cs-container-footer">
+        <div class="cs-progress-field">
+          <div class="cs-progress-label">
+            <span><%= arrival_row[:stage].label %> <span class="cs-secondary">· of <%= arrival_row[:applicable] %> cleared to travel</span></span>
+            <span class="tabular-nums"><%= arrival_row[:percent] %>%</span>
+          </div>
+          <div class="cs-progress" aria-hidden="true"><span style="width: <%= arrival_row[:percent] %>%"></span></div>
+          <p class="cs-progress-hint tabular-nums">
+            <%= arrival_row[:cleared] %> checked in<% if arrival_row[:stalled].positive? %> · <%= arrival_row[:stalled] %> not yet scanned<% end %>
+          </p>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+</section>

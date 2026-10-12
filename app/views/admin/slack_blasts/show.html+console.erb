@@ -1,0 +1,101 @@
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Messages", admin_event_messages_path(current_event) ], [ "Slack blasts", admin_event_slack_blasts_path(current_event) ], [ "Slack blast details", nil ]) %>
+<% blast_status_types = { "pending" => :pending, "in_progress" => :in_progress, "completed" => :success, "failed" => :error } %>
+<% recipient_status_types = { "pending" => :pending, "sent" => :success, "failed" => :error } %>
+
+<div class="max-w-4xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Slack blast details</h1>
+    </div>
+  </div>
+
+  <div class="cs-stack">
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Overview</h2>
+      </div>
+      <div class="cs-container-body cs-stack">
+        <dl class="cs-kv cs-kv-4">
+          <div>
+            <dt class="cs-kv-label">Status</dt>
+            <dd class="cs-kv-value"><%= cs_status(blast_status_types[@slack_blast.status], @slack_blast.status.humanize) if blast_status_types.key?(@slack_blast.status) %></dd>
+          </div>
+          <div>
+            <dt class="cs-kv-label">Sent by</dt>
+            <dd class="cs-kv-value"><%= @slack_blast.sent_by_user.display_name_or_fallback %></dd>
+          </div>
+          <div>
+            <dt class="cs-kv-label">Created</dt>
+            <dd class="cs-kv-value"><%= cs_relative_time(@slack_blast.created_at) %></dd>
+          </div>
+          <div>
+            <dt class="cs-kv-label">Recipients</dt>
+            <dd class="cs-kv-value">
+              <strong><%= @slack_blast.sent_count %></strong> sent,
+              <strong><%= @slack_blast.failed_count %></strong> failed
+              of <strong><%= @slack_blast.recipient_count %></strong> total
+            </dd>
+          </div>
+        </dl>
+        <dl>
+          <dt class="cs-kv-label">Message</dt>
+          <dd class="cs-kv-value prose prose-sm max-w-none"><%= @slack_blast.message_as_html.html_safe %></dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <h2 class="cs-h2">Recipients <span class="cs-counter">(<%= @recipients.size %>)</span></h2>
+        <% if @slack_blast.slack_blast_recipients.failed.any? %>
+          <div class="cs-actions">
+            <%= button_to "Retry all failed",
+                retry_failed_admin_event_slack_blast_path(current_event, @slack_blast),
+                method: :post,
+                class: "cs-btn",
+                data: { confirm: "Retry sending to all #{@slack_blast.failed_count} failed recipients?" } %>
+          </div>
+        <% end %>
+      </div>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Participant</th>
+              <th scope="col">Slack ID</th>
+              <th scope="col">Status</th>
+              <th scope="col">Error</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @recipients.each do |recipient| %>
+              <tr>
+                <td class="whitespace-nowrap">
+                  <%= link_to recipient.participant.display_name,
+                      admin_event_participant_path(current_event, recipient.participant_event),
+                      class: "cs-link" %>
+                </td>
+                <td class="whitespace-nowrap">
+                  <%= link_to "slack://user?team=T0266FRGM&id=#{recipient.participant_event.participant.slack_user_id}", class: "cs-link" do %><code class="cs-copy-value"><%= recipient.participant_event.participant.slack_user_id %></code><% end %>
+                </td>
+                <td class="whitespace-nowrap">
+                  <%= cs_status(recipient_status_types[recipient.status], recipient.status.humanize) if recipient_status_types.key?(recipient.status) %>
+                </td>
+                <td class="text-(--cs-error)"><%= recipient.error_message %></td>
+                <td class="whitespace-nowrap text-right">
+                  <% if recipient.failed? %>
+                    <%= button_to "Retry",
+                        retry_recipient_admin_event_slack_blast_path(current_event, @slack_blast, recipient_id: recipient.id),
+                        method: :post,
+                        class: "cs-btn cs-btn-link" %>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</div>

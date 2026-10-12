@@ -1,0 +1,12 @@
+<% content_for :title, "New Incident – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Incidents", admin_event_incidents_path(current_event) ], [ "New incident", nil ]) %>
+
+<div class="cs-stack max-w-3xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">New incident</h1>
+    </div>
+  </div>
+
+  <%= render "form", incident: @incident %>
+</div>

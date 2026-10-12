@@ -1,0 +1,65 @@
+<% content_for :title, "Edit #{@participant.display_name} – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Participants", admin_event_participants_path(current_event) ], [ participant_name(@participant), admin_event_participant_path(current_event, @participant_event) ], [ "Edit", nil ]) %>
+
+<div class="max-w-2xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Edit participant</h1>
+    </div>
+  </div>
+
+  <%= form_with model: @participant, url: admin_event_participant_path(current_event, @participant_event), method: :patch, local: true, multipart: true, class: "cs-stack", html: { novalidate: true }, data: { controller: "phone-input cs-form-validation" } do |f| %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Participant details</h2>
+      </div>
+      <div class="cs-container-body">
+        <div class="border-2 border-dashed border-orange-400 rounded px-4 py-4 mb-5">
+          <%= cs_form_field f, :headshot, label: "Profile photo", optional: true, constraint: "JPEG, PNG, or WebP. Max 10MB." do |aria| %>
+            <div class="flex items-center gap-4">
+              <% if @participant.headshot.attached? && @participant.headshot.blob.persisted? %>
+                <%= image_tag @participant.headshot, alt: "Current headshot", class: "w-20 h-20 rounded-full object-cover border border-(--cs-border-divider) shrink-0" %>
+              <% else %>
+                <div class="w-20 h-20 shrink-0 rounded-full flex items-center justify-center bg-(--cs-bg-shaded) text-(--cs-text-muted) font-bold text-2xl" aria-hidden="true">
+                  <%= @participant.initials %>
+                </div>
+              <% end %>
+              <div class="flex-1 min-w-0">
+                <%= f.file_field :headshot, accept: "image/jpeg,image/png,image/webp", class: "cs-file", **aria %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+
+        <div class="cs-field-grid">
+          <%= cs_form_field f, :legal_first_name, label: "Legal first name", input: { required: true, autocomplete: "off" } %>
+          <%= cs_form_field f, :legal_last_name, label: "Legal last name", input: { required: true, autocomplete: "off" } %>
+
+          <%= cs_form_field f, :preferred_name, label: "Preferred name", optional: true,
+                constraint: "Leave blank if it's the same as the legal name." %>
+          <%= cs_form_field f, :email, label: "Email", as: :email_field,
+                input: { required: true, autocomplete: "off" },
+                messages: { invalid: "Enter a valid email address." } %>
+
+          <% if can_view_participant_pii? %>
+            <%= cs_form_field f, :date_of_birth, label: "Date of birth", as: :date_field, optional: true %>
+            <%= cs_form_field f, :phone, label: "Phone", as: :telephone_field, optional: true,
+                  constraint: "Include the country code, for example +1 415 555 0132." %>
+          <% end %>
+
+          <%= cs_form_field f, :pronouns, label: "Pronouns", optional: true %>
+          <%= cs_form_field f, :tshirt_size, label: "T-shirt size", optional: true do |aria| %>
+            <%= f.select :tshirt_size, [["Select size", ""], "XS", "S", "M", "L", "XL", "XXL"], {}, class: "cs-select", id: f.field_id(:tshirt_size), **aria %>
+          <% end %>
+        </div>
+      </div>
+    </section>
+
+    <%= cs_form_errors f, title: "These changes couldn't be saved." %>
+
+    <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+      <%= link_to "Cancel", admin_event_participant_path(current_event, @participant_event), class: "cs-btn cs-btn-link cs-btn-full" %>
+      <%= f.button "Save changes", class: "cs-btn cs-btn-primary cs-btn-full" %>
+    </div>
+  <% end %>
+</div>

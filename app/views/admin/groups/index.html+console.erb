@@ -1,0 +1,58 @@
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Groups", nil ]) %>
+<div class="cs-header">
+  <div class="cs-header-text">
+    <h1 class="cs-h1">Groups <span class="cs-counter">(<%= @groups.size %>)</span></h1>
+    <p class="cs-description">Cohorts within this event (e.g. Hardware, General Attendance). Shown on tickets, scans, and the participant table.</p>
+  </div>
+  <div class="cs-actions">
+    <%= link_to "New group", new_admin_event_group_path(current_event), class: "cs-btn cs-btn-primary" %>
+  </div>
+</div>
+
+<section class="cs-container">
+  <% if @groups.any? %>
+    <div class="cs-table-wrap">
+      <table class="cs-table">
+        <thead>
+          <tr>
+            <th scope="col">Group</th>
+            <th scope="col">Slug</th>
+            <th scope="col">Members</th>
+            <th scope="col">Position</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @groups.each do |group| %>
+            <tr>
+              <td class="whitespace-nowrap">
+                <% if group.color.present? %>
+                  <span class="cs-badge" style="background-color: <%= group.normalized_color %>; color: white;"><%= group.name %></span>
+                <% else %>
+                  <%= cs_badge(group.name) %>
+                <% end %>
+              </td>
+              <td class="whitespace-nowrap cs-secondary font-mono"><%= group.slug %></td>
+              <td class="whitespace-nowrap"><%= @member_counts[group.id] || 0 %></td>
+              <td class="whitespace-nowrap cs-secondary"><%= group.position %></td>
+              <td class="whitespace-nowrap">
+                <div class="flex items-center gap-1">
+                  <%= link_to "Edit", edit_admin_event_group_path(current_event, group), class: "cs-btn cs-btn-link" %>
+                  <%= button_to "Delete", admin_event_group_path(current_event, group), method: :delete, class: "cs-btn cs-btn-link", form: { class: "contents" }, data: { confirm: "Delete #{group.name}? This removes the group from all members." } %>
+                </div>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <div class="cs-empty">
+      <p class="cs-empty-title">No groups yet</p>
+      <p>Create one to start tagging participants.</p>
+      <div class="cs-actions">
+        <%= link_to "New group", new_admin_event_group_path(current_event), class: "cs-btn" %>
+      </div>
+    </div>
+  <% end %>
+</section>

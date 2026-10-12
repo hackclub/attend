@@ -1,0 +1,149 @@
+<% content_for :title, "Edit #{@custom_document.name} – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs(cs_gated_crumb("Integrations", admin_event_integrations_path(current_event), policy(current_event).manage_integrations?), [ @custom_document.name_was.presence || @custom_document.name, nil ]) %>
+<% locked = @custom_document.consents.exists? %>
+
+<div class="cs-stack max-w-3xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Edit <%= @custom_document.name %></h1>
+      <p class="cs-description">Custom document for <%= current_event.name %></p>
+    </div>
+  </div>
+
+  <%= form_with url: admin_event_custom_document_path(current_event, @custom_document), scope: :custom_document,
+      model: @custom_document, method: :patch, multipart: true,
+      html: { novalidate: true }, data: { controller: "document-kind cs-form-validation" }, class: "cs-stack" do |cd| %>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Details</h2>
+      </div>
+      <div class="cs-container-body">
+        <%= cs_form_field cd, :name, label: "Name", input: { required: true } %>
+
+        <%= cs_form_field cd, :description, label: "Description", optional: true,
+              constraint: "Shown to participants. For example: which activity it's for, or which sections to fill in." do |aria| %>
+          <%= cd.text_area :description, rows: 2, class: "cs-input", **aria %>
+        <% end %>
+      </div>
+    </section>
+
+    <% if locked %>
+      <%# Signatures exist: the shape of the document is now a legal record %>
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">Signing setup</h2>
+        </div>
+        <div class="cs-container-body">
+          <div class="cs-alert cs-alert-warning">
+            <%= cs_status_icon(:warning) %>
+            <div>
+              <p class="cs-alert-title">Signing setup is locked</p>
+              <p>
+                <%= pluralize(@custom_document.consents.count, "participant") %> already
+                <%= @custom_document.consents.count == 1 ? "has" : "have" %> this document, and their DocuSeal
+                submissions were created against the current setup. Changing who signs it, or which template it
+                uses, would leave those signatures pointing at a document that no longer matches what was signed.
+                Remove this document and add a replacement if the setup itself needs to change — existing
+                signatures are kept.
+              </p>
+            </div>
+          </div>
+          <dl class="cs-kv cs-kv-3 mt-4">
+            <div>
+              <dt class="cs-kv-label">Type</dt>
+              <dd class="cs-kv-value"><%= @custom_document.document_kind.humanize %></dd>
+            </div>
+            <div>
+              <dt class="cs-kv-label">Who signs</dt>
+              <dd class="cs-kv-value"><%= @custom_document.signer_type.humanize %></dd>
+            </div>
+            <div>
+              <dt class="cs-kv-label"><%= @custom_document.physical? ? "PDF" : "DocuSeal template" %></dt>
+              <dd class="cs-kv-value">
+                <% if @custom_document.physical? %>
+                  <% if @custom_document.template_pdf.attached? %>
+                    <%= link_to "Download", rails_blob_path(@custom_document.template_pdf, disposition: "attachment"), class: "cs-link" %>
+                  <% else %>
+                    —
+                  <% end %>
+                <% else %>
+                  <span class="font-mono">#<%= @custom_document.docuseal_template_id %></span>
+                <% end %>
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+    <% else %>
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">Signing setup</h2>
+        </div>
+        <div class="cs-container-body">
+          <%= cs_form_field cd, :document_kind, label: "Document type", group: true do |aria| %>
+            <div class="cs-tiles mt-2">
+              <label class="cs-tile">
+                <span class="cs-option">
+                  <%= cd.radio_button :document_kind, "electronic", data: { action: "document-kind#toggle" }, **aria %>
+                  <span>
+                    <span class="cs-option-label block">Electronic</span>
+                    <span class="cs-option-description block">Signed online through DocuSeal, with participant details pre-filled.</span>
+                  </span>
+                </span>
+              </label>
+              <label class="cs-tile">
+                <span class="cs-option">
+                  <%= cd.radio_button :document_kind, "physical", data: { action: "document-kind#toggle" }, **aria %>
+                  <span>
+                    <span class="cs-option-label block">Physical</span>
+                    <span class="cs-option-description block">Downloaded as a PDF, signed on paper, and uploaded as a photo.</span>
+                  </span>
+                </span>
+              </label>
+            </div>
+          <% end %>
+
+          <div class="cs-field-grid">
+            <%= cs_form_field cd, :docuseal_template_id, label: "DocuSeal template ID", data: { document_kind_target: "electronic" },
+                  constraint: "A number. For example: 1234. Changing it clears the pre-fill mappings, so sync the new template's fields afterwards." do |aria| %>
+              <%= cd.text_field :docuseal_template_id, required: true, class: "cs-input font-mono", inputmode: "numeric", **aria %>
+            <% end %>
+            <%= cs_form_field cd, :template_pdf, label: "PDF document", optional: @custom_document.template_pdf.attached?, class: "hidden", data: { document_kind_target: "physical" },
+                  constraint: (@custom_document.template_pdf.attached? ? safe_join([ "PDF, up to 25 MB. Leave empty to keep the ", link_to("current PDF", rails_blob_path(@custom_document.template_pdf, disposition: "attachment"), class: "cs-link"), "." ]) : "PDF, up to 25 MB.") do |aria| %>
+              <%= cd.file_field :template_pdf, accept: "application/pdf", required: !@custom_document.template_pdf.attached?, class: "cs-file", data: { cs_required_message: "PDF document is required for a physical document." }, **aria %>
+            <% end %>
+            <%= cs_form_field cd, :signer_type, label: "Who signs",
+                  constraint: "Guardian roles only apply to under-18s. Adults sign by themselves, and guardian-only or under-18s-only documents are skipped for them." do |aria| %>
+              <%= cd.select :signer_type,
+                  [ [ "Participant", "participant" ], [ "Guardian", "guardian" ],
+                    [ "Participant + Guardian", "participant_and_guardian" ],
+                    [ "Participant + Guardian, under-18s only", "minor_and_guardian" ] ],
+                  {},
+                  class: "cs-select", **aria %>
+            <% end %>
+          </div>
+
+          <div class="cs-option mt-4">
+            <%= cd.check_box :optional, class: "cs-toggle" %>
+            <div>
+              <%= cd.label :optional, "Optional — participants choose whether to add it", class: "cs-option-label" %>
+              <p class="cs-option-description">
+                The document stays hidden — including from parents/guardians — until the participant adds it
+                themselves. Turning this off makes it required for everyone, which reopens participants who
+                already finished registering.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    <% end %>
+
+    <%= cs_form_errors cd %>
+
+    <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+      <%= link_to "Cancel", admin_event_integrations_path(current_event), class: "cs-btn cs-btn-link cs-btn-full" %>
+      <%= cd.button "Save changes", type: :submit, class: "cs-btn cs-btn-primary cs-btn-full" %>
+    </div>
+  <% end %>
+</div>

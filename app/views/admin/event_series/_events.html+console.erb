@@ -1,0 +1,66 @@
+<% phase_statuses = { "Past" => :stopped, "Draft" => :pending, "Upcoming" => :pending, "Active" => :success } %>
+<section class="cs-container">
+  <div class="cs-container-header cs-container-header-divided">
+    <h2 class="cs-h2">Events <span class="cs-counter">(<%= event_rows.length %>)</span></h2>
+  </div>
+
+  <div class="cs-table-wrap">
+    <table class="cs-table">
+      <thead>
+        <tr>
+          <th scope="col">Event</th>
+          <th scope="col">Status</th>
+          <th scope="col">Progress</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% event_rows.each do |row| %>
+          <% event = row[:event] %>
+          <% phase_label, _phase_type = event_phase(event) %>
+          <tr id="series-event-<%= event.id %>">
+            <td>
+              <div class="flex items-center gap-3 min-w-0">
+                <%= render "admin/events/avatar", event: event, size: 32, rounded: "rounded-lg" %>
+                <div class="min-w-0">
+                  <%= link_to event.name, admin_event_dashboard_path(event.slug), class: "cs-link cs-link-strong" %>
+                  <p class="cs-small cs-secondary">
+                    <span class="whitespace-nowrap"><%= cs_date_range(event.starts_at, event.ends_at) %></span>
+                    <% if event.location_city.present? %>
+                      · <%= [ event.location_city, event.location_country ].compact_blank.join(", ") %>
+                    <% end %>
+                  </p>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="flex flex-col gap-1">
+                <%= cs_status(phase_statuses.fetch(phase_label, :info), phase_label) %>
+                <% if !event.completed? && !event.setup_complete? %>
+                  <%= cs_status(:warning, "Setup incomplete") %>
+                <% end %>
+              </div>
+            </td>
+            <td class="min-w-48">
+              <div class="cs-progress-field">
+                <div class="cs-progress-label">
+                  <span class="tabular-nums"><%= pluralize(row[:active], "participant") %></span>
+                  <span class="tabular-nums"><%= row[:percent] %>% cleared</span>
+                </div>
+                <div class="cs-progress" aria-hidden="true"><span style="width: <%= row[:percent] %>%"></span></div>
+                <p class="cs-progress-hint">
+                  <% if row[:active].zero? %>
+                    No participants yet
+                  <% elsif row[:top_blocker] %>
+                    <span class="tabular-nums"><%= row[:top_blocker][:count] %></span> stuck on <%= row[:top_blocker][:stage].label.downcase %>
+                  <% else %>
+                    Everyone cleared
+                  <% end %>
+                </p>
+              </div>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</section>

@@ -1,0 +1,58 @@
+<section id="summary_bar" class="cs-container">
+  <div class="cs-container-header">
+    <div>
+      <h2 class="cs-h2">Summary</h2>
+    </div>
+    <% unless @rooming_plan.locked? %>
+      <div class="cs-actions">
+        <%= form_with url: auto_assign_admin_event_rooming_wizard_path(@event.slug), method: :post, class: "contents" do %>
+          <button type="submit" class="cs-btn">
+            Re-run auto-assign
+          </button>
+        <% end %>
+        <button type="button" data-show="add-room-modal" class="cs-btn">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          Add room
+        </button>
+        <%= button_to lock_admin_event_rooming_wizard_path(@event.slug), method: :post, class: "cs-btn", form: { class: "contents" } do %>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+          Lock
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+  <div class="cs-container-body cs-stack">
+    <% if @rooming_plan.locked? %>
+      <div class="cs-alert cs-alert-warning">
+        <%= cs_status_icon(:warning) %>
+        <div class="flex flex-1 flex-wrap items-center justify-between gap-3">
+          <p class="cs-alert-title">Rooming is locked - assignments cannot be modified</p>
+          <%= button_to unlock_admin_event_rooming_wizard_path(@event.slug), method: :post, class: "cs-btn", form: { class: "contents" } do %>
+            Unlock
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <dl class="cs-kv cs-kv-3 cs-kv-divided">
+      <div>
+        <dt class="cs-kv-label">Assigned</dt>
+        <dd class="cs-kv-value-lg"><%= @rooms.sum { |r| r.room_assignments.size } %></dd>
+      </div>
+      <div>
+        <dt class="cs-kv-label">Unassigned</dt>
+        <dd class="cs-kv-value-lg"><%= @unassigned.size %></dd>
+      </div>
+      <% if @needs_acknowledgment.any? %>
+        <div>
+          <dt class="cs-kv-label">Need acknowledgment</dt>
+          <dd class="cs-kv-value-lg"><%= @needs_acknowledgment.size %></dd>
+        </div>
+      <% end %>
+    </dl>
+  </div>
+</section>

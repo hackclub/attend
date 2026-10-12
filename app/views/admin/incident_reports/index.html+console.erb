@@ -1,0 +1,78 @@
+<% content_for :title, "Incident Reports – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Incident reports", nil ]) %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Incident reports <span class="cs-counter">(<%= @incident_reports.size %>)</span></h1>
+      <p class="cs-description">
+        Confidential reports submitted through the public form at
+        <code class="font-mono">/incident</code>. Visible to global admins only.
+      </p>
+    </div>
+    <div class="cs-actions">
+      <%= link_to "Notification settings", admin_incident_settings_path, class: "cs-btn" %>
+    </div>
+  </div>
+
+  <div class="cs-segmented" role="group" aria-label="Filter by priority">
+    <% nav_link = ->(label, params_hash) {
+         active = params_hash.all? { |k, v| params[k].to_s == v.to_s } && (params_hash.any? || params[:priority].blank?)
+         link_to label, admin_incidents_path(params_hash), class: "cs-segment", "aria-current": (active ? "page" : nil)
+       } %>
+    <%= nav_link.("All priorities", {}) %>
+    <%= nav_link.("Emergency only", { priority: "emergency" }) %>
+  </div>
+
+  <% if @incident_reports.any? %>
+    <% IncidentReport.statuses.keys.each do |status| %>
+      <% reports = @reports_by_status[status] || [] %>
+      <% next if reports.empty? %>
+      <section class="cs-container">
+        <div class="cs-container-header cs-container-header-divided">
+          <h2 class="cs-h2"><%= status.humanize %> <span class="cs-counter">(<%= reports.size %>)</span></h2>
+        </div>
+        <div class="cs-table-wrap">
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th scope="col">Filed</th>
+                <th scope="col">Priority</th>
+                <th scope="col">Type</th>
+                <th scope="col">Event</th>
+                <th scope="col">Reporter</th>
+                <th scope="col"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% reports.each do |report| %>
+                <tr>
+                  <td class="whitespace-nowrap"><%= cs_absolute_time_tag(report.created_at) %></td>
+                  <td class="whitespace-nowrap"><%= incident_report_priority_badge(report.priority) %></td>
+                  <td class="whitespace-nowrap"><%= report.incident_type_label %></td>
+                  <td class="whitespace-nowrap"><%= report.event_name || "—" %></td>
+                  <td class="whitespace-nowrap">
+                    <%= report.reporter_name %>
+                    <span class="block cs-small cs-muted"><%= report.role_label %></span>
+                  </td>
+                  <td class="whitespace-nowrap text-right">
+                    <%= link_to "View", admin_incident_path(report), class: "cs-link" %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    <% end %>
+  <% else %>
+    <section class="cs-container">
+      <div class="cs-container-body">
+        <div class="cs-empty">
+          <p class="cs-empty-title">No incident reports</p>
+          <p>No incident reports<%= " match this filter" if params[:priority].present? %>.</p>
+        </div>
+      </div>
+    </section>
+  <% end %>
+</div>

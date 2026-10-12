@@ -1,0 +1,48 @@
+<div id="unassigned-drop-zone" class="min-h-[200px] border-2 border-dashed border-(--cs-border-input) rounded-lg p-2 space-y-2">
+  <% @unassigned.each do |pe| %>
+    <div class="<%= 'draggable-participant cursor-move hover:border-(--cs-accent)' unless @rooming_plan.locked? %> bg-(--cs-bg-shaded) rounded-(--cs-radius-item) p-2 border border-(--cs-border-divider-secondary) transition"
+         draggable="<%= !@rooming_plan.locked? %>"
+         data-pe-id="<%= pe.id %>">
+      <div class="flex items-center justify-between gap-2">
+        <div class="min-w-0">
+          <p class="text-sm font-bold"><%= pe.participant.full_name %></p>
+          <p class="cs-small cs-muted flex flex-wrap items-center gap-1">
+            Age <%= pe.age_on_event %>
+            <% if pe.is_18_on_event? %>
+              <%= cs_badge("18", "yellow") %>
+            <% end %>
+            · <%= pe.accommodation&.gender_identity&.titleize&.first || "?" %>
+            <% if pe.accommodation&.trans_or_nb? %>
+              <%= cs_badge("T/NB", "blue") %>
+            <% end %>
+          </p>
+        </div>
+        <div class="flex items-center gap-1">
+          <% if pe.participant.sibling_groups.any? %>
+            <%= cs_badge("Sib") %>
+          <% end %>
+          <% if pe.roommate_preferences.any? %>
+            <%= cs_badge("Pref", "green") %>
+          <% end %>
+          <% unless @rooming_plan.locked? %>
+            <%= button_to toggle_exempt_admin_event_rooming_wizard_path(@event.slug, participant_event_id: pe.id),
+              method: :post,
+              class: "cs-btn-inline-icon",
+              title: "Mark as exempt (e.g., staying at home)",
+              "aria-label": "Mark #{pe.participant.full_name} as exempt (e.g., staying at home)",
+              data: { turbo: true } do %>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+  <% if @unassigned.empty? %>
+    <div class="cs-empty">
+      <p class="cs-empty-title">All participants assigned</p>
+    </div>
+  <% end %>
+</div>

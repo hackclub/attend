@@ -28,6 +28,12 @@ module Admin
       authorize @change_request, :request_follow_up?
       response = params.require(:registration_change_request).permit(:staff_response)[:staff_response]
       if response.blank?
+        # The console shows the error under the field; the original UI keeps
+        # its flash.
+        if request.variant.include?(:console)
+          @change_request.errors.add(:staff_response, :blank)
+          return render :show, status: :unprocessable_entity
+        end
         return redirect_to admin_event_registration_change_request_path(current_event, @change_request),
           alert: "Add a message explaining what is needed."
       end

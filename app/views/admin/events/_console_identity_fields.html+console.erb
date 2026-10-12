@@ -1,0 +1,21 @@
+<%# Console-only: name, slug and support email, shared by the console's new
+    and edit event forms so their validation and wording stay identical. %>
+<%= cs_form_field f, :name, label: "Event name" do |aria| %>
+  <%= f.text_field :name, class: "cs-input", required: true, **aria %>
+<% end %>
+<%= cs_form_field f, :slug, label: "Slug", optional: true,
+      constraint: "Lowercase letters, numbers and hyphens (-) only. Leave blank to create one from the name.",
+      messages: {
+        blank: "Slug is required. Enter a slug or an event name.",
+        taken: "This slug is already in use.",
+        invalid: "Enter a valid slug. Use lowercase letters, numbers and hyphens (-) only.",
+        exclusion: "This slug is reserved. Enter a different slug."
+      } do |aria| %>
+  <%= f.text_field :slug, class: "cs-input", pattern: "[a-z0-9\\-]+", data: { cs_pattern_message: "Enter a valid slug. Use lowercase letters, numbers and hyphens (-) only." }, **aria %>
+<% end %>
+<%= cs_form_field f, :support_email, label: "Support email",
+      constraint: "The from and reply-to address on participant and guardian emails. Use a #{Event::SUPPORT_EMAIL_DOMAINS_SENTENCE} address. For example: team@hackclub.com",
+      messages: { invalid: "Enter an email address ending in #{Event::SUPPORT_EMAIL_DOMAINS_SENTENCE}." } do |aria| %>
+  <%= f.email_field :support_email, required: true, class: "cs-input", autocomplete: "off",
+        data: { cs_allowed_domains: Event::SUPPORT_EMAIL_DOMAINS.to_json, cs_domain_message: "Enter an email address ending in #{Event::SUPPORT_EMAIL_DOMAINS_SENTENCE}." }, **aria %>
+<% end %>

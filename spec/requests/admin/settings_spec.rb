@@ -23,6 +23,21 @@ RSpec.describe "Admin::Settings", type: :request do
       expect(response.body).to include("+14155551234")
     end
 
+    context "with the admin console beta" do
+      before { global_admin.update!(admin_console_beta: true) }
+
+      it "renders the sentence-case notification card" do
+        Setting.support_sms_notification_numbers = [ "+14155551234" ]
+        sign_in global_admin
+
+        get admin_settings_path
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("Support inbox notifications")
+        expect(response.body).to include("+14155551234")
+      end
+    end
+
     it "denies non-global-admins" do
       sign_in event_admin
 
@@ -83,6 +98,22 @@ RSpec.describe "Admin::Settings", type: :request do
       expect(response.body).to include("Admin Help Slack Channel")
       expect(response.body).to include("CHELP")
       expect(response.body).to include("2 eligible people") # the event admin plus the signed-in global admin
+    end
+
+    context "with the admin console beta" do
+      before { global_admin.update!(admin_console_beta: true) }
+
+      it "shows the sentence-case channel card and how many people would be synced" do
+        Setting.admin_help_slack_channel_id = "CHELP"
+        event_admin
+        sign_in global_admin
+
+        get admin_settings_path
+
+        expect(response.body).to include("Admin help Slack channel")
+        expect(response.body).to include("CHELP")
+        expect(response.body).to include("2 eligible people")
+      end
     end
 
     it "saves the channel ID and rejects junk" do

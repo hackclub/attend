@@ -185,6 +185,9 @@ Rails.application.routes.draw do
 
     get "search", to: "search#index"
 
+    # Opt-in switch between the original admin and the console redesign.
+    patch "console_beta", to: "console_beta#update", as: :console_beta
+
     # The staff profile form now lives on the participant-facing settings page.
     get "profile/edit", to: redirect("/dashboard/profile#staff-settings")
 
@@ -267,7 +270,7 @@ Rails.application.routes.draw do
             delete :cancel
           end
         end
-      resources :staff, only: [ :index, :new, :create, :destroy ], controller: "event_staff"
+      resources :staff, only: [ :index, :new, :create, :update, :destroy ], controller: "event_staff"
       resources :registration_change_requests, only: [ :index, :show ] do
         member do
           patch :approve

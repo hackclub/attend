@@ -18,6 +18,11 @@ module Admin
         end
 
         redirect_to admin_incident_path(@incident_report), notice: notice_message
+      elsif request.variant.include?(:console)
+        # The console re-renders the report with the comment's errors under
+        # its fields; the original UI keeps its redirect.
+        @incident_report.comments.reset
+        render "admin/incident_reports/show", status: :unprocessable_entity
       else
         redirect_to admin_incident_path(@incident_report), alert: "Failed to add comment."
       end

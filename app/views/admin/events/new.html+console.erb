@@ -1,0 +1,48 @@
+<% content_for :title, "New Event – Attend" %>
+
+<%= render layout: "admin/event_setup/wizard", locals: {
+      current_step: "basics",
+      title: "Event basics",
+      description: "You can change any of this later."
+    } do %>
+  <%= form_with model: [ :admin, @event ], class: "cs-stack", multipart: true, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+    <% if @event.event_series %>
+      <%= f.hidden_field :event_series_id %>
+      <div class="cs-alert">
+        <%= cs_status_icon(:info) %>
+        <p>This event will be part of the <strong><%= @event.event_series.name %></strong> series and will inherit its branding unless you set its own.</p>
+      </div>
+    <% end %>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Event details</h2>
+      </div>
+      <div class="cs-container-body">
+        <div class="cs-field-grid">
+          <%= render "admin/events/console_identity_fields", f: f, event: @event %>
+          <%= cs_form_field f, :timezone, label: "Time zone" do |aria| %>
+            <%= f.time_zone_select :timezone, nil, {}, class: "cs-select", **aria %>
+          <% end %>
+          <% if !@event.event_series && current_user.global_admin? && EventSeries.any? %>
+            <%= cs_form_field f, :event_series_id, label: "Series", optional: true, error_keys: [ :event_series ],
+                  constraint: "Events in a series inherit its branding and can be managed by series members." do |aria| %>
+              <%= f.collection_select :event_series_id, EventSeries.order(:name), :id, :name, { include_blank: "No series (standalone event)" }, class: "cs-select", **aria %>
+            <% end %>
+          <% end %>
+          <%= cs_form_field f, :logo, label: "Logo", optional: true,
+                constraint: "JPEG, PNG, GIF, WebP or SVG, up to 5 MB. Shown in the side navigation and event picker." do |aria| %>
+            <%= f.file_field :logo, accept: "image/jpeg,image/png,image/gif,image/webp,image/svg+xml", class: "block text-sm file:mr-3 file:py-1 file:px-4 file:rounded-full file:border-2 file:border-solid file:border-(--cs-accent) file:bg-transparent file:text-sm file:font-bold file:text-(--cs-accent) file:cursor-pointer", **aria %>
+          <% end %>
+        </div>
+      </div>
+    </section>
+
+    <%= cs_form_errors f %>
+
+    <div class="cs-wizard-actions">
+      <%= link_to "Cancel", admin_root_path, class: "cs-btn cs-btn-link" %>
+      <%= f.button "Create event and continue", class: "cs-btn cs-btn-primary" %>
+    </div>
+  <% end %>
+<% end %>
