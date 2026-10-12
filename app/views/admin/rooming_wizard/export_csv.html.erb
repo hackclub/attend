@@ -1,52 +1,54 @@
-<div class="space-y-6">
-  <div class="flex items-center justify-between">
+<% content_for :title, "Export rooming list – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Participants", admin_event_participants_path(@event.slug) ], [ "Rooming wizard", finalize_admin_event_rooming_wizard_path(@event.slug) ], [ "Export", nil ]) %>
+
+<div class="cs-header">
+  <div class="cs-header-text">
+    <h1 class="cs-h1">Export rooming list</h1>
+    <p class="cs-description">Download the final rooming assignments</p>
+  </div>
+</div>
+
+<div class="cs-stack">
+  <div class="cs-alert cs-alert-success">
+    <%= cs_status_icon(:success) %>
     <div>
-      <h1 class="text-2xl font-bold text-gray-900">Export Rooming List</h1>
-      <p class="mt-1 text-sm text-gray-600">Download the final rooming assignments</p>
+      <p class="cs-alert-title">Rooming complete!</p>
+      <p>The rooming assignments have been finalized.</p>
     </div>
   </div>
 
-  <div class="bg-white border border-gray-200 rounded-lg p-6">
-    <div class="text-center py-8">
-      <svg class="mx-auto h-16 w-16 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-      </svg>
-      
-      <h2 class="mt-4 text-xl font-medium text-gray-900">Rooming Complete!</h2>
-      <p class="mt-2 text-gray-500">The rooming assignments have been finalized.</p>
-      
-      <div class="mt-6 flex justify-center gap-4">
-        <%= link_to export_csv_admin_event_rooming_wizard_path(@event.slug, format: :csv), class: "inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md  text-white bg-[#d42f46] hover:bg-[#b82840]" do %>
-          <svg class="-ml-1 mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2">Rooming list</h2>
+        <p class="cs-container-description">The CSV contains only legal names for privacy compliance.</p>
+      </div>
+      <div class="cs-actions">
+        <%= link_to finalize_admin_event_rooming_wizard_path(@event.slug), class: "cs-btn" do %>
+          View room list
+        <% end %>
+        <%= link_to export_csv_admin_event_rooming_wizard_path(@event.slug, format: :csv), class: "cs-btn cs-btn-primary" do %>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
           </svg>
           Download CSV
         <% end %>
-        
-        <%= link_to finalize_admin_event_rooming_wizard_path(@event.slug), class: "inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50" do %>
-          View Room List
-        <% end %>
       </div>
-      
-      <p class="mt-4 text-sm text-gray-500">
-        The CSV contains only legal names for privacy compliance.
-      </p>
     </div>
-  </div>
+  </section>
 
-  <!-- Quick Links -->
-  <div class="bg-white border border-gray-200 rounded-lg p-6">
-    <h3 class="font-medium text-gray-900 mb-4">Quick Links</h3>
-    <div class="flex gap-4">
-      <%= link_to setup_admin_event_rooming_wizard_path(@event.slug), class: "text-[#ec3750] hover:text-blue-800" do %>
-        ← Start Over (Setup)
-      <% end %>
-      <%= link_to assignments_admin_event_rooming_wizard_path(@event.slug), class: "text-[#ec3750] hover:text-blue-800" do %>
-        View Assignments
-      <% end %>
-      <%= link_to admin_event_participants_path(@event.slug), class: "text-[#ec3750] hover:text-blue-800" do %>
-        Back to Participants
-      <% end %>
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2">Quick links</h2>
+      </div>
     </div>
-  </div>
+    <div class="cs-container-body">
+      <ul class="flex flex-wrap gap-x-6 gap-y-2">
+        <li><%= link_to "Start over (setup)", setup_admin_event_rooming_wizard_path(@event.slug), class: "cs-link" %></li>
+        <li><%= link_to "View assignments", assignments_admin_event_rooming_wizard_path(@event.slug), class: "cs-link" %></li>
+        <li><%= link_to "Back to participants", admin_event_participants_path(@event.slug), class: "cs-link" %></li>
+      </ul>
+    </div>
+  </section>
 </div>

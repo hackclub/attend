@@ -52,6 +52,24 @@ RSpec.describe "Admin::Dashboard#index", type: :request do
     end
   end
 
+  describe "series groups" do
+    let(:series) { create(:event_series, name: "Example Series") }
+    let!(:first_event) { create(:event, name: "Series Stop One", slug: "series-stop-one", event_series: series, starts_at: 1.week.from_now, ends_at: 1.week.from_now + 2.days) }
+    let!(:second_event) { create(:event, name: "Series Stop Two", slug: "series-stop-two", event_series: series, starts_at: 2.weeks.from_now, ends_at: 2.weeks.from_now + 2.days) }
+
+    it "renders the series as a collapsed row group with a toggle" do
+      get admin_root_path
+
+      html = Nokogiri::HTML(response.body)
+      toggle = html.at_css('button[data-action="cs-row-group#toggle"]')
+      expect(toggle["aria-expanded"]).to eq("false")
+      rows = html.css('tr[data-cs-row-group-target="row"]')
+      expect(rows.size).to eq(2)
+      expect(rows).to all(satisfy { |row| row.key?("hidden") })
+      expect(toggle["aria-controls"].split).to match_array(rows.map { |row| row["id"] })
+    end
+  end
+
   describe "when every visible event has finished" do
     let!(:finished) { create(:event, slug: "finished", starts_at: 1.month.ago, ends_at: 3.weeks.ago) }
 
@@ -59,7 +77,7 @@ RSpec.describe "Admin::Dashboard#index", type: :request do
       get admin_root_path
 
       expect(response.body).to include("Nothing running right now")
-      expect(response.body).to include('<details class="mt-6 group/completed" open>')
+      expect(response.body).to include('<details class="cs-expandable cs-expandable-container" open>')
     end
   end
 

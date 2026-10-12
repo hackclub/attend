@@ -1,0 +1,45 @@
+<%# Cloudscape wizard frame for the rooming wizard (cloudscape.design/components/wizard),
+    mirroring admin/event_setup/_wizard. Render as a layout:
+      render layout: "wizard", locals: { current_step:, title:, description:, wide: }
+    Every step is its own GET route, so the step list links anywhere.
+    `wide: true` drops the 960px reading width for the drag-and-drop board. %>
+<% steps = [
+     { key: "setup", label: "Room setup", path: setup_admin_event_rooming_wizard_path(@event.slug) },
+     { key: "preferences", label: "Roommate preferences", path: preferences_admin_event_rooming_wizard_path(@event.slug) },
+     { key: "assignments", label: "Room assignments", path: assignments_admin_event_rooming_wizard_path(@event.slug) },
+     { key: "finalize", label: "Room numbers and export", path: finalize_admin_event_rooming_wizard_path(@event.slug) }
+   ]
+   current_index = steps.index { |s| s[:key] == current_step } %>
+
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Participants", admin_event_participants_path(@event.slug) ], [ "Rooming wizard", nil ]) %>
+
+<div class="cs-wizard">
+  <nav class="cs-wizard-nav" aria-label="Rooming wizard steps">
+    <ol>
+      <% steps.each_with_index do |step, index| %>
+        <% state = index == current_index ? "current" : "available" %>
+        <li class="cs-wizard-nav-step cs-wizard-nav-step-<%= state %>">
+          <span class="cs-wizard-nav-number">Step <%= index + 1 %></span>
+          <% if state == "current" %>
+            <span class="cs-wizard-nav-label" aria-current="step"><%= step[:label] %></span>
+          <% else %>
+            <%= link_to step[:label], step[:path], class: "cs-wizard-nav-label" %>
+          <% end %>
+        </li>
+      <% end %>
+    </ol>
+  </nav>
+
+  <div class="<%= local_assigns[:wide] ? "min-w-0" : "cs-wizard-main" %>">
+    <p class="cs-wizard-step-count">Rooming wizard · Step <%= current_index + 1 %> of <%= steps.size %></p>
+    <div class="cs-header">
+      <div class="cs-header-text">
+        <h1 class="cs-h1"><%= title %></h1>
+        <% if local_assigns[:description] %>
+          <p class="cs-description"><%= description %></p>
+        <% end %>
+      </div>
+    </div>
+    <%= yield %>
+  </div>
+</div>

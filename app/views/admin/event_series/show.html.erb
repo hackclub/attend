@@ -10,32 +10,33 @@
 <% stage_rows = @dashboard.stage_rows %>
 <% arrival_row = @dashboard.arrival_row %>
 
-<div class="max-w-7xl mx-auto px-4 py-6">
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Series", admin_series_index_path ], [ @series.name, nil ]) %>
+
+<div class="cs-stack">
   <% if @series.banner.attached? %>
-    <div class="mb-6 rounded-lg overflow-hidden border border-(--border-card)">
-      <%= image_tag @series.banner, class: "w-full h-32 sm:h-40 object-cover" %>
+    <div class="cs-container overflow-hidden">
+      <%= image_tag @series.banner, alt: "", class: "w-full h-32 sm:h-40 object-cover" %>
     </div>
   <% end %>
 
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-    <div class="flex items-center gap-4 min-w-0">
+  <div class="cs-header">
+    <div class="cs-header-text flex items-center gap-4 min-w-0">
       <%= render "admin/events/avatar", event: @series, size: 48, rounded: "rounded-lg" %>
       <div class="min-w-0">
-        <h1 class="text-2xl font-bold text-(--text-strong) truncate tracking-[-0.01em]"><%= @series.name %></h1>
+        <h1 class="cs-h1 truncate"><%= @series.name %></h1>
         <%# Identity only. Every participant figure lives in the funnel and the
             chase list, so nothing here repeats a number those two already own —
             this line answers "which series, how big, is anything running". %>
         <% if @events.any? %>
           <% live_events = @dashboard.live_events %>
-          <p class="text-[13px] text-(--text-soft) mt-0.5 flex flex-wrap items-center gap-x-1.5">
+          <p class="cs-description flex flex-wrap items-center gap-x-1.5">
             <span><%= pluralize(totals[:events], "event") %></span>
             <% if live_events.any? %>
               <span aria-hidden="true">·</span>
               <% if live_events.one? %>
-                <%= link_to "1 live", admin_event_dashboard_path(live_events.first.slug),
-                      class: "font-medium text-(--text-link) hover:underline" %>
+                <%= link_to "1 live", admin_event_dashboard_path(live_events.first.slug), class: "cs-link" %>
               <% else %>
-                <span class="font-medium text-(--text)"><%= live_events.length %> live</span>
+                <span><%= live_events.length %> live</span>
               <% end %>
             <% elsif @dashboard.next_event %>
               <span aria-hidden="true">·</span>
@@ -48,42 +49,27 @@
           </p>
         <% end %>
         <% if @series.description.present? %>
-          <p class="text-sm text-(--text-soft) mt-0.5"><%= @series.description %></p>
+          <p class="cs-description"><%= @series.description %></p>
         <% end %>
       </div>
     </div>
-    <div class="flex flex-wrap items-center gap-2">
+    <div class="cs-actions flex-wrap">
       <% if policy(@series).manage_members? %>
-        <%= link_to admin_series_members_path(@series), class: "inline-flex items-center gap-2 cursor-pointer border border-(--border-strong) bg-(--bg-elev) text-(--text) hover:bg-(--bg-elev-3) hover:text-(--text-strong) text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
-          <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-          Members
-        <% end %>
+        <%= link_to "Members", admin_series_members_path(@series), class: "cs-btn" %>
       <% end %>
       <% if policy(@series).manage_api_tokens? %>
-        <%= link_to admin_series_api_tokens_path(@series), class: "inline-flex items-center gap-2 cursor-pointer border border-(--border-strong) bg-(--bg-elev) text-(--text) hover:bg-(--bg-elev-3) hover:text-(--text-strong) text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
-          <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l6.964-6.964A6 6 0 1121 9z"></path></svg>
-          API Keys
-        <% end %>
+        <%= link_to "API keys", admin_series_api_tokens_path(@series), class: "cs-btn" %>
       <% end %>
       <% if policy(@series).manage_integrations? %>
-        <%= link_to admin_series_integrations_path(@series), class: "inline-flex items-center gap-2 cursor-pointer border border-(--border-strong) bg-(--bg-elev) text-(--text) hover:bg-(--bg-elev-3) hover:text-(--text-strong) text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
-          <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-          Integrations
-        <% end %>
+        <%= link_to "Integrations", admin_series_integrations_path(@series), class: "cs-btn" %>
       <% end %>
       <% if policy(@series).update? %>
-        <%= link_to edit_admin_series_path(@series), class: "inline-flex items-center gap-2 cursor-pointer border border-(--border-strong) bg-(--bg-elev) text-(--text) hover:bg-(--bg-elev-3) hover:text-(--text-strong) text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
-          <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-          Settings
-        <% end %>
+        <%= link_to "Settings", edit_admin_series_path(@series), class: "cs-btn" %>
       <% end %>
       <% if policy(Event.new(event_series_id: @series.id)).create? %>
         <%# Secondary, like its neighbours: this is a cleanup page, and the work
             it opens with is chasing people, not adding another event. %>
-        <%= link_to admin_new_event_path(series: @series.slug), class: "inline-flex items-center gap-2 cursor-pointer border border-(--border-strong) bg-(--bg-elev) text-(--text) hover:bg-(--bg-elev-3) hover:text-(--text-strong) text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
-          <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-          New Event
-        <% end %>
+        <%= link_to "New event", admin_new_event_path(series: @series.slug), class: "cs-btn" %>
       <% end %>
     </div>
   </div>
@@ -101,11 +87,9 @@
 
     <%# The ribbon needs the full width to hold nine stages, so the map moves
         down beside the events table it indexes. %>
-    <div class="mt-6">
-      <%= render "admin/event_series/funnel", stage_rows: stage_rows, arrival_row: arrival_row, totals: totals %>
-    </div>
+    <%= render "admin/event_series/funnel", stage_rows: stage_rows, arrival_row: arrival_row, totals: totals %>
 
-    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
       <div class="lg:col-span-3 min-w-0">
         <%= render "admin/event_series/events", event_rows: @event_rows %>
       </div>

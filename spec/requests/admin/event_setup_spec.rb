@@ -81,7 +81,7 @@ RSpec.describe "Admin::EventSetup", type: :request do
       get admin_new_event_path
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Setup progress")
+      expect(response.body).to include("Event setup steps")
     end
 
     it "renders every step" do

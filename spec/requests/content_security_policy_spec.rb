@@ -84,6 +84,10 @@ RSpec.describe "Content Security Policy", type: :request do
   # floor for any page using it.
   LAYOUT_INLINE_SCRIPTS = 4
 
+  # The admin console adds one more: the pre-paint script that restores a
+  # collapsed side navigation before the page draws.
+  ADMIN_LAYOUT_INLINE_SCRIPTS = LAYOUT_INLINE_SCRIPTS + 1
+
   describe "public pages" do
     it "the sign-in page is clean" do
       expect_csp_clean(root_path, inline_scripts: LAYOUT_INLINE_SCRIPTS)
@@ -112,27 +116,27 @@ RSpec.describe "Content Security Policy", type: :request do
     it "the QR scanner is clean" do
       ScanContext.create!(event: event, name: "Main Door", checks_in: true, is_travel_pickup: false)
 
-      expect_csp_clean(scanner_admin_event_scans_path(event), inline_scripts: LAYOUT_INLINE_SCRIPTS + 1)
+      expect_csp_clean(scanner_admin_event_scans_path(event), inline_scripts: ADMIN_LAYOUT_INLINE_SCRIPTS + 1)
     end
 
     it "the scan history is clean" do
-      expect_csp_clean(history_admin_event_scans_path(event), inline_scripts: LAYOUT_INLINE_SCRIPTS + 1)
+      expect_csp_clean(history_admin_event_scans_path(event), inline_scripts: ADMIN_LAYOUT_INLINE_SCRIPTS + 1)
     end
 
     it "the event form is clean" do
-      expect_csp_clean(edit_admin_event_path(event), inline_scripts: LAYOUT_INLINE_SCRIPTS + 1)
+      expect_csp_clean(edit_admin_event_path(event), inline_scripts: ADMIN_LAYOUT_INLINE_SCRIPTS + 1)
     end
 
     it "the event setup schedule step is clean" do
-      expect_csp_clean(admin_event_setup_schedule_path(event.slug), inline_scripts: LAYOUT_INLINE_SCRIPTS + 1)
+      expect_csp_clean(admin_event_setup_schedule_path(event.slug), inline_scripts: ADMIN_LAYOUT_INLINE_SCRIPTS + 1)
     end
 
     it "the participants table is clean" do
-      expect_csp_clean(admin_event_participants_path(event), inline_scripts: LAYOUT_INLINE_SCRIPTS)
+      expect_csp_clean(admin_event_participants_path(event), inline_scripts: ADMIN_LAYOUT_INLINE_SCRIPTS)
     end
 
     it "the dashboard is clean" do
-      expect_csp_clean(admin_event_dashboard_path(event), inline_scripts: LAYOUT_INLINE_SCRIPTS)
+      expect_csp_clean(admin_event_dashboard_path(event), inline_scripts: ADMIN_LAYOUT_INLINE_SCRIPTS)
     end
 
     # /docs uses its own bare layout rather than the app one, hence the count.
@@ -168,7 +172,7 @@ RSpec.describe "Content Security Policy", type: :request do
     before { sign_in admin }
 
     it "the setup step is clean" do
-      expect_csp_clean(setup_admin_event_rooming_wizard_path(event.slug), inline_scripts: LAYOUT_INLINE_SCRIPTS + 1)
+      expect_csp_clean(setup_admin_event_rooming_wizard_path(event.slug), inline_scripts: ADMIN_LAYOUT_INLINE_SCRIPTS + 1)
     end
 
     it "the preferences step is clean, with one script per participant partial" do
@@ -179,7 +183,7 @@ RSpec.describe "Content Security Policy", type: :request do
 
       expect_csp_clean(
         preferences_admin_event_rooming_wizard_path(event.slug),
-        inline_scripts: LAYOUT_INLINE_SCRIPTS + 1 + 2
+        inline_scripts: ADMIN_LAYOUT_INLINE_SCRIPTS + 1 + 2
       )
     end
 
@@ -189,14 +193,14 @@ RSpec.describe "Content Security Policy", type: :request do
 
       expect_csp_clean(
         assignments_admin_event_rooming_wizard_path(event.slug),
-        inline_scripts: LAYOUT_INLINE_SCRIPTS + 1 + 2
+        inline_scripts: ADMIN_LAYOUT_INLINE_SCRIPTS + 1 + 2
       )
     end
 
     it "the finalize step is clean" do
       RoomingPlan.create!(event: event)
 
-      expect_csp_clean(finalize_admin_event_rooming_wizard_path(event.slug), inline_scripts: LAYOUT_INLINE_SCRIPTS + 1)
+      expect_csp_clean(finalize_admin_event_rooming_wizard_path(event.slug), inline_scripts: ADMIN_LAYOUT_INLINE_SCRIPTS + 1)
     end
   end
 end

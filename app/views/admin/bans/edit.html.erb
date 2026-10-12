@@ -1,11 +1,11 @@
-<div class="space-y-6">
-  <div class="flex justify-between items-center">
-    <h1 class="text-2xl font-bold text-gray-900">Edit Ban</h1>
-  </div>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Ban list", admin_bans_path ], [ "Ban", admin_ban_path(@ban) ], [ "Edit", nil ]) %>
 
-  <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
-    <div class="px-6 py-4">
-      <%= render "form", ban: @ban, submit_label: "Save Changes" %>
+<div class="cs-stack max-w-3xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Edit ban</h1>
     </div>
   </div>
+
+  <%= render "form", ban: @ban, submit_label: "Save changes" %>
 </div>

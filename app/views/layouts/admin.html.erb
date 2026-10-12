@@ -1,12 +1,19 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full" data-theme="<%= current_theme %>">
+<%# The admin console. Its look is AWS's Cloudscape design system, tuned to
+    Hack Club red — see app/assets/stylesheets/console.css. %>
+<html lang="en" class="h-full cs-console" data-theme="<%= admin_console_theme %>" data-console-light-themes="<%= ConsoleHelper::LIGHT_THEMES.to_json %>">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="application-name" content="Attend">
-    <meta name="theme-color" content="<%= current_theme_color %>">
+    <meta name="theme-color" content="<%= ConsoleHelper::CONSOLE_THEME_COLOR %>">
+    <%# Turbo swaps <body> but never <html>'s attributes, and the console is
+        switched on by html.cs-console and a collapsed data-theme. A tracked
+        element only this layout carries makes Turbo do a full load whenever a
+        visit crosses between the console and any other layout. %>
+    <meta name="attend-shell" content="console" data-turbo-track="reload">
     <link rel="manifest" href="<%= pwa_manifest_path(format: :json) %>">
 
     <title><%= content_for(:title) || "Admin – Attend – Hack Club" %></title>
@@ -29,188 +36,155 @@
 
     <link rel="icon" href="/icon-32.png?v=3" type="image/png" sizes="32x32">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3">
+    <link rel="preload" href="<%= asset_path("open-sans-normal.woff2") %>" as="font" type="font/woff2" crossorigin>
 
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= stylesheet_link_tag "hackclub", "data-turbo-track": "reload" %>
     <%= stylesheet_link_tag "themes", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
+    <%# Applied before first paint so a collapsed side nav doesn't flash open. %>
+    <%= javascript_tag nonce: true do %>
+      try { if (localStorage.getItem("attend-console-nav") === "collapsed") document.documentElement.classList.add("cs-nav-collapsed") } catch (e) {}
+    <% end %>
   </head>
 
-  <body class="h-full bg-white flex flex-col" style="background-color: var(--bg-elev);" data-controller="command-palette" data-command-palette-search-url-value="<%= admin_search_path %>">
+  <body class="cs-body" data-controller="command-palette" data-command-palette-search-url-value="<%= admin_search_path %>">
     <% if impersonating? %>
-      <div class="flex-shrink-0 text-center py-2 text-sm" style="background-color: #f97316; color: white;">
-        <span class="font-medium">You are impersonating <%= current_user.display_name_or_fallback %>.</span>
-        <%= button_to "Stop Impersonating", stop_impersonation_path, method: :delete, class: "ml-2 underline hover:no-underline font-semibold", style: "color: white;", form: { class: "inline" } %>
+      <div class="cs-impersonation" role="status">
+        <span>You are impersonating <strong><%= current_user.display_name_or_fallback %></strong>.</span>
+        <%= button_to "Stop impersonating", stop_impersonation_path, method: :delete, form: { class: "inline" } %>
       </div>
     <% end %>
-    <div class="flex-1 flex min-h-0" data-controller="mobile-menu">
-      <!-- Mobile sidebar overlay -->
-      <div class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 z-40 lg:hidden" data-mobile-menu-target="overlay" data-action="click->mobile-menu#close"></div>
 
-      <!-- Mobile sidebar -->
-      <div class="hidden fixed inset-y-0 left-0 z-50 w-64 bg-[#f7f7f9] border-r border-[#e5e7eb] lg:hidden" data-mobile-menu-target="panel">
-        <div class="flex flex-col h-full">
-          <div class="flex items-center justify-between px-4 pt-4 pb-3">
-            <%= link_to admin_root_path, class: "flex items-center space-x-2" do %>
-              <img src="/flag.png" alt="Hack Club" class="h-6">
-              <span class="text-[#1f2d3d] font-bold text-lg">Attend</span>
-            <% end %>
-            <button type="button" class="text-[#8492a6] hover:text-[#1f2d3d]" data-action="mobile-menu#close">
-              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
-          </div>
+    <div class="contents" data-controller="mobile-menu">
+      <header class="cs-topnav">
+        <button type="button" class="cs-topnav-icon-button lg:hidden" data-action="mobile-menu#toggle" aria-label="Open navigation">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
 
-          <nav class="flex-1 px-3 py-2 overflow-y-auto">
-            <%= render "layouts/admin_sidebar_nav", close_action: "click->mobile-menu#close" %>
-          </nav>
+        <%= link_to admin_root_path, class: "cs-topnav-identity" do %>
+          <img src="/flag.png" alt="Hack Club">
+          <span class="cs-topnav-title">Attend</span>
+        <% end %>
 
-          <%= render "layouts/admin_sidebar_footer", close_action: "click->mobile-menu#close" %>
+        <button type="button" class="cs-topnav-search" data-action="command-palette#open" aria-label="Search participants, events and pages">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <span>Search participants, events, pages</span>
+          <kbd>⌘K</kbd>
+        </button>
+
+        <div class="cs-topnav-spacer"></div>
+
+        <button type="button" class="cs-topnav-icon-button sm:hidden" data-action="command-palette#open" aria-label="Search">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        </button>
+
+        <div class="hidden sm:block">
+          <%= render "layouts/admin_event_switcher", variant: :topnav, close_action: nil %>
+        </div>
+
+        <%= render "layouts/admin_user_menu" %>
+      </header>
+
+      <%# Mobile navigation drawer %>
+      <div class="hidden cs-drawer-overlay lg:hidden" data-mobile-menu-target="overlay" data-action="click->mobile-menu#close"></div>
+      <div class="hidden cs-drawer lg:hidden" data-mobile-menu-target="panel">
+        <div class="cs-drawer-header">
+          <span class="cs-topnav-title">Navigation</span>
+          <button type="button" class="cs-topnav-icon-button" data-action="mobile-menu#close" aria-label="Close navigation">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="cs-drawer-event sm:hidden">
+          <%= render "layouts/admin_event_switcher", variant: :drawer, close_action: "click->mobile-menu#close" %>
+        </div>
+        <%# The footer scrolls with the links here: a phone can't spare the
+            height to pin it. %>
+        <div class="cs-sidenav-scroll">
+          <%= render "layouts/admin_sidebar_nav", close_action: "click->mobile-menu#close" %>
+          <%= render "layouts/admin_sidebar_footer" %>
         </div>
       </div>
 
-      <!-- Desktop Sidebar -->
-      <aside class="hidden lg:flex lg:flex-shrink-0">
-        <div class="w-64 flex flex-col">
-          <div class="flex-1 flex flex-col min-h-0 bg-[#f7f7f9] border-r border-[#e5e7eb]">
-            <div class="flex-1 flex flex-col pt-4 overflow-y-auto">
-              <div class="flex items-center justify-between flex-shrink-0 px-4 pb-3">
-                <%= link_to admin_root_path, class: "flex items-center space-x-2" do %>
-                  <img src="/flag.png" alt="Hack Club" class="h-6">
-                  <span class="text-[#1f2d3d] font-bold text-lg">Attend</span>
-                <% end %>
-                <div class="flex items-center gap-1">
-                  <button type="button" class="sidebar-icon-btn" data-action="command-palette#open" title="Search">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                    </svg>
+      <div class="cs-applayout">
+        <aside class="cs-sidenav" aria-label="Admin navigation" data-controller="console-nav">
+          <button type="button" class="cs-sidenav-toggle" data-action="console-nav#toggle" data-console-nav-target="toggle" aria-expanded="true" aria-controls="cs-sidenav-panel" title="Hide navigation">
+            <svg class="cs-sidenav-toggle-close" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <svg class="cs-sidenav-toggle-open" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            <span class="sr-only" data-console-nav-target="label">Hide navigation</span>
+          </button>
+          <div class="cs-sidenav-panel" id="cs-sidenav-panel">
+            <div class="cs-sidenav-scroll">
+              <%= render "layouts/admin_sidebar_nav", close_action: nil %>
+            </div>
+            <%= render "layouts/admin_sidebar_footer" %>
+          </div>
+        </aside>
+
+        <div class="cs-content">
+          <% if content_for?(:breadcrumbs) %>
+            <div class="cs-breadcrumbs">
+              <%= yield :breadcrumbs %>
+            </div>
+          <% end %>
+
+          <% if flash[:notice] || flash[:alert] %>
+            <div class="cs-flashbar" aria-live="polite">
+              <% { notice: "success", alert: "error" }.each do |key, kind| %>
+                <% next unless flash[key] %>
+                <div class="cs-flash cs-flash-<%= kind %>" role="<%= kind == "error" ? "alert" : "status" %>" data-controller="flash" data-flash-target="container">
+                  <%= cs_status_icon(kind == "error" ? :error : :success) %>
+                  <p><%= flash[key] %></p>
+                  <button type="button" data-action="flash#dismiss" aria-label="Dismiss">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                   </button>
                 </div>
-              </div>
-
-              <nav class="px-3 pt-2">
-                <%= render "layouts/admin_sidebar_nav", close_action: nil %>
-              </nav>
+              <% end %>
             </div>
+          <% end %>
 
-            <%= render "layouts/admin_sidebar_footer", close_action: nil %>
+          <% if current_event&.waiver_dates_stale? %>
+            <%= render "layouts/waiver_dates_banner", event: current_event %>
+          <% end %>
 
-            <!-- Debug footer -->
-            <%= render "shared/debug_footer" %>
-          </div>
+          <main class="cs-main" id="main" data-controller="cs-date-picker">
+            <%= yield %>
+          </main>
         </div>
-      </aside>
-
-      <!-- Main content area -->
-      <div class="flex-1 flex flex-col min-w-0 overflow-y-auto">
-        <!-- Top header -->
-        <header class="bg-white border-b border-gray-200 sticky top-0 z-30 lg:hidden">
-          <div class="flex items-center justify-between h-12 px-4 sm:px-6 lg:px-8">
-            <!-- Left: Mobile menu button + Event selector -->
-            <div class="flex items-center space-x-4">
-              <button type="button" class="lg:hidden p-2 rounded-lg text-[#8492a6] hover:text-[#ec3750] hover:bg-[#f9fafc]" data-action="mobile-menu#toggle">
-                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-        </header>
-
-        <!-- Breadcrumbs -->
-        <% if content_for?(:breadcrumbs) %>
-          <nav class="bg-white border-b border-[#e0e6ed] px-4 sm:px-6 lg:px-8 py-3">
-            <%= yield :breadcrumbs %>
-          </nav>
-        <% end %>
-
-        <!-- Flash messages -->
-        <% if flash[:notice] %>
-          <div class="border-b border-[#33d6a6]/30 border-l-4 border-l-[#33d6a6] bg-white" data-controller="flash" data-flash-target="container">
-            <div class="px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-              <p class="text-sm text-[#1f2d3d]"><%= flash[:notice] %></p>
-              <button type="button" class="text-[#8492a6] hover:text-[#3c4858]" data-action="flash#dismiss">
-                <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-        <% end %>
-
-        <% if flash[:alert] %>
-          <div class="border-b border-[#ec3750]/30 border-l-4 border-l-[#ec3750] bg-white" data-controller="flash" data-flash-target="container">
-            <div class="px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-              <p class="text-sm text-[#1f2d3d]"><%= flash[:alert] %></p>
-              <button type="button" class="text-[#8492a6] hover:text-[#3c4858]" data-action="flash#dismiss">
-                <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-        <% end %>
-
-        <% if current_event&.waiver_dates_stale? %>
-          <%= render "layouts/waiver_dates_banner", event: current_event %>
-        <% end %>
-
-        <!-- Main content -->
-        <main class="flex-1 px-4 sm:px-6 lg:px-8 py-8">
-          <%= yield %>
-        </main>
       </div>
     </div>
 
-    <!-- Command Palette Modal -->
+    <!-- Command palette -->
     <div class="hidden fixed inset-0 z-50 overflow-y-auto"
          data-command-palette-target="modal"
          data-action="click->command-palette#closeOnOverlay">
-      <div class="flex items-start justify-center min-h-screen pt-24 px-4">
-        <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" data-action="click->command-palette#close"></div>
+      <div class="flex items-start justify-center min-h-screen pt-20 px-4">
+        <div class="fixed inset-0 bg-gray-900/50 transition-opacity" data-action="click->command-palette#close"></div>
 
-        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-xl transform transition-all">
-          <!-- Search Input -->
+        <div class="cs-palette relative w-full max-w-xl" role="dialog" aria-label="Search">
           <div class="flex items-center px-4 border-b border-gray-200">
-            <svg class="h-5 w-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="h-5 w-5 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
             </svg>
             <input type="text"
-                   class="w-full px-3 py-4 text-gray-900 placeholder-gray-400 border-0 focus:ring-0 focus:outline-none"
+                   class="w-full px-3 py-4 border-0 focus:ring-0 focus:outline-none"
                    placeholder="Search participants, events, or navigate..."
+                   aria-label="Search"
                    data-command-palette-target="input"
                    data-action="input->command-palette#search"
                    autocomplete="off"
                    spellcheck="false">
-            <kbd class="hidden sm:inline-flex items-center px-2 py-1 text-xs font-medium text-gray-400 bg-gray-100 rounded">
-              esc
-            </kbd>
+            <kbd class="hidden sm:inline-flex items-center px-2 py-1 text-xs font-medium rounded">esc</kbd>
           </div>
 
-          <!-- Results -->
-          <div class="max-h-80 overflow-y-auto py-2" data-command-palette-target="results">
-            <!-- Results rendered by JS -->
-          </div>
+          <div class="max-h-80 overflow-y-auto py-2" data-command-palette-target="results"></div>
 
-          <!-- Footer -->
-          <div class="flex items-center justify-between px-4 py-2 border-t border-gray-200 text-xs text-gray-400">
-            <div class="flex items-center space-x-2">
-              <span class="flex items-center">
-                <kbd class="px-1.5 py-0.5 bg-gray-100 rounded mr-1">↑</kbd>
-                <kbd class="px-1.5 py-0.5 bg-gray-100 rounded mr-1">↓</kbd>
-                to navigate
-              </span>
-              <span class="flex items-center">
-                <kbd class="px-1.5 py-0.5 bg-gray-100 rounded mr-1">↵</kbd>
-                to select
-              </span>
+          <div class="flex items-center justify-between px-4 py-2 border-t border-gray-200 text-xs text-gray-500">
+            <div class="flex items-center space-x-3">
+              <span class="flex items-center"><kbd class="px-1.5 py-0.5 rounded mr-1">↑</kbd><kbd class="px-1.5 py-0.5 rounded mr-1">↓</kbd> to navigate</span>
+              <span class="flex items-center"><kbd class="px-1.5 py-0.5 rounded mr-1">↵</kbd> to select</span>
             </div>
-            <span class="hidden sm:inline">
-              <kbd class="px-1.5 py-0.5 bg-gray-100 rounded">⌘</kbd>
-              <kbd class="px-1.5 py-0.5 bg-gray-100 rounded ml-0.5">K</kbd>
-              to open
-            </span>
+            <span class="hidden sm:inline"><kbd class="px-1.5 py-0.5 rounded">⌘</kbd><kbd class="px-1.5 py-0.5 rounded ml-0.5">K</kbd> to open</span>
           </div>
         </div>
       </div>

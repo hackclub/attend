@@ -1,9 +1,12 @@
 <% content_for :title, "Edit #{@series.name} – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Series", admin_series_index_path ], [ @series.name, admin_series_path(@series) ], [ "Settings", nil ]) %>
 
-<div class="w-full max-w-3xl">
-  <div class="mb-8">
-    <h1 class="text-2xl font-bold mb-1">Series settings</h1>
-    <p class="text-gray-500">Branding here is inherited by every event in <%= @series.name %> that doesn't set its own.</p>
+<div class="cs-stack max-w-3xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Series settings</h1>
+      <p class="cs-description">Branding here is inherited by every event in <%= @series.name %> that doesn't set its own.</p>
+    </div>
   </div>
 
   <%= render "form" %>

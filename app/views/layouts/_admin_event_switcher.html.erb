@@ -1,0 +1,47 @@
+<%# The event switcher — the console's equivalent of the AWS region selector. %>
+<%# Locals: variant (:topnav or :drawer), close_action (Stimulus action for the mobile drawer, or nil) %>
+<% item_data = close_action ? { action: close_action } : {} %>
+<div class="relative" data-controller="dropdown">
+  <% if variant == :topnav %>
+    <button type="button" class="cs-topnav-utility" data-action="dropdown#toggle" aria-haspopup="true" aria-expanded="false">
+      <span class="cs-topnav-utility-label">Event</span>
+      <span><%= current_event ? current_event.name : "All events" %></span>
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+    </button>
+  <% else %>
+    <button type="button" class="cs-input flex items-center gap-2 text-left cursor-pointer" data-action="dropdown#toggle" aria-haspopup="true" aria-expanded="false">
+      <span class="cs-muted">Event</span>
+      <span class="flex-1 truncate font-bold"><%= current_event ? current_event.name : "All events" %></span>
+      <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+    </button>
+  <% end %>
+
+  <div class="hidden cs-menu <%= variant == :topnav ? "cs-menu-right" : "left-0 right-0" %>" data-dropdown-target="menu">
+    <%= link_to admin_root_path(deselect: 1), class: "cs-menu-item", "aria-current": current_event ? nil : "true", data: item_data do %>
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      <span class="cs-menu-item-label">All events</span>
+    <% end %>
+    <div class="cs-menu-divider"></div>
+    <p class="cs-menu-group-label">Running and upcoming</p>
+    <div class="cs-menu-scroll">
+      <%# The current event leads the list, so it's never scrolled out of view. %>
+      <% current_first = available_events.partition { |e| current_event && e.id == current_event.id }.flatten %>
+      <% current_first.each do |event| %>
+        <% is_current = current_event && event.id == current_event.id %>
+        <% next if event.completed? && !is_current %>
+        <% if is_current %>
+          <div class="cs-menu-item" aria-current="true">
+            <%= render "admin/events/avatar", event: event, size: 20, rounded: "rounded" %>
+            <span class="cs-menu-item-label"><%= event.name %></span>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          </div>
+        <% else %>
+          <%= button_to select_admin_event_path(event), method: :post, data: { turbo: false }, class: "cs-menu-item", form: { class: "block" } do %>
+            <%= render "admin/events/avatar", event: event, size: 20, rounded: "rounded" %>
+            <span class="cs-menu-item-label"><%= event.name %></span>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+</div>

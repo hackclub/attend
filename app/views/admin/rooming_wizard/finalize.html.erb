@@ -1,136 +1,165 @@
-<div class="space-y-6">
-  <div class="flex items-center justify-between">
-    <div>
-      <h1 class="text-2xl font-bold text-gray-900">Rooming Wizard</h1>
-      <p class="mt-1 text-sm text-gray-600">Step 4: Review and assign room numbers</p>
-    </div>
-    <div class="flex items-center gap-4">
-      <span class="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
-        Step 4 of 4
-      </span>
-      <%= link_to assignments_admin_event_rooming_wizard_path(@event.slug), class: "text-sm text-gray-500 hover:text-gray-700" do %>
-        ← Back to Assignments
-      <% end %>
-    </div>
-  </div>
+<% content_for :title, "Rooming wizard: Room numbers – Attend" %>
 
-  <!-- Summary Stats -->
-  <div class="bg-white border border-gray-200 rounded-lg p-6">
-    <h2 class="text-lg font-medium text-gray-900 mb-4">Summary</h2>
-    
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-      <div class="bg-gray-50 rounded-lg p-4 text-center">
-        <p class="text-sm text-gray-500">Total Rooms</p>
-        <p class="text-2xl font-bold text-gray-900"><%= @stats[:total_rooms] %></p>
-      </div>
-      <div class="bg-green-50 rounded-lg p-4 text-center">
-        <p class="text-sm text-green-700">Assigned</p>
-        <p class="text-2xl font-bold text-green-900"><%= @stats[:assigned_participants] %></p>
-      </div>
-      <% if @stats[:unassigned_participants] > 0 %>
-        <div class="bg-red-50 rounded-lg p-4 text-center">
-          <p class="text-sm text-red-700">Unassigned</p>
-          <p class="text-2xl font-bold text-red-900"><%= @stats[:unassigned_participants] %></p>
+<%= render layout: "wizard", locals: {
+      current_step: "finalize",
+      title: "Room numbers and export",
+      description: "Review and assign room numbers."
+    } do %>
+  <div class="cs-stack">
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Summary</h2>
         </div>
-      <% end %>
-      <% if @stats[:rooms_needing_acknowledgment] > 0 %>
-        <div class="bg-purple-50 rounded-lg p-4 text-center">
-          <p class="text-sm text-purple-700">Needs Ack</p>
-          <p class="text-2xl font-bold text-purple-900"><%= @stats[:rooms_needing_acknowledgment] %></p>
-        </div>
-      <% end %>
-      <% if @stats[:rooms_with_age_gap] > 0 %>
-        <div class="bg-yellow-50 rounded-lg p-4 text-center">
-          <p class="text-sm text-yellow-700">Age Gap Warnings</p>
-          <p class="text-2xl font-bold text-yellow-900"><%= @stats[:rooms_with_age_gap] %></p>
-        </div>
-      <% end %>
-    </div>
-
-    <% if @stats[:unassigned_participants] > 0 %>
-      <div class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-        <p class="text-sm text-red-700">
-          <strong>Warning:</strong> There are <%= @stats[:unassigned_participants] %> unassigned participants.
-          <%= link_to "Go back to fix", assignments_admin_event_rooming_wizard_path(@event.slug), class: "underline" %>
-        </p>
       </div>
-    <% end %>
-
-    <% if @stats[:rooms_needing_acknowledgment] > 0 %>
-      <div class="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-        <p class="text-sm text-purple-700">
-          <strong>Note:</strong> There are <%= @stats[:rooms_needing_acknowledgment] %> rooms with trans/NB pairings that need acknowledgment.
-        </p>
-      </div>
-    <% end %>
-  </div>
-
-  <!-- Room Numbers Assignment -->
-  <div class="bg-white border border-gray-200 rounded-lg">
-    <div class="px-6 py-4 border-b border-gray-200">
-      <h2 class="text-lg font-medium text-gray-900">Assign Room Numbers</h2>
-      <p class="text-sm text-gray-500">Enter room numbers for each room grouping</p>
-    </div>
-    
-    <div class="divide-y divide-gray-100">
-      <% @rooms.each do |room| %>
-        <div class="p-4 flex items-center gap-4">
-          <div class="w-32">
-            <input type="text" 
-                   value="<%= room.name %>" 
-                   placeholder="Room #"
-                   class="block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] text-sm"
-                   data-update-room-name="<%= room.id %>">
+      <div class="cs-container-body cs-stack">
+        <dl class="cs-kv cs-kv-4 cs-kv-divided">
+          <div>
+            <dt class="cs-kv-label">Total rooms</dt>
+            <dd class="cs-kv-value-lg"><%= @stats[:total_rooms] %></dd>
           </div>
-          <div class="flex-1">
-            <div class="flex flex-wrap gap-2">
-              <% room.staff_names_list.each do |staff_name| %>
-                <span class="inline-flex items-center px-2 py-1 rounded-full text-sm bg-orange-100 text-orange-800">
-                  <%= staff_name %>
-                  <span class="ml-1 text-orange-500 text-xs">(Staff)</span>
-                </span>
-              <% end %>
-              <% room.room_assignments.each do |assignment| %>
-                <% has_hotel_scan = @hotel_scan_context && assignment.participant_event.scans.any? { |s| s.scan_context_id == @hotel_scan_context.id } %>
-                <span class="inline-flex items-center px-2 py-1 rounded-full text-sm <%= has_hotel_scan ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' %>">
-                  <%= assignment.participant_event.participant.full_name %>
-                  <span class="ml-1 <%= has_hotel_scan ? 'text-green-600' : 'text-gray-500' %> text-xs">(Age <%= assignment.participant_event.age_on_event %>)</span>
-                </span>
-              <% end %>
+          <div>
+            <dt class="cs-kv-label">Assigned</dt>
+            <dd class="cs-kv-value-lg"><%= @stats[:assigned_participants] %></dd>
+          </div>
+          <% if @stats[:unassigned_participants] > 0 %>
+            <div>
+              <dt class="cs-kv-label">Unassigned</dt>
+              <dd class="cs-kv-value-lg"><%= @stats[:unassigned_participants] %></dd>
+            </div>
+          <% end %>
+          <% if @stats[:rooms_needing_acknowledgment] > 0 %>
+            <div>
+              <dt class="cs-kv-label">Needs ack</dt>
+              <dd class="cs-kv-value-lg"><%= @stats[:rooms_needing_acknowledgment] %></dd>
+            </div>
+          <% end %>
+          <% if @stats[:rooms_with_age_gap] > 0 %>
+            <div>
+              <dt class="cs-kv-label">Age gap warnings</dt>
+              <dd class="cs-kv-value-lg"><%= @stats[:rooms_with_age_gap] %></dd>
+            </div>
+          <% end %>
+        </dl>
+
+        <% if @stats[:unassigned_participants] > 0 %>
+          <div class="cs-alert cs-alert-error">
+            <%= cs_status_icon(:error) %>
+            <div>
+              <p class="cs-alert-title">Warning</p>
+              <p>
+                There are <%= @stats[:unassigned_participants] %> unassigned participants.
+                <%= link_to "Go back to fix", assignments_admin_event_rooming_wizard_path(@event.slug), class: "cs-link cs-link-strong" %>
+              </p>
             </div>
           </div>
-          <div class="flex items-center gap-2 text-sm text-gray-500">
-            <span><%= room.room_assignments.size %>/<%= room.capacity %></span>
-            <% if room.staff_only? %>
-              <span class="text-orange-600">Staff</span>
-            <% end %>
-            <% if room.age_gap > 2 %>
-              <span class="text-yellow-600">Age gap: <%= room.age_gap %>y</span>
-            <% end %>
-          </div>
-        </div>
-      <% end %>
-    </div>
-  </div>
+        <% end %>
 
-  <!-- Export -->
-  <div class="bg-white border border-gray-200 rounded-lg p-6">
-    <div class="flex items-center justify-between">
-      <div>
-        <h3 class="font-medium text-gray-900">Export Rooming List</h3>
-        <p class="text-sm text-gray-500">Download the current rooming assignments. You can continue editing after exporting.</p>
-      </div>
-      <div class="flex gap-3">
-        <%= link_to export_csv_admin_event_rooming_wizard_path(@event.slug, format: :csv), class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md  text-white bg-green-600 hover:bg-green-700" do %>
-          <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-          </svg>
-          Export CSV
+        <% if @stats[:rooms_needing_acknowledgment] > 0 %>
+          <div class="cs-alert cs-alert-warning">
+            <%= cs_status_icon(:warning) %>
+            <div>
+              <p class="cs-alert-title">Note</p>
+              <p>There are <%= @stats[:rooms_needing_acknowledgment] %> rooms with trans/NB pairings that need acknowledgment.</p>
+            </div>
+          </div>
         <% end %>
       </div>
-    </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <div>
+          <h2 class="cs-h2">Assign room numbers <span class="cs-counter">(<%= @rooms.size %>)</span></h2>
+          <p class="cs-container-description">Enter room numbers for each room grouping</p>
+        </div>
+      </div>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Room number</th>
+              <th scope="col">Occupants</th>
+              <th scope="col">Occupancy</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @rooms.each do |room| %>
+              <tr>
+                <td class="w-40">
+                  <input type="text"
+                         value="<%= room.name %>"
+                         placeholder="Room #"
+                         aria-label="Room number"
+                         class="cs-input"
+                         data-update-room-name="<%= room.id %>">
+                </td>
+                <td>
+                  <div class="cs-token-group">
+                    <% room.staff_names_list.each do |staff_name| %>
+                      <span class="cs-token cs-token-readonly">
+                        <%= staff_name %>
+                        <%= cs_badge("Staff", "yellow") %>
+                      </span>
+                    <% end %>
+                    <% room.room_assignments.each do |assignment| %>
+                      <% has_hotel_scan = @hotel_scan_context && assignment.participant_event.scans.any? { |s| s.scan_context_id == @hotel_scan_context.id } %>
+                      <span class="cs-token cs-token-readonly">
+                        <% if has_hotel_scan %>
+                          <%= cs_status(:success, assignment.participant_event.participant.full_name) %>
+                        <% else %>
+                          <%= assignment.participant_event.participant.full_name %>
+                        <% end %>
+                        <span class="cs-small cs-muted">(Age <%= assignment.participant_event.age_on_event %>)</span>
+                      </span>
+                    <% end %>
+                  </div>
+                </td>
+                <td class="whitespace-nowrap">
+                  <div class="flex flex-col items-start gap-1">
+                    <span><%= room.room_assignments.size %>/<%= room.capacity %></span>
+                    <% if room.staff_only? %>
+                      <%= cs_badge("Staff", "yellow") %>
+                    <% end %>
+                    <% if room.age_gap > 2 %>
+                      <%= cs_status(:warning, "Age gap: #{room.age_gap}y") %>
+                    <% end %>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+      <% if @rooms.empty? %>
+        <div class="cs-empty">
+          <p class="cs-empty-title">No rooms</p>
+        </div>
+      <% end %>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Export rooming list</h2>
+          <p class="cs-container-description">Download the current rooming assignments. You can continue editing after exporting.</p>
+        </div>
+        <div class="cs-actions">
+          <%= link_to export_csv_admin_event_rooming_wizard_path(@event.slug, format: :csv), class: "cs-btn cs-btn-primary" do %>
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            Export CSV
+          <% end %>
+        </div>
+      </div>
+    </section>
   </div>
-</div>
+
+  <div class="cs-wizard-actions">
+    <%= link_to "Previous", assignments_admin_event_rooming_wizard_path(@event.slug), class: "cs-btn" %>
+  </div>
+<% end %>
 
 <script nonce="<%= content_security_policy_nonce %>">
 async function updateRoomName(roomId, name) {

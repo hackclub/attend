@@ -16,7 +16,7 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
       get preferences_admin_event_rooming_wizard_path(event.slug)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Assign Manually")
+      expect(response.body).to include("Assign manually")
       expect(response.body).to include(manual_assign_admin_event_rooming_wizard_path(event.slug))
     end
   end

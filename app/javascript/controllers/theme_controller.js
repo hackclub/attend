@@ -6,7 +6,7 @@ export default class extends Controller {
 
   apply(event) {
     const theme = event.target.value
-    document.documentElement.setAttribute("data-theme", theme)
+    document.documentElement.setAttribute("data-theme", this.displayTheme(theme))
 
     const token = document.querySelector('meta[name="csrf-token"]')?.content
     fetch(this.urlValue || "/theme", {
@@ -18,5 +18,17 @@ export default class extends Controller {
       },
       body: JSON.stringify({ theme })
     }).catch(() => {})
+  }
+
+  // The admin console only has light and dark (see ConsoleHelper), so a
+  // picked theme is collapsed to one of them there, the same way the server
+  // renders it on the next load.
+  displayTheme(theme) {
+    const root = document.documentElement
+    if (!root.classList.contains("cs-console")) return theme
+
+    let lightThemes = ["light"]
+    try { lightThemes = JSON.parse(root.dataset.consoleLightThemes || "[\"light\"]") } catch (e) {}
+    return lightThemes.includes(theme) ? "light" : "dark"
   }
 }

@@ -3,15 +3,23 @@
 <div>
   <%= render "header" %>
 
-  <div class="bg-purple-50 border border-purple-200 text-purple-800 px-4 py-3 rounded mb-6">
-    <strong>🔒 Restricted Access</strong>
-    <p class="text-sm mt-1">This information is restricted to safeguarding leads only.</p>
+  <div class="cs-alert cs-alert-warning mb-5">
+    <%= cs_status_icon(:warning) %>
+    <div>
+      <p class="cs-alert-title">Restricted access</p>
+      <p>This information is restricted to safeguarding leads only.</p>
+    </div>
   </div>
 
-  <div class="space-y-6">
-    <section class="bg-white rounded-lg border border-gray-200 p-6">
-      <h2 class="text-lg font-semibold mb-4">Engagement Preference</h2>
-      <p class="text-sm text-gray-500 mb-3">How this participant prefers to engage at events – helps identify if low participation is a concern or simply their preference.</p>
+  <div class="cs-stack">
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Engagement preference</h2>
+          <p class="cs-container-description">How this participant prefers to engage at events – helps identify if low participation is a concern or simply their preference.</p>
+        </div>
+      </div>
+      <div class="cs-container-body">
 
       <% participant = @participant_event.participant %>
       <% if participant.engagement_preference.present? || participant.engagement_notes.present? %>
@@ -19,13 +27,10 @@
           <% if participant.engagement_preference.present? %>
             <div class="flex items-center gap-2">
               <% preference = participant.engagement_preference %>
-              <% badge_class = case preference
-                when "very_social" then "bg-green-100 text-green-800"
-                when "social_with_downtime" then "bg-blue-100 text-blue-800"
-                when "balanced" then "bg-gray-100 text-gray-800"
-                when "mostly_focused" then "bg-yellow-100 text-yellow-800"
-                when "very_focused" then "bg-orange-100 text-orange-800"
-                else "bg-gray-100 text-gray-800"
+              <% badge_color = case preference
+                when "very_social" then "green"
+                when "social_with_downtime" then "blue"
+                when "mostly_focused", "very_focused" then "yellow"
               end %>
               <% preference_label = {
                 "very_social" => "Very social – loves group activities",
@@ -34,33 +39,39 @@
                 "mostly_focused" => "Mostly focused on projects",
                 "very_focused" => "Very focused – prefers heads-down work"
               }[preference] || preference.humanize %>
-              <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium <%= badge_class %>">
-                <%= preference_label %>
-              </span>
+              <%= cs_badge(preference_label, badge_color) %>
             </div>
           <% end %>
 
           <% if participant.engagement_notes.present? %>
-            <div class="bg-gray-50 border border-gray-200 rounded-md p-3">
-              <p class="text-sm text-gray-700"><%= participant.engagement_notes %></p>
+            <div class="rounded p-3 bg-(--cs-bg-shaded)">
+              <p><%= participant.engagement_notes %></p>
             </div>
           <% end %>
         </div>
       <% else %>
-        <p class="text-gray-500 italic">Not provided</p>
+        <p class="cs-muted italic">Not provided</p>
       <% end %>
+      </div>
     </section>
-    <section class="bg-white rounded-lg border border-gray-200 p-6">
-      <h2 class="text-lg font-semibold mb-4">Safeguarding Flags</h2>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Safeguarding flags</h2>
+      </div>
+      <div class="cs-container-body">
 
       <%= form_with model: @safeguarding_info, url: safeguarding_admin_event_participant_path(current_event, @participant_event), method: :patch, local: true do |f| %>
         <% if @safeguarding_info.errors.any? %>
-          <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded mb-6">
-            <ul class="list-disc list-inside">
-              <% @safeguarding_info.errors.full_messages.each do |msg| %>
-                <li><%= msg %></li>
-              <% end %>
-            </ul>
+          <div class="cs-alert cs-alert-error mb-5" role="alert">
+            <%= cs_status_icon(:error) %>
+            <div>
+              <p class="cs-alert-title"><%= pluralize(@safeguarding_info.errors.count, "error") %> stopped this from saving</p>
+              <ul class="mt-1 list-disc list-inside">
+                <% @safeguarding_info.errors.full_messages.each do |msg| %>
+                  <li><%= msg %></li>
+                <% end %>
+              </ul>
+            </div>
           </div>
         <% end %>
 
@@ -68,15 +79,15 @@
           <div class="space-y-4">
             <div>
               <%= f.label :high_support_flag, class: "flex items-center gap-2 cursor-pointer" do %>
-                <%= f.check_box :high_support_flag, class: "w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" %>
-                <span class="text-sm font-medium text-purple-700">High Support Flag</span>
+                <%= f.check_box :high_support_flag, class: "w-4 h-4 accent-(--cs-accent)" %>
+                <span class="font-bold">High support flag</span>
               <% end %>
-              <p class="ml-6 text-sm text-gray-500">Mark if participant requires additional support</p>
+              <p class="ml-6 cs-small cs-muted">Mark if participant requires additional support</p>
             </div>
 
             <div>
-              <%= f.label :high_support_notes, class: "block text-sm font-medium text-gray-700 mb-1" %>
-              <%= f.text_area :high_support_notes, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500" %>
+              <%= f.label :high_support_notes, class: "cs-field-label" %>
+              <%= f.text_area :high_support_notes, rows: 3, class: "cs-input" %>
             </div>
           </div>
 
@@ -84,58 +95,62 @@
             <% if current_event.freedom_waivers_enabled? %>
             <div>
               <%= f.label :freedom_waiver_granted, class: "flex items-center gap-2 cursor-pointer" do %>
-                <%= f.check_box :freedom_waiver_granted, class: "w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500" %>
-                <span class="text-sm font-medium text-green-700">Freedom Waiver Granted</span>
+                <%= f.check_box :freedom_waiver_granted, class: "w-4 h-4 accent-(--cs-accent)" %>
+                <span class="font-bold">Freedom waiver granted</span>
               <% end %>
-              <p class="ml-6 text-sm text-gray-500">Participant has guardian permission for independent movement</p>
+              <p class="ml-6 cs-small cs-muted">Participant has guardian permission for independent movement</p>
             </div>
             <% end %>
 
             <div>
               <%= f.label :can_leave_unaccompanied, class: "flex items-center gap-2 cursor-pointer" do %>
-                <%= f.check_box :can_leave_unaccompanied, class: "w-4 h-4 rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
-                <span class="text-sm font-medium text-gray-700">Can Leave Unaccompanied</span>
+                <%= f.check_box :can_leave_unaccompanied, class: "w-4 h-4 accent-(--cs-accent)" %>
+                <span class="font-bold">Can leave unaccompanied</span>
               <% end %>
-              <p class="ml-6 text-sm text-gray-500">Participant can leave venue without supervision</p>
+              <p class="ml-6 cs-small cs-muted">Participant can leave venue without supervision</p>
             </div>
           </div>
 
           <div>
-            <%= f.label :authorized_pickup_adults, class: "block text-sm font-medium text-gray-700 mb-1" %>
-            <%= f.text_area :authorized_pickup_adults, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500" %>
-            <p class="mt-1 text-sm text-gray-500">Names and contact information of adults authorized to pick up the participant</p>
+            <%= f.label :authorized_pickup_adults, class: "cs-field-label" %>
+            <%= f.text_area :authorized_pickup_adults, rows: 3, class: "cs-input" %>
+            <p class="cs-field-hint">Names and contact information of adults authorized to pick up the participant</p>
           </div>
 
           <div>
-            <%= f.label :other_instructions, class: "block text-sm font-medium text-gray-700 mb-1" %>
-            <%= f.text_area :other_instructions, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500" %>
-            <p class="mt-1 text-sm text-gray-500">Any other safeguarding instructions or notes</p>
+            <%= f.label :other_instructions, class: "cs-field-label" %>
+            <%= f.text_area :other_instructions, rows: 3, class: "cs-input" %>
+            <p class="cs-field-hint">Any other safeguarding instructions or notes</p>
           </div>
 
-          <div class="pt-4 flex flex-col sm:flex-row gap-3">
-            <%= f.submit "Save Safeguarding Information", class: "w-full sm:w-auto bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 cursor-pointer" %>
-            <%= link_to "Cancel", admin_event_participant_path(current_event, @participant_event), class: "w-full sm:w-auto text-center px-6 py-2 text-gray-600 hover:text-gray-900" %>
+          <div class="pt-2 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+            <%= link_to "Cancel", admin_event_participant_path(current_event, @participant_event), class: "cs-btn cs-btn-link cs-btn-full" %>
+            <%= f.button "Save safeguarding information", class: "cs-btn cs-btn-primary cs-btn-full" %>
           </div>
         </div>
       <% end %>
+      </div>
     </section>
 
-    <section class="bg-white rounded-lg border border-gray-200 p-6">
-      <h2 class="text-lg font-semibold mb-4">Guardians</h2>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Guardians</h2>
+      </div>
+      <div class="cs-container-body">
 
       <% if @guardians.any? %>
         <div class="space-y-4">
           <% @guardians.each do |guardian| %>
-            <div class="border rounded-lg p-4">
+            <div class="border border-(--cs-border-divider-secondary) rounded-lg p-4">
               <div class="flex justify-between items-start">
                 <div>
-                  <div class="font-medium text-gray-900"><%= guardian.full_name %></div>
-                  <div class="text-sm text-gray-600"><%= guardian.email %></div>
+                  <div class="font-bold"><%= guardian.full_name %></div>
+                  <div class="cs-secondary"><%= guardian.email %></div>
                   <% if guardian.phone.present? %>
-                    <div class="text-sm text-gray-600"><%= guardian.phone %></div>
+                    <div class="cs-secondary"><%= guardian.phone %></div>
                   <% end %>
                   <% if guardian.address_line_1.present? %>
-                    <div class="text-sm text-gray-500 mt-2">
+                    <div class="cs-muted mt-2">
                       <%= guardian.address_line_1 %><br>
                       <% if guardian.address_line_2.present? %><%= guardian.address_line_2 %><br><% end %>
                       <%= [guardian.city, guardian.state, guardian.postal_code].compact.join(", ") %><br>
@@ -145,55 +160,60 @@
                 </div>
                 <% gpe = @participant_event.guardian_participant_events.find_by(guardian: guardian) %>
                 <% if gpe&.is_primary_guardian %>
-                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Primary</span>
+                  <%= cs_badge("Primary", "blue") %>
                 <% end %>
               </div>
             </div>
           <% end %>
         </div>
       <% else %>
-        <p class="text-gray-500">No guardians linked to this participant.</p>
+        <p class="cs-muted">No guardians linked to this participant.</p>
       <% end %>
+      </div>
     </section>
 
-    <section class="bg-white rounded-lg border border-gray-200 p-6">
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="text-lg font-semibold">Emergency Contacts</h2>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Emergency Contacts</h2>
         <% if policy(@participant_event).update_safeguarding? %>
-          <%= link_to "+ Add contact", new_admin_event_participant_emergency_contact_path(current_event, @participant_event), class: "text-sm bg-purple-600 text-white px-3 py-1.5 rounded-md hover:bg-purple-700" %>
+          <div class="cs-actions">
+            <%= link_to "Add contact", new_admin_event_participant_emergency_contact_path(current_event, @participant_event), class: "cs-btn" %>
+          </div>
         <% end %>
       </div>
+      <div class="cs-container-body">
 
       <% if @emergency_contacts.any? %>
         <div class="space-y-3">
           <% @emergency_contacts.order(:priority).each_with_index do |contact, index| %>
-            <div class="flex items-start gap-4 border-b border-gray-100 pb-3 last:border-0 last:pb-0">
-              <span class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium"><%= index + 1 %></span>
+            <div class="flex items-start gap-4 border-b border-(--cs-border-divider-secondary) pb-3 last:border-0 last:pb-0">
+              <span class="w-6 h-6 shrink-0 rounded-full bg-(--cs-bg-shaded) flex items-center justify-center cs-small font-bold"><%= index + 1 %></span>
               <div class="flex-1">
-                <div class="font-medium text-gray-900"><%= contact.name %></div>
-                <div class="text-sm text-gray-600"><%= contact.phone %></div>
+                <div class="font-bold"><%= contact.name %></div>
+                <div class="cs-secondary"><%= contact.phone %></div>
                 <% if contact.email.present? %>
-                  <div class="text-sm text-gray-600"><%= contact.email %></div>
+                  <div class="cs-secondary"><%= contact.email %></div>
                 <% end %>
                 <% if contact.relationship.present? %>
-                  <div class="text-sm text-gray-500"><%= contact.relationship %></div>
+                  <div class="cs-muted"><%= contact.relationship %></div>
                 <% end %>
                 <% if contact.guardian.present? %>
-                  <div class="text-xs text-gray-400 mt-1">Linked to guardian: <%= contact.guardian.full_name %></div>
+                  <div class="cs-small cs-muted mt-1">Linked to guardian: <%= contact.guardian.full_name %></div>
                 <% end %>
               </div>
               <% if policy(@participant_event).update_safeguarding? %>
-                <div class="flex gap-3 text-sm">
-                  <%= link_to "Edit", edit_admin_event_participant_emergency_contact_path(current_event, @participant_event, contact), class: "text-purple-600 hover:text-purple-700" %>
-                  <%= button_to "Delete", admin_event_participant_emergency_contact_path(current_event, @participant_event, contact), method: :delete, data: { turbo_confirm: "Delete this emergency contact?" }, class: "text-red-600 hover:text-red-700 cursor-pointer", form: { class: "inline" } %>
+                <div class="flex gap-1">
+                  <%= link_to "Edit", edit_admin_event_participant_emergency_contact_path(current_event, @participant_event, contact), class: "cs-btn cs-btn-link" %>
+                  <%= button_to "Delete", admin_event_participant_emergency_contact_path(current_event, @participant_event, contact), method: :delete, data: { turbo_confirm: "Delete this emergency contact?" }, class: "cs-btn cs-btn-link", form: { class: "inline" } %>
                 </div>
               <% end %>
             </div>
           <% end %>
         </div>
       <% else %>
-        <p class="text-gray-500">No emergency contacts recorded.</p>
+        <p class="cs-muted">No emergency contacts recorded.</p>
       <% end %>
+      </div>
     </section>
   </div>
 </div>

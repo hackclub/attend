@@ -1,32 +1,23 @@
 module Admin::DashboardHelper
-  def severity_badge_class(severity)
-    case severity
-    when "critical"
-      "bg-red-600 text-white"
-    when "high"
-      "bg-red-100 text-red-800"
-    when "medium"
-      "bg-amber-100 text-amber-800"
-    when "low"
-      "bg-green-100 text-green-800"
+  # The single phase an event row shows, as [label, status indicator type].
+  # An event with no dates used to fall through to "Active", which read as
+  # "happening now" on a row that was really an unscheduled draft.
+  def event_phase(event)
+    if event.completed?
+      [ "Past", :stopped ]
+    elsif event.starts_at.nil?
+      [ "Draft", :pending ]
+    elsif event.starts_at > Time.current
+      [ "Upcoming", :info ]
     else
-      "bg-gray-100 text-gray-800"
+      [ "Active", :success ]
     end
   end
 
-  # The single phase pill an event row shows, as [label, badge classes].
-  # An event with no dates used to fall through to "Active", which read as
-  # "happening now" on a row that was really an unscheduled draft.
-  def event_phase_badge(event)
-    if event.completed?
-      [ "Past", "bg-gray-100 text-gray-500" ]
-    elsif event.starts_at.nil?
-      [ "Draft", "bg-gray-100 text-gray-500" ]
-    elsif event.starts_at > Time.current
-      [ "Upcoming", "bg-blue-50 text-blue-700" ]
-    else
-      [ "Active", "bg-green-50 text-green-700" ]
-    end
+  # Cloudscape status indicator for an event's phase.
+  def event_phase_status(event)
+    label, type = event_phase(event)
+    cs_status(type, label)
   end
 
   # "Aug 13, 2026" · "Aug 13–15, 2026" · "Aug 30 – Sep 2, 2026" ·

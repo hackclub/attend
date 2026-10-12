@@ -1,128 +1,141 @@
-<div class="max-w-4xl mx-auto px-4 py-6">
-  <div class="mb-6">
-    <h1 class="text-3xl font-bold">Global API Tokens</h1>
-    <p class="text-gray-600 text-sm mt-1">
-      Global tokens authenticate to the API as you, with your full global-admin access across every event —
-      unless you limit one to specific scopes below. Only global admins can create them. Treat them like a password.
-    </p>
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Global API tokens</h1>
+      <p class="cs-description">
+        Global tokens authenticate to the API as you, with your full global-admin access across every event —
+        unless you limit one to specific scopes below. Only global admins can create them. Treat them like a password.
+      </p>
+    </div>
   </div>
 
-  <!-- Create -->
-  <div class="bg-white border border-gray-200 rounded-lg mb-6">
-    <div class="p-4 border-b border-gray-100">
-      <h2 class="font-semibold text-gray-900">Create a token</h2>
+  <% if flash[:global_api_token] %>
+    <div class="cs-alert cs-alert-success" role="status">
+      <%= cs_status_icon(:success) %>
+      <div class="min-w-0">
+        <p class="cs-alert-title">Your new token</p>
+        <p class="flex flex-wrap items-center gap-2 my-1">
+          <span class="cs-copy">
+            <span class="cs-copy-value"><%= flash[:global_api_token] %></span>
+          </span>
+          <button type="button" class="cs-btn"
+                  data-controller="clipboard"
+                  data-clipboard-content-value="<%= flash[:global_api_token] %>"
+                  data-action="click->clipboard#copy">Copy</button>
+        </p>
+        <p>Copy this token now. It won't be shown again.</p>
+      </div>
     </div>
-    <div class="p-4">
-      <%= form_with url: admin_global_api_tokens_path, method: :post, class: "space-y-4" do |f| %>
-        <div class="max-w-md">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Name (optional)</label>
-          <%= f.text_field :name,
-                placeholder: "e.g. reporting script",
-                class: "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#ec3750] focus:border-[#ec3750]" %>
+  <% end %>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Create a token</h2>
+    </div>
+    <div class="cs-container-body">
+      <%= form_with url: admin_global_api_tokens_path, method: :post do |f| %>
+        <div class="cs-field max-w-md">
+          <%= f.label :name, "Name (optional)", class: "cs-field-label" %>
+          <%= f.text_field :name, placeholder: "e.g. reporting script", class: "cs-input" %>
         </div>
 
-        <div>
-          <span class="block text-sm font-medium text-gray-700 mb-1">Limit to scopes (optional)</span>
-          <p class="text-xs text-gray-500 mb-2">
+        <fieldset class="cs-field">
+          <legend class="cs-field-label">Limit to scopes (optional)</legend>
+          <p class="cs-field-description">
             Leave every box unchecked for a full-access token. Tick one and the token can do
             <strong>only</strong> that — every other endpoint returns 403, including read-only ones.
           </p>
-          <div class="space-y-2">
+          <div class="mt-2">
             <% GlobalApiToken::SCOPES.each do |scope, label| %>
-              <label class="flex items-center gap-2">
-                <%= check_box_tag "scopes[]", scope, false,
-                      class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]",
-                      id: "scope_#{scope.parameterize.underscore}" %>
-                <span class="text-sm text-gray-700"><%= label %></span>
-                <code class="text-xs text-gray-400"><%= scope %></code>
-              </label>
+              <% scope_id = "scope_#{scope.parameterize.underscore}" %>
+              <div class="cs-option">
+                <%= check_box_tag "scopes[]", scope, false, id: scope_id %>
+                <div>
+                  <label for="<%= scope_id %>" class="cs-option-label"><%= label %></label>
+                  <p class="cs-option-description"><code><%= scope %></code></p>
+                </div>
+              </div>
             <% end %>
           </div>
-        </div>
+        </fieldset>
 
-        <%= f.submit "Generate Token",
-              class: "bg-[#d42f46] hover:bg-[#b82840] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer" %>
-      <% end %>
-
-      <% if flash[:global_api_token] %>
-        <div class="mt-4">
-          <label class="block text-sm font-medium text-gray-700 mb-1">Your new token</label>
-          <code class="block bg-yellow-100 px-3 py-2 rounded text-sm font-mono overflow-x-auto"><%= flash[:global_api_token] %></code>
-          <p class="text-xs text-amber-600 mt-1">⚠️ Copy this token now. It won't be shown again.</p>
+        <div class="flex justify-end mt-4">
+          <%= f.button "Generate token", class: "cs-btn cs-btn-primary cs-btn-full" %>
         </div>
       <% end %>
     </div>
-  </div>
+  </section>
 
-  <!-- List -->
-  <div class="bg-white border border-gray-200 rounded-lg">
-    <div class="p-4 border-b border-gray-100">
-      <h2 class="font-semibold text-gray-900">Your tokens</h2>
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided">
+      <h2 class="cs-h2">Your tokens <span class="cs-counter">(<%= @global_api_tokens.size %>)</span></h2>
     </div>
 
     <% if @global_api_tokens.any? %>
-      <div class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="text-left text-gray-500 border-b border-gray-100">
-            <th class="px-4 py-2 font-medium">Name</th>
-            <th class="px-4 py-2 font-medium">Scope</th>
-            <th class="px-4 py-2 font-medium">Created</th>
-            <th class="px-4 py-2 font-medium">Last used</th>
-            <th class="px-4 py-2 font-medium">Status</th>
-            <th class="px-4 py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <% @global_api_tokens.each do |token| %>
-            <tr class="border-b border-gray-50">
-              <td class="px-4 py-3 font-medium text-gray-900"><%= token.name.presence || "Untitled" %></td>
-              <td class="px-4 py-3">
-                <% if token.unrestricted? %>
-                  <span class="px-2 py-1 text-xs font-medium rounded bg-amber-100 text-amber-800 whitespace-nowrap">Full access</span>
-                <% else %>
-                  <div class="flex flex-wrap gap-1">
-                    <% token.scope_labels.each do |label| %>
-                      <span class="px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800 whitespace-nowrap"><%= label %></span>
-                    <% end %>
-                  </div>
-                <% end %>
-              </td>
-              <td class="px-4 py-3 text-gray-600"><%= token.created_at.strftime("%b %-d, %Y") %></td>
-              <td class="px-4 py-3 text-gray-600"><%= token.last_used_at ? time_ago_in_words(token.last_used_at) + " ago" : "Never" %></td>
-              <td class="px-4 py-3">
-                <% if token.active? %>
-                  <span class="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">Active</span>
-                <% else %>
-                  <span class="px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-600">Revoked</span>
-                <% end %>
-              </td>
-              <td class="px-4 py-3 text-right">
-                <% if token.active? %>
-                  <%= button_to "Revoke",
-                        revoke_admin_global_api_token_path(token),
-                        method: :delete,
-                        data: { turbo_confirm: "Revoke this token? Anything using it will immediately lose access." },
-                        class: "text-red-600 hover:text-red-800 text-sm font-medium" %>
-                <% end %>
-              </td>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Scope</th>
+              <th scope="col">Created</th>
+              <th scope="col">Last used</th>
+              <th scope="col">Status</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
             </tr>
-          <% end %>
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            <% @global_api_tokens.each do |token| %>
+              <tr>
+                <td><%= token.name.presence || "Untitled" %></td>
+                <td>
+                  <% if token.unrestricted? %>
+                    <%= cs_badge("Full access", "yellow") %>
+                  <% else %>
+                    <div class="cs-token-group">
+                      <% token.scope_labels.each do |label| %>
+                        <span class="cs-token cs-token-readonly"><%= label %></span>
+                      <% end %>
+                    </div>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap"><%= token.created_at.strftime("%b %-d, %Y") %></td>
+                <td class="whitespace-nowrap"><%= token.last_used_at ? time_ago_in_words(token.last_used_at) + " ago" : "Never" %></td>
+                <td class="whitespace-nowrap">
+                  <% if token.active? %>
+                    <%= cs_status(:success, "Active") %>
+                  <% else %>
+                    <%= cs_status(:stopped, "Revoked") %>
+                  <% end %>
+                </td>
+                <td class="text-right">
+                  <% if token.active? %>
+                    <%= button_to "Revoke",
+                          revoke_admin_global_api_token_path(token),
+                          method: :delete,
+                          data: { turbo_confirm: "Revoke this token? Anything using it will immediately lose access." },
+                          class: "cs-btn cs-btn-link" %>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
       </div>
     <% else %>
-      <p class="px-4 py-6 text-gray-400 text-sm">No tokens yet.</p>
+      <div class="cs-empty">
+        <p class="cs-empty-title">No tokens yet.</p>
+      </div>
     <% end %>
-  </div>
+  </section>
 
-  <details class="mt-6">
-    <summary class="cursor-pointer text-sm text-[#ec3750] hover:text-[#d42f46] font-medium">View API usage example</summary>
-    <div class="mt-3 bg-gray-50 rounded-lg p-4">
-      <pre class="bg-gray-800 text-gray-100 p-3 rounded text-xs overflow-x-auto">curl <%= api_v1_events_url %> \
+  <details class="cs-expandable cs-expandable-container">
+    <summary>API usage example</summary>
+    <div class="cs-expandable-content">
+      <pre class="cs-copy-value p-3 rounded bg-(--cs-bg-shaded) overflow-x-auto">curl <%= api_v1_events_url %> \
   -H "Authorization: Bearer YOUR_GLOBAL_TOKEN"</pre>
-      <p class="text-xs text-gray-500 mt-3 mb-1">With a token scoped to <code>bans:write</code>:</p>
-      <pre class="bg-gray-800 text-gray-100 p-3 rounded text-xs overflow-x-auto">curl -X POST <%= api_v1_bans_url %> \
+      <p class="cs-small cs-secondary mt-3 mb-1">With a token scoped to <code>bans:write</code>:</p>
+      <pre class="cs-copy-value p-3 rounded bg-(--cs-bg-shaded) overflow-x-auto">curl -X POST <%= api_v1_bans_url %> \
   -H "Authorization: Bearer YOUR_SCOPED_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"email":"banned@example.com","reason":"why"}'</pre>

@@ -1,13 +1,14 @@
 <%# Renders a logo or a letter fallback for an Event or EventSeries. %>
 <%# Events without their own logo inherit their series' via effective_logo. %>
+<%# Decorative: it always sits beside the event name, so alt is empty. %>
 <%# Locals: event, size: integer (px, default 24), rounded: tailwind class (default "rounded-full") %>
 <% size ||= 24 %>
 <% rounded ||= "rounded-full" %>
 <% logo = event.effective_logo %>
 <% if logo&.content_type == "image/svg+xml" %>
-  <%= image_tag logo, class: "#{rounded} object-cover flex-shrink-0 bg-white", style: "height: #{size}px; width: #{size}px;" %>
+  <%= image_tag logo, alt: "", class: "#{rounded} object-cover flex-shrink-0 bg-white", style: "height: #{size}px; width: #{size}px;" %>
 <% elsif variant_safe?(logo) %>
-  <%= image_tag logo.variant(resize_to_fill: [size * 2, size * 2]), class: "#{rounded} object-cover flex-shrink-0", style: "height: #{size}px; width: #{size}px;" %>
+  <%= image_tag logo.variant(resize_to_fill: [size * 2, size * 2]), alt: "", class: "#{rounded} object-cover flex-shrink-0", style: "height: #{size}px; width: #{size}px;" %>
 <% else %>
   <span class="<%= rounded %> bg-[#d42f46] flex items-center justify-center font-bold text-white flex-shrink-0" style="height: <%= size %>px; width: <%= size %>px; font-size: <%= (size * 0.42).round %>px;">
     <%= event.name.first.upcase %>

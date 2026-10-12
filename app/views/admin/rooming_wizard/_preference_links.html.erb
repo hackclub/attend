@@ -1,50 +1,51 @@
-<div class="space-y-3">
+<% remove_icon = capture do %><svg class="block h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8m0-8l-8 8"/></svg><% end %>
+<div class="cs-stack">
   <!-- Linked Preferences -->
   <div>
-    <div class="flex items-center justify-between mb-1">
-      <p class="text-xs font-medium text-green-700 uppercase">Linked Preferences</p>
-      <button type="button" data-open-link-modal="<%= participant_event.id %>" data-link-kind="preference" 
-              class="text-xs text-[#ec3750] hover:text-blue-800">+ Add</button>
+    <div class="flex items-center justify-between gap-2 mb-1">
+      <p class="cs-kv-label">Linked preferences</p>
+      <button type="button" data-open-link-modal="<%= participant_event.id %>" data-link-kind="preference"
+              class="cs-btn cs-btn-link">Add</button>
     </div>
-    <div class="space-y-1">
+    <div class="cs-token-group">
       <% participant_event.roommate_preferences.sort_by { |p| p.rank || Float::INFINITY }.each do |pref| %>
-        <div class="flex items-center justify-between bg-green-50 rounded px-2 py-1 text-sm">
+        <span class="cs-token">
           <span>
-            <% if pref.rank %><span class="text-green-600 font-medium">#<%= pref.rank %></span><% end %>
+            <% if pref.rank %><span class="font-bold">#<%= pref.rank %></span><% end %>
             <%= pref.preferred_participant_event.participant.full_name %>
-            <% if pref.mutual? %>
-              <span class="inline-flex items-center rounded-full bg-green-200 px-1.5 py-0.5 text-xs font-medium text-green-800">Mutual</span>
-            <% end %>
           </span>
-          <button type="button" 
+          <% if pref.mutual? %>
+            <%= cs_badge("Mutual", "green") %>
+          <% end %>
+          <button type="button"
                   data-unlink="<%= pref.id %>" data-link-kind="preference"
-                  class="text-red-500 hover:text-red-700">&times;</button>
-        </div>
+                  aria-label="Remove link to <%= pref.preferred_participant_event.participant.full_name %>"><%= remove_icon %></button>
+        </span>
       <% end %>
       <% if participant_event.roommate_preferences.empty? %>
-        <p class="text-xs text-gray-400 italic">No linked preferences</p>
+        <p class="cs-small cs-muted">No linked preferences</p>
       <% end %>
     </div>
   </div>
 
   <!-- Linked Exclusions -->
   <div>
-    <div class="flex items-center justify-between mb-1">
-      <p class="text-xs font-medium text-red-700 uppercase">Linked Exclusions</p>
-      <button type="button" data-open-link-modal="<%= participant_event.id %>" data-link-kind="exclusion" 
-              class="text-xs text-[#ec3750] hover:text-blue-800">+ Add</button>
+    <div class="flex items-center justify-between gap-2 mb-1">
+      <p class="cs-kv-label">Linked exclusions</p>
+      <button type="button" data-open-link-modal="<%= participant_event.id %>" data-link-kind="exclusion"
+              class="cs-btn cs-btn-link">Add</button>
     </div>
-    <div class="space-y-1">
+    <div class="cs-token-group">
       <% participant_event.roommate_exclusions.each do |excl| %>
-        <div class="flex items-center justify-between bg-red-50 rounded px-2 py-1 text-sm">
-          <span><%= excl.excluded_participant_event.participant.full_name %></span>
-          <button type="button" 
+        <span class="cs-token">
+          <%= cs_status(:error, excl.excluded_participant_event.participant.full_name) %>
+          <button type="button"
                   data-unlink="<%= excl.id %>" data-link-kind="exclusion"
-                  class="text-red-500 hover:text-red-700">&times;</button>
-        </div>
+                  aria-label="Remove exclusion of <%= excl.excluded_participant_event.participant.full_name %>"><%= remove_icon %></button>
+        </span>
       <% end %>
       <% if participant_event.roommate_exclusions.empty? %>
-        <p class="text-xs text-gray-400 italic">No linked exclusions</p>
+        <p class="cs-small cs-muted">No linked exclusions</p>
       <% end %>
     </div>
   </div>

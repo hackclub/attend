@@ -15,7 +15,7 @@ RSpec.describe "Admin::Messages", type: :request do
       }.not_to change(Message, :count)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Compose Message")
+      expect(response.body).to include("Compose message")
     end
   end
 

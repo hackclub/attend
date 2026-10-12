@@ -1,10 +1,11 @@
 module Admin::ParticipantsHelper
-  DISPLAY_STATUS_STYLES = {
-    "Complete" => "bg-green-50 text-green-700",
-    "Awaiting Participant" => "bg-blue-50 text-blue-700",
-    "Awaiting Parent" => "bg-amber-50 text-amber-700",
-    "Withdrawn" => "bg-red-50 text-red-700",
-    "Rejected" => "bg-red-50 text-red-700"
+  # Cloudscape status indicator type for each participant display status.
+  DISPLAY_STATUS_TYPES = {
+    "Complete" => :success,
+    "Awaiting Participant" => :in_progress,
+    "Awaiting Parent" => :pending,
+    "Withdrawn" => :stopped,
+    "Rejected" => :error
   }.freeze
 
   BLOCKING_STEP_LABELS = {
@@ -30,11 +31,10 @@ module Admin::ParticipantsHelper
     not_added: "Not added"
   }.freeze
 
-  OPTIONAL_DOCUMENT_STATE_STYLES = {
-    signed: "bg-green-100 text-green-700",
-    awaiting: "bg-yellow-100 text-yellow-700",
-    withdrawn: "bg-gray-100 text-gray-600",
-    not_added: "text-gray-400"
+  OPTIONAL_DOCUMENT_STATE_TYPES = {
+    signed: :success,
+    awaiting: :pending,
+    withdrawn: :stopped
   }.freeze
 
   def optional_document_state_label(state)
@@ -44,11 +44,10 @@ module Admin::ParticipantsHelper
   def render_optional_document_badge(participant_event, custom_document)
     state = participant_event.optional_document_state(custom_document)
     label = optional_document_state_label(state)
-    style = OPTIONAL_DOCUMENT_STATE_STYLES.fetch(state, "bg-gray-100 text-gray-800")
 
-    return content_tag(:span, label, class: style) if state == :not_added
+    return content_tag(:span, label, class: "cs-muted") if state == :not_added
 
-    content_tag(:span, label, class: "inline-flex items-center px-1.5 py-0.5 rounded text-xs #{style}")
+    cs_status(OPTIONAL_DOCUMENT_STATE_TYPES.fetch(state, :info), label)
   end
 
   # The group dropdown shows the current grouping back to the admin; a
@@ -60,8 +59,7 @@ module Admin::ParticipantsHelper
 
   def render_display_status_badge(participant_event)
     ds = participant_event.display_status
-    css_class = DISPLAY_STATUS_STYLES[ds] || "bg-gray-100 text-gray-800"
-    content_tag(:span, ds, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium #{css_class}")
+    cs_status(DISPLAY_STATUS_TYPES.fetch(ds, :info), ds)
   end
 
   def render_blocking_step_badge(participant_event)
@@ -73,7 +71,7 @@ module Admin::ParticipantsHelper
     return nil unless blocking
 
     label = BLOCKING_STEP_LABELS[blocking] || blocking.titleize
-    content_tag(:span, label, class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200")
+    cs_badge(label, "yellow")
   end
 
   # Placeholder for a contact detail the current role isn't allowed to see (see
@@ -99,7 +97,7 @@ module Admin::ParticipantsHelper
   def legal_name_part(value, dash: false)
     return value unless Participant.name_placeholder?(value)
 
-    dash ? content_tag(:span, "—", class: "text-gray-400") : pending_name_label
+    dash ? content_tag(:span, "—", class: "cs-muted") : pending_name_label
   end
 
   def pending_name_label
@@ -107,17 +105,25 @@ module Admin::ParticipantsHelper
       title: "Signed in, but hasn't filled in their name yet")
   end
 
+  # Cloudscape sort caret for a sortable column header (inside .cs-sort). An
+  # unsorted column shows a muted two-way caret; the sorted one points the
+  # current direction.
   def render_sort_icon(field, current_sort, current_direction)
-    return "" unless current_sort == field
-
-    if current_direction == "asc"
-      content_tag(:svg, class: "w-4 h-4 text-[#ec3750]") do
-        content_tag(:path, "", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M5 15l7-7 7 7", fill: "none", stroke: "currentColor")
-      end
+    path = if current_sort != field
+      "M4 6l4-4 4 4M4 10l4 4 4-4"
+    elsif current_direction == "asc"
+      "M4 10l4-4 4 4"
     else
-      content_tag(:svg, class: "w-4 h-4 text-[#ec3750]") do
-        content_tag(:path, "", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M19 9l-7 7-7-7", fill: "none", stroke: "currentColor")
-      end
+      "M4 6l4 4 4-4"
     end
+    content_tag(:svg, tag.path(d: path), viewBox: "0 0 16 16", fill: "none", stroke: "currentColor",
+      "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true")
+  end
+
+  # aria-sort value for a sortable column header.
+  def sort_aria(field, current_sort, current_direction)
+    return nil unless current_sort == field
+
+    current_direction == "asc" ? "ascending" : "descending"
   end
 end

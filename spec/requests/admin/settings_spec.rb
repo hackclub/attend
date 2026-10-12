@@ -19,7 +19,7 @@ RSpec.describe "Admin::Settings", type: :request do
       get admin_settings_path
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Support Inbox Notifications")
+      expect(response.body).to include("Support inbox notifications")
       expect(response.body).to include("+14155551234")
     end
 
@@ -80,7 +80,7 @@ RSpec.describe "Admin::Settings", type: :request do
 
       get admin_settings_path
 
-      expect(response.body).to include("Admin Help Slack Channel")
+      expect(response.body).to include("Admin help Slack channel")
       expect(response.body).to include("CHELP")
       expect(response.body).to include("2 eligible people") # the event admin plus the signed-in global admin
     end

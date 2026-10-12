@@ -135,6 +135,13 @@ components:
 
 ## Overview
 
+> **Two worlds, one file.** Attend ships two visual systems, split by surface:
+>
+> - **The Clipboard** (everything in this file above the *Admin Console* section, and the YAML frontmatter): participant, guardian, onboarding, public-profile, docs and support surfaces. Unchanged, and still authoritative for them.
+> - **The Cloud Console** (the *Admin Console (/admin)* section at the end, and `extensions.console` in `.impeccable/design.json`): the staff admin console under `/admin` only, rendered by `layouts/admin.html.erb` and styled by `app/assets/stylesheets/console.css`.
+>
+> The frontmatter tokens below describe the Clipboard. Inside `/admin`, console.css repoints the shared semantic properties (`--accent`, `--bg-elev`, `--text-strong`, …) at the console's `--cs-*` tokens, so a Clipboard token name used in admin markup resolves to the console value, not the frontmatter hex.
+
 **Creative North Star: "The Clipboard"**
 
 Attend is the binder a good event organiser carries: tabbed, legible at arm's length, nothing on it that isn't doing a job. Every surface is a checklist in some form — an onboarding step, a consent form, a participant row, a rooming plan — and the interface's whole job is to make the state of that checklist unmistakable. Structure comes from hairline rules and tonal surfaces, not from decoration. The page is mostly quiet greys and whites; Hack Club red appears where something is actionable or wrong, and nowhere else.
@@ -150,7 +157,7 @@ Two things Attend must not look like. Not a **generic Tailwind starter** — und
 - One loud colour (Hack Club red) held to actions, alerts, and active state
 - Dense administrative type scale: 14px body, 12px labels, weight over size for hierarchy
 - Every colour semantic and themed; eight themes on one palette contract
-- Mobile-first single column that widens into a 256px-sidebar shell on `lg`
+- Mobile-first single column for participants and guardians; the support desk widens into a 256px-sidebar shell on `lg` (the admin console has its own shell; see *Admin Console*)
 - Motion is confined to `transition-colors` at ~150ms, plus a small lift on genuinely interactive cards
 
 ## Colors
@@ -169,7 +176,7 @@ No second accent. Blue appears in the codebase (`bg-blue-600` buttons, `ring-blu
 ### Neutral
 - **Paper** (`{colors.bg-app}`): the app canvas behind everything. Never used for a card.
 - **Card White** (`{colors.bg-elev}`): the surface every card, panel, dropdown, and input sits on. The single most common background in the system.
-- **Rest Grey** (`{colors.bg-elev-2}`): sunken panels, the admin sidebar column, secondary-button hover.
+- **Rest Grey** (`{colors.bg-elev-2}`): sunken panels and secondary-button hover.
 - **Press Grey** (`{colors.bg-elev-3}`): hover fills on icon buttons and dropdown items.
 - **Sunken Grey** (`{colors.bg-sunken}`): the active navigation item's background — the deepest neutral before you're into ink.
 - **Ink** (`{colors.text-strong}`): headings, active nav labels, primary values in a table. The darkest text.
@@ -196,9 +203,9 @@ State colours, used as badge tints and status dots, never as brand:
 
 ## Typography
 
-**Display Font:** the system UI stack (`ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto`) — Tailwind's default, adopted deliberately. There is no webfont; a guardian on a slow connection gets text on first paint.
+**Display Font:** the system UI stack (`ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto`) — Tailwind's default, adopted deliberately. Clipboard surfaces load no webfont; a guardian on a slow connection gets text on first paint. (The admin console self-hosts Open Sans for staff only; that font must never reach a Clipboard surface.)
 **Body Font:** the same stack. One family, differentiated entirely by weight and size.
-**Label/Mono Font:** none distinct. `<kbd>` in the search trigger is the only monospace-adjacent treatment and it uses the same stack at 11px.
+**Label/Mono Font:** none distinct.
 
 **Character:** neutral, native, and unbranded on purpose. The type carries no personality of its own so the density can be high without becoming tiring, and so an eleven-line participant record reads as data rather than as design.
 
@@ -208,7 +215,7 @@ State colours, used as badge tints and status dots, never as brand:
 - **Title** (600, 1.125rem / `text-lg`, 1.4): card headings, section headings within a form step, and the required size for text on a red fill.
 - **Body** (500, 0.875rem / `text-sm`, 1.5): the workhorse — by a factor of three the most common size in the codebase. Form labels, table cells, button text, nav items. `font-medium` is the default weight, not `font-normal`; the small size needs the extra stem.
 - **Label** (600, 0.75rem / `text-xs`, 1.4): status badges, helper text, metadata, timestamps.
-- **Eyebrow** (600, 0.6875rem, uppercase, 0.05em): sidebar section headers only.
+- **Eyebrow** (600, 0.6875rem, uppercase, 0.05em): its documented home, the old admin sidebar's section headers, was retired with the admin console. The token stays because Clipboard markup still carries uppercase labels, but it is not a pattern to extend to new surfaces.
 
 ### Named Rules
 
@@ -218,7 +225,7 @@ State colours, used as badge tints and status dots, never as brand:
 
 ## Layout
 
-A single mobile-first column that becomes a shell at the large breakpoint. Participant and guardian surfaces use `container mx-auto px-4 sm:px-6 lg:px-8 py-8` with a content cap between `max-w-2xl` and `max-w-4xl` — forms stay narrow enough to read in one eye-line. Admin surfaces use a fixed **256px** (`w-64`) left sidebar that appears at `lg` and collapses to an overlay drawer below it, with content filling the remainder unconstrained; tables need the width.
+A single mobile-first column that becomes a shell at the large breakpoint. Participant and guardian surfaces use `container mx-auto px-4 sm:px-6 lg:px-8 py-8` with a content cap between `max-w-2xl` and `max-w-4xl` — forms stay narrow enough to read in one eye-line. The support desk uses a fixed **256px** (`w-64`) left sidebar that appears at `lg`, with content filling the remainder. The admin console's layout is documented in *Admin Console*.
 
 The breakpoint weighting tells the truth about the audience: `sm:` outnumbers `md:` more than three to one and `xl:` is essentially unused. Design for a phone, then for a laptop; there is no third case.
 
@@ -247,7 +254,7 @@ Dark themes scale the same three roles up in opacity (0.4 / 0.5 / 0.6) because a
 
 Two radii carry the system: **6px** (`rounded-md`, 702 uses) for anything interactive and rectangular — buttons, inputs, nav items, icon buttons — and **8px** (`rounded-lg`, 569 uses) for containers and cards. 12px (`rounded-xl`) appears only on floating overlays; 16px+ is essentially absent and should stay that way.
 
-**Full-round** (`rounded-full`, 296 uses) is the system's one piece of personality and it is strictly typed: status badges, avatars, count bubbles, sidebar selector pills, and the Hack Club pill button. A pill in Attend means "this is a piece of state or an identity", never "this is a generic button".
+**Full-round** (`rounded-full`, 296 uses) is the system's one piece of personality and it is strictly typed: status badges, avatars, count bubbles, the profile pill in the participant header, and the Hack Club pill button. (Inside `/admin` the console turns legacy status pills into 4px badges.) A pill in Attend means "this is a piece of state or an identity", never "this is a generic button".
 
 Borders are always 1px, always a hairline neutral, never coloured except to signal state — a red left border on an alert row, an amber dashed border on the admin escape hatch in the participant header. The dashed border is meaningful: it marks a control that isn't part of the normal user's world.
 
@@ -281,14 +288,11 @@ Components are **tactile and confident**: they respond when touched, and the res
 - **Theming caveat:** `themes.css` sets `background-color` and `color` on bare `input, select, textarea` under every non-light theme. That rule beats Tailwind's utilities on specificity ties; new input styling must be verified in a dark theme, not only in light.
 
 ### Status Badges
-Attend's most-repeated pattern and the closest thing it has to a signature. A full-round pill, 12px/600, `px-2.5 py-0.5`, tinted background with same-hue dark text: green for Complete, sky for Awaiting Participant, amber for Awaiting Parent, red for Withdrawn and Rejected, grey as the fallback. The tint carries the meaning at a glance and the word carries it precisely — **never the tint alone**, since colour is not an accessible signal on its own.
+Attend's most-repeated pattern on Clipboard surfaces and the closest thing it has to a signature. A full-round pill, 12px/600, `px-2.5 py-0.5`, tinted background with same-hue dark text: green for Complete, sky for Awaiting Participant, amber for Awaiting Parent, red for Withdrawn and Rejected, grey as the fallback. The tint carries the meaning at a glance and the word carries it precisely — **never the tint alone**, since colour is not an accessible signal on its own.
 
 ### Navigation
 - **Participant header:** 64px tall, white, hairline bottom border. Links are 14px/500 in `{colors.text}`, 6px radius, and the active item takes an `{colors.accent-soft}` background with `{colors.accent}` text. Collapses to a hamburger below `md`.
-- **Admin sidebar:** 256px, `{colors.bg-elev-2}`, items at 13px/500 with a 20px icon in `{colors.text-muted}`; hover is a 4% black wash, active is `{colors.bg-sunken}` with `{colors.text-strong}` at 600 and the icon darkening to match. Section headers are uppercase 11px eyebrows. Sidebar selector pills (user, event) are full-round with a hairline border that darkens on hover.
-
-### Search Trigger
-A Stripe-style faux input in the admin header: 240px minimum, `{colors.bg-elev-2}` fill, hairline border, 8px radius, muted placeholder text, and a `<kbd>` shortcut hint pushed to the right edge. It looks like an input and behaves like a button that opens the command palette.
+- **Admin navigation:** the light 256px admin sidebar, its uppercase section eyebrows, the full-round user/event selector pills and the faux-input search trigger were all retired when `/admin` moved to the console. Admin navigation is now documented in *Admin Console*; don't rebuild those pieces on a Clipboard surface.
 
 ## Do's and Don'ts
 
@@ -306,7 +310,7 @@ A Stripe-style faux input in the admin header: 240px minimum, `{colors.bg-elev-2
 - **Don't** add new `bg-blue-600` buttons or `ring-blue-500` focus rings. The blue running through the onboarding wizard and guardian portal (35 blue fills, 277 blue rings) is **drift from a Tailwind default, not a decision**. Red is the accent everywhere; converge on it when touching those files.
 - **Don't** let Hack Club red occupy area. It fills buttons, badges, and 1px borders. Large red panels, red page headers, and red backgrounds behind body copy are out — use `{colors.accent-soft}` if a red-tinted region is genuinely needed.
 - **Don't** ship gradients, hero imagery, or marketing motion inside the app shell. Attend is a tool someone uses to do a job, not a consumer event app.
-- **Don't** introduce a webfont. The system stack is a deliberate performance choice for guardians on slow connections and old phones.
+- **Don't** introduce a webfont on a Clipboard surface. The system stack is a deliberate performance choice for guardians on slow connections and old phones. (The console's Open Sans is staff-only and loads only under `/admin`.)
 - **Don't** add a third container radius. 6px controls, 8px containers, full for state and identity.
 - **Don't** use `rounded-full` on a plain action button. A pill in Attend means state or identity; the Hack Club brand pill is the one sanctioned exception.
 - **Don't** trust `text-white` to be white. Outside the default theme it resolves to a surface colour; a new filled surface needs its foreground declared in `themes.css` per **The Theme Foreground Rule**, or its label disappears.

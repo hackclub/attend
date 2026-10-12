@@ -1,16 +1,21 @@
 <% content_for :title, "Edit Emergency Contact – #{@participant_event.participant.display_name} – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs(
+     [ "Participants", admin_event_participants_path(current_event) ],
+     [ @participant_event.participant.display_name, admin_event_participant_path(current_event, @participant_event) ],
+     [ "Safeguarding", safeguarding_admin_event_participant_path(current_event, @participant_event) ],
+     [ "Edit emergency contact", nil ]
+   ) %>
 
-<div class="max-w-2xl">
-  <div class="mb-6">
-    <%= link_to "← Back to safeguarding", safeguarding_admin_event_participant_path(current_event, @participant_event), class: "text-sm text-purple-600 hover:text-purple-700" %>
-    <h1 class="text-2xl font-semibold mt-2">Edit Emergency Contact</h1>
-    <p class="text-sm text-gray-500">For <%= @participant_event.participant.display_name %></p>
+<div class="max-w-3xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Edit emergency contact</h1>
+      <p class="cs-description">For <%= @participant_event.participant.display_name %></p>
+    </div>
   </div>
 
-  <div class="bg-white rounded-lg border border-gray-200 p-6">
-    <%= render "form",
-      form_url: admin_event_participant_emergency_contact_path(current_event, @participant_event, @emergency_contact),
-      form_method: :patch,
-      submit_label: "Save Changes" %>
-  </div>
+  <%= render "form",
+    form_url: admin_event_participant_emergency_contact_path(current_event, @participant_event, @emergency_contact),
+    form_method: :patch,
+    submit_label: "Save changes" %>
 </div>

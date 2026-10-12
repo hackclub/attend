@@ -1,81 +1,115 @@
-<div class="w-full max-w-3xl">
-  <div class="flex items-center gap-3 mb-6">
-    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
-          style="background-color: <%= @group.normalized_color || "#e5e7eb" %>; color: <%= @group.color.present? ? "white" : "#1f2d3d" %>;">
-      <%= @group.name %>
-    </span>
-    <h1 class="text-2xl font-bold">Edit Group</h1>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Groups", admin_event_groups_path(current_event) ], [ @group.name, nil ]) %>
+
+<div class="max-w-3xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1 flex flex-wrap items-center gap-3">
+        Edit group
+        <% if @group.color.present? %>
+          <span class="cs-badge" style="background-color: <%= @group.normalized_color %>; color: white;"><%= @group.name %></span>
+        <% else %>
+          <%= cs_badge(@group.name) %>
+        <% end %>
+      </h1>
+    </div>
   </div>
 
-  <%= render "form", group: @group %>
+  <div class="cs-stack">
+    <%= render "form", group: @group %>
 
-  <div class="mt-10">
-    <h2 class="text-lg font-semibold mb-3">Members (<%= @members.size %>)</h2>
-
-    <% if @members.any? %>
-      <div class="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100 mb-6">
-        <% @members.each do |pe| %>
-          <div class="flex items-center justify-between px-4 py-2">
-            <div>
-              <%= link_to pe.participant.display_name, admin_event_participant_path(current_event, pe.participant), class: "text-[#ec3750] hover:underline" %>
-              <span class="text-xs text-gray-500 ml-2"><%= pe.participant.email %></span>
-            </div>
-            <%= button_to "Remove", unassign_admin_event_group_path(current_event, @group, participant_event_ids: [pe.id]),
-                method: :post,
-                class: "text-sm text-red-600 hover:text-red-800",
-                data: { confirm: "Remove this participant from the group?" } %>
-          </div>
-        <% end %>
-      </div>
-    <% else %>
-      <p class="text-sm text-gray-500 mb-4">No members yet.</p>
-    <% end %>
-
-    <h3 class="text-base font-semibold mb-2">Add members</h3>
-    <%= form_with url: assign_admin_event_group_path(current_event, @group), method: :post, local: true, class: "space-y-3" do %>
-      <div data-controller="multiselect">
-        <div class="border border-gray-300 rounded-lg overflow-hidden">
-          <div class="p-3 border-b border-gray-200 bg-gray-50">
-            <input type="text"
-                   data-multiselect-target="search"
-                   placeholder="Search participants..."
-                   class="w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] text-sm px-3 py-2"
-                   data-action="input->multiselect#filter">
-          </div>
-          <div class="px-3 py-2 bg-blue-50 border-b border-gray-200 flex items-center justify-between">
-            <span class="text-sm text-blue-800">
-              <strong data-multiselect-target="count">0</strong> participant<span data-multiselect-target="plural">s</span> selected
-            </span>
-            <button type="button"
-                    class="text-xs text-[#ec3750] hover:text-blue-800 font-medium"
-                    data-action="click->multiselect#clearAll">
-              Clear all
-            </button>
-          </div>
-          <div class="max-h-64 overflow-y-auto" data-multiselect-target="list">
-            <% if @available_participants.empty? %>
-              <div class="px-3 py-6 text-center text-sm text-gray-500">All participants are already in this group.</div>
-            <% else %>
-              <% @available_participants.each do |pe| %>
-                <label class="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0"
-                       data-name="<%= pe.participant.display_name.downcase %> <%= pe.participant.email.downcase %>">
-                  <input type="checkbox"
-                         name="participant_event_ids[]"
-                         value="<%= pe.id %>"
-                         class="rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]"
-                         data-multiselect-target="checkbox"
-                         data-action="change->multiselect#updateCount">
-                  <div class="ml-3 flex-1 min-w-0">
-                    <p class="text-sm font-medium text-gray-900 truncate"><%= pe.participant.display_name %></p>
-                    <p class="text-xs text-gray-500 truncate"><%= pe.participant.email %></p>
-                  </div>
-                </label>
-              <% end %>
-            <% end %>
-          </div>
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <div>
+          <h2 class="cs-h2">Members <span class="cs-counter">(<%= @members.size %>)</span></h2>
         </div>
       </div>
-      <button type="submit" class="bg-[#d42f46] text-white px-4 py-2 rounded-md hover:bg-[#b82840]">Add selected</button>
+      <% if @members.any? %>
+        <div class="cs-table-wrap">
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th scope="col">Participant</th>
+                <th scope="col">Email</th>
+                <th scope="col"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @members.each do |pe| %>
+                <tr>
+                  <td><%= link_to pe.participant.display_name, admin_event_participant_path(current_event, pe.participant), class: "cs-link" %></td>
+                  <td class="cs-secondary"><%= pe.participant.email %></td>
+                  <td class="text-right">
+                    <%= button_to "Remove", unassign_admin_event_group_path(current_event, @group, participant_event_ids: [pe.id]),
+                        method: :post,
+                        class: "cs-btn cs-btn-link",
+                        form: { class: "contents" },
+                        data: { confirm: "Remove this participant from the group?" } %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <div class="cs-empty">
+          <p class="cs-empty-title">No members yet.</p>
+        </div>
+      <% end %>
+    </section>
+
+    <%= form_with url: assign_admin_event_group_path(current_event, @group), method: :post, local: true do %>
+      <section class="cs-container" data-controller="multiselect">
+        <div class="cs-container-header">
+          <div>
+            <h2 class="cs-h2">Add members</h2>
+          </div>
+        </div>
+        <div class="cs-filter-bar">
+          <label class="cs-search flex-1">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+            <input type="search"
+                   data-multiselect-target="search"
+                   placeholder="Search participants..."
+                   aria-label="Search participants"
+                   class="cs-input"
+                   data-action="input->multiselect#filter">
+          </label>
+          <span class="cs-secondary text-sm">
+            <strong data-multiselect-target="count">0</strong> participant<span data-multiselect-target="plural">s</span> selected
+          </span>
+          <button type="button"
+                  class="cs-btn cs-btn-link"
+                  data-action="click->multiselect#clearAll">
+            Clear all
+          </button>
+        </div>
+        <div class="max-h-64 overflow-y-auto border-t border-(--cs-border-divider-secondary)" data-multiselect-target="list">
+          <% if @available_participants.empty? %>
+            <div class="cs-empty">
+              <p class="cs-empty-title">All participants are already in this group.</p>
+            </div>
+          <% else %>
+            <% @available_participants.each do |pe| %>
+              <label class="flex items-center gap-3 px-5 py-2 cursor-pointer border-b border-(--cs-border-divider-secondary) last:border-0 hover:bg-(--cs-bg-hover)"
+                     data-name="<%= pe.participant.display_name.downcase %> <%= pe.participant.email.downcase %>">
+                <input type="checkbox"
+                       name="participant_event_ids[]"
+                       value="<%= pe.id %>"
+                       class="accent-(--cs-accent)"
+                       data-multiselect-target="checkbox"
+                       data-action="change->multiselect#updateCount">
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-bold truncate"><%= pe.participant.display_name %></p>
+                  <p class="cs-small cs-muted truncate"><%= pe.participant.email %></p>
+                </div>
+              </label>
+            <% end %>
+          <% end %>
+        </div>
+        <div class="cs-container-footer flex justify-end">
+          <button type="submit" class="cs-btn cs-btn-primary">Add selected</button>
+        </div>
+      </section>
     <% end %>
   </div>
 </div>

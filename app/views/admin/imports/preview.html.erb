@@ -1,140 +1,143 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Participants", admin_event_participants_path(current_event) ], [ "Import participants", new_admin_event_import_path(current_event) ], [ "Review import", nil ]) %>
+
 <div>
-  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-    <div>
-      <h1 class="text-2xl font-bold">Review Import</h1>
-      <p class="text-gray-600 mt-1">Review the participants before importing</p>
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Review import</h1>
+      <p class="cs-description">Review the participants before importing</p>
     </div>
-    <%= link_to "← Cancel Import", cancel_admin_event_import_path(current_event, @import_batch), data: { turbo_method: :delete, turbo_confirm: "Are you sure you want to cancel this import?" }, class: "text-red-600 hover:text-red-800" %>
-  </div>
-
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-    <div class="bg-white rounded-lg border border-gray-200 p-4">
-      <div class="text-3xl font-bold text-gray-900"><%= @import_batch.total_count %></div>
-      <div class="text-sm text-gray-500">Total rows</div>
-    </div>
-    <div class="bg-white rounded-lg border border-gray-200 p-4">
-      <div class="text-3xl font-bold text-green-600"><%= @valid_rows.count %></div>
-      <div class="text-sm text-gray-500">Will be imported</div>
-    </div>
-    <div class="bg-white rounded-lg border border-gray-200 p-4">
-      <div class="text-3xl font-bold text-yellow-600"><%= @skipped_rows.count %></div>
-      <div class="text-sm text-gray-500">Will be skipped</div>
+    <div class="cs-actions">
+      <%= link_to "Cancel import", cancel_admin_event_import_path(current_event, @import_batch), data: { turbo_method: :delete, turbo_confirm: "Are you sure you want to cancel this import?" }, class: "cs-btn" %>
     </div>
   </div>
 
-  <% if @valid_rows.any? %>
-    <div class="bg-white rounded-lg border border-gray-200 mb-6">
-      <div class="px-4 py-3 border-b border-gray-200">
-        <h2 class="font-semibold text-gray-900">Participants to Import (<%= @valid_rows.count %>)</h2>
+  <div class="cs-stack">
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Summary</h2>
       </div>
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-100">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Row</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parent Email</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-100">
-            <% @valid_rows.first(100).each do |row| %>
-              <tr>
-                <td class="px-4 py-3 text-sm text-gray-500"><%= row[:row_number] %></td>
-                <td class="px-4 py-3 text-sm font-medium text-gray-900"><%= row[:name].presence || "—" %></td>
-                <td class="px-4 py-3 text-sm text-gray-600"><%= row[:email] %></td>
-                <td class="px-4 py-3 text-sm <%= row[:parent_email_conflict] ? "text-yellow-700" : "text-gray-600" %>">
-                  <%= row[:parent_email].presence || "—" %>
-                  <% if row[:parent_email_conflict] %>
-                    <span class="block text-xs">Same as participant email — no guardian will be created</span>
-                  <% end %>
-                </td>
-              </tr>
-            <% end %>
-            <% if @valid_rows.count > 100 %>
-              <tr>
-                <td colspan="4" class="px-4 py-3 text-sm text-gray-500 text-center">
-                  ... and <%= @valid_rows.count - 100 %> more
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
+      <div class="cs-container-body">
+        <dl class="cs-kv cs-kv-3 cs-kv-divided">
+          <div><dt class="cs-kv-label">Total rows</dt><dd class="cs-kv-value-lg"><%= @import_batch.total_count %></dd></div>
+          <div><dt class="cs-kv-label">Will be imported</dt><dd class="cs-kv-value-lg"><%= @valid_rows.count %></dd></div>
+          <div><dt class="cs-kv-label">Will be skipped</dt><dd class="cs-kv-value-lg"><%= @skipped_rows.count %></dd></div>
+        </dl>
       </div>
-    </div>
-  <% end %>
+    </section>
 
-  <% if @skipped_rows.any? %>
-    <div class="bg-white rounded-lg border border-gray-200 mb-6">
-      <div class="px-4 py-3 border-b border-gray-200">
-        <h2 class="font-semibold text-yellow-700">Participants to Skip (<%= @skipped_rows.count %>)</h2>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-100">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Row</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-100">
-            <% @skipped_rows.first(50).each do |row| %>
-              <tr class="bg-yellow-50">
-                <td class="px-4 py-3 text-sm text-gray-500"><%= row[:row_number] %></td>
-                <td class="px-4 py-3 text-sm font-medium text-gray-900"><%= row[:name].presence || "—" %></td>
-                <td class="px-4 py-3 text-sm text-gray-600"><%= row[:email] %></td>
-                <td class="px-4 py-3 text-sm text-yellow-700"><%= row[:reason] %></td>
-              </tr>
-            <% end %>
-            <% if @skipped_rows.count > 50 %>
+    <% if @valid_rows.any? %>
+      <section class="cs-container">
+        <div class="cs-container-header cs-container-header-divided">
+          <h2 class="cs-h2">Participants to import <span class="cs-counter">(<%= @valid_rows.count %>)</span></h2>
+        </div>
+        <div class="cs-table-wrap">
+          <table class="cs-table cs-table-compact">
+            <thead>
               <tr>
-                <td colspan="4" class="px-4 py-3 text-sm text-gray-500 text-center">
-                  ... and <%= @skipped_rows.count - 50 %> more
-                </td>
+                <th scope="col">Row</th>
+                <th scope="col">Name</th>
+                <th scope="col">Email</th>
+                <th scope="col">Parent email</th>
               </tr>
-            <% end %>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  <% end %>
+            </thead>
+            <tbody>
+              <% @valid_rows.first(100).each do |row| %>
+                <tr>
+                  <td class="cs-muted"><%= row[:row_number] %></td>
+                  <td class="font-bold"><%= row[:name].presence || "—" %></td>
+                  <td><%= row[:email] %></td>
+                  <td>
+                    <%= row[:parent_email].presence || "—" %>
+                    <% if row[:parent_email_conflict] %>
+                      <span class="block"><%= cs_status(:warning, "Same as participant email — no guardian will be created") %></span>
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+              <% if @valid_rows.count > 100 %>
+                <tr>
+                  <td colspan="4" class="cs-muted text-center">
+                    ... and <%= @valid_rows.count - 100 %> more
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    <% end %>
 
-  <% unless @import_batch.send_invitations %>
-    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-      <h3 class="font-semibold text-amber-800">No emails will be sent</h3>
-      <p class="text-sm text-amber-700 mt-1">
-        <% if current_event.onboarding_invites_held? %>
-          This event is holding onboarding invitations.
-        <% end %>
-        <%= @valid_rows.count %> <%= "invitation".pluralize(@valid_rows.count) %> will be recorded as held and can be sent later from the participants page or the series page.
-      </p>
-    </div>
-  <% end %>
+    <% if @skipped_rows.any? %>
+      <section class="cs-container">
+        <div class="cs-container-header cs-container-header-divided">
+          <h2 class="cs-h2">Participants to skip <span class="cs-counter">(<%= @skipped_rows.count %>)</span></h2>
+        </div>
+        <div class="cs-table-wrap">
+          <table class="cs-table cs-table-compact">
+            <thead>
+              <tr>
+                <th scope="col">Row</th>
+                <th scope="col">Name</th>
+                <th scope="col">Email</th>
+                <th scope="col">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @skipped_rows.first(50).each do |row| %>
+                <tr>
+                  <td class="cs-muted"><%= row[:row_number] %></td>
+                  <td class="font-bold"><%= row[:name].presence || "—" %></td>
+                  <td><%= row[:email] %></td>
+                  <td><%= cs_status(:warning, row[:reason]) %></td>
+                </tr>
+              <% end %>
+              <% if @skipped_rows.count > 50 %>
+                <tr>
+                  <td colspan="4" class="cs-muted text-center">
+                    ... and <%= @skipped_rows.count - 50 %> more
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    <% end %>
 
-  <% if @import_batch.send_invitations %>
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-      <div class="flex items-start gap-3">
-        <svg class="w-5 h-5 text-[#ec3750] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
+    <% unless @import_batch.send_invitations %>
+      <div class="cs-alert cs-alert-warning">
+        <%= cs_status_icon(:warning) %>
         <div>
-          <h3 class="font-semibold text-blue-800">Invitation emails will be sent</h3>
-          <p class="text-sm text-blue-700 mt-1">
+          <p class="cs-alert-title">No emails will be sent</p>
+          <p>
+            <% if current_event.onboarding_invites_held? %>
+              This event is holding onboarding invitations.
+            <% end %>
+            <%= @valid_rows.count %> <%= "invitation".pluralize(@valid_rows.count) %> will be recorded as held and can be sent later from the participants page or the series page.
+          </p>
+        </div>
+      </div>
+    <% end %>
+
+    <% if @import_batch.send_invitations %>
+      <div class="cs-alert">
+        <%= cs_status_icon(:info) %>
+        <div>
+          <p class="cs-alert-title">Invitation emails will be sent</p>
+          <p>
             <%= @valid_rows.count %> invitation emails will be sent after import completes.
             Emails are sent at a rate of ~1 per second to avoid rate limits.
             <strong>Estimated time: ~<%= (@valid_rows.count / 60.0).ceil %> minutes</strong>
           </p>
         </div>
       </div>
-    </div>
-  <% end %>
-
-  <div class="flex justify-end gap-4">
-    <%= link_to "Cancel", cancel_admin_event_import_path(current_event, @import_batch), data: { turbo_method: :delete, turbo_confirm: "Are you sure?" }, class: "px-4 py-2 text-gray-700 hover:text-gray-900" %>
-    <%= form_with url: confirm_admin_event_import_path(current_event, @import_batch), method: :post, class: "inline" do %>
-      <%= submit_tag "Start Import", class: "px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed", disabled: @valid_rows.empty? %>
     <% end %>
+
+    <div class="flex justify-end gap-2">
+      <%= link_to "Cancel", cancel_admin_event_import_path(current_event, @import_batch), data: { turbo_method: :delete, turbo_confirm: "Are you sure?" }, class: "cs-btn cs-btn-link" %>
+      <%= form_with url: confirm_admin_event_import_path(current_event, @import_batch), method: :post, class: "inline" do %>
+        <%= button_tag "Start import", type: "submit", name: "commit", value: "Start Import", class: "cs-btn cs-btn-primary", disabled: @valid_rows.empty? %>
+      <% end %>
+    </div>
   </div>
 </div>

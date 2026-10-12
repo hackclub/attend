@@ -1,10 +1,12 @@
-<div class="max-w-2xl mx-auto">
-  <div class="mb-6">
-    <h1 class="text-2xl font-bold">Edit Scan Context</h1>
-    <p class="text-sm text-gray-500 mt-1">Update settings for "<%= @scan_context.name %>"</p>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Check-ins", admin_event_scans_path(current_event) ], [ "Scan contexts", admin_event_scan_contexts_path(current_event) ], [ @scan_context.name_was.presence || @scan_context.name, nil ]) %>
+
+<div class="max-w-2xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Edit scan context</h1>
+      <p class="cs-description">Update settings for "<%= @scan_context.name %>"</p>
+    </div>
   </div>
 
-  <div class="bg-white border border-gray-200 rounded-lg p-6">
-    <%= render "form", scan_context: @scan_context %>
-  </div>
+  <%= render "form", scan_context: @scan_context %>
 </div>

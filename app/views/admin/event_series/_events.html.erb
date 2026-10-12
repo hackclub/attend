@@ -1,60 +1,66 @@
-<section>
-  <h2 class="text-sm font-semibold text-(--text-strong) mb-2">Events</h2>
+<% phase_statuses = { "Past" => :stopped, "Draft" => :pending, "Upcoming" => :pending, "Active" => :success } %>
+<section class="cs-container">
+  <div class="cs-container-header cs-container-header-divided">
+    <h2 class="cs-h2">Events <span class="cs-counter">(<%= event_rows.length %>)</span></h2>
+  </div>
 
-  <div class="bg-(--bg-elev) border border-(--border-card) rounded-lg overflow-hidden">
-    <ul>
-      <% event_rows.each do |row| %>
-        <% event = row[:event] %>
-        <% phase_label, phase_class = event_phase_badge(event) %>
-        <li class="series-row" id="series-event-<%= event.id %>">
-          <%= link_to admin_event_dashboard_path(event.slug), class: "series-row-link px-4 py-4 cursor-pointer group" do %>
-            <div class="flex flex-col md:flex-row md:items-center gap-3 md:gap-5">
-              <div class="flex items-center gap-3 min-w-0 md:flex-1">
-                <%= render "admin/events/avatar", event: event, size: 36, rounded: "rounded-lg" %>
+  <div class="cs-table-wrap">
+    <table class="cs-table">
+      <thead>
+        <tr>
+          <th scope="col">Event</th>
+          <th scope="col">Status</th>
+          <th scope="col">Progress</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% event_rows.each do |row| %>
+          <% event = row[:event] %>
+          <% phase_label, _phase_type = event_phase(event) %>
+          <tr id="series-event-<%= event.id %>">
+            <td>
+              <div class="flex items-center gap-3 min-w-0">
+                <%= render "admin/events/avatar", event: event, size: 32, rounded: "rounded-lg" %>
                 <div class="min-w-0">
-                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span class="text-sm font-semibold text-(--text-strong) group-hover:text-(--accent-strong) transition-colors"><%= event.name %></span>
-                    <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap <%= phase_class %>"><%= phase_label %></span>
-                    <% if !event.completed? && !event.setup_complete? %>
-                      <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">Setup incomplete</span>
-                    <% end %>
-                  </div>
-                  <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-(--text-soft)">
+                  <%= link_to event.name, admin_event_dashboard_path(event.slug), class: "cs-link cs-link-strong" %>
+                  <p class="cs-small cs-secondary">
                     <span class="whitespace-nowrap"><%= event_date_range(event.starts_at, event.ends_at) %></span>
                     <% if event.location_city.present? %>
-                      <span class="truncate"><%= [ event.location_city, event.location_country ].compact_blank.join(", ") %></span>
+                      · <%= [ event.location_city, event.location_country ].compact_blank.join(", ") %>
                     <% end %>
-                  </div>
+                  </p>
                 </div>
               </div>
-
-              <div class="md:w-64 md:flex-shrink-0">
-                <div class="flex items-baseline justify-between gap-2 text-xs">
-                  <span class="text-(--text-soft) tabular-nums">
-                    <%= pluralize(row[:active], "participant") %>
-                  </span>
-                  <span class="font-semibold text-(--text-strong) tabular-nums"><%= row[:percent] %>% cleared</span>
+            </td>
+            <td>
+              <div class="flex flex-col gap-1">
+                <%= cs_status(phase_statuses.fetch(phase_label, :info), phase_label) %>
+                <% if !event.completed? && !event.setup_complete? %>
+                  <%= cs_status(:warning, "Setup incomplete") %>
+                <% end %>
+              </div>
+            </td>
+            <td class="min-w-48">
+              <div class="cs-progress-field">
+                <div class="cs-progress-label">
+                  <span class="tabular-nums"><%= pluralize(row[:active], "participant") %></span>
+                  <span class="tabular-nums"><%= row[:percent] %>% cleared</span>
                 </div>
-                <div class="series-microbar mt-1.5" aria-hidden="true">
-                  <div class="series-microbar-fill" style="width: <%= row[:percent] %>%"></div>
-                </div>
-                <p class="text-xs mt-1.5 truncate">
+                <div class="cs-progress" aria-hidden="true"><span style="width: <%= row[:percent] %>%"></span></div>
+                <p class="cs-progress-hint">
                   <% if row[:active].zero? %>
-                    <span class="text-(--text-soft)">No participants yet</span>
+                    No participants yet
                   <% elsif row[:top_blocker] %>
-                    <span class="text-(--warning-text) font-medium tabular-nums"><%= row[:top_blocker][:count] %></span>
-                    <span class="text-(--text-soft)">stuck on <%= row[:top_blocker][:stage].label.downcase %></span>
+                    <span class="tabular-nums"><%= row[:top_blocker][:count] %></span> stuck on <%= row[:top_blocker][:stage].label.downcase %>
                   <% else %>
-                    <span class="text-(--success-text) font-medium">Everyone cleared</span>
+                    Everyone cleared
                   <% end %>
                 </p>
               </div>
-
-              <svg class="hidden md:block w-4 h-4 text-(--text-faint) group-hover:text-(--text-muted) transition-colors flex-shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            </div>
-          <% end %>
-        </li>
-      <% end %>
-    </ul>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
   </div>
 </section>

@@ -153,7 +153,7 @@ RSpec.describe "Custom documents", type: :request do
       get admin_event_docuseal_template_mappings_path(event, doc.mapping_key)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Hotel Waiver Field Mappings")
+      expect(response.body).to include("Hotel Waiver field mappings")
     end
 
     it "saves mappings for a custom document under its mapping key" do

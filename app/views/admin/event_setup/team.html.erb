@@ -1,92 +1,110 @@
 <% content_for :title, "Event Setup: Team – Attend" %>
 
-<div class="w-full max-w-3xl">
-  <%= render "progress", current_step: "team" %>
+<%= render layout: "wizard", locals: {
+      current_step: "team",
+      title: "Team",
+      description: "Staff can be added later from event settings."
+    } do %>
+  <div class="cs-stack">
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <h2 class="cs-h2">Staff <span class="cs-counter">(<%= @event_role_assignments.size %>)</span></h2>
+      </div>
+      <% if @event_role_assignments.any? %>
+        <div class="cs-table-wrap">
+          <table class="cs-table">
+            <thead>
+              <tr><th scope="col">Email</th><th scope="col">Role</th><th scope="col"><span class="sr-only">Actions</span></th></tr>
+            </thead>
+            <tbody>
+              <% @event_role_assignments.each do |assignment| %>
+                <tr>
+                  <td><%= assignment.user.email %></td>
+                  <td><%= EventRoleAssignment::ROLE_DETAILS.dig(assignment.role, :label) || assignment.role.humanize %></td>
+                  <td class="text-right">
+                    <% if assignment.inherited_from_series? %>
+                      <span title="Series <%= assignment.series_role %>s act as event admins on every event in the series. Manage them from the series members page."><%= cs_status(:info, "Inherited from series") %></span>
+                    <% else %>
+                      <%= button_to "Remove", admin_event_setup_team_member_path(@event, assignment), method: :delete, class: "cs-btn cs-btn-link", form: { data: { turbo_confirm: "Remove #{assignment.user.email} from #{@event.name}?" } } %>
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <div class="cs-empty">
+          <p class="cs-empty-title">No staff yet</p>
+          <p>Only global admins can reach this event until you add someone.</p>
+        </div>
+      <% end %>
+    </section>
 
-  <h1 class="text-2xl font-bold mb-1">Who's running <%= @event.name %>?</h1>
-  <p class="text-gray-500 mb-6">Add event admins and other staff so they can access this event. You can skip this and manage staff later from event settings.</p>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Add a staff member</h2>
+      </div>
+      <div class="cs-container-body">
+        <%= form_with url: admin_event_setup_team_path(@event), method: :post do |f| %>
+          <div class="cs-field">
+            <%= label_tag :email, "User email", class: "cs-field-label" %>
+            <%= email_field_tag :email, params[:email], class: "cs-input", placeholder: "user@example.com", required: true %>
+            <p class="cs-field-hint">They need an Attend account already. If they don't have one, ask them to sign in to Attend first.</p>
+          </div>
 
-  <div class="space-y-6">
-    <% if @event_role_assignments.any? %>
-      <div class="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
-        <% @event_role_assignments.each do |assignment| %>
-          <div class="flex items-center justify-between px-6 py-3">
-            <div>
-              <p class="text-sm font-medium text-gray-900"><%= assignment.user.email %></p>
-              <p class="text-xs text-gray-500"><%= EventRoleAssignment::ROLE_DETAILS.dig(assignment.role, :label) || assignment.role.humanize %></p>
+          <%= fields_for :event_role_assignment do |era| %>
+            <div class="cs-field" data-controller="role-info">
+              <%= era.label :role, "Role", class: "cs-field-label" %>
+              <%= era.select :role,
+                EventRoleAssignment::ROLE_DETAILS.map { |role, details| [ details[:label], role ] },
+                { selected: "event_admin" },
+                class: "cs-select",
+                data: { role_info_target: "select", action: "change->role-info#update" } %>
+
+              <% EventRoleAssignment::ROLE_DETAILS.each do |role, details| %>
+                <div data-role-info-target="panel" data-role="<%= role %>" class="cs-alert mt-3 hidden">
+                  <%= cs_status_icon(:info) %>
+                  <div class="w-full">
+                    <p class="cs-alert-title"><%= details[:label] %></p>
+                    <p><%= details[:summary] %></p>
+                    <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <p class="cs-kv-label">Can</p>
+                        <ul class="mt-1 space-y-1">
+                          <% details[:can].each do |perm| %>
+                            <li><%= cs_status(:success, perm) %></li>
+                          <% end %>
+                        </ul>
+                      </div>
+                      <% if details[:cannot].any? %>
+                        <div>
+                          <p class="cs-kv-label">Cannot</p>
+                          <ul class="mt-1 space-y-1">
+                            <% details[:cannot].each do |perm| %>
+                              <li><%= cs_status(:stopped, perm) %></li>
+                            <% end %>
+                          </ul>
+                        </div>
+                      <% end %>
+                    </div>
+                  </div>
+                </div>
+              <% end %>
             </div>
-            <% if assignment.inherited_from_series? %>
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800" title="Series <%= assignment.series_role %>s act as event admins on every event in the series. Manage them from the series members page.">
-                Inherited from series
-              </span>
-            <% else %>
-              <%= button_to "Remove", admin_event_setup_team_member_path(@event, assignment), method: :delete, class: "text-sm text-gray-400 hover:text-red-600 font-medium cursor-pointer", form: { data: { turbo_confirm: "Remove #{assignment.user.email} from #{@event.name}?" } } %>
-            <% end %>
+          <% end %>
+
+          <div class="flex justify-end mt-4">
+            <%= f.button "Add staff member", class: "cs-btn" %>
           </div>
         <% end %>
       </div>
-    <% end %>
-
-    <div class="bg-white border border-gray-200 rounded-lg p-6">
-      <h2 class="text-lg font-semibold mb-4">Add a staff member</h2>
-      <%= form_with url: admin_event_setup_team_path(@event), method: :post, class: "space-y-4" do |f| %>
-        <div>
-          <%= label_tag :email, "User Email", class: "block text-sm font-medium text-gray-700" %>
-          <%= email_field_tag :email, params[:email], class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "user@example.com", required: true %>
-          <p class="mt-1 text-sm text-gray-500">The user must already have an account. If they don't, they need to sign in to Attend first.</p>
-        </div>
-
-        <%= fields_for :event_role_assignment do |era| %>
-          <div data-controller="role-info">
-            <%= era.label :role, "Role", class: "block text-sm font-medium text-gray-700" %>
-            <%= era.select :role,
-              EventRoleAssignment::ROLE_DETAILS.map { |role, details| [details[:label], role] },
-              { selected: "event_admin" },
-              class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2",
-              data: { role_info_target: "select", action: "change->role-info#update" } %>
-
-            <% EventRoleAssignment::ROLE_DETAILS.each do |role, details| %>
-              <div data-role-info-target="panel" data-role="<%= role %>" class="mt-3 rounded-md border border-gray-200 bg-gray-50 p-4 hidden">
-                <p class="text-sm font-medium text-gray-900"><%= details[:label] %></p>
-                <p class="text-sm text-gray-600"><%= details[:summary] %></p>
-                <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <p class="text-xs font-semibold uppercase tracking-wide text-green-700">Can</p>
-                    <ul class="mt-1 space-y-1">
-                      <% details[:can].each do |perm| %>
-                        <li class="flex items-start gap-1.5 text-sm text-gray-700">
-                          <span class="text-green-600">✓</span><span><%= perm %></span>
-                        </li>
-                      <% end %>
-                    </ul>
-                  </div>
-                  <% if details[:cannot].any? %>
-                    <div>
-                      <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Cannot</p>
-                      <ul class="mt-1 space-y-1">
-                        <% details[:cannot].each do |perm| %>
-                          <li class="flex items-start gap-1.5 text-sm text-gray-500">
-                            <span class="text-gray-400">✕</span><span><%= perm %></span>
-                          </li>
-                        <% end %>
-                      </ul>
-                    </div>
-                  <% end %>
-                </div>
-              </div>
-            <% end %>
-          </div>
-        <% end %>
-
-        <div class="flex justify-end">
-          <%= f.submit "Add Staff Member", class: "px-4 py-2 bg-white border border-[#ec3750] text-[#ec3750] rounded-md hover:bg-[#ec3750]/5 font-medium transition-colors cursor-pointer" %>
-        </div>
-      <% end %>
-    </div>
+    </section>
   </div>
 
-  <div class="mt-6 flex flex-col sm:flex-row justify-between gap-3">
-    <%= link_to "Back", admin_event_setup_waivers_path(@event), class: "w-full sm:w-auto text-center text-gray-500 hover:text-gray-700 font-medium py-2 px-4" %>
-    <%= link_to "Continue", admin_event_setup_review_path(@event), class: "w-full sm:w-auto text-center bg-[#d42f46] hover:bg-[#b82840] text-white font-semibold py-2 px-4 rounded-lg transition-colors" %>
+  <div class="cs-wizard-actions">
+    <%= link_to "Exit setup", admin_event_dashboard_path(@event.slug), class: "cs-btn cs-btn-link" %>
+    <%= link_to "Previous", admin_event_setup_waivers_path(@event), class: "cs-btn" %>
+    <%= link_to "Next", admin_event_setup_review_path(@event), class: "cs-btn cs-btn-primary" %>
   </div>
-</div>
+<% end %>

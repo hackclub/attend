@@ -1,4 +1,4 @@
-<div id="rooms_list" class="grid grid-cols-2 gap-4">
+<div id="rooms_list" class="cs-cards">
   <% @rooms.each do |room| %>
     <%= render partial: "admin/rooming_wizard/room_card", locals: { room: room } %>
   <% end %>

@@ -1,4 +1,5 @@
 <% content_for :title, "Scanner – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Check-ins", admin_event_scans_path(current_event) ], [ "Scanner", nil ]) %>
 
 <%= content_for :head do %>
   <script src="<%= asset_path("vendor/zxing.min.js") %>"></script>
@@ -8,228 +9,233 @@
   <meta name="turbo-cache-control" content="no-cache">
 <% end %>
 
-<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-0">
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-1">
-    <div class="flex items-center gap-3">
-      <%= link_to admin_event_scans_path(current_event), class: "text-sm text-[#ec3750] hover:text-blue-800" do %>← Check Ins<% end %>
-      <h1 class="text-xl sm:text-2xl font-bold">Scanner</h1>
-    </div>
-    <span class="text-xs sm:text-sm text-gray-500 hidden sm:block">Check in participants by scanning QR codes or NFC tokens</span>
+<div class="cs-header">
+  <div class="cs-header-text">
+    <h1 class="cs-h1">Scanner</h1>
+    <p class="cs-description hidden sm:block">Check in participants by scanning QR codes or NFC tokens</p>
   </div>
+</div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-    <!-- Scanner -->
-    <div class="lg:col-span-2 bg-white rounded-lg border border-gray-200 p-4 sm:p-6">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <div class="flex items-center gap-2">
-          <h2 class="text-base sm:text-lg font-semibold">Camera Scanner</h2>
-          <div id="camera-status" class="flex items-center gap-2">
-            <span class="w-2 h-2 bg-gray-400 rounded-full" id="status-dot"></span>
-            <span class="text-xs sm:text-sm text-gray-500" id="status-text">Initializing...</span>
-          </div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
+  <!-- Scanner -->
+  <section class="cs-container lg:col-span-2">
+    <div class="cs-container-header">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h2 class="cs-h2">Camera scanner</h2>
+        <div id="camera-status" class="cs-status cs-status-pending">
+          <span class="w-2 h-2 rounded-full bg-current" id="status-dot"></span>
+          <span id="status-text">Initializing...</span>
         </div>
-        
-        <% if @scan_contexts.size > 1 %>
-          <div class="flex items-center gap-2">
-            <label for="scan-context" class="text-xs sm:text-sm text-gray-500 whitespace-nowrap">Context:</label>
-            <select id="scan-context" class="border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]">
-              <% @scan_contexts.each do |context| %>
-                <option value="<%= context.id %>" <%= "selected" if context == @default_scan_context %>>
-                  <%= context.name %><%= " — Travel pickup" if context.is_travel_pickup? %><% if context.checks_in? %> ✓<% end %>
-                </option>
-              <% end %>
-            </select>
-          </div>
-        <% else %>
-          <input type="hidden" id="scan-context" value="<%= @default_scan_context&.id %>">
-        <% end %>
-      </div>
-      
-      <div class="flex items-center gap-2 mb-3 hidden" id="camera-select-wrapper">
-        <label for="camera-select" class="text-xs sm:text-sm text-gray-500 whitespace-nowrap">Camera:</label>
-        <select id="camera-select" class="flex-1 border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]"></select>
       </div>
 
-      <div id="qr-reader" class="w-full bg-gray-900 rounded-lg overflow-hidden relative" style="min-height: 280px;">
+      <% if @scan_contexts.size > 1 %>
+        <div class="flex w-full items-center gap-2 sm:w-auto">
+          <label for="scan-context" class="cs-kv-label whitespace-nowrap">Context</label>
+          <select id="scan-context" class="cs-select min-h-11 sm:min-h-8">
+            <% @scan_contexts.each do |context| %>
+              <option value="<%= context.id %>" <%= "selected" if context == @default_scan_context %>>
+                <%= context.name %><%= " — Travel pickup" if context.is_travel_pickup? %><% if context.checks_in? %> ✓<% end %>
+              </option>
+            <% end %>
+          </select>
+        </div>
+      <% else %>
+        <input type="hidden" id="scan-context" value="<%= @default_scan_context&.id %>">
+      <% end %>
+    </div>
+
+    <div class="cs-container-body">
+      <div class="flex items-center gap-2 mb-3 hidden" id="camera-select-wrapper">
+        <label for="camera-select" class="cs-kv-label whitespace-nowrap">Camera</label>
+        <select id="camera-select" class="cs-select flex-1 min-h-11 sm:min-h-8"></select>
+      </div>
+
+      <div id="qr-reader" class="w-full bg-black rounded-(--cs-radius-container) overflow-hidden relative" style="min-height: 280px;">
         <video id="qr-video" class="w-full h-full object-cover" style="min-height: 280px;" muted playsinline></video>
         <!-- iOS home-screen web apps often refuse a camera prompt that isn't
              tied to a tap, so keep a manual way to (re)start it. -->
         <button type="button" id="start-camera-btn"
-                class="hidden absolute inset-0 w-full h-full flex items-center justify-center text-white text-sm font-medium bg-gray-900/80">
+                class="hidden absolute inset-0 w-full h-full flex items-center justify-center text-white text-sm font-bold bg-black/80">
           Tap to start camera
         </button>
       </div>
-      
-      <div id="scan-result" class="mt-4 p-3 sm:p-4 rounded-lg hidden">
+
+      <div id="scan-result" class="mt-4 hidden" role="status" aria-live="polite">
         <!-- Scan result appears here -->
       </div>
 
       <!-- Search by name or ID -->
-      <div class="mt-4 pt-4 border-t border-gray-200">
-        <p class="text-sm text-gray-500 mb-2">Search by name or ID:</p>
+      <div class="cs-field mt-5 pt-4 border-t border-(--cs-border-divider-secondary)">
+        <label for="participant-search" class="cs-field-label">Search by name or ID</label>
         <div class="relative">
-          <input type="text" id="participant-search" placeholder="Name or first 8 chars of ID..." 
-                 class="w-full border border-gray-300 rounded-md px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]"
-                 autocomplete="off">
-          <div id="search-results" class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg hidden max-h-64 overflow-y-auto">
+          <label class="cs-search">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+            <input type="text" id="participant-search" placeholder="Name or first 8 chars of ID..."
+                   class="cs-input min-h-11 text-base sm:min-h-8 sm:text-sm"
+                   autocomplete="off">
+          </label>
+          <div id="search-results" class="cs-menu cs-menu-scroll left-0 right-0 max-w-none! hidden">
             <!-- Search results appear here -->
           </div>
         </div>
       </div>
 
       <!-- Manual entry fallback -->
-      <div class="mt-4 pt-4 border-t border-gray-200">
-        <p class="text-sm text-gray-500 mb-2">Or enter full participant ID manually:</p>
+      <div class="cs-field mt-4 pt-4 border-t border-(--cs-border-divider-secondary)">
+        <label for="manual-participant-id" class="cs-field-label">Or enter full participant ID manually</label>
         <form id="manual-scan-form" class="flex flex-col sm:flex-row gap-2">
-          <input type="text" id="manual-participant-id" placeholder="Participant ID (UUID)" 
-                 class="flex-1 border border-gray-300 rounded-md px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]">
-          <button type="submit" class="bg-[#d42f46] text-white px-4 py-2.5 sm:py-2 rounded-md hover:bg-[#b82840] text-sm font-medium min-h-[44px] sm:min-h-0">
-            Look Up
+          <input type="text" id="manual-participant-id" placeholder="Participant ID (UUID)"
+                 class="cs-input flex-1 min-h-11 text-base sm:min-h-8 sm:text-sm">
+          <button type="submit" class="cs-btn cs-btn-primary min-h-11 sm:min-h-8">
+            Look up
           </button>
         </form>
       </div>
 
       <!-- NFC Scanner (via macOS bridge) -->
-      <div class="mt-4 pt-4 border-t border-gray-200" id="nfc-scanner-section">
-          <div class="flex items-center justify-between mb-2">
-            <div class="flex items-center gap-2">
-              <p class="text-sm font-medium text-gray-700">NFC Scanner</p>
-              <div id="nfc-status" class="flex items-center gap-1.5">
-                <span class="w-2 h-2 bg-gray-400 rounded-full" id="nfc-status-dot"></span>
-                <span class="text-xs text-gray-500" id="nfc-status-text">Not connected</span>
+      <div class="mt-4 pt-4 border-t border-(--cs-border-divider-secondary)" id="nfc-scanner-section">
+          <div class="flex items-center justify-between gap-2 mb-1">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h3 class="cs-h3">NFC Scanner</h3>
+              <div id="nfc-status" class="cs-status cs-status-stopped">
+                <span class="w-2 h-2 rounded-full bg-current" id="nfc-status-dot"></span>
+                <span id="nfc-status-text">Not connected</span>
               </div>
             </div>
-            <button type="button" id="nfc-connect-btn" class="text-xs text-[#ec3750] hover:text-blue-800">
+            <button type="button" id="nfc-connect-btn" class="cs-btn min-h-11 sm:min-h-8">
               Connect
             </button>
           </div>
-          <p class="text-xs text-gray-500 mb-3">
+          <p class="cs-small cs-muted">
             Connect to the Attend NFC Bridge app to scan NFC badges or passports.
-            <a href="https://github.com/hackclub/attend-nfc/releases/latest" target="_blank" class="text-[#ec3750] hover:underline">Download bridge app →</a>
+            <a href="https://github.com/hackclub/attend-nfc/releases/latest" target="_blank" class="cs-link">Download bridge app →</a>
           </p>
-          
+
           <% if current_event.nfc_badges_enabled? %>
           <!-- NFC Write Panel (shown after QR scan) -->
-          <div id="nfc-write-panel" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-4 mt-3">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-sm font-medium text-blue-800">Write NFC Badge</span>
-              <button type="button" id="nfc-write-cancel" class="text-xs text-[#ec3750] hover:text-blue-800">Cancel</button>
+          <div id="nfc-write-panel" class="hidden cs-alert mt-3">
+            <%= cs_status_icon(:info) %>
+            <div class="flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <p class="cs-alert-title">Write NFC badge</p>
+                <button type="button" id="nfc-write-cancel" class="cs-btn cs-btn-link min-h-11 sm:min-h-8">Cancel</button>
+              </div>
+              <p class="cs-small">
+                Tap a fresh NFC badge to the reader to assign it to <strong id="nfc-write-participant-name"></strong>
+              </p>
+              <p id="nfc-write-status" class="cs-small cs-secondary mt-2">Waiting for badge...</p>
             </div>
-            <p class="text-xs text-blue-700 mb-3">
-              Tap a fresh NFC badge to the reader to assign it to <strong id="nfc-write-participant-name"></strong>
-            </p>
-            <div id="nfc-write-status" class="text-xs text-[#ec3750]">Waiting for badge...</div>
           </div>
           <% end %>
       </div>
     </div>
+  </section>
 
-    <!-- Recent Scans -->
-    <div class="bg-white rounded-lg border border-gray-200 p-4 sm:p-6" data-controller="event-scans" data-event-scans-event-id-value="<%= current_event.id %>">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-base sm:text-lg font-semibold">Recent Scans</h2>
-        <%= link_to "View All", history_admin_event_scans_path(current_event), class: "text-xs text-[#ec3750] hover:text-blue-800" %>
-      </div>
+  <!-- Recent Scans -->
+  <section class="cs-container flex flex-col" data-controller="event-scans" data-event-scans-event-id-value="<%= current_event.id %>">
+    <div class="cs-container-header cs-container-header-divided">
+      <h2 class="cs-h2">Recent scans</h2>
+      <%= link_to "View all", history_admin_event_scans_path(current_event), class: "cs-btn cs-btn-link" %>
+    </div>
+    <div class="cs-container-body flex-1 pt-3!">
       <div id="recent-scans" class="space-y-3 max-h-[300px] sm:max-h-[500px] overflow-y-auto" data-event-scans-target="scans">
         <% if @recent_scans.any? %>
           <% @recent_scans.each do |scan| %>
-            <div class="flex items-center justify-between border-b border-gray-100 pb-3 last:border-0">
+            <div class="flex items-center justify-between border-b border-(--cs-border-divider-secondary) pb-3 last:border-0">
               <div class="min-w-0 flex-1 mr-2">
-                <p class="font-medium text-sm truncate"><%= scan.participant.display_name %></p>
-                <p class="text-xs text-gray-500">
+                <p class="font-bold truncate"><%= scan.participant.display_name %></p>
+                <p class="cs-small cs-muted">
                   <%= scan.scanned_at.strftime("%H:%M") %>
                   <% if scan.scan_context %>
-                    <span class="text-gray-400">@ <%= scan.scan_context.name %></span>
+                    <span>@ <%= scan.scan_context.name %></span>
                   <% end %>
                 </p>
-                <p class="text-xs text-gray-400">by <%= scan.user.display_name_or_fallback %></p>
+                <p class="cs-small cs-muted">by <%= scan.user.display_name_or_fallback %></p>
               </div>
-              <%= link_to "View", admin_event_participant_path(current_event, scan.participant_event), 
-                  class: "text-xs text-[#ec3750] hover:text-blue-800 min-h-[44px] min-w-[44px] flex items-center justify-center" %>
+              <%= link_to "View", admin_event_participant_path(current_event, scan.participant_event),
+                  class: "cs-link min-h-[44px] min-w-[44px] flex items-center justify-center" %>
             </div>
           <% end %>
         <% else %>
-          <p class="text-gray-500 text-center py-8 text-sm" data-event-scans-target="empty">No scans yet today</p>
+          <p class="cs-empty" data-event-scans-target="empty">No scans yet today</p>
         <% end %>
       </div>
-      
-      <div class="mt-4 pt-4 border-t border-gray-200">
-        <p class="text-sm text-gray-500">
-          <span class="font-medium text-gray-700" id="scan-count" data-event-scans-target="count"><%= @recent_scans.count %></span> scans today
-        </p>
-      </div>
     </div>
-  </div>
+
+    <div class="cs-container-footer">
+      <span class="font-bold cs-secondary" id="scan-count" data-event-scans-target="count"><%= @recent_scans.count %></span> scans today
+    </div>
+  </section>
 </div>
 
 <!-- Participant Modal -->
-<div id="participant-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+<div id="participant-modal" class="cs-modal-overlay hidden">
+  <div class="cs-modal max-w-lg! max-h-[calc(100dvh-88px)] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="modal-name">
     <!-- Header -->
-    <div id="modal-header" class="bg-gradient-to-r from-blue-600 to-blue-800 text-white px-4 sm:px-6 py-4">
-      <div class="flex justify-between items-start gap-4">
-        <div class="min-w-0 flex-1">
-          <p class="text-blue-200 text-xs sm:text-sm" id="modal-action-text">Checked In</p>
-          <h3 class="text-xl sm:text-2xl font-bold truncate" id="modal-name"></h3>
-          <div id="modal-groups" class="flex flex-wrap gap-1 mt-1"></div>
-          <p class="text-blue-200 text-xs mt-1" id="modal-context-name"></p>
-        </div>
-        <button data-close-participant-modal class="text-white/70 hover:text-white text-2xl leading-none min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2">&times;</button>
+    <div id="modal-header" class="cs-modal-header">
+      <div class="min-w-0 flex-1">
+        <span class="cs-badge cs-badge-green" id="modal-action-text">Checked In</span>
+        <h2 class="truncate mt-1" id="modal-name"></h2>
+        <div id="modal-groups" class="flex flex-wrap gap-1 mt-1"></div>
+        <p class="cs-small cs-muted mt-1" id="modal-context-name"></p>
       </div>
+      <button type="button" data-close-participant-modal class="cs-modal-close min-h-[44px] min-w-[44px] items-center justify-center -mr-2" aria-label="Close">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"/></svg>
+      </button>
     </div>
-    
+
     <!-- Alerts -->
-    <div id="modal-alerts" class="px-4 sm:px-6"></div>
-    
+    <div id="modal-alerts" class="px-5"></div>
+
     <!-- Content -->
-    <div class="p-4 sm:p-6">
-      <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
+    <div class="cs-modal-body pt-4!">
+      <dl class="cs-kv cs-kv-2">
         <div>
-          <dt class="text-gray-500">Status</dt>
-          <dd id="modal-status" class="font-semibold"></dd>
+          <dt class="cs-kv-label">Status</dt>
+          <dd id="modal-status" class="cs-kv-value font-bold"></dd>
         </div>
         <div>
-          <dt class="text-gray-500">Pronouns</dt>
-          <dd id="modal-pronouns"></dd>
+          <dt class="cs-kv-label">Pronouns</dt>
+          <dd id="modal-pronouns" class="cs-kv-value"></dd>
         </div>
-        <div class="sm:col-span-2">
-          <dt class="text-gray-500">Email</dt>
-          <dd id="modal-email" class="truncate"></dd>
+        <div class="md:col-span-2">
+          <dt class="cs-kv-label">Email</dt>
+          <dd id="modal-email" class="cs-kv-value truncate"></dd>
         </div>
         <% if can_view_participant_pii? %>
           <div>
-            <dt class="text-gray-500">Phone</dt>
-            <dd id="modal-phone"></dd>
+            <dt class="cs-kv-label">Phone</dt>
+            <dd id="modal-phone" class="cs-kv-value"></dd>
           </div>
         <% end %>
         <div>
-          <dt class="text-gray-500">T-Shirt Size</dt>
-          <dd id="modal-tshirt" class="font-medium"></dd>
+          <dt class="cs-kv-label">T-shirt size</dt>
+          <dd id="modal-tshirt" class="cs-kv-value"></dd>
         </div>
-        <div class="sm:col-span-2">
-          <dt class="text-gray-500">Dietary</dt>
-          <dd id="modal-dietary"></dd>
+        <div class="md:col-span-2">
+          <dt class="cs-kv-label">Dietary</dt>
+          <dd id="modal-dietary" class="cs-kv-value"></dd>
         </div>
       </dl>
-
-      <div class="mt-6 flex flex-col sm:flex-row gap-3">
-        <a id="modal-view-link" href="#" class="flex-1 bg-[#d42f46] text-white px-4 py-3 sm:py-2 rounded-lg text-center hover:bg-[#b82840] font-medium min-h-[44px] flex items-center justify-center">
-          View Full Profile
-        </a>
-        <button data-close-participant-modal class="flex-1 bg-gray-100 text-gray-700 px-4 py-3 sm:py-2 rounded-lg hover:bg-gray-200 font-medium min-h-[44px]">
-          Scan Next
-        </button>
-      </div>
-      <% if current_event.nfc_badges_enabled? %>
-      <div id="modal-nfc-section" class="mt-4 pt-4 border-t border-gray-200 hidden">
-        <button id="modal-write-nfc-btn" class="w-full bg-purple-600 text-white px-4 py-3 sm:py-2 rounded-lg hover:bg-purple-700 font-medium min-h-[44px] flex items-center justify-center gap-2">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
-          <span id="modal-nfc-btn-text">Write NFC Badge</span>
-        </button>
-        <p id="modal-nfc-status" class="text-xs text-gray-500 text-center mt-2"></p>
-      </div>
-      <% end %>
     </div>
+
+    <div class="cs-modal-footer flex-col-reverse sm:flex-row">
+      <button type="button" data-close-participant-modal class="cs-btn min-h-11 sm:min-h-8">
+        Scan next
+      </button>
+      <a id="modal-view-link" href="#" class="cs-btn cs-btn-primary min-h-11 sm:min-h-8">
+        View full profile
+      </a>
+    </div>
+    <% if current_event.nfc_badges_enabled? %>
+    <div id="modal-nfc-section" class="px-5 pb-4 hidden">
+      <button type="button" id="modal-write-nfc-btn" class="cs-btn w-full min-h-11 sm:min-h-8">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
+        <span id="modal-nfc-btn-text">Write NFC Badge</span>
+      </button>
+      <p id="modal-nfc-status" class="cs-small cs-muted text-center mt-2"></p>
+    </div>
+    <% end %>
   </div>
 </div>
 
@@ -269,9 +275,10 @@ function safeHexColor(value) {
   return /^#?[0-9a-fA-F]{6}$/.test(String(value || '')) ? String(value) : null;
 }
 
-function groupBadgeHtml(group, fallbackColor) {
+function groupBadgeHtml(group) {
   const color = safeHexColor(group.color);
-  return html`<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium" style="background-color: ${color || fallbackColor}; color: ${color ? 'white' : '#1f2d3d'};">${group.name}</span>`;
+  if (!color) return html`<span class="cs-badge">${group.name}</span>`;
+  return html`<span class="cs-badge" style="background-color: ${color}; color: white;">${group.name}</span>`;
 }
 
 // Runs on every render, not just the first: this script sits below the markup
@@ -298,15 +305,17 @@ function groupBadgeHtml(group, fallbackColor) {
   }
 
   function updateStatus(message, state = 'loading') {
+    const wrapper = document.getElementById('camera-status');
     const dot = document.getElementById('status-dot');
     const text = document.getElementById('status-text');
     text.textContent = message;
-    
-    dot.className = 'w-2 h-2 rounded-full';
-    if (state === 'ready') dot.classList.add('bg-green-500');
-    else if (state === 'error') dot.classList.add('bg-red-500');
-    else if (state === 'scanning') dot.classList.add('bg-yellow-500', 'animate-pulse');
-    else dot.classList.add('bg-gray-400');
+
+    // Cloudscape status indicator: the wrapper carries the colour and the
+    // dot paints itself with currentColor.
+    const tone = { ready: 'success', error: 'error', scanning: 'in-progress' }[state] || 'pending';
+    wrapper.className = 'cs-status cs-status-' + tone;
+    dot.className = 'w-2 h-2 rounded-full bg-current';
+    if (state === 'scanning') dot.classList.add('animate-pulse');
   }
 
   function offerManualStart() {
@@ -331,8 +340,8 @@ function groupBadgeHtml(group, fallbackColor) {
 
   function showResult(message, isError = false) {
     const result = document.getElementById('scan-result');
-    result.className = `mt-4 p-4 rounded-lg ${isError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`;
-    result.textContent = message;
+    result.className = `mt-4 cs-alert ${isError ? 'cs-alert-error' : 'cs-alert-success'}`;
+    result.innerHTML = (isError ? '<%= j cs_status_icon(:error) %>' : '<%= j cs_status_icon(:success) %>') + html`<p class="font-bold">${message}</p>`;
     result.classList.remove('hidden');
     
     setTimeout(() => result.classList.add('hidden'), 3000);
@@ -574,21 +583,19 @@ function groupBadgeHtml(group, fallbackColor) {
         const data = await response.json();
         
         if (data.results.length === 0) {
-          searchResults.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500">No participants found</div>';
+          searchResults.innerHTML = '<div class="cs-menu-header">No participants found</div>';
         } else {
           searchResults.innerHTML = data.results.map(p => html`
-            <div class="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0 search-result" 
+            <div class="cs-menu-item min-h-11 justify-between search-result"
                  data-participant-id="${p.id}">
-              <div class="flex justify-between items-center">
-                <div>
-                  <p class="font-medium text-sm">${p.display_name}</p>
-                  <p class="text-xs text-gray-500">ID: ${p.short_id}</p>
-                  ${(p.groups && p.groups.length) ? html`<div class="flex flex-wrap gap-1 mt-1">${p.groups.map(g => groupBadgeHtml(g, '#e5e7eb'))}</div>` : ''}
-                </div>
-                <span class="text-xs px-2 py-1 rounded-full ${p.status === 'complete' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
-                  ${p.status.replace('_', ' ')}
-                </span>
+              <div class="min-w-0">
+                <p class="font-bold truncate">${p.display_name}</p>
+                <p class="cs-small cs-muted">ID: ${p.short_id}</p>
+                ${(p.groups && p.groups.length) ? html`<div class="flex flex-wrap gap-1 mt-1">${p.groups.map(g => groupBadgeHtml(g))}</div>` : ''}
               </div>
+              <span class="cs-badge ${p.status === 'complete' ? 'cs-badge-green' : ''}">
+                ${p.status.replace('_', ' ')}
+              </span>
             </div>
           `).join('');
         }
@@ -644,7 +651,6 @@ let currentModalParticipant = null;
 
 function showParticipantModal(data, scanContext, firstScan) {
   const modal = document.getElementById('participant-modal');
-  const header = document.getElementById('modal-header');
   const actionText = document.getElementById('modal-action-text');
   const contextName = document.getElementById('modal-context-name');
   
@@ -654,10 +660,10 @@ function showParticipantModal(data, scanContext, firstScan) {
   // Update header based on whether it's first scan or re-scan
   if (firstScan) {
     actionText.textContent = scanContext?.checks_in ? 'Checked In' : 'Scanned';
-    header.className = 'bg-gradient-to-r from-blue-600 to-blue-800 text-white px-4 sm:px-6 py-4';
+    actionText.className = 'cs-badge cs-badge-green';
   } else {
     actionText.textContent = 'Already Scanned';
-    header.className = 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-4 sm:px-6 py-4';
+    actionText.className = 'cs-badge cs-badge-yellow';
   }
   
   contextName.textContent = scanContext?.name ? '@ ' + scanContext.name : '';
@@ -666,7 +672,7 @@ function showParticipantModal(data, scanContext, firstScan) {
   const groupsEl = document.getElementById('modal-groups');
   if (groupsEl) {
     groupsEl.innerHTML = (data.groups && data.groups.length)
-      ? data.groups.map(g => groupBadgeHtml(g, '#ffffff')).join('')
+      ? data.groups.map(g => groupBadgeHtml(g)).join('')
       : '';
   }
   document.getElementById('modal-status').textContent = data.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -684,10 +690,10 @@ function showParticipantModal(data, scanContext, firstScan) {
   alertsDiv.innerHTML = '';
 
   if (data.has_anaphylaxis_risk) {
-    alertsDiv.innerHTML += '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 px-4 py-3 mt-4"><strong>⚠️ Anaphylaxis Risk</strong></div>';
+    alertsDiv.innerHTML += '<div class="cs-alert cs-alert-error mt-3"><%= j cs_status_icon(:warning) %><p class="cs-alert-title">Anaphylaxis Risk</p></div>';
   }
   if (data.requires_refrigeration) {
-    alertsDiv.innerHTML += '<div class="bg-blue-100 border-l-4 border-[#ec3750] text-blue-700 px-4 py-3 mt-4"><strong>❄️ Needs Medication Refrigeration</strong></div>';
+    alertsDiv.innerHTML += '<div class="cs-alert mt-3"><%= j cs_status_icon(:info) %><p class="cs-alert-title">Needs Medication Refrigeration</p></div>';
   }
 
   // Show NFC section if NFC is enabled and bridge is connected
@@ -766,25 +772,25 @@ function closeModal() {
 
 function addToRecentScans(participant, scanContext, scannedBy) {
   const container = document.getElementById('recent-scans');
-  const emptyMessage = container.querySelector('.text-center.py-8');
+  const emptyMessage = container.querySelector('[data-event-scans-target="empty"]');
   if (emptyMessage) emptyMessage.remove();
 
-  const contextInfo = scanContext?.name ? html`<span class="text-gray-400">@ ${scanContext.name}</span>` : '';
+  const contextInfo = scanContext?.name ? html`<span>@ ${scanContext.name}</span>` : '';
   const scanHtml = html`
-    <div class="flex items-center justify-between border-b border-gray-100 pb-3 bg-green-50 -mx-2 px-2 rounded transition-colors">
+    <div class="flex items-center justify-between border-b border-(--cs-border-divider-secondary) pb-3 bg-(--cs-success-bg) -mx-2 px-2 rounded transition-colors">
       <div class="min-w-0 flex-1 mr-2">
-        <p class="font-medium text-sm truncate">${participant.display_name}</p>
-        <p class="text-xs text-gray-500">just now ${contextInfo}</p>
-        <p class="text-xs text-gray-400">by ${scannedBy}</p>
+        <p class="font-bold truncate">${participant.display_name}</p>
+        <p class="cs-small cs-muted">just now ${contextInfo}</p>
+        <p class="cs-small cs-muted">by ${scannedBy}</p>
       </div>
-      <a href="${participant.show_url}" class="text-xs text-[#ec3750] hover:text-blue-800">View</a>
+      <a href="${participant.show_url}" class="cs-link min-h-[44px] min-w-[44px] flex items-center justify-center">View</a>
     </div>
   `;
   container.insertAdjacentHTML('afterbegin', scanHtml.toString());
 
   setTimeout(() => {
     const firstChild = container.firstElementChild;
-    if (firstChild) firstChild.classList.remove('bg-green-50');
+    if (firstChild) firstChild.classList.remove('bg-(--cs-success-bg)');
   }, 2000);
 }
 
@@ -826,22 +832,22 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
   function updateNfcStatus(status, message) {
     if (!nfcStatusDot || !nfcStatusText) return;
     
-    nfcStatusDot.className = 'w-2 h-2 rounded-full';
+    const nfcStatusWrapper = document.getElementById('nfc-status');
+    const tone = { connected: 'success', connecting: 'in-progress', error: 'error' }[status] || 'stopped';
+    if (nfcStatusWrapper) nfcStatusWrapper.className = 'cs-status cs-status-' + tone;
+    nfcStatusDot.className = 'w-2 h-2 rounded-full bg-current';
     switch (status) {
       case 'connected':
-        nfcStatusDot.classList.add('bg-green-500');
         nfcConnectBtn.textContent = 'Disconnect';
         break;
       case 'connecting':
-        nfcStatusDot.classList.add('bg-yellow-500', 'animate-pulse');
+        nfcStatusDot.classList.add('animate-pulse');
         nfcConnectBtn.textContent = 'Connecting...';
         break;
       case 'error':
-        nfcStatusDot.classList.add('bg-red-500');
         nfcConnectBtn.textContent = 'Retry';
         break;
       default:
-        nfcStatusDot.classList.add('bg-gray-400');
         nfcConnectBtn.textContent = 'Connect';
     }
     nfcStatusText.textContent = message;
