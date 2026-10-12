@@ -90,6 +90,37 @@ RSpec.describe Privacy::Eraser do
     expect(result.retained).to include(a_hash_including(type: "signed documents", count: 1))
   end
 
+  it "keeps a consent the guardian signed for a child who stays, with its uploads" do
+    consent = registration.consents.create!(consent_type: "waiver", status: "signed", guardian_participant_event: guardian_link,
+      docuseal_envelope_id: "fake-envelope")
+    consent.physical_uploads.attach(io: file_fixture("headshot.png").open, filename: "signed.png", content_type: "image/png")
+
+    result = described_class.new(subject_for(emails: [ "parent@example.com" ])).call(dry_run: false)
+
+    expect(Guardian.exists?(guardian.id)).to be(false)
+    expect(consent.reload).to have_attributes(guardian_participant_event_id: nil, status: "signed")
+    expect(consent.physical_uploads).to be_attached
+    expect(result.retained).to include(a_hash_including(type: "guardian-signed documents", count: 1))
+  end
+
+  it "erases the account behind a participant matched on Slack alone" do
+    user.update!(slack_user_id: nil)
+
+    described_class.new(subject_for(slack_id: "U0FAKE1")).call(dry_run: false)
+
+    expect(Participant.exists?(participant.id)).to be(false)
+    expect(User.exists?(user.id)).to be(false)
+  end
+
+  it "erases an account that other people's audit entries name as the actor" do
+    AuditLog.create!(actor_user_id: user.id, action: "update", record_type: "Event", record_id: past_event.id)
+
+    described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false)
+
+    expect(User.exists?(user.id)).to be(false)
+    expect(AuditLog.where(record_id: past_event.id).pluck(:actor_user_id)).to eq([ nil ])
+  end
+
   describe "matching only the subject" do
     it "leaves blank-email rows alone when the hub sends no emails" do
       other = create(:participant_event, event: past_event)
@@ -112,6 +143,15 @@ RSpec.describe Privacy::Eraser do
       expect(Ticket.exists?(ticket.id)).to be(true)
       expect(AutomatedSmsLog.exists?(sms.id)).to be(true)
       expect(Guardian.exists?(parent.id)).to be(true)
+    end
+
+    it "keeps tickets from a phone number another account shares" do
+      create(:user, phone_number: participant.phone)
+      ticket = Ticket.create!(channel: "sms", phone_number: participant.phone)
+
+      described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false)
+
+      expect(Ticket.exists?(ticket.id)).to be(true)
     end
 
     it "erases texts and unfiled tickets from a number only they had" do

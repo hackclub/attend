@@ -60,6 +60,8 @@ module Privacy
 
     DOCUSEAL_REASON = "signed waivers and documents stay in DocuSeal as liability records; " \
                       "Attend's copy of the signing status and its link to them are removed".freeze
+    GUARDIAN_CONSENT_REASON = "documents a guardian signed for a child who stays registered remain on the child's record, " \
+                              "with the link to the guardian removed".freeze
     AIRTABLE_REASON = "copies synced to event organisers' Airtable bases are not touched here".freeze
 
     def initialize(subject, now: Time.current)
@@ -118,6 +120,9 @@ module Privacy
                                    .or(Participant.where(id: ParticipantEvent.where(slack_user_id: slack_id).select(:participant_id)))
       end
       participant_ids = participants.pluck(:id)
+      # a participant matched on Slack alone still brings the account it
+      # belongs to
+      user_ids |= Participant.where(id: participant_ids).where.not(user_id: nil).pluck(:user_id)
       participant_event_ids = ParticipantEvent.where(participant_id: participant_ids).pluck(:id)
 
       # guardians matched directly, plus anyone whose only reason to be here
@@ -142,8 +147,12 @@ module Privacy
       phones = (User.where(id: user_ids).map(&:phone_number) +
         Participant.where(id: participant_ids).map(&:phone) +
         Guardian.where(id: guardian_ids).map(&:phone)).compact_blank.uniq
+      # users' numbers aren't deterministically encrypted, so they're
+      # decrypted and compared here rather than queried
+      other_user_phones = phones.any? ? User.where.not(id: user_ids).where.not(phone_number: nil).pluck(:phone_number).to_set : Set.new
       phones = phones.reject do |phone|
-        Participant.where(phone:).where.not(id: participant_ids).exists? ||
+        other_user_phones.include?(phone) ||
+          Participant.where(phone:).where.not(id: participant_ids).exists? ||
           Guardian.where(phone:).where.not(id: guardian_ids).exists? ||
           EmergencyContact.where(phone:).where.not(id: EmergencyContact.where(participant_event_id: participant_event_ids).select(:id)).exists?
       end
@@ -240,6 +249,9 @@ module Privacy
       signed = Consent.where(participant_event_id: people.participant_events).where.not(docuseal_envelope_id: nil).count
       retained << { type: "signed documents", count: signed, reason: DOCUSEAL_REASON } if signed.positive?
 
+      kept = surviving_guardian_consents.count
+      retained << { type: "guardian-signed documents", count: kept, reason: GUARDIAN_CONSENT_REASON } if kept.positive?
+
       synced = ParticipantEvent.where(id: people.participant_events).where.not(airtable_record_id: nil).count +
         GuardianParticipantEvent.where(id: people.guardian_links).where.not(airtable_record_id: nil).count +
         Accommodation.where(participant_event_id: people.participant_events).where.not(airtable_record_id: nil).count
@@ -255,6 +267,11 @@ module Privacy
 
       pes = people.participant_events
       users = people.users
+
+      # cleared first: audit_logs.actor_user_id is a foreign key, so the
+      # user can't go while an entry still names them
+      PaperTrail::Version.where(whodunnit: users).update_all(whodunnit: nil) if users.any?
+      AuditLog.where(actor_user_id: users).update_all(actor_user_id: nil) if users.any?
 
       # these hang off a registration or account without a dependent: :destroy
       Note.where(participant_event_id: pes).or(Note.where(ticket_id: people.tickets)).delete_all
@@ -281,9 +298,7 @@ module Privacy
       User.where(id: users).destroy_all
 
       PaperTrail::Version.where(item_id: ids).delete_all
-      PaperTrail::Version.where(whodunnit: users).update_all(whodunnit: nil) if users.any?
       AuditLog.where(record_id: ids).delete_all
-      AuditLog.where(actor_user_id: users).update_all(actor_user_id: nil) if users.any?
 
       blob_ids
     end
@@ -299,9 +314,14 @@ module Privacy
       ids.concat(TravelLeg.where(travel_id: Travel.where(participant_event_id: pes).select(:id)).pluck(:id))
       ids.concat(SiblingMembership.where(participant_id: people.participants).pluck(:id))
       ids.concat(TicketMessage.where(ticket_id: people.tickets).pluck(:id))
-      ids.concat(Consent.where(guardian_participant_event_id: people.guardian_links).pluck(:id))
       ids.concat(Note.where(ticket_id: people.tickets).pluck(:id))
       ids.uniq
+    end
+
+    # consents a guardian being erased signed for a child who isn't. The
+    # guardian link is nullified and the consent, with its uploads, stays
+    def surviving_guardian_consents
+      Consent.where(guardian_participant_event_id: people.guardian_links).where.not(participant_event_id: people.participant_events)
     end
 
     def execute(statement)
