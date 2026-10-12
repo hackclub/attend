@@ -7,9 +7,9 @@
     <section class="cs-container mb-5">
       <div class="cs-container-header">
         <div>
-          <h2 class="cs-h2">Unaccompanied Minor Verification</h2>
+          <h2 class="cs-h2">Unaccompanied minor verification</h2>
           <p class="cs-container-description">
-            UM means the airline's formal (paid) unaccompanied minor chaperone service — not just an under-18 travelling alone.
+            UM means the airline's formal (paid) unaccompanied minor chaperone service, not just an under-18 travelling alone.
             Only approved participants show the UM badge in the Travel Calendar and admin views.
           </p>
         </div>
@@ -19,7 +19,15 @@
           "approved" => ["Verified UM", :success],
           "rejected" => ["Rejected", :error]
         }[@participant_event.um_status] %>
-        <div class="cs-actions"><%= cs_status(badge[1], badge[0]) %></div>
+        <div class="cs-actions">
+          <%= cs_status(badge[1], badge[0]) %>
+          <% unless @participant_event.um_rejected? %>
+            <%= button_to "Reject UM status", reject_um_admin_event_participant_path(current_event, @participant_event), method: :post, class: "cs-btn" %>
+          <% end %>
+          <% unless @participant_event.um_approved? %>
+            <%= button_to "Approve UM status", approve_um_admin_event_participant_path(current_event, @participant_event), method: :post, class: "cs-btn cs-btn-primary" %>
+          <% end %>
+        </div>
       </div>
 
       <div class="cs-container-body">
@@ -43,29 +51,20 @@
           </div>
           <div>
             <dt class="cs-kv-label">Guardian double-confirmed</dt>
-            <dd class="cs-kv-value"><%= @participant_event.um_guardian_confirmed_at&.strftime("%b %d, %Y %H:%M") || "Not yet" %></dd>
+            <dd class="cs-kv-value"><%= cs_relative_time(@participant_event.um_guardian_confirmed_at) || "Not yet" %></dd>
           </div>
           <% if @participant_event.um_verified_at.present? %>
             <div>
               <dt class="cs-kv-label">Reviewed</dt>
-              <dd class="cs-kv-value"><%= @participant_event.um_verified_at.strftime("%b %d, %Y %H:%M") %><%= " by #{@participant_event.um_verified_by.name || @participant_event.um_verified_by.email}" if @participant_event.um_verified_by %></dd>
+              <dd class="cs-kv-value"><%= cs_relative_time(@participant_event.um_verified_at) %><%= " by #{@participant_event.um_verified_by.name || @participant_event.um_verified_by.email}" if @participant_event.um_verified_by %></dd>
             </div>
           <% end %>
         </dl>
       </div>
-
-      <div class="cs-container-footer flex flex-wrap justify-end gap-2">
-        <% unless @participant_event.um_rejected? %>
-          <%= button_to "Reject UM status", reject_um_admin_event_participant_path(current_event, @participant_event), method: :post, class: "cs-btn" %>
-        <% end %>
-        <% unless @participant_event.um_approved? %>
-          <%= button_to "Approve UM status", approve_um_admin_event_participant_path(current_event, @participant_event), method: :post, class: "cs-btn cs-btn-primary" %>
-        <% end %>
-      </div>
     </section>
   <% end %>
 
-  <%= form_with url: travel_admin_event_participant_path(current_event, @participant_event), method: :patch, local: true, class: "cs-stack", data: { controller: "travel-form" } do |form| %>
+  <%= form_with url: travel_admin_event_participant_path(current_event, @participant_event), method: :patch, local: true, class: "cs-stack", html: { novalidate: true }, data: { controller: "travel-form cs-form-validation" } do |form| %>
 
     <section class="cs-container">
       <div class="cs-container-header">
@@ -75,29 +74,26 @@
 
       <%= fields_for :travel_inbound, @travel_inbound do |f| %>
         <div class="space-y-4">
-          <div>
-            <%= f.label :arrangement_status, "Arrangement status", class: "cs-field-label" %>
+          <%= cs_form_field f, :arrangement_status, label: "Arrangement status", optional: true do |aria| %>
             <%= f.select :arrangement_status, Travel.arrangement_statuses.keys.map { |status| [status.titleize, status] },
-                { include_blank: "Select status..." }, class: "cs-select",
-                data: { action: "change->travel-form#updateFields", travel_form_target: "inboundStatus" } %>
-          </div>
+                  { include_blank: "Select status" }, class: "cs-select", id: f.field_id(:arrangement_status), **aria,
+                  data: { action: "change->travel-form#updateFields", travel_form_target: "inboundStatus" } %>
+          <% end %>
           <!-- Mode -->
-          <div>
-            <%= f.label :mode, "Travel mode", class: "cs-field-label" %>
+          <%= cs_form_field f, :mode, label: "Travel mode", constraint: "Required once the arrangement is provisional or confirmed." do |aria| %>
             <%= f.select :mode, Travel.modes.keys.map { |m| [m.titleize, m] },
-                { include_blank: "Select mode..." },
-                class: "cs-select",
-                data: { action: "change->travel-form#updateFields", travel_form_target: "inboundMode" } %>
-          </div>
+                  { include_blank: "Select mode" },
+                  class: "cs-select", id: f.field_id(:mode), **aria,
+                  data: { action: "change->travel-form#updateFields", travel_form_target: "inboundMode" } %>
+          <% end %>
 
           <% if current_event.visa_options_enabled? %>
           <!-- Visa Status -->
-          <div>
-            <%= f.label :visa_status, "Visa status", class: "cs-field-label" %>
+          <%= cs_form_field f, :visa_status, label: "Visa status", optional: true do |aria| %>
             <%= f.select :visa_status, Travel.visa_statuses.keys.map { |s| [s.titleize.gsub("_", " "), s] },
-                { include_blank: "Select status..." },
-                class: "cs-select" %>
-          </div>
+                  { include_blank: "Select status" },
+                  class: "cs-select", id: f.field_id(:visa_status), **aria %>
+          <% end %>
           <% end %>
 
           <!-- Unaccompanied Minor -->
@@ -125,40 +121,19 @@
           <!-- Train fields -->
           <% if @travel_inbound.train? %>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
-              <div>
-                <%= f.label :train_departure_station, "Departure station", class: "cs-field-label" %>
-                <%= f.text_field :train_departure_station, class: "cs-input" %>
-              </div>
-              <div>
-                <%= f.label :train_arrival_station, "Arrival station", class: "cs-field-label" %>
-                <%= f.text_field :train_arrival_station, class: "cs-input" %>
-              </div>
-              <div>
-                <%= f.label :arrival_time, "Arrival time", class: "cs-field-label" %>
-                <%= f.datetime_local_field :arrival_time, class: "cs-input" %>
-              </div>
+              <%= cs_form_field f, :train_departure_station, label: "Departure station" %>
+              <%= cs_form_field f, :train_arrival_station, label: "Arrival station" %>
+              <%= cs_form_field f, :arrival_time, label: "Arrival time", as: :datetime_local_field %>
             </div>
           <% end %>
 
           <!-- Bus fields -->
           <% if @travel_inbound.bus? %>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
-              <div>
-                <%= f.label :bus_departure_location, "Departure location", class: "cs-field-label" %>
-                <%= f.text_field :bus_departure_location, class: "cs-input" %>
-              </div>
-              <div>
-                <%= f.label :bus_arrival_location, "Arrival location", class: "cs-field-label" %>
-                <%= f.text_field :bus_arrival_location, class: "cs-input" %>
-              </div>
-              <div>
-                <%= f.label :departure_time, "Departure time", class: "cs-field-label" %>
-                <%= f.datetime_local_field :departure_time, class: "cs-input" %>
-              </div>
-              <div>
-                <%= f.label :arrival_time, "Arrival time", class: "cs-field-label" %>
-                <%= f.datetime_local_field :arrival_time, class: "cs-input" %>
-              </div>
+              <%= cs_form_field f, :bus_departure_location, label: "Departure location" %>
+              <%= cs_form_field f, :bus_arrival_location, label: "Arrival location" %>
+              <%= cs_form_field f, :departure_time, label: "Departure time", as: :datetime_local_field %>
+              <%= cs_form_field f, :arrival_time, label: "Arrival time", as: :datetime_local_field %>
             </div>
           <% end %>
 
@@ -166,31 +141,21 @@
           <% if @travel_inbound.car? %>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
               <% if can_view_participant_pii? %>
-                <div data-controller="address-autocomplete">
-                  <%= f.label :origin_address, "Travelling from", class: "cs-field-label" %>
-                  <%= f.text_field :origin_address, class: "cs-input", data: { address_autocomplete_target: "input" } %>
-                </div>
+                <%= cs_form_field f, :origin_address, label: "Travelling from", data: { controller: "address-autocomplete" } do |aria| %>
+                  <%= f.text_field :origin_address, class: "cs-input", id: f.field_id(:origin_address), data: { address_autocomplete_target: "input" }, **aria %>
+                <% end %>
               <% end %>
-              <div>
-                <%= f.label :expected_arrival_time, "Expected arrival time", class: "cs-field-label" %>
-                <%= f.datetime_local_field :expected_arrival_time, class: "cs-input" %>
-              </div>
+              <%= cs_form_field f, :expected_arrival_time, label: "Expected arrival time", as: :datetime_local_field %>
             </div>
           <% end %>
 
           <!-- Other fields -->
           <% if @travel_inbound.other? %>
-            <div class="border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
-              <%= f.label :other_details, "Travel details", class: "cs-field-label" %>
-              <%= f.text_area :other_details, rows: 3, class: "cs-input" %>
-            </div>
+            <%= cs_form_field f, :other_details, label: "Travel details", as: :text_area, input: { rows: 3 }, class: "border-t border-(--cs-border-divider-secondary) pt-4 mt-4" %>
           <% end %>
 
           <!-- Notes -->
-          <div class="border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
-            <%= f.label :notes, "Notes", class: "cs-field-label" %>
-            <%= f.text_area :notes, rows: 2, class: "cs-input", placeholder: "Any additional notes..." %>
-          </div>
+          <%= cs_form_field f, :notes, label: "Notes", optional: true, as: :text_area, input: { rows: 2, placeholder: "Any additional notes" }, class: "border-t border-(--cs-border-divider-secondary) pt-4 mt-4" %>
         </div>
       <% end %>
       </div>
@@ -204,20 +169,18 @@
 
       <%= fields_for :travel_outbound, @travel_outbound do |f| %>
         <div class="space-y-4">
-          <div>
-            <%= f.label :arrangement_status, "Arrangement status", class: "cs-field-label" %>
+          <%= cs_form_field f, :arrangement_status, label: "Arrangement status", optional: true do |aria| %>
             <%= f.select :arrangement_status, Travel.arrangement_statuses.keys.map { |status| [status.titleize, status] },
-                { include_blank: "Select status..." }, class: "cs-select",
-                data: { action: "change->travel-form#updateFields", travel_form_target: "outboundStatus" } %>
-          </div>
+                  { include_blank: "Select status" }, class: "cs-select", id: f.field_id(:arrangement_status), **aria,
+                  data: { action: "change->travel-form#updateFields", travel_form_target: "outboundStatus" } %>
+          <% end %>
           <!-- Mode -->
-          <div>
-            <%= f.label :mode, "Travel mode", class: "cs-field-label" %>
+          <%= cs_form_field f, :mode, label: "Travel mode", constraint: "Required once the arrangement is provisional or confirmed." do |aria| %>
             <%= f.select :mode, Travel.modes.keys.map { |m| [m.titleize, m] },
-                { include_blank: "Select mode..." },
-                class: "cs-select",
-                data: { action: "change->travel-form#updateFields", travel_form_target: "outboundMode" } %>
-          </div>
+                  { include_blank: "Select mode" },
+                  class: "cs-select", id: f.field_id(:mode), **aria,
+                  data: { action: "change->travel-form#updateFields", travel_form_target: "outboundMode" } %>
+          <% end %>
 
           <!-- Unaccompanied Minor -->
           <div class="cs-option">
@@ -244,40 +207,19 @@
           <!-- Train fields -->
           <% if @travel_outbound.train? %>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
-              <div>
-                <%= f.label :train_departure_station, "Departure station", class: "cs-field-label" %>
-                <%= f.text_field :train_departure_station, class: "cs-input" %>
-              </div>
-              <div>
-                <%= f.label :train_arrival_station, "Arrival station", class: "cs-field-label" %>
-                <%= f.text_field :train_arrival_station, class: "cs-input" %>
-              </div>
-              <div>
-                <%= f.label :departure_time, "Departure time", class: "cs-field-label" %>
-                <%= f.datetime_local_field :departure_time, class: "cs-input" %>
-              </div>
+              <%= cs_form_field f, :train_departure_station, label: "Departure station" %>
+              <%= cs_form_field f, :train_arrival_station, label: "Arrival station" %>
+              <%= cs_form_field f, :departure_time, label: "Departure time", as: :datetime_local_field %>
             </div>
           <% end %>
 
           <!-- Bus fields -->
           <% if @travel_outbound.bus? %>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
-              <div>
-                <%= f.label :bus_departure_location, "Departure location", class: "cs-field-label" %>
-                <%= f.text_field :bus_departure_location, class: "cs-input" %>
-              </div>
-              <div>
-                <%= f.label :bus_arrival_location, "Arrival location", class: "cs-field-label" %>
-                <%= f.text_field :bus_arrival_location, class: "cs-input" %>
-              </div>
-              <div>
-                <%= f.label :departure_time, "Departure time", class: "cs-field-label" %>
-                <%= f.datetime_local_field :departure_time, class: "cs-input" %>
-              </div>
-              <div>
-                <%= f.label :arrival_time, "Arrival time", class: "cs-field-label" %>
-                <%= f.datetime_local_field :arrival_time, class: "cs-input" %>
-              </div>
+              <%= cs_form_field f, :bus_departure_location, label: "Departure location" %>
+              <%= cs_form_field f, :bus_arrival_location, label: "Arrival location" %>
+              <%= cs_form_field f, :departure_time, label: "Departure time", as: :datetime_local_field %>
+              <%= cs_form_field f, :arrival_time, label: "Arrival time", as: :datetime_local_field %>
             </div>
           <% end %>
 
@@ -285,35 +227,28 @@
           <% if @travel_outbound.car? %>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
               <% if can_view_participant_pii? %>
-                <div data-controller="address-autocomplete">
-                  <%= f.label :origin_address, "Travelling to", class: "cs-field-label" %>
-                  <%= f.text_field :origin_address, class: "cs-input", data: { address_autocomplete_target: "input" } %>
-                </div>
+                <%= cs_form_field f, :origin_address, label: "Travelling to", data: { controller: "address-autocomplete" } do |aria| %>
+                  <%= f.text_field :origin_address, class: "cs-input", id: f.field_id(:origin_address), data: { address_autocomplete_target: "input" }, **aria %>
+                <% end %>
               <% end %>
-              <div>
-                <%= f.label :departure_time, "Departure time", class: "cs-field-label" %>
-                <%= f.datetime_local_field :departure_time, class: "cs-input" %>
-              </div>
+              <%= cs_form_field f, :departure_time, label: "Departure time", as: :datetime_local_field %>
             </div>
           <% end %>
 
           <!-- Other fields -->
           <% if @travel_outbound.other? %>
-            <div class="border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
-              <%= f.label :other_details, "Travel details", class: "cs-field-label" %>
-              <%= f.text_area :other_details, rows: 3, class: "cs-input" %>
-            </div>
+            <%= cs_form_field f, :other_details, label: "Travel details", as: :text_area, input: { rows: 3 }, class: "border-t border-(--cs-border-divider-secondary) pt-4 mt-4" %>
           <% end %>
 
           <!-- Notes -->
-          <div class="border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
-            <%= f.label :notes, "Notes", class: "cs-field-label" %>
-            <%= f.text_area :notes, rows: 2, class: "cs-input", placeholder: "Any additional notes..." %>
-          </div>
+          <%= cs_form_field f, :notes, label: "Notes", optional: true, as: :text_area, input: { rows: 2, placeholder: "Any additional notes" }, class: "border-t border-(--cs-border-divider-secondary) pt-4 mt-4" %>
         </div>
       <% end %>
       </div>
     </section>
+
+    <%= cs_form_errors @travel_inbound, title: "Inbound travel couldn't be saved.", labels: { "travel_legs.flight_code": "Flight code", "travel_legs.departure_airport": "Departure airport", "travel_legs.arrival_airport": "Arrival airport", "travel_legs.departure_time": "Departure time", "travel_legs.arrival_time": "Arrival time", travel_legs: "Flight legs" } %>
+    <%= cs_form_errors @travel_outbound, title: "Outbound travel couldn't be saved.", labels: { "travel_legs.flight_code": "Flight code", "travel_legs.departure_airport": "Departure airport", "travel_legs.arrival_airport": "Arrival airport", "travel_legs.departure_time": "Departure time", "travel_legs.arrival_time": "Arrival time", travel_legs: "Flight legs" } %>
 
     <!-- Submit -->
     <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
@@ -335,27 +270,27 @@
     <input type="hidden" class="leg-position" name="" value="">
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-      <div>
-        <label class="cs-field-label">Flight Code <span aria-hidden="true">*</span></label>
+      <div data-cs-field data-cs-label="Flight code">
+        <label class="cs-field-label">Flight code</label>
         <input type="text"
                class="leg-flight-code cs-input"
                name=""
-               placeholder="e.g. LH1234"
+               placeholder="LH1234"
                required>
       </div>
-      <div>
-        <label class="cs-field-label">Confirmation Code</label>
+      <div data-cs-field data-cs-label="Confirmation code">
+        <label class="cs-field-label">Confirmation code<span class="cs-field-optional"> - optional</span></label>
         <input type="text" class="leg-confirmation-code cs-input" name="" placeholder="Booking reference">
       </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-      <div data-controller="airport-autocomplete" class="relative">
-        <label class="cs-field-label">Departure Airport <span aria-hidden="true">*</span></label>
+      <div data-controller="airport-autocomplete" class="relative" data-cs-field data-cs-label="Departure airport">
+        <label class="cs-field-label">Departure airport</label>
         <input type="text"
                class="leg-departure-airport cs-input"
                name=""
-               placeholder="e.g. LHR"
+               placeholder="LHR"
                required
                autocomplete="off"
                data-airport-autocomplete-target="input"
@@ -363,13 +298,14 @@
         <div data-airport-autocomplete-target="dropdown" class="hidden cs-menu cs-menu-scroll left-0 w-full">
           <div data-airport-autocomplete-target="results"></div>
         </div>
+        <p class="cs-field-hint">3-letter IATA or 4-letter ICAO code.</p>
       </div>
-      <div data-controller="airport-autocomplete" class="relative">
-        <label class="cs-field-label">Arrival Airport <span aria-hidden="true">*</span></label>
+      <div data-controller="airport-autocomplete" class="relative" data-cs-field data-cs-label="Arrival airport">
+        <label class="cs-field-label">Arrival airport</label>
         <input type="text"
                class="leg-arrival-airport cs-input"
                name=""
-               placeholder="e.g. VIE"
+               placeholder="VIE"
                required
                autocomplete="off"
                data-airport-autocomplete-target="input"
@@ -377,19 +313,22 @@
         <div data-airport-autocomplete-target="dropdown" class="hidden cs-menu cs-menu-scroll left-0 w-full">
           <div data-airport-autocomplete-target="results"></div>
         </div>
+        <p class="cs-field-hint">3-letter IATA or 4-letter ICAO code.</p>
       </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <label class="cs-field-label">Departure Time <span aria-hidden="true">*</span> <span class="font-normal cs-muted">(local airport time)</span></label>
+      <div data-cs-field data-cs-label="Departure time">
+        <label class="cs-field-label">Departure time</label>
         <input type="datetime-local" class="leg-departure-time cs-input" name="" required>
-        <select class="leg-departure-tz mt-1 cs-select" name=""><%= travel_leg_time_zone_options %></select>
+        <select class="leg-departure-tz mt-1 cs-select" name="" aria-label="Departure time zone" data-cs-validate="false"><%= travel_leg_time_zone_options %></select>
+        <p class="cs-field-hint">Local time at the departure airport.</p>
       </div>
-      <div>
-        <label class="cs-field-label">Arrival Time <span aria-hidden="true">*</span> <span class="font-normal cs-muted">(local airport time)</span></label>
+      <div data-cs-field data-cs-label="Arrival time">
+        <label class="cs-field-label">Arrival time</label>
         <input type="datetime-local" class="leg-arrival-time cs-input" name="" required>
-        <select class="leg-arrival-tz mt-1 cs-select" name=""><%= travel_leg_time_zone_options %></select>
+        <select class="leg-arrival-tz mt-1 cs-select" name="" aria-label="Arrival time zone" data-cs-validate="false"><%= travel_leg_time_zone_options %></select>
+        <p class="cs-field-hint">Local time at the arrival airport.</p>
       </div>
     </div>
   </div>

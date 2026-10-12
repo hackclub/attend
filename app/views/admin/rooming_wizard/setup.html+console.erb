@@ -84,7 +84,7 @@
       </div>
     </section>
 
-    <%= form_with url: setup_admin_event_rooming_wizard_path(@event.slug), method: :post do |f| %>
+    <%= form_with url: setup_admin_event_rooming_wizard_path(@event.slug), method: :post, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
       <section class="cs-container">
         <div class="cs-container-header cs-container-header-divided">
           <div>
@@ -112,17 +112,17 @@
             <tbody id="room-configurations-body">
               <tr class="configuration-row">
                 <td>
-                  <div class="w-28"><input type="number" name="room_configurations[][capacity]"
-                         value="<%= @rooming_plan.room_capacity || 2 %>" min="1"
+                  <div data-cs-field data-cs-label="People per room"><div class="w-28"><input type="number" name="room_configurations[][capacity]"
+                         value="<%= @rooming_plan.room_capacity || 2 %>" min="1" step="1" required
                          aria-label="People per room"
-                         class="cs-input"></div>
+                         class="cs-input"></div></div>
                 </td>
                 <td>
-                  <div class="w-28"><input type="number" name="room_configurations[][count]"
+                  <div data-cs-field data-cs-label="Number of rooms"><div class="w-28"><input type="number" name="room_configurations[][count]"
                          value="<%= estimated_rooms %>"
-                         min="1"
+                         min="1" step="1" required
                          aria-label="Number of rooms"
-                         class="cs-input"></div>
+                         class="cs-input"></div></div>
                 </td>
                 <td>
                   <button type="button" data-remove-config-row aria-label="Remove room size"
@@ -153,14 +153,14 @@
         row.className = 'configuration-row';
         row.innerHTML = `
           <td>
-            <div class="w-28"><input type="number" name="room_configurations[][capacity]"
-                   value="2" min="1" aria-label="People per room"
-                   class="cs-input"></div>
+            <div data-cs-field data-cs-label="People per room"><div class="w-28"><input type="number" name="room_configurations[][capacity]"
+                   value="2" min="1" step="1" required aria-label="People per room"
+                   class="cs-input"></div></div>
           </td>
           <td>
-            <div class="w-28"><input type="number" name="room_configurations[][count]"
-                   value="1" min="1" aria-label="Number of rooms"
-                   class="cs-input"></div>
+            <div data-cs-field data-cs-label="Number of rooms"><div class="w-28"><input type="number" name="room_configurations[][count]"
+                   value="1" min="1" step="1" required aria-label="Number of rooms"
+                   class="cs-input"></div></div>
           </td>
           <td>
             <button type="button" data-remove-config-row aria-label="Remove room size"
@@ -185,6 +185,26 @@
         const removeButton = event.target.closest('[data-remove-config-row]');
         if (removeButton) removeConfigRow(removeButton);
       });
+
+      // A sibling group needs at least two participants. The cs-form-validation
+      // controller shows this inline: it's checked on submit (capture phase, so
+      // it runs before the controller), then live once the field is in error.
+      function syncSiblingValidity(enforce) {
+        const boxes = Array.from(document.querySelectorAll('[data-sibling-participant]'));
+        const checked = boxes.filter((box) => box.checked).length;
+        const message = enforce && checked < 2 ? 'Select at least 2 participants.' : '';
+        boxes.forEach((box) => box.setCustomValidity(message));
+      }
+
+      document.addEventListener('submit', (event) => {
+        if (event.target.querySelector('[data-sibling-participant]')) syncSiblingValidity(true);
+      }, true);
+
+      document.addEventListener('change', (event) => {
+        if (!event.target.matches('[data-sibling-participant]')) return;
+        const inError = document.querySelector('[data-sibling-participant][aria-invalid="true"]');
+        syncSiblingValidity(Boolean(inError));
+      }, true);
 
       function updateRemoveButtons() {
         const rows = document.querySelectorAll('#room-configurations-body .configuration-row');
@@ -260,7 +280,7 @@
   <div class="fixed inset-0" data-hide="sibling-modal"></div>
 
   <div class="cs-modal relative" role="dialog" aria-modal="true" aria-labelledby="sibling-modal-title">
-    <%= form_with url: admin_event_sibling_groups_path(@event.slug), method: :post, data: { turbo_frame: "_top" } do |f| %>
+    <%= form_with url: admin_event_sibling_groups_path(@event.slug), method: :post, html: { novalidate: true }, data: { turbo_frame: "_top", controller: "cs-form-validation" } do |f| %>
       <div class="cs-modal-header">
         <h2 id="sibling-modal-title">Create sibling group</h2>
         <button type="button" class="cs-modal-close" data-hide="sibling-modal" aria-label="Close">
@@ -268,17 +288,17 @@
         </button>
       </div>
       <div class="cs-modal-body">
-        <div class="cs-field">
-          <label class="cs-field-label" for="sibling-group-label">Label <span class="font-normal cs-muted">- optional</span></label>
-          <input type="text" id="sibling-group-label" name="label" placeholder="e.g., Smith siblings" class="cs-input">
-        </div>
+        <%= cs_field id: "sibling-group-label", label: "Label", optional: true, constraint: "For example: Rivera siblings" do |aria| %>
+          <%= text_field_tag :label, nil, id: "sibling-group-label", class: "cs-input", **aria %>
+        <% end %>
 
-        <fieldset class="cs-field">
-          <legend class="cs-field-label">Select participants</legend>
+        <fieldset class="cs-field" data-cs-field data-cs-label="Participants" data-cs-error-id="sibling-group-participants-error">
+          <legend class="cs-field-label">Participants</legend>
+          <p class="cs-field-description" id="sibling-group-participants-description">Select at least 2 participants.</p>
           <div class="max-h-60 overflow-y-auto rounded-lg border border-(--cs-border-input) px-3 py-2">
             <% @event.participants.includes(:sibling_groups).order(:legal_last_name, :legal_first_name).each do |participant| %>
               <label class="cs-option">
-                <input type="checkbox" name="participant_ids[]" value="<%= participant.id %>">
+                <input type="checkbox" name="participant_ids[]" value="<%= participant.id %>" data-sibling-participant aria-describedby="sibling-group-participants-description">
                 <span class="cs-option-label">
                   <%= participant.full_name %>
                   <% if participant.sibling_groups.any? %>

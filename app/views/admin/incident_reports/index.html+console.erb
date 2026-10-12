@@ -36,7 +36,7 @@
           <table class="cs-table">
             <thead>
               <tr>
-                <th scope="col">Date</th>
+                <th scope="col">Filed</th>
                 <th scope="col">Priority</th>
                 <th scope="col">Type</th>
                 <th scope="col">Event</th>
@@ -47,7 +47,7 @@
             <tbody>
               <% reports.each do |report| %>
                 <tr>
-                  <td class="whitespace-nowrap"><%= report.created_at.strftime("%b %d, %Y %H:%M") %></td>
+                  <td class="whitespace-nowrap"><%= cs_absolute_time_tag(report.created_at) %></td>
                   <td class="whitespace-nowrap"><%= incident_report_priority_badge(report.priority) %></td>
                   <td class="whitespace-nowrap"><%= report.incident_type_label %></td>
                   <td class="whitespace-nowrap"><%= report.event_name || "—" %></td>

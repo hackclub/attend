@@ -57,12 +57,12 @@
                 </td>
                 <td class="whitespace-nowrap">
                   <% if token.last_used_at %>
-                    <%= "#{time_ago_in_words(token.last_used_at)} ago" %>
+                    <%= cs_relative_time(token.last_used_at) %>
                   <% else %>
                     <%= cs_status(:pending, "Never") %>
                   <% end %>
                 </td>
-                <td class="whitespace-nowrap"><%= token.created_at.strftime("%B %d, %Y") %></td>
+                <td class="whitespace-nowrap"><%= cs_relative_time(token.created_at) %></td>
                 <td class="whitespace-nowrap text-right">
                   <div class="flex items-center justify-end gap-2">
                     <%= button_to "Rotate", rotate_admin_series_api_token_path(@series, token), method: :post,
@@ -86,15 +86,14 @@
     <% end %>
 
     <div class="cs-container-footer">
-      <%= form_with url: admin_series_api_tokens_path(@series), method: :post, class: "flex flex-col sm:flex-row items-stretch sm:items-end gap-2" do |f| %>
-        <div class="cs-field flex-1">
-          <%= f.label :name, "Key name", class: "cs-field-label" %>
+      <%= form_with url: admin_series_api_tokens_path(@series), method: :post, class: "flex flex-col sm:flex-row items-stretch sm:items-start gap-2", html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+        <%= cs_field id: "name", label: "Key name", class: "flex-1", constraint: "Describes what uses the key. For example: series-ops-integration" do |aria| %>
           <div class="flex items-center gap-1">
             <span class="cs-secondary font-mono select-none"><%= current_user.email.to_s.split("@").first %>@</span>
-            <%= f.text_field :name, placeholder: "series-ops-integration", required: true, class: "cs-input font-mono" %>
+            <%= f.text_field :name, required: true, pattern: ".*\\S.*", class: "cs-input font-mono", data: { cs_pattern_message: "Key name is required." }, **aria %>
           </div>
-        </div>
-        <%= f.button "Create API key", class: "cs-btn cs-btn-primary" %>
+        <% end %>
+        <%= f.button "Create API key", class: "cs-btn cs-btn-primary sm:mt-6" %>
       <% end %>
     </div>
   </section>

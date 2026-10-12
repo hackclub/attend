@@ -16,7 +16,7 @@
       <div class="cs-container-header">
         <div>
           <h2 class="cs-h2">Engagement preference</h2>
-          <p class="cs-container-description">How this participant prefers to engage at events – helps identify if low participation is a concern or simply their preference.</p>
+          <p class="cs-container-description">How this participant prefers to engage at events. This helps identify whether low participation is a concern or simply their preference.</p>
         </div>
       </div>
       <div class="cs-container-body">
@@ -60,21 +60,7 @@
       </div>
       <div class="cs-container-body">
 
-      <%= form_with model: @safeguarding_info, url: safeguarding_admin_event_participant_path(current_event, @participant_event), method: :patch, local: true do |f| %>
-        <% if @safeguarding_info.errors.any? %>
-          <div class="cs-alert cs-alert-error mb-5" role="alert">
-            <%= cs_status_icon(:error) %>
-            <div>
-              <p class="cs-alert-title"><%= pluralize(@safeguarding_info.errors.count, "error") %> stopped this from saving</p>
-              <ul class="mt-1 list-disc list-inside">
-                <% @safeguarding_info.errors.full_messages.each do |msg| %>
-                  <li><%= msg %></li>
-                <% end %>
-              </ul>
-            </div>
-          </div>
-        <% end %>
-
+      <%= form_with model: @safeguarding_info, url: safeguarding_admin_event_participant_path(current_event, @participant_event), method: :patch, local: true, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
         <div class="space-y-6">
           <div class="space-y-4">
             <div>
@@ -85,10 +71,7 @@
               <p class="ml-6 cs-small cs-muted">Mark if participant requires additional support</p>
             </div>
 
-            <div>
-              <%= f.label :high_support_notes, class: "cs-field-label" %>
-              <%= f.text_area :high_support_notes, rows: 3, class: "cs-input" %>
-            </div>
+            <%= cs_form_field f, :high_support_notes, label: "High support notes", optional: true, as: :text_area, input: { rows: 3 } %>
           </div>
 
           <div class="space-y-4">
@@ -111,17 +94,13 @@
             </div>
           </div>
 
-          <div>
-            <%= f.label :authorized_pickup_adults, class: "cs-field-label" %>
-            <%= f.text_area :authorized_pickup_adults, rows: 3, class: "cs-input" %>
-            <p class="cs-field-hint">Names and contact information of adults authorized to pick up the participant</p>
-          </div>
+          <%= cs_form_field f, :authorized_pickup_adults, label: "Authorized pickup adults", optional: true, as: :text_area, input: { rows: 3 },
+                constraint: "Names and contact information of adults authorized to pick up the participant." %>
 
-          <div>
-            <%= f.label :other_instructions, class: "cs-field-label" %>
-            <%= f.text_area :other_instructions, rows: 3, class: "cs-input" %>
-            <p class="cs-field-hint">Any other safeguarding instructions or notes</p>
-          </div>
+          <%= cs_form_field f, :other_instructions, label: "Other instructions", optional: true, as: :text_area, input: { rows: 3 },
+                constraint: "Any other safeguarding instructions or notes." %>
+
+          <%= cs_form_errors f, title: "This safeguarding information couldn't be saved." %>
 
           <div class="pt-2 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
             <%= link_to "Cancel", admin_event_participant_path(current_event, @participant_event), class: "cs-btn cs-btn-link cs-btn-full" %>
@@ -174,7 +153,7 @@
 
     <section class="cs-container">
       <div class="cs-container-header">
-        <h2 class="cs-h2">Emergency Contacts</h2>
+        <h2 class="cs-h2">Emergency contacts</h2>
         <% if policy(@participant_event).update_safeguarding? %>
           <div class="cs-actions">
             <%= link_to "Add contact", new_admin_event_participant_emergency_contact_path(current_event, @participant_event), class: "cs-btn" %>

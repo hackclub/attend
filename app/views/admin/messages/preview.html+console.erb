@@ -113,7 +113,7 @@
         <%= cs_status_icon(:pending) %>
         <p>
           <strong>Scheduled:</strong> This message will be sent on
-          <strong><%= @message.scheduled_at.strftime("%B %d, %Y at %l:%M %p") %></strong>
+          <strong><%= cs_absolute_time_tag(@message.scheduled_at) %></strong>
         </p>
       </div>
     <% end %>
@@ -123,7 +123,7 @@
       <% if @message.scheduled_at.present? && @message.scheduled_at > Time.current %>
         <%= button_to "Schedule message", send_now_admin_event_message_path(current_event, @message),
             method: :post,
-            data: { confirm: "Schedule this message to be sent on #{@message.scheduled_at.strftime("%B %d at %l:%M %p")}?" },
+            data: { confirm: "Schedule this message to be sent on #{cs_absolute_time(@message.scheduled_at)}?" },
             class: "cs-btn cs-btn-primary",
             disabled: @total_count == 0 %>
       <% else %>

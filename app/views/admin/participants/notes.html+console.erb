@@ -9,23 +9,18 @@
       <h2 class="cs-h2">Add note</h2>
     </div>
 
-    <%= form_with model: Note.new, url: admin_event_participant_notes_path(current_event, @participant_event), method: :post, local: true do |f| %>
+    <%= form_with model: Note.new, url: admin_event_participant_notes_path(current_event, @participant_event), method: :post, local: true, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
       <div class="cs-container-body">
-        <div class="cs-field">
-          <%= f.label :body, "Note", class: "cs-field-label" %>
-          <%= f.text_area :body, rows: 4, class: "cs-input", required: true %>
-        </div>
+        <%= cs_form_field f, :body, label: "Note", as: :text_area, input: { rows: 4, required: true } %>
 
         <div class="cs-field-grid mt-4">
-          <div>
-            <%= f.label :note_type, "Type", class: "cs-field-label" %>
-            <%= f.select :note_type, Note.note_types.keys.map { |t| [t.titleize, t] }, {}, class: "cs-select" %>
-          </div>
+          <%= cs_form_field f, :note_type, label: "Type" do |aria| %>
+            <%= f.select :note_type, Note.note_types.keys.map { |t| [t.titleize, t] }, {}, class: "cs-select", id: f.field_id(:note_type), **aria %>
+          <% end %>
 
-          <div>
-            <%= f.label :sensitivity, class: "cs-field-label" %>
-            <%= f.select :sensitivity, Note.sensitivities.keys.map { |s| [s.titleize, s] }, {}, class: "cs-select" %>
-          </div>
+          <%= cs_form_field f, :sensitivity, label: "Sensitivity" do |aria| %>
+            <%= f.select :sensitivity, Note.sensitivities.keys.map { |s| [s.titleize, s] }, {}, class: "cs-select", id: f.field_id(:sensitivity), **aria %>
+          <% end %>
         </div>
       </div>
       <div class="cs-container-footer flex justify-end">
@@ -58,15 +53,15 @@
             <p class="whitespace-pre-wrap"><%= note.body %></p>
 
             <div class="mt-3 cs-small cs-muted">
-              <%= note.author&.email || "Unknown" %> · <%= note.created_at.strftime("%B %d, %Y at %H:%M") %>
+              <%= note.author&.email || "Unknown" %> · <%= cs_relative_time(note.created_at) %>
             </div>
           </li>
         <% end %>
       </ul>
     <% else %>
       <div class="cs-empty">
-        <p class="cs-empty-title">No notes yet.</p>
-        <p>Add one above.</p>
+        <p class="cs-empty-title">No notes</p>
+        <p>Notes you add with the previous form appear here.</p>
       </div>
     <% end %>
   </section>

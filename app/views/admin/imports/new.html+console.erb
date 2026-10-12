@@ -12,7 +12,7 @@
   </div>
 
   <div data-controller="dropzone">
-    <%= form_with url: admin_event_imports_path(current_event), method: :post, multipart: true, local: true, id: "import-form", class: "cs-stack" do |f| %>
+    <%= form_with url: admin_event_imports_path(current_event), method: :post, multipart: true, local: true, id: "import-form", class: "cs-stack", html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
       <section class="cs-container">
         <div class="cs-container-header">
           <div>
@@ -21,26 +21,28 @@
           </div>
         </div>
         <div class="cs-container-body">
-          <div class="cs-field">
-            <%= label_tag :csv_file, "Participants CSV", class: "cs-field-label" %>
+          <%= cs_field id: "csv_file", label: "Participants CSV", errors: @csv_file_errors,
+                constraint: "CSV files only. You'll see a preview before the import starts." do |aria| %>
             <div
-              data-action="click->dropzone#openFilePicker dragover->dropzone#handleDragOver dragleave->dropzone#handleDragLeave drop->dropzone#handleDrop"
+              data-action="click->dropzone#openFilePicker keydown.enter->dropzone#openFilePicker dragover->dropzone#handleDragOver dragleave->dropzone#handleDragLeave drop->dropzone#handleDrop"
               class="border-2 border-dashed border-(--cs-border-input) rounded-lg p-10 text-center hover:border-(--cs-accent) hover:bg-(--cs-bg-selected) transition-colors cursor-pointer"
+              tabindex="0"
+              role="button"
+              aria-label="Choose a participants CSV file"
               data-dropzone-target="zone"
             >
               <div data-dropzone-target="content">
                 <p class="cs-secondary">Drag and drop your CSV file here</p>
                 <p class="mt-3"><span class="cs-btn">Choose file</span></p>
-                <p class="cs-small cs-muted mt-2">or click anywhere in this area to browse</p>
+                <p class="cs-small cs-muted mt-2">or select this area to browse</p>
               </div>
               <div data-dropzone-target="selected" class="hidden">
                 <p><span class="cs-status cs-status-success"><%= cs_status_icon(:success) %><span class="font-bold" data-dropzone-target="fileName"></span></span></p>
-                <p class="cs-small cs-muted mt-2">Click to change file</p>
+                <p class="cs-small cs-muted mt-2">Select to change the file</p>
               </div>
-              <%= file_field_tag :csv_file, accept: ".csv", class: "hidden cs-file", data: { dropzone_target: "input", action: "change->dropzone#fileSelected" } %>
+              <%= file_field_tag :csv_file, accept: ".csv", required: true, class: "hidden cs-file", data: { dropzone_target: "input", action: "change->dropzone#fileSelected" }, **aria %>
             </div>
-            <p class="cs-field-hint">CSV files only. You'll see a preview before the import starts.</p>
-          </div>
+          <% end %>
         </div>
       </section>
 
@@ -102,7 +104,7 @@
 
       <div class="flex justify-end gap-2">
         <%= link_to "Cancel", admin_event_participants_path(current_event), class: "cs-btn cs-btn-link" %>
-        <%= button_tag "Upload & preview", type: "submit", name: "commit", value: "Upload & Preview", class: "cs-btn cs-btn-primary", id: "submit-btn", data: { dropzone_target: "submit" }, disabled: true %>
+        <%= button_tag "Upload & preview", type: "submit", name: "commit", value: "Upload & Preview", class: "cs-btn cs-btn-primary", id: "submit-btn", data: { dropzone_target: "submit" } %>
       </div>
     <% end %>
   </div>

@@ -11,26 +11,30 @@
     </div>
   </div>
 
-  <%= form_with url: send_invite_admin_event_participants_path(current_event), method: :post, class: "cs-stack", data: { turbo: false } do |f| %>
+  <%# send_invite redirects back here with a flash alert; every one of them
+      is about the email address, so it renders under that field instead of
+      in the flashbar (deleting it keeps the layout from repeating it). %>
+  <% invite_error = flash[:alert].presence %>
+  <% flash.delete(:alert) %>
+  <% invite_error = "Email address is required." if invite_error == "Email is required." %>
+  <%= form_with url: send_invite_admin_event_participants_path(current_event), method: :post, class: "cs-stack", html: { novalidate: true }, data: { turbo: false, controller: "cs-form-validation" } do |f| %>
     <section class="cs-container">
       <div class="cs-container-header">
         <h2 class="cs-h2">Participant</h2>
       </div>
       <div class="cs-container-body">
-        <div class="cs-field">
-          <%= f.label "invite[email]", "Email address", class: "cs-field-label" %>
-          <%= f.email_field "invite[email]", required: true, placeholder: "participant@example.com", class: "cs-input" %>
-        </div>
+        <%= cs_field id: "invite_email", label: "Email address", errors: [ invite_error ] do |aria| %>
+          <%= f.email_field "invite[email]", id: "invite_email", required: true, placeholder: "participant@example.com", autocomplete: "off", class: "cs-input", **aria %>
+        <% end %>
 
-        <div class="cs-field">
-          <%= f.label "invite[name]", "Name (optional)", class: "cs-field-label" %>
-          <%= f.text_field "invite[name]", placeholder: "First Last", class: "cs-input" %>
-          <p class="cs-field-hint">If provided, the name will be used in the email greeting.</p>
-        </div>
+        <%= cs_field id: "invite_name", label: "Name", optional: true,
+              constraint: "Used in the email greeting." do |aria| %>
+          <%= f.text_field "invite[name]", id: "invite_name", placeholder: "First Last", autocomplete: "off", class: "cs-input", **aria %>
+        <% end %>
 
         <% if current_event.groups_enabled? && current_event.groups.any? %>
           <fieldset class="cs-field">
-            <legend class="cs-field-label">Groups (optional)</legend>
+            <legend class="cs-field-label">Groups<span class="cs-field-optional"> - optional</span></legend>
             <p class="cs-field-description">Selected groups will be applied when the participant accepts the invite.</p>
             <% current_event.groups.ordered.each do |g| %>
               <div class="cs-option">

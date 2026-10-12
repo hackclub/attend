@@ -53,7 +53,7 @@
         <table class="cs-table">
           <thead>
             <tr>
-              <th scope="col">Timestamp</th>
+              <th scope="col">Logged</th>
               <th scope="col">Actor</th>
               <th scope="col">Action</th>
               <th scope="col">Record</th>
@@ -65,8 +65,8 @@
           <tbody>
             <% @audit_logs.each do |log| %>
               <tr>
-                <td class="whitespace-nowrap cs-secondary font-mono">
-                  <%= log.created_at.strftime("%Y-%m-%d %H:%M:%S") %>
+                <td class="whitespace-nowrap cs-secondary">
+                  <%= cs_absolute_time_tag(log.created_at) %>
                 </td>
                 <td class="whitespace-nowrap">
                   <div class="flex items-center gap-2">

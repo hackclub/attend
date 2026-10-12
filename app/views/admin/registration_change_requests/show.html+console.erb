@@ -75,11 +75,14 @@
           </div>
         <% end %>
 
-        <%= form_with url: request_follow_up_admin_event_registration_change_request_path(current_event, @change_request), scope: :registration_change_request, method: :patch do |f| %>
-          <div class="cs-field">
-            <%= f.label :staff_response, "Request follow-up", class: "cs-field-label" %>
-            <%= f.text_area :staff_response, class: "cs-input", required: true, placeholder: "Explain what the attendee needs to provide" %>
-          </div>
+        <%= form_with model: @change_request, url: request_follow_up_admin_event_registration_change_request_path(current_event, @change_request), scope: :registration_change_request, method: :patch, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+          <%= cs_form_field f, :staff_response, label: "Follow-up message",
+                description: "Sent to the attendee with the request marked as needing follow-up.",
+                constraint: "Explain what the attendee needs to provide.",
+                messages: { blank: "Follow-up message is required." } do |aria| %>
+            <%= f.text_area :staff_response, class: "cs-input", required: true, **aria %>
+          <% end %>
+          <%= cs_form_errors f %>
           <div class="mt-3">
             <%= f.button "Request follow-up", class: "cs-btn" %>
           </div>

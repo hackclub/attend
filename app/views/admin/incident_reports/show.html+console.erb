@@ -6,7 +6,7 @@
     <div class="cs-header-text">
       <h1 class="cs-h1"><%= @incident_report.summary %></h1>
       <p class="cs-description flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span>Filed <%= @incident_report.created_at.strftime("%B %-d, %Y at %H:%M %Z") %></span>
+        <span>Filed <%= cs_absolute_time_tag(@incident_report.created_at) %></span>
         <%= incident_status(@incident_report.status) %>
         <%= incident_report_priority_badge(@incident_report.priority) %>
       </p>
@@ -75,33 +75,32 @@
       <h2 class="cs-h2">Add comment</h2>
     </div>
     <div class="cs-container-body">
-      <%= form_with model: IncidentReportComment.new, url: admin_incident_comments_path(@incident_report), html: { multipart: true } do |f| %>
-        <div class="cs-field">
-          <%= f.label :body, "Comment", class: "cs-field-label" %>
-          <%= f.text_area :body, rows: 3, class: "cs-input", placeholder: "Add a comment or note about this report..." %>
-        </div>
-        <div class="cs-field">
-          <%= f.label :attachments, "Attachments", class: "cs-field-label" %>
-          <%= f.file_field :attachments, multiple: true, class: "cs-file" %>
-          <p class="cs-field-hint">Up to <%= IncidentReportComment::MAX_ATTACHMENT_COUNT %> files, 25MB each.</p>
-        </div>
+      <%= form_with model: @comment || IncidentReportComment.new, url: admin_incident_comments_path(@incident_report),
+            html: { multipart: true, novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+        <%= cs_form_field f, :body, label: "Comment", description: "A comment or note about this report." do |aria| %>
+          <%= f.text_area :body, rows: 3, class: "cs-input", required: true, **aria %>
+        <% end %>
+        <%= cs_form_field f, :attachments, label: "Attachments", optional: true,
+              constraint: "Up to #{IncidentReportComment::MAX_ATTACHMENT_COUNT} files, 25 MB each." do |aria| %>
+          <%= f.file_field :attachments, multiple: true, class: "cs-file", **aria %>
+        <% end %>
         <% if @incident_report.reporter_phone.present? %>
           <label class="cs-option mt-4 cursor-pointer">
             <%= check_box_tag :share_with_reporter, "1", false %>
             <span>
-              <span class="cs-option-label block">Share this update with the reporter?</span>
-              <span class="cs-option-description block">Texts the comment to <%= @incident_report.reporter_phone %></span>
+              <span class="cs-option-label block">Share this update with the reporter</span>
+              <span class="cs-option-description block">Texts the comment to <%= @incident_report.reporter_phone %>.</span>
             </span>
           </label>
         <% end %>
+        <%= cs_form_errors f %>
         <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mt-4">
-          <div class="cs-field">
-            <%= f.label :new_status, "Change status to", class: "cs-field-label" %>
+          <%= cs_form_field f, :new_status, label: "Change status to", optional: true do |aria| %>
             <%= f.select :new_status,
                 [ [ "No change", "" ] ] + IncidentReport.statuses.keys.map { |s| [ s.humanize, s ] },
                 {},
-                class: "cs-select" %>
-          </div>
+                class: "cs-select", **aria %>
+          <% end %>
           <%= f.button "Add comment", class: "cs-btn cs-btn-primary cs-btn-full" %>
         </div>
       <% end %>
@@ -138,7 +137,7 @@
                 <%= incident_step_icon(:info) %>
                 <div>
                   <p class="cs-step-title"><%= comment.body %></p>
-                  <p class="cs-step-detail"><%= entry[:time].strftime("%b %d, %Y %H:%M") %></p>
+                  <p class="cs-step-detail"><%= cs_absolute_time_tag(entry[:time]) %></p>
                 </div>
               </li>
             <% elsif entry[:type] == :comment %>
@@ -153,7 +152,7 @@
                       and changed status to <strong><%= comment.new_status.humanize %></strong>
                     <% end %>
                   </p>
-                  <p class="cs-step-detail"><%= entry[:time].strftime("%b %d, %Y %H:%M") %></p>
+                  <p class="cs-step-detail"><%= cs_absolute_time_tag(entry[:time]) %></p>
                   <div class="mt-2 text-sm rounded-(--cs-radius-item) bg-(--cs-bg-shaded) p-3">
                     <%= simple_format(comment.body) %>
                   </div>
@@ -181,7 +180,7 @@
                     <strong><%= timeline_user&.display_name_or_fallback || "System" %></strong>
                     <%= version.event == "create" ? "created" : "updated" %> the report
                   </p>
-                  <p class="cs-step-detail"><%= entry[:time].strftime("%b %d, %Y %H:%M") %></p>
+                  <p class="cs-step-detail"><%= cs_absolute_time_tag(entry[:time]) %></p>
                 </div>
               </li>
             <% end %>

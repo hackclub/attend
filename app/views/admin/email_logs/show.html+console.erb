@@ -42,19 +42,19 @@
           <dd class="cs-kv-value"><%= cs_status(email_status_types.fetch(@email_log.status, :pending), @email_log.status.titleize) %></dd>
         </div>
         <div>
-          <dt class="cs-kv-label">Sent at</dt>
-          <dd class="cs-kv-value"><%= @email_log.created_at.strftime("%Y-%m-%d %H:%M:%S %Z") %></dd>
+          <dt class="cs-kv-label">Sent</dt>
+          <dd class="cs-kv-value"><%= cs_absolute_time_tag(@email_log.created_at) %></dd>
         </div>
         <% if @email_log.delivered_at %>
           <div>
-            <dt class="cs-kv-label">Delivered at</dt>
-            <dd class="cs-kv-value"><%= @email_log.delivered_at.strftime("%Y-%m-%d %H:%M:%S %Z") %></dd>
+            <dt class="cs-kv-label">Delivered</dt>
+            <dd class="cs-kv-value"><%= cs_absolute_time_tag(@email_log.delivered_at) %></dd>
           </div>
         <% end %>
         <% if @email_log.opened_at %>
           <div>
-            <dt class="cs-kv-label">Opened at</dt>
-            <dd class="cs-kv-value"><%= @email_log.opened_at.strftime("%Y-%m-%d %H:%M:%S %Z") %></dd>
+            <dt class="cs-kv-label">Opened</dt>
+            <dd class="cs-kv-value"><%= cs_absolute_time_tag(@email_log.opened_at) %></dd>
           </div>
         <% end %>
         <% if @email_log.postmark_message_id %>
@@ -86,8 +86,8 @@
             <p class="cs-alert-title">Bounced</p>
             <dl class="cs-kv cs-kv-3 mt-2">
               <div>
-                <dt class="cs-kv-label">Bounced at</dt>
-                <dd class="cs-kv-value"><%= @email_log.bounced_at.strftime("%Y-%m-%d %H:%M:%S %Z") %></dd>
+                <dt class="cs-kv-label">Bounced</dt>
+                <dd class="cs-kv-value"><%= cs_absolute_time_tag(@email_log.bounced_at) %></dd>
               </div>
               <div>
                 <dt class="cs-kv-label">Bounce type</dt>
@@ -142,7 +142,7 @@
                   <% end %>
                 </div>
                 <p class="cs-step-detail whitespace-nowrap">
-                  <time datetime="<%= event.occurred_at.iso8601 %>"><%= event.occurred_at.strftime("%b %d, %Y %H:%M:%S") %></time>
+                  <%= cs_absolute_time_tag(event.occurred_at) %>
                 </p>
               </div>
             </li>

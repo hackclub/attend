@@ -5,7 +5,7 @@
       title: "Modules",
       description: "Modules you turn off are hidden from onboarding and the dashboards."
     } do %>
-  <%= form_with model: @event, url: admin_event_setup_modules_path(@event, return_to: params[:return_to].presence), method: :patch, class: "cs-stack" do |f| %>
+  <%= form_with model: @event, url: admin_event_setup_modules_path(@event, return_to: params[:return_to].presence), method: :patch, class: "cs-stack", html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
     <section class="cs-container">
       <div class="cs-container-header">
         <div>
@@ -30,9 +30,10 @@
             </div>
           </div>
           <div class="ml-7 mt-3" data-wizard-reveal-target="panel" data-show-when="checked">
-            <%= f.label :visa_application_url, "Visa letter application URL", class: "cs-field-label" %>
-            <%= f.url_field :visa_application_url, placeholder: "https://visas.hackclub.com/...", class: "cs-input" %>
-            <p class="cs-field-hint">The Envoy (visas.hackclub.com) form participants are pointed to when they need a visa letter.</p>
+            <%= cs_form_field f, :visa_application_url, label: "Visa letter application URL", optional: true,
+                  constraint: "The Envoy form participants are pointed to when they need a visa letter. For example: https://visas.hackclub.com/…" do |aria| %>
+              <%= f.url_field :visa_application_url, class: "cs-input", data: { cs_example: "https://visas.hackclub.com/…" }, **aria %>
+            <% end %>
           </div>
         </div>
         <div class="cs-option">
@@ -71,7 +72,7 @@
           <%= f.check_box :groups_enabled, { checked: f.object.groups_enabled? } %>
           <div>
             <%= f.label :groups_enabled, "Groups", class: "cs-option-label" %>
-            <p class="cs-option-description">Tag participants with named groups (e.g. "Hardware", "General Attendance") to tell cohorts apart within one event.</p>
+            <p class="cs-option-description">Tag participants with named groups (for example, "Hardware" or "General Attendance") to tell cohorts apart within one event.</p>
           </div>
         </div>
         <div class="cs-option">
@@ -108,6 +109,8 @@
         </div>
       </div>
     </section>
+
+    <%= cs_form_errors f %>
 
     <div class="cs-wizard-actions">
       <%= link_to "Exit setup", admin_event_dashboard_path(@event.slug), class: "cs-btn cs-btn-link" %>

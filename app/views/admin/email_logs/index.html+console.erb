@@ -40,7 +40,7 @@
         <table class="cs-table">
           <thead>
             <tr>
-              <th scope="col">Sent at</th>
+              <th scope="col">Sent</th>
               <th scope="col">To</th>
               <th scope="col">Subject</th>
               <th scope="col">Mailer</th>
@@ -52,8 +52,8 @@
           <tbody>
             <% @email_logs.each do |log| %>
               <tr>
-                <td class="whitespace-nowrap cs-secondary font-mono">
-                  <%= log.created_at.strftime("%Y-%m-%d %H:%M:%S") %>
+                <td class="whitespace-nowrap cs-secondary">
+                  <%= cs_absolute_time_tag(log.created_at) %>
                 </td>
                 <td class="whitespace-nowrap truncate max-w-[180px]" title="<%= log.to_address %>">
                   <%= log.to_address %>

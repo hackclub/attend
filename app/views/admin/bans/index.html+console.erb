@@ -54,7 +54,7 @@
                   <% end %>
                 </td>
                 <td class="whitespace-nowrap">
-                  <%= ban.expires_at ? l(ban.expires_at, format: :long) : "—" %>
+                  <%= ban.expires_at ? cs_absolute_time_tag(ban.expires_at) : "—" %>
                 </td>
                 <td class="whitespace-nowrap"><%= ban.created_by&.email || "—" %></td>
                 <td class="whitespace-nowrap text-right">

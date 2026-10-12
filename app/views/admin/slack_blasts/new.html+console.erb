@@ -14,7 +14,7 @@
       <p>No participants have linked their Slack accounts yet.</p>
     </div>
   <% else %>
-    <%= form_with url: admin_event_slack_blasts_path(current_event), method: :post, class: "cs-stack" do |f| %>
+    <%= form_with url: admin_event_slack_blasts_path(current_event), method: :post, class: "cs-stack", html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
       <div class="cs-alert">
         <%= cs_status_icon(:info) %>
         <p>
@@ -28,14 +28,15 @@
           <h2 class="cs-h2">Message</h2>
         </div>
         <div class="cs-container-body">
-          <div class="cs-field" data-controller="tinymce" data-tinymce-slack-mode-value="true">
-            <%= label_tag :message, "Message", class: "cs-field-label" %>
-            <p class="cs-field-description">Use the toolbar for formatting. Bold, italic, strikethrough, links, lists, and code are supported in Slack.</p>
-            <%= text_area_tag :message, nil,
+          <%= cs_field id: "message", label: "Message", errors: @message_errors,
+                data: { controller: "tinymce", tinymce_slack_mode_value: "true" },
+                description: "Use the toolbar for bold, italic, strikethrough, links, lists and code. Slack supports all of them." do |aria| %>
+            <%= text_area_tag :message, params[:message],
                 rows: 6,
                 class: "cs-input",
-                data: { tinymce_target: "editor" } %>
-          </div>
+                data: { tinymce_target: "editor" },
+                **aria %>
+          <% end %>
         </div>
       </section>
 
@@ -46,7 +47,7 @@
             name: "commit",
             value: "Send Blast",
             class: "cs-btn cs-btn-primary",
-            data: { confirm: "Are you sure you want to send this message to #{@participant_count} participants?" } %>
+            data: { confirm: "Send this message to #{@participant_count} participants?" } %>
       </div>
     <% end %>
   <% end %>

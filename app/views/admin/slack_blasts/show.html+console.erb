@@ -25,8 +25,8 @@
             <dd class="cs-kv-value"><%= @slack_blast.sent_by_user.display_name_or_fallback %></dd>
           </div>
           <div>
-            <dt class="cs-kv-label">Date</dt>
-            <dd class="cs-kv-value"><%= @slack_blast.created_at.strftime("%B %d, %Y at %l:%M %p") %></dd>
+            <dt class="cs-kv-label">Created</dt>
+            <dd class="cs-kv-value"><%= cs_relative_time(@slack_blast.created_at) %></dd>
           </div>
           <div>
             <dt class="cs-kv-label">Recipients</dt>

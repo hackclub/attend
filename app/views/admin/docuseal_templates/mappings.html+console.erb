@@ -51,13 +51,13 @@
           </div>
           <div>
             <dt class="cs-kv-label">Last synced</dt>
-            <dd class="cs-kv-value"><%= Time.parse(@template_snapshot["synced_at"]).strftime("%b %d, %Y %H:%M") rescue "Unknown" %></dd>
+            <dd class="cs-kv-value"><%= cs_relative_time(Time.zone.parse(@template_snapshot["synced_at"].to_s)) || "Unknown" rescue "Unknown" %></dd>
           </div>
         </dl>
       </div>
     </section>
 
-    <%= form_with url: admin_event_docuseal_template_mappings_path(current_event, @template_type), method: :patch, local: true, class: "cs-stack" do |f| %>
+    <%= form_with url: admin_event_docuseal_template_mappings_path(current_event, @template_type), method: :patch, local: true, class: "cs-stack", html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
       <% if @template_type == "freedom_waiver" %>
         <section class="cs-container">
           <div class="cs-container-header">
@@ -71,28 +71,26 @@
           </div>
           <div class="cs-container-body">
             <div class="cs-field-grid">
-              <div class="cs-field">
-                <label for="freedom_granted_field" class="cs-field-label">Granted checkbox field</label>
-                <select id="freedom_granted_field" name="freedom_granted_field" class="cs-select">
-                  <option value="">-- Select Field --</option>
+              <%= cs_field id: "freedom_granted_field", label: "Granted checkbox field", optional: true do |aria| %>
+                <select id="freedom_granted_field" name="freedom_granted_field" class="cs-select" <%= tag.attributes(aria) %>>
+                  <option value="">Select a field</option>
                   <% (@template_snapshot["fields"] || []).reject { |f| f["readonly"] }.each do |field| %>
                     <option value="<%= field["name"] %>" <%= "selected" if @freedom_checkbox_config["granted_field"] == field["name"] %>>
                       <%= field["name"] %>
                     </option>
                   <% end %>
                 </select>
-              </div>
-              <div class="cs-field">
-                <label for="freedom_rejected_field" class="cs-field-label">Rejected checkbox field</label>
-                <select id="freedom_rejected_field" name="freedom_rejected_field" class="cs-select">
-                  <option value="">-- Select Field --</option>
+              <% end %>
+              <%= cs_field id: "freedom_rejected_field", label: "Rejected checkbox field", optional: true do |aria| %>
+                <select id="freedom_rejected_field" name="freedom_rejected_field" class="cs-select" <%= tag.attributes(aria) %>>
+                  <option value="">Select a field</option>
                   <% (@template_snapshot["fields"] || []).reject { |f| f["readonly"] }.each do |field| %>
                     <option value="<%= field["name"] %>" <%= "selected" if @freedom_checkbox_config["rejected_field"] == field["name"] %>>
                       <%= field["name"] %>
                     </option>
                   <% end %>
                 </select>
-              </div>
+              <% end %>
             </div>
           </div>
         </section>

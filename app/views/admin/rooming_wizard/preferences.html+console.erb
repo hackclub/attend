@@ -113,7 +113,7 @@
   <div class="fixed inset-0" data-close-link-modal></div>
 
   <div class="cs-modal relative" role="dialog" aria-modal="true" aria-labelledby="link-modal-title">
-    <form id="link-form">
+    <form id="link-form" novalidate data-controller="cs-form-validation">
       <div class="cs-modal-header">
         <h2 id="link-modal-title">Link to participant</h2>
         <button type="button" class="cs-modal-close" data-close-link-modal aria-label="Close">
@@ -128,16 +128,18 @@
           <label class="cs-field-label" for="link-search">Search participants</label>
           <label class="cs-search">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
-            <input type="text" id="link-search" placeholder="Type to search..."
-                   class="cs-input"
+            <input type="search" id="link-search" placeholder="Search by name"
+                   class="cs-input" data-cs-validate="false"
                    data-filter-link-participants>
           </label>
         </div>
 
-        <div id="link-participants" class="cs-field max-h-60 overflow-y-auto rounded-lg border border-(--cs-border-input)">
+        <fieldset class="cs-field" data-cs-field data-cs-label="Participant" data-cs-error-id="link-participant-error">
+        <legend class="sr-only">Participant</legend>
+        <div id="link-participants" class="max-h-60 overflow-y-auto rounded-lg border border-(--cs-border-input)">
           <% @participant_events.each do |pe| %>
             <label class="link-participant-option flex items-center gap-2.5 px-3 py-2 cursor-pointer border-b border-(--cs-border-divider-secondary) last:border-b-0 hover:bg-(--cs-bg-hover)" data-name="<%= pe.participant.full_name.downcase %>">
-              <input type="radio" name="target_participant_event_id" value="<%= pe.id %>" class="accent-(--cs-accent)">
+              <input type="radio" name="target_participant_event_id" value="<%= pe.id %>" class="accent-(--cs-accent)" required data-cs-required-message="Select a participant to link.">
               <span class="text-sm">
                 <%= pe.participant.full_name %>
                 <span class="cs-muted">- Age <%= pe.age_on_event %>, <%= pe.accommodation&.gender_identity&.titleize %></span>
@@ -145,6 +147,7 @@
             </label>
           <% end %>
         </div>
+        </fieldset>
 
         <div id="link-rank-field" class="hidden cs-field">
           <label class="cs-field-label" for="link-rank">Preference rank</label>
@@ -190,9 +193,12 @@ function filterLinkParticipants(query) {
   });
 }
 
-document.getElementById('link-form').addEventListener('submit', async function(e) {
+// Listens on document so the form's cs-form-validation controller runs first
+// and can stop a submit with no participant selected.
+document.addEventListener('submit', async function(e) {
+  if (e.target.id !== 'link-form') return;
   e.preventDefault();
-  const formData = new FormData(this);
+  const formData = new FormData(e.target);
 
   const response = await fetch('<%= link_preference_admin_event_rooming_wizard_path(@event.slug) %>', {
     method: 'POST',

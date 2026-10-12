@@ -1,6 +1,68 @@
 <% content_for :title, "Participants Table – #{current_event.name} – Attend" %>
 <% content_for :breadcrumbs, cs_event_breadcrumbs([ "Participants", nil ]) %>
 
+<%# Applied panel filters, shown as Cloudscape filter tokens. Each token
+    links to this view without that one filter; sort and grouping carry
+    over. The free-text box filters the loaded rows on the client. %>
+<% raw_filters = params[:filters].respond_to?(:to_unsafe_h) ? params[:filters].to_unsafe_h.values : Array(params[:filters])
+   applied_filters = raw_filters.filter_map { |f| f = f.to_h.stringify_keys; f.slice("field", "operator", "value") if f["field"].present? && f["value"].present? }
+   filter_logic = params[:filter_logic] == "or" ? "or" : "and"
+   view_query = request.query_parameters.slice("sort", "direction", "group_by")
+   table_filter_href = ->(filters) {
+     query = view_query.dup
+     if filters.any?
+       query["filters"] = filters.each_with_index.to_h { |f, i| [ i.to_s, f ] }
+       query["filter_logic"] = filter_logic if filter_logic == "or"
+     end
+     table_admin_event_participants_path(current_event, query)
+   }
+   clear_table_filters_href = table_filter_href.call([])
+   field_labels = {
+     "legal_first_name" => "First name", "legal_last_name" => "Last name", "preferred_name" => "Preferred name",
+     "email" => "Email", "pronouns" => "Pronouns", "tshirt_size" => "T-shirt size", "status" => "Status",
+     "onboarding_complete" => "Onboarding complete", "waiver_signed" => "Waiver signed", "age" => "Age",
+     "is_minor" => "Minor", "travel_mode" => "Travel mode", "has_anaphylaxis" => "Anaphylaxis risk",
+     "high_support" => "High support", "freedom_waiver_granted" => "Freedom waiver", "group" => "Group"
+   }
+   operator_labels = {
+     "is" => "=", "is_not" => "!=", "equals" => "=", "contains" => "contains", "starts_with" => "starts with",
+     "is_empty" => "is empty", "is_not_empty" => "is not empty", "greater_than" => ">", "less_than" => "<"
+   }
+   status_labels = { "awaiting_participant" => "Awaiting participant", "awaiting_parent" => "Awaiting parent", "complete" => "Complete", "withdrawn" => "Withdrawn", "rejected" => "Rejected" }
+   document_state_labels = { "added" => "Added", "not_added" => "Not added", "signed" => "Added and signed", "awaiting" => "Awaiting signature", "withdrawn" => "Removed after adding" }
+   group_names = current_event.groups_enabled? ? current_event.groups.to_h { |g| [ g.id.to_s, g.name ] } : {}
+   table_filter_tokens = applied_filters.each_with_index.map do |filter, index|
+     field, operator, value = filter.values_at("field", "operator", "value")
+     token = case field
+     when "scan_context"
+       { label: operator == "not_scanned_in" ? "Not scanned in at" : "Scanned in at", operator: "=", value: @scan_contexts.find { |sc| sc.id.to_s == value.to_s }&.name || value }
+     when "optional_document"
+       { label: @optional_documents.find { |d| d.id.to_s == value.to_s }&.name || "Optional document", operator: "=", value: document_state_labels[operator] || operator.to_s.humanize }
+     when "group"
+       if %w[is_empty is_not_empty].include?(operator)
+         { label: "Group", operator: operator == "is_empty" ? "is empty" : "is not empty", value: nil }
+       else
+         { label: "Group", operator: operator_labels[operator] || operator, value: group_names[value.to_s] || value }
+       end
+     else
+       display_value = case field
+       when "status" then status_labels[value] || value.to_s.humanize
+       when "onboarding_complete", "waiver_signed", "is_minor", "has_anaphylaxis", "high_support", "freedom_waiver_granted"
+         value.to_s == "true" ? "Yes" : "No"
+       when "travel_mode" then value.to_s.humanize
+       when "tshirt_size" then value.to_s.upcase
+       when "age" then value
+       else "“#{value}”"
+       end
+       if %w[is_empty is_not_empty].include?(operator)
+         { label: field_labels[field] || field.humanize, operator: operator_labels[operator], value: nil }
+       else
+         { label: field_labels[field] || field.to_s.humanize, operator: operator_labels[operator] || operator.to_s.humanize(capitalize: false), value: display_value }
+       end
+     end
+     token.merge(remove_href: table_filter_href.call(applied_filters.reject.with_index { |_, i| i == index }))
+   end
+   table_filtering = table_filter_tokens.any? %>
 <div data-controller="data-table"
      data-data-table-base-url-value="<%= table_admin_event_participants_path(current_event) %>"
      data-data-table-scan-contexts-value="<%= @scan_contexts.map { |sc| { id: sc.id, name: sc.name } }.to_json %>"
@@ -37,6 +99,11 @@
                data-data-table-target="searchInput"
                data-action="input->data-table#search">
       </label>
+      <span class="cs-text-filter-count" role="status" aria-live="polite"
+            data-data-table-target="count"
+            data-server-filtered="<%= table_filtering %>"
+            data-testid="filter-match-count"
+            <%= "hidden" unless table_filtering %>><%= cs_match_count(@participant_events.size) if table_filtering %></span>
 
       <button type="button"
               class="cs-btn"
@@ -139,6 +206,12 @@
       </div>
     </div>
   </div>
+
+  <% if table_filtering %>
+    <div class="px-5 pb-4 border-b border-(--cs-border-divider-secondary)">
+      <%= cs_filter_tokens(table_filter_tokens, clear_href: clear_table_filters_href, operation: filter_logic, data: { testid: "table-filter-tokens" }) %>
+    </div>
+  <% end %>
 
   <div class="hidden" data-data-table-target="filterPanel">
     <div class="px-5 py-4 border-b border-(--cs-border-divider-secondary)">
@@ -299,9 +372,31 @@
 
           <% if @participant_events.empty? %>
             <tr>
-              <td colspan="35">
+              <td colspan="<%= 35 + @optional_documents.size %>" class="cs-table-empty-cell">
+                <% if table_filtering %>
+                  <%= cs_no_match(clear_href: clear_table_filters_href, data: { testid: "filter-no-match" }) %>
+                <% else %>
+                  <div class="cs-empty">
+                    <p class="cs-empty-title">No participants</p>
+                    <p>Participants appear here once they're added or imported.</p>
+                  </div>
+                <% end %>
+              </td>
+            </tr>
+          <% else %>
+            <%# Shown by data-table#search when the text filter hides every row. %>
+            <tr class="hidden" data-data-table-target="noMatch">
+              <td colspan="<%= 35 + @optional_documents.size %>" class="cs-table-empty-cell">
                 <div class="cs-empty">
-                  <p class="cs-empty-title">No participants found.</p>
+                  <p class="cs-empty-title">No matches</p>
+                  <p>We can't find a match.</p>
+                  <div class="cs-actions">
+                    <% if table_filtering %>
+                      <%= link_to "Clear filters", clear_table_filters_href, class: "cs-btn" %>
+                    <% else %>
+                      <button type="button" class="cs-btn" data-action="data-table#clearSearch">Clear filters</button>
+                    <% end %>
+                  </div>
                 </div>
               </td>
             </tr>

@@ -20,7 +20,7 @@
         <table class="cs-table">
           <thead>
             <tr>
-              <th scope="col">Date</th>
+              <th scope="col">Created</th>
               <th scope="col">Sent by</th>
               <th scope="col">Message</th>
               <th scope="col">Status</th>
@@ -31,7 +31,7 @@
           <tbody>
             <% @slack_blasts.each do |blast| %>
               <tr>
-                <td class="whitespace-nowrap"><%= blast.created_at.strftime("%b %d, %Y %l:%M %p") %></td>
+                <td class="whitespace-nowrap"><%= cs_relative_time(blast.created_at) %></td>
                 <td class="whitespace-nowrap"><%= blast.sent_by_user.display_name_or_fallback %></td>
                 <td class="max-w-xs truncate"><%= truncate(blast.message, length: 50) %></td>
                 <td><%= cs_status(blast_status_types.fetch(blast.status, :info), blast.status.humanize) if blast_status_types.key?(blast.status) %></td>

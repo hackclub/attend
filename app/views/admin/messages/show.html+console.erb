@@ -21,12 +21,12 @@
         <h1 class="cs-h1 cs-muted">No subject</h1>
       <% end %>
       <p class="cs-description">
-        Sent by <%= @message.sent_by_user.display_name_or_fallback %>
         <% if @message.sent_at.present? %>
-          on <%= @message.sent_at.strftime("%B %d, %Y at %l:%M %p") %>
+          Sent <%= cs_relative_time(@message.sent_at) %> by <%= @message.sent_by_user.display_name_or_fallback %>
         <% elsif @message.scheduled_at.present? %>
-          · Scheduled for <%= @message.scheduled_at.strftime("%B %d, %Y at %l:%M %p") %>
+          Scheduled for <%= cs_absolute_time_tag(@message.scheduled_at) %> by <%= @message.sent_by_user.display_name_or_fallback %>
         <% else %>
+          Sent by <%= @message.sent_by_user.display_name_or_fallback %>
           · Draft
         <% end %>
       </p>
@@ -159,9 +159,9 @@
                             class: "cs-btn cs-btn-link" %>
                       <% elsif delivery.delivered? && delivery.delivered_at.present? %>
                         <% if delivery.channel == "email" && delivery.read? %>
-                          <%= cs_status(:success, "Opened #{time_ago_in_words(delivery.read_at)} ago") %>
+                          <%= cs_status(:success, safe_join([ "Opened ", cs_relative_time(delivery.read_at) ])) %>
                         <% else %>
-                          <span class="cs-small cs-muted"><%= time_ago_in_words(delivery.delivered_at) %> ago</span>
+                          <span class="cs-small cs-muted">Delivered <%= cs_relative_time(delivery.delivered_at) %></span>
                         <% end %>
                       <% end %>
                     </td>

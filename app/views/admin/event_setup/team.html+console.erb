@@ -46,21 +46,19 @@
         <h2 class="cs-h2">Add a staff member</h2>
       </div>
       <div class="cs-container-body">
-        <%= form_with url: admin_event_setup_team_path(@event), method: :post do |f| %>
-          <div class="cs-field">
-            <%= label_tag :email, "User email", class: "cs-field-label" %>
-            <%= email_field_tag :email, params[:email], class: "cs-input", placeholder: "user@example.com", required: true %>
-            <p class="cs-field-hint">They need an Attend account already. If they don't have one, ask them to sign in to Attend first.</p>
-          </div>
+        <%= form_with url: admin_event_setup_team_path(@event), method: :post, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+          <%= cs_field id: "email", label: "User email", errors: [ @email_error ],
+                constraint: "They need an Attend account already. If they don't have one, ask them to sign in to Attend first. For example: name@hackclub.com" do |aria| %>
+            <%= email_field_tag :email, params[:email], class: "cs-input", required: true, autocomplete: "off", **aria %>
+          <% end %>
 
-          <%= fields_for :event_role_assignment do |era| %>
-            <div class="cs-field" data-controller="role-info">
-              <%= era.label :role, "Role", class: "cs-field-label" %>
+          <%= fields_for :event_role_assignment, @event_role_assignment do |era| %>
+            <%= cs_form_field era, :role, label: "Role", messages: { taken: "This person already has this role on the event." }, data: { controller: "role-info" } do |aria| %>
               <%= era.select :role,
                 EventRoleAssignment::ROLE_DETAILS.map { |role, details| [ details[:label], role ] },
-                { selected: "event_admin" },
-                class: "cs-select",
-                data: { role_info_target: "select", action: "change->role-info#update" } %>
+                { selected: @event_role_assignment&.role.presence || "event_admin" },
+                class: "cs-select", required: true,
+                data: { role_info_target: "select", action: "change->role-info#update" }, **aria %>
 
               <% EventRoleAssignment::ROLE_DETAILS.each do |role, details| %>
                 <div data-role-info-target="panel" data-role="<%= role %>" class="cs-alert mt-3 hidden">
@@ -91,8 +89,10 @@
                   </div>
                 </div>
               <% end %>
-            </div>
+            <% end %>
           <% end %>
+
+          <%= cs_form_errors @event_role_assignment, except: [ :user_id, :user, :event_id, :event ] %>
 
           <div class="flex justify-end mt-4">
             <%= f.button "Add staff member", class: "cs-btn" %>

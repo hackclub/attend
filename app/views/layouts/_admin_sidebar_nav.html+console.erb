@@ -11,7 +11,7 @@
 <% if current_event %>
   <%= link_to admin_event_dashboard_path(current_event.slug), class: "cs-sidenav-header", data: link_data do %>
     <%= current_event.name %>
-    <span class="cs-sidenav-header-meta"><%= event_date_range(current_event.starts_at, current_event.ends_at) %></span>
+    <span class="cs-sidenav-header-meta"><%= cs_date_range(current_event.starts_at, current_event.ends_at) %></span>
   <% end %>
 <% else %>
   <%= link_to admin_root_path, class: "cs-sidenav-header", data: link_data do %>

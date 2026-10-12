@@ -16,8 +16,8 @@
     <div class="cs-container-body">
       <dl class="cs-kv cs-kv-3">
         <div>
-          <dt class="cs-kv-label">Timestamp</dt>
-          <dd class="cs-kv-value"><%= @audit_log.created_at.strftime("%B %d, %Y at %I:%M:%S %p") %></dd>
+          <dt class="cs-kv-label">Logged</dt>
+          <dd class="cs-kv-value"><%= cs_absolute_time_tag(@audit_log.created_at) %></dd>
         </div>
         <div>
           <dt class="cs-kv-label">Actor</dt>
@@ -126,7 +126,7 @@
           <% changes = audit_version_changes(version) %>
           <details class="cs-expandable">
             <summary class="px-5 py-2 font-normal! hover:bg-(--cs-bg-hover)">
-              <span class="cs-small cs-secondary font-mono w-40 flex-shrink-0"><%= version.created_at.strftime("%Y-%m-%d %H:%M:%S") %></span>
+              <span class="cs-small cs-secondary w-64 flex-shrink-0"><%= cs_absolute_time_tag(version.created_at) %></span>
               <span class="w-20 flex-shrink-0"><%= cs_badge(version.event.titleize, version_badge[version.event]) %></span>
               <span class="cs-secondary flex-1 truncate"><%= audit_user_label(version.whodunnit) %></span>
               <span class="cs-small cs-muted">

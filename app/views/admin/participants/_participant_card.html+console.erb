@@ -37,7 +37,7 @@
     <% if can_view_participant_pii? %>
       <div>
         <span class="text-gray-500">Date of Birth:</span>
-        <span class="text-gray-900"><%= participant.date_of_birth&.strftime("%B %d, %Y") %></span>
+        <span class="text-gray-900"><%= cs_absolute_time_tag(participant.date_of_birth, date_only: true) %></span>
       </div>
     <% end %>
     <% if defined?(event) && event %>

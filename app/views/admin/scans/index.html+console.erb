@@ -93,7 +93,7 @@
               <div class="min-w-0 flex-1">
                 <p class="truncate font-bold"><%= scan.participant.display_name %></p>
                 <p class="cs-small cs-muted">
-                  <%= scan.scanned_at.strftime("%b %-d, %H:%M") %>
+                  <%= cs_relative_time(scan.scanned_at) %>
                   <% if scan.scan_context %>@ <%= scan.scan_context.name %><% end %>
                   · by <%= scan.user.display_name_or_fallback %>
                 </p>

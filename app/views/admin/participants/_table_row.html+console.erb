@@ -26,7 +26,7 @@
   </td>
   <% if can_view_participant_pii? %>
     <td class="cs-secondary whitespace-nowrap" data-column="dob">
-      <%= pe.participant.date_of_birth&.strftime("%Y-%m-%d") || "—" %>
+      <%= cs_absolute_time_tag(pe.participant.date_of_birth, date_only: true) || "—" %>
     </td>
   <% end %>
   <td class="whitespace-nowrap" data-column="age">
@@ -94,14 +94,14 @@
   </td>
   <td class="cs-secondary whitespace-nowrap" data-column="arrival">
     <% if pe.travel_inbound&.last_arrival_time %>
-      <div><%= pe.travel_inbound.last_arrival_time.strftime("%b %d %H:%M") %></div>
+      <div><%= cs_absolute_time_tag(pe.travel_inbound.last_arrival_time) %></div>
     <% else %>
       <span class="cs-muted">—</span>
     <% end %>
   </td>
   <td class="cs-secondary whitespace-nowrap" data-column="departure">
     <% if pe.travel_outbound&.first_departure_time %>
-      <div><%= pe.travel_outbound.first_departure_time.strftime("%b %d %H:%M") %></div>
+      <div><%= cs_absolute_time_tag(pe.travel_outbound.first_departure_time) %></div>
     <% else %>
       <span class="cs-muted">—</span>
     <% end %>
@@ -227,14 +227,14 @@
   <td class="whitespace-nowrap" data-column="last_scan">
     <% last_scan = pe.scans.max_by(&:scanned_at) %>
     <% if last_scan %>
-      <div><%= last_scan.scanned_at.strftime("%b %d %H:%M") %></div>
+      <div><%= cs_relative_time(last_scan.scanned_at) %></div>
       <div class="cs-small cs-muted"><%= last_scan.scan_context.name %> · <%= last_scan.user.name %></div>
     <% else %>
       <span class="cs-muted">—</span>
     <% end %>
   </td>
   <td class="cs-secondary whitespace-nowrap" data-column="created">
-    <%= pe.created_at.strftime("%Y-%m-%d") %>
+    <%= cs_relative_time(pe.created_at) %>
   </td>
   <td class="text-right sticky right-0 bg-(--cs-bg-container) whitespace-nowrap">
     <%= link_to admin_event_participant_path(current_event, pe), class: "cs-link" do %>

@@ -12,23 +12,19 @@
 
   <%= form_with url: admin_event_custom_document_path(current_event, @custom_document), scope: :custom_document,
       model: @custom_document, method: :patch, multipart: true,
-      data: { controller: "document-kind" }, class: "cs-stack" do |cd| %>
+      html: { novalidate: true }, data: { controller: "document-kind cs-form-validation" }, class: "cs-stack" do |cd| %>
 
     <section class="cs-container">
       <div class="cs-container-header">
         <h2 class="cs-h2">Details</h2>
       </div>
       <div class="cs-container-body">
-        <div class="cs-field">
-          <%= cd.label :name, "Name", class: "cs-field-label" %>
-          <%= cd.text_field :name, required: true, class: "cs-input" %>
-        </div>
+        <%= cs_form_field cd, :name, label: "Name", input: { required: true } %>
 
-        <div class="cs-field">
-          <%= cd.label :description, "Description (optional)", class: "cs-field-label" %>
-          <%= cd.text_area :description, rows: 2, class: "cs-input",
-              placeholder: "Shown to participants — which activity it's for, or which sections to fill in" %>
-        </div>
+        <%= cs_form_field cd, :description, label: "Description", optional: true,
+              constraint: "Shown to participants. For example: which activity it's for, or which sections to fill in." do |aria| %>
+          <%= cd.text_area :description, rows: 2, class: "cs-input", **aria %>
+        <% end %>
       </div>
     </section>
 
@@ -85,12 +81,11 @@
           <h2 class="cs-h2">Signing setup</h2>
         </div>
         <div class="cs-container-body">
-          <fieldset class="cs-field">
-            <legend class="cs-field-label">Document type</legend>
+          <%= cs_form_field cd, :document_kind, label: "Document type", group: true do |aria| %>
             <div class="cs-tiles mt-2">
               <label class="cs-tile">
                 <span class="cs-option">
-                  <%= cd.radio_button :document_kind, "electronic", data: { action: "document-kind#toggle" } %>
+                  <%= cd.radio_button :document_kind, "electronic", data: { action: "document-kind#toggle" }, **aria %>
                   <span>
                     <span class="cs-option-label block">Electronic</span>
                     <span class="cs-option-description block">Signed online through DocuSeal, with participant details pre-filled.</span>
@@ -99,7 +94,7 @@
               </label>
               <label class="cs-tile">
                 <span class="cs-option">
-                  <%= cd.radio_button :document_kind, "physical", data: { action: "document-kind#toggle" } %>
+                  <%= cd.radio_button :document_kind, "physical", data: { action: "document-kind#toggle" }, **aria %>
                   <span>
                     <span class="cs-option-label block">Physical</span>
                     <span class="cs-option-description block">Downloaded as a PDF, signed on paper, and uploaded as a photo.</span>
@@ -107,36 +102,26 @@
                 </span>
               </label>
             </div>
-          </fieldset>
+          <% end %>
 
           <div class="cs-field-grid">
-            <div class="cs-field" data-document-kind-target="electronic">
-              <%= cd.label :docuseal_template_id, "DocuSeal template ID", class: "cs-field-label" %>
-              <%= cd.text_field :docuseal_template_id, required: true, class: "cs-input font-mono", placeholder: "1234" %>
-              <p class="cs-field-hint">Changing this clears the pre-fill mappings — sync the new template's fields afterwards.</p>
-            </div>
-            <div class="cs-field hidden" data-document-kind-target="physical">
-              <%= cd.label :template_pdf, "PDF document", class: "cs-field-label" %>
-              <%= cd.file_field :template_pdf, accept: "application/pdf", required: !@custom_document.template_pdf.attached?, class: "cs-file" %>
-              <p class="cs-field-hint">
-                <% if @custom_document.template_pdf.attached? %>
-                  Leave empty to keep the
-                  <%= link_to "current PDF", rails_blob_path(@custom_document.template_pdf, disposition: "attachment"), class: "cs-link" %>.
-                <% else %>
-                  Required for a physical document.
-                <% end %>
-              </p>
-            </div>
-            <div class="cs-field">
-              <%= cd.label :signer_type, "Who signs?", class: "cs-field-label" %>
+            <%= cs_form_field cd, :docuseal_template_id, label: "DocuSeal template ID", data: { document_kind_target: "electronic" },
+                  constraint: "A number. For example: 1234. Changing it clears the pre-fill mappings, so sync the new template's fields afterwards." do |aria| %>
+              <%= cd.text_field :docuseal_template_id, required: true, class: "cs-input font-mono", inputmode: "numeric", **aria %>
+            <% end %>
+            <%= cs_form_field cd, :template_pdf, label: "PDF document", optional: @custom_document.template_pdf.attached?, class: "hidden", data: { document_kind_target: "physical" },
+                  constraint: (@custom_document.template_pdf.attached? ? safe_join([ "PDF, up to 25 MB. Leave empty to keep the ", link_to("current PDF", rails_blob_path(@custom_document.template_pdf, disposition: "attachment"), class: "cs-link"), "." ]) : "PDF, up to 25 MB.") do |aria| %>
+              <%= cd.file_field :template_pdf, accept: "application/pdf", required: !@custom_document.template_pdf.attached?, class: "cs-file", data: { cs_required_message: "PDF document is required for a physical document." }, **aria %>
+            <% end %>
+            <%= cs_form_field cd, :signer_type, label: "Who signs",
+                  constraint: "Guardian roles only apply to under-18s. Adults sign by themselves, and guardian-only or under-18s-only documents are skipped for them." do |aria| %>
               <%= cd.select :signer_type,
                   [ [ "Participant", "participant" ], [ "Guardian", "guardian" ],
                     [ "Participant + Guardian", "participant_and_guardian" ],
                     [ "Participant + Guardian, under-18s only", "minor_and_guardian" ] ],
                   {},
-                  class: "cs-select" %>
-              <p class="cs-field-hint">Guardian roles only apply to under-18s — adults sign by themselves, and guardian-only or under-18s-only documents are skipped for them.</p>
-            </div>
+                  class: "cs-select", **aria %>
+            <% end %>
           </div>
 
           <div class="cs-option mt-4">
@@ -153,6 +138,8 @@
         </div>
       </section>
     <% end %>
+
+    <%= cs_form_errors cd %>
 
     <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
       <%= link_to "Cancel", admin_event_integrations_path(current_event), class: "cs-btn cs-btn-link cs-btn-full" %>

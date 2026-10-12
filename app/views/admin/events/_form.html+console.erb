@@ -1,42 +1,19 @@
-<%= form_with model: [:admin, event], class: "cs-stack", multipart: true do |f| %>
+<%= form_with model: [:admin, event], class: "cs-stack", multipart: true, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
   <% if params[:return_to].in?(Admin::EventsController::SETUP_RETURNS) %>
     <%= hidden_field_tag :return_to, params[:return_to] %>
   <% end %>
-  <% if event.errors.any? %>
-    <div class="cs-alert cs-alert-error" role="alert">
-      <%= cs_status_icon(:error) %>
-      <div>
-        <p class="cs-alert-title"><%= pluralize(event.errors.count, "error") %> prohibited this event from being saved:</p>
-        <ul class="mt-1 list-disc list-inside">
-          <% event.errors.full_messages.each do |message| %>
-            <li><%= message %></li>
-          <% end %>
-        </ul>
-      </div>
-    </div>
-  <% end %>
-
   <section class="cs-container">
     <div class="cs-container-header">
       <h2 class="cs-h2">Basic information</h2>
     </div>
     <div class="cs-container-body">
       <div class="cs-field-grid">
-        <div>
-          <%= f.label :name, class: "cs-field-label" %>
-          <%= f.text_field :name, class: "cs-input" %>
-        </div>
-        <div>
-          <%= f.label :slug, class: "cs-field-label" %>
-          <%= f.text_field :slug, class: "cs-input", placeholder: "auto-generated from name" %>
-          <p class="cs-field-hint">Lowercase letters, numbers, and dashes only</p>
-        </div>
+        <%= render "admin/events/console_identity_fields", f: f, event: event %>
         <% if current_user.global_admin? && EventSeries.any? %>
-          <div>
-            <%= f.label :event_series_id, "Series", class: "cs-field-label" %>
-            <%= f.collection_select :event_series_id, EventSeries.order(:name), :id, :name, { include_blank: "No series — standalone event" }, class: "cs-select" %>
-            <p class="cs-field-hint">Series members can manage this event and it inherits the series' branding.</p>
-          </div>
+          <%= cs_form_field f, :event_series_id, label: "Series", optional: true, error_keys: [ :event_series ],
+                constraint: "Series members can manage this event and it inherits the series' branding." do |aria| %>
+            <%= f.collection_select :event_series_id, EventSeries.order(:name), :id, :name, { include_blank: "No series (standalone event)" }, class: "cs-select", **aria %>
+          <% end %>
         <% elsif event.event_series %>
           <div>
             <span class="cs-field-label block">Series</span>
@@ -48,35 +25,34 @@
         <% end %>
       </div>
 
-      <div class="cs-field mt-4">
-        <%= f.label :logo, "Logo", class: "cs-field-label" %>
+      <%= cs_form_field f, :logo, label: "Logo", optional: true, class: "mt-4",
+            constraint: "JPEG, PNG, GIF, WebP or SVG, up to 5 MB. Shown in the sidebar and event picker.#{" Uploads as soon as you choose a file." if event.persisted?}" do |aria| %>
         <div class="mt-1 flex items-center gap-4"
              data-controller="instant-upload"
              data-instant-upload-field-value="logo"
              data-instant-upload-url-value="<%= event.persisted? ? attach_image_admin_event_path(event) : "" %>">
           <%= render "admin/events/image_preview", event: event, field: "logo" %>
           <div class="flex flex-col gap-1 min-w-0">
-            <%= f.file_field :logo, accept: "image/jpeg,image/png,image/gif,image/webp,image/svg+xml", data: { instant_upload_target: "input", action: "change->instant-upload#upload" }, class: "cs-file" %>
+            <%= f.file_field :logo, accept: "image/jpeg,image/png,image/gif,image/webp,image/svg+xml", data: { instant_upload_target: "input", action: "change->instant-upload#upload" }, class: "cs-file", **aria %>
             <span data-instant-upload-target="status" class="cs-small" aria-live="polite"></span>
           </div>
         </div>
-        <p class="cs-field-hint">JPEG, PNG, GIF, WebP, or SVG. Max 5MB. Shown in the sidebar and event picker.<% if event.persisted? %> Uploads as soon as you pick a file.<% end %></p>
-      </div>
+      <% end %>
 
-      <div class="cs-field mt-4">
-        <%= f.label :banner, "Ticket banner", class: "cs-field-label" %>
+      <%= cs_form_field f, :banner, label: "Ticket banner", optional: true, class: "mt-4",
+            description: "Shown as the hero image on Google Wallet tickets (full image, roughly 5:4) and cropped to a wide center strip on Apple Wallet tickets. Avoid text in the image and keep the important content centered.",
+            constraint: "PNG or JPEG, 1032×812 px recommended, up to 5 MB.#{" Uploads as soon as you choose a file." if event.persisted?}" do |aria| %>
         <div class="mt-1 flex items-center gap-4"
              data-controller="instant-upload"
              data-instant-upload-field-value="banner"
              data-instant-upload-url-value="<%= event.persisted? ? attach_image_admin_event_path(event) : "" %>">
           <%= render "admin/events/image_preview", event: event, field: "banner" %>
           <div class="flex flex-col gap-1 min-w-0">
-            <%= f.file_field :banner, accept: "image/jpeg,image/png", data: { instant_upload_target: "input", action: "change->instant-upload#upload" }, class: "cs-file" %>
+            <%= f.file_field :banner, accept: "image/jpeg,image/png", data: { instant_upload_target: "input", action: "change->instant-upload#upload" }, class: "cs-file", **aria %>
             <span data-instant-upload-target="status" class="cs-small" aria-live="polite"></span>
           </div>
         </div>
-        <p class="cs-field-hint">Shown as the hero image on Google Wallet tickets (full image, roughly 5:4) and cropped to a wide center strip on Apple Wallet tickets. PNG or JPEG, 1032&times;812px recommended, max 5MB. Avoid text in the image and keep the important content centered.<% if event.persisted? %> Uploads as soon as you pick a file.<% end %></p>
-      </div>
+      <% end %>
     </div>
   </section>
 
@@ -86,18 +62,11 @@
     </div>
     <div class="cs-container-body">
       <div class="cs-field-grid">
-        <div>
-          <%= f.label :location_city, class: "cs-field-label" %>
-          <%= f.text_field :location_city, class: "cs-input" %>
-        </div>
-        <div>
-          <%= f.label :location_country, class: "cs-field-label" %>
-          <%= f.text_field :location_country, class: "cs-input" %>
-        </div>
-        <div>
-          <%= f.label :timezone, class: "cs-field-label" %>
-          <%= f.time_zone_select :timezone, nil, {}, class: "cs-select" %>
-        </div>
+        <%= cs_form_field f, :location_city, label: "City", optional: true %>
+        <%= cs_form_field f, :location_country, label: "Country", optional: true %>
+        <%= cs_form_field f, :timezone, label: "Time zone" do |aria| %>
+          <%= f.time_zone_select :timezone, nil, {}, class: "cs-select", **aria %>
+        <% end %>
       </div>
     </div>
   </section>
@@ -106,24 +75,16 @@
     <div class="cs-container-header">
       <div>
         <h2 class="cs-h2">Venue details</h2>
-        <p class="cs-container-description">Optional venue information for Google Wallet passes. Both venue name and address are required for the pass to display venue info.</p>
+        <p class="cs-container-description">Venue information for Google Wallet passes. The pass shows it only when both the venue name and address are set.</p>
       </div>
     </div>
     <div class="cs-container-body">
       <div class="cs-field-grid">
-        <div>
-          <%= f.label :venue_name, "Venue name", class: "cs-field-label" %>
-          <%= f.text_field :venue_name, class: "cs-input", placeholder: "e.g. Reaktor" %>
-        </div>
-        <div>
-          <%= f.label :location_address, "Venue address", class: "cs-field-label" %>
-          <%= f.text_field :location_address,
-              id: "venue-address-input",
-              class: "cs-input",
-              placeholder: "Start typing to search...",
-              autocomplete: "off" %>
-          <p class="cs-field-hint">Search for a place using Google Places</p>
-        </div>
+        <%= cs_form_field f, :venue_name, label: "Venue name", optional: true, constraint: "For example: Reaktor" %>
+        <%= cs_form_field f, :location_address, label: "Venue address", optional: true, id: "venue-address-input",
+              constraint: "Start typing to search Google Places." do |aria| %>
+          <%= f.text_field :location_address, id: "venue-address-input", class: "cs-input", autocomplete: "off", **aria %>
+        <% end %>
       </div>
       <%= f.hidden_field :location_latitude, id: "venue-latitude" %>
       <%= f.hidden_field :location_longitude, id: "venue-longitude" %>
@@ -166,14 +127,12 @@
     </div>
     <div class="cs-container-body">
       <div class="cs-field-grid">
-        <div>
-          <%= f.label :starts_at, class: "cs-field-label" %>
-          <%= f.datetime_local_field :starts_at, value: f.object.schedule_time_field_value(:starts_at), class: "cs-input" %>
-        </div>
-        <div>
-          <%= f.label :ends_at, class: "cs-field-label" %>
-          <%= f.datetime_local_field :ends_at, value: f.object.schedule_time_field_value(:ends_at), class: "cs-input" %>
-        </div>
+        <%= cs_form_field f, :starts_at, label: "Starts at", optional: true do |aria| %>
+          <%= f.datetime_local_field :starts_at, value: f.object.schedule_time_field_value(:starts_at), class: "cs-input", **aria %>
+        <% end %>
+        <%= cs_form_field f, :ends_at, label: "Ends at", optional: true do |aria| %>
+          <%= f.datetime_local_field :ends_at, value: f.object.schedule_time_field_value(:ends_at), class: "cs-input", **aria %>
+        <% end %>
       </div>
     </div>
   </section>
@@ -184,14 +143,12 @@
     </div>
     <div class="cs-container-body">
       <div class="cs-field-grid">
-        <div>
-          <%= f.label :registration_open_at, class: "cs-field-label" %>
-          <%= f.datetime_local_field :registration_open_at, value: f.object.schedule_time_field_value(:registration_open_at), class: "cs-input" %>
-        </div>
-        <div>
-          <%= f.label :registration_close_at, class: "cs-field-label" %>
-          <%= f.datetime_local_field :registration_close_at, value: f.object.schedule_time_field_value(:registration_close_at), class: "cs-input" %>
-        </div>
+        <%= cs_form_field f, :registration_open_at, label: "Registration opens at", optional: true do |aria| %>
+          <%= f.datetime_local_field :registration_open_at, value: f.object.schedule_time_field_value(:registration_open_at), class: "cs-input", **aria %>
+        <% end %>
+        <%= cs_form_field f, :registration_close_at, label: "Registration closes at", optional: true do |aria| %>
+          <%= f.datetime_local_field :registration_close_at, value: f.object.schedule_time_field_value(:registration_close_at), class: "cs-input", **aria %>
+        <% end %>
       </div>
     </div>
   </section>
@@ -200,35 +157,17 @@
     <div class="cs-container-header">
       <div>
         <h2 class="cs-h2">Arrival window</h2>
-        <p class="cs-container-description">Optional. Shown to attendees as "when to arrive" on their dashboard.</p>
+        <p class="cs-container-description">Shown to attendees as "when to arrive" on their dashboard.</p>
       </div>
     </div>
     <div class="cs-container-body">
       <div class="cs-field-grid">
-        <div>
-          <%= f.label :arrival_opens_at, "Arrival opens at", class: "cs-field-label" %>
-          <%= f.datetime_local_field :arrival_opens_at, value: f.object.schedule_time_field_value(:arrival_opens_at), class: "cs-input" %>
-        </div>
-        <div>
-          <%= f.label :arrival_closes_at, "Arrival closes at", class: "cs-field-label" %>
-          <%= f.datetime_local_field :arrival_closes_at, value: f.object.schedule_time_field_value(:arrival_closes_at), class: "cs-input" %>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="cs-container">
-    <div class="cs-container-header">
-      <h2 class="cs-h2">Contact</h2>
-    </div>
-    <div class="cs-container-body">
-      <div class="cs-field-grid">
-        <div data-controller="email-domain" data-email-domain-domains-value="<%= Event::SUPPORT_EMAIL_DOMAINS.to_json %>">
-          <%= f.label :support_email, "Support email", class: "cs-field-label" %>
-          <%= f.email_field :support_email, required: true, class: "cs-input", placeholder: "team@hackclub.com", data: { email_domain_target: "input", action: "input->email-domain#validate blur->email-domain#validate" } %>
-          <p class="cs-field-hint text-red-600 hidden" data-email-domain-target="message"></p>
-          <p class="cs-field-hint">Used as the from and reply-to address on participant and guardian emails. Must be a <%= Event::SUPPORT_EMAIL_DOMAINS_SENTENCE %> address.</p>
-        </div>
+        <%= cs_form_field f, :arrival_opens_at, label: "Arrival opens at", optional: true do |aria| %>
+          <%= f.datetime_local_field :arrival_opens_at, value: f.object.schedule_time_field_value(:arrival_opens_at), class: "cs-input", **aria %>
+        <% end %>
+        <%= cs_form_field f, :arrival_closes_at, label: "Arrival closes at", optional: true do |aria| %>
+          <%= f.datetime_local_field :arrival_closes_at, value: f.object.schedule_time_field_value(:arrival_closes_at), class: "cs-input", **aria %>
+        <% end %>
       </div>
     </div>
   </section>
@@ -239,14 +178,13 @@
         <h2 class="cs-h2">Rooming</h2>
       </div>
       <div class="cs-container-body">
-        <div class="cs-field">
-          <%= f.label :hotel_scan_context_id, "Hotel scan context", class: "cs-field-label" %>
+        <%= cs_form_field f, :hotel_scan_context_id, label: "Hotel scan context", optional: true, error_keys: [ :hotel_scan_context ],
+              constraint: "The scan context used for hotel check-in. Participants with this scan show as green on the rooming finalize page." do |aria| %>
           <%= f.select :hotel_scan_context_id,
               event.scan_contexts.map { |c| [c.name, c.id] },
               { include_blank: "None", selected: event.hotel_scan_context_id },
-              class: "cs-select" %>
-          <p class="cs-field-hint">Select the scanning context used for hotel check-in. Participants with this scan will show as green on the rooming finalize page.</p>
-        </div>
+              class: "cs-select", **aria %>
+        <% end %>
       </div>
     </section>
   <% end %>
@@ -275,11 +213,10 @@
         <div class="w-full">
           <%= f.label :visa_options_enabled, "Enable visa options", class: "cs-option-label" %>
           <p class="cs-option-description">Show visa requirement fields in travel information for international participants</p>
-          <div class="cs-field mt-3">
-            <%= f.label :visa_application_url, "Visa letter application URL", class: "cs-field-label" %>
-            <%= f.url_field :visa_application_url, placeholder: "https://visas.hackclub.com/...", class: "cs-input" %>
-            <p class="cs-field-hint">Envoy (visas.hackclub.com) application form participants are pointed to when they need a visa letter.</p>
-          </div>
+          <%= cs_form_field f, :visa_application_url, label: "Visa letter application URL", optional: true, class: "mt-3",
+                constraint: "The Envoy application form participants are pointed to when they need a visa letter. For example: https://visas.hackclub.com/…" do |aria| %>
+            <%= f.url_field :visa_application_url, class: "cs-input", data: { cs_example: "https://visas.hackclub.com/…" }, **aria %>
+          <% end %>
         </div>
       </div>
       <div class="cs-option">
@@ -342,7 +279,7 @@
     <div class="cs-container-header">
       <div>
         <h2 class="cs-h2">Groups</h2>
-        <p class="cs-container-description">Tag participants with named groups (e.g. "Hardware", "General Attendance") to distinguish cohorts within the same event.</p>
+        <p class="cs-container-description">Tag participants with named groups (for example, "Hardware" or "General Attendance") to distinguish cohorts within the same event.</p>
       </div>
     </div>
     <div class="cs-container-body">
@@ -355,6 +292,8 @@
       </div>
     </div>
   </section>
+
+  <%= cs_form_errors f %>
 
   <div class="flex flex-col-reverse sm:flex-row justify-end gap-2">
     <%= link_to "Cancel", (event.persisted? ? admin_event_dashboard_path(event.slug) : admin_root_path), class: "cs-btn cs-btn-link cs-btn-full justify-center" %>

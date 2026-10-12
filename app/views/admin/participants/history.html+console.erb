@@ -16,8 +16,7 @@
           <% changes = audit_version_changes(version, hide_pii: !can_view_participant_pii?) %>
           <details class="cs-expandable">
             <summary class="px-4 sm:px-5 py-3 font-normal! hover:bg-(--cs-bg-hover)">
-              <span class="cs-small cs-muted font-mono w-40 flex-shrink-0 hidden sm:block"><%= version.created_at.strftime("%Y-%m-%d %H:%M") %></span>
-              <span class="cs-small cs-muted sm:hidden"><%= time_ago_in_words(version.created_at) %> ago</span>
+              <span class="cs-small cs-muted w-32 flex-shrink-0"><%= cs_relative_time(version.created_at) %></span>
               <% badge_color = case version.event when "create" then "green" when "update" then "blue" when "destroy" then "red" end %>
               <span class="w-20 flex-shrink-0"><%= cs_badge(version.event.titleize, badge_color) %></span>
               <span class="font-bold flex-shrink-0"><%= version.item_type.titleize %></span>
@@ -58,7 +57,7 @@
       <% end %>
     <% else %>
       <div class="cs-empty">
-        <p class="cs-empty-title">No change history yet.</p>
+        <p class="cs-empty-title">No change history</p>
       </div>
     <% end %>
   </section>

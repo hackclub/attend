@@ -40,7 +40,7 @@
               <% end %>
             <% elsif @dashboard.next_event %>
               <span aria-hidden="true">·</span>
-              <span>next in <%= distance_of_time_in_words(Time.current, @dashboard.next_event.starts_at) %></span>
+              <span>next event <%= cs_relative_time(@dashboard.next_event.starts_at, inline: true) %></span>
             <% end %>
             <% if totals[:inactive].positive? %>
               <span aria-hidden="true">·</span>

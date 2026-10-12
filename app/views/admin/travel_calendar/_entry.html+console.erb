@@ -43,7 +43,13 @@
   <div class="grid gap-3 px-5 py-4 sm:grid-cols-[5rem_minmax(0,1fr)_auto] sm:items-start">
     <div>
       <p class="cs-h3 tabular-nums">
-        <%= entry[:primary_time_at]&.in_time_zone(current_event.event_time_zone)&.strftime("%H:%M") || "No time" %>
+        <% if entry[:primary_time_at] %>
+          <%= content_tag :time, entry[:primary_time_at].in_time_zone(current_event.event_time_zone).strftime("%H:%M"),
+                datetime: cs_iso_time(entry[:primary_time_at], zone: current_event.event_time_zone),
+                title: cs_absolute_time(entry[:primary_time_at], zone: current_event.event_time_zone) %>
+        <% else %>
+          No time
+        <% end %>
       </p>
     </div>
 

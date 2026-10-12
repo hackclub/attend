@@ -43,7 +43,7 @@
               </td>
               <td class="whitespace-nowrap">
                 <% if context.starts_at? || context.ends_at? %>
-                  <%= [ context.starts_at&.strftime("%b %-d, %-l:%M %p"), context.ends_at&.strftime("%b %-d, %-l:%M %p") ].compact.join(" – ") %>
+                  <%= [ cs_absolute_time(context.starts_at), cs_absolute_time(context.ends_at) ].compact.join(" – ") %>
                 <% else %>
                   <span class="cs-muted">—</span>
                 <% end %>

@@ -27,7 +27,7 @@
         <table class="cs-table">
           <thead>
             <tr>
-              <th scope="col">Date</th>
+              <th scope="col">Incident time</th>
               <th scope="col">Category</th>
               <th scope="col">Severity</th>
               <th scope="col">Status</th>
@@ -41,7 +41,7 @@
               <% participant_names = incident.participants.map { |p| p.preferred_name || p.legal_first_name } %>
               <tr data-name="<%= [ incident.category.humanize, incident.severity.humanize, incident.status.humanize, *participant_names, incident.reported_by.display_name_or_fallback ].join(" ").downcase %>">
                 <td class="whitespace-nowrap">
-                  <%= incident.occurred_at&.strftime("%b %d, %Y %H:%M") || incident.created_at.strftime("%b %d, %Y %H:%M") %>
+                  <%= cs_absolute_time_tag(incident.occurred_at || incident.created_at) %>
                 </td>
                 <td><%= render_category_badge(incident.category) %></td>
                 <td><%= render_severity_badge(incident.severity) %></td>

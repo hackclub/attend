@@ -136,7 +136,10 @@ export default class extends Controller {
 
   triggerLabel(input) {
     const label = input.id && this.element.querySelector(`label[for="${CSS.escape(input.id)}"]`)
-    const name = label?.textContent?.trim()
+    // Leave out the console's "- optional" marker.
+    const copy = label?.cloneNode(true)
+    copy?.querySelectorAll(".cs-field-optional").forEach((node) => node.remove())
+    const name = copy?.textContent?.trim()
     return name ? `Choose date for ${name}` : "Choose date"
   }
 

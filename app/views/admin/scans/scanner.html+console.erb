@@ -145,7 +145,7 @@
               <div class="min-w-0 flex-1 mr-2">
                 <p class="font-bold truncate"><%= scan.participant.display_name %></p>
                 <p class="cs-small cs-muted">
-                  <%= scan.scanned_at.strftime("%H:%M") %>
+                  <%= cs_relative_time(scan.scanned_at) %>
                   <% if scan.scan_context %>
                     <span>@ <%= scan.scan_context.name %></span>
                   <% end %>
@@ -780,7 +780,7 @@ function addToRecentScans(participant, scanContext, scannedBy) {
     <div class="flex items-center justify-between border-b border-(--cs-border-divider-secondary) pb-3 bg-(--cs-success-bg) -mx-2 px-2 rounded transition-colors">
       <div class="min-w-0 flex-1 mr-2">
         <p class="font-bold truncate">${participant.display_name}</p>
-        <p class="cs-small cs-muted">just now ${contextInfo}</p>
+        <p class="cs-small cs-muted"><time datetime="${new Date().toISOString()}">Now</time> ${contextInfo}</p>
         <p class="cs-small cs-muted">by ${scannedBy}</p>
       </div>
       <a href="${participant.show_url}" class="cs-link min-h-[44px] min-w-[44px] flex items-center justify-center">View</a>

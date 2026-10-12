@@ -45,7 +45,7 @@
   <div class="fixed inset-0" data-hide="add-room-modal"></div>
 
   <div class="cs-modal relative" role="dialog" aria-modal="true" aria-labelledby="add-room-modal-title">
-    <%= form_with url: create_room_admin_event_rooming_wizard_path(@event.slug), method: :post, data: { turbo: false } do |f| %>
+    <%= form_with url: create_room_admin_event_rooming_wizard_path(@event.slug), method: :post, html: { novalidate: true }, data: { turbo: false, controller: "cs-form-validation" } do |f| %>
       <div class="cs-modal-header">
         <h2 id="add-room-modal-title">Add room</h2>
         <button type="button" class="cs-modal-close" data-hide="add-room-modal" aria-label="Close">
@@ -53,18 +53,15 @@
         </button>
       </div>
       <div class="cs-modal-body">
-        <div class="cs-field">
-          <label class="cs-field-label" for="add-room-name">Room name/number</label>
-          <input type="text" id="add-room-name" name="name" placeholder="e.g., Room 101" class="cs-input">
-        </div>
-        <div class="cs-field">
-          <label class="cs-field-label" for="add-room-capacity">Capacity</label>
-          <input type="number" id="add-room-capacity" name="capacity" value="<%= @rooming_plan.room_capacity %>" min="1" class="cs-input">
-        </div>
-        <div class="cs-field">
-          <label class="cs-field-label" for="add-room-notes">Notes</label>
-          <textarea id="add-room-notes" name="notes" rows="2" class="cs-input"></textarea>
-        </div>
+        <%= cs_field id: "add-room-name", label: "Room name or number", optional: true, constraint: "For example: Room 101" do |aria| %>
+          <%= text_field_tag :name, nil, id: "add-room-name", class: "cs-input", **aria %>
+        <% end %>
+        <%= cs_field id: "add-room-capacity", label: "Capacity", constraint: "The number of beds. Whole numbers of 1 or more." do |aria| %>
+          <%= number_field_tag :capacity, @rooming_plan.room_capacity, id: "add-room-capacity", min: 1, step: 1, required: true, class: "cs-input", **aria %>
+        <% end %>
+        <%= cs_field id: "add-room-notes", label: "Notes", optional: true do |aria| %>
+          <%= text_area_tag :notes, nil, id: "add-room-notes", rows: 2, class: "cs-input", **aria %>
+        <% end %>
       </div>
       <div class="cs-modal-footer">
         <button type="button" data-hide="add-room-modal" class="cs-btn cs-btn-link">
@@ -250,10 +247,8 @@ async function addStaff(e) {
   const roomId = document.getElementById('add-staff-room-id').value;
   const staffName = document.getElementById('add-staff-name').value.trim();
   
-  if (!staffName) {
-    alert('Please enter a staff name');
-    return;
-  }
+  // The cs-form-validation controller reports an empty name inline.
+  if (!staffName) return;
   
   const response = await fetch('<%= add_staff_admin_event_rooming_wizard_path(@event.slug) %>', {
     method: 'POST',
@@ -288,7 +283,7 @@ document.addEventListener('submit', (event) => {
   <div class="fixed inset-0" data-hide="add-staff-modal"></div>
 
   <div class="cs-modal relative" role="dialog" aria-modal="true" aria-labelledby="add-staff-modal-title">
-    <form id="add-staff-form">
+    <form id="add-staff-form" novalidate data-controller="cs-form-validation">
       <div class="cs-modal-header">
         <h2 id="add-staff-modal-title">Add staff member</h2>
         <button type="button" class="cs-modal-close" data-hide="add-staff-modal" aria-label="Close">
@@ -298,11 +293,12 @@ document.addEventListener('submit', (event) => {
       <div class="cs-modal-body">
         <input type="hidden" id="add-staff-room-id">
 
-        <div class="cs-field">
-          <label class="cs-field-label" for="add-staff-name">Staff name</label>
-          <input type="text" id="add-staff-name" placeholder="e.g., Deven" class="cs-input">
-          <p class="cs-field-hint">Once a staff member is added to a room, participants cannot be assigned to it.</p>
-        </div>
+        <%= cs_field id: "add-staff-name", label: "Staff name",
+              description: "Once a staff member is added to a room, participants can't be assigned to it.",
+              constraint: "For example: Alex" do |aria| %>
+          <%= text_field_tag nil, nil, id: "add-staff-name", class: "cs-input", required: true, pattern: ".*\\S.*",
+                data: { cs_pattern_message: "Staff name is required." }, **aria %>
+        <% end %>
       </div>
       <div class="cs-modal-footer">
         <button type="button" data-hide="add-staff-modal" class="cs-btn cs-btn-link">

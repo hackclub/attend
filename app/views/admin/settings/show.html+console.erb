@@ -72,18 +72,17 @@
       </div>
 
       <div class="<%= row_divider %>">
-        <%= form_with url: update_twilio_from_number_admin_settings_path, method: :post, data: { controller: "phone-input" } do |f| %>
-          <div class="cs-field">
-            <%= f.label :twilio_from_number, "From phone number", class: "cs-field-label" %>
-            <p class="cs-field-description">The phone number used to send SMS messages. Format: +1234567890</p>
+        <%= form_with url: update_twilio_from_number_admin_settings_path, method: :post, html: { novalidate: true }, data: { controller: "phone-input cs-form-validation" } do |f| %>
+          <%= cs_field id: "twilio_from_number", label: "From phone number", optional: true,
+                description: "The phone number used to send SMS messages.",
+                constraint: "E.164 format, with the country code. For example: +14155551234" do |aria| %>
             <div class="flex flex-wrap items-center gap-2">
               <%= f.telephone_field :twilio_from_number,
                     value: @twilio_from_number,
-                    placeholder: "+1234567890",
-                    class: "cs-input max-w-xs" %>
+                    class: "cs-input max-w-xs", **aria %>
               <%= f.button "Save", class: "cs-btn" %>
             </div>
-          </div>
+          <% end %>
         <% end %>
       </div>
     </div>
@@ -114,16 +113,15 @@
       </div>
 
       <div class="<%= row_divider %>">
-        <%= form_with url: update_support_sms_numbers_admin_settings_path, method: :post do |f| %>
-          <div class="cs-field">
-            <%= f.label :support_sms_notification_numbers, "Notification numbers", class: "cs-field-label" %>
-            <p class="cs-field-description">Phone numbers texted when a new ticket is opened. One per line (or comma-separated), E.164 format: +14155551234</p>
+        <%= form_with url: update_support_sms_numbers_admin_settings_path, method: :post, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+          <%= cs_field id: "support_sms_notification_numbers", label: "Notification numbers", optional: true,
+                description: "Phone numbers texted when a new ticket is opened.",
+                constraint: "One per line or comma-separated, in E.164 format. For example: +14155551234" do |aria| %>
             <%= f.text_area :support_sms_notification_numbers,
                   value: @support_sms_notification_numbers.join("\n"),
                   rows: 4,
-                  placeholder: "+14155551234\n+447700900123",
-                  class: "cs-input max-w-md font-mono" %>
-          </div>
+                  class: "cs-input max-w-md font-mono", **aria %>
+          <% end %>
           <div class="mt-2">
             <%= f.button "Save", class: "cs-btn" %>
           </div>
@@ -137,22 +135,19 @@
       <h2 class="cs-h2">Admin help Slack channel</h2>
     </div>
     <div class="cs-container-body">
-      <%= form_with url: update_admin_help_slack_channel_admin_settings_path, method: :post do |f| %>
-        <div class="cs-field">
-          <%= f.label :admin_help_slack_channel_id, "Channel", class: "cs-field-label" %>
-          <p class="cs-field-description">
-            Where event admins ask questions about Attend. Global admins are invited when they're made one, and
-            Event Admins, Ops, Safeguarding Leads, and series members when they're given a role on an event that hasn't ended.
-            Limited and Read Only staff are never invited. The Attend Slack bot must be in the channel.
-          </p>
+      <%= form_with url: update_admin_help_slack_channel_admin_settings_path, method: :post, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+        <%= cs_field id: "admin_help_slack_channel_id", label: "Channel ID", optional: true,
+              description: "Where event admins ask questions about Attend. Global admins are invited when they're made one, and Event Admins, Ops, Safeguarding Leads, and series members when they're given a role on an event that hasn't ended. Limited and Read Only staff are never invited. The Attend Slack bot must be in the channel.",
+              constraint: "Starts with C or G, then capital letters and numbers. For example: C0123ABCD" do |aria| %>
           <div class="flex flex-wrap items-center gap-2">
             <%= f.text_field :admin_help_slack_channel_id,
                   value: @admin_help_slack_channel_id,
-                  placeholder: "C0123ABCD",
-                  class: "cs-input max-w-xs font-mono" %>
+                  pattern: "\\s*[CG][A-Z0-9]+\\s*",
+                  data: { cs_pattern_message: "Enter a valid Slack channel ID. For example: C0123ABCD" },
+                  class: "cs-input max-w-xs font-mono", **aria %>
             <%= f.button "Save", class: "cs-btn" %>
           </div>
-        </div>
+        <% end %>
       <% end %>
 
       <div class="<%= row_divider %> flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -164,7 +159,7 @@
           </p>
           <% if @admin_help_last_sync["at"].present? %>
             <p class="cs-field-description mt-1">
-              Last synced <%= time_ago_in_words(Time.zone.parse(@admin_help_last_sync["at"])) %> ago:
+              Last synced <%= cs_relative_time(Time.zone.parse(@admin_help_last_sync["at"])) %>:
               <%= @admin_help_last_sync["added"] %> added,
               <%= @admin_help_last_sync["already_member"] %> already in the channel,
               <%= @admin_help_last_sync["failed"] %> failed,

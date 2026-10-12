@@ -45,7 +45,7 @@
           <dt class="cs-kv-label">Dates</dt>
           <dd class="cs-kv-value">
             <% if @event.starts_at && @event.ends_at %>
-              <%= @event.starts_at.strftime("%b %d") %> – <%= @event.ends_at.strftime("%b %d, %Y") %>
+              <%= cs_date_range(@event.starts_at, @event.ends_at) %>
             <% else %>
               <span class="cs-muted">Not set</span>
             <% end %>
@@ -214,7 +214,7 @@
                       <% end %>
                     </td>
                     <td class="whitespace-nowrap"><%= incident_status(incident.status) %></td>
-                    <td class="whitespace-nowrap cs-secondary"><%= time_ago_in_words(incident.created_at) %> ago</td>
+                    <td class="whitespace-nowrap cs-secondary"><%= cs_relative_time(incident.created_at) %></td>
                   </tr>
                 <% end %>
               </tbody>
@@ -268,7 +268,7 @@
           <div class="cs-table-wrap max-h-96 overflow-y-auto">
             <table class="cs-table cs-table-compact">
               <thead>
-                <tr><th scope="col"><span class="sr-only">Actor</span></th><th scope="col">Action</th><th scope="col">When</th></tr>
+                <tr><th scope="col"><span class="sr-only">Actor</span></th><th scope="col">Action</th><th scope="col">Logged</th></tr>
               </thead>
               <tbody>
                 <% @recent_activity.each do |log| %>
@@ -286,7 +286,7 @@
                         <%= log.record_type %>
                       <% end %>
                     </td>
-                    <td class="whitespace-nowrap cs-secondary"><%= time_ago_in_words(log.created_at) %> ago</td>
+                    <td class="whitespace-nowrap cs-secondary"><%= cs_relative_time(log.created_at) %></td>
                   </tr>
                 <% end %>
               </tbody>
@@ -347,7 +347,7 @@
                   <div class="cs-small cs-secondary"><%= assignment.user.email %></div>
                 </td>
                 <td class="whitespace-nowrap"><%= cs_badge(assignment.role.titleize, role_badge_colors[assignment.role]) %></td>
-                <td class="whitespace-nowrap cs-secondary"><%= assignment.created_at.strftime("%b %d, %Y") %></td>
+                <td class="whitespace-nowrap cs-secondary"><%= cs_relative_time(assignment.created_at) %></td>
               </tr>
             <% end %>
           </tbody>

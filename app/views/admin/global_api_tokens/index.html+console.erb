@@ -34,14 +34,13 @@
       <h2 class="cs-h2">Create a token</h2>
     </div>
     <div class="cs-container-body">
-      <%= form_with url: admin_global_api_tokens_path, method: :post do |f| %>
-        <div class="cs-field max-w-md">
-          <%= f.label :name, "Name (optional)", class: "cs-field-label" %>
-          <%= f.text_field :name, placeholder: "e.g. reporting script", class: "cs-input" %>
-        </div>
+      <%= form_with url: admin_global_api_tokens_path, method: :post, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+        <%= cs_field id: "name", label: "Name", optional: true, class: "max-w-md", constraint: "For example: reporting script" do |aria| %>
+          <%= f.text_field :name, class: "cs-input", **aria %>
+        <% end %>
 
         <fieldset class="cs-field">
-          <legend class="cs-field-label">Limit to scopes (optional)</legend>
+          <legend class="cs-field-label">Limit to scopes<span class="cs-field-optional"> - optional</span></legend>
           <p class="cs-field-description">
             Leave every box unchecked for a full-access token. Tick one and the token can do
             <strong>only</strong> that — every other endpoint returns 403, including read-only ones.
@@ -100,8 +99,8 @@
                     </div>
                   <% end %>
                 </td>
-                <td class="whitespace-nowrap"><%= token.created_at.strftime("%b %-d, %Y") %></td>
-                <td class="whitespace-nowrap"><%= token.last_used_at ? time_ago_in_words(token.last_used_at) + " ago" : "Never" %></td>
+                <td class="whitespace-nowrap"><%= cs_relative_time(token.created_at) %></td>
+                <td class="whitespace-nowrap"><%= token.last_used_at ? cs_relative_time(token.last_used_at) : "Never" %></td>
                 <td class="whitespace-nowrap">
                   <% if token.active? %>
                     <%= cs_status(:success, "Active") %>

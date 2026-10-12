@@ -44,7 +44,7 @@
         </div>
         <div>
           <dt class="cs-kv-label">Expires</dt>
-          <dd class="cs-kv-value"><%= @ban.expires_at ? l(@ban.expires_at, format: :long) : "Indefinite" %></dd>
+          <dd class="cs-kv-value"><%= @ban.expires_at ? cs_absolute_time_tag(@ban.expires_at) : "Indefinite" %></dd>
         </div>
         <div>
           <dt class="cs-kv-label">Added by</dt>
@@ -68,7 +68,7 @@
           <div>
             <dt class="cs-kv-label">Revoked</dt>
             <dd class="cs-kv-value">
-              <%= l(@ban.revoked_at, format: :long) %><%= " by #{@ban.revoked_by.email}" if @ban.revoked_by %>
+              <%= cs_relative_time(@ban.revoked_at) %><%= " by #{@ban.revoked_by.email}" if @ban.revoked_by %>
             </dd>
           </div>
         <% end %>

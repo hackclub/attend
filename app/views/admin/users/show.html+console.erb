@@ -77,7 +77,7 @@
           <dt class="cs-kv-label">Last sign in</dt>
           <dd class="cs-kv-value">
             <% if @user.last_sign_in_at %>
-              <%= @user.last_sign_in_at.strftime("%B %d, %Y at %I:%M %p") %>
+              <%= cs_relative_time(@user.last_sign_in_at) %>
               <span class="cs-secondary">from <%= @user.last_sign_in_ip %></span>
             <% else %>
               Never
@@ -86,7 +86,7 @@
         </div>
         <div>
           <dt class="cs-kv-label">Created</dt>
-          <dd class="cs-kv-value"><%= @user.created_at.strftime("%B %d, %Y at %I:%M %p") %></dd>
+          <dd class="cs-kv-value"><%= cs_relative_time(@user.created_at) %></dd>
         </div>
       </dl>
     </div>
@@ -154,7 +154,7 @@
                 </td>
                 <td class="whitespace-nowrap">
                   <% if passport.paired_at? %>
-                    <%= passport.paired_at.strftime("%B %d, %Y") %>
+                    <%= cs_relative_time(passport.paired_at) %>
                     <% if passport.paired_by %>
                       <span class="block cs-small cs-muted">by <%= passport.paired_by.display_name_or_fallback %></span>
                     <% end %>
@@ -170,7 +170,7 @@
                       class: "cs-btn cs-btn-link",
                       data: { turbo_confirm: "Revoke passport #{passport.serial_number}?" } %>
                   <% elsif passport.revoked? %>
-                    <span class="cs-small cs-muted"><%= passport.revoked_at.strftime("%B %d, %Y") %></span>
+                    <span class="cs-small cs-muted">Revoked <%= cs_relative_time(passport.revoked_at, inline: true) %></span>
                   <% end %>
                 </td>
               </tr>
@@ -207,7 +207,7 @@
                   <%= link_to assignment.event.name, admin_event_dashboard_path(assignment.event.slug), class: "cs-link" %>
                 </td>
                 <td class="whitespace-nowrap"><%= assignment.role.titleize %></td>
-                <td class="whitespace-nowrap cs-secondary"><%= assignment.created_at.strftime("%B %d, %Y") %></td>
+                <td class="whitespace-nowrap cs-secondary"><%= cs_relative_time(assignment.created_at) %></td>
               </tr>
             <% end %>
           </tbody>

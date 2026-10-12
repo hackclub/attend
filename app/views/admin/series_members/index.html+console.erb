@@ -37,7 +37,7 @@
                 <td class="whitespace-nowrap">
                   <%= cs_badge(assignment.role.titleize, assignment.role == "owner" ? "red" : "blue") %>
                 </td>
-                <td class="whitespace-nowrap"><%= assignment.created_at.strftime("%B %d, %Y") %></td>
+                <td class="whitespace-nowrap"><%= cs_relative_time(assignment.created_at) %></td>
                 <td class="whitespace-nowrap text-right">
                   <%= button_to "Remove", admin_series_member_path(@series, assignment), method: :delete, class: "cs-btn cs-btn-link", data: { turbo_confirm: "Are you sure you want to remove #{assignment.user.email} from this series?" } %>
                 </td>

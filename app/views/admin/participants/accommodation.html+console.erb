@@ -3,60 +3,40 @@
 <div>
   <%= render "header" %>
 
-  <%= form_with model: @accommodation, url: accommodation_admin_event_participant_path(current_event, @participant_event), method: :patch, local: true, class: "cs-stack" do |f| %>
-    <% if @accommodation.errors.any? %>
-      <div class="cs-alert cs-alert-error" role="alert">
-        <%= cs_status_icon(:error) %>
-        <div>
-          <p class="cs-alert-title"><%= pluralize(@accommodation.errors.count, "error") %> stopped this accommodation from saving</p>
-          <ul class="mt-1 list-disc list-inside">
-            <% @accommodation.errors.full_messages.each do |msg| %>
-              <li><%= msg %></li>
-            <% end %>
-          </ul>
-        </div>
-      </div>
-    <% end %>
-
+  <%= form_with model: @accommodation, url: accommodation_admin_event_participant_path(current_event, @participant_event), method: :patch, local: true, class: "cs-stack", html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
     <section class="cs-container">
       <div class="cs-container-header">
         <h2 class="cs-h2">Accommodation details</h2>
       </div>
       <div class="cs-container-body">
         <div class="cs-field-grid mb-4">
-          <div>
-            <%= f.label :check_in_date, "Check-in date", class: "cs-field-label" %>
-            <%= f.date_field :check_in_date, class: "cs-input" %>
-          </div>
-          <div>
-            <%= f.label :check_out_date, "Check-out date", class: "cs-field-label" %>
-            <%= f.date_field :check_out_date, class: "cs-input" %>
-          </div>
+          <%= cs_form_field f, :check_in_date, label: "Check-in date", as: :date_field, optional: true %>
+          <%= cs_form_field f, :check_out_date, label: "Check-out date", as: :date_field, optional: true,
+                input: { data: { cs_after: f.field_id(:check_in_date), cs_after_message: "Check-out date must be after the check-in date." } } %>
         </div>
 
-        <div class="cs-field">
-          <%= f.label :gender_base, "Gender identity", class: "cs-field-label" %>
+        <%= cs_form_field f, :gender_base, label: "Gender identity", optional: true, group: true, id: "gender_base" do |aria| %>
           <div class="cs-tiles">
             <label class="cs-tile">
               <span class="cs-option">
-                <%= f.radio_button :gender_base, "female", { id: "gender_base_female" } %>
+                <%= f.radio_button :gender_base, "female", { id: "gender_base_female", **aria } %>
                 <span class="cs-option-label">Woman</span>
               </span>
             </label>
             <label class="cs-tile">
               <span class="cs-option">
-                <%= f.radio_button :gender_base, "male", { id: "gender_base_male" } %>
+                <%= f.radio_button :gender_base, "male", { id: "gender_base_male", **aria } %>
                 <span class="cs-option-label">Man</span>
               </span>
             </label>
             <label class="cs-tile">
               <span class="cs-option">
-                <%= f.radio_button :gender_base, "non_binary", { id: "gender_base_non_binary" } %>
+                <%= f.radio_button :gender_base, "non_binary", { id: "gender_base_non_binary", **aria } %>
                 <span class="cs-option-label">Non-binary</span>
               </span>
             </label>
           </div>
-        </div>
+        <% end %>
 
         <div class="cs-field">
           <div class="cs-option">
@@ -65,8 +45,7 @@
           </div>
         </div>
 
-        <fieldset class="cs-field">
-          <legend class="cs-field-label">Preferred roommate genders</legend>
+        <%= cs_form_field f, :preferred_roommate_genders, label: "Preferred roommate genders", optional: true, group: true, id: "preferred_roommate_genders" do |aria| %>
           <div class="flex flex-wrap gap-x-6 gap-y-2">
             <% Accommodation::ROOMMATE_GENDER_OPTIONS.each do |key, value| %>
               <label class="flex items-center gap-2 cursor-pointer">
@@ -74,29 +53,18 @@
                   value,
                   @accommodation.preferred_roommate_genders&.include?(value),
                   id: "preferred_roommate_genders_#{key}",
-                  class: "w-4 h-4 accent-(--cs-accent)" %>
+                  class: "w-4 h-4 accent-(--cs-accent)", **aria %>
                 <span><%= key.to_s.titleize %></span>
               </label>
             <% end %>
           </div>
-        </fieldset>
+        <% end %>
 
-        <div class="cs-field">
-          <%= f.label :roommate_preferences, class: "cs-field-label" %>
-          <%= f.text_area :roommate_preferences, rows: 3, class: "cs-input" %>
-          <p class="cs-field-hint">Names of requested roommates</p>
-        </div>
-
-        <div class="cs-field">
-          <%= f.label :roommate_exclusions, class: "cs-field-label" %>
-          <%= f.text_area :roommate_exclusions, rows: 3, class: "cs-input" %>
-          <p class="cs-field-hint">People this participant should NOT be roomed with</p>
-        </div>
-
-        <div class="cs-field">
-          <%= f.label :accessibility_needs, class: "cs-field-label" %>
-          <%= f.text_area :accessibility_needs, rows: 3, class: "cs-input" %>
-        </div>
+        <%= cs_form_field f, :roommate_preferences, label: "Roommate preferences", optional: true, as: :text_area, input: { rows: 3 },
+              constraint: "Names of requested roommates." %>
+        <%= cs_form_field f, :roommate_exclusions, label: "Roommate exclusions", optional: true, as: :text_area, input: { rows: 3 },
+              constraint: "People this participant should not be roomed with." %>
+        <%= cs_form_field f, :accessibility_needs, label: "Accessibility needs", optional: true, as: :text_area, input: { rows: 3 } %>
       </div>
     </section>
 
@@ -110,22 +78,17 @@
             <%= f.check_box :rooming_exempt %>
             <div>
               <%= f.label :rooming_exempt, "Exempt from rooming", class: "cs-option-label" %>
-              <p class="cs-option-description">Check if this participant doesn't need a room (e.g., staying at home)</p>
+              <p class="cs-option-description">Select if this participant doesn't need a room, for example because they're staying at home.</p>
             </div>
           </div>
         </div>
 
-        <div class="cs-field">
-          <%= f.label :assigned_room, class: "cs-field-label" %>
-          <%= f.text_field :assigned_room, class: "cs-input" %>
-        </div>
-
-        <div class="cs-field">
-          <%= f.label :notes, "Admin notes", class: "cs-field-label" %>
-          <%= f.text_area :notes, rows: 3, class: "cs-input" %>
-        </div>
+        <%= cs_form_field f, :assigned_room, label: "Assigned room", optional: true %>
+        <%= cs_form_field f, :notes, label: "Admin notes", optional: true, as: :text_area, input: { rows: 3 } %>
       </div>
     </section>
+
+    <%= cs_form_errors f, title: "This accommodation couldn't be saved." %>
 
     <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
       <%= link_to "Cancel", admin_event_participant_path(current_event, @participant_event), class: "cs-btn cs-btn-link cs-btn-full" %>

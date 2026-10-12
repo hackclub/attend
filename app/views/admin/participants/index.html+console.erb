@@ -119,78 +119,127 @@
       </div>
     </div>
 
-    <form action="<%= admin_event_participants_path(current_event) %>" method="get" class="cs-filter-bar">
-      <label class="cs-search flex-1 min-w-[200px] max-w-xs">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-        <span class="sr-only">Find participants</span>
-        <%= search_field_tag :search, params[:search], placeholder: "Find participants", class: "cs-input" %>
-      </label>
-      <div class="w-44">
-        <%= select_tag :status,
-            options_for_select(
-              [
-                ["All statuses", ""],
-                ["Pending invitations", "pending_invitations"],
-                ["Awaiting participant", "awaiting_participant"],
-                ["Awaiting parent", "awaiting_parent"],
-                ["Complete", "complete"],
-                ["Withdrawn", "withdrawn"],
-                ["Rejected", "rejected"]
-              ],
-              params[:status]
-            ),
-            class: "cs-select", "aria-label": "Status" %>
-      </div>
-      <div class="w-44">
-        <%= select_tag :flag,
-            options_for_select([
-              ["All flags", ""],
-              ["Incomplete onboarding", "incomplete_onboarding"],
-              *(current_event.travel_enabled? ? [["Missing travel", "missing_travel"]] : []),
-              ["Missing medical", "missing_medical"],
-              ["High support", "high_support"],
-              ["Anaphylaxis risk", "anaphylaxis"]
-            ], params[:flag]),
-            class: "cs-select", "aria-label": "Flag" %>
-      </div>
-      <div class="w-40">
-        <%= select_tag :checked_in,
-            options_for_select([
-              ["All check-in", ""],
-              ["Checked in", "yes"],
-              ["Not checked in", "no"]
-            ], params[:checked_in]),
-            class: "cs-select", "aria-label": "Check-in" %>
-      </div>
-      <% if current_event.groups_enabled? && current_event.groups.any? %>
-        <div class="w-40">
-          <%= select_tag :group_id,
-              options_for_select(
-                [["All groups", ""], ["No group", "none"]] + current_event.groups.ordered.map { |g| [g.name, g.id] },
-                params[:group_id]
-              ),
-              class: "cs-select", "aria-label": "Group" %>
+    <%# Cloudscape property filter. The server applies one value per property
+        and ANDs them, so each applied filter is one token joined by a fixed
+        "and". Without JavaScript the plain search box and selects below
+        submit the same GET params; cs-property-filter hides them and drives
+        them from a single autosuggest input instead. %>
+    <% status_options = [
+         ["Pending invitations", "pending_invitations"],
+         ["Awaiting participant", "awaiting_participant"],
+         ["Awaiting parent", "awaiting_parent"],
+         ["Complete", "complete"],
+         ["Withdrawn", "withdrawn"],
+         ["Rejected", "rejected"]
+       ]
+       flag_options = [
+         ["Incomplete onboarding", "incomplete_onboarding"],
+         *(current_event.travel_enabled? ? [["Missing travel", "missing_travel"]] : []),
+         ["Missing medical", "missing_medical"],
+         ["High support", "high_support"],
+         ["Anaphylaxis risk", "anaphylaxis"]
+       ]
+       check_in_options = [["Checked in", "yes"], ["Not checked in", "no"]]
+       show_group_filter = current_event.groups_enabled? && current_event.groups.any?
+       group_options = show_group_filter ? [["No group", "none"]] + current_event.groups.ordered.map { |g| [g.name, g.id] } : []
+       document_options = @optional_documents.flat_map { |doc|
+         [ [ "#{doc.name}: added", "#{doc.id}:added" ],
+           [ "#{doc.name}: awaiting signature", "#{doc.id}:awaiting" ],
+           [ "#{doc.name}: not added", "#{doc.id}:not_added" ] ]
+       }
+       blocked_stage = params[:blocked_on].present? && ([ *SeriesDashboard::STAGES, SeriesDashboard::ARRIVAL_STAGE ].find { |stage| stage.key.to_s == params[:blocked_on].to_s })
+       base_query = @show_pending_invitations ? { status: "pending_invitations" } : {}
+       clear_href = admin_event_participants_path(current_event, base_query)
+       current_query = request.query_parameters.slice("search", "status", "flag", "checked_in", "group_id", "optional_document", "blocked_on")
+       remove_href = ->(key) { admin_event_participants_path(current_event, current_query.except(key)) }
+       value_label = ->(options, value) { options.find { |_, v| v.to_s == value.to_s }&.first }
+       filter_tokens = []
+       filter_tokens << { label: "Name or email", operator: "contains", value: "“#{params[:search]}”", remove_href: remove_href.call("search") } if params[:search].present?
+       if !@show_pending_invitations && (label = value_label.call(status_options, params[:status]))
+         filter_tokens << { label: "Status", operator: "=", value: label, remove_href: remove_href.call("status") }
+       end
+       if (label = value_label.call(flag_options, params[:flag]))
+         filter_tokens << { label: "Flag", operator: "=", value: label, remove_href: remove_href.call("flag") }
+       end
+       if (label = value_label.call(check_in_options, params[:checked_in]))
+         filter_tokens << { label: "Check-in", operator: "=", value: label, remove_href: remove_href.call("checked_in") }
+       end
+       if (label = value_label.call(group_options, params[:group_id]))
+         filter_tokens << { label: "Group", operator: "=", value: label, remove_href: remove_href.call("group_id") }
+       end
+       if (label = value_label.call(document_options, params[:optional_document]))
+         filter_tokens << { label: "Optional document", operator: "=", value: label, remove_href: remove_href.call("optional_document") }
+       end
+       if blocked_stage
+         filter_tokens << { label: "Blocked on", operator: "=", value: blocked_stage.label, remove_href: remove_href.call("blocked_on") }
+       end
+       filtering = filter_tokens.any?
+       match_total = @show_pending_invitations ? @pending_invitations.count : @participant_events.size %>
+    <form action="<%= admin_event_participants_path(current_event) %>" method="get"
+          class="cs-property-filter" role="search" aria-label="Filter participants"
+          data-controller="cs-property-filter"
+          data-cs-property-filter-text-label-value="Name or email"
+          data-testid="participant-property-filter">
+      <div class="cs-property-filter-bar">
+        <div class="cs-property-filter-control" data-cs-property-filter-target="enhanced" hidden>
+          <label class="cs-search">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <span class="sr-only">Find participants</span>
+            <input type="text" class="cs-input" placeholder="Find participants" autocomplete="off" spellcheck="false"
+                   role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="participant-filter-suggestions"
+                   aria-describedby="participant-filter-help"
+                   data-cs-property-filter-target="input"
+                   data-action="focus->cs-property-filter#open input->cs-property-filter#refresh keydown->cs-property-filter#keydown blur->cs-property-filter#close">
+          </label>
+          <span id="participant-filter-help" class="sr-only">Type to filter by name or email, or choose a property and a value. Use the arrow keys to move through suggestions.</span>
+          <ul id="participant-filter-suggestions" class="cs-menu cs-property-filter-menu" role="listbox" aria-label="Filter suggestions" hidden
+              data-cs-property-filter-target="listbox"
+              data-action="mousedown->cs-property-filter#keepFocus"></ul>
         </div>
-      <% end %>
-      <% if @optional_documents.any? %>
-        <%# Opt-in activities: who's doing each one, and who still owes a signature. %>
-        <div class="w-56">
-          <%= select_tag :optional_document,
-              options_for_select(
-                [ [ "All Optional Docs", "" ] ] + @optional_documents.flat_map { |doc|
-                  [ [ "#{doc.name}: added", "#{doc.id}:added" ],
-                    [ "#{doc.name}: awaiting signature", "#{doc.id}:awaiting" ],
-                    [ "#{doc.name}: not added", "#{doc.id}:not_added" ] ]
-                },
-                params[:optional_document]
-              ),
-              class: "cs-select", "aria-label": "Optional document" %>
+
+        <div class="cs-property-filter-fallback" data-cs-property-filter-target="fallback">
+          <label class="cs-search flex-1 min-w-[200px] max-w-xs">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <span class="sr-only">Find participants</span>
+            <%= search_field_tag :search, params[:search], placeholder: "Find participants", class: "cs-input", id: "participant-filter-search", data: { cs_property_filter_target: "text" } %>
+          </label>
+          <div class="w-44">
+            <%= select_tag :status, options_for_select([["All statuses", ""], *status_options], params[:status]),
+                class: "cs-select", "aria-label": "Status", data: { cs_property_filter_target: "property" } %>
+          </div>
+          <div class="w-44">
+            <%= select_tag :flag, options_for_select([["All flags", ""], *flag_options], params[:flag]),
+                class: "cs-select", "aria-label": "Flag", data: { cs_property_filter_target: "property" } %>
+          </div>
+          <div class="w-40">
+            <%= select_tag :checked_in, options_for_select([["All check-in states", ""], *check_in_options], params[:checked_in]),
+                class: "cs-select", "aria-label": "Check-in", data: { cs_property_filter_target: "property" } %>
+          </div>
+          <% if show_group_filter %>
+            <div class="w-40">
+              <%= select_tag :group_id, options_for_select([["All groups", ""], *group_options], params[:group_id]),
+                  class: "cs-select", "aria-label": "Group", data: { cs_property_filter_target: "property" } %>
+            </div>
+          <% end %>
+          <% if @optional_documents.any? %>
+            <%# Opt-in activities: who's doing each one, and who still owes a signature. %>
+            <div class="w-56">
+              <%= select_tag :optional_document, options_for_select([["All optional documents", ""], *document_options], params[:optional_document]),
+                  class: "cs-select", "aria-label": "Optional document", data: { cs_property_filter_target: "property" } %>
+            </div>
+          <% end %>
+          <% if blocked_stage %>
+            <%= hidden_field_tag :blocked_on, params[:blocked_on], id: nil %>
+          <% end %>
+          <%= button_tag "Filter", type: "submit", name: nil, class: "cs-btn" %>
         </div>
-      <% end %>
-      <%= button_tag "Filter", type: "submit", name: nil, class: "cs-btn" %>
-      <% if params[:search].present? || params[:status].present? || params[:flag].present? || params[:checked_in].present? || params[:group_id].present? || params[:optional_document].present? %>
-        <%= link_to "Clear", admin_event_participants_path(current_event), class: "cs-btn cs-btn-link" %>
-      <% end %>
+
+        <% if filtering %>
+          <span class="cs-property-filter-count" data-testid="filter-match-count"><%= cs_match_count(match_total) %></span>
+        <% end %>
+      </div>
+
+      <%= cs_filter_tokens(filter_tokens, clear_href: clear_href, data: { cs_property_filter_target: "tokens", testid: "participant-filter-tokens" }) %>
     </form>
 
     <% if @show_pending_invitations %>
@@ -218,11 +267,11 @@
                     <% end %>
                   </td>
                   <% if invitation.held? %>
-                    <td class="cs-secondary">Not sent <span class="cs-muted">· added <%= time_ago_in_words(invitation.created_at) %> ago</span></td>
+                    <td class="cs-secondary">Not sent <span class="cs-muted">· added <%= cs_relative_time(invitation.created_at, inline: true) %></span></td>
                     <td class="cs-muted" title="The link is valid for 30 days from when it is sent">—</td>
                   <% else %>
-                    <td class="cs-secondary"><%= time_ago_in_words(invitation.sent_at) %> ago</td>
-                    <td class="cs-secondary"><%= time_ago_in_words(invitation.expires_at) %></td>
+                    <td class="cs-secondary"><%= cs_relative_time(invitation.sent_at) %></td>
+                    <td class="cs-secondary"><%= cs_relative_time(invitation.expires_at) %></td>
                   <% end %>
                   <td>
                     <% if policy(current_event).invite_participants? %>
@@ -239,9 +288,13 @@
         </div>
         <div class="cs-container-footer cs-small"><%= @pending_invitations.count %> <%= "invitation".pluralize(@pending_invitations.count) %></div>
       <% else %>
-        <div class="cs-empty">
-          <p class="cs-empty-title">No pending invitations.</p>
-        </div>
+        <% if filtering %>
+          <%= cs_no_match(clear_href: clear_href, data: { testid: "filter-no-match" }) %>
+        <% else %>
+          <div class="cs-empty">
+            <p class="cs-empty-title">No pending invitations</p>
+          </div>
+        <% end %>
       <% end %>
     <% else %>
       <% if @participant_events.any? %>
@@ -256,6 +309,7 @@
               <tr>
                 <th scope="col">Participant</th>
                 <th scope="col">Status</th>
+                <th scope="col">T-shirt</th>
                 <th scope="col">Progress</th>
                 <th scope="col">Flags</th>
                 <th scope="col"><span class="sr-only">Actions</span></th>
@@ -284,6 +338,7 @@
                 <td>
                   <%= render_display_status_badge(pe) %>
                 </td>
+                <td class="whitespace-nowrap" data-testid="tshirt-size"><%= pe.participant.tshirt_size&.upcase || "—" %></td>
                 <td>
                   <div class="flex gap-1">
                     <% if current_event.travel_enabled? %>
@@ -325,9 +380,14 @@
         </div>
         <div class="cs-container-footer cs-small"><%= @participant_events.size %> <%= "participant".pluralize(@participant_events.size) %></div>
       <% else %>
-        <div class="cs-empty">
-          <p class="cs-empty-title">No participants found matching your criteria.</p>
-        </div>
+        <% if filtering %>
+          <%= cs_no_match(clear_href: clear_href, data: { testid: "filter-no-match" }) %>
+        <% else %>
+          <div class="cs-empty">
+            <p class="cs-empty-title">No participants</p>
+            <p>Participants appear here once they're added or imported.</p>
+          </div>
+        <% end %>
       <% end %>
     <% end %>
   </section>

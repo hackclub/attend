@@ -34,12 +34,12 @@
       <%= section_header.call(2, "Schedule and location", admin_event_setup_schedule_path(@event)) %>
       <div class="cs-container-body">
         <dl class="cs-kv cs-kv-2">
-          <div><dt class="cs-kv-label">Dates</dt><dd class="cs-kv-value"><%= @event.formatted_date_range || "Not set" %></dd></div>
+          <div><dt class="cs-kv-label">Dates</dt><dd class="cs-kv-value"><%= @event.starts_at && @event.ends_at ? cs_date_range(@event.starts_at, @event.ends_at, zone: @event.event_time_zone) : "Not set" %></dd></div>
           <div>
             <dt class="cs-kv-label">Registration</dt>
             <dd class="cs-kv-value">
               <% if @event.registration_open_at && @event.registration_close_at %>
-                <%= @event.registration_open_at.to_date.strftime("%b %-d") %> – <%= @event.registration_close_at.to_date.strftime("%b %-d, %Y") %>
+                <%= cs_date_range(@event.registration_open_at, @event.registration_close_at) %>
               <% else %>
                 Not set
               <% end %>

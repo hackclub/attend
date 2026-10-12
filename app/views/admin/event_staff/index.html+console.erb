@@ -36,7 +36,7 @@
                 <td class="whitespace-nowrap">
                   <%= cs_badge(assignment.role.titleize, role_badge_colors[assignment.role]) %>
                 </td>
-                <td class="whitespace-nowrap"><%= assignment.created_at.strftime("%B %d, %Y") %></td>
+                <td class="whitespace-nowrap"><%= cs_relative_time(assignment.created_at) %></td>
                 <td class="whitespace-nowrap text-right">
                   <% if assignment.inherited_from_series? %>
                     <span title="Series <%= assignment.series_role %>s act as event admins on every event in the series. Manage them from the series members page."><%= cs_status(:info, "Inherited from series") %></span>

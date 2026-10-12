@@ -51,7 +51,7 @@
           <% changes = audit_version_changes(version) %>
           <details class="cs-expandable">
             <summary class="px-5 py-2 font-normal! hover:bg-(--cs-bg-hover)">
-              <span class="cs-small cs-secondary font-mono w-40 flex-shrink-0"><%= version.created_at.strftime("%Y-%m-%d %H:%M:%S") %></span>
+              <span class="cs-small cs-secondary w-64 flex-shrink-0"><%= cs_absolute_time_tag(version.created_at) %></span>
               <span class="w-20 flex-shrink-0"><%= cs_badge(version.event.titleize, version_badge[version.event]) %></span>
               <span class="font-bold w-48 truncate" title="<%= version.item_type %> #<%= version.item_id %>">
                 <%= version.item_type %>

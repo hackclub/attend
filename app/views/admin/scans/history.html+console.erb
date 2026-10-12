@@ -97,7 +97,7 @@
           <th scope="col">Participant</th>
           <th scope="col">Location</th>
           <th scope="col">Scanned by</th>
-          <th scope="col">Time</th>
+          <th scope="col">Scanned</th>
           <% if current_user.global_admin? %>
             <th scope="col" class="text-right"><span class="sr-only">Actions</span></th>
           <% end %>
@@ -120,9 +120,8 @@
             <td class="cs-secondary">
               <%= scan.user.display_name_or_fallback %>
             </td>
-            <td class="cs-secondary whitespace-nowrap" data-controller="local-time" data-local-time-datetime-value="<%= scan.scanned_at.iso8601 %>" title="<%= scan.scanned_at.utc.strftime("%b %d, %Y %H:%M:%S UTC") %>">
-              <div data-local-time-target="date"><%= scan.scanned_at.strftime("%b %d, %Y") %></div>
-              <div class="cs-small" data-local-time-target="time"><%= scan.scanned_at.strftime("%H:%M:%S") %></div>
+            <td class="cs-secondary whitespace-nowrap">
+              <%= cs_absolute_time_tag(scan.scanned_at, data: { controller: "cs-local-time" }) %>
             </td>
             <% if current_user.global_admin? %>
               <td class="text-right">

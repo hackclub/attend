@@ -17,15 +17,17 @@
       </div>
     </div>
     <div class="cs-container-body">
-      <%= form_with url: merge_admin_event_participant_path(current_event, @participant_event), method: :get, local: true do |f| %>
-        <label for="q" class="cs-field-label">Find the duplicate record</label>
-        <div class="flex gap-2">
-          <div class="cs-search flex-1">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <%= f.text_field :q, value: @query, placeholder: "Search by name or email…", class: "cs-input" %>
+      <%= form_with url: merge_admin_event_participant_path(current_event, @participant_event), method: :get, local: true, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+        <%= cs_field id: "q", label: "Find the duplicate record" do |aria| %>
+          <div class="flex gap-2">
+            <div class="cs-search flex-1">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <%= f.text_field :q, value: @query, id: "q", placeholder: "Find by name or email", required: true, autocomplete: "off",
+                    data: { cs_required_message: "Enter a name or email address to search." }, class: "cs-input", **aria %>
+            </div>
+            <%= f.button "Search", class: "cs-btn" %>
           </div>
-          <%= f.button "Search", class: "cs-btn" %>
-        </div>
+        <% end %>
       <% end %>
 
       <% if @candidates %>
@@ -37,7 +39,7 @@
                   <p class="font-bold truncate"><%= candidate.display_name %></p>
                   <p class="cs-secondary truncate"><%= candidate.email %></p>
                   <p class="cs-small cs-muted">
-                    <%= candidate.date_of_birth&.strftime("%b %-d, %Y") || "No DOB" %>
+                    <%= cs_absolute_time_tag(candidate.date_of_birth, date_only: true) || "No DOB" %>
                     · <%= candidate.slack_user_id.present? ? "Slack linked" : "No Slack" %>
                     · <%= candidate.user_id.present? ? "Sign-in linked" : "No sign-in" %>
                     <% if candidate.participant_events.any? %>
@@ -80,13 +82,13 @@
                 <% end %>
               </ul>
             <% else %>
-              <p>Nothing to transfer — the duplicate record will simply be deleted.</p>
+              <p>Nothing to transfer. The duplicate record will simply be deleted.</p>
             <% end %>
           </div>
         </div>
       </div>
       <div class="cs-container-footer flex justify-end">
-        <%= button_to "Merge & delete duplicate",
+        <%= button_to "Merge and delete duplicate",
             merge_duplicate_admin_event_participant_path(current_event, @participant_event),
             method: :post,
             params: { duplicate_id: @duplicate.id },

@@ -75,7 +75,7 @@
               <% end %>
             </td>
             <td class="whitespace-nowrap cs-secondary">
-              <%= user.last_sign_in_at ? time_ago_in_words(user.last_sign_in_at) + " ago" : "Never" %>
+              <%= user.last_sign_in_at ? cs_relative_time(user.last_sign_in_at) : "Never" %>
             </td>
             <td class="whitespace-nowrap text-right">
               <%= link_to "View", admin_user_path(user), class: "cs-link" %>

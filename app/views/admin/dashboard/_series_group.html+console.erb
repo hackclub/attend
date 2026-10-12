@@ -36,7 +36,7 @@
       <%= cs_status(:success, "#{live_count} active") %>
     <% end %>
   </td>
-  <td class="whitespace-nowrap"><%= event_date_range(series_start, series_end) %></td>
+  <td class="whitespace-nowrap"><%= cs_date_range(series_start, series_end) %></td>
   <td class="whitespace-nowrap tabular-nums"><%= pluralize(series_participants, "participant") %></td>
   <td></td>
 </tr>

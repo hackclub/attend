@@ -75,12 +75,12 @@
                 </td>
                 <td class="whitespace-nowrap">
                   <% if message.sent_at.present? %>
-                    <%= message.sent_at.strftime("%b %d, %H:%M") %>
+                    <%= cs_relative_time(message.sent_at) %>
                     <div class="cs-small cs-muted">
                       <%= message.sent_count %>/<%= message.recipient_count %> delivered
                     </div>
                   <% elsif message.scheduled_at.present? %>
-                    <%= cs_status(:pending, "Scheduled: #{message.scheduled_at.strftime("%b %d, %H:%M")}") %>
+                    <%= cs_status(:pending, safe_join([ "Scheduled for ", cs_absolute_time_tag(message.scheduled_at) ])) %>
                   <% else %>
                     <span class="cs-muted">Draft</span>
                   <% end %>

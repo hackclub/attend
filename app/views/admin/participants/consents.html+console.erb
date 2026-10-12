@@ -7,7 +7,7 @@
   <section class="cs-container">
     <div class="cs-container-header">
       <div>
-        <h2 class="cs-h2">Code of Conduct &amp; Safeguarding</h2>
+        <h2 class="cs-h2">Code of conduct and safeguarding</h2>
         <p class="cs-container-description">
           <a href="https://hackclub.com/conduct/" target="_blank" class="cs-link">hackclub.com/conduct</a>
           ·
@@ -31,15 +31,14 @@
             <dd class="cs-kv-value"><%= @participant_event.code_of_conduct_signature %></dd>
           </div>
           <div>
-            <dt class="cs-kv-label">Signed on</dt>
+            <dt class="cs-kv-label">Signed</dt>
             <dd class="cs-kv-value">
-              <%= @participant_event.code_of_conduct_accepted_at.strftime("%B %d, %Y") %>
-              <span class="cs-small cs-muted ml-1"><%= @participant_event.code_of_conduct_accepted_at.strftime("%H:%M") %></span>
+              <%= cs_absolute_time_tag(@participant_event.code_of_conduct_accepted_at) %>
             </dd>
           </div>
         </dl>
       <% else %>
-        <p class="cs-muted">The participant has not yet signed the Code of Conduct &amp; Safeguarding Policy.</p>
+        <p class="cs-muted">The participant has not yet signed the code of conduct and safeguarding policy.</p>
       <% end %>
     </div>
   </section>
@@ -94,7 +93,7 @@
           <th scope="col">Consent type</th>
           <th scope="col">Status</th>
           <th scope="col">Signed by</th>
-          <th scope="col">Date</th>
+          <th scope="col">Signed</th>
           <th scope="col" class="text-right">Document</th>
         </tr>
       </thead>
@@ -114,7 +113,7 @@
                   <span class="cs-small cs-muted">Required</span>
                 <% elsif consent.withdrawn? %>
                   <span class="cs-small cs-muted">
-                    Optional — removed by participant <%= consent.withdrawn_at.strftime("%B %d, %Y") %>
+                    Optional — removed by participant <%= cs_relative_time(consent.withdrawn_at, inline: true) %>
                   </span>
                 <% end %>
               </td>
@@ -142,8 +141,7 @@
               </td>
               <td class="cs-secondary">
                 <% if consent.signed_at %>
-                  <%= consent.signed_at.strftime("%B %d, %Y") %>
-                  <div class="cs-small cs-muted"><%= consent.signed_at.strftime("%H:%M") %></div>
+                  <%= cs_absolute_time_tag(consent.signed_at) %>
                 <% else %>
                   —
                 <% end %>
@@ -153,14 +151,14 @@
                   <div class="space-y-1">
                     <% consent.physical_uploads.each_with_index do |upload, i| %>
                       <div>
-                        <%= link_to "View Upload#{" #{i + 1}" if consent.physical_uploads.size > 1}",
+                        <%= link_to "View upload#{" #{i + 1}" if consent.physical_uploads.size > 1}",
                             viewable_upload_path(upload), target: "_blank",
                             class: "cs-link" %>
                       </div>
                     <% end %>
                   </div>
                 <% elsif consent.document_url.present? %>
-                  <%= link_to "View Document", consent.document_url, target: "_blank", class: "cs-link" %>
+                  <%= link_to "View document", consent.document_url, target: "_blank", class: "cs-link" %>
                 <% elsif consent.docuseal_envelope_id.present? %>
                   <span class="cs-muted">DocuSeal: <%= consent.docuseal_envelope_id %></span>
                 <% else %>
@@ -173,7 +171,7 @@
           <tr>
             <td colspan="5">
               <div class="cs-empty">
-                <p class="cs-empty-title">No consent records found.</p>
+                <p class="cs-empty-title">No consent records</p>
               </div>
             </td>
           </tr>
@@ -187,7 +185,7 @@
     <% can_resend_custom_documents = policy(@participant_event).reset_waiver? %>
     <section class="cs-container">
     <div class="cs-container-header cs-container-header-divided">
-      <h2 class="cs-h2">Additional Documents</h2>
+      <h2 class="cs-h2">Additional documents</h2>
     </div>
     <div class="cs-table-wrap">
       <table class="cs-table">
@@ -196,7 +194,7 @@
             <th scope="col">Document</th>
             <th scope="col">Status</th>
             <th scope="col">Signed by</th>
-            <th scope="col">Date</th>
+            <th scope="col">Signed</th>
             <th scope="col" class="text-right">Document</th>
             <% if can_resend_custom_documents %>
               <th scope="col" class="text-right">Actions</th>
@@ -231,7 +229,7 @@
                   <%= doc.physical? ? "Signed on paper" : "DocuSeal" %>
                   · <%= doc.signer_type.to_s.delete_prefix("signed_by_").humanize %>
                   <% if doc.optional? && consent&.opted_in_at %>
-                    · Added <%= consent.opted_in_at.strftime("%B %d, %Y") %>
+                    · Added <%= cs_relative_time(consent.opted_in_at, inline: true) %>
                   <% end %>
                 </span>
               </td>
@@ -253,8 +251,7 @@
               </td>
               <td class="cs-secondary">
                 <% if consent&.signed_at %>
-                  <%= consent.signed_at.strftime("%B %d, %Y") %>
-                  <div class="cs-small cs-muted"><%= consent.signed_at.strftime("%H:%M") %></div>
+                  <%= cs_absolute_time_tag(consent.signed_at) %>
                 <% else %>
                   —
                 <% end %>
@@ -264,14 +261,14 @@
                   <div class="space-y-1">
                     <% consent.physical_uploads.each_with_index do |upload, i| %>
                       <div>
-                        <%= link_to "View Upload#{" #{i + 1}" if consent.physical_uploads.size > 1}",
+                        <%= link_to "View upload#{" #{i + 1}" if consent.physical_uploads.size > 1}",
                             viewable_upload_path(upload), target: "_blank",
                             class: "cs-link" %>
                       </div>
                     <% end %>
                   </div>
                 <% elsif consent&.document_url.present? %>
-                  <%= link_to "View Document", consent.document_url, target: "_blank", class: "cs-link" %>
+                  <%= link_to "View document", consent.document_url, target: "_blank", class: "cs-link" %>
                 <% elsif consent&.docuseal_envelope_id.present? %>
                   <span class="cs-muted">DocuSeal: <%= consent.docuseal_envelope_id %></span>
                 <% else %>
@@ -312,7 +309,7 @@
     <section class="cs-container">
       <div class="cs-container-header">
         <div>
-          <h2 class="cs-h2">Optional Documents Not Added</h2>
+          <h2 class="cs-h2">Optional documents not added</h2>
           <p class="cs-container-description">
             Offered for opt-in activities. This participant hasn't taken these up, so no signature is
             expected and nothing has been sent to their parent/guardian.

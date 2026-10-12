@@ -2519,3 +2519,206 @@
     &:focus-visible { outline: 2px solid var(--cs-info); outline-offset: 2px; border-radius: 2px; }
   }
 }
+
+@layer components {
+  /* Cloudscape filter patterns: property filter (participants list, travel
+   * calendar) and the text filter's count + no-match feedback (table view).
+   * Tokens sit under the input, joined by the fixed operation, with
+   * "Clear filters" after the last token; "N matches" sits beside the input. */
+  .cs-property-filter { padding: 0 20px 16px; }
+
+  .cs-property-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+  }
+
+  .cs-property-filter-control {
+    position: relative;
+    flex: 1 1 320px;
+    min-width: 0;
+    max-width: 640px;
+  }
+
+  .cs-property-filter-control[hidden],
+  .cs-property-filter-fallback[hidden] { display: none; }
+
+  .cs-property-filter-fallback {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+  }
+
+  .cs-property-filter-menu {
+    left: 0;
+    right: 0;
+    max-width: none;
+    max-height: 320px;
+    overflow-y: auto;
+    list-style: none;
+  }
+
+  .cs-property-filter-menu[hidden] { display: none; }
+
+  .cs-property-filter-menu [role="option"] {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 6px 16px;
+    border: 1px solid transparent;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-body);
+    cursor: pointer;
+
+    &:hover { background-color: var(--cs-bg-hover); }
+  }
+
+  .cs-property-filter-menu [role="option"][aria-selected="true"] {
+    background-color: var(--cs-bg-selected);
+    border-color: var(--cs-accent);
+  }
+
+  .cs-property-filter-menu [role="option"][aria-current="true"]::after {
+    content: "✓";
+    margin-left: auto;
+    color: var(--cs-accent);
+  }
+
+  .cs-property-filter-option-meta { font-size: 12px; color: var(--cs-text-muted); }
+
+  .cs-property-filter-empty-option {
+    padding: 6px 16px;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-muted);
+  }
+
+  .cs-property-filter-count,
+  .cs-text-filter-count {
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-muted);
+    white-space: nowrap;
+  }
+
+  .cs-text-filter-count[hidden] { display: none; }
+
+  .cs-filter-tokens {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+
+    > .cs-token-group { list-style: none; margin: 0; padding: 0; }
+  }
+
+  .cs-filter-tokens[hidden] { display: none; }
+
+  .cs-filter-token-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .cs-filter-operation {
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-muted);
+  }
+
+  .cs-filter-token-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cs-filter-token-operator { color: var(--cs-text-muted); }
+
+  .cs-token > a,
+  .cs-token > button {
+    display: inline-flex;
+    flex-shrink: 0;
+    padding: 2px;
+    border-radius: 4px;
+    color: var(--cs-text-secondary);
+    cursor: pointer;
+
+    &:hover { color: var(--cs-text-heading); }
+    &:focus-visible { outline: 2px solid var(--cs-focus); outline-offset: 1px; }
+    svg { width: 12px; height: 12px; }
+  }
+
+  .cs-filter-clear { padding-left: 4px; padding-right: 4px; }
+
+  /* The travel calendar's no-match state is a live region the filter
+   * controller toggles with [hidden]. */
+  .cs-empty[hidden] { display: none; }
+
+  /* An empty state spanning a wide, horizontally scrolling table stays in
+   * view instead of centring across every column. */
+  .cs-table-wrap:has(.cs-table-empty-cell) { container-type: inline-size; }
+  .cs-table-empty-cell > .cs-empty { position: sticky; left: 0; width: 100cqw; }
+}
+
+/* Divided key-value grids draw the rule between columns only: the first
+ * item of every row starts flush, not just the first item overall. */
+@media (min-width: 768px) {
+  :root.cs-console .cs-kv-2.cs-kv-divided > :nth-child(2n + 1),
+  :root.cs-console .cs-kv-3.cs-kv-divided > :nth-child(3n + 1),
+  :root.cs-console .cs-kv-4.cs-kv-divided > :nth-child(4n + 1) {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+/* Form validation (cloudscape.design/patterns/general/errors/validation):
+ * the "- optional" label marker, inline warnings that sit where errors do,
+ * invalid selects, and the end-of-form error alert. */
+@layer components {
+  .cs-field-optional { font-weight: 400; font-style: italic; color: var(--cs-text-muted); }
+
+  fieldset.cs-field { min-width: 0; margin: 0; padding: 0; border: 0; }
+
+  fieldset.cs-field > legend.cs-field-label { padding: 0; }
+
+  .cs-field-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 700;
+    color: var(--cs-warning);
+
+    svg { width: 14px; height: 14px; margin-top: 1px; flex-shrink: 0; }
+  }
+
+  :root.cs-console .cs-select[aria-invalid="true"],
+  :root.cs-console textarea[aria-invalid="true"] {
+    border-color: var(--cs-error);
+    border-left-width: 4px;
+  }
+
+  :root.cs-console input[type="checkbox"][aria-invalid="true"],
+  :root.cs-console input[type="radio"][aria-invalid="true"] {
+    outline: 2px solid var(--cs-error);
+    outline-offset: 1px;
+  }
+
+  .cs-form-error:focus { outline: none; }
+
+  /* Rails wraps an invalid control in .field_with_errors; the console marks
+   * it with aria-invalid instead, so the wrapper mustn't affect layout. */
+  :root.cs-console .cs-field .field_with_errors { display: contents; }
+
+  .cs-form-error-list { margin-top: 2px; padding-left: 18px; list-style: disc; }
+}

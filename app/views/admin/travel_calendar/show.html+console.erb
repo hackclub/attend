@@ -1,7 +1,15 @@
 <% content_for :title, "Travel Calendar – #{current_event.name} – Attend" %>
 <% content_for :breadcrumbs, cs_event_breadcrumbs([ "Travel calendar", nil ]) %>
 
-<div class="cs-stack" data-controller="travel-calendar-filter">
+<%# Filters: a Cloudscape property filter in live mode. travel-calendar-filter
+    still does the filtering from its search box and selects;
+    cs-property-filter hides those and drives them from one autosuggest
+    input, and draws the tokens, "N matches" and "Clear filters". %>
+<div class="cs-stack"
+     data-controller="travel-calendar-filter cs-property-filter"
+     data-cs-property-filter-live-value="true"
+     data-cs-property-filter-text-label-value="Name, route or reference"
+     data-cs-property-filter-item-selector-value="[data-travel-calendar-filter-target~='entry']">
   <header class="cs-header mb-0!">
     <div class="cs-header-text">
       <h1 class="cs-h1">Travel calendar</h1>
@@ -16,78 +24,113 @@
 
   <% if @journeys.any? %>
     <nav aria-label="Travel filters" class="cs-container sticky top-(--cs-topnav-height) z-20 shadow-(--cs-shadow-sticky)">
-      <div class="cs-filter-bar pt-4">
-        <label class="cs-search min-w-0 flex-1 basis-64">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
-          <span class="sr-only">Search</span>
-          <input type="search"
-                 placeholder="Find by name, route, or reference"
-                 autocomplete="off"
-                 data-travel-calendar-filter-target="search"
-                 data-action="input->travel-calendar-filter#apply"
-                 class="cs-input">
-        </label>
+      <div class="cs-property-filter pt-4" data-testid="travel-property-filter">
+        <div class="cs-property-filter-bar">
+          <div class="cs-property-filter-control" data-cs-property-filter-target="enhanced" hidden>
+            <label class="cs-search">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+              <span class="sr-only">Find journeys</span>
+              <input type="text" class="cs-input" placeholder="Find journeys" autocomplete="off" spellcheck="false"
+                     id="travel-filter-input"
+                     role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="travel-filter-suggestions"
+                     aria-describedby="travel-filter-help"
+                     data-cs-property-filter-target="input"
+                     data-action="focus->cs-property-filter#open input->cs-property-filter#refresh keydown->cs-property-filter#keydown blur->cs-property-filter#close">
+            </label>
+            <span id="travel-filter-help" class="sr-only">Type to filter by name, route or reference, or choose a property and a value. Use the arrow keys to move through suggestions.</span>
+            <ul id="travel-filter-suggestions" class="cs-menu cs-property-filter-menu" role="listbox" aria-label="Filter suggestions" hidden
+                data-cs-property-filter-target="listbox"
+                data-action="mousedown->cs-property-filter#keepFocus"></ul>
+          </div>
 
-        <label class="w-full sm:w-auto">
-          <span class="sr-only">Direction</span>
-          <select data-travel-calendar-filter-target="direction"
-                  data-action="change->travel-calendar-filter#apply"
-                  class="cs-select">
-            <option value="">All directions</option>
-            <option value="inbound">Inbound</option>
-            <option value="outbound">Outbound</option>
-          </select>
-        </label>
+          <div class="cs-property-filter-fallback" data-cs-property-filter-target="fallback">
+            <label class="cs-search min-w-0 flex-1 basis-64">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+              <span class="sr-only">Find journeys</span>
+              <input type="search"
+                     placeholder="Find journeys"
+                     autocomplete="off"
+                     data-travel-calendar-filter-target="search"
+                     data-cs-property-filter-target="text"
+                     data-action="input->travel-calendar-filter#apply"
+                     class="cs-input">
+            </label>
 
-        <label class="w-full sm:w-auto">
-          <span class="sr-only">Mode</span>
-          <select data-travel-calendar-filter-target="mode"
-                  data-action="change->travel-calendar-filter#apply"
-                  class="cs-select">
-            <option value="">All modes</option>
-            <% @filter_choices[:modes].each do |mode| %>
-              <option value="<%= mode %>"><%= mode == "plane" ? "Flight" : mode.titleize %></option>
+            <label class="w-full sm:w-auto">
+              <span class="sr-only">Direction</span>
+              <select data-travel-calendar-filter-target="direction"
+                      data-cs-property-filter-target="property" data-cs-property-filter-label="Direction"
+                      data-action="change->travel-calendar-filter#apply"
+                      class="cs-select">
+                <option value="">All directions</option>
+                <option value="inbound">Inbound</option>
+                <option value="outbound">Outbound</option>
+              </select>
+            </label>
+
+            <label class="w-full sm:w-auto">
+              <span class="sr-only">Mode</span>
+              <select data-travel-calendar-filter-target="mode"
+                      data-cs-property-filter-target="property" data-cs-property-filter-label="Mode"
+                      data-action="change->travel-calendar-filter#apply"
+                      class="cs-select">
+                <option value="">All modes</option>
+                <% @filter_choices[:modes].each do |mode| %>
+                  <option value="<%= mode %>"><%= mode == "plane" ? "Flight" : mode.titleize %></option>
+                <% end %>
+              </select>
+            </label>
+
+            <label class="w-full sm:w-auto">
+              <span class="sr-only">Pickup</span>
+              <select data-travel-calendar-filter-target="pickup"
+                      data-cs-property-filter-target="property" data-cs-property-filter-label="Pickup"
+                      data-action="change->travel-calendar-filter#apply"
+                      class="cs-select">
+                <option value="">All pickup states</option>
+                <option value="awaiting_pickup">Awaiting pickup</option>
+                <option value="collected">Collected</option>
+                <option value="checked_in">Checked in</option>
+                <option value="pickup_not_needed">Pickup not needed</option>
+              </select>
+            </label>
+
+            <% if current_event.groups_enabled? %>
+              <label class="w-full sm:w-auto">
+                <span class="sr-only">Group</span>
+                <select data-travel-calendar-filter-target="group"
+                        data-cs-property-filter-target="property" data-cs-property-filter-label="Group"
+                        data-action="change->travel-calendar-filter#apply"
+                        class="cs-select">
+                  <option value="">All groups</option>
+                  <%= options_from_collection_for_select(@filter_choices[:groups], :id, :name) %>
+                </select>
+              </label>
             <% end %>
-          </select>
-        </label>
 
-        <label class="w-full sm:w-auto">
-          <span class="sr-only">Pickup</span>
-          <select data-travel-calendar-filter-target="pickup"
-                  data-action="change->travel-calendar-filter#apply"
-                  class="cs-select">
-            <option value="">All pickup states</option>
-            <option value="awaiting_pickup">Awaiting pickup</option>
-            <option value="collected">Collected</option>
-            <option value="checked_in">Checked in</option>
-            <option value="pickup_not_needed">Pickup not needed</option>
-          </select>
-        </label>
+            <button type="button"
+                    data-action="travel-calendar-filter#reset"
+                    class="cs-btn cs-btn-link">
+              Clear filters
+            </button>
+          </div>
 
-        <% if current_event.groups_enabled? %>
-          <label class="w-full sm:w-auto">
-            <span class="sr-only">Group</span>
-            <select data-travel-calendar-filter-target="group"
-                    data-action="change->travel-calendar-filter#apply"
-                    class="cs-select">
-              <option value="">All groups</option>
-              <%= options_from_collection_for_select(@filter_choices[:groups], :id, :name) %>
-            </select>
-          </label>
-        <% end %>
+          <span class="cs-property-filter-count" role="status" aria-live="polite" hidden
+                data-cs-property-filter-target="count" data-testid="filter-match-count"></span>
+        </div>
 
-        <button type="button"
-                data-action="travel-calendar-filter#reset"
-                class="cs-btn cs-btn-link">
-          Clear filters
-        </button>
+        <div class="cs-filter-tokens" hidden data-cs-property-filter-target="tokens" data-testid="travel-filter-tokens"></div>
       </div>
     </nav>
 
     <% @journeys_by_date.each do |date, entries| %>
       <section class="cs-container" data-travel-calendar-filter-target="day" aria-labelledby="travel-day-<%= date.iso8601 %>">
         <div class="cs-container-header cs-container-header-divided items-baseline">
-          <h2 id="travel-day-<%= date.iso8601 %>" class="cs-h2"><%= date.strftime("%A %-d %B") %></h2>
+          <h2 id="travel-day-<%= date.iso8601 %>" class="cs-h2"><%= date.strftime("%A, ") + cs_absolute_time(date) %>
+            <%# Entry times below are clock times in the event zone; the day's offset
+                (which can change across a DST switch) is stated once here. %>
+            <span class="cs-small cs-muted font-normal" data-testid="travel-day-offset">(<%= cs_utc_offset(date.in_time_zone(current_event.event_time_zone).noon) %>)</span>
+          </h2>
           <span data-travel-calendar-filter-target="count" class="cs-counter"><%= pluralize(entries.size, "journey") %></span>
         </div>
         <ol>
@@ -111,9 +154,13 @@
       </section>
     <% end %>
 
-    <p hidden role="status" aria-live="polite" aria-atomic="true" data-travel-calendar-filter-target="empty" class="cs-container cs-empty">
-      No journeys match these filters.
-    </p>
+    <div hidden role="status" aria-live="polite" aria-atomic="true" data-travel-calendar-filter-target="empty" class="cs-container cs-empty" data-testid="filter-no-match">
+      <p class="cs-empty-title">No matches</p>
+      <p>We can't find a match.</p>
+      <div class="cs-actions">
+        <button type="button" class="cs-btn" data-action="cs-property-filter#clear">Clear filters</button>
+      </div>
+    </div>
   <% else %>
     <section class="cs-container">
       <div class="cs-empty">
