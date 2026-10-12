@@ -122,7 +122,7 @@
   --cs-radius-badge: 4px;
 
   --cs-topnav-height: 52px;
-  --cs-sidenav-width: 280px;
+  --cs-sidenav-width: 232px;
 
   /* the shared semantic palette, so themes.css, hackclub.css and the
    * portal-* layer resolve to Cloudscape inside the console */
@@ -927,6 +927,8 @@
     &:focus-visible { outline-offset: -2px; }
   }
 
+  .cs-sidenav-icon { width: 16px; height: 16px; flex-shrink: 0; }
+
   .cs-sidenav-link[aria-current="page"] {
     font-weight: 700;
     color: var(--cs-accent);
@@ -962,23 +964,24 @@
       list-style: none;
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 4px 24px 4px 10px;
+      gap: 8px;
+      padding: 4px 24px 4px 8px;
       font-size: 14px;
       line-height: 20px;
       color: var(--cs-text-secondary);
       cursor: pointer;
 
       &::-webkit-details-marker { display: none; }
-      svg { width: 12px; height: 12px; margin: 0 2px 0 4px; color: var(--cs-text-muted); transition: transform 135ms ease-out; }
+      .cs-sidenav-chevron { width: 12px; height: 12px; flex-shrink: 0; color: var(--cs-text-muted); transition: transform 135ms ease-out; }
       &:hover { color: var(--cs-accent); }
     }
 
-    &[open] > summary svg { transform: rotate(90deg); }
+    &[open] > summary .cs-sidenav-chevron { transform: rotate(90deg); }
     &[open] > summary { font-weight: 700; color: var(--cs-text-heading); }
 
-    .cs-sidenav-link { padding-left: 44px; }
-    .cs-sidenav-link[aria-current="page"]::before { left: 28px; }
+    /* children's icons line up under the group's label */
+    .cs-sidenav-link { padding-left: 52px; }
+    .cs-sidenav-link[aria-current="page"]::before { left: 36px; }
   }
 
   .cs-sidenav-footer {
@@ -1631,15 +1634,63 @@
 
   .cs-sidenav .cs-sidenav-header { margin-right: 52px; }
 
+  /* Collapsed, the rail keeps one icon per link; labels stay in the
+   * accessibility tree and console_nav_controller.js shows them as tooltips.
+   * Groups flatten so their links are reachable without a flyout. */
   @media (min-width: 1024px) {
     .cs-nav-collapsed .cs-sidenav { width: 48px; }
-    .cs-nav-collapsed .cs-sidenav-panel { display: none; }
 
     .cs-nav-collapsed .cs-sidenav-toggle {
       right: 8px;
       .cs-sidenav-toggle-open { display: block; }
       .cs-sidenav-toggle-close { display: none; }
     }
+
+    .cs-nav-collapsed .cs-sidenav {
+      .cs-sidenav-scroll { padding-top: 56px; overflow-x: hidden; scrollbar-width: none; }
+      .cs-sidenav-header, .cs-sidenav-section-title, .cs-sidenav-footer, .cs-sidenav-group > summary { display: none; }
+      .cs-sidenav-group::details-content { content-visibility: visible; }
+      .cs-sidenav-divider { margin: 8px 12px; }
+
+      .cs-sidenav-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      .cs-sidenav-link, .cs-sidenav-group .cs-sidenav-link {
+        justify-content: center;
+        margin: 0 8px;
+        padding: 8px 0;
+        border-radius: var(--cs-radius-item);
+
+        &:hover { background-color: var(--cs-bg-hover); }
+      }
+
+      .cs-sidenav-link[aria-current="page"] {
+        background-color: var(--cs-bg-selected);
+        &::before { left: -6px; top: 8px; bottom: 8px; }
+      }
+    }
+  }
+
+  .cs-sidenav-tooltip {
+    position: fixed;
+    z-index: 60;
+    padding: 4px 8px;
+    border-radius: var(--cs-radius-badge);
+    background-color: var(--cs-topnav-bg);
+    color: var(--cs-topnav-text-hover);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 700;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: var(--cs-shadow-dropdown);
+    transform: translateY(-50%);
   }
 
   .cs-drawer.hidden, .cs-drawer-overlay.hidden { display: none; }
