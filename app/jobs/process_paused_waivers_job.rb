@@ -31,7 +31,7 @@ class ProcessPausedWaiversJob < ApplicationJob
       guardian_pe = pe.guardian_participant_events.first
       return unless guardian_pe
 
-      consent = pe.consents.find_or_create_by!(consent_type: :waiver) do |c|
+      consent = pe.find_or_create_consent!(:waiver) do |c|
         c.status = :pending
         c.guardian_participant_event = guardian_pe
       end
@@ -41,7 +41,7 @@ class ProcessPausedWaiversJob < ApplicationJob
         DocusealJobs::CreateMinorWaiverJob.perform_later(consent.id)
       end
     else
-      consent = pe.consents.find_or_create_by!(consent_type: :waiver) do |c|
+      consent = pe.find_or_create_consent!(:waiver) do |c|
         c.status = :pending
       end
 

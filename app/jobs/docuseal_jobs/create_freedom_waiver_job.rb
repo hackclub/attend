@@ -7,6 +7,9 @@ module DocusealJobs
     def perform(consent_id)
       consent = Consent.find(consent_id)
       return if consent.signed? || consent.voided?
+      # Idempotency: the guardian portal may enqueue this again while an earlier
+      # run is in flight — never create a second DocuSeal submission.
+      return if consent.docuseal_guardian_slug.present?
 
       participant_event = consent.participant_event
       guardian_participant_event = consent.guardian_participant_event || participant_event.guardian_participant_events.first

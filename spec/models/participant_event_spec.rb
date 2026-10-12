@@ -193,6 +193,45 @@ RSpec.describe ParticipantEvent, type: :model do
     end
   end
 
+  describe "#find_or_create_consent!" do
+    let(:pe) { create(:participant_event) }
+
+    it "returns the existing consent of that type" do
+      existing = create(:consent, :freedom_waiver, participant_event: pe)
+
+      expect(pe.find_or_create_consent!(:freedom_waiver)).to eq(existing)
+    end
+
+    it "creates the consent with the block's attributes when none exists" do
+      consent = pe.find_or_create_consent!(:freedom_waiver) { |c| c.status = :pending }
+
+      expect(consent).to be_persisted
+      expect(consent).to be_freedom_waiver
+    end
+
+    it "picks up the other request's row when it loses the insert race" do
+      existing = create(:consent, :freedom_waiver, participant_event: pe)
+      # Simulate the race: our find missed, so we go straight to the insert.
+      allow(pe.consents).to receive(:find_or_create_by!) do |attrs|
+        Consent.create!(participant_event: pe, **attrs)
+      end
+
+      expect(pe.find_or_create_consent!(:freedom_waiver)).to eq(existing)
+      expect(pe.consents.freedom_waiver.count).to eq(1)
+    end
+
+    it "is backed by a unique index that still allows several custom documents" do
+      create(:consent, :freedom_waiver, participant_event: pe)
+
+      expect { Consent.new(participant_event: pe, consent_type: :freedom_waiver).save!(validate: false) }
+        .to raise_error(ActiveRecord::RecordNotUnique)
+      expect {
+        create(:consent, :custom_document, participant_event: pe)
+        create(:consent, :custom_document, participant_event: pe)
+      }.to change(Consent, :count).by(2)
+    end
+  end
+
   describe "#mark_complete_if_eligible!" do
     let(:event) { create(:event) }
 

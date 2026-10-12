@@ -79,7 +79,7 @@ class SendPendingGuardianInvitesJob < ApplicationJob
       guardian_participant_event = participant_event.guardian_participant_events.first
       return unless guardian_participant_event
 
-      consent = participant_event.consents.find_or_create_by!(consent_type: :waiver) do |c|
+      consent = participant_event.find_or_create_consent!(:waiver) do |c|
         c.status = :pending
         c.guardian_participant_event = guardian_participant_event
       end
@@ -90,7 +90,7 @@ class SendPendingGuardianInvitesJob < ApplicationJob
         Rails.logger.info("[SendPendingGuardianInvitesJob] Created minor waiver and sent notification for PE #{participant_event.id}")
       end
     else
-      consent = participant_event.consents.find_or_create_by!(consent_type: :waiver) do |c|
+      consent = participant_event.find_or_create_consent!(:waiver) do |c|
         c.status = :pending
       end
 
