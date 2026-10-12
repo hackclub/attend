@@ -94,6 +94,10 @@ RSpec.describe Privacy::Eraser do
     consent = registration.consents.create!(consent_type: "waiver", status: "signed", guardian_participant_event: guardian_link,
       docuseal_envelope_id: "fake-envelope", docuseal_guardian_slug: "fake-guardian-slug", docuseal_participant_slug: "fake-participant-slug")
     consent.physical_uploads.attach(io: file_fixture("headshot.png").open, filename: "signed.png", content_type: "image/png")
+    PaperTrail.request(enabled: true) do
+      consent.update!(failure_reason: "fictional")
+      consent.update!(docuseal_guardian_slug: "fake-guardian-slug-2")
+    end
 
     result = described_class.new(subject_for(emails: [ "parent@example.com" ])).call(dry_run: false)
 
@@ -102,6 +106,19 @@ RSpec.describe Privacy::Eraser do
       docuseal_guardian_slug: nil, docuseal_participant_slug: "fake-participant-slug")
     expect(consent.physical_uploads).to be_attached
     expect(result.retained).to include(a_hash_including(type: "guardian-signed documents", count: 1))
+    history = PaperTrail::Version.where(item_id: consent.id).pluck(:object, :object_changes).flatten.compact.join
+    expect(history).not_to include("fake-guardian-slug", guardian_link.id)
+    expect(history).to include("fictional", "fake-participant-slug")
+  end
+
+  it "erases every profile on an account found through one of them" do
+    user.update!(email: "account@example.com", hack_club_account_id: nil)
+    other_profile = create(:participant, email: "old-address@example.com", user:)
+
+    described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false)
+
+    expect(User.exists?(user.id)).to be(false)
+    expect(Participant.exists?(other_profile.id)).to be(false)
   end
 
   it "erases the account behind a participant matched on Slack alone" do

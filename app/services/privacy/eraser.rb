@@ -119,13 +119,14 @@ module Privacy
         participants = participants.or(Participant.where(slack_user_id: slack_id))
                                    .or(Participant.where(id: ParticipantEvent.where(slack_user_id: slack_id).select(:participant_id)))
       end
-      participant_ids = participants.pluck(:id)
       # a participant matched on their own email or Slack ID brings the
-      # account it belongs to. A Slack ID on a registration doesn't: an
-      # organiser may have typed it, so it's not enough to delete an account
+      # account it belongs to, and with it any other profile that account
+      # owns. A Slack ID on a registration doesn't: an organiser may have
+      # typed it, so it's not enough to delete an account
       owned = email_in(Participant, :email, emails)
       owned = owned.or(Participant.where(slack_user_id: slack_id)) if slack_id
       user_ids |= owned.where.not(user_id: nil).pluck(:user_id)
+      participant_ids = participants.or(Participant.where(user_id: user_ids)).pluck(:id)
       participant_event_ids = ParticipantEvent.where(participant_id: participant_ids).pluck(:id)
 
       # guardians matched directly, plus anyone whose only reason to be here
@@ -277,7 +278,7 @@ module Privacy
       AuditLog.where(actor_user_id: users).update_all(actor_user_id: nil) if users.any?
 
       # before the guardian links go, while these can still be found
-      surviving_guardian_consents.update_all(docuseal_guardian_slug: nil)
+      scrub_guardian_from_consents!
 
       # these hang off a registration or account without a dependent: :destroy
       Note.where(participant_event_id: pes).or(Note.where(ticket_id: people.tickets)).delete_all
@@ -329,6 +330,26 @@ module Privacy
     # with its uploads, stays
     def surviving_guardian_consents
       Consent.where(guardian_participant_event_id: people.guardian_links).where.not(participant_event_id: people.participant_events)
+    end
+
+    GUARDIAN_CONSENT_COLUMNS = %w[guardian_participant_event_id docuseal_guardian_slug].freeze
+
+    # takes the guardian out of kept consents and their history. Versions are
+    # YAML text, so they're rewritten one by one; the rest of each version,
+    # and the child's side of the consent, is left as it was
+    def scrub_guardian_from_consents!
+      consent_ids = surviving_guardian_consents.pluck(:id)
+      return if consent_ids.empty?
+
+      Consent.where(id: consent_ids).update_all(docuseal_guardian_slug: nil)
+      serializer = PaperTrail.serializer
+      PaperTrail::Version.where(item_type: "Consent", item_id: consent_ids).find_each do |version|
+        object = version.object && serializer.load(version.object)
+        changes = version.object_changes && serializer.load(version.object_changes)
+        GUARDIAN_CONSENT_COLUMNS.each { |column| object[column] = nil if object&.key?(column) }
+        changes&.except!(*GUARDIAN_CONSENT_COLUMNS)
+        version.update_columns(object: object && serializer.dump(object), object_changes: changes && serializer.dump(changes))
+      end
     end
 
     def execute(statement)
