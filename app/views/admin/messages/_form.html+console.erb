@@ -1,0 +1,198 @@
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Messages", admin_event_messages_path(current_event) ], [ "Compose message", nil ]) %>
+
+<div class="max-w-3xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Compose message</h1>
+      <p class="cs-description">Step 1 of 2 — Write your message</p>
+    </div>
+    <div class="cs-actions">
+      <span class="cs-small text-gray-400" id="save-status">Draft</span>
+    </div>
+  </div>
+
+  <%= form_with model: @message,
+      url: @message.persisted? ? admin_event_message_path(current_event, @message) : admin_event_messages_path(current_event),
+      method: @message.persisted? ? :patch : :post,
+      id: "message-form",
+      html: { novalidate: true },
+      data: {
+        controller: "autosave cs-form-validation",
+        autosave_create_url_value: admin_event_messages_path(current_event, format: :json),
+        autosave_url_value: @message.persisted? ? admin_event_message_path(current_event, @message, format: :json) : ""
+      },
+      class: "cs-stack" do |f| %>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Recipients</h2>
+      </div>
+      <div class="cs-container-body">
+        <div class="cs-field-grid">
+          <%= cs_form_field f, :audience, label: "Audience", messages: { inclusion: "Select a valid audience." } do |aria| %>
+            <%= f.select :audience,
+                Message::AUDIENCES.reject { |k, _| k == :attendees_in_groups && !current_event.groups_enabled? }.map { |k, v| [ v, k ] },
+                {},
+                class: "cs-select",
+                required: true,
+                data: { action: "change->autosave#save change->autosave#toggleParticipantSelect" },
+                **aria %>
+          <% end %>
+
+          <%= cs_form_field f, :channels, label: "Channels", group: true,
+                messages: { blank: "Select at least one channel." } do |aria| %>
+            <% Message::CHANNELS.each do |key, label| %>
+              <% sms_disabled = key == :sms && !Setting.twilio_enabled? %>
+              <div class="cs-option">
+                <%= check_box_tag "message[channels][]", key, @message.channels.include?(key.to_s),
+                    id: "channel_#{key}",
+                    disabled: sms_disabled,
+                    data: { action: "change->autosave#save" },
+                    **aria %>
+                <div>
+                  <label class="cs-option-label" for="channel_<%= key %>"><%= label %></label>
+                  <% if key == :slack %>
+                    <p class="cs-option-description">Attendees only</p>
+                  <% elsif sms_disabled %>
+                    <p class="cs-option-description">Disabled in settings</p>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+          <% end %>
+        </div>
+
+        <% selected_ids = @message.audience_filters["participant_event_ids"] || [] %>
+        <div id="participant-select-container" class="mt-4 <%= @message.audience == 'specific_participants' ? '' : 'hidden' %>">
+          <p class="cs-field-label">Select participants</p>
+          <div class="cs-container">
+            <div class="cs-filter-bar pt-4">
+              <label class="cs-search w-full">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+                <input type="search"
+                       id="participant-search"
+                       placeholder="Find participants"
+                       aria-label="Find participants"
+                       class="cs-input"
+                       data-action="input->autosave#filterParticipants">
+              </label>
+            </div>
+            <div class="flex items-center justify-between gap-3 px-5 pb-3">
+              <span class="cs-secondary">
+                <strong id="selected-count"><%= selected_ids.count %></strong> participant<span id="selected-plural"><%= selected_ids.count == 1 ? '' : 's' %></span> selected
+              </span>
+              <button type="button"
+                      class="cs-btn cs-btn-link"
+                      data-action="click->autosave#clearAllParticipants">
+                Clear all
+              </button>
+            </div>
+            <div class="max-h-64 overflow-y-auto border-t border-(--cs-border-divider-secondary)" id="participant-list">
+              <% current_event.participant_events.includes(:participant).order("participants.legal_first_name").each do |pe| %>
+                <label class="flex items-center gap-3 px-5 py-2 cursor-pointer border-b border-(--cs-border-divider-secondary) last:border-0 hover:bg-(--cs-bg-hover) participant-row"
+                       data-name="<%= pe.participant.display_name.downcase %> <%= pe.participant.email.downcase %>">
+                  <input type="checkbox"
+                         name="message[participant_event_ids][]"
+                         value="<%= pe.id %>"
+                         <%= selected_ids.include?(pe.id) ? 'checked' : '' %>
+                         class="participant-checkbox"
+                         data-action="change->autosave#updateSelectedCount change->autosave#debouncedSave">
+                  <span class="flex-1 min-w-0">
+                    <span class="block truncate"><%= pe.participant.display_name %></span>
+                    <span class="block truncate cs-small cs-muted"><%= pe.participant.email %></span>
+                  </span>
+                  <%= cs_status(case pe.status
+                                when "complete" then :success
+                                when "in_progress", "awaiting_guardian" then :in_progress
+                                else :pending
+                                end, pe.status.titleize) %>
+                </label>
+              <% end %>
+            </div>
+          </div>
+        </div>
+
+        <% if current_event.groups_enabled? && current_event.groups.any? %>
+          <% selected_group_ids = @message.audience_filters["group_ids"] || [] %>
+          <fieldset id="group-select-container" class="cs-field mt-4">
+            <legend class="cs-field-label">Restrict to groups<span class="cs-field-optional"> - optional</span></legend>
+            <p class="cs-field-description">
+              Narrows the audience to people in the groups you select. For example, "Incomplete onboarding" with Exhibitor reaches exhibitors not yet onboarded; "All guardians" with Attendees reaches guardians of attendees in that group.
+              Leave all cleared to send to the full audience.
+            </p>
+            <% current_event.groups.ordered.each do |g| %>
+              <div class="cs-option">
+                <%= check_box_tag "message[group_ids][]", g.id, selected_group_ids.include?(g.id),
+                    id: "message_group_#{g.id}",
+                    data: { action: "change->autosave#save" } %>
+                <div>
+                  <label for="message_group_<%= g.id %>" class="cs-badge"
+                         style="background-color: <%= g.normalized_color || '#e5e7eb' %>; color: <%= g.color.present? ? 'white' : '#1f2d3d' %>;"><%= g.name %></label>
+                </div>
+              </div>
+            <% end %>
+          </fieldset>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Content</h2>
+      </div>
+      <div class="cs-container-body">
+        <%= cs_form_field f, :subject, label: "Subject", optional: true,
+              description: "The email subject line. Slack and SMS use the event name.",
+              constraint: "For example: Important update about your travel" do |aria| %>
+          <%= f.text_field :subject,
+              class: "cs-input",
+              data: { action: "input->autosave#debouncedSave" },
+              **aria %>
+        <% end %>
+
+        <%= cs_form_field f, :body, label: "Message", data: { controller: "tinymce" },
+              description: "Use the toolbar for links, bold, italic and lists. Formatting is adapted for each channel.",
+              constraint: "Required before the message can be sent." do |aria| %>
+          <%= f.text_area :body,
+              rows: 10,
+              class: "cs-input",
+              data: { tinymce_target: "editor", action: "input->autosave#debouncedSave" },
+              **aria %>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Delivery</h2>
+      </div>
+      <div class="cs-container-body">
+        <div class="cs-option">
+          <input type="checkbox" id="schedule-toggle"
+                 class="cs-toggle"
+                 <%= @message.scheduled_at.present? ? "checked" : "" %>
+                 data-action="change->autosave#toggleSchedule">
+          <div>
+            <label class="cs-option-label" for="schedule-toggle">Schedule for later</label>
+          </div>
+        </div>
+        <div id="schedule-fields" class="mt-4 max-w-xs <%= @message.scheduled_at.present? ? '' : 'hidden' %>">
+          <%= cs_form_field f, :scheduled_at, label: "Send at", optional: true do |aria| %>
+            <%= f.datetime_local_field :scheduled_at,
+                class: "cs-input",
+                min: Time.current.strftime("%Y-%m-%dT%H:%M"),
+                data: { action: "change->autosave#save", cs_range_message: "Enter a time in the future." },
+                **aria %>
+          <% end %>
+        </div>
+      </div>
+    </section>
+
+    <%= cs_form_errors f %>
+
+    <div class="flex justify-end gap-2">
+      <%= link_to "Cancel", admin_event_messages_path(current_event), class: "cs-btn cs-btn-link" %>
+      <%= f.button "Next: Preview →", class: "cs-btn cs-btn-primary", name: "commit", value: "Next: Preview →" %>
+    </div>
+  <% end %>
+</div>

@@ -19,6 +19,8 @@ module Admin
 
     def create
       unless params[:csv_file].present?
+        return render_console_file_error("Participants CSV is required.") if request.variant.include?(:console)
+
         redirect_to new_admin_event_import_path(current_event), alert: "Please select a CSV file to import."
         return
       end
@@ -31,6 +33,8 @@ module Admin
       rows = parse_csv(csv_content)
 
       if rows.empty?
+        return render_console_file_error("The file has no rows to import. Check it against the template.") if request.variant.include?(:console)
+
         redirect_to new_admin_event_import_path(current_event), alert: "No valid rows found in CSV."
         return
       end
@@ -113,6 +117,13 @@ module Admin
     end
 
     private
+
+    # The console shows upload problems under the file field rather than as
+    # a flash on a fresh form; the original UI keeps its redirects.
+    def render_console_file_error(message)
+      @csv_file_errors = [ message ]
+      render :new, status: :unprocessable_entity
+    end
 
     # Importing a CSV invites everyone in it, so it takes the same permission as
     # the invite form: event admins only.

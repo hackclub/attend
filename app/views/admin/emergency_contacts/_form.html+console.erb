@@ -1,0 +1,56 @@
+<%= form_with model: @emergency_contact, url: form_url, method: form_method, local: true, class: "cs-stack", html: { novalidate: true }, data: { controller: "phone-input cs-form-validation" } do |f| %>
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2">Contact details</h2>
+      </div>
+    </div>
+    <div class="cs-container-body">
+      <div class="cs-field-grid">
+        <%= cs_form_field f, :name, label: "Name", input: { required: true } %>
+
+        <%= cs_form_field f, :relationship, label: "Relationship", optional: true, constraint: "For example: Aunt" %>
+
+        <%
+          phone_errors = @emergency_contact.errors.where(:phone).map do |error|
+            if error.type == E164PhoneValidator::MESSAGE
+              "Enter a valid phone number, including the country code."
+            elsif error.type == :blank
+              "Phone number is required."
+            else
+              cs_sentence("Phone number #{error.message}")
+            end
+          end
+        %>
+        <%= cs_field id: f.field_id(:phone), label: "Phone number", errors: phone_errors,
+              constraint: "Include the country code. For example: +1 415 555 0132" do |aria| %>
+          <%= f.telephone_field :phone, class: "cs-input", required: true, **aria %>
+        <% end %>
+
+        <%= cs_form_field f, :email, label: "Email", optional: true, messages: { invalid: "Enter a valid email address." } do |aria| %>
+          <%= f.email_field :email, class: "cs-input", **aria %>
+        <% end %>
+
+        <%= cs_form_field f, :priority, label: "Priority", optional: true, constraint: "Lower numbers are contacted first." do |aria| %>
+          <div class="w-32">
+            <%= f.number_field :priority, min: 1, step: 1, class: "cs-input", **aria %>
+          </div>
+        <% end %>
+
+        <% guardian_options = @participant_event.guardian_participant_events.includes(:guardian).map { |gpe| [gpe.guardian.full_name, gpe.id] } %>
+        <% if guardian_options.any? %>
+          <%= cs_form_field f, :guardian_participant_event_id, label: "Linked guardian", optional: true, error_keys: [ :guardian_participant_event ] do |aria| %>
+            <%= f.select :guardian_participant_event_id, guardian_options, { include_blank: "Not linked to a guardian" }, class: "cs-select", **aria %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  </section>
+
+  <%= cs_form_errors f, except: [ :phone ] %>
+
+  <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+    <%= link_to "Cancel", safeguarding_admin_event_participant_path(current_event, @participant_event), class: "cs-btn cs-btn-link cs-btn-full" %>
+    <%= f.button submit_label, class: "cs-btn cs-btn-primary cs-btn-full" %>
+  </div>
+<% end %>

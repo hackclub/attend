@@ -26,18 +26,16 @@ module Admin
     end
 
     def edit
-      @members = @group.participant_events.includes(:participant).joins(:participant).order("participants.legal_last_name ASC")
-      @available_participants = current_event.participant_events
-        .where.not(id: GroupMembership.where(group_id: @group.id).select(:participant_event_id))
-        .includes(:participant)
-        .joins(:participant)
-        .order("participants.legal_last_name ASC")
+      load_membership_lists
     end
 
     def update
       if @group.update(group_params)
         redirect_to admin_event_groups_path(current_event), notice: "Group updated."
       else
+        # The edit page lists members too, so a failed save needs them to
+        # re-render with its errors rather than raising.
+        load_membership_lists
         render :edit, status: :unprocessable_entity
       end
     end
@@ -79,6 +77,15 @@ module Admin
     end
 
     private
+
+    def load_membership_lists
+      @members = @group.participant_events.includes(:participant).joins(:participant).order("participants.legal_last_name ASC")
+      @available_participants = current_event.participant_events
+        .where.not(id: GroupMembership.where(group_id: @group.id).select(:participant_event_id))
+        .includes(:participant)
+        .joins(:participant)
+        .order("participants.legal_last_name ASC")
+    end
 
     def set_group
       @group = current_event.groups.find(params[:id])

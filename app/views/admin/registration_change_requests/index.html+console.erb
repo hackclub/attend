@@ -1,0 +1,50 @@
+<% content_for :title, "Change requests – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Change requests", nil ]) %>
+<% change_request_status_types = { "pending" => :pending, "approved" => :success, "follow_up_needed" => :warning } %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Registration change requests <span class="cs-counter">(<%= @change_requests.size %>)</span></h1>
+      <p class="cs-description"><%= current_event.name %></p>
+    </div>
+  </div>
+
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided">
+      <h2 class="cs-h2">Requests</h2>
+    </div>
+    <% if @change_requests.empty? %>
+      <div class="cs-empty">
+        <p class="cs-empty-title">No visible change requests.</p>
+      </div>
+    <% else %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Participant</th>
+              <th scope="col">Kind</th>
+              <th scope="col">Status</th>
+              <th scope="col">Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @change_requests.each do |request_record| %>
+              <tr>
+                <td class="whitespace-nowrap">
+                  <%= link_to request_record.participant.display_name, admin_event_registration_change_request_path(current_event, request_record), class: "cs-link cs-link-strong" %>
+                </td>
+                <td class="whitespace-nowrap"><%= request_record.kind.humanize %></td>
+                <td class="whitespace-nowrap"><%= cs_status(change_request_status_types.fetch(request_record.status, :info), request_record.status.humanize) %></td>
+                <td>
+                  <% if request_record.support? %><span class="cs-secondary"><%= truncate(request_record.requester_note, length: 160) %></span><% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </section>
+</div>

@@ -1,0 +1,150 @@
+<% content_for :title, "Event Setup: Review – Attend" %>
+
+<% section_header = lambda do |step_number, title, path|
+     capture do %>
+       <div class="cs-container-header">
+         <h2 class="cs-h2"><span class="cs-muted font-normal">Step <%= step_number %>:</span> <%= title %></h2>
+         <%= link_to "Edit", path, class: "cs-btn" %>
+       </div>
+<%   end
+   end %>
+
+<%= render layout: "wizard", locals: {
+      current_step: "review",
+      title: "Review and finish",
+      description: "Everything here can be changed later in event settings."
+    } do %>
+  <div class="cs-stack">
+    <section class="cs-container">
+      <%= section_header.call(1, "Basics", edit_admin_event_path(@event, return_to: "review")) %>
+      <div class="cs-container-body">
+        <dl class="cs-kv cs-kv-2">
+          <div><dt class="cs-kv-label">Name</dt><dd class="cs-kv-value"><%= @event.name %></dd></div>
+          <div><dt class="cs-kv-label">Slug</dt><dd class="cs-kv-value font-mono"><%= @event.slug %></dd></div>
+          <div>
+            <dt class="cs-kv-label">Support email</dt>
+            <dd class="cs-kv-value"><%= @event.support_email.present? ? @event.support_email : cs_status(:warning, "Not set (required)") %></dd>
+          </div>
+          <div><dt class="cs-kv-label">Timezone</dt><dd class="cs-kv-value"><%= @event.timezone.presence || "Not set" %></dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <%= section_header.call(2, "Schedule and location", admin_event_setup_schedule_path(@event)) %>
+      <div class="cs-container-body">
+        <dl class="cs-kv cs-kv-2">
+          <div><dt class="cs-kv-label">Dates</dt><dd class="cs-kv-value"><%= @event.starts_at && @event.ends_at ? cs_date_range(@event.starts_at, @event.ends_at, zone: @event.event_time_zone) : "Not set" %></dd></div>
+          <div>
+            <dt class="cs-kv-label">Registration</dt>
+            <dd class="cs-kv-value">
+              <% if @event.registration_open_at && @event.registration_close_at %>
+                <%= cs_date_range(@event.registration_open_at, @event.registration_close_at) %>
+              <% else %>
+                Not set
+              <% end %>
+            </dd>
+          </div>
+          <div><dt class="cs-kv-label">Location</dt><dd class="cs-kv-value"><%= [ @event.location_city, @event.location_country ].compact_blank.join(", ").presence || "Not set" %></dd></div>
+          <div><dt class="cs-kv-label">Venue</dt><dd class="cs-kv-value"><%= @event.venue_name.presence || "Not set" %></dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <%= section_header.call(3, "Modules", admin_event_setup_modules_path(@event)) %>
+      <div class="cs-container-body">
+        <% modules = {
+             "Travel" => @event.travel_enabled?,
+             "Visa options" => @event.visa_options_enabled?,
+             "Accommodation" => @event.accommodation_enabled?,
+             "Roommate preferences" => @event.roommate_preferences_enabled?,
+             "Freedom waivers" => @event.freedom_waivers_enabled?,
+             "Groups" => @event.groups_enabled?,
+             "NFC badges" => @event.nfc_badges_enabled?
+           } %>
+        <dl class="cs-kv cs-kv-3">
+          <% modules.each do |label, enabled| %>
+            <div>
+              <dt class="cs-kv-label"><%= label %></dt>
+              <dd class="cs-kv-value"><%= enabled ? cs_status(:success, "On") : cs_status(:stopped, "Off") %></dd>
+            </div>
+          <% end %>
+        </dl>
+        <% if @event.guardian_invites_locked? %>
+          <div class="cs-alert cs-alert-warning mt-4">
+            <%= cs_status_icon(:warning) %>
+            <p>Guardian invites are locked. Remember to unlock them once waivers are finalised.</p>
+          </div>
+        <% end %>
+        <% if @event.onboarding_invites_held? %>
+          <div class="cs-alert cs-alert-warning mt-4">
+            <%= cs_status_icon(:warning) %>
+            <p>Onboarding invitations are held. Participants you add won't be emailed until you send them from the participants page or the series page.</p>
+          </div>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <%= section_header.call(4, "Waivers", admin_event_setup_waivers_path(@event)) %>
+      <div class="cs-container-body">
+        <% if @event.docuseal_waiver_template_id.present? %>
+          <dl class="cs-kv cs-kv-3">
+            <div><dt class="cs-kv-label">Status</dt><dd class="cs-kv-value"><%= cs_status(:success, "Configured") %></dd></div>
+            <div><dt class="cs-kv-label">Waiver template</dt><dd class="cs-kv-value font-mono"><%= @event.docuseal_waiver_template_id %></dd></div>
+            <% if @event.freedom_waivers_enabled? && @event.docuseal_freedom_waiver_template_id.present? %>
+              <div><dt class="cs-kv-label">Freedom waiver template</dt><dd class="cs-kv-value font-mono"><%= @event.docuseal_freedom_waiver_template_id %></dd></div>
+            <% end %>
+          </dl>
+        <% else %>
+          <div class="cs-alert cs-alert-warning">
+            <%= cs_status_icon(:warning) %>
+            <p>
+              Waivers aren't configured yet, and participants can't finish onboarding without them.
+              <% if policy(@event).manage_integrations? %>
+                Set them up from the <%= link_to "waivers step", admin_event_setup_waivers_path(@event), class: "cs-link" %> or the <%= link_to "integrations page", admin_event_integrations_path(@event), class: "cs-link" %>.
+              <% else %>
+                Ask an event admin to set them up.
+              <% end %>
+            </p>
+          </div>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <%= section_header.call(5, "Team", admin_event_setup_team_path(@event)) %>
+      <div class="cs-container-body">
+        <% if @event_role_assignments.any? %>
+          <dl class="cs-kv cs-kv-2">
+            <% @event_role_assignments.each do |assignment| %>
+              <div>
+                <dt class="cs-kv-label"><%= EventRoleAssignment::ROLE_DETAILS.dig(assignment.role, :label) || assignment.role.humanize %></dt>
+                <dd class="cs-kv-value"><%= assignment.user.email %></dd>
+              </div>
+            <% end %>
+          </dl>
+        <% else %>
+          <p class="cs-muted">No staff added yet, so only global admins can reach this event. Add event admins from the <%= link_to "team step", admin_event_setup_team_path(@event), class: "cs-link" %>.</p>
+        <% end %>
+      </div>
+    </section>
+
+    <% if @event.support_email.blank? %>
+      <div class="cs-alert cs-alert-warning">
+        <%= cs_status_icon(:warning) %>
+        <p>
+          This event needs a support email before setup can be finished. It's the from and reply-to address on participant and guardian emails.
+          Set a <%= Event::SUPPORT_EMAIL_DOMAINS_SENTENCE %> address from <%= link_to "event settings", edit_admin_event_path(@event), class: "cs-link" %>.
+        </p>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="cs-wizard-actions">
+    <%= link_to "Exit setup", admin_event_dashboard_path(@event.slug), class: "cs-btn cs-btn-link" %>
+    <%= link_to "Previous", admin_event_setup_team_path(@event), class: "cs-btn" %>
+    <%= button_to "Finish setup", admin_event_setup_complete_path(@event), method: :post, class: "cs-btn cs-btn-primary", form: { class: "contents" } %>
+  </div>
+<% end %>

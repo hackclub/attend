@@ -11,6 +11,11 @@ module Admin
       if @comment.save
         SendIncidentCommentToSlackJob.perform_later(@comment.id) if @incident.slack_message_ts.present?
         redirect_to admin_event_incident_path(current_event, @incident), notice: "Comment added."
+      elsif request.variant.include?(:console)
+        # The console re-renders the incident with the comment's errors under
+        # its fields; the original UI keeps its redirect.
+        @incident.comments.reset
+        render "admin/incidents/show", status: :unprocessable_entity
       else
         redirect_to admin_event_incident_path(current_event, @incident), alert: "Failed to add comment."
       end

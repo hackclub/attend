@@ -1,10 +1,20 @@
 module Admin::ParticipantsHelper
+  # Tailwind pill classes for each display status (original admin UI).
   DISPLAY_STATUS_STYLES = {
     "Complete" => "bg-green-50 text-green-700",
     "Awaiting Participant" => "bg-blue-50 text-blue-700",
     "Awaiting Parent" => "bg-amber-50 text-amber-700",
     "Withdrawn" => "bg-red-50 text-red-700",
     "Rejected" => "bg-red-50 text-red-700"
+  }.freeze
+
+  # Cloudscape status indicator type for each participant display status.
+  DISPLAY_STATUS_TYPES = {
+    "Complete" => :success,
+    "Awaiting Participant" => :in_progress,
+    "Awaiting Parent" => :pending,
+    "Withdrawn" => :stopped,
+    "Rejected" => :error
   }.freeze
 
   BLOCKING_STEP_LABELS = {
@@ -37,6 +47,12 @@ module Admin::ParticipantsHelper
     not_added: "text-gray-400"
   }.freeze
 
+  OPTIONAL_DOCUMENT_STATE_TYPES = {
+    signed: :success,
+    awaiting: :pending,
+    withdrawn: :stopped
+  }.freeze
+
   def optional_document_state_label(state)
     OPTIONAL_DOCUMENT_STATE_LABELS.fetch(state, state.to_s.humanize)
   end
@@ -44,6 +60,13 @@ module Admin::ParticipantsHelper
   def render_optional_document_badge(participant_event, custom_document)
     state = participant_event.optional_document_state(custom_document)
     label = optional_document_state_label(state)
+
+    if console_ui?
+      return content_tag(:span, label, class: "cs-muted") if state == :not_added
+
+      return cs_status(OPTIONAL_DOCUMENT_STATE_TYPES.fetch(state, :info), label)
+    end
+
     style = OPTIONAL_DOCUMENT_STATE_STYLES.fetch(state, "bg-gray-100 text-gray-800")
 
     return content_tag(:span, label, class: style) if state == :not_added
@@ -60,6 +83,8 @@ module Admin::ParticipantsHelper
 
   def render_display_status_badge(participant_event)
     ds = participant_event.display_status
+    return cs_status(DISPLAY_STATUS_TYPES.fetch(ds, :info), ds) if console_ui?
+
     css_class = DISPLAY_STATUS_STYLES[ds] || "bg-gray-100 text-gray-800"
     content_tag(:span, ds, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium #{css_class}")
   end
@@ -73,6 +98,8 @@ module Admin::ParticipantsHelper
     return nil unless blocking
 
     label = BLOCKING_STEP_LABELS[blocking] || blocking.titleize
+    return cs_badge(label, "yellow") if console_ui?
+
     content_tag(:span, label, class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200")
   end
 
@@ -99,7 +126,7 @@ module Admin::ParticipantsHelper
   def legal_name_part(value, dash: false)
     return value unless Participant.name_placeholder?(value)
 
-    dash ? content_tag(:span, "—", class: "text-gray-400") : pending_name_label
+    dash ? content_tag(:span, "—", class: console_ui? ? "cs-muted" : "text-gray-400") : pending_name_label
   end
 
   def pending_name_label
@@ -107,7 +134,25 @@ module Admin::ParticipantsHelper
       title: "Signed in, but hasn't filled in their name yet")
   end
 
+  # Sort caret for a sortable column header. In the console (inside .cs-sort)
+  # an unsorted column shows a muted two-way caret and the sorted one points
+  # the current direction; the original UI shows a red chevron on the sorted
+  # column only.
   def render_sort_icon(field, current_sort, current_direction)
+    return legacy_sort_icon(field, current_sort, current_direction) unless console_ui?
+
+    path = if current_sort != field
+      "M4 6l4-4 4 4M4 10l4 4 4-4"
+    elsif current_direction == "asc"
+      "M4 10l4-4 4 4"
+    else
+      "M4 6l4 4 4-4"
+    end
+    content_tag(:svg, tag.path(d: path), viewBox: "0 0 16 16", fill: "none", stroke: "currentColor",
+      "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true")
+  end
+
+  def legacy_sort_icon(field, current_sort, current_direction)
     return "" unless current_sort == field
 
     if current_direction == "asc"
@@ -119,5 +164,12 @@ module Admin::ParticipantsHelper
         content_tag(:path, "", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M19 9l-7 7-7-7", fill: "none", stroke: "currentColor")
       end
     end
+  end
+
+  # aria-sort value for a sortable column header.
+  def sort_aria(field, current_sort, current_direction)
+    return nil unless current_sort == field
+
+    current_direction == "asc" ? "ascending" : "descending"
   end
 end

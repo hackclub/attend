@@ -1,0 +1,111 @@
+<%# The details summary above the participant tabs: the facts every tab needs
+    at a glance, the same on every tab. Statuses and counts only. Contact
+    details, date of birth, addresses, medical and safeguarding records
+    belong to their own tabs and their own gates; the one safeguarding fact
+    here (freedom waiver) sits behind the same policy check the header has
+    always used for it. %>
+<% event_date = current_event.starts_at || Date.current %>
+<% age = @participant.age_on(event_date) %>
+<% progress = summary_pe.onboarding_progress %>
+<% steps_done = progress[:steps].count { |s| s[:done] } %>
+<% guardian_links = summary_pe.guardian_participant_events.to_a %>
+<% consents = summary_pe.consents.to_a %>
+<% required_types = Consent::REQUIRED_CONSENT_TYPES.reject { |t| t == "freedom_waiver" && !current_event.freedom_waivers_enabled? } %>
+<% required_signed = required_types.count do |type|
+     type == "code_of_conduct" ? summary_pe.code_of_conduct_accepted_at.present? : consents.any? { |c| c.consent_type == type && c.signed? }
+   end %>
+<% check_in_time = summary_pe.check_in_time %>
+
+<section class="cs-container mb-5" data-participant-summary aria-labelledby="participant-summary-title">
+  <div class="cs-container-header">
+    <h2 class="cs-h2" id="participant-summary-title">Summary</h2>
+  </div>
+  <div class="cs-container-body">
+      <dl class="cs-kv cs-kv-3 cs-kv-divided">
+        <div>
+          <dt class="cs-kv-label">Onboarding</dt>
+          <dd class="cs-kv-value">
+            <div><%= steps_done %> of <%= progress[:steps].size %> steps done</div>
+            <% if (blocking_badge = render_blocking_step_badge(summary_pe)) %>
+              <div class="mt-1"><%= blocking_badge %></div>
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Age at event</dt>
+          <dd class="cs-kv-value flex flex-wrap items-center gap-2">
+            <%= age ? "#{age} years" : "—" %>
+            <% if @participant.minor_on?(event_date) %>
+              <%= cs_badge("Minor", "yellow") %>
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Guardians</dt>
+          <dd class="cs-kv-value">
+            <% if guardian_links.any? %>
+              <% completed = guardian_links.count(&:completed?) %>
+              <%= cs_status(completed == guardian_links.size ? :success : :in_progress,
+                    "#{completed} of #{guardian_links.size} completed") %>
+            <% elsif summary_pe.requires_guardian? %>
+              <%= cs_status(:pending, "None linked") %>
+            <% else %>
+              <span class="cs-muted">Not required</span>
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Required consents</dt>
+          <dd class="cs-kv-value">
+            <%= cs_status(required_signed == required_types.size ? :success : :pending,
+                  "#{required_signed} of #{required_types.size} signed") %>
+          </dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Check-in</dt>
+          <dd class="cs-kv-value">
+            <% if check_in_time %>
+              <%= cs_status(:success, "Checked in") %>
+              <div class="cs-small cs-muted mt-1"><%= cs_relative_time(check_in_time) %></div>
+            <% else %>
+              <%= cs_status(:stopped, "Not checked in") %>
+            <% end %>
+          </dd>
+        </div>
+        <% if current_event.groups_enabled? %>
+          <div>
+            <dt class="cs-kv-label">Groups</dt>
+            <dd class="cs-kv-value">
+              <% groups = summary_pe.groups.ordered.to_a %>
+              <% if groups.any? %>
+                <div class="flex flex-wrap gap-1">
+                  <% groups.each do |g| %>
+                    <%= link_to edit_admin_event_group_path(current_event, g),
+                        class: "cs-badge",
+                        style: "background-color: #{g.normalized_color || '#e5e7eb'}; color: #{g.color.present? ? 'white' : '#1f2d3d'};",
+                        title: "Edit group: #{g.name}" do %>
+                      <%= g.name %>
+                    <% end %>
+                  <% end %>
+                </div>
+              <% else %>
+                <span class="cs-muted">None</span>
+              <% end %>
+            </dd>
+          </div>
+        <% end %>
+        <% if current_event.freedom_waivers_enabled? && policy(@safeguarding_info || SafeguardingInfo.new(participant_event: @participant_event)).show? %>
+          <div>
+            <dt class="cs-kv-label">Freedom waiver</dt>
+            <dd class="cs-kv-value">
+              <% if summary_pe.safeguarding_info&.attribute_in_database("freedom_waiver_granted") %>
+                <%= cs_status(:success, "Freedom") %>
+              <% else %>
+                <%= cs_status(:error, "No freedom") %>
+              <% end %>
+            </dd>
+          </div>
+        <% end %>
+      </dl>
+  </div>
+</section>

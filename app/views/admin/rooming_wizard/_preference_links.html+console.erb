@@ -1,0 +1,87 @@
+<% remove_icon = capture do %><svg class="block h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8m0-8l-8 8"/></svg><% end %>
+<div class="cs-stack">
+  <!-- Linked Preferences -->
+  <div>
+    <div class="flex items-center justify-between gap-2 mb-1">
+      <p class="cs-kv-label">Linked preferences</p>
+      <button type="button" data-open-link-modal="<%= participant_event.id %>" data-link-kind="preference"
+              class="cs-btn cs-btn-link">Add</button>
+    </div>
+    <div class="cs-token-group">
+      <% participant_event.roommate_preferences.sort_by { |p| p.rank || Float::INFINITY }.each do |pref| %>
+        <span class="cs-token">
+          <span>
+            <% if pref.rank %><span class="font-bold">#<%= pref.rank %></span><% end %>
+            <%= pref.preferred_participant_event.participant.full_name %>
+          </span>
+          <% if pref.mutual? %>
+            <%= cs_badge("Mutual", "green") %>
+          <% end %>
+          <button type="button"
+                  data-unlink="<%= pref.id %>" data-link-kind="preference"
+                  aria-label="Remove link to <%= pref.preferred_participant_event.participant.full_name %>"><%= remove_icon %></button>
+        </span>
+      <% end %>
+      <% if participant_event.roommate_preferences.empty? %>
+        <p class="cs-small cs-muted">No linked preferences</p>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Linked Exclusions -->
+  <div>
+    <div class="flex items-center justify-between gap-2 mb-1">
+      <p class="cs-kv-label">Linked exclusions</p>
+      <button type="button" data-open-link-modal="<%= participant_event.id %>" data-link-kind="exclusion"
+              class="cs-btn cs-btn-link">Add</button>
+    </div>
+    <div class="cs-token-group">
+      <% participant_event.roommate_exclusions.each do |excl| %>
+        <span class="cs-token">
+          <%= cs_status(:error, excl.excluded_participant_event.participant.full_name) %>
+          <button type="button"
+                  data-unlink="<%= excl.id %>" data-link-kind="exclusion"
+                  aria-label="Remove exclusion of <%= excl.excluded_participant_event.participant.full_name %>"><%= remove_icon %></button>
+        </span>
+      <% end %>
+      <% if participant_event.roommate_exclusions.empty? %>
+        <p class="cs-small cs-muted">No linked exclusions</p>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<script nonce="<%= content_security_policy_nonce %>">
+async function unlinkPreference(linkId, kind) {
+  if (!confirm('Remove this link?')) return;
+  
+  await fetch('<%= unlink_preference_admin_event_rooming_wizard_path(@event.slug) %>?' + new URLSearchParams({
+    link_id: linkId,
+    kind: kind
+  }), {
+    method: 'DELETE',
+    headers: {
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+    }
+  });
+  
+  location.reload();
+}
+
+// Rendered once per participant, so guard against stacking listeners.
+// openLinkModal lives in the parent page and is resolved at click time.
+if (!window.preferenceLinkHandlersInstalled) {
+  window.preferenceLinkHandlersInstalled = true;
+
+  document.addEventListener('click', (event) => {
+    const openButton = event.target.closest('[data-open-link-modal]');
+    if (openButton) {
+      openLinkModal(openButton.dataset.openLinkModal, openButton.dataset.linkKind);
+      return;
+    }
+
+    const unlinkButton = event.target.closest('[data-unlink]');
+    if (unlinkButton) unlinkPreference(unlinkButton.dataset.unlink, unlinkButton.dataset.linkKind);
+  });
+}
+</script>

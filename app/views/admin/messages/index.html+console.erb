@@ -1,0 +1,116 @@
+<% content_for :title, "Messages – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Messages", nil ]) %>
+
+<% message_status_types = {
+     "draft" => :stopped,
+     "scheduled" => :pending,
+     "sending" => :in_progress,
+     "completed" => :success,
+     "failed" => :error,
+     "cancelled" => :stopped
+   } %>
+<% channel_badge_colors = { "email" => "blue", "sms" => "green" } %>
+
+<div class="w-full">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Messages</h1>
+      <p class="cs-description">Send messages to attendees and guardians via multiple channels.</p>
+    </div>
+    <div class="cs-actions">
+      <%= link_to "New message", new_admin_event_message_path(current_event), class: "cs-btn cs-btn-primary" %>
+    </div>
+  </div>
+
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided">
+      <h2 class="cs-h2">Messages <span class="cs-counter">(<%= @messages.size %>)</span></h2>
+    </div>
+    <% if @messages.any? %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Message</th>
+              <th scope="col">Audience</th>
+              <th scope="col">Channels</th>
+              <th scope="col">Status</th>
+              <th scope="col">Sent by</th>
+              <th scope="col">Sent</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @messages.each do |message| %>
+              <tr>
+                <td>
+                  <% message_link = message.draft? ? edit_admin_event_message_path(current_event, message) : admin_event_message_path(current_event, message) %>
+                  <%= link_to message_link, class: "block cs-link" do %>
+                    <% if message.subject.present? %>
+                      <span class="block cs-link-strong"><%= message.subject %></span>
+                    <% end %>
+                    <span class="block truncate max-w-xs cs-secondary"><%= truncate(message.body.presence || "(empty)", length: 60) %></span>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap"><%= message.audience_label %></td>
+                <td class="whitespace-nowrap">
+                  <div class="flex gap-1">
+                    <% message.channels.each do |channel| %>
+                      <%= cs_badge(channel.titleize, channel_badge_colors[channel]) %>
+                    <% end %>
+                  </div>
+                </td>
+                <td><%= cs_status(message_status_types.fetch(message.status, :info), message.status.titleize) %></td>
+                <td class="whitespace-nowrap">
+                  <% if message.sent_by_user %>
+                    <div class="flex items-center gap-2">
+                      <% if message.sent_by_user.avatar_displayable? %>
+                        <%= image_tag message.sent_by_user.avatar.variant(resize_to_fill: [ 24, 24 ]), class: "w-6 h-6 rounded-full object-cover flex-shrink-0", alt: "" %>
+                      <% else %>
+                        <span class="cs-avatar cs-small flex-shrink-0" aria-hidden="true"><%= message.sent_by_user.initials %></span>
+                      <% end %>
+                      <span><%= message.sent_by_user.display_name_or_fallback %></span>
+                    </div>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap">
+                  <% if message.sent_at.present? %>
+                    <%= cs_relative_time(message.sent_at) %>
+                    <div class="cs-small cs-muted">
+                      <%= message.sent_count %>/<%= message.recipient_count %> delivered
+                    </div>
+                  <% elsif message.scheduled_at.present? %>
+                    <%= cs_status(:pending, safe_join([ "Scheduled for ", cs_absolute_time_tag(message.scheduled_at) ])) %>
+                  <% else %>
+                    <span class="cs-muted">Draft</span>
+                  <% end %>
+                </td>
+                <td class="text-right">
+                  <% if message.draft? || message.scheduled? %>
+                    <%= button_to admin_event_message_path(current_event, message),
+                        method: :delete,
+                        data: { confirm: "Delete this draft?" },
+                        class: "cs-btn-inline-icon",
+                        "aria-label": "Delete draft" do %>
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                      </svg>
+                    <% end %>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="cs-empty">
+        <p class="cs-empty-title">No messages yet</p>
+        <p>Get started by creating a new message.</p>
+        <div class="cs-actions">
+          <%= link_to "New message", new_admin_event_message_path(current_event), class: "cs-btn" %>
+        </div>
+      </div>
+    <% end %>
+  </section>
+</div>

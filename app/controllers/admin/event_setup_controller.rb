@@ -65,6 +65,12 @@ module Admin
       user = User.find_by(email: params[:email].to_s.strip.downcase)
 
       unless user
+        # The console shows the problem under the email field; the original
+        # UI keeps its flash.
+        if console_team_form?
+          @email_error = params[:email].blank? ? "User email is required." : "No Attend account uses this email address. Ask them to sign in to Attend first, then add them."
+          return render_team_with_errors(@event.event_role_assignments.build(role: params.dig(:event_role_assignment, :role)))
+        end
         redirect_to admin_event_setup_team_path(@event), alert: "User not found with that email. They need to sign in to Attend first."
         return
       end
@@ -77,6 +83,8 @@ module Admin
       if @event_role_assignment.save
         notify_new_staff_member(@event_role_assignment)
         redirect_to admin_event_setup_team_path(@event), notice: "#{user.email} added as #{@event_role_assignment.role.humanize.downcase}."
+      elsif console_team_form?
+        render_team_with_errors(@event_role_assignment)
       else
         redirect_to admin_event_setup_team_path(@event), alert: @event_role_assignment.errors.full_messages.to_sentence
       end
@@ -111,6 +119,17 @@ module Admin
     end
 
     private
+
+    def console_team_form?
+      Array(request.variant).include?(:console)
+    end
+
+    # Re-renders the team step with the failed assignment's errors inline.
+    def render_team_with_errors(assignment)
+      @event_role_assignments = @event.event_role_assignments.includes(:user).order("users.email")
+      @event_role_assignment = assignment
+      render :team, status: :unprocessable_entity
+    end
 
     def set_event
       @event = Event.find_by!(slug: params[:slug])

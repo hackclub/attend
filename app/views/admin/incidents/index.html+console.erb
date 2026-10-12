@@ -1,0 +1,82 @@
+<% content_for :title, "Incidents – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Incidents", nil ]) %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Incidents <span class="cs-counter">(<%= @incidents.size %>)</span></h1>
+    </div>
+    <div class="cs-actions">
+      <%= link_to "New incident", new_admin_event_incident_path(current_event), class: "cs-btn cs-btn-primary" %>
+    </div>
+  </div>
+
+  <section class="cs-container" data-controller="multiselect">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Incident log</h2>
+    </div>
+    <% if @incidents.any? %>
+      <div class="cs-filter-bar">
+        <label class="cs-search w-full sm:max-w-sm">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+          <input type="search" class="cs-input" placeholder="Find incidents" aria-label="Find incidents"
+                 data-multiselect-target="search" data-action="input->multiselect#filter">
+        </label>
+      </div>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Incident time</th>
+              <th scope="col">Category</th>
+              <th scope="col">Severity</th>
+              <th scope="col">Status</th>
+              <th scope="col">Participant</th>
+              <th scope="col">Reported by</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody data-multiselect-target="list">
+            <% @incidents.each do |incident| %>
+              <% participant_names = incident.participants.map { |p| p.preferred_name || p.legal_first_name } %>
+              <tr data-name="<%= [ incident.category.humanize, incident.severity.humanize, incident.status.humanize, *participant_names, incident.reported_by.display_name_or_fallback ].join(" ").downcase %>">
+                <td class="whitespace-nowrap">
+                  <%= cs_absolute_time_tag(incident.occurred_at || incident.created_at) %>
+                </td>
+                <td><%= render_category_badge(incident.category) %></td>
+                <td><%= render_severity_badge(incident.severity) %></td>
+                <td><%= incident_status(incident.status) %></td>
+                <td>
+                  <% if incident.participants.any? %>
+                    <%= participant_names.join(", ") %>
+                    <% if incident.participants.size > 1 %>
+                      <span class="cs-small cs-muted">(+<%= incident.participants.size - 1 %> more)</span>
+                    <% end %>
+                  <% else %>
+                    <span class="cs-muted">—</span>
+                  <% end %>
+                </td>
+                <td class="truncate max-w-[160px]" title="<%= incident.reported_by.display_name_or_fallback %>">
+                  <%= incident.reported_by.display_name_or_fallback %>
+                </td>
+                <td class="text-right">
+                  <%= link_to "View", admin_event_incident_path(current_event, incident), class: "cs-link" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="cs-container-body">
+        <div class="cs-empty">
+          <p class="cs-empty-title">No incidents</p>
+          <p>No incidents reported for this event.</p>
+          <div class="cs-actions">
+            <%= link_to "New incident", new_admin_event_incident_path(current_event), class: "cs-btn" %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </section>
+</div>

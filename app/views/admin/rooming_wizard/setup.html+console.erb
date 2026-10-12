@@ -1,0 +1,323 @@
+<% content_for :title, "Rooming wizard: Room setup – Attend" %>
+<% estimated_rooms = (@participant_stats[:total].to_f / (@rooming_plan.room_capacity || 2)).ceil %>
+
+<%= render layout: "wizard", locals: {
+      current_step: "setup",
+      title: "Room setup",
+      description: "Set up the room configuration."
+    } do %>
+  <%= render "group_filter" %>
+
+  <div class="cs-stack">
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Participant overview</h2>
+        </div>
+      </div>
+      <div class="cs-container-body">
+        <dl class="cs-kv cs-kv-4 cs-kv-divided">
+          <div>
+            <dt class="cs-kv-label">Total participants</dt>
+            <dd class="cs-kv-value-lg"><%= @participant_stats[:total] %></dd>
+          </div>
+          <div>
+            <dt class="cs-kv-label">18 year olds</dt>
+            <dd class="cs-kv-value-lg"><%= @participant_stats[:age_18_count] %></dd>
+            <dd class="cs-kv-value cs-small cs-muted">Must room together (unless siblings)</dd>
+          </div>
+          <div>
+            <dt class="cs-kv-label">Missing gender</dt>
+            <dd class="cs-kv-value-lg"><%= @participant_stats[:missing_gender] %></dd>
+          </div>
+          <div>
+            <dt class="cs-kv-label">Rooms needed (est.)</dt>
+            <dd class="cs-kv-value-lg"><%= estimated_rooms %></dd>
+            <dd class="cs-kv-value cs-small cs-muted">at <%= @rooming_plan.room_capacity || 2 %> per room</dd>
+          </div>
+        </dl>
+
+        <div class="cs-columns cs-columns-2 mt-6">
+          <div>
+            <h3 class="cs-h3 mb-2">By gender</h3>
+            <div class="cs-table-wrap">
+              <table class="cs-table cs-table-compact">
+                <thead>
+                  <tr>
+                    <th scope="col">Gender</th>
+                    <th scope="col" class="text-right">Participants</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% @participant_stats[:by_gender].sort.each do |gender, count| %>
+                    <tr>
+                      <td><%= gender.titleize %></td>
+                      <td class="text-right"><%= count %></td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <h3 class="cs-h3 mb-2">By age</h3>
+            <div class="cs-table-wrap">
+              <table class="cs-table cs-table-compact">
+                <thead>
+                  <tr>
+                    <th scope="col">Age</th>
+                    <th scope="col" class="text-right">Participants</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% @participant_stats[:by_age].sort.each do |age, count| %>
+                    <tr>
+                      <td><%= age %> years old</td>
+                      <td class="text-right"><%= count %></td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <%= form_with url: setup_admin_event_rooming_wizard_path(@event.slug), method: :post, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+      <section class="cs-container">
+        <div class="cs-container-header cs-container-header-divided">
+          <div>
+            <h2 class="cs-h2">Room configuration</h2>
+            <p class="cs-container-description">Mix different room sizes as needed. Existing empty rooms are replaced to match this configuration; rooms with assignments or staff are kept.</p>
+          </div>
+          <div class="cs-actions">
+            <button type="button" data-add-config-row class="cs-btn">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+              </svg>
+              Add another room size
+            </button>
+          </div>
+        </div>
+        <div class="cs-table-wrap">
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th scope="col">People per room</th>
+                <th scope="col">Number of rooms</th>
+                <th scope="col" class="w-10"><span class="sr-only">Remove</span></th>
+              </tr>
+            </thead>
+            <tbody id="room-configurations-body">
+              <tr class="configuration-row">
+                <td>
+                  <div data-cs-field data-cs-label="People per room"><div class="w-28"><input type="number" name="room_configurations[][capacity]"
+                         value="<%= @rooming_plan.room_capacity || 2 %>" min="1" step="1" required
+                         aria-label="People per room"
+                         class="cs-input"></div></div>
+                </td>
+                <td>
+                  <div data-cs-field data-cs-label="Number of rooms"><div class="w-28"><input type="number" name="room_configurations[][count]"
+                         value="<%= estimated_rooms %>"
+                         min="1" step="1" required
+                         aria-label="Number of rooms"
+                         class="cs-input"></div></div>
+                </td>
+                <td>
+                  <button type="button" data-remove-config-row aria-label="Remove room size"
+                          class="remove-row-btn hidden rounded p-0.5 text-(--cs-accent) hover:text-(--cs-accent-hover) cursor-pointer">
+                    <svg class="block h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8m0-8l-8 8"/></svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="cs-wizard-actions">
+        <button type="submit" class="cs-btn cs-btn-primary">
+          Continue to preference linking
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+        </button>
+      </div>
+    <% end %>
+
+    <script nonce="<%= content_security_policy_nonce %>">
+      function addConfigRow() {
+        const tbody = document.getElementById('room-configurations-body');
+        const row = document.createElement('tr');
+        row.className = 'configuration-row';
+        row.innerHTML = `
+          <td>
+            <div data-cs-field data-cs-label="People per room"><div class="w-28"><input type="number" name="room_configurations[][capacity]"
+                   value="2" min="1" step="1" required aria-label="People per room"
+                   class="cs-input"></div></div>
+          </td>
+          <td>
+            <div data-cs-field data-cs-label="Number of rooms"><div class="w-28"><input type="number" name="room_configurations[][count]"
+                   value="1" min="1" step="1" required aria-label="Number of rooms"
+                   class="cs-input"></div></div>
+          </td>
+          <td>
+            <button type="button" data-remove-config-row aria-label="Remove room size"
+                    class="remove-row-btn rounded p-0.5 text-(--cs-accent) hover:text-(--cs-accent-hover) cursor-pointer">
+              <svg class="block h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8m0-8l-8 8"/></svg>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(row);
+        updateRemoveButtons();
+      }
+
+      function removeConfigRow(btn) {
+        btn.closest('tr').remove();
+        updateRemoveButtons();
+      }
+
+      // Delegated so the rows addConfigRow() creates are covered too.
+      document.addEventListener('click', (event) => {
+        if (event.target.closest('[data-add-config-row]')) addConfigRow();
+
+        const removeButton = event.target.closest('[data-remove-config-row]');
+        if (removeButton) removeConfigRow(removeButton);
+      });
+
+      // A sibling group needs at least two participants. The cs-form-validation
+      // controller shows this inline: it's checked on submit (capture phase, so
+      // it runs before the controller), then live once the field is in error.
+      function syncSiblingValidity(enforce) {
+        const boxes = Array.from(document.querySelectorAll('[data-sibling-participant]'));
+        const checked = boxes.filter((box) => box.checked).length;
+        const message = enforce && checked < 2 ? 'Select at least 2 participants.' : '';
+        boxes.forEach((box) => box.setCustomValidity(message));
+      }
+
+      document.addEventListener('submit', (event) => {
+        if (event.target.querySelector('[data-sibling-participant]')) syncSiblingValidity(true);
+      }, true);
+
+      document.addEventListener('change', (event) => {
+        if (!event.target.matches('[data-sibling-participant]')) return;
+        const inError = document.querySelector('[data-sibling-participant][aria-invalid="true"]');
+        syncSiblingValidity(Boolean(inError));
+      }, true);
+
+      function updateRemoveButtons() {
+        const rows = document.querySelectorAll('#room-configurations-body .configuration-row');
+        rows.forEach(row => {
+          const btn = row.querySelector('.remove-row-btn');
+          if (btn) btn.classList.toggle('hidden', rows.length === 1);
+        });
+      }
+    </script>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Sibling groups</h2>
+          <p class="cs-container-description">Siblings can room together regardless of age.</p>
+        </div>
+        <div class="cs-actions">
+          <button type="button" data-show="sibling-modal" class="cs-btn">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add sibling group
+          </button>
+        </div>
+      </div>
+      <div class="cs-container-body cs-stack">
+        <% if @suggested_siblings.any? %>
+          <div class="cs-alert">
+            <%= cs_status_icon(:info) %>
+            <div class="min-w-0 flex-1">
+              <p class="cs-alert-title">Suggested sibling groups (by surname)</p>
+              <ul class="mt-2">
+                <% @suggested_siblings.each do |suggestion| %>
+                  <li class="flex flex-wrap items-center justify-between gap-3 py-2 border-t border-(--cs-border-divider-secondary) first:border-t-0">
+                    <div class="min-w-0">
+                      <span class="font-bold <%= 'cs-muted' if suggestion[:already_grouped] %>"><%= suggestion[:surname] %></span>
+                      <span class="cs-secondary ml-2">
+                        <%= suggestion[:participants].map(&:full_name).join(", ") %>
+                      </span>
+                    </div>
+                    <% if suggestion[:already_grouped] %>
+                      <%= cs_status(:success, "Created") %>
+                    <% else %>
+                      <%= form_with url: admin_event_sibling_groups_path(@event.slug), method: :post, class: "inline", data: { turbo: true } do %>
+                        <% suggestion[:participants].each do |p| %>
+                          <input type="hidden" name="participant_ids[]" value="<%= p.id %>">
+                        <% end %>
+                        <input type="hidden" name="label" value="<%= suggestion[:surname] %> siblings">
+                        <button type="submit" class="cs-btn">
+                          Create group
+                        </button>
+                      <% end %>
+                    <% end %>
+                  </li>
+                <% end %>
+              </ul>
+            </div>
+          </div>
+        <% end %>
+
+        <div id="sibling_groups_list">
+          <% SiblingGroup.includes(:participants).joins(participants: :participant_events).where(participant_events: { event_id: @event.id }).distinct.each do |group| %>
+            <%= render partial: "admin/sibling_groups/sibling_group", locals: { sibling_group: group } %>
+          <% end %>
+        </div>
+      </div>
+    </section>
+  </div>
+<% end %>
+
+<!-- Sibling Group Modal -->
+<div id="sibling-modal" class="hidden cs-modal-overlay">
+  <div class="fixed inset-0" data-hide="sibling-modal"></div>
+
+  <div class="cs-modal relative" role="dialog" aria-modal="true" aria-labelledby="sibling-modal-title">
+    <%= form_with url: admin_event_sibling_groups_path(@event.slug), method: :post, html: { novalidate: true }, data: { turbo_frame: "_top", controller: "cs-form-validation" } do |f| %>
+      <div class="cs-modal-header">
+        <h2 id="sibling-modal-title">Create sibling group</h2>
+        <button type="button" class="cs-modal-close" data-hide="sibling-modal" aria-label="Close">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8m0-8l-8 8"/></svg>
+        </button>
+      </div>
+      <div class="cs-modal-body">
+        <%= cs_field id: "sibling-group-label", label: "Label", optional: true, constraint: "For example: Rivera siblings" do |aria| %>
+          <%= text_field_tag :label, nil, id: "sibling-group-label", class: "cs-input", **aria %>
+        <% end %>
+
+        <fieldset class="cs-field" data-cs-field data-cs-label="Participants" data-cs-error-id="sibling-group-participants-error">
+          <legend class="cs-field-label">Participants</legend>
+          <p class="cs-field-description" id="sibling-group-participants-description">Select at least 2 participants.</p>
+          <div class="max-h-60 overflow-y-auto rounded-lg border border-(--cs-border-input) px-3 py-2">
+            <% @event.participants.includes(:sibling_groups).order(:legal_last_name, :legal_first_name).each do |participant| %>
+              <label class="cs-option">
+                <input type="checkbox" name="participant_ids[]" value="<%= participant.id %>" data-sibling-participant aria-describedby="sibling-group-participants-description">
+                <span class="cs-option-label">
+                  <%= participant.full_name %>
+                  <% if participant.sibling_groups.any? %>
+                    <span class="cs-muted">(already in a group)</span>
+                  <% end %>
+                </span>
+              </label>
+            <% end %>
+          </div>
+        </fieldset>
+      </div>
+      <div class="cs-modal-footer">
+        <button type="button" data-hide="sibling-modal" class="cs-btn cs-btn-link">
+          Cancel
+        </button>
+        <button type="submit" class="cs-btn cs-btn-primary">
+          Create group
+        </button>
+      </div>
+    <% end %>
+  </div>
+</div>

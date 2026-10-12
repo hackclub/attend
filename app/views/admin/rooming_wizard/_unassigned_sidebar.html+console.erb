@@ -1,0 +1,38 @@
+<section id="unassigned_sidebar" class="cs-container lg:sticky lg:top-4">
+  <div class="cs-container-header">
+    <div>
+      <h2 class="cs-h2">Unassigned <span class="cs-counter">(<%= @unassigned.size %>)</span></h2>
+    </div>
+  </div>
+  <div class="cs-container-body">
+    <div id="unassigned_container">
+      <%= render partial: "admin/rooming_wizard/unassigned_container" %>
+    </div>
+  </div>
+
+  <% if @exempt.any? %>
+    <div class="cs-container-header border-t border-(--cs-border-divider-secondary)">
+      <div>
+        <h2 class="cs-h2">Exempt <span class="cs-counter">(<%= @exempt.size %>)</span></h2>
+        <p class="cs-container-description">Not assigned to rooms (e.g., staying at home)</p>
+      </div>
+    </div>
+    <div class="cs-container-body space-y-2">
+      <% @exempt.each do |pe| %>
+        <div class="flex items-center justify-between gap-2 rounded-(--cs-radius-item) border border-(--cs-border-divider-secondary) p-2">
+          <div class="min-w-0">
+            <p class="text-sm font-bold cs-secondary"><%= pe.participant.full_name %></p>
+            <p class="cs-small cs-muted">Age <%= pe.age_on_event %></p>
+          </div>
+          <% unless @rooming_plan.locked? %>
+            <%= button_to "Unexempt",
+              toggle_exempt_admin_event_rooming_wizard_path(@event.slug, participant_event_id: pe.id),
+              method: :post,
+              class: "cs-btn cs-btn-link",
+              data: { turbo: true } %>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</section>

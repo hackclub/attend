@@ -11,6 +11,13 @@ module ApplicationHelper
     "solarized-dark"         => "Solarized Dark"
   }.freeze
 
+  # Store links for the Attend mobile (scanner) app, shared by the
+  # participant dashboard badges and the admin console's side nav.
+  MOBILE_APP_URLS = {
+    ios: "https://testflight.apple.com/join/faP6dmwQ",
+    android: "https://play.google.com/store/apps/details?id=com.hackclub.attend"
+  }.freeze
+
   # Mirrors --bg-app in themes.css; <meta name="theme-color"> can't read CSS
   # variables, so the browser-chrome color has to be rendered server-side.
   THEME_COLORS = {

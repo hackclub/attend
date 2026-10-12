@@ -1,0 +1,54 @@
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Messages", admin_event_messages_path(current_event) ], [ "Slack blasts", admin_event_slack_blasts_path(current_event) ], [ "Send Slack blast", nil ]) %>
+
+<div class="max-w-2xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Send Slack blast</h1>
+      <p class="cs-description">Send a direct message to all participants with linked Slack accounts.</p>
+    </div>
+  </div>
+
+  <% if @participant_count.zero? %>
+    <div class="cs-alert cs-alert-warning">
+      <%= cs_status_icon(:warning) %>
+      <p>No participants have linked their Slack accounts yet.</p>
+    </div>
+  <% else %>
+    <%= form_with url: admin_event_slack_blasts_path(current_event), method: :post, class: "cs-stack", html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+      <div class="cs-alert">
+        <%= cs_status_icon(:info) %>
+        <p>
+          This will send a DM to <strong><%= @participant_count %></strong> participant<%= @participant_count == 1 ? "" : "s" %>
+          who have completed onboarding and linked their Slack account.
+        </p>
+      </div>
+
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">Message</h2>
+        </div>
+        <div class="cs-container-body">
+          <%= cs_field id: "message", label: "Message", errors: @message_errors,
+                data: { controller: "tinymce", tinymce_slack_mode_value: "true" },
+                description: "Use the toolbar for bold, italic, strikethrough, links, lists and code. Slack supports all of them." do |aria| %>
+            <%= text_area_tag :message, params[:message],
+                rows: 6,
+                class: "cs-input",
+                data: { tinymce_target: "editor" },
+                **aria %>
+          <% end %>
+        </div>
+      </section>
+
+      <div class="flex justify-end gap-2">
+        <%= link_to "Cancel", admin_event_dashboard_path(current_event.slug), class: "cs-btn cs-btn-link" %>
+        <%= button_tag "Send blast",
+            type: "submit",
+            name: "commit",
+            value: "Send Blast",
+            class: "cs-btn cs-btn-primary",
+            data: { confirm: "Send this message to #{@participant_count} participants?" } %>
+      </div>
+    <% end %>
+  <% end %>
+</div>

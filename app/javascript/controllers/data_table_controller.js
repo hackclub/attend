@@ -10,7 +10,9 @@ export default class extends Controller {
     "columnToggle",
     "table",
     "searchInput",
-    "filterTemplate"
+    "filterTemplate",
+    "count",
+    "noMatch"
   ]
 
   static values = {
@@ -338,6 +340,35 @@ export default class extends Controller {
       const text = row.textContent.toLowerCase()
       row.classList.toggle("hidden", !text.includes(query))
     })
+
+    this.updateSearchFeedback(query, rows)
+  }
+
+  // Cloudscape text-filter feedback for the console table: "N matches"
+  // beside the search box and a no-match row. Only the +console template
+  // renders these targets, so the original table is unaffected.
+  updateSearchFeedback(query, rows) {
+    if (!this.hasCountTarget && !this.hasNoMatchTarget) return
+
+    const matches = Array.from(rows).filter(row => row.textContent.toLowerCase().includes(query)).length
+
+    if (this.hasCountTarget) {
+      const filtered = query !== "" || this.countTarget.dataset.serverFiltered === "true"
+      this.countTarget.textContent = filtered ? `${matches} ${matches === 1 ? "match" : "matches"}` : ""
+      this.countTarget.hidden = !filtered
+    }
+
+    if (this.hasNoMatchTarget) {
+      this.noMatchTarget.classList.toggle("hidden", !(query !== "" && rows.length > 0 && matches === 0))
+    }
+  }
+
+  clearSearch() {
+    if (!this.hasSearchInputTarget) return
+
+    this.searchInputTarget.value = ""
+    this.search({ target: this.searchInputTarget })
+    this.searchInputTarget.focus()
   }
 
   toggleSortDropdown() {

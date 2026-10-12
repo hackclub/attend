@@ -1,0 +1,201 @@
+<% content_for :title, "Medical – #{@participant_event.participant.display_name} – #{current_event.name} – Attend" %>
+
+<div>
+  <%= render "header" %>
+
+  <div class="cs-alert cs-alert-warning mb-5">
+    <%= cs_status_icon(:warning) %>
+    <div>
+      <p class="cs-alert-title">Sensitive information</p>
+      <p>This information is confidential and should only be accessed when necessary for participant safety.</p>
+    </div>
+  </div>
+
+  <%= form_with url: medical_admin_event_participant_path(current_event, @participant_event), method: :patch, local: true, class: "cs-stack", html: { novalidate: true }, data: { turbo: false, controller: "cs-form-validation" } do |form| %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Medical</h2>
+      </div>
+      <div class="cs-container-body">
+      <%= fields_for :medical, @medical do |f| %>
+        <div class="space-y-6">
+          <section>
+            <h3 class="cs-h3 mb-3">Allergies</h3>
+
+            <div class="space-y-4">
+              <%= cs_form_field f, :allergies, label: "Allergies", optional: true, as: :text_area, input: { rows: 3 } %>
+
+              <div>
+                <%= f.label :has_anaphylaxis_risk, class: "flex items-center gap-2 cursor-pointer" do %>
+                  <%= f.check_box :has_anaphylaxis_risk, class: "w-4 h-4 accent-(--cs-accent)" %>
+                  <span class="font-bold">Anaphylaxis risk</span>
+                <% end %>
+                <p class="ml-6 cs-small cs-muted">Select if the participant carries an EpiPen or has severe allergic reactions</p>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h3 class="cs-h3 mb-3">Medical conditions</h3>
+
+            <%= cs_form_field f, :medical_conditions, label: "Medical conditions", optional: true, as: :text_area, input: { rows: 4 } %>
+          </section>
+
+          <section>
+            <h3 class="cs-h3 mb-3">Medications</h3>
+
+            <div class="space-y-4">
+              <%= cs_form_field f, :medications, label: "Medications", optional: true, as: :text_area, input: { rows: 3 } %>
+
+              <div>
+                <%= f.label :requires_refrigeration, class: "flex items-center gap-2 cursor-pointer" do %>
+                  <%= f.check_box :requires_refrigeration, class: "w-4 h-4 accent-(--cs-accent)" %>
+                  <span class="font-bold">Requires refrigeration</span>
+                <% end %>
+                <p class="ml-6 cs-small cs-muted">Select if any medications need to be stored in a refrigerator</p>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h3 class="cs-h3 mb-3">Emergency action plan</h3>
+
+            <%= cs_form_field f, :emergency_action_plan, label: "Emergency action plan", optional: true, as: :text_area, input: { rows: 4 }, constraint: "Specific instructions for handling medical emergencies." %>
+          </section>
+
+          <section>
+            <h3 class="cs-h3 mb-3">Additional medical notes</h3>
+
+            <%= cs_form_field f, :additional_notes, label: "Additional notes", optional: true, as: :text_area, input: { rows: 3 } %>
+          </section>
+
+          <% if @medical.last_updated_by %>
+            <div class="cs-small cs-muted pt-4 border-t border-(--cs-border-divider-secondary)">
+              Edited <%= cs_relative_time(@medical.updated_at, inline: true) %> by <%= @medical.last_updated_by.name.presence || @medical.last_updated_by.email %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Dietary requirements</h2>
+      </div>
+      <div class="cs-container-body">
+
+      <%= fields_for :dietary, @dietary || @participant_event.build_dietary do |f| %>
+        <div class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <%= cs_form_field f, :diet_type, label: "Diet type", optional: true do |aria| %>
+              <%= f.select :diet_type, [["No specific diet", ""], ["Vegetarian", "vegetarian"], ["Vegan", "vegan"], ["Halal", "halal"], ["Kosher", "kosher"], ["Other", "other"]], {}, class: "cs-select", id: f.field_id(:diet_type), **aria %>
+            <% end %>
+
+            <div class="flex items-center pt-6">
+              <%= f.label :cross_contamination_risk, class: "flex items-center gap-2 cursor-pointer" do %>
+                <%= f.check_box :cross_contamination_risk, class: "w-4 h-4 accent-(--cs-accent)" %>
+                <span class="font-bold">Cross-contamination risk</span>
+              <% end %>
+            </div>
+          </div>
+
+          <%= cs_form_field f, :intolerances, label: "Food intolerances", optional: true, as: :text_area, input: { rows: 2, placeholder: "Lactose, gluten, nuts" } %>
+
+          <%= cs_form_field f, :life_threatening_allergies, label: "Life-threatening food allergies", optional: true, as: :text_area, input: { rows: 2, placeholder: "List any severe food allergies" }, constraint: "This helps the catering team take extra precautions." %>
+
+          <%= cs_form_field f, :notes, label: "Dietary notes", optional: true, as: :text_area, input: { rows: 2 } %>
+        </div>
+      <% end %>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Learning and cognitive needs</h2>
+      </div>
+      <div class="cs-container-body">
+
+      <%= fields_for :accessibility, @accessibility || @participant_event.build_accessibility do |f| %>
+        <div class="space-y-4">
+          <fieldset>
+            <legend class="cs-field-label">Neurodivergent conditions</legend>
+            <div class="flex flex-wrap gap-4">
+              <%= f.label :has_adhd, class: "flex items-center gap-2 cursor-pointer" do %>
+                <%= f.check_box :has_adhd, class: "w-4 h-4 accent-(--cs-accent)" %>
+                <span>ADHD</span>
+              <% end %>
+
+              <%= f.label :has_dyslexia, class: "flex items-center gap-2 cursor-pointer" do %>
+                <%= f.check_box :has_dyslexia, class: "w-4 h-4 accent-(--cs-accent)" %>
+                <span>Dyslexia</span>
+              <% end %>
+
+              <%= f.label :has_autism, class: "flex items-center gap-2 cursor-pointer" do %>
+                <%= f.check_box :has_autism, class: "w-4 h-4 accent-(--cs-accent)" %>
+                <span>Autism</span>
+              <% end %>
+            </div>
+          </fieldset>
+
+          <%= cs_form_field f, :neurodivergent_notes, label: "Accommodation notes", optional: true, as: :text_area, input: { rows: 3, placeholder: "Any accommodations or support that would help, such as quiet space access, written instructions or extra time" } %>
+        </div>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Accessibility needs</h2>
+      </div>
+      <div class="cs-container-body">
+
+      <div class="space-y-6">
+        <fieldset>
+          <legend class="cs-field-label">Mobility needs</legend>
+          <div class="flex flex-wrap gap-4">
+            <%= f.label :uses_wheelchair, class: "flex items-center gap-2 cursor-pointer" do %>
+              <%= f.check_box :uses_wheelchair, class: "w-4 h-4 accent-(--cs-accent)" %>
+              <span>Wheelchair accessible room or venue</span>
+            <% end %>
+
+            <%= f.label :step_free_required, class: "flex items-center gap-2 cursor-pointer" do %>
+              <%= f.check_box :step_free_required, class: "w-4 h-4 accent-(--cs-accent)" %>
+              <span>Step-free access required</span>
+            <% end %>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend class="cs-field-label">Sensory needs</legend>
+          <div class="flex flex-wrap gap-4">
+            <%= f.label :needs_captioning, class: "flex items-center gap-2 cursor-pointer" do %>
+              <%= f.check_box :needs_captioning, class: "w-4 h-4 accent-(--cs-accent)" %>
+              <span>Captioning or hearing assistance</span>
+            <% end %>
+
+            <%= f.label :needs_large_print, class: "flex items-center gap-2 cursor-pointer" do %>
+              <%= f.check_box :needs_large_print, class: "w-4 h-4 accent-(--cs-accent)" %>
+              <span>Large print materials</span>
+            <% end %>
+
+            <%= f.label :needs_sign_language, class: "flex items-center gap-2 cursor-pointer" do %>
+              <%= f.check_box :needs_sign_language, class: "w-4 h-4 accent-(--cs-accent)" %>
+              <span>Sign language interpreter needed</span>
+            <% end %>
+          </div>
+        </fieldset>
+
+        <%= cs_form_field f, :other_needs, label: "Other accessibility or communication needs", optional: true, as: :text_area, input: { rows: 3, placeholder: "Describe any additional needs" } %>
+      </div>
+      <% end %>
+      </div>
+    </section>
+
+    <%= cs_form_errors @medical, @dietary, @accessibility, title: "This information couldn't be saved." %>
+
+    <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+      <%= link_to "Cancel", admin_event_participant_path(current_event, @participant_event), class: "cs-btn cs-btn-link cs-btn-full" %>
+      <%= form.button "Save all information", class: "cs-btn cs-btn-primary cs-btn-full" %>
+    </div>
+  <% end %>
+</div>

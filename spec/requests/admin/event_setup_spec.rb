@@ -84,6 +84,17 @@ RSpec.describe "Admin::EventSetup", type: :request do
       expect(response.body).to include("Setup progress")
     end
 
+    context "with the admin console beta" do
+      before { admin.update!(admin_console_beta: true) }
+
+      it "renders the setup steps on step 1" do
+        get admin_new_event_path
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("Event setup steps")
+      end
+    end
+
     it "renders every step" do
       get admin_event_setup_schedule_path(event)
       expect(response).to have_http_status(:ok)

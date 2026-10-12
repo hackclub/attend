@@ -71,7 +71,9 @@ module Admin
       when true then "yes"
       when false then "no"
       when Hash, Array then JSON.pretty_generate(value)
-      when Time, DateTime, ActiveSupport::TimeWithZone then value.strftime("%Y-%m-%d %H:%M:%S %Z")
+      when Time, DateTime, ActiveSupport::TimeWithZone
+        # The console shows raw values as ISO 8601, per Cloudscape's timestamp pattern.
+        console_ui? ? value.iso8601 : value.strftime("%Y-%m-%d %H:%M:%S %Z")
       when Date then value.strftime("%Y-%m-%d")
       else value.to_s
       end

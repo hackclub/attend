@@ -1,0 +1,92 @@
+<%# Cloudscape side navigation, shared by the desktop rail and the mobile drawer. %>
+<%# Locals: close_action ("click->mobile-menu#close" in the drawer, nil on desktop) %>
+<% link_data = close_action ? { action: close_action } : {} %>
+<% nav_link = ->(label, path, active) do
+     link_to label, path, class: "cs-sidenav-link", "aria-current": cs_current(active), data: link_data
+   end %>
+<% chevron = capture do %>
+  <svg fill="none" stroke="currentColor" viewBox="0 0 12 12" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 2l4 4-4 4"/></svg>
+<% end %>
+
+<% if current_event %>
+  <%= link_to admin_event_dashboard_path(current_event.slug), class: "cs-sidenav-header", data: link_data do %>
+    <%= current_event.name %>
+    <span class="cs-sidenav-header-meta"><%= cs_date_range(current_event.starts_at, current_event.ends_at) %></span>
+  <% end %>
+<% else %>
+  <%= link_to admin_root_path, class: "cs-sidenav-header", data: link_data do %>
+    Attend admin
+    <span class="cs-sidenav-header-meta">Hack Club events</span>
+  <% end %>
+<% end %>
+
+<nav class="cs-sidenav-section" aria-label="Admin">
+  <%= nav_link.call("All events", admin_root_path, request.path == admin_root_path) %>
+</nav>
+
+<% if current_event %>
+  <div class="cs-sidenav-divider"></div>
+  <%# No section title: the header above already names the event. %>
+  <div class="cs-sidenav-section">
+    <%= nav_link.call("Overview", admin_event_dashboard_path(current_event.slug), request.path == admin_event_dashboard_path(current_event.slug)) %>
+    <%= nav_link.call("Participants", admin_event_participants_path(current_event), request.path.include?("/participants")) %>
+    <% if current_user.global_admin? || current_user.event_admin_for?(current_event) || current_user.ops_for?(current_event) || current_user.safeguarding_lead_for?(current_event) %>
+      <%= nav_link.call("Change requests", admin_event_registration_change_requests_path(current_event), request.path.include?("/registration_change_requests")) %>
+    <% end %>
+    <%= nav_link.call("Incidents", admin_event_incidents_path(current_event), request.path.include?("/incidents") && !request.path.start_with?("/admin/incidents")) %>
+    <%= nav_link.call("Check-ins", admin_event_scans_path(current_event), request.path.include?("/scans")) %>
+    <% if current_event.travel_enabled? %>
+      <%= nav_link.call("Travel calendar", admin_event_travel_path(current_event), request.path == admin_event_travel_path(current_event)) %>
+    <% end %>
+    <% if current_event.accommodation_enabled? %>
+      <%= nav_link.call("Rooming", admin_event_rooming_wizard_path(current_event), request.path.include?("/rooming_wizard")) %>
+    <% end %>
+    <% if current_event.groups_enabled? %>
+      <%= nav_link.call("Groups", admin_event_groups_path(current_event), request.path.include?("/groups")) %>
+    <% end %>
+    <%= nav_link.call("Messages", admin_event_messages_path(current_event), request.path.include?("/messages")) %>
+    <%# These two used to be reachable only from the dashboard's quick-actions grid. %>
+    <%= nav_link.call("Exports", admin_event_exports_path(current_event), request.path.include?("/exports")) %>
+    <%# Same gate as AuditLogsController#require_audit_access, so the link never dead-ends. %>
+    <% if current_user.global_admin? || current_user.event_role_assignments.exists?(role: :event_admin) %>
+      <%= nav_link.call("Event audit log", admin_audit_logs_path(event_id: current_event.id), request.path.start_with?("/admin/audit_logs") && params[:event_id] == current_event.id.to_s) %>
+    <% end %>
+  </div>
+<% end %>
+
+<% if policy(EventSeries).index? %>
+  <div class="cs-sidenav-divider"></div>
+  <div class="cs-sidenav-section">
+    <p class="cs-sidenav-section-title">Series</p>
+    <%= nav_link.call("Event series", admin_series_index_path, request.path.start_with?("/admin/series")) %>
+  </div>
+<% end %>
+
+<% if policy(Ticket).index? %>
+  <div class="cs-sidenav-divider"></div>
+  <div class="cs-sidenav-section">
+    <p class="cs-sidenav-section-title">Administration</p>
+    <%= nav_link.call("Support chat", support_tickets_path, request.path.start_with?("/support")) %>
+
+    <% if current_user.global_admin? %>
+      <%= nav_link.call("Users", admin_users_path, request.path.start_with?("/admin/users")) %>
+
+      <% conduct_active = request.path.start_with?("/admin/bans") || request.path.start_with?("/admin/incidents") %>
+      <details class="cs-sidenav-group" <%= "open" if conduct_active %>>
+        <summary><%= chevron %>Conduct</summary>
+        <%= nav_link.call("Ban list", admin_bans_path, request.path.start_with?("/admin/bans")) %>
+        <%= nav_link.call("Incident reports", admin_incidents_path, request.path.start_with?("/admin/incidents")) %>
+      </details>
+
+      <% logs_active = request.path.start_with?("/admin/audit_logs") || request.path.start_with?("/admin/email_logs") %>
+      <details class="cs-sidenav-group" <%= "open" if logs_active %>>
+        <summary><%= chevron %>Logs</summary>
+        <%= nav_link.call("Audit log", admin_audit_logs_path, request.path.start_with?("/admin/audit_logs") && params[:event_id].blank?) %>
+        <%= nav_link.call("Email logs", admin_email_logs_path, request.path.start_with?("/admin/email_logs")) %>
+      </details>
+
+      <%= nav_link.call("API tokens", admin_global_api_tokens_path, request.path.start_with?("/admin/global_api_tokens")) %>
+      <%= nav_link.call("Settings", admin_settings_path, request.path.start_with?("/admin/settings")) %>
+    <% end %>
+  </div>
+<% end %>

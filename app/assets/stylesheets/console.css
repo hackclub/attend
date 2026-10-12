@@ -1,0 +1,2724 @@
+/*
+ * attend admin console
+ *
+ * The /admin shell is built on AWS's Cloudscape design system
+ * (cloudscape.design, visual refresh): dark top navigation, a white side
+ * navigation, breadcrumbs, a flashbar, and content laid out as containers,
+ * tables and key-value panels. Values below come from the official
+ * @cloudscape-design/design-tokens package, with one deliberate swap:
+ * Cloudscape's interactive blue is replaced by Hack Club red, deepened so
+ * white labels clear AA (#c8283f on white is 5.48:1).
+ *
+ * Everything is scoped to `html.cs-console`, which only the admin layout
+ * sets, so participant, guardian and support pages are untouched.
+ *
+ * The admin collapses the nine themes to Cloudscape's two modes: the
+ * layout renders data-theme="light" or "dark" (see admin_console_theme).
+ * Inside those two modes this file does three jobs:
+ *   1. declares the --cs-* tokens and points the shared semantic palette
+ *      (--bg-elev, --text-strong, --accent, …) at them, so themes.css,
+ *      hackclub.css and the portal-* layer all resolve to Cloudscape;
+ *   2. remaps Tailwind's gray/blue/green/red/amber scales in light mode
+ *      (themes.css already remaps them in dark against --bg-elev);
+ *   3. restyles the patterns the 126 admin views already use — cards,
+ *      tables, inputs, buttons, badges, links — so pages that have not
+ *      been hand-converted still read as Cloudscape.
+ *
+ * `:root.cs-console` carries (0,2,0) specificity on purpose: themes.css
+ * scopes its overrides as `[data-theme]:not([data-theme="light"]) .x`,
+ * (0,3,0), and loads after this file, so global overrides here need the
+ * extra weight to win in dark mode.
+ */
+
+/* Pin Tailwind's layer order before anything here names a layer, so the
+ * kit's `components` layer sits above preflight and below utilities. */
+@layer theme, base, components, utilities;
+
+@font-face {
+  font-family: "Open Sans";
+  src: url("/open-sans-normal.woff2") format("woff2");
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Open Sans";
+  src: url("/open-sans-italic.woff2") format("woff2");
+  font-weight: 300 800;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* ---------- tokens: light ---------- */
+:root.cs-console {
+  --cs-font: "Open Sans", "Helvetica Neue", Roboto, Arial, sans-serif;
+  --cs-font-mono: Monaco, Menlo, Consolas, "Courier Prime", Courier, monospace;
+
+  --cs-bg-page: #ffffff;
+  --cs-bg-container: #ffffff;
+  --cs-bg-shaded: #f6f6f9;
+  --cs-bg-hover: #f6f6f9;
+  --cs-bg-input: #ffffff;
+  --cs-bg-input-disabled: #ebebf0;
+  --cs-bg-selected: #fff5f6;
+  --cs-bg-pressed: #ffe5e9;
+
+  --cs-text-heading: #0f141a;
+  --cs-text-body: #0f141a;
+  --cs-text-secondary: #424650;
+  --cs-text-muted: #656871;
+  --cs-text-disabled: #8c8c94;
+  --cs-text-label: #0f141a;
+
+  --cs-border-divider: #c6c6cd;
+  --cs-border-divider-secondary: #ebebf0;
+  --cs-border-container: #c6c6cd;
+  --cs-border-input: #8c8c94;
+
+  --cs-accent: #c8283f;
+  --cs-accent-hover: #8f1426;
+  --cs-accent-active: #7a0f20;
+  --cs-accent-on: #ffffff;
+  --cs-brand: #ec3750;
+  --cs-focus: #c8283f;
+
+  --cs-success: #00802f;
+  --cs-success-bg: #effff1;
+  --cs-error: #db0000;
+  --cs-error-bg: #fff5f5;
+  --cs-warning: #855900;
+  --cs-warning-fill: #ffe347;
+  --cs-warning-bg: #fffef0;
+  --cs-info: #006ce0;
+  --cs-info-bg: #f0fbff;
+  --cs-inactive: #656871;
+
+  --cs-badge-grey: #424650;
+  --cs-badge-green: #00802f;
+  --cs-badge-blue: #006ce0;
+  --cs-badge-red: #db0000;
+  --cs-badge-on: #f9f9fa;
+
+  /* the top navigation is dark in both modes */
+  --cs-topnav-bg: #0f141a;
+  --cs-topnav-border: #232b37;
+  --cs-topnav-text: #dedee3;
+  --cs-topnav-text-hover: #f9f9fa;
+  --cs-topnav-muted: #a4a4ad;
+  --cs-topnav-field: #161d26;
+  --cs-topnav-field-border: #656871;
+  --cs-topnav-hover: #1b232d;
+
+  --cs-shadow-dropdown: 0 4px 20px 1px rgba(0, 7, 22, 0.10);
+  --cs-shadow-modal: 0 4px 20px 1px rgba(0, 7, 22, 0.18);
+  --cs-shadow-sticky: 0 4px 8px 1px rgba(0, 7, 22, 0.10);
+
+  --cs-radius-container: 16px;
+  --cs-radius-button: 20px;
+  --cs-radius-input: 8px;
+  --cs-radius-item: 8px;
+  --cs-radius-flash: 12px;
+  --cs-radius-badge: 4px;
+
+  --cs-topnav-height: 52px;
+  --cs-sidenav-width: 280px;
+
+  /* the shared semantic palette, so themes.css, hackclub.css and the
+   * portal-* layer resolve to Cloudscape inside the console */
+  --bg-app: var(--cs-bg-page);
+  --bg-elev: var(--cs-bg-container);
+  --bg-elev-2: var(--cs-bg-shaded);
+  --bg-elev-3: var(--cs-bg-hover);
+  --bg-sunken: #dedee3;
+  --bg-dark: var(--cs-topnav-bg);
+  --bg-darker: #0a0e12;
+
+  --text-strong: var(--cs-text-heading);
+  --text: var(--cs-text-body);
+  --text-soft: var(--cs-text-secondary);
+  --text-muted: var(--cs-text-muted);
+  --text-faint: var(--cs-text-disabled);
+  --text-on-dark: #f9f9fa;
+  --text-link: var(--cs-accent);
+
+  --border-soft: var(--cs-border-divider-secondary);
+  --border: var(--cs-border-divider-secondary);
+  --border-strong: var(--cs-border-input);
+  --border-card: var(--cs-border-container);
+
+  --accent: var(--cs-accent);
+  --accent-strong: var(--cs-accent-hover);
+  --accent-soft: var(--cs-bg-selected);
+  --accent-on: var(--cs-accent-on);
+  --accent-fill: var(--cs-accent);
+  --accent-fill-hover: var(--cs-accent-hover);
+  --focus-ring: var(--cs-focus);
+
+  --success: var(--cs-success);
+  --success-strong: var(--cs-success);
+  --success-text: var(--cs-success);
+  --success-soft: var(--cs-success-bg);
+  --warning: #f89256;
+  --warning-strong: #e07700;
+  --warning-text: var(--cs-warning);
+  --danger: var(--cs-error);
+  --danger-strong: var(--cs-error);
+  --info: var(--cs-info);
+
+  --shadow-sm: none;
+  --shadow-md: var(--cs-shadow-dropdown);
+  --shadow-lg: var(--cs-shadow-dropdown);
+
+  --hc-red: var(--cs-accent);
+  --hc-primary: var(--cs-accent);
+}
+
+/* ---------- tokens: dark ---------- */
+:root.cs-console[data-theme="dark"] {
+  --cs-bg-page: #161d26;
+  --cs-bg-container: #161d26;
+  --cs-bg-shaded: #1b232d;
+  --cs-bg-hover: #1b232d;
+  --cs-bg-input: #0f141a;
+  --cs-bg-input-disabled: #1b232d;
+  --cs-bg-selected: #2a0d14;
+  --cs-bg-pressed: #3d121c;
+
+  --cs-text-heading: #ebebf0;
+  --cs-text-body: #dedee3;
+  --cs-text-secondary: #c6c6cd;
+  --cs-text-muted: #a4a4ad;
+  --cs-text-disabled: #8c8c94;
+  --cs-text-label: #dedee3;
+
+  --cs-border-divider: #424650;
+  --cs-border-divider-secondary: #232b37;
+  --cs-border-container: #424650;
+  --cs-border-input: #656871;
+
+  --cs-accent: #ff7a8a;
+  --cs-accent-hover: #ffb3bc;
+  --cs-accent-active: #ff7a8a;
+  --cs-accent-on: #0f141a;
+  --cs-focus: #ff7a8a;
+
+  --cs-success: #2bb534;
+  --cs-success-bg: #001401;
+  --cs-error: #ff7a7a;
+  --cs-error-bg: #1f0000;
+  --cs-warning: #fbd332;
+  --cs-warning-fill: #fbd332;
+  --cs-warning-bg: #191100;
+  --cs-info: #42b4ff;
+  --cs-info-bg: #001129;
+  --cs-inactive: #a4a4ad;
+
+  --cs-badge-grey: #656871;
+
+  --cs-topnav-bg: #0a0e12;
+  --cs-topnav-border: #232b37;
+
+  --cs-shadow-dropdown: 0 4px 20px 1px rgba(0, 4, 12, 1);
+  --cs-shadow-modal: 0 4px 20px 1px rgba(0, 4, 12, 1);
+  --cs-shadow-sticky: 0 4px 8px 1px rgba(0, 4, 12, 1);
+
+  --bg-sunken: #333843;
+  --warning: #fbd332;
+  --warning-strong: #fbd332;
+  --text-on-dark: #f9f9fa;
+
+  color-scheme: dark;
+}
+
+/* ---------- tailwind scales, light mode ----------
+ * themes.css leaves Tailwind's literal values alone in light and remaps
+ * them against --bg-elev in dark. In the console's light mode the greys
+ * become Cloudscape's neutral ramp and the four state hues become its
+ * status colours, so the 126 views that still speak in gray-500 and
+ * green-100 land on the right palette. */
+:root.cs-console[data-theme="light"] {
+  --color-gray-50: #f9f9fa;
+  --color-gray-100: #f3f3f7;
+  --color-gray-200: #ebebf0;
+  --color-gray-300: #c6c6cd;
+  /* Cloudscape's #8c8c94 is 3.34:1 on white; the legacy views use gray-400
+   * for readable meta text, so it is lifted to AA (4.83:1). */
+  --color-gray-400: #71717a;
+  --color-gray-500: #656871;
+  --color-gray-600: #424650;
+  --color-gray-700: #333843;
+  --color-gray-800: #232b37;
+  --color-gray-900: #0f141a;
+  --color-gray-950: #0a0e12;
+
+  --color-slate-50: #f9f9fa;
+  --color-slate-100: #f3f3f7;
+  --color-slate-200: #ebebf0;
+  --color-slate-300: #c6c6cd;
+  --color-slate-400: #8c8c94;
+  --color-slate-500: #656871;
+  --color-slate-600: #424650;
+  --color-slate-700: #333843;
+  --color-slate-800: #232b37;
+  --color-slate-900: #0f141a;
+
+  --color-blue-50: #f0fbff;
+  --color-blue-100: #d1f1ff;
+  --color-blue-200: #b8e7ff;
+  --color-blue-300: #75cfff;
+  --color-blue-400: #42b4ff;
+  --color-blue-500: #006ce0;
+  --color-blue-600: #006ce0;
+  --color-blue-700: #004a9e;
+  --color-blue-800: #002b66;
+  --color-blue-900: #001129;
+
+  --color-green-50: #effff1;
+  --color-green-100: #d9fadd;
+  --color-green-200: #afebb5;
+  --color-green-500: #2bb534;
+  --color-green-600: #00802f;
+  --color-green-700: #00802f;
+  --color-green-800: #005c22;
+  --color-green-900: #003b15;
+
+  --color-red-50: #fff5f5;
+  --color-red-100: #ffe3e3;
+  --color-red-200: #ffc7c7;
+  --color-red-500: #db0000;
+  --color-red-600: #db0000;
+  --color-red-700: #b30000;
+  --color-red-800: #8a0000;
+  --color-red-900: #5c0000;
+
+  --color-amber-50: #fffef0;
+  --color-amber-100: #fff6c2;
+  --color-amber-200: #ffe9a3;
+  --color-amber-400: #fbd332;
+  --color-amber-500: #f2b600;
+  --color-amber-600: #b37b00;
+  --color-amber-700: #855900;
+  --color-amber-800: #6b4700;
+  --color-amber-900: #4d3300;
+
+  --color-yellow-50: #fffef0;
+  --color-yellow-100: #fff6c2;
+  --color-yellow-200: #ffe9a3;
+  --color-yellow-500: #f2b600;
+  --color-yellow-600: #b37b00;
+  --color-yellow-700: #855900;
+  --color-yellow-800: #6b4700;
+  --color-yellow-900: #4d3300;
+}
+
+/* ====================================================================
+ * base
+ * ==================================================================== */
+
+:root.cs-console {
+  body {
+    font-family: var(--cs-font);
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-body);
+    background-color: var(--cs-bg-page);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection { background-color: var(--cs-bg-pressed); color: var(--cs-text-heading); }
+
+  :focus-visible { outline: 2px solid var(--cs-focus); outline-offset: 2px; }
+
+  .font-mono, code, kbd, pre { font-family: var(--cs-font-mono); }
+  .tabular-nums, td, .cs-kv-value { font-variant-numeric: tabular-nums; }
+
+  * { scrollbar-color: var(--cs-border-input) transparent; }
+
+  .turbo-progress-bar { background-color: var(--cs-accent); height: 2px; }
+}
+
+/* ====================================================================
+ * app layout
+ * ==================================================================== */
+
+/* mobile drawer */
+
+:root.cs-console[data-theme="dark"] .cs-flash-error { background-color: #b30000; }
+
+/* Old pages float a 32px top margin of their own; the content area already
+ * leaves Cloudscape's gap under the breadcrumbs. */
+
+/* ====================================================================
+ * components
+ * ==================================================================== */
+
+/* ====================================================================
+ * legacy pattern adapter
+ *
+ * The admin views predate the console. Rather than leaving 126 pages in
+ * the old look until each is hand-converted, these rules restyle the
+ * patterns they already share. Unlayered CSS beats Tailwind's
+ * @layer utilities, so these win over the utility classes in markup.
+ * ==================================================================== */
+
+:root.cs-console .cs-main {
+  /* page titles */
+  h1:is(.text-2xl, .text-3xl, .text-xl) {
+    font-size: 24px;
+    line-height: 30px;
+    font-weight: 700;
+    letter-spacing: 0;
+    color: var(--cs-text-heading);
+  }
+
+  /* section headings inside cards */
+  :is(h2, h3):is(.text-lg, .text-base, .text-xl).font-semibold,
+  :is(h2, h3).text-lg { font-weight: 700; color: var(--cs-text-heading); }
+
+  /* cards → containers */
+  :not(a, button, input, select, textarea, label, span, li, summary).bg-white.border:is(.rounded-lg, .rounded-xl, .rounded-2xl),
+  :not(a, button, input, select, textarea, label, span, li, summary).bg-white:is(.rounded-lg, .rounded-xl):is(.shadow, .shadow-sm) {
+    border-radius: var(--cs-radius-container);
+    border-color: var(--cs-border-container);
+    border-width: 1px;
+    box-shadow: none;
+  }
+
+  /* tables */
+  table:not(.cs-calendar-grid, .cs-table) thead,
+  table:not(.cs-calendar-grid, .cs-table) thead tr,
+  table:not(.cs-calendar-grid, .cs-table) thead th { background-color: transparent; }
+
+  table:not(.cs-calendar-grid, .cs-table) thead th {
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 700;
+    color: var(--cs-text-secondary);
+    border-bottom: 1px solid var(--cs-border-divider);
+  }
+
+  table:not(.cs-calendar-grid, .cs-table) tbody tr:hover { background-color: var(--cs-bg-hover); }
+
+  .divide-y.divide-gray-100 > :not(:last-child),
+  .divide-y.divide-gray-200 > :not(:last-child) { border-color: var(--cs-border-divider-secondary); }
+
+  /* form fields */
+  :is(input:not([type="checkbox"], [type="radio"], [type="file"], [type="submit"], [type="button"], [type="reset"], [type="hidden"], [type="range"], [type="color"], [type="image"]), select, textarea):not(.border-0, .cs-input, .cs-select) {
+    border-color: var(--cs-border-input);
+    border-radius: var(--cs-radius-input);
+    background-color: var(--cs-bg-input);
+    color: var(--cs-text-body);
+    font-size: 14px;
+
+    &::placeholder { color: var(--cs-text-muted); font-style: italic; }
+    &:focus { outline: none; border-color: var(--cs-focus); box-shadow: 0 0 0 1px var(--cs-focus); }
+    &:disabled { background-color: var(--cs-bg-input-disabled); color: var(--cs-text-disabled); }
+  }
+
+  input[type="checkbox"], input[type="radio"] { accent-color: var(--cs-accent); }
+
+  label:is(.block, .text-sm).font-medium:not(:has(input)) { font-weight: 700; color: var(--cs-text-label); }
+
+  /* primary buttons: the deepened-red fill every admin view already uses */
+  :is(a, button, input[type="submit"], input[type="button"]):is(.bg-\[\#d42f46\], .bg-\[\#ec3750\]) {
+    border-radius: var(--cs-radius-button);
+    background-color: var(--cs-accent);
+    color: var(--cs-accent-on);
+    font-weight: 700;
+
+    &:hover { background-color: var(--cs-accent-hover); }
+    &:active { background-color: var(--cs-accent-active); }
+  }
+
+  /* normal buttons: white with a grey hairline in the old look, outlined
+   * in the accent in Cloudscape's */
+  :is(a, button, input[type="submit"], input[type="button"]).border:is(.border-gray-300, .border-gray-200):not(.border-0) {
+    border-width: 2px;
+    border-color: var(--cs-accent);
+    border-radius: var(--cs-radius-button);
+    background-color: var(--cs-bg-container);
+    color: var(--cs-accent);
+    font-weight: 700;
+
+    svg { color: currentColor; }
+
+    &:hover { background-color: var(--cs-bg-selected); border-color: var(--cs-accent-hover); color: var(--cs-accent-hover); }
+  }
+
+  /* destructive fills */
+  :is(a, button, input[type="submit"]):is(.bg-red-600, .bg-red-700) {
+    border-radius: var(--cs-radius-button);
+    font-weight: 700;
+  }
+
+  /* status pills → Cloudscape's 4px badges */
+  span.rounded-full.text-xs:is(.px-2, .px-2\.5, .px-3, .px-1\.5) { border-radius: var(--cs-radius-badge); }
+
+  /* inline links */
+  a.text-\[\#ec3750\], .text-\[\#ec3750\] a, a.text-\[\#d42f46\] { color: var(--cs-accent); }
+  a.text-\[\#ec3750\]:hover, a.hover\:text-\[\#d42f46\]:hover { color: var(--cs-accent-hover); text-decoration: underline; text-underline-offset: 2px; }
+
+  .text-\[\#1f2d3d\] { color: var(--cs-text-heading); }
+  .text-\[\#3c4858\] { color: var(--cs-text-body); }
+  .text-\[\#5a6473\] { color: var(--cs-text-secondary); }
+  .text-\[\#8492a6\] { color: var(--cs-text-muted); }
+  .border-\[\#e0e6ed\], .border-\[\#e5e7eb\] { border-color: var(--cs-border-divider-secondary); }
+  .bg-\[\#f9fafc\], .bg-\[\#f7f7f9\] { background-color: var(--cs-bg-shaded); }
+  .focus\:border-\[\#ec3750\]:focus { border-color: var(--cs-focus); }
+}
+
+/* Command palette and other overlays rendered by the layout */
+:root.cs-console .cs-palette {
+  background-color: var(--cs-bg-container);
+  border: 1px solid var(--cs-border-divider);
+  border-radius: var(--cs-radius-container);
+  box-shadow: var(--cs-shadow-modal);
+  overflow: hidden;
+
+  input { background-color: transparent; color: var(--cs-text-body); font-size: 16px; }
+  input::placeholder { color: var(--cs-text-muted); }
+  kbd { font-family: var(--cs-font); background-color: var(--cs-bg-shaded); color: var(--cs-text-secondary); border: 1px solid var(--cs-border-divider-secondary); }
+}
+
+/* ---------- collapsible side navigation ----------
+ * Cloudscape's app layout lets the side nav fold away to a rail holding
+ * only the button that brings it back. The state lives on <html> so the
+ * inline script in the layout can apply it before first paint. */
+
+/* leave room for the close button beside the header */
+
+/* ---------- visibility ----------
+ * Component rules above set `display`, and unlayered CSS beats Tailwind's
+ * utilities, so the responsive hide classes the shell relies on have to
+ * be restated for these components. */
+
+/* ---------- field focus ----------
+ * The console-wide :focus-visible outline is for buttons and links. Text
+ * fields take Cloudscape's own focus treatment instead (accent border plus
+ * a 1px ring), so they don't end up wearing both. */
+:root.cs-console :is(input:not([type="checkbox"], [type="radio"]), select, textarea):focus-visible {
+  outline: none;
+  border-color: var(--cs-focus);
+  box-shadow: 0 0 0 1px var(--cs-focus);
+}
+
+/* The palette's search field is the dialog's only control and sits flush
+ * in its header; the open dialog is the focus indicator. */
+:root.cs-console .cs-palette input:focus-visible {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* ---------- content rhythm ----------
+ * Without breadcrumbs the page title is the first thing under the top
+ * bar, so it gets the same top gap as the side nav's header, and the two
+ * titles share a line. With breadcrumbs, the breadcrumbs take that gap and
+ * the title tucks in under them. */
+
+/* ---------- mobile drawer ---------- */
+/* .cs-input sets display: block, which beats the `flex` utility */
+
+/* With the event switcher at the top of the drawer, the event-name
+ * header would say the same thing twice. Phones only: from sm up the
+ * switcher lives in the top bar and the header comes back. */
+
+/* ---------- one page width ----------
+ * The admin views each picked their own max-w-* wrapper (2xl through
+ * 7xl, some centred, some not), so the content edge jumped between
+ * pages. Cloudscape's app layout gives every page the same content area,
+ * left-aligned against the side nav, so top-level wrappers are released
+ * and the area gets one cap for very wide screens. */
+/* Fixed overlays (modals and their backdrops) sit at this level too and must
+ * still cover the whole viewport, so they're left out of the cap. */
+.cs-main > :not(.cs-modal-overlay, .fixed) { max-width: 1680px; }
+
+:root.cs-console .cs-main > [class*="max-w-"] {
+  max-width: 1680px;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+/* A dozen of those wrappers also add their own px-4 py-6, from before the
+ * layout padded the content area; that indented them past every other
+ * page. The content area's padding is the only page gutter. */
+:root.cs-console .cs-main > [class*="max-w-"] {
+  padding-left: 0;
+  padding-right: 0;
+  padding-top: 0;
+}
+
+/* the build stamp's own wrapper pads for the old sidebar */
+
+/* ====================================================================
+ * date picker + calendar
+ *
+ * Cloudscape's calendar (cloudscape.design/components/calendar), rebuilt
+ * for Stimulus in cs_date_picker_controller.js. Sizes follow the
+ * component's tokens: a 238px grid with 6px gutters, 8px day radius, an
+ * accent-filled selected day and a neutral chip for today.
+ * ==================================================================== */
+
+:root.cs-console {
+  --cs-calendar-today: #ebebf0;
+  --cs-calendar-weekday: #656871;
+}
+
+:root.cs-console[data-theme="dark"] {
+  --cs-calendar-today: #333843;
+  --cs-calendar-weekday: #a4a4ad;
+}
+
+/* ====================================================================
+ * wizard (cloudscape.design/components/wizard)
+ *
+ * A step list on the left, "Step N of M" over the page title, the step's
+ * containers, and a right-aligned action row: a link-style exit, then
+ * Previous, then the primary Next. Below lg the step list folds away
+ * and the step count carries the position.
+ * ==================================================================== */
+
+/* form-field furniture shared by the hand-built steps */
+
+/* checkbox / radio with a label and description, Cloudscape-style */
+
+/* Cloudscape tiles: selectable cards for a one-of-n choice */
+
+/* status lines used as list items may run long; let them wrap */
+
+/* ====================================================================
+ * component kit, part two
+ *
+ * The rest of the Cloudscape components Attend has a use for. Each block
+ * names its Cloudscape counterpart so the mapping stays obvious.
+ * ==================================================================== */
+
+/* a whole card that links somewhere */
+
+/* ---------- severity badges (cloudscape badge, severity colours) ---------- */
+
+:root.cs-console[data-theme="dark"] {
+  .cs-badge-severity-critical { background-color: #d63f38; color: #000000; }
+  .cs-badge-severity-high { background-color: #fe6e73; color: #0f141a; }
+}
+
+/* An expandable's summary spans its container's rounded edge; an offset
+ * outline there draws a square box across the corner. Keep the ring
+ * inside the summary, following the container's radius. */
+
+
+
+/* ====================================================================
+ * the component kit
+ *
+ * Every cs-* component lives in Tailwind's `components` layer: it beats
+ * preflight, and loses to utilities. That ordering is what lets `hidden`,
+ * `sm:block` and friends work on kit elements, which Stimulus controllers
+ * rely on to show and hide panels. Rules above this block that must beat
+ * utilities on purpose (tokens, the legacy-pattern adapter, field focus,
+ * the single page width) stay unlayered.
+ * ==================================================================== */
+@layer components {
+  .cs-console .cs-body {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .cs-topnav {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: var(--cs-topnav-height);
+    padding: 0 12px 0 8px;
+    background-color: var(--cs-topnav-bg);
+    border-bottom: 1px solid var(--cs-topnav-border);
+    color: var(--cs-topnav-text);
+  }
+
+  @media (min-width: 1024px) {
+    .cs-topnav { padding: 0 20px 0 20px; gap: 16px; }
+  }
+
+  .cs-topnav-identity {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    padding: 4px 8px 4px 4px;
+    border-radius: var(--cs-radius-item);
+    color: var(--cs-topnav-text-hover);
+    text-decoration: none;
+
+    img { height: 22px; width: auto; }
+
+    &:hover { background-color: var(--cs-topnav-hover); }
+  }
+
+  .cs-topnav-title {
+    font-size: 16px;
+    line-height: 20px;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  .cs-topnav-divider {
+    width: 1px;
+    height: 24px;
+    background-color: var(--cs-topnav-border);
+    flex-shrink: 0;
+  }
+
+  .cs-topnav-search {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 560px;
+    height: 32px;
+    padding: 0 8px 0 12px;
+    background-color: var(--cs-topnav-field);
+    border: 1px solid var(--cs-topnav-field-border);
+    border-radius: var(--cs-radius-input);
+    color: var(--cs-topnav-muted);
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 90ms linear;
+
+    svg { width: 16px; height: 16px; flex-shrink: 0; }
+    span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    kbd {
+      display: inline-flex;
+      align-items: center;
+      height: 20px;
+      padding: 0 6px;
+      border: 1px solid var(--cs-topnav-field-border);
+      border-radius: 4px;
+      font-family: var(--cs-font);
+      font-size: 12px;
+      color: var(--cs-topnav-muted);
+    }
+
+    &:hover { border-color: var(--cs-topnav-text); color: var(--cs-topnav-text); }
+  }
+
+  @media (min-width: 640px) {
+    .cs-topnav-search { display: inline-flex; }
+  }
+
+  .cs-topnav-spacer { flex: 1 1 auto; }
+
+  .cs-topnav-utility {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    max-width: 280px;
+    height: 36px;
+    padding: 0 10px;
+    border-radius: var(--cs-radius-item);
+    color: var(--cs-topnav-text);
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+
+    > span { overflow: hidden; text-overflow: ellipsis; }
+    .cs-topnav-utility-label { font-weight: 400; color: var(--cs-topnav-muted); }
+    svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    &:hover { background-color: var(--cs-topnav-hover); color: var(--cs-topnav-text-hover); }
+    &[aria-expanded="true"] { background-color: var(--cs-topnav-hover); color: var(--cs-topnav-text-hover); }
+  }
+
+  .cs-topnav-icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--cs-radius-item);
+    color: var(--cs-topnav-text);
+    cursor: pointer;
+
+    svg { width: 20px; height: 20px; }
+    &:hover { background-color: var(--cs-topnav-hover); color: var(--cs-topnav-text-hover); }
+  }
+
+  .cs-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 9999px;
+    background-color: var(--cs-accent);
+    color: var(--cs-accent-on);
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+    object-fit: cover;
+  }
+
+  .cs-menu {
+    position: absolute;
+    z-index: 50;
+    min-width: 240px;
+    max-width: 340px;
+    margin-top: 4px;
+    padding: 4px 0;
+    background-color: var(--cs-bg-container);
+    border: 1px solid var(--cs-border-divider);
+    border-radius: var(--cs-radius-item);
+    box-shadow: var(--cs-shadow-dropdown);
+    color: var(--cs-text-body);
+    font-weight: 400;
+  }
+
+  .cs-menu-right { right: 0; }
+
+  .cs-menu-header {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--cs-border-divider-secondary);
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--cs-text-muted);
+  }
+
+  .cs-menu-group-label {
+    padding: 8px 16px 4px;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 700;
+    color: var(--cs-text-secondary);
+  }
+
+  .cs-menu-scroll { max-height: 320px; overflow-y: auto; }
+
+  .cs-menu-divider {
+    height: 1px;
+    margin: 4px 0;
+    background-color: var(--cs-border-divider-secondary);
+  }
+
+  .cs-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 6px 16px;
+    border: 1px solid transparent;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-body);
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+
+    svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--cs-text-muted); }
+    .cs-menu-item-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    &:hover, &:focus-visible {
+      background-color: var(--cs-bg-hover);
+      border-color: var(--cs-border-input);
+      outline: none;
+    }
+  }
+
+  .cs-menu-item[aria-current="true"] {
+    background-color: var(--cs-bg-selected);
+    border-color: var(--cs-accent);
+    font-weight: 700;
+
+    svg { color: var(--cs-accent); }
+  }
+
+  .cs-applayout {
+    flex: 1 1 auto;
+    display: flex;
+    min-height: 0;
+  }
+
+  .cs-sidenav {
+    display: none;
+    flex-direction: column;
+    width: var(--cs-sidenav-width);
+    flex-shrink: 0;
+    background-color: var(--cs-bg-container);
+    border-right: 1px solid var(--cs-border-divider);
+  }
+
+  @media (min-width: 1024px) {
+    .cs-sidenav {
+      display: flex;
+      position: sticky;
+      top: var(--cs-topnav-height);
+      height: calc(100vh - var(--cs-topnav-height));
+    }
+  }
+
+  .cs-sidenav-scroll {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 20px 0 24px;
+  }
+
+  .cs-sidenav-header {
+    display: block;
+    margin: 0 24px 12px 28px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--cs-border-divider-secondary);
+    font-size: 18px;
+    line-height: 22px;
+    font-weight: 700;
+    color: var(--cs-text-heading);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+
+    &:hover { color: var(--cs-accent); }
+  }
+
+  .cs-sidenav-header-meta {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 400;
+    color: var(--cs-text-muted);
+  }
+
+  .cs-sidenav-section { padding: 4px 0; }
+
+  .cs-sidenav-section-title {
+    margin: 8px 24px 4px 28px;
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 700;
+    color: var(--cs-text-heading);
+  }
+
+  .cs-sidenav-divider {
+    height: 1px;
+    margin: 12px 24px 12px 28px;
+    background-color: var(--cs-border-divider-secondary);
+  }
+
+  .cs-sidenav-link {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 24px 4px 28px;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-secondary);
+    text-decoration: none;
+
+    &:hover { color: var(--cs-accent); }
+    &:focus-visible { outline-offset: -2px; }
+  }
+
+  .cs-sidenav-link[aria-current="page"] {
+    font-weight: 700;
+    color: var(--cs-accent);
+
+    /* Cloudscape marks the active link with weight and colour alone; the
+     * 3px rail is the console's one Hack Club gesture, a flag on the page
+     * you're on. */
+    &::before {
+      content: "";
+      position: absolute;
+      left: 12px;
+      top: 6px;
+      bottom: 6px;
+      width: 3px;
+      border-radius: 2px;
+      background-color: var(--cs-accent);
+    }
+  }
+
+  .cs-sidenav-count {
+    margin-left: auto;
+    padding: 0 6px;
+    border-radius: var(--cs-radius-badge);
+    background-color: var(--cs-badge-red);
+    color: var(--cs-badge-on);
+    font-size: 12px;
+    line-height: 18px;
+    font-weight: 700;
+  }
+
+  .cs-sidenav-group {
+    > summary {
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 24px 4px 10px;
+      font-size: 14px;
+      line-height: 20px;
+      color: var(--cs-text-secondary);
+      cursor: pointer;
+
+      &::-webkit-details-marker { display: none; }
+      svg { width: 12px; height: 12px; margin: 0 2px 0 4px; color: var(--cs-text-muted); transition: transform 135ms ease-out; }
+      &:hover { color: var(--cs-accent); }
+    }
+
+    &[open] > summary svg { transform: rotate(90deg); }
+    &[open] > summary { font-weight: 700; color: var(--cs-text-heading); }
+
+    .cs-sidenav-link { padding-left: 44px; }
+    .cs-sidenav-link[aria-current="page"]::before { left: 28px; }
+  }
+
+  .cs-sidenav-footer {
+    padding: 16px 24px 16px 28px;
+    border-top: 1px solid var(--cs-border-divider-secondary);
+  }
+
+  .cs-sidenav-footer-label {
+    margin-bottom: 8px;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 700;
+    color: var(--cs-text-secondary);
+  }
+
+  .cs-drawer-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background-color: rgba(15, 20, 26, 0.6);
+  }
+
+  .cs-drawer {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    width: min(var(--cs-sidenav-width), 86vw);
+    background-color: var(--cs-bg-container);
+    box-shadow: var(--cs-shadow-modal);
+  }
+
+  .cs-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--cs-topnav-height);
+    padding: 0 12px 0 20px;
+    background-color: var(--cs-topnav-bg);
+    color: var(--cs-topnav-text-hover);
+  }
+
+  .cs-drawer-event {
+    margin: 16px 20px 4px;
+  }
+
+  .cs-content {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .cs-breadcrumbs {
+    padding: 16px 16px 0;
+
+    nav, ol { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+    a { color: var(--cs-accent); text-decoration: none; font-weight: 400; }
+    a:hover { color: var(--cs-accent-hover); text-decoration: underline; }
+    span, li { font-size: 14px; line-height: 20px; color: var(--cs-text-muted); }
+    svg { color: var(--cs-text-disabled); }
+  }
+
+  @media (min-width: 640px) {
+    .cs-breadcrumbs { padding: 20px 24px 0; }
+  }
+
+  @media (min-width: 1024px) {
+    .cs-breadcrumbs { padding: 20px 40px 0; }
+  }
+
+  .cs-flashbar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px 16px 0;
+  }
+
+  @media (min-width: 640px) {
+    .cs-flashbar { padding: 16px 24px 0; }
+  }
+
+  @media (min-width: 1024px) {
+    .cs-flashbar { padding: 16px 40px 0; }
+  }
+
+  .cs-flash {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 12px 10px 20px;
+    border-radius: var(--cs-radius-flash);
+    background-color: var(--cs-info);
+    color: #f9f9fa;
+    font-size: 14px;
+    line-height: 20px;
+
+    > svg { width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; }
+    p { flex: 1; min-width: 0; margin: 0; }
+
+    button {
+      display: inline-flex;
+      padding: 2px;
+      border-radius: 4px;
+      color: inherit;
+      opacity: 0.85;
+      cursor: pointer;
+
+      &:hover { opacity: 1; }
+      svg { width: 16px; height: 16px; }
+    }
+  }
+
+  .cs-flash-success { background-color: #00802f; }
+
+  .cs-flash-error { background-color: #db0000; }
+
+  .cs-flash-warning { background-color: #ffe347; color: #0f141a; }
+
+  .cs-main {
+    flex: 1 1 auto;
+    padding: 20px 16px 40px;
+  }
+
+  @media (min-width: 640px) {
+    .cs-main { padding: 20px 24px 48px; }
+  }
+
+  @media (min-width: 1024px) {
+    .cs-main { padding: 20px 40px 56px; }
+  }
+
+  .cs-main > :first-child { margin-top: 0; }
+
+  .cs-impersonation {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4px 12px;
+    padding: 6px 16px;
+    background-color: #ffe347;
+    color: #0f141a;
+    font-size: 14px;
+
+    button { font-weight: 700; text-decoration: underline; cursor: pointer; }
+    button:hover { text-decoration: none; }
+  }
+
+  .cs-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px 24px;
+    margin-bottom: 20px;
+  }
+
+  .cs-header-text { min-width: 0; flex: 1 1 320px; }
+
+  .cs-h1 {
+    font-size: 24px;
+    line-height: 30px;
+    font-weight: 700;
+    color: var(--cs-text-heading);
+    letter-spacing: 0;
+  }
+
+  .cs-h1 .cs-counter { font-size: 24px; }
+
+  .cs-description {
+    margin-top: 4px;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-secondary);
+  }
+
+  .cs-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .cs-counter {
+    font-weight: 400;
+    color: var(--cs-text-muted);
+  }
+
+  .cs-container {
+    background-color: var(--cs-bg-container);
+    border: 1px solid var(--cs-border-container);
+    border-radius: var(--cs-radius-container);
+    color: var(--cs-text-body);
+  }
+
+  .cs-container-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px 16px;
+    padding: 12px 20px;
+  }
+
+  .cs-container-header + .cs-container-body { padding-top: 4px; }
+
+  .cs-container-header-divided { border-bottom: 1px solid var(--cs-border-divider-secondary); }
+
+  .cs-h2 {
+    font-size: 18px;
+    line-height: 22px;
+    font-weight: 700;
+    color: var(--cs-text-heading);
+    letter-spacing: 0;
+  }
+
+  .cs-h3 {
+    font-size: 16px;
+    line-height: 20px;
+    font-weight: 700;
+    color: var(--cs-text-heading);
+  }
+
+  .cs-container-description {
+    margin-top: 2px;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-muted);
+  }
+
+  .cs-container-body { padding: 12px 20px 20px; }
+
+  .cs-container-flush { padding: 0; }
+
+  .cs-container-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--cs-border-divider-secondary);
+    font-size: 14px;
+    color: var(--cs-text-secondary);
+  }
+
+  .cs-stack { display: flex; flex-direction: column; gap: 20px; }
+
+  .cs-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  @media (min-width: 768px) {
+    .cs-columns-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cs-columns-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+
+  @media (min-width: 1024px) {
+    .cs-columns-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .cs-columns-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  .cs-kv {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px 32px;
+  }
+
+  @media (min-width: 768px) {
+    .cs-kv-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cs-kv-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .cs-kv-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+
+  @media (min-width: 768px) {
+    /* Cloudscape draws a hairline between key-value columns */
+    .cs-kv-divided > * { padding-left: 20px; border-left: 1px solid var(--cs-border-divider-secondary); }
+    .cs-kv-divided > *:first-child { padding-left: 0; border-left: 0; }
+  }
+
+  .cs-kv-label {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 700;
+    color: var(--cs-text-label);
+  }
+
+  .cs-kv-value {
+    margin-top: 2px;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-body);
+    overflow-wrap: anywhere;
+  }
+
+  .cs-kv-value-lg {
+    margin-top: 4px;
+    font-size: 32px;
+    line-height: 40px;
+    font-weight: 300;
+    color: var(--cs-text-heading);
+    letter-spacing: -0.01em;
+  }
+
+  a.cs-kv-value-lg { color: var(--cs-accent); text-decoration: none; }
+
+  a.cs-kv-value-lg:hover { color: var(--cs-accent-hover); text-decoration: underline; text-underline-offset: 4px; }
+
+  .cs-muted { color: var(--cs-text-muted); }
+
+  .cs-secondary { color: var(--cs-text-secondary); }
+
+  .cs-small { font-size: 12px; line-height: 16px; }
+
+  .cs-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 4px 20px;
+    border: 2px solid var(--cs-accent);
+    border-radius: var(--cs-radius-button);
+    background-color: var(--cs-bg-container);
+    color: var(--cs-accent);
+    font-family: var(--cs-font);
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 700;
+    letter-spacing: 0.005em;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 90ms linear, border-color 90ms linear, color 90ms linear;
+
+    svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    &:hover { background-color: var(--cs-bg-selected); border-color: var(--cs-accent-hover); color: var(--cs-accent-hover); }
+    &:active { background-color: var(--cs-bg-pressed); }
+    &:focus-visible { outline: 2px solid var(--cs-focus); outline-offset: 2px; }
+    &:disabled, &[aria-disabled="true"] {
+      border-color: var(--cs-border-input);
+      background-color: var(--cs-bg-container);
+      color: var(--cs-text-disabled);
+      cursor: default;
+    }
+  }
+
+  .cs-btn-primary {
+    background-color: var(--cs-accent);
+    border-color: var(--cs-accent);
+    color: var(--cs-accent-on);
+
+    &:hover { background-color: var(--cs-accent-hover); border-color: var(--cs-accent-hover); color: var(--cs-accent-on); }
+    &:active { background-color: var(--cs-accent-active); border-color: var(--cs-accent-active); }
+    &:disabled, &[aria-disabled="true"] {
+      background-color: var(--cs-bg-input-disabled);
+      border-color: var(--cs-bg-input-disabled);
+      color: var(--cs-text-disabled);
+    }
+  }
+
+  .cs-btn-link {
+    border-color: transparent;
+    background-color: transparent;
+    padding-left: 12px;
+    padding-right: 12px;
+
+    &:hover { border-color: transparent; }
+  }
+
+  .cs-btn-icon { padding: 4px 8px; }
+
+  .cs-btn-full { width: 100%; }
+
+  @media (min-width: 640px) {
+    .cs-btn-full { width: auto; }
+  }
+
+  .cs-link {
+    color: var(--cs-accent);
+    font-weight: 400;
+    text-decoration: none;
+
+    &:hover { color: var(--cs-accent-hover); text-decoration: underline; text-underline-offset: 2px; }
+  }
+
+  .cs-link-strong { font-weight: 700; }
+
+  .cs-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: var(--cs-radius-badge);
+    background-color: var(--cs-badge-grey);
+    color: var(--cs-badge-on);
+    font-size: 12px;
+    line-height: 20px;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  .cs-badge-green { background-color: var(--cs-badge-green); }
+
+  .cs-badge-blue { background-color: var(--cs-badge-blue); }
+
+  .cs-badge-red { background-color: var(--cs-badge-red); }
+
+  .cs-badge-yellow { background-color: var(--cs-warning-fill); color: #0f141a; }
+
+  .cs-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    line-height: 20px;
+    white-space: nowrap;
+
+    svg { width: 16px; height: 16px; flex-shrink: 0; }
+  }
+
+  .cs-status-success { color: var(--cs-success); }
+
+  .cs-status-error { color: var(--cs-error); }
+
+  .cs-status-warning { color: var(--cs-warning); }
+
+  .cs-status-info, .cs-status-in-progress { color: var(--cs-info); }
+
+  .cs-status-pending, .cs-status-stopped { color: var(--cs-inactive); }
+
+  .cs-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 16px;
+    border: 2px solid var(--cs-info);
+    border-radius: var(--cs-radius-flash);
+    background-color: var(--cs-info-bg);
+    color: var(--cs-text-body);
+
+    > svg { width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; color: var(--cs-info); }
+  }
+
+  .cs-alert-warning { border-color: var(--cs-warning); background-color: var(--cs-warning-bg); > svg { color: var(--cs-warning); } }
+
+  .cs-alert-error { border-color: var(--cs-error); background-color: var(--cs-error-bg); > svg { color: var(--cs-error); } }
+
+  .cs-alert-success { border-color: var(--cs-success); background-color: var(--cs-success-bg); > svg { color: var(--cs-success); } }
+
+  .cs-alert-title { font-weight: 700; color: var(--cs-text-heading); }
+
+  .cs-table-wrap { overflow-x: auto; }
+
+  .cs-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 14px;
+    line-height: 20px;
+
+    th {
+      position: relative;
+      padding: 8px 20px 8px 20px;
+      border-bottom: 1px solid var(--cs-border-divider);
+      background-color: var(--cs-bg-container);
+      color: var(--cs-text-secondary);
+      font-weight: 700;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    /* Cloudscape separates header cells with a short vertical rule */
+    th + th::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 10px;
+      bottom: 10px;
+      width: 1px;
+      background-color: var(--cs-border-divider-secondary);
+    }
+
+    td {
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--cs-border-divider-secondary);
+      color: var(--cs-text-body);
+      vertical-align: middle;
+    }
+
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover td { background-color: var(--cs-bg-hover); }
+  }
+
+  .cs-table-compact {
+    th { padding-top: 6px; padding-bottom: 6px; }
+    td { padding-top: 6px; padding-bottom: 6px; }
+  }
+
+  .cs-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: inherit;
+    text-decoration: none;
+
+    svg { width: 12px; height: 12px; color: var(--cs-text-disabled); }
+    &:hover { color: var(--cs-text-heading); }
+    &:hover svg, &[aria-sort] svg { color: var(--cs-text-heading); }
+  }
+
+  .cs-input, .cs-select {
+    display: block;
+    width: 100%;
+    min-height: 32px;
+    padding: 4px 12px;
+    border: 1px solid var(--cs-border-input);
+    border-radius: var(--cs-radius-input);
+    background-color: var(--cs-bg-input);
+    color: var(--cs-text-body);
+    font-family: var(--cs-font);
+    font-size: 14px;
+    line-height: 22px;
+
+    &::placeholder { color: var(--cs-text-muted); font-style: italic; }
+    &:focus { outline: none; border-color: var(--cs-focus); box-shadow: 0 0 0 1px var(--cs-focus); }
+  }
+
+  .cs-select { padding-right: 32px; }
+
+  .cs-search {
+    position: relative;
+    display: block;
+
+    svg {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      width: 16px;
+      height: 16px;
+      transform: translateY(-50%);
+      color: var(--cs-text-muted);
+      pointer-events: none;
+    }
+
+    .cs-input { padding-left: 36px; }
+  }
+
+  .cs-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 0 20px 16px;
+  }
+
+  .cs-tabs {
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--cs-border-divider);
+    scrollbar-width: none;
+  }
+
+  .cs-tab {
+    position: relative;
+    padding: 8px 16px;
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 700;
+    color: var(--cs-text-secondary);
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover { color: var(--cs-accent); }
+    & + &::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 10px;
+      bottom: 10px;
+      width: 1px;
+      background-color: var(--cs-border-divider);
+    }
+  }
+
+  .cs-tab[aria-selected="true"], .cs-tab[aria-current="page"] {
+    color: var(--cs-accent);
+
+    &::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 4px;
+      border-radius: 4px 4px 0 0;
+      background-color: var(--cs-accent);
+    }
+  }
+
+  .cs-empty {
+    padding: 32px 20px;
+    text-align: center;
+    color: var(--cs-text-muted);
+
+    .cs-empty-title { font-weight: 700; color: var(--cs-text-secondary); }
+    p { margin-top: 2px; }
+    .cs-actions { justify-content: center; margin-top: 12px; }
+  }
+
+  .cs-progress {
+    height: 4px;
+    border-radius: 10px;
+    background-color: var(--cs-border-divider-secondary);
+    overflow: hidden;
+
+    > span { display: block; height: 100%; border-radius: 10px; background-color: var(--cs-accent); }
+  }
+
+  .cs-sidenav-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .cs-sidenav-toggle {
+    position: absolute;
+    top: 14px;
+    right: 12px;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 9999px;
+    color: var(--cs-text-secondary);
+    cursor: pointer;
+
+    svg { width: 16px; height: 16px; }
+    .cs-sidenav-toggle-open { display: none; }
+
+    &:hover { background-color: var(--cs-bg-hover); color: var(--cs-text-heading); }
+  }
+
+  .cs-sidenav .cs-sidenav-header { margin-right: 52px; }
+
+  @media (min-width: 1024px) {
+    .cs-nav-collapsed .cs-sidenav { width: 48px; }
+    .cs-nav-collapsed .cs-sidenav-panel { display: none; }
+
+    .cs-nav-collapsed .cs-sidenav-toggle {
+      right: 8px;
+      .cs-sidenav-toggle-open { display: block; }
+      .cs-sidenav-toggle-close { display: none; }
+    }
+  }
+
+  .cs-drawer.hidden, .cs-drawer-overlay.hidden { display: none; }
+
+  @media (min-width: 640px) {
+    .cs-topnav-icon-button.sm\:hidden { display: none; }
+  }
+
+  @media (min-width: 1024px) {
+    .cs-drawer, .cs-drawer-overlay, .cs-topnav-icon-button.lg\:hidden { display: none; }
+  }
+
+  .cs-sidenav-scroll { padding-top: 28px; }
+
+  @media (min-width: 1024px) {
+    .cs-main { padding-top: 28px; }
+    .cs-content:has(.cs-breadcrumbs, .cs-flashbar) .cs-main { padding-top: 20px; }
+    .cs-breadcrumbs { padding-top: 28px; }
+  }
+
+  .cs-input.flex { display: flex; align-items: center; }
+
+  .cs-drawer-event { margin: 16px 24px 0 28px; }
+
+  @media (max-width: 639px) {
+    .cs-drawer:has(.cs-drawer-event) .cs-sidenav-header { display: none; }
+    .cs-drawer .cs-sidenav-scroll { padding-top: 12px; }
+  }
+
+  .cs-drawer .cs-sidenav-footer { margin-top: 16px; }
+
+  .cs-sidenav-footer { padding-top: 10px; padding-bottom: 10px; }
+
+  .cs-app-links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--cs-text-secondary);
+
+    > span { flex: 1; min-width: 0; font-weight: 700; }
+  }
+
+  .cs-app-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 9999px;
+    color: var(--cs-text-secondary);
+
+    svg { width: 16px; height: 16px; }
+    &:hover { background-color: var(--cs-bg-hover); color: var(--cs-accent); }
+  }
+
+  .cs-sidenav-footer > .flex-shrink-0 { padding: 4px 0 0; }
+
+  .cs-datepicker {
+    position: relative;
+    display: block;
+
+    > input { padding-right: 40px; }
+
+    /* the calendar button replaces the browser's own picker icon */
+    > input::-webkit-calendar-picker-indicator { display: none; }
+  }
+
+  .cs-datepicker-trigger {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    transform: translateY(-50%);
+    border-radius: 9999px;
+    color: var(--cs-text-secondary);
+    cursor: pointer;
+
+    svg { width: 16px; height: 16px; }
+    &:hover, &[aria-expanded="true"] { color: var(--cs-accent); background-color: var(--cs-bg-hover); }
+    &:disabled { color: var(--cs-text-disabled); cursor: default; background: none; }
+  }
+
+  .cs-calendar {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 60;
+    width: calc(238px + 2 * 8px);
+    padding: 8px;
+    background-color: var(--cs-bg-container);
+    border: 1px solid var(--cs-border-divider);
+    border-radius: var(--cs-radius-item);
+    box-shadow: var(--cs-shadow-dropdown);
+    color: var(--cs-text-body);
+    font-family: var(--cs-font);
+  }
+
+  .cs-calendar-up { top: auto; bottom: calc(100% + 4px); }
+
+  .cs-calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2px;
+  }
+
+  .cs-calendar-title {
+    margin: 0;
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 700;
+    color: var(--cs-text-heading);
+  }
+
+  .cs-calendar-nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 9999px;
+    color: var(--cs-text-secondary);
+    cursor: pointer;
+
+    svg { width: 16px; height: 16px; }
+    &:hover { color: var(--cs-accent); background-color: var(--cs-bg-hover); }
+  }
+
+  .cs-calendar-grid {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 6px;
+    margin: 0 -6px -6px;
+    width: calc(100% + 12px);
+  }
+
+  .cs-calendar-weekday {
+    padding: 8px 0 2px;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 400;
+    color: var(--cs-calendar-weekday);
+    text-align: center;
+
+    abbr { text-decoration: none; }
+  }
+
+  .cs-calendar-grid td { padding: 0; }
+
+  .cs-calendar-day {
+    display: block;
+    width: 100%;
+    padding: 4px 0;
+    border: 2px solid transparent;
+    border-radius: var(--cs-radius-item);
+    background: transparent;
+    color: var(--cs-text-body);
+    font-size: 14px;
+    line-height: 18px;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    cursor: pointer;
+
+    &:hover { background-color: var(--cs-bg-hover); border-color: var(--cs-border-input); }
+    &:focus-visible { outline: 2px solid var(--cs-focus); outline-offset: 1px; }
+  }
+
+  .cs-calendar-day-outside { color: var(--cs-text-muted); }
+
+  .cs-calendar-day-today {
+    background-color: var(--cs-calendar-today);
+    font-weight: 700;
+  }
+
+  .cs-calendar-day-selected,
+  .cs-calendar-day-selected:hover {
+    background-color: var(--cs-accent);
+    border-color: var(--cs-accent);
+    color: var(--cs-accent-on);
+    font-weight: 700;
+  }
+
+  .cs-calendar-day[aria-disabled="true"] {
+    background: none;
+    border-color: transparent;
+    color: var(--cs-text-disabled);
+    cursor: default;
+  }
+
+  .cs-wizard {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px 40px;
+  }
+
+  @media (min-width: 1024px) {
+    .cs-wizard { grid-template-columns: 200px minmax(0, 1fr); }
+  }
+
+  .cs-wizard-nav {
+    display: none;
+
+    ol { list-style: none; margin: 0; padding: 0; }
+  }
+
+  @media (min-width: 1024px) {
+    .cs-wizard-nav { display: block; padding-top: 4px; }
+  }
+
+  .cs-wizard-nav-step {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--cs-border-divider-secondary);
+
+    &:first-child { padding-top: 0; }
+    &:last-child { border-bottom: 0; }
+  }
+
+  .cs-wizard-nav-number {
+    display: block;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--cs-text-muted);
+  }
+
+  .cs-wizard-nav-label {
+    display: block;
+    margin-top: 2px;
+    font-size: 14px;
+    line-height: 20px;
+  }
+
+  .cs-wizard-nav-step-current .cs-wizard-nav-label { font-weight: 700; color: var(--cs-text-heading); }
+
+  .cs-wizard-nav-step-available a.cs-wizard-nav-label { color: var(--cs-accent); text-decoration: none; }
+
+  .cs-wizard-nav-step-available a.cs-wizard-nav-label:hover { color: var(--cs-accent-hover); text-decoration: underline; }
+
+  .cs-wizard-nav-step-disabled .cs-wizard-nav-label { color: var(--cs-text-disabled); }
+
+  .cs-wizard-main { min-width: 0; max-width: 960px; }
+
+  .cs-wizard-step-count {
+    margin-bottom: 4px;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-muted);
+  }
+
+  .cs-wizard-actions {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 8px;
+    margin-top: 20px;
+
+    .cs-btn { width: 100%; }
+  }
+
+  @media (min-width: 640px) {
+    .cs-wizard-actions {
+      flex-direction: row;
+      justify-content: flex-end;
+      align-items: center;
+
+      .cs-btn { width: auto; }
+    }
+  }
+
+  .cs-field + .cs-field { margin-top: 16px; }
+
+  .cs-field-label { display: block; margin-bottom: 4px; font-size: 14px; line-height: 20px; font-weight: 700; color: var(--cs-text-label); }
+
+  .cs-field-hint { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--cs-text-muted); }
+
+  .cs-field-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px 20px;
+  }
+
+  @media (min-width: 768px) {
+    .cs-field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  .cs-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+
+    > input { margin-top: 3px; width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--cs-accent); }
+    .cs-option-label { font-size: 14px; line-height: 20px; color: var(--cs-text-body); font-weight: 400; }
+    .cs-option-description { font-size: 12px; line-height: 16px; color: var(--cs-text-muted); }
+  }
+
+  .cs-option + .cs-option, .cs-option + div, div + .cs-option { margin-top: 12px; }
+
+  .cs-tile {
+    display: block;
+    padding: 12px 16px;
+    border: 1px solid var(--cs-border-input);
+    border-radius: var(--cs-radius-item);
+    background-color: var(--cs-bg-container);
+    cursor: pointer;
+    transition: border-color 90ms linear, background-color 90ms linear;
+
+    &:hover { border-color: var(--cs-text-secondary); }
+    &:has(> .cs-option > input:checked) {
+      border: 2px solid var(--cs-accent);
+      padding: 11px 15px;
+      background-color: var(--cs-bg-selected);
+    }
+  }
+
+  .cs-tiles { display: flex; flex-direction: column; gap: 12px; }
+
+  li > .cs-status, dd > .cs-status { white-space: normal; align-items: flex-start; }
+
+  li > .cs-status svg, dd > .cs-status svg { margin-top: 2px; }
+
+  .cs-field-description { margin: -2px 0 6px; font-size: 12px; line-height: 16px; color: var(--cs-text-muted); }
+
+  .cs-field-error {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 700;
+    color: var(--cs-error);
+
+    svg { width: 14px; height: 14px; margin-top: 1px; flex-shrink: 0; }
+  }
+
+  .cs-input-invalid, :root.cs-console .cs-input[aria-invalid="true"] {
+    border-color: var(--cs-error);
+    border-left-width: 4px;
+  }
+
+  .cs-info-link {
+    margin-left: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--cs-accent);
+    text-decoration: none;
+
+    &:hover { color: var(--cs-accent-hover); text-decoration: underline; }
+  }
+
+  textarea.cs-input { min-height: 80px; resize: vertical; }
+
+  .cs-file {
+    font-size: 14px;
+    color: var(--cs-text-secondary);
+
+    &::file-selector-button {
+      margin-right: 12px;
+      padding: 4px 20px;
+      border: 2px solid var(--cs-accent);
+      border-radius: var(--cs-radius-button);
+      background-color: var(--cs-bg-container);
+      color: var(--cs-accent);
+      font-family: var(--cs-font);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    &::file-selector-button:hover { background-color: var(--cs-bg-selected); border-color: var(--cs-accent-hover); color: var(--cs-accent-hover); }
+  }
+
+  input[type="checkbox"].cs-toggle {
+    appearance: none;
+    position: relative;
+    width: 24px;
+    height: 16px;
+    margin-top: 2px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    background-color: var(--cs-badge-grey);
+    cursor: pointer;
+    transition: background-color 120ms ease-out;
+
+    &::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 12px;
+      height: 12px;
+      border-radius: 9999px;
+      background-color: #ffffff;
+      transition: transform 120ms ease-out;
+    }
+
+    &:checked { background-color: var(--cs-accent); }
+    &:checked::after { transform: translateX(8px); }
+    &:disabled { background-color: var(--cs-bg-input-disabled); cursor: default; }
+    &:focus-visible { outline: 2px solid var(--cs-focus); outline-offset: 2px; }
+  }
+
+  .cs-segmented {
+    display: inline-flex;
+    flex-wrap: wrap;
+    border: 1px solid var(--cs-border-input);
+    border-radius: var(--cs-radius-button);
+    overflow: hidden;
+  }
+
+  .cs-segment {
+    position: relative;
+    padding: 4px 16px;
+    background-color: var(--cs-bg-container);
+    color: var(--cs-text-secondary);
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 700;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+
+    & + & { border-left: 1px solid var(--cs-border-input); }
+    &:hover { color: var(--cs-accent-hover); background-color: var(--cs-bg-selected); }
+  }
+
+  .cs-segment[aria-pressed="true"], .cs-segment[aria-current="page"], .cs-segment[aria-selected="true"], .cs-segment-active {
+    background-color: var(--cs-accent);
+    color: var(--cs-accent-on);
+  }
+
+  .cs-expandable {
+    > summary {
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      line-height: 20px;
+      font-weight: 700;
+      color: var(--cs-text-heading);
+      cursor: pointer;
+
+      &::-webkit-details-marker { display: none; }
+      &::before {
+        content: "";
+        width: 0;
+        height: 0;
+        border-top: 5px solid transparent;
+        border-bottom: 5px solid transparent;
+        border-left: 6px solid currentColor;
+        transition: transform 135ms ease-out;
+        flex-shrink: 0;
+      }
+      &:hover { color: var(--cs-accent); }
+    }
+
+    &[open] > summary::before { transform: rotate(90deg); }
+    > .cs-expandable-content { padding-top: 8px; }
+  }
+
+  .cs-expandable-container {
+    border: 1px solid var(--cs-border-container);
+    border-radius: var(--cs-radius-container);
+    background-color: var(--cs-bg-container);
+
+    > summary { padding: 12px 20px; font-size: 18px; line-height: 22px; }
+    > .cs-expandable-content { padding: 0 20px 20px; }
+  }
+
+  .cs-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 72px 16px 16px;
+    overflow-y: auto;
+    background-color: rgba(15, 20, 26, 0.7);
+  }
+
+  .cs-modal-overlay.hidden { display: none; }
+
+  .cs-modal {
+    width: 100%;
+    max-width: 600px;
+    background-color: var(--cs-bg-container);
+    border: 1px solid var(--cs-border-divider);
+    border-radius: var(--cs-radius-container);
+    box-shadow: var(--cs-shadow-modal);
+    color: var(--cs-text-body);
+  }
+
+  .cs-modal-lg { max-width: 820px; }
+
+  .cs-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 20px 8px;
+
+    h2, h3 { font-size: 20px; line-height: 24px; font-weight: 700; color: var(--cs-text-heading); }
+  }
+
+  .cs-modal-close {
+    display: inline-flex;
+    padding: 4px;
+    border-radius: 9999px;
+    color: var(--cs-text-secondary);
+    cursor: pointer;
+
+    svg { width: 16px; height: 16px; }
+    &:hover { color: var(--cs-text-heading); background-color: var(--cs-bg-hover); }
+  }
+
+  .cs-modal-body { padding: 8px 20px 20px; }
+
+  .cs-modal-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--cs-border-divider-secondary);
+  }
+
+  .cs-pagination {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    list-style: none;
+
+    a, span {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      padding: 0 4px;
+      border-radius: 4px;
+      font-size: 14px;
+      color: var(--cs-text-secondary);
+      text-decoration: none;
+    }
+
+    a:hover { color: var(--cs-accent); }
+    [aria-current="page"] { font-weight: 700; color: var(--cs-text-heading); border: 1px solid var(--cs-text-heading); }
+    [aria-disabled="true"] { color: var(--cs-text-disabled); }
+    svg { width: 14px; height: 14px; }
+  }
+
+  .cs-btn-caret { margin-right: -6px; }
+
+  .cs-btn-inline-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    border-radius: 4px;
+    color: var(--cs-accent);
+    cursor: pointer;
+
+    svg { width: 16px; height: 16px; }
+    &:hover { color: var(--cs-accent-hover); }
+  }
+
+  .cs-copy { display: inline-flex; align-items: center; gap: 6px; }
+
+  .cs-copy-value { font-family: var(--cs-font-mono); font-size: 13px; overflow-wrap: anywhere; }
+
+  .cs-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 9999px;
+    animation: cs-spin 0.7s linear infinite;
+    vertical-align: -3px;
+  }
+
+  @keyframes cs-spin { to { transform: rotate(360deg); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cs-spinner { animation-duration: 2.4s; }
+  }
+
+  .cs-progress-field {
+    .cs-progress-label { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px; color: var(--cs-text-body); }
+    .cs-progress { margin-top: 4px; }
+    .cs-progress-hint { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--cs-text-muted); }
+  }
+
+  .cs-progress > .cs-progress-success { background-color: var(--cs-success); }
+
+  .cs-progress > .cs-progress-warning { background-color: var(--cs-warning-fill); }
+
+  .cs-progress > .cs-progress-error { background-color: var(--cs-error); }
+
+  .cs-token-group { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .cs-token {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 4px 2px 10px;
+    border: 1px solid var(--cs-border-input);
+    border-radius: var(--cs-radius-item);
+    background-color: var(--cs-bg-shaded);
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-body);
+
+    button { display: inline-flex; padding: 2px; border-radius: 4px; color: var(--cs-text-secondary); cursor: pointer; }
+    button:hover { color: var(--cs-text-heading); }
+    button svg { width: 12px; height: 12px; }
+  }
+
+  .cs-token-readonly { padding-right: 10px; }
+
+  .cs-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    > li {
+      position: relative;
+      display: grid;
+      grid-template-columns: 16px minmax(0, 1fr);
+      column-gap: 10px;
+      padding-bottom: 16px;
+    }
+
+    > li:not(:last-child)::before {
+      content: "";
+      position: absolute;
+      left: 7.5px;
+      top: 22px;
+      bottom: 2px;
+      width: 1px;
+      background-color: var(--cs-border-divider);
+    }
+
+    .cs-step-icon { padding-top: 2px; }
+    .cs-step-icon svg { width: 16px; height: 16px; }
+    .cs-step-title { font-size: 14px; line-height: 20px; color: var(--cs-text-body); }
+    .cs-step-detail { font-size: 12px; line-height: 16px; color: var(--cs-text-muted); }
+  }
+
+  .cs-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
+  }
+
+  .cs-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 20px 20px;
+    background-color: var(--cs-bg-container);
+    border: 1px solid var(--cs-border-container);
+    border-radius: var(--cs-radius-container);
+    color: var(--cs-text-body);
+  }
+
+  .cs-card-title { font-size: 16px; line-height: 20px; font-weight: 700; }
+
+  a.cs-card-title { color: var(--cs-accent); text-decoration: none; }
+
+  a.cs-card-title:hover { color: var(--cs-accent-hover); text-decoration: underline; }
+
+  a.cs-card { text-decoration: none; transition: border-color 90ms linear; }
+
+  a.cs-card:hover { border-color: var(--cs-accent); }
+
+  .cs-badge-severity-critical { background-color: #870303; color: #f9f9fa; }
+
+  .cs-badge-severity-high { background-color: #ce3311; color: #f9f9fa; }
+
+  .cs-badge-severity-medium { background-color: #f89256; color: #0f141a; }
+
+  .cs-badge-severity-low { background-color: #f2cd54; color: #0f141a; }
+
+  .cs-badge-severity-neutral { background-color: #656871; color: #f9f9fa; }
+
+  .cs-breadcrumb-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    li { display: inline-flex; align-items: center; gap: 8px; }
+    li + li::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-top: 1.5px solid var(--cs-text-disabled);
+      border-right: 1.5px solid var(--cs-text-disabled);
+      transform: rotate(45deg);
+      margin-right: 2px;
+    }
+  }
+
+  .cs-expandable > summary:focus-visible {
+    outline: 2px solid var(--cs-focus);
+    outline-offset: -2px;
+    border-radius: var(--cs-radius-item);
+  }
+
+  .cs-expandable-container > summary:focus-visible {
+    border-radius: var(--cs-radius-container) var(--cs-radius-container) var(--cs-radius-item) var(--cs-radius-item);
+  }
+
+  .cs-expandable-container:not([open]) > summary:focus-visible { border-radius: var(--cs-radius-container); }
+}
+
+@layer components {
+  /* Counter grids go two-up on phones instead of one long column. */
+  @media (max-width: 767px) {
+    .cs-kv-3:has(.cs-kv-value-lg), .cs-kv-4, .cs-kv-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (min-width: 1024px) {
+    .cs-kv-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  }
+
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .cs-kv-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+}
+
+@layer components {
+  /* Inside a field grid the grid gap does the spacing. */
+  .cs-field-grid > .cs-field + .cs-field { margin-top: 0; }
+
+  /* Selects sitting directly in a filter bar size to their content, like
+   * Cloudscape's filter selects. A select inside its own width wrapper
+   * keeps filling that wrapper. */
+  .cs-filter-bar > .cs-select { width: auto; min-width: 160px; }
+
+  /* aria-sort belongs on the <th>; darken the sorted column's icon from there. */
+  th[aria-sort]:not([aria-sort="none"]) .cs-sort svg { color: var(--cs-text-heading); }
+}
+
+@layer components {
+  /* Absolutely positioned descendants (sr-only labels, header rules) need
+   * the scroll wrapper as their containing block, or they escape its
+   * clipping and widen the whole page on phones. */
+  .cs-table-wrap { position: relative; }
+}
+
+@layer components {
+  /* The calendar button follows its field's state without JS bookkeeping. */
+  .cs-datepicker:has(> input:disabled, > input[readonly]) .cs-datepicker-trigger {
+    color: var(--cs-text-disabled);
+    background: none;
+    cursor: default;
+  }
+}
+
+@layer components {
+  /* A labelled setting row: title, then a description at body size with a
+   * readable measure. (cs-field-description is the smaller hint that sits
+   * under a form label, not under a row title.) */
+  .cs-setting-title {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 700;
+    color: var(--cs-text-heading);
+  }
+
+  .cs-setting-description {
+    margin-top: 2px;
+    max-width: 72ch;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-secondary);
+  }
+}
+
+@layer components {
+  /* Hints under a field shouldn't run the full width of a wide container. */
+  .cs-field-description, .cs-field-hint, .cs-container-description, .cs-description { max-width: 80ch; }
+}
+
+
+/* ---------- links in running text ----------
+ * A link inside a sentence can't rely on colour alone (WCAG 1.4.1): the
+ * console's red is 3.37:1 against body text in light mode and 1.86:1 in dark. Links in prose get an
+ * underline; standalone links and link-style buttons don't. Unlayered so it
+ * beats the no-underline utilities in older markup. */
+:root.cs-console .cs-main :is(p, .cs-alert, .cs-description, .cs-field-hint, .cs-setting-description, .cs-empty) a:not([class*="cs-btn"]) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+
+/* ---------- touch targets on phones ----------
+ * Cloudscape's 32px controls are a desktop density. Below the sm
+ * breakpoint the console's tappable controls grow to 40px. */
+@media (max-width: 639px) {
+  @layer components {
+    .cs-btn { min-height: 40px; }
+    .cs-btn-link, .cs-btn-inline-icon { min-height: 40px; min-width: 40px; }
+    .cs-sidenav-link { padding-top: 10px; padding-bottom: 10px; }
+    .cs-sidenav-group > summary { padding-top: 10px; padding-bottom: 10px; }
+    .cs-menu-item { padding-top: 10px; padding-bottom: 10px; }
+    .cs-tab, .cs-segment { padding-top: 10px; padding-bottom: 10px; }
+    .cs-input, .cs-select { min-height: 40px; font-size: 16px; }
+    .cs-calendar-day { padding: 8px 0; }
+  }
+}
+
+@layer components {
+  /* Cloudscape's "primary" link: underlined, for a link that sits inside
+   * a run of text outside a paragraph (a key-value line, a table cell). */
+  .cs-link-inline { text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+}
+
+@layer components {
+  /* The opt-in beta notice under the top nav (layouts/admin.html+console.erb).
+   * Cloudscape's info treatment, one quiet line that wraps on phones. Its
+   * gutters match .cs-breadcrumbs and .cs-main so the text lines up with the
+   * page below it. */
+  .cs-beta-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 16px;
+    padding: 11px 16px;
+    background-color: var(--cs-info-bg);
+    border-bottom: 1px solid var(--cs-border-divider-secondary);
+    color: var(--cs-text-body);
+    font-size: 14px;
+    line-height: 20px;
+
+    p { margin: 0; min-width: 0; }
+    form { display: inline-flex; }
+  }
+
+  .cs-beta-bar-actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 16px;
+  }
+
+  @media (min-width: 640px) {
+    .cs-beta-bar { padding-left: 24px; padding-right: 24px; }
+  }
+
+  @media (min-width: 1024px) {
+    .cs-beta-bar { padding-left: 40px; padding-right: 40px; }
+  }
+
+  .cs-beta-bar-link {
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--cs-info);
+    font: inherit;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover { text-decoration: underline; text-underline-offset: 2px; }
+    &:focus-visible { outline: 2px solid var(--cs-info); outline-offset: 2px; border-radius: 2px; }
+  }
+}
+
+@layer components {
+  /* Cloudscape filter patterns: property filter (participants list, travel
+   * calendar) and the text filter's count + no-match feedback (table view).
+   * Tokens sit under the input, joined by the fixed operation, with
+   * "Clear filters" after the last token; "N matches" sits beside the input. */
+  .cs-property-filter { padding: 0 20px 16px; }
+
+  .cs-property-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+  }
+
+  .cs-property-filter-control {
+    position: relative;
+    flex: 1 1 320px;
+    min-width: 0;
+    max-width: 640px;
+  }
+
+  .cs-property-filter-control[hidden],
+  .cs-property-filter-fallback[hidden] { display: none; }
+
+  .cs-property-filter-fallback {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+  }
+
+  .cs-property-filter-menu {
+    left: 0;
+    right: 0;
+    max-width: none;
+    max-height: 320px;
+    overflow-y: auto;
+    list-style: none;
+  }
+
+  .cs-property-filter-menu[hidden] { display: none; }
+
+  .cs-property-filter-menu [role="option"] {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 6px 16px;
+    border: 1px solid transparent;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-body);
+    cursor: pointer;
+
+    &:hover { background-color: var(--cs-bg-hover); }
+  }
+
+  .cs-property-filter-menu [role="option"][aria-selected="true"] {
+    background-color: var(--cs-bg-selected);
+    border-color: var(--cs-accent);
+  }
+
+  .cs-property-filter-menu [role="option"][aria-current="true"]::after {
+    content: "✓";
+    margin-left: auto;
+    color: var(--cs-accent);
+  }
+
+  .cs-property-filter-option-meta { font-size: 12px; color: var(--cs-text-muted); }
+
+  .cs-property-filter-empty-option {
+    padding: 6px 16px;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-muted);
+  }
+
+  .cs-property-filter-count,
+  .cs-text-filter-count {
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-muted);
+    white-space: nowrap;
+  }
+
+  .cs-text-filter-count[hidden] { display: none; }
+
+  .cs-filter-tokens {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+
+    > .cs-token-group { list-style: none; margin: 0; padding: 0; }
+  }
+
+  .cs-filter-tokens[hidden] { display: none; }
+
+  .cs-filter-token-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .cs-filter-operation {
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--cs-text-muted);
+  }
+
+  .cs-filter-token-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cs-filter-token-operator { color: var(--cs-text-muted); }
+
+  .cs-token > a,
+  .cs-token > button {
+    display: inline-flex;
+    flex-shrink: 0;
+    padding: 2px;
+    border-radius: 4px;
+    color: var(--cs-text-secondary);
+    cursor: pointer;
+
+    &:hover { color: var(--cs-text-heading); }
+    &:focus-visible { outline: 2px solid var(--cs-focus); outline-offset: 1px; }
+    svg { width: 12px; height: 12px; }
+  }
+
+  .cs-filter-clear { padding-left: 4px; padding-right: 4px; }
+
+  /* The travel calendar's no-match state is a live region the filter
+   * controller toggles with [hidden]. */
+  .cs-empty[hidden] { display: none; }
+
+  /* An empty state spanning a wide, horizontally scrolling table stays in
+   * view instead of centring across every column. */
+  .cs-table-wrap:has(.cs-table-empty-cell) { container-type: inline-size; }
+  .cs-table-empty-cell > .cs-empty { position: sticky; left: 0; width: 100cqw; }
+}
+
+/* Divided key-value grids draw the rule between columns only: the first
+ * item of every row starts flush, not just the first item overall. */
+@media (min-width: 768px) {
+  :root.cs-console .cs-kv-2.cs-kv-divided > :nth-child(2n + 1),
+  :root.cs-console .cs-kv-3.cs-kv-divided > :nth-child(3n + 1),
+  :root.cs-console .cs-kv-4.cs-kv-divided > :nth-child(4n + 1) {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
+/* Form validation (cloudscape.design/patterns/general/errors/validation):
+ * the "- optional" label marker, inline warnings that sit where errors do,
+ * invalid selects, and the end-of-form error alert. */
+@layer components {
+  .cs-field-optional { font-weight: 400; font-style: italic; color: var(--cs-text-muted); }
+
+  fieldset.cs-field { min-width: 0; margin: 0; padding: 0; border: 0; }
+
+  fieldset.cs-field > legend.cs-field-label { padding: 0; }
+
+  .cs-field-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 700;
+    color: var(--cs-warning);
+
+    svg { width: 14px; height: 14px; margin-top: 1px; flex-shrink: 0; }
+  }
+
+  :root.cs-console .cs-select[aria-invalid="true"],
+  :root.cs-console textarea[aria-invalid="true"] {
+    border-color: var(--cs-error);
+    border-left-width: 4px;
+  }
+
+  :root.cs-console input[type="checkbox"][aria-invalid="true"],
+  :root.cs-console input[type="radio"][aria-invalid="true"] {
+    outline: 2px solid var(--cs-error);
+    outline-offset: 1px;
+  }
+
+  .cs-form-error:focus { outline: none; }
+
+  /* Rails wraps an invalid control in .field_with_errors; the console marks
+   * it with aria-invalid instead, so the wrapper mustn't affect layout. */
+  :root.cs-console .cs-field .field_with_errors { display: contents; }
+
+  .cs-form-error-list { margin-top: 2px; padding-left: 18px; list-style: disc; }
+}
