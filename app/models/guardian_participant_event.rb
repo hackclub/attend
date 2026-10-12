@@ -16,10 +16,7 @@ class GuardianParticipantEvent < ApplicationRecord
 
   enum :status, { pending: "pending", in_progress: "in_progress", completed: "completed" }
 
-  # Checked on the association, not the foreign key: onboarding autosave
-  # validates a brand-new guardian and its link together before saving either,
-  # and guardian_id is only copied from the guardian once it has been saved.
-  validates :guardian, presence: true
+  validates :guardian_id, presence: true
   validates :participant_event_id, presence: true, uniqueness: { scope: :guardian_id }
   # Guardian#email_differs_from_participants can't see this pairing until the
   # link exists, so a freshly created guardian is checked here instead. Create
