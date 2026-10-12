@@ -90,6 +90,40 @@ RSpec.describe Privacy::Eraser do
     expect(result.retained).to include(a_hash_including(type: "signed documents", count: 1))
   end
 
+  describe "matching only the subject" do
+    it "leaves blank-email rows alone when the hub sends no emails" do
+      other = create(:participant_event, event: past_event)
+      blank = other.emergency_contacts.create!(name: "Fictional Contact", phone: "+12025550102", email: "")
+
+      result = described_class.new(subject_for(slack_id: "U0NOBODY")).call(dry_run: false)
+
+      expect(result.found).to be(false)
+      expect(EmergencyContact.exists?(blank.id)).to be(true)
+    end
+
+    it "keeps texts and tickets from a phone number someone staying on file shares" do
+      parent = create(:guardian, phone: participant.phone)
+      create(:guardian_participant_event, guardian: parent, participant_event: create(:participant_event, event: past_event))
+      ticket = Ticket.create!(channel: "sms", phone_number: participant.phone)
+      sms = AutomatedSmsLog.create!(phone_number: participant.phone, body: "fictional", source: "spec", sent_at: Time.current)
+
+      described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false)
+
+      expect(Ticket.exists?(ticket.id)).to be(true)
+      expect(AutomatedSmsLog.exists?(sms.id)).to be(true)
+      expect(Guardian.exists?(parent.id)).to be(true)
+    end
+
+    it "erases texts and unfiled tickets from a number only they had" do
+      participant.update!(phone: "+12025550177")
+      ticket = Ticket.create!(channel: "sms", phone_number: "+12025550177")
+
+      described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false)
+
+      expect(Ticket.exists?(ticket.id)).to be(false)
+    end
+  end
+
   describe "manual review" do
     def expect_review(reason, emails: [ "attendee@example.com" ])
       expect { described_class.new(subject_for(emails:)).call(dry_run: false) }

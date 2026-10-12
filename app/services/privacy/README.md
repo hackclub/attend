@@ -49,9 +49,13 @@ Emails are compared case-insensitively.
 - **Users** by `email`, `hack_club_account_id` (the subject's `identity_id`) or `slack_user_id`
 - **Participants** by `email`, linked user, or a `slack_user_id` on the participant or any of their registrations
 - **Guardians** by `email` or linked user
-- Loose rows by any of the matched people's emails or phone numbers: emergency
-  contacts on other people's registrations, invitations, email logs, message
-  deliveries, automated SMS logs and support tickets
+- Emergency contacts on other people's registrations, by the subject's own emails
+- Invitations, email logs and message deliveries, by any of the matched people's emails
+- Automated SMS logs and support tickets, by the matched people's phone numbers.
+  A number that anyone staying on file also has is never used, since children
+  often give a parent's number. Tickets filed against another person always stay
+
+An empty email list matches nothing.
 
 ## Needs a human first
 

@@ -107,12 +107,12 @@ module Privacy
       slack_id = @subject.slack_id
       identity_id = @subject.identity_id
 
-      users = User.where("lower(email) IN (?)", emails.presence || [ "" ])
+      users = email_in(User, :email, emails)
       users = users.or(User.where(hack_club_account_id: identity_id)) if identity_id
       users = users.or(User.where(slack_user_id: slack_id)) if slack_id
       user_ids = users.pluck(:id)
 
-      participants = Participant.where("lower(email) IN (?)", emails.presence || [ "" ]).or(Participant.where(user_id: user_ids))
+      participants = email_in(Participant, :email, emails).or(Participant.where(user_id: user_ids))
       if slack_id
         participants = participants.or(Participant.where(slack_user_id: slack_id))
                                    .or(Participant.where(id: ParticipantEvent.where(slack_user_id: slack_id).select(:participant_id)))
@@ -123,7 +123,7 @@ module Privacy
       # guardians matched directly, plus anyone whose only reason to be here
       # is a child being erased: with the registration gone, their details
       # serve nothing
-      matched_guardian_ids = Guardian.where("lower(email) IN (?)", emails.presence || [ "" ]).or(Guardian.where(user_id: user_ids)).pluck(:id)
+      matched_guardian_ids = email_in(Guardian, :email, emails).or(Guardian.where(user_id: user_ids)).pluck(:id)
       linked_guardian_ids = GuardianParticipantEvent.where(participant_event_id: participant_event_ids).distinct.pluck(:guardian_id)
       orphaned_guardian_ids = Guardian.where(id: linked_guardian_ids)
                                       .where.not(id: GuardianParticipantEvent.where.not(participant_event_id: participant_event_ids).select(:guardian_id))
@@ -135,16 +135,23 @@ module Privacy
       all_emails = (emails +
         User.where(id: user_ids).pluck(:email) +
         Participant.where(id: participant_ids).pluck(:email) +
-        Guardian.where(id: guardian_ids).pluck(:email)).compact.map { |email| email.strip.downcase }.uniq
-      # phones are encrypted, so they're read back through the models
+        Guardian.where(id: guardian_ids).pluck(:email)).compact.map { |email| email.strip.downcase }.compact_blank.uniq
+      # phones are encrypted, so they're read back through the models. A child
+      # often gives a parent's number, so a phone anyone staying on file also
+      # has is never used to match: it would sweep up their texts and tickets
       phones = (User.where(id: user_ids).map(&:phone_number) +
         Participant.where(id: participant_ids).map(&:phone) +
         Guardian.where(id: guardian_ids).map(&:phone)).compact_blank.uniq
-      email_match = all_emails.presence || [ "" ]
+      phones = phones.reject do |phone|
+        Participant.where(phone:).where.not(id: participant_ids).exists? ||
+          Guardian.where(phone:).where.not(id: guardian_ids).exists? ||
+          EmergencyContact.where(phone:).where.not(id: EmergencyContact.where(participant_event_id: participant_event_ids).select(:id)).exists?
+      end
 
+      # a ticket filed against someone else stays, even from a shared number
       tickets = Ticket.where(subject_type: "Participant", subject_id: participant_ids)
                       .or(Ticket.where(subject_type: "Guardian", subject_id: guardian_ids))
-      tickets = tickets.or(Ticket.where(phone_number: phones)) if phones.any?
+      tickets = tickets.or(Ticket.where(subject_id: nil, phone_number: phones)) if phones.any?
 
       People.new(
         users: user_ids,
@@ -154,18 +161,29 @@ module Privacy
         guardian_links: guardian_link_ids,
         emails: all_emails,
         phones: phones,
-        emergency_contacts: EmergencyContact.where("lower(email) IN (?)", email_match)
+        # someone listed as an emergency contact is matched on the emails the
+        # hub sent for them only, not on the emails of everyone being erased
+        emergency_contacts: email_in(EmergencyContact, :email, emails)
                                             .or(EmergencyContact.where(participant_event_id: participant_event_ids))
                                             .or(EmergencyContact.where(guardian_participant_event_id: guardian_link_ids)).pluck(:id),
-        invitations: Invitation.where("lower(email) IN (?)", email_match).pluck(:id),
-        email_logs: EmailLog.where("lower(to_address) IN (?)", email_match)
+        invitations: email_in(Invitation, :email, all_emails).pluck(:id),
+        email_logs: email_in(EmailLog, :to_address, all_emails)
                             .or(EmailLog.where(emailable_id: user_ids + participant_ids + participant_event_ids + guardian_ids + guardian_link_ids)).pluck(:id),
-        message_deliveries: MessageDelivery.where("lower(recipient_email) IN (?)", email_match)
+        message_deliveries: email_in(MessageDelivery, :recipient_email, all_emails)
                                            .or(MessageDelivery.where(participant_event_id: participant_event_ids))
                                            .or(MessageDelivery.where(guardian_id: guardian_ids)).pluck(:id),
         sms_logs: phones.any? ? AutomatedSmsLog.where(phone_number: phones).pluck(:id) : [],
         tickets: tickets.pluck(:id)
       )
+    end
+
+    # an empty list matches nothing. Matching on "" instead would sweep up
+    # every row whose email is blank
+    def email_in(model, column, emails)
+      emails = emails.compact_blank
+      return model.where("1=0") if emails.empty?
+
+      model.where("lower(#{model.connection.quote_column_name(column)}) IN (?)", emails)
     end
 
     def found?
@@ -176,7 +194,7 @@ module Privacy
       raise ManualReviewRequired, "staff_account" if staff?
       raise ManualReviewRequired, "event_not_over" if open_registration?
       raise ManualReviewRequired, "safeguarding_record" if safeguarding_record?
-      raise ManualReviewRequired, "banned" if BanEmail.where("lower(email) IN (?)", people.emails.presence || [ "" ]).exists?
+      raise ManualReviewRequired, "banned" if email_in(BanEmail, :email, people.emails).exists?
     end
 
     # staff accounts authored incidents, notes, messages and audit history
@@ -211,7 +229,7 @@ module Privacy
       pes = people.participant_events
       Incident.where(participant_event_id: pes).exists? ||
         IncidentParticipant.where(participant_event_id: pes).exists? ||
-        IncidentReport.where(user_id: users).or(IncidentReport.where("lower(reporter_email) IN (?)", people.emails.presence || [ "" ])).exists? ||
+        IncidentReport.where(user_id: users).or(email_in(IncidentReport, :reporter_email, people.emails)).exists? ||
         IncidentHelpingStaff.where(user_id: users).exists? ||
         IncidentComment.where(user_id: users).exists? ||
         IncidentReportComment.where(user_id: users).exists?
