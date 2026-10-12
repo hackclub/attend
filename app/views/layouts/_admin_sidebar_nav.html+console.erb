@@ -1,11 +1,44 @@
 <%# Cloudscape side navigation, shared by the desktop rail and the mobile drawer. %>
 <%# Locals: close_action ("click->mobile-menu#close" in the drawer, nil on desktop) %>
+<%# Collapsed, the desktop rail shows only the icons; console_nav_controller.js
+    gives each one a tooltip from its (visually hidden) label. %>
 <% link_data = close_action ? { action: close_action } : {} %>
-<% nav_link = ->(label, path, active) do
-     link_to label, path, class: "cs-sidenav-link", "aria-current": cs_current(active), data: link_data
+<% icons = {
+     events: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
+     overview: "M4 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10-3a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1v-7z",
+     participants: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z",
+     change_requests: "M16.862 4.487l1.651-1.651a2.121 2.121 0 013 3l-1.651 1.651m-3-3L7.5 12.198V16.5H11.8l8.362-8.362m-3-3L20.162 7.5M5 20.25h14A2.25 2.25 0 0021.25 18V6A2.25 2.25 0 0019 3.75H5A2.25 2.25 0 002.75 6v12A2.25 2.25 0 005 20.25z",
+     incidents: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
+     check_ins: "M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z",
+     travel: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
+     rooming: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
+     groups: "M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z",
+     messages: "M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",
+     exports: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4",
+     event_audit: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4",
+     series: "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10",
+     support: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z",
+     users: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
+     conduct: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
+     bans: "M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636",
+     incident_reports: "M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2z",
+     logs: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+     audit_log: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+     email_logs: "M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.206",
+     api_tokens: "M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z",
+     settings: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z"
+   } %>
+<% icon = ->(name) do
+     tag.svg(tag.path("stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: icons.fetch(name)),
+       class: "cs-sidenav-icon", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", "aria-hidden": "true")
+   end %>
+<% nav_link = ->(label, path, active, icon_name) do
+     link_to path, class: "cs-sidenav-link", "aria-current": cs_current(active), data: link_data do
+       icon.call(icon_name) + tag.span(label, class: "cs-sidenav-label")
+     end
    end %>
 <% chevron = capture do %>
-  <svg fill="none" stroke="currentColor" viewBox="0 0 12 12" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 2l4 4-4 4"/></svg>
+  <svg class="cs-sidenav-chevron" fill="none" stroke="currentColor" viewBox="0 0 12 12" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 2l4 4-4 4"/></svg>
 <% end %>
 
 <% if current_event %>
@@ -21,35 +54,35 @@
 <% end %>
 
 <nav class="cs-sidenav-section" aria-label="Admin">
-  <%= nav_link.call("All events", admin_root_path, request.path == admin_root_path) %>
+  <%= nav_link.call("All events", admin_root_path, request.path == admin_root_path, :events) %>
 </nav>
 
 <% if current_event %>
   <div class="cs-sidenav-divider"></div>
   <%# No section title: the header above already names the event. %>
   <div class="cs-sidenav-section">
-    <%= nav_link.call("Overview", admin_event_dashboard_path(current_event.slug), request.path == admin_event_dashboard_path(current_event.slug)) %>
-    <%= nav_link.call("Participants", admin_event_participants_path(current_event), request.path.include?("/participants")) %>
+    <%= nav_link.call("Overview", admin_event_dashboard_path(current_event.slug), request.path == admin_event_dashboard_path(current_event.slug), :overview) %>
+    <%= nav_link.call("Participants", admin_event_participants_path(current_event), request.path.include?("/participants"), :participants) %>
     <% if current_user.global_admin? || current_user.event_admin_for?(current_event) || current_user.ops_for?(current_event) || current_user.safeguarding_lead_for?(current_event) %>
-      <%= nav_link.call("Change requests", admin_event_registration_change_requests_path(current_event), request.path.include?("/registration_change_requests")) %>
+      <%= nav_link.call("Change requests", admin_event_registration_change_requests_path(current_event), request.path.include?("/registration_change_requests"), :change_requests) %>
     <% end %>
-    <%= nav_link.call("Incidents", admin_event_incidents_path(current_event), request.path.include?("/incidents") && !request.path.start_with?("/admin/incidents")) %>
-    <%= nav_link.call("Check-ins", admin_event_scans_path(current_event), request.path.include?("/scans")) %>
+    <%= nav_link.call("Incidents", admin_event_incidents_path(current_event), request.path.include?("/incidents") && !request.path.start_with?("/admin/incidents"), :incidents) %>
+    <%= nav_link.call("Check-ins", admin_event_scans_path(current_event), request.path.include?("/scans"), :check_ins) %>
     <% if current_event.travel_enabled? %>
-      <%= nav_link.call("Travel calendar", admin_event_travel_path(current_event), request.path == admin_event_travel_path(current_event)) %>
+      <%= nav_link.call("Travel calendar", admin_event_travel_path(current_event), request.path == admin_event_travel_path(current_event), :travel) %>
     <% end %>
     <% if current_event.accommodation_enabled? %>
-      <%= nav_link.call("Rooming", admin_event_rooming_wizard_path(current_event), request.path.include?("/rooming_wizard")) %>
+      <%= nav_link.call("Rooming", admin_event_rooming_wizard_path(current_event), request.path.include?("/rooming_wizard"), :rooming) %>
     <% end %>
     <% if current_event.groups_enabled? %>
-      <%= nav_link.call("Groups", admin_event_groups_path(current_event), request.path.include?("/groups")) %>
+      <%= nav_link.call("Groups", admin_event_groups_path(current_event), request.path.include?("/groups"), :groups) %>
     <% end %>
-    <%= nav_link.call("Messages", admin_event_messages_path(current_event), request.path.include?("/messages")) %>
+    <%= nav_link.call("Messages", admin_event_messages_path(current_event), request.path.include?("/messages"), :messages) %>
     <%# These two used to be reachable only from the dashboard's quick-actions grid. %>
-    <%= nav_link.call("Exports", admin_event_exports_path(current_event), request.path.include?("/exports")) %>
+    <%= nav_link.call("Exports", admin_event_exports_path(current_event), request.path.include?("/exports"), :exports) %>
     <%# Same gate as AuditLogsController#require_audit_access, so the link never dead-ends. %>
     <% if current_user.global_admin? || current_user.event_role_assignments.exists?(role: :event_admin) %>
-      <%= nav_link.call("Event audit log", admin_audit_logs_path(event_id: current_event.id), request.path.start_with?("/admin/audit_logs") && params[:event_id] == current_event.id.to_s) %>
+      <%= nav_link.call("Event audit log", admin_audit_logs_path(event_id: current_event.id), request.path.start_with?("/admin/audit_logs") && params[:event_id] == current_event.id.to_s, :event_audit) %>
     <% end %>
   </div>
 <% end %>
@@ -58,7 +91,7 @@
   <div class="cs-sidenav-divider"></div>
   <div class="cs-sidenav-section">
     <p class="cs-sidenav-section-title">Series</p>
-    <%= nav_link.call("Event series", admin_series_index_path, request.path.start_with?("/admin/series")) %>
+    <%= nav_link.call("Event series", admin_series_index_path, request.path.start_with?("/admin/series"), :series) %>
   </div>
 <% end %>
 
@@ -66,27 +99,27 @@
   <div class="cs-sidenav-divider"></div>
   <div class="cs-sidenav-section">
     <p class="cs-sidenav-section-title">Administration</p>
-    <%= nav_link.call("Support chat", support_tickets_path, request.path.start_with?("/support")) %>
+    <%= nav_link.call("Support chat", support_tickets_path, request.path.start_with?("/support"), :support) %>
 
     <% if current_user.global_admin? %>
-      <%= nav_link.call("Users", admin_users_path, request.path.start_with?("/admin/users")) %>
+      <%= nav_link.call("Users", admin_users_path, request.path.start_with?("/admin/users"), :users) %>
 
       <% conduct_active = request.path.start_with?("/admin/bans") || request.path.start_with?("/admin/incidents") %>
       <details class="cs-sidenav-group" <%= "open" if conduct_active %>>
-        <summary><%= chevron %>Conduct</summary>
-        <%= nav_link.call("Ban list", admin_bans_path, request.path.start_with?("/admin/bans")) %>
-        <%= nav_link.call("Incident reports", admin_incidents_path, request.path.start_with?("/admin/incidents")) %>
+        <summary><%= chevron %><%= icon.call(:conduct) %><span class="cs-sidenav-label">Conduct</span></summary>
+        <%= nav_link.call("Ban list", admin_bans_path, request.path.start_with?("/admin/bans"), :bans) %>
+        <%= nav_link.call("Incident reports", admin_incidents_path, request.path.start_with?("/admin/incidents"), :incident_reports) %>
       </details>
 
       <% logs_active = request.path.start_with?("/admin/audit_logs") || request.path.start_with?("/admin/email_logs") %>
       <details class="cs-sidenav-group" <%= "open" if logs_active %>>
-        <summary><%= chevron %>Logs</summary>
-        <%= nav_link.call("Audit log", admin_audit_logs_path, request.path.start_with?("/admin/audit_logs") && params[:event_id].blank?) %>
-        <%= nav_link.call("Email logs", admin_email_logs_path, request.path.start_with?("/admin/email_logs")) %>
+        <summary><%= chevron %><%= icon.call(:logs) %><span class="cs-sidenav-label">Logs</span></summary>
+        <%= nav_link.call("Audit log", admin_audit_logs_path, request.path.start_with?("/admin/audit_logs") && params[:event_id].blank?, :audit_log) %>
+        <%= nav_link.call("Email logs", admin_email_logs_path, request.path.start_with?("/admin/email_logs"), :email_logs) %>
       </details>
 
-      <%= nav_link.call("API tokens", admin_global_api_tokens_path, request.path.start_with?("/admin/global_api_tokens")) %>
-      <%= nav_link.call("Settings", admin_settings_path, request.path.start_with?("/admin/settings")) %>
+      <%= nav_link.call("API tokens", admin_global_api_tokens_path, request.path.start_with?("/admin/global_api_tokens"), :api_tokens) %>
+      <%= nav_link.call("Settings", admin_settings_path, request.path.start_with?("/admin/settings"), :settings) %>
     <% end %>
   </div>
 <% end %>
