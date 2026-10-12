@@ -2,6 +2,7 @@ puts "Seeding database..."
 
 event = Event.find_or_create_by!(slug: "midnight-vienna-2026") do |e|
   e.name = "Midnight, Vienna 2026"
+  e.support_email = "midnight@hackclub.com"
   e.starts_at = DateTime.new(2026, 6, 15, 18, 0, 0)
   e.ends_at = DateTime.new(2026, 6, 18, 12, 0, 0)
   e.location_city = "Vienna"
@@ -21,14 +22,12 @@ puts "Created event: #{event.name}"
 if Rails.env.development?
   admin = User.find_or_create_by!(email: "admin@hackclub.com") do |u|
     u.name = "Admin User"
-    u.password = "password123"
     u.global_role = "global_admin"
   end
   puts "Created admin user: #{admin.email}"
 
   event_admin = User.find_or_create_by!(email: "eventadmin@hackclub.com") do |u|
     u.name = "Event Admin"
-    u.password = "password123"
     u.global_role = "no_role"
   end
   EventRoleAssignment.find_or_create_by!(user: event_admin, event: event, role: "event_admin")
@@ -36,7 +35,6 @@ if Rails.env.development?
 
   ops_staff = User.find_or_create_by!(email: "ops@hackclub.com") do |u|
     u.name = "Ops Staff"
-    u.password = "password123"
     u.global_role = "no_role"
   end
   EventRoleAssignment.find_or_create_by!(user: ops_staff, event: event, role: "ops")
@@ -44,7 +42,6 @@ if Rails.env.development?
 
   limited_staff = User.find_or_create_by!(email: "limited@hackclub.com") do |u|
     u.name = "Limited Staff"
-    u.password = "password123"
     u.global_role = "no_role"
   end
   EventRoleAssignment.find_or_create_by!(user: limited_staff, event: event, role: "limited")
@@ -52,7 +49,6 @@ if Rails.env.development?
 
   safeguarding = User.find_or_create_by!(email: "safeguarding@hackclub.com") do |u|
     u.name = "Safeguarding Lead"
-    u.password = "password123"
     u.global_role = "no_role"
   end
   EventRoleAssignment.find_or_create_by!(user: safeguarding, event: event, role: "safeguarding_lead")
@@ -60,7 +56,6 @@ if Rails.env.development?
 
   participant_user = User.find_or_create_by!(email: "participant@example.com") do |u|
     u.name = "Test Participant"
-    u.password = "password123"
     u.global_role = "no_role"
   end
 
