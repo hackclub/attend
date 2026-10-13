@@ -38,7 +38,10 @@ Responses:
   Once someone is erased, later calls answer `found: false`.
 - `401 {error}` for a bad token, `400 action_mismatch`, `409 replayed`
 - `409 {error: "manual_review_required", reason}`, see below
-- `503` when the JWKS can't be fetched. The hub retries.
+- `503 {error}` for anything worth retrying: `jwks_unavailable` when the JWKS
+  can't be fetched, `storage_unavailable` when attachment files couldn't be
+  deleted, `database_busy` when the matched rows stayed locked by other work.
+  The hub retries with a fresh token.
 
 Only the `request_id`, dry-run flag and outcome are logged.
 
@@ -46,14 +49,31 @@ Only the `request_id`, dry-run flag and outcome are logged.
 
 Emails are compared case-insensitively.
 
-- **Users** by `email`, `hack_club_account_id` (the subject's `identity_id`) or `slack_user_id`
-- **Participants** by `email`, linked user, or a `slack_user_id` on the participant or any of their registrations
-- **Guardians** by `email` or linked user
+Accounts are matched only on what Hack Club Auth vouches for. Profiles carry
+emails and Slack IDs that anyone can type, so those can find a profile but
+never reach into an account on their own:
+
+- **Users** by `email` (synced from HCA at sign-in), `hack_club_account_id`
+  (the subject's `identity_id`), or `slack_user_id` when the Slack ID HCA
+  gives for that account agrees. The profile's Slack ID is a free-text override
+- **Participants** by linked user, or by their own `email` or `slack_user_id`
+- **Guardians** by linked user, or by their own `email`
+- Every profile on a matched account goes with it
+
+Anything that points at an account the subject's verified identifiers don't
+reach stops the run with `identity_conflict`: a participant or guardian
+matched on its own email or Slack ID but linked to an unmatched account, an
+account whose HCA identity differs from the subject's `identity_id`, or a
+participant found only through a Slack ID on a registration (typed by
+whoever registered them, often an organiser). A profile no account has
+claimed, like an imported one, is erased on its own email.
 - Emergency contacts on other people's registrations, by the subject's own emails
 - Invitations, email logs and message deliveries, by any of the matched people's emails
 - Automated SMS logs and support tickets, by the matched people's phone numbers.
   A number that anyone staying on file also has is never used, since children
   often give a parent's number. Tickets filed against another person always stay
+- Import batches whose uploaded CSV rows or per-row errors hold any of the
+  matched people's emails
 
 An empty email list matches nothing.
 
@@ -68,15 +88,33 @@ deal with the cause in Attend, then rerun the request from the hub.
 | `event_not_over` | A registration, guardian link or emergency-contact entry for an event that hasn't ended | Pulling someone out of an upcoming or running event changes organisers' headcount, rooming and medical lists, so organisers remove the registration first |
 | `safeguarding_record` | Named in an incident, or filed or commented on an incident report | Safeguarding records have their own retention rules, and the safeguarding lead decides |
 | `banned` | One of their emails is on a ban list | Erasing would lift the ban |
+| `identity_conflict` | An editable email or Slack ID leads to an account the subject's verified identifiers don't (see above) | It may be someone else's account; a human works out whose it is |
+| `import_in_progress` | An import holding their row is pending or running | The import would write its copy of them back |
 | `unexpected_reference` | A foreign key the eraser doesn't plan for | Something references them that needs a look; the whole run rolls back |
 
-Exports skip every check except `staff_account`.
+Exports skip every check except `staff_account` and `identity_conflict`.
+
+### Concurrent changes
+
+Matching, the checks and the erasure run in one transaction. The matched
+users, participants, registrations, guardians, guardian links and import
+batches are locked `FOR UPDATE` and their events `FOR SHARE`, then matched
+again; if the match moved while waiting, it goes round again. With those locks
+held, a role assignment, incident, registration or guardian link created
+mid-run waits for the erasure and then fails its foreign key, a role change or
+event date change waits, and an import can't be confirmed. Lock waits give up
+after 5 seconds with `503 database_busy`.
+
+Ban emails and incident reports filed by email have no foreign key to the
+person, so one added in the instant between the check and the commit isn't
+held off.
 
 ## What is erased
 
 All in one transaction, with PaperTrail switched off:
 
-- the user account, with its mobile and push tokens, passports, NFC tokens and badge redirect
+- the user account, with its mobile and push tokens, passports, NFC tokens,
+  badge redirect, and MCP OAuth grants, tokens and connection settings
 - the participant, with sibling-group memberships, headshot and public-profile photo
 - every registration and everything hanging off it: medical, dietary,
   accessibility, safeguarding info, accommodation, travel and travel legs,
@@ -89,17 +127,26 @@ All in one transaction, with PaperTrail switched off:
   their row and loses only the erased links
 - support tickets with their messages and notes, invitations, email logs and
   automated SMS logs
+- their rows in import batches. Their own rows are removed; where they're only
+  the parent or emergency contact on someone else's row, those columns come off
+  it. Per-row errors naming them go. Reported as `import_batches.rows_data` and
+  `import_batches.errors_data`, counting rows changed
 - PaperTrail versions and audit-log entries for every one of those rows.
   Versions they authored keep their content with `whodunnit` cleared
 
-Attachment rows go in the transaction; their blobs are purged after a real run
-commits.
+Attachment, variant and blob rows go in the transaction. On a real run the
+files are deleted from storage before it commits; if that fails, the whole run
+rolls back and answers `503 storage_unavailable`, so the hub's retry still
+finds the person and finishes. A commit that fails after the files went leaves
+the rows for the retry, which deletes the (already missing) files again
+harmlessly. A blob that something else still has attached is left alone.
 
 ## Kept, and reported as `retained`
 
 | Kept | Why |
 | --- | --- |
 | Signed documents in DocuSeal | Liability records. Attend's own consent rows go, so it no longer links to them |
+| Unsigned documents in DocuSeal | Sent for signature but never signed. The submission isn't cancelled or deleted from here; Attend's link to it goes |
 | Documents a guardian signed for a child who stays registered | The consent and any paper upload belong to the child's registration; the link to the erased guardian and their DocuSeal signing reference are removed from it and from its PaperTrail history |
 | Airtable copies | Synced to event organisers' Airtable bases, which aren't touched here |
 

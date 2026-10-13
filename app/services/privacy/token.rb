@@ -66,7 +66,7 @@ module Privacy
         raise Invalid, "invalid_aud" unless claims["aud"] == audience
         iat = claims["iat"]
         exp = claims["exp"]
-        raise Invalid, "invalid_lifetime" unless iat.is_a?(Integer) && exp.is_a?(Integer) && exp - iat <= MAX_LIFETIME
+        raise Invalid, "invalid_lifetime" unless iat.is_a?(Integer) && exp.is_a?(Integer) && exp >= iat && exp - iat <= MAX_LIFETIME
         raise Invalid, "expired" if exp + LEEWAY < now
         raise Invalid, "invalid_iat" if iat - LEEWAY > now
         raise Invalid, "invalid_jti" unless claims["jti"].is_a?(String) && claims["jti"].present?
@@ -125,9 +125,11 @@ module Privacy
         raise Invalid, "jwks_unavailable" unless response.is_a?(Net::HTTPSuccess)
 
         keys = JSON.parse(response.body).fetch("keys")
+        raise Invalid, "jwks_unavailable" unless keys.is_a?(Array)
+
         @keys = keys.filter_map { |jwk| [ jwk["kid"], public_key(jwk) ] if usable?(jwk) }.to_h
         @fetched_at = Time.now
-      rescue JSON::ParserError, KeyError, SocketError, SystemCallError, Net::OpenTimeout, Net::ReadTimeout
+      rescue Invalid, JSON::ParserError, KeyError, TypeError, ArgumentError, OpenSSL::OpenSSLError, SocketError, SystemCallError, Net::OpenTimeout, Net::ReadTimeout
         raise Invalid, "jwks_unavailable"
       end
 

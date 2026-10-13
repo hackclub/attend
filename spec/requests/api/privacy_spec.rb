@@ -74,6 +74,16 @@ RSpec.describe "Privacy hub endpoints", type: :request do
     expect(response).to have_http_status(:service_unavailable)
   end
 
+  it "answers 503 when attachment files can't be deleted, leaving the subject for the retry" do
+    allow_any_instance_of(Privacy::Eraser).to receive(:delete_files!).and_raise(Privacy::Eraser::Unavailable.new("storage_unavailable"))
+
+    call_hub("/api/privacy/delete", privacy_claims(emails: [ "attendee@example.com" ], dry_run: false))
+
+    expect(response).to have_http_status(:service_unavailable)
+    expect(response.parsed_body).to eq("error" => "storage_unavailable")
+    expect(Participant.exists?(participant.id)).to be(true)
+  end
+
   it "asks for manual review instead of erasing someone registered for an event still to come" do
     create(:participant_event, participant:, event: create(:event))
     call_hub("/api/privacy/delete", privacy_claims(emails: [ "attendee@example.com" ], dry_run: false))

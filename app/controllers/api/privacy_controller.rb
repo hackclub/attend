@@ -5,20 +5,25 @@ module Api
   class PrivacyController < ActionController::API
     before_action :authenticate!
 
-    def delete
-      respond(Privacy::Eraser.new(@claims.subject).call(dry_run: @claims.dry_run))
-    rescue Privacy::Eraser::ManualReviewRequired => e
+    rescue_from Privacy::Eraser::ManualReviewRequired do |e|
       log("manual_review_required reason=#{e.reason}")
       render json: { error: "manual_review_required", reason: e.reason }, status: :conflict
+    end
+
+    # the hub retries a 503, with a fresh token
+    rescue_from Privacy::Eraser::Unavailable do |e|
+      log(e.code)
+      render json: { error: e.code }, status: :service_unavailable
+    end
+
+    def delete
+      respond(Privacy::Eraser.new(@claims.subject).call(dry_run: @claims.dry_run))
     end
 
     # export delivery is not specified yet, so this reports what a deletion
     # would remove without changing anything
     def export
       respond(Privacy::Eraser.new(@claims.subject).call(dry_run: true, review: false))
-    rescue Privacy::Eraser::ManualReviewRequired => e
-      log("manual_review_required reason=#{e.reason}")
-      render json: { error: "manual_review_required", reason: e.reason }, status: :conflict
     end
 
     private

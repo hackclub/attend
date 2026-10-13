@@ -9,16 +9,23 @@ module Privacy
   #
   # Anything a human should decide raises ManualReviewRequired before a
   # single row changes: staff accounts, registrations for events that haven't
-  # ended, safeguarding records and bans. A foreign key we didn't plan for
-  # does the same, so an unexpected reference stops the run rather than
-  # leaving half an erasure behind.
+  # ended, safeguarding records, bans, imports still running, and matches that
+  # lead to an account the subject's verified identifiers don't. A foreign key
+  # we didn't plan for does the same, so an unexpected reference stops the run
+  # rather than leaving half an erasure behind.
   #
-  # A dry run performs the real erasure inside a transaction, reads the
-  # per-table delete counts postgres tracks for that transaction, then rolls
-  # back, so dry run and real run report the same numbers. Those counters
-  # carry earlier transactions on the same connection until postgres flushes
-  # them, so we diff a snapshot. Attachment blobs are purged only after a real
-  # run commits.
+  # Matching, the checks and the erasure all run in one transaction, with the
+  # matched rows locked first, so a role, incident or registration added
+  # mid-run waits for us and then fails its foreign key rather than slipping
+  # past the checks.
+  #
+  # A dry run performs the real erasure inside that transaction, reads the
+  # per-table delete counts postgres tracks for it, then rolls back, so dry
+  # run and real run report the same numbers. Those counters carry earlier
+  # transactions on the same connection until postgres flushes them, so we
+  # diff a snapshot. On a real run, attachment files are deleted from storage
+  # before the commit: if that fails, everything rolls back and the hub's
+  # retry still finds the person.
   class Eraser
     Result = Data.define(:found, :deleted, :retained)
 
@@ -60,6 +67,8 @@ module Privacy
 
     DOCUSEAL_REASON = "signed waivers and documents stay in DocuSeal as liability records; " \
                       "Attend's copy of the signing status and its link to them are removed".freeze
+    UNSIGNED_DOCUSEAL_REASON = "documents sent for signature but never signed stay in DocuSeal; " \
+                               "Attend's link to them is removed".freeze
     GUARDIAN_CONSENT_REASON = "documents a guardian signed for a child who stays registered remain on the child's record, " \
                               "with the link to the guardian and their DocuSeal signing reference removed".freeze
     AIRTABLE_REASON = "copies synced to event organisers' Airtable bases are not touched here".freeze
@@ -69,29 +78,44 @@ module Privacy
       @now = now
     end
 
+    # A failure the hub should retry, answered with a 503
+    class Unavailable < StandardError
+      attr_reader :code
+
+      def initialize(code)
+        @code = code
+        super("privacy erasure couldn't finish: #{code}")
+      end
+    end
+
     # review: false skips the manual-review checks, for exports: those only
     # ever run as a dry run, and should still say what we hold. Staff accounts
-    # still need a human, since their dry run can't get past the records that
-    # reference them.
+    # and identity conflicts still need a human: a staff dry run can't get past
+    # the records that reference them, and a conflict would report someone
+    # else's data.
     def call(dry_run:, review: true)
-      @people = match
-      return Result.new(found: false, deleted: {}, retained: []) unless found?
-
-      review ? check_review! : (raise ManualReviewRequired, "staff_account" if staff?)
-      retained = retained_counts
-      deleted = {}
-      blob_ids = []
+      result = Result.new(found: false, deleted: {}, retained: [])
       ActiveRecord::Base.transaction do
-        before = delete_counters
-        PaperTrail.request(enabled: false) { blob_ids = erase! }
-        deleted = delete_counters.filter_map { |table, count| [ table, count - before.fetch(table, 0) ] if count > before.fetch(table, 0) }.to_h
-        raise ActiveRecord::Rollback if dry_run
-      end
-      ActiveStorage::Blob.where(id: blob_ids).find_each(&:purge_later) unless dry_run
+        ActiveRecord::Base.connection.execute("SET LOCAL lock_timeout = '5s'")
+        @people = lock_people!
+        next unless found?
 
-      Result.new(found: true, deleted:, retained:)
+        review ? check_review! : (raise ManualReviewRequired, "staff_account" if staff?)
+        retained = retained_counts
+        before = delete_counters
+        blobs = PaperTrail.request(enabled: false) { erase! }
+        scrubbed = scrub_imports!
+        deleted = delete_counters.filter_map { |table, count| [ table, count - before.fetch(table, 0) ] if count > before.fetch(table, 0) }.to_h
+        result = Result.new(found: true, deleted: deleted.merge(scrubbed), retained:)
+        raise ActiveRecord::Rollback if dry_run
+
+        delete_files!(blobs)
+      end
+      result
     rescue ActiveRecord::InvalidForeignKey
       raise ManualReviewRequired, "unexpected_reference"
+    rescue ActiveRecord::Deadlocked, ActiveRecord::LockWaitTimeout
+      raise Unavailable, "database_busy"
     end
 
     private
@@ -101,9 +125,38 @@ module Privacy
     People = Data.define(
       :users, :participants, :participant_events, :guardians, :guardian_links,
       :emails, :phones, :emergency_contacts, :invitations, :email_logs,
-      :message_deliveries, :sms_logs, :tickets
+      :message_deliveries, :sms_logs, :tickets, :import_batches
     )
 
+    # matches, then locks what it matched and matches again. If the match
+    # moved while we waited for the locks, it goes round again
+    def lock_people!
+      3.times do
+        people = match
+        lock!(people)
+        return people if match == people
+      end
+      raise Unavailable, "database_busy"
+    end
+
+    # FOR UPDATE on the people, so nothing new can reference them or change
+    # their roles until we're done, and FOR SHARE on their events, so an
+    # event's dates can't move under the event_not_over check
+    def lock!(people)
+      User.where(id: people.users).order(:id).lock.pluck(:id)
+      Participant.where(id: people.participants).order(:id).lock.pluck(:id)
+      ParticipantEvent.where(id: people.participant_events).order(:id).lock.pluck(:id)
+      Guardian.where(id: people.guardians).order(:id).lock.pluck(:id)
+      GuardianParticipantEvent.where(id: people.guardian_links).order(:id).lock.pluck(:id)
+      ImportBatch.where(id: people.import_batches).order(:id).lock.pluck(:id)
+      Event.where(id: event_ids(people)).order(:id).lock("FOR SHARE").pluck(:id)
+    end
+
+    # Accounts are matched only on what Hack Club Auth vouches for: the
+    # identity, the email it syncs at sign-in, and its Slack ID. Profiles and
+    # guardians are also matched on the email or Slack ID they carry, which
+    # anyone can type; one of those that belongs to an account we didn't
+    # match is someone else's, so that stops the run instead.
     def match
       emails = @subject.emails
       slack_id = @subject.slack_id
@@ -111,28 +164,29 @@ module Privacy
 
       users = email_in(User, :email, emails)
       users = users.or(User.where(hack_club_account_id: identity_id)) if identity_id
-      users = users.or(User.where(slack_user_id: slack_id)) if slack_id
       user_ids = users.pluck(:id)
+      # slack_user_id is a profile override, so it only counts where HCA agrees
+      user_ids |= User.where(slack_user_id: slack_id).select { |user| user.verified_slack_id == slack_id }.map(&:id) if slack_id
+      conflict! if identity_id && User.where(id: user_ids).where.not(hack_club_account_id: [ nil, identity_id ]).exists?
 
-      participants = email_in(Participant, :email, emails).or(Participant.where(user_id: user_ids))
+      participants = email_in(Participant, :email, emails)
+      participants = participants.or(Participant.where(slack_user_id: slack_id)) if slack_id
+      conflict! if participants.where.not(user_id: nil).where.not(user_id: user_ids).exists?
+      # a Slack ID on a registration was typed by whoever registered them,
+      # often an organiser, so it isn't evidence of whose profile it is
       if slack_id
-        participants = participants.or(Participant.where(slack_user_id: slack_id))
-                                   .or(Participant.where(id: ParticipantEvent.where(slack_user_id: slack_id).select(:participant_id)))
+        conflict! if Participant.where(id: ParticipantEvent.where(slack_user_id: slack_id).select(:participant_id))
+                                .where.not(id: participants.or(Participant.where(user_id: user_ids)).select(:id)).exists?
       end
-      # a participant matched on their own email or Slack ID brings the
-      # account it belongs to, and with it any other profile that account
-      # owns. A Slack ID on a registration doesn't: an organiser may have
-      # typed it, so it's not enough to delete an account
-      owned = email_in(Participant, :email, emails)
-      owned = owned.or(Participant.where(slack_user_id: slack_id)) if slack_id
-      user_ids |= owned.where.not(user_id: nil).pluck(:user_id)
       participant_ids = participants.or(Participant.where(user_id: user_ids)).pluck(:id)
       participant_event_ids = ParticipantEvent.where(participant_id: participant_ids).pluck(:id)
 
       # guardians matched directly, plus anyone whose only reason to be here
       # is a child being erased: with the registration gone, their details
       # serve nothing
-      matched_guardian_ids = email_in(Guardian, :email, emails).or(Guardian.where(user_id: user_ids)).pluck(:id)
+      guardians = email_in(Guardian, :email, emails)
+      conflict! if guardians.where.not(user_id: nil).where.not(user_id: user_ids).exists?
+      matched_guardian_ids = guardians.or(Guardian.where(user_id: user_ids)).pluck(:id)
       linked_guardian_ids = GuardianParticipantEvent.where(participant_event_id: participant_event_ids).distinct.pluck(:guardian_id)
       orphaned_guardian_ids = Guardian.where(id: linked_guardian_ids)
                                       .where.not(id: GuardianParticipantEvent.where.not(participant_event_id: participant_event_ids).select(:guardian_id))
@@ -166,7 +220,7 @@ module Privacy
                       .or(Ticket.where(subject_type: "Guardian", subject_id: guardian_ids))
       tickets = tickets.or(Ticket.where(subject_id: nil, phone_number: phones)) if phones.any?
 
-      People.new(
+      people = {
         users: user_ids,
         participants: participant_ids,
         participant_events: participant_event_ids,
@@ -186,8 +240,14 @@ module Privacy
                                            .or(MessageDelivery.where(participant_event_id: participant_event_ids))
                                            .or(MessageDelivery.where(guardian_id: guardian_ids)).pluck(:id),
         sms_logs: phones.any? ? AutomatedSmsLog.where(phone_number: phones).pluck(:id) : [],
-        tickets: tickets.pluck(:id)
-      )
+        tickets: tickets.pluck(:id),
+        import_batches: import_batch_ids(all_emails)
+      }
+      People.new(**people.transform_values(&:sort))
+    end
+
+    def conflict!
+      raise ManualReviewRequired, "identity_conflict"
     end
 
     # an empty list matches nothing. Matching on "" instead would sweep up
@@ -208,6 +268,8 @@ module Privacy
       raise ManualReviewRequired, "event_not_over" if open_registration?
       raise ManualReviewRequired, "safeguarding_record" if safeguarding_record?
       raise ManualReviewRequired, "banned" if email_in(BanEmail, :email, people.emails).exists?
+      # a running import would write its copy of their row back
+      raise ManualReviewRequired, "import_in_progress" if ImportBatch.where(id: people.import_batches).where.not(status: %w[previewing completed failed]).exists?
     end
 
     # staff accounts authored incidents, notes, messages and audit history
@@ -229,10 +291,15 @@ module Privacy
     # them out of the organisers' headcount, rooming and medical lists, so the
     # organisers remove the registration first
     def open_registration?
-      event_ids = ParticipantEvent.where(id: people.participant_events).pluck(:event_id) +
+      Event.where(id: event_ids(people)).where("COALESCE(ends_at, starts_at) IS NULL OR COALESCE(ends_at, starts_at) > ?", @now).exists?
+    end
+
+    # every event the people being erased are registered for, guard, or are
+    # an emergency contact at
+    def event_ids(people)
+      (ParticipantEvent.where(id: people.participant_events).pluck(:event_id) +
         GuardianParticipantEvent.where(id: people.guardian_links).joins(:participant_event).pluck("participant_events.event_id") +
-        EmergencyContact.where(id: people.emergency_contacts).filter_map { |contact| (contact.participant_event || contact.guardian_participant_event&.participant_event)&.event_id }
-      Event.where(id: event_ids.uniq).where("COALESCE(ends_at, starts_at) IS NULL OR COALESCE(ends_at, starts_at) > ?", @now).exists?
+        EmergencyContact.where(id: people.emergency_contacts).filter_map { |contact| (contact.participant_event || contact.guardian_participant_event&.participant_event)&.event_id }).uniq
     end
 
     # safeguarding records are kept on their own retention schedule, and the
@@ -250,8 +317,11 @@ module Privacy
 
     def retained_counts
       retained = []
-      signed = Consent.where(participant_event_id: people.participant_events).where.not(docuseal_envelope_id: nil).count
+      envelopes = Consent.where(participant_event_id: people.participant_events).where.not(docuseal_envelope_id: nil)
+      signed = envelopes.where(status: "signed").count
       retained << { type: "signed documents", count: signed, reason: DOCUSEAL_REASON } if signed.positive?
+      unsigned = envelopes.where.not(status: "signed").count
+      retained << { type: "unsigned documents", count: unsigned, reason: UNSIGNED_DOCUSEAL_REASON } if unsigned.positive?
 
       kept = surviving_guardian_consents.count
       retained << { type: "guardian-signed documents", count: kept, reason: GUARDIAN_CONSENT_REASON } if kept.positive?
@@ -265,9 +335,7 @@ module Privacy
 
     def erase!
       ids = record_ids
-      attachments = ActiveStorage::Attachment.where(record_id: ids)
-      blob_ids = attachments.pluck(:blob_id)
-      attachments.delete_all
+      blobs = erase_attachments!(ids)
 
       pes = people.participant_events
       users = people.users
@@ -302,12 +370,87 @@ module Privacy
 
       BadgeRedirect.where(user_id: users).delete_all
       execute([ "DELETE FROM nfc_tokens WHERE user_id IN (?)", users.presence || [ nil ] ])
+      # MCP grants and tokens name their owner as a string, with no foreign key
+      owners = users.map(&:to_s).presence || [ nil ]
+      %w[toolchest_oauth_access_grants toolchest_oauth_access_tokens mcp_connection_settings].each do |table|
+        execute([ "DELETE FROM #{table} WHERE resource_owner_id IN (?)", owners ])
+      end
       User.where(id: users).destroy_all
 
       PaperTrail::Version.where(item_id: ids).delete_all
       AuditLog.where(record_id: ids).delete_all
 
-      blob_ids
+      blobs
+    end
+
+    # attachment, variant and blob rows go now; the files they point at go
+    # in delete_files! on a real run. A blob something else still has
+    # attached stays
+    def erase_attachments!(ids)
+      attachments = ActiveStorage::Attachment.where(record_id: ids)
+      blob_ids = attachments.pluck(:blob_id)
+      attachments.delete_all
+      blobs = ActiveStorage::Blob.where(id: blob_ids).where.not(id: ActiveStorage::Attachment.select(:blob_id)).to_a
+
+      variants = ActiveStorage::VariantRecord.where(blob_id: blobs.map(&:id))
+      variant_attachments = ActiveStorage::Attachment.where(record_type: "ActiveStorage::VariantRecord", record_id: variants.pluck(:id).map(&:to_s))
+      variant_blobs = ActiveStorage::Blob.where(id: variant_attachments.pluck(:blob_id)).to_a
+      variant_attachments.delete_all
+      variants.delete_all
+      ActiveStorage::Blob.where(id: (blobs + variant_blobs).map(&:id)).delete_all
+      blobs + variant_blobs
+    end
+
+    def delete_files!(blobs)
+      blobs.each(&:delete)
+    rescue StandardError => e
+      Rails.logger.error("[Privacy] deleting attachment files failed: #{e.class}")
+      raise Unavailable, "storage_unavailable"
+    end
+
+    IMPORT_CONTACTS = {
+      "parent_email" => %w[parent_first_name parent_last_name parent_email parent_phone],
+      "emergency_email" => %w[emergency_first_name emergency_last_name emergency_email emergency_phone emergency_relationship]
+    }.freeze
+
+    # import batches hold the CSV rows an organiser uploaded until the import
+    # finishes, and the per-row errors after. Narrowed with a text search,
+    # then checked field by field
+    def import_batch_ids(emails)
+      return [] if emails.empty?
+
+      patterns = emails.map { |email| "%#{ImportBatch.sanitize_sql_like(email)}%" }
+      ImportBatch.where("lower(rows_data::text) LIKE ANY (ARRAY[?]) OR lower(errors_data::text) LIKE ANY (ARRAY[?])", patterns, patterns)
+                 .select { |batch| scrubbed_import(batch, emails).present? }.map(&:id)
+    end
+
+    # the batch's rows and errors without the people being erased: their
+    # own rows go, and their details come off rows where they're the parent
+    # or emergency contact. nil when there's nothing of theirs
+    def scrubbed_import(batch, emails)
+      erased = ->(value) { value.is_a?(String) && emails.include?(value.strip.downcase) }
+      mentioned = ->(text) { text.is_a?(String) && emails.any? { |email| text.match?(/(?<![\w.+-])#{Regexp.escape(email)}(?![\w-])/i) } }
+
+      rows = batch.rows_data.reject { |row| erased.(row["email"]) }.map do |row|
+        IMPORT_CONTACTS.reduce(row) { |kept, (field, fields)| erased.(kept[field]) ? kept.except(*fields) : kept }
+      end
+      errors = batch.errors_data.reject { |error| erased.(error["email"]) || mentioned.(error["error"]) }
+      return if rows == batch.rows_data && errors == batch.errors_data
+
+      { rows:, errors:, rows_changed: batch.rows_data.count { |row| !rows.include?(row) }, errors_removed: batch.errors_data.size - errors.size }
+    end
+
+    def scrub_imports!
+      counts = Hash.new(0)
+      ImportBatch.where(id: people.import_batches).find_each do |batch|
+        scrubbed = scrubbed_import(batch, people.emails)
+        next unless scrubbed
+
+        batch.update_columns(rows_data: scrubbed[:rows], errors_data: scrubbed[:errors], updated_at: @now)
+        counts["import_batches.rows_data"] += scrubbed[:rows_changed]
+        counts["import_batches.errors_data"] += scrubbed[:errors_removed]
+      end
+      counts.select { |_, count| count.positive? }
     end
 
     # every row about to go whose paper_trail versions, audit logs or

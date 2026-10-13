@@ -6,7 +6,7 @@ RSpec.describe Privacy::Eraser do
   end
 
   let(:past_event) { create(:event, starts_at: 3.weeks.ago, ends_at: 2.weeks.ago, registration_open_at: 2.months.ago, registration_close_at: 1.month.ago) }
-  let(:user) { create(:user, email: "attendee@example.com", hack_club_account_id: "ident!fake1") }
+  let(:user) { create(:user, email: "attendee@example.com", hack_club_account_id: "ident!fake1", slack_user_id: "U0FAKE1", oidc_claims: { "slack_id" => "U0FAKE1" }) }
   let(:participant) { create(:participant, email: "attendee@example.com", user:, slack_user_id: "U0FAKE1") }
   let!(:registration) { create(:participant_event, participant:, event: past_event, status: :complete) }
   let(:guardian) { create(:guardian, email: "parent@example.com") }
@@ -47,10 +47,12 @@ RSpec.describe Privacy::Eraser do
   it "erases the attendee, their registration and the guardian who was only there for them" do
     PaperTrail.request(enabled: true) { participant.update!(preferred_name: "Fakey") }
 
-    expect {
-      described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false)
-    }.to have_enqueued_job(ActiveStorage::PurgeJob)
+    blob = participant.headshot.blob
 
+    described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false)
+
+    expect(ActiveStorage::Blob.exists?(blob.id)).to be(false)
+    expect(blob.service.exist?(blob.key)).to be(false)
     expect(User.exists?(user.id)).to be(false)
     expect(Participant.exists?(participant.id)).to be(false)
     expect(ParticipantEvent.exists?(registration.id)).to be(false)
@@ -82,12 +84,119 @@ RSpec.describe Privacy::Eraser do
     expect(Participant.exists?(participant.id)).to be(true)
   end
 
-  it "reports signed DocuSeal documents as retained" do
+  it "reports signed and unsigned DocuSeal documents as retained, separately" do
     registration.consents.create!(consent_type: "waiver", status: "signed", docuseal_envelope_id: "fake-envelope")
+    registration.consents.create!(consent_type: "media", status: "sent", docuseal_envelope_id: "fake-envelope-2")
 
     result = described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: true)
 
-    expect(result.retained).to include(a_hash_including(type: "signed documents", count: 1))
+    expect(result.retained).to include(a_hash_including(type: "signed documents", count: 1),
+      a_hash_including(type: "unsigned documents", count: 1))
+  end
+
+  it "erases their MCP grants and tokens" do
+    application = Toolchest::OauthApplication.create!(name: "Fictional client", redirect_uri: "https://example.com/callback")
+    McpConnectionSetting.create!(application:, resource_owner_id: user.id)
+
+    result = described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false)
+
+    expect(result.deleted).to include("mcp_connection_settings" => 1)
+    expect(McpConnectionSetting.where(resource_owner_id: user.id)).not_to exist
+  end
+
+  describe "attachment files" do
+    let(:blob) { participant.headshot.blob }
+
+    it "leaves files alone on a dry run" do
+      described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: true)
+
+      expect(blob.service.exist?(blob.key)).to be(true)
+    end
+
+    it "rolls everything back when storage fails, so the retry still finds them and finishes" do
+      allow_any_instance_of(ActiveStorage::Blob).to receive(:delete).and_raise(Errno::ECONNRESET)
+
+      expect { described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false) }
+        .to raise_error(described_class::Unavailable) { |error| expect(error.code).to eq("storage_unavailable") }
+      expect(Participant.exists?(participant.id)).to be(true)
+      expect(ActiveStorage::Blob.exists?(blob.id)).to be(true)
+
+      allow_any_instance_of(ActiveStorage::Blob).to receive(:delete).and_call_original
+      retry_result = described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false)
+
+      expect(retry_result.found).to be(true)
+      expect(Participant.exists?(participant.id)).to be(false)
+      expect(blob.service.exist?(blob.key)).to be(false)
+    end
+
+    it "deletes variants with the original" do
+      variant = participant.headshot.variant(resize_to_limit: [ 10, 10 ]).processed
+      variant_blob = variant.image.blob
+
+      described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false)
+
+      expect(ActiveStorage::VariantRecord.where(blob_id: blob.id)).not_to exist
+      expect(ActiveStorage::Blob.exists?(variant_blob.id)).to be(false)
+      expect(variant_blob.service.exist?(variant_blob.key)).to be(false)
+    end
+  end
+
+  describe "import batches" do
+    def row(email, **fields) = { "email" => email, "legal_first_name" => "Fictional" }.merge(fields.transform_keys(&:to_s))
+
+    it "finds and removes someone who only exists in an import preview" do
+      batch = ImportBatch.create!(event: past_event, status: :previewing, total_count: 2,
+        rows_data: [ row("preview-only@example.com"), row("someone-else@example.com") ])
+
+      result = described_class.new(subject_for(emails: [ "preview-only@example.com" ])).call(dry_run: false)
+
+      expect(result.found).to be(true)
+      expect(result.deleted).to include("import_batches.rows_data" => 1)
+      expect(batch.reload.rows_data.map { |r| r["email"] }).to eq([ "someone-else@example.com" ])
+    end
+
+    it "removes their errors from a finished batch, and only theirs" do
+      batch = ImportBatch.create!(event: past_event, status: :completed, total_count: 2, errors_data: [
+        { "row" => 2, "email" => "attendee@example.com", "error" => "Already registered for this event" },
+        { "row" => nil, "email" => nil, "error" => "Failed to send invitation for attendee@example.com" },
+        { "row" => 3, "email" => "someone-else@example.com", "error" => "Already registered for this event" }
+      ])
+
+      result = described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false)
+
+      expect(result.deleted).to include("import_batches.errors_data" => 2)
+      expect(batch.reload.errors_data.map { |e| e["email"] }).to eq([ "someone-else@example.com" ])
+    end
+
+    it "takes a parent or emergency contact's details off another child's row, leaving the child's" do
+      batch = ImportBatch.create!(event: past_event, status: :previewing, total_count: 1, rows_data: [
+        row("child@example.com", parent_first_name: "Fictional", parent_email: "parent@example.com", parent_phone: "+12025550111",
+          emergency_first_name: "Fictional", emergency_email: "parent@example.com", medical_requirements: "fictional")
+      ])
+      create(:guardian_participant_event, guardian:, participant_event: create(:participant_event, event: past_event))
+
+      described_class.new(subject_for(emails: [ "parent@example.com" ])).call(dry_run: false)
+
+      kept = batch.reload.rows_data.first
+      expect(kept).to include("email" => "child@example.com", "medical_requirements" => "fictional")
+      expect(kept.keys).not_to include("parent_email", "parent_phone", "parent_first_name", "emergency_email", "emergency_first_name")
+    end
+
+    it "changes nothing on a dry run" do
+      batch = ImportBatch.create!(event: past_event, status: :previewing, total_count: 1, rows_data: [ row("attendee@example.com") ])
+
+      described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: true)
+
+      expect(batch.reload.rows_data.size).to eq(1)
+    end
+
+    it "needs a human while an import holding them is running" do
+      ImportBatch.create!(event: past_event, status: :importing, total_count: 1, rows_data: [ row("attendee@example.com") ])
+
+      expect { described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false) }
+        .to raise_error(described_class::ManualReviewRequired) { |error| expect(error.reason).to eq("import_in_progress") }
+      expect(Participant.exists?(participant.id)).to be(true)
+    end
   end
 
   it "keeps a consent the guardian signed for a child who stays, with its uploads" do
@@ -111,19 +220,17 @@ RSpec.describe Privacy::Eraser do
     expect(history).to include("fictional", "fake-participant-slug")
   end
 
-  it "erases every profile on an account found through one of them" do
-    user.update!(email: "account@example.com", hack_club_account_id: nil)
+  it "erases every profile on an account matched on its Hack Club identity" do
+    user.update!(email: "account@example.com")
     other_profile = create(:participant, email: "old-address@example.com", user:)
 
-    described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false)
+    described_class.new(subject_for(emails: [ "attendee@example.com" ], identity_id: "ident!fake1")).call(dry_run: false)
 
     expect(User.exists?(user.id)).to be(false)
     expect(Participant.exists?(other_profile.id)).to be(false)
   end
 
-  it "erases the account behind a participant matched on Slack alone" do
-    user.update!(slack_user_id: nil)
-
+  it "erases the account behind a Slack ID Hack Club Auth vouches for" do
     described_class.new(subject_for(slack_id: "U0FAKE1")).call(dry_run: false)
 
     expect(Participant.exists?(participant.id)).to be(false)
@@ -140,15 +247,60 @@ RSpec.describe Privacy::Eraser do
   end
 
   describe "matching only the subject" do
-    it "doesn't follow a Slack ID on a registration to the participant's account" do
+    def expect_conflict(subject)
+      expect { described_class.new(subject).call(dry_run: false) }
+        .to raise_error(described_class::ManualReviewRequired) { |error| expect(error.reason).to eq("identity_conflict") }
+    end
+
+    # Alice's profile carries Bob's email; Bob asks to be erased
+    it "stops when a profile's typed email leads to someone else's account" do
+      bob = create(:user, email: "bob@example.com", hack_club_account_id: "ident!bob")
+      create(:participant, email: "bob@example.com", user: bob)
+      alice = create(:user, email: "alice@example.com", hack_club_account_id: "ident!alice")
+      alice_profile = create(:participant, email: "alice-typed@example.com", user: alice)
+      alice_profile.update_columns(email: "bob@example.com")
+
+      expect_conflict(subject_for(emails: [ "bob@example.com" ], identity_id: "ident!bob"))
+      expect(User.exists?(alice.id)).to be(true)
+      expect(Participant.exists?(alice_profile.id)).to be(true)
+      expect(User.exists?(bob.id)).to be(true)
+    end
+
+    it "stops when an email leads to an account with a different Hack Club identity" do
+      expect_conflict(subject_for(emails: [ "attendee@example.com" ], identity_id: "ident!someone-else"))
+      expect(User.exists?(user.id)).to be(true)
+    end
+
+    it "stops on a Slack ID typed onto someone else's profile override" do
+      user.update!(oidc_claims: { "slack_id" => "U0REAL1" })
+
+      expect_conflict(subject_for(slack_id: "U0FAKE1"))
+      expect(User.exists?(user.id)).to be(true)
+    end
+
+    it "stops on a Slack ID typed onto someone else's registration" do
       participant.update!(slack_user_id: nil)
-      user.update!(slack_user_id: nil)
+      user.update!(slack_user_id: nil, oidc_claims: {})
       registration.update!(slack_user_id: "U0TYPO1")
 
-      described_class.new(subject_for(slack_id: "U0TYPO1")).call(dry_run: false)
-
-      expect(Participant.exists?(participant.id)).to be(false)
+      expect_conflict(subject_for(slack_id: "U0TYPO1"))
+      expect(Participant.exists?(participant.id)).to be(true)
       expect(User.exists?(user.id)).to be(true)
+    end
+
+    it "stops when a guardian matched on email belongs to another account" do
+      guardian.update!(user: create(:user, email: "parent-account@example.com"))
+
+      expect_conflict(subject_for(emails: [ "parent@example.com" ]))
+      expect(Guardian.exists?(guardian.id)).to be(true)
+    end
+
+    it "erases an imported profile no account has claimed, matched on its email" do
+      imported = create(:participant, email: "imported@example.com")
+
+      described_class.new(subject_for(emails: [ "imported@example.com" ])).call(dry_run: false)
+
+      expect(Participant.exists?(imported.id)).to be(false)
     end
 
     it "leaves blank-email rows alone when the hub sends no emails" do
