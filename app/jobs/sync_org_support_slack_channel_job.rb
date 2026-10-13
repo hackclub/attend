@@ -7,8 +7,11 @@
 class SyncOrgSupportSlackChannelJob < ApplicationJob
   queue_as :default
 
-  # conversations.invite and .kick are Tier 3 (~50 req/min) — pause between calls.
-  SLACK_PAUSE = 0.1
+  # conversations.invite and .kick are Tier 3 (~50 req/min) — pause between
+  # calls, and when Slack still says slow down, wait as long as it asks and
+  # retry the same person rather than counting them as failed.
+  SLACK_PAUSE = 1.2
+  MAX_RATE_LIMIT_WAITS = 5
 
   # With no user_ids, syncs everyone and records the counts so the settings
   # page can show how the last full sync went.
@@ -18,7 +21,11 @@ class SyncOrgSupportSlackChannelJob < ApplicationJob
 
     @slack_service = SlackService.new
     @channel_id = channel_id
-    @counts = { "added" => 0, "already_member" => 0, "removed" => 0, "failed" => 0, "no_slack" => 0 }
+    @counts = { "added" => 0, "already_member" => 0, "removed" => 0, "failed" => 0, "no_slack" => 0,
+                "not_in_workspace" => 0 }
+    # Set once Slack confirms the bot is in the channel (any invite that
+    # doesn't fail), which removals need; see SlackService#remove_from_channel.
+    @bot_in_channel = false
 
     members = User.org_support_channel_members
     invite_all(user_ids ? members.where(id: user_ids) : members)
@@ -45,13 +52,17 @@ class SyncOrgSupportSlackChannelJob < ApplicationJob
       end
 
       begin
-        result = @slack_service.invite_to_channel(channel_id: @channel_id, user_id: slack_id)
+        result = with_rate_limit_retry { @slack_service.invite_to_channel(channel_id: @channel_id, user_id: slack_id) }
+        @bot_in_channel = true
         if result[:already_member]
+          claim_existing_invite(user, slack_id)
           @counts["already_member"] += 1
         else
           record_invite(user, slack_id)
           @counts["added"] += 1
         end
+      rescue SlackService::NotInWorkspace
+        @counts["not_in_workspace"] += 1
       rescue SlackService::Error => e
         Rails.logger.error("[SyncOrgSupportSlackChannel] Failed to add #{slack_id}: #{e.message}")
         @counts["failed"] += 1
@@ -63,7 +74,15 @@ class SyncOrgSupportSlackChannelJob < ApplicationJob
 
   def remove_all(invites)
     invites.find_each do |invite|
-      @slack_service.remove_from_channel(channel_id: @channel_id, user_id: invite.slack_user_id)
+      result = with_rate_limit_retry { @slack_service.remove_from_channel(channel_id: @channel_id, user_id: invite.slack_user_id) }
+      if result[:not_member] && !@bot_in_channel
+        # Could just as well mean the bot isn't in the channel: keep the row
+        # for a run that can tell the difference.
+        Rails.logger.error("[SyncOrgSupportSlackChannel] Couldn't confirm removal of #{invite.slack_user_id}: not_in_channel")
+        @counts["failed"] += 1
+        next
+      end
+
       invite.destroy!
       @counts["removed"] += 1
     rescue SlackService::Error => e
@@ -72,6 +91,27 @@ class SyncOrgSupportSlackChannelJob < ApplicationJob
     ensure
       sleep SLACK_PAUSE
     end
+  end
+
+  def with_rate_limit_retry
+    waits = 0
+    begin
+      yield
+    rescue SlackService::RateLimited => e
+      raise if (waits += 1) > MAX_RATE_LIMIT_WAITS
+
+      sleep e.retry_after
+      retry
+    end
+  end
+
+  # Someone already in the channel may still have a row from an earlier
+  # invite under another (deleted or merged) user; point it at this eligible
+  # one so the removal pass doesn't treat it as stale.
+  def claim_existing_invite(user, slack_id)
+    SlackChannelInvite.where(channel_id: @channel_id, slack_user_id: slack_id)
+      .where("user_id IS DISTINCT FROM ?", user.id)
+      .update_all(user_id: user.id, updated_at: Time.current)
   end
 
   def record_invite(user, slack_id)

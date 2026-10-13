@@ -14,6 +14,7 @@ RSpec.describe SyncOrgSupportSlackChannelJob, type: :job do
     allow(slack_service).to receive(:invite_to_channel).and_return({ success: true })
     allow(slack_service).to receive(:remove_from_channel).and_return({ success: true })
     stub_const("SyncOrgSupportSlackChannelJob::SLACK_PAUSE", 0)
+    allow_any_instance_of(described_class).to receive(:sleep)
   end
 
   def slack_user(slack_id = "U#{SecureRandom.hex(3).upcase}", **attrs)
@@ -139,6 +140,77 @@ RSpec.describe SyncOrgSupportSlackChannelJob, type: :job do
 
     expect(SlackChannelInvite.exists?(user: old)).to be(true)
     expect(Setting.org_support_slack_last_sync).to include("removed" => 0, "failed" => 1)
+  end
+
+  it "waits out Slack's rate limit and retries the same person" do
+    member = staff("event_admin")
+    calls = 0
+    allow(slack_service).to receive(:invite_to_channel) do
+      calls += 1
+      raise SlackService::RateLimited.new(3) if calls == 1
+
+      { success: true }
+    end
+
+    described_class.perform_now
+
+    expect(calls).to eq(2)
+    expect(SlackChannelInvite.exists?(user: member)).to be(true)
+    expect(Setting.org_support_slack_last_sync).to include("added" => 1, "failed" => 0)
+  end
+
+  it "gives up on someone after repeated rate limits and moves on" do
+    staff("event_admin")
+    allow(slack_service).to receive(:invite_to_channel).and_raise(SlackService::RateLimited.new(1))
+
+    described_class.perform_now
+
+    expect(slack_service).to have_received(:invite_to_channel)
+      .exactly(SyncOrgSupportSlackChannelJob::MAX_RATE_LIMIT_WAITS + 1).times
+    expect(Setting.org_support_slack_last_sync).to include("failed" => 1)
+  end
+
+  it "counts people outside the Slack workspace separately from failures" do
+    staff("ops")
+    allow(slack_service).to receive(:invite_to_channel).and_raise(SlackService::NotInWorkspace, "org_user_not_in_team")
+
+    described_class.perform_now
+
+    expect(Setting.org_support_slack_last_sync).to include("not_in_workspace" => 1, "failed" => 0)
+  end
+
+  it "hands an orphaned invite to the eligible user already in the channel instead of removing them" do
+    member = staff("event_admin")
+    SlackChannelInvite.create!(user: nil, channel_id: "CORG", slack_user_id: member.verified_slack_id)
+    allow(slack_service).to receive(:invite_to_channel).and_return({ success: true, already_member: true })
+
+    described_class.perform_now
+
+    expect(slack_service).not_to have_received(:remove_from_channel)
+    expect(SlackChannelInvite.find_by(slack_user_id: member.verified_slack_id).user).to eq(member)
+  end
+
+  it "keeps the row when Slack says not_in_channel but the bot's own membership is unconfirmed" do
+    old = staff("ops", event: long_ended_event)
+    SlackChannelInvite.create!(user: old, channel_id: "CORG", slack_user_id: old.verified_slack_id)
+    allow(slack_service).to receive(:remove_from_channel).and_return({ success: true, not_member: true })
+
+    described_class.perform_now
+
+    expect(SlackChannelInvite.exists?(user: old)).to be(true)
+    expect(Setting.org_support_slack_last_sync).to include("removed" => 0, "failed" => 1)
+  end
+
+  it "drops the row for someone who already left, once an invite confirms the bot is in the channel" do
+    staff("event_admin")
+    old = staff("ops", event: long_ended_event)
+    SlackChannelInvite.create!(user: old, channel_id: "CORG", slack_user_id: old.verified_slack_id)
+    allow(slack_service).to receive(:remove_from_channel).and_return({ success: true, not_member: true })
+
+    described_class.perform_now
+
+    expect(SlackChannelInvite.exists?(user: old)).to be(false)
+    expect(Setting.org_support_slack_last_sync).to include("removed" => 1)
   end
 
   it "only trusts the Slack ID from Hack Club Auth" do

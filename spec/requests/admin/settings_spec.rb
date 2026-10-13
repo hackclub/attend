@@ -161,6 +161,16 @@ RSpec.describe "Admin::Settings", type: :request do
       expect(response.body).to include("CORG")
     end
 
+    it "shows people outside the Slack workspace in the last sync" do
+      Setting.org_support_slack_channel_id = "CORG"
+      Setting.org_support_slack_last_sync = { "at" => Time.current.iso8601, "added" => 3, "failed" => 0, "not_in_workspace" => 2 }
+      sign_in global_admin
+
+      get admin_settings_path
+
+      expect(response.body).to include("2 not in this Slack workspace")
+    end
+
     context "with the admin console beta" do
       before { global_admin.update!(admin_console_beta: true) }
 
