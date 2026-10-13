@@ -133,10 +133,34 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(body["participant_id"]).to be_nil
     end
 
-    it "requires an email" do
+    it "requires an email or Slack ID" do
       get "/api/v1/events/#{event.id}/participants/lookup", headers: api_key_headers
 
       expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it "finds a registration by Slack ID and returns the id admin pages use" do
+      participant = create(:participant, slack_user_id: "U0TESTPART")
+      pe = create(:participant_event, participant: participant, event: event)
+
+      get "/api/v1/events/#{event.id}/participants/lookup",
+        params: { slack_id: "u0testpart" }, headers: api_key_headers
+
+      body = JSON.parse(response.body)
+      expect(body["registered"]).to be(true)
+      expect(body["participant_id"]).to eq(participant.id)
+      expect(body["participant_event_id"]).to eq(pe.id)
+    end
+
+    it "prefers a registration's own Slack ID over the person's" do
+      create(:participant_event, event: event, participant: create(:participant, slack_user_id: "U0TESTPART"),
+        slack_user_id: "U0TESTOTHR")
+      pe = create(:participant_event, event: event, slack_user_id: "U0TESTPART")
+
+      get "/api/v1/events/#{event.id}/participants/lookup",
+        params: { slack_id: "U0TESTPART" }, headers: api_key_headers
+
+      expect(JSON.parse(response.body)["participant_event_id"]).to eq(pe.id)
     end
 
     it "still forbids an event API key from reading the full roster" do

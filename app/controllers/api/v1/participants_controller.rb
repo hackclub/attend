@@ -144,20 +144,29 @@ module Api
 
       # Read-only participation check. Unlike `create`, this never sends an
       # invitation or mutates anything, so it is safe to call on every sign-in.
+      # Takes `email` or `slack_id`. `participant_event_id` is the id the admin
+      # participant page and #show are keyed on.
       def lookup
         email = params[:email].to_s.strip.downcase
+        slack_id = params[:slack_id].to_s.strip.upcase
 
-        if email.blank?
-          return render json: { error: "Email is required" }, status: :unprocessable_entity
+        if email.blank? && slack_id.blank?
+          return render json: { error: "Email or slack_id is required" }, status: :unprocessable_entity
         end
 
-        participant = @event.participants.find_by(email: email)
-        participant_event = participant && @event.participant_events.find_by(participant_id: participant.id)
+        participant_event = if email.present?
+          participant = @event.participants.find_by(email: email)
+          participant && @event.participant_events.find_by(participant_id: participant.id)
+        else
+          participant_event_for_slack_id(slack_id)
+        end
 
         render json: {
-          email: email,
+          email: email.presence,
+          slack_id: slack_id.presence,
           registered: participant_event.present?,
-          participant_id: participant&.id,
+          participant_id: participant_event&.participant_id,
+          participant_event_id: participant_event&.id,
           status: participant_event&.status
         }
       end
@@ -301,6 +310,17 @@ module Api
         legal_first_name legal_last_name preferred_name email
         date_of_birth phone pronouns tshirt_size
       ].freeze
+
+      # A registration's own Slack ID overrides the person's, the same
+      # precedence SendIncidentToSlackJob uses.
+      def participant_event_for_slack_id(slack_id)
+        @event.participant_events.joins(:participant)
+          .where(slack_user_id: slack_id)
+          .or(@event.participant_events.joins(:participant)
+            .where(slack_user_id: [ nil, "" ], participants: { slack_user_id: slack_id }))
+          .order(:created_at)
+          .first
+      end
 
       def participant_update_params
         return {} if params[:participant].blank?

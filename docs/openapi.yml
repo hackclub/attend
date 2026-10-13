@@ -243,6 +243,58 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
 
+  /users/lookup:
+    get:
+      tags: [Account]
+      summary: Look up an event admin by Slack ID
+      x-mint:
+        href: /api-reference/account/look-up-an-event-admin-by-slack-id
+      description: >-
+        Global admins only. Finds a member of the admin help Slack channel by
+        the Slack ID Hack Club Auth verified (the profile override is ignored)
+        and lists the events they run that haven't ended: those where they are
+        an event admin, ops or safeguarding lead, plus every event in a series
+        they belong to. Global admin access on its own lists no events.
+      parameters:
+        - name: slack_id
+          in: query
+          required: true
+          schema: { type: string, example: U0123ABCDEF }
+      responses:
+        "200":
+          description: The user and their events, ordered by start date.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      name: { type: string }
+                      email: { type: string, format: email }
+                      global_admin: { type: boolean }
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        slug: { type: string }
+                        starts_at: { type: string, format: date-time, nullable: true }
+                        ends_at: { type: string, format: date-time, nullable: true }
+                        dashboard_url: { type: string, format: uri }
+        "422":
+          description: slack_id is required.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /events:
     get:
       tags: [Account]
@@ -1123,14 +1175,25 @@ paths:
       x-mint:
         href: /api-reference/participants/look-up-a-registration-by-email
       description: >-
-        Read-only check of whether an email is registered for the event. Safe
-        to call on every sign-in; never mutates. Available to event API keys.
+        Read-only check of whether an email or Slack ID is registered for the
+        event. Pass exactly one of `email` or `slack_id`; `email` wins if both
+        are sent. Safe to call on every sign-in; never mutates. Available to
+        event API keys. `participant_event_id` is the id the admin participant
+        page (`/admin/events/{slug}/participants/{participant_event_id}`) and
+        `GET /events/{event_id}/participants/{id}` take.
       parameters:
         - $ref: "#/components/parameters/EventId"
         - name: email
           in: query
-          required: true
+          required: false
           schema: { type: string, format: email }
+        - name: slack_id
+          in: query
+          required: false
+          description: >-
+            Matches the registration's own Slack ID, falling back to the
+            participant's when the registration has none.
+          schema: { type: string, example: U0123ABCDEF }
       responses:
         "200":
           description: Lookup result.
@@ -1139,14 +1202,16 @@ paths:
               schema:
                 type: object
                 properties:
-                  email: { type: string, format: email }
+                  email: { type: string, format: email, nullable: true }
+                  slack_id: { type: string, nullable: true }
                   registered: { type: boolean }
-                  participant_id: { type: integer, nullable: true }
+                  participant_id: { type: string, format: uuid, nullable: true }
+                  participant_event_id: { type: string, format: uuid, nullable: true }
                   status:
                     allOf: [{ $ref: "#/components/schemas/ParticipantStatus" }]
                     nullable: true
         "422":
-          description: Email is required.
+          description: Email or slack_id is required.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
