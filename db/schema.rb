@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_13_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1403,10 +1403,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
     t.string "theme"
     t.string "time_zone", default: "UTC"
     t.datetime "updated_at", null: false
+    t.string "verified_slack_id"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["global_role"], name: "index_users_on_global_role"
     t.index ["hack_club_account_id"], name: "index_users_on_hack_club_account_id", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
+    t.index ["verified_slack_id"], name: "index_users_on_verified_slack_id"
   end
 
   create_table "versions", force: :cascade do |t|

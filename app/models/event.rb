@@ -192,6 +192,24 @@ class Event < ApplicationRecord
   scope :within_support_window, -> { where(ends_at: 7.days.ago..) }
   scope :not_ended, -> { where(ends_at: nil).or(where(ends_at: Time.current..)) }
 
+  # The events that put `user` in the admin help Slack channel: an
+  # ADMIN_HELP_CHANNEL_ROLES role on the event itself, or any role on its
+  # series, for events that haven't ended. Undated drafts count, since setting
+  # an event up is when people most need help. A global admin's blanket access
+  # doesn't count here, or every event would be listed.
+  #
+  # `user` is a User, a user id, or the users.id Arel column:
+  # User.admin_help_channel_members passes the column to correlate this into an
+  # EXISTS, so the channel and the support lookup share one rule.
+  scope :admin_help_events_for, ->(user) {
+    user = user.id if user.is_a?(User)
+    via_event = EventRoleAssignment.where(role: User::ADMIN_HELP_CHANNEL_ROLES)
+      .where(EventRoleAssignment.arel_table[:user_id].eq(user)).select(:event_id)
+    via_series = SeriesRoleAssignment.where(SeriesRoleAssignment.arel_table[:user_id].eq(user)).select(:event_series_id)
+
+    not_ended.where(id: via_event).or(not_ended.where(event_series_id: via_series))
+  }
+
   def setup_complete?
     setup_completed_at.present?
   end

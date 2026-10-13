@@ -484,6 +484,10 @@ Rails.application.routes.draw do
       end
 
       resources :events, only: [ :index ]
+
+      # Global-admin only: who someone is and which events they run, by Slack ID.
+      get "users/lookup", to: "users#lookup"
+
       resources :push_tokens, only: [ :create, :destroy ], param: :token
 
       # Global-admin only: adds emails to the app-wide ban list.

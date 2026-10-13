@@ -108,6 +108,13 @@ RSpec.describe "Api::V1::Participants", type: :request do
       { "Authorization" => "Bearer #{api_key}" }
     end
 
+    # Slack ID lookups belong to the support bot, which holds a global token
+    # scoped to support:read.
+    def support_headers
+      @support_token ||= GlobalApiToken.generate_for(admin, scopes: [ "support:read" ]).token
+      { "Authorization" => "Bearer #{@support_token}" }
+    end
+
     it "reports a registered participant, case-insensitively, without side effects" do
       participant = create(:participant, email: "voter@example.com")
       create(:participant_event, participant: participant, event: event)
@@ -133,10 +140,152 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(body["participant_id"]).to be_nil
     end
 
-    it "requires an email" do
+    it "requires an email or Slack ID" do
       get "/api/v1/events/#{event.id}/participants/lookup", headers: api_key_headers
 
       expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it "finds a registration by the Slack ID Hack Club Auth verified, with its admin link" do
+      user = create(:user, oidc_claims: { "slack_id" => "U0TESTPART" })
+      participant = create(:participant, user: user)
+      pe = create(:participant_event, participant: participant, event: event)
+
+      get "/api/v1/events/#{event.id}/participants/lookup",
+        params: { slack_id: " u0testpart " }, headers: support_headers
+
+      body = JSON.parse(response.body)
+      expect(body["registered"]).to be(true)
+      expect(body["participant_id"]).to eq(participant.id)
+      expect(body["participant_event_id"]).to eq(pe.id)
+      expect(body["admin_url"]).to end_with("/admin/events/#{event.slug}/participants/#{pe.id}")
+      expect(body["slack_id"]).to eq("U0TESTPART")
+      expect(body["email"]).to be_nil
+    end
+
+    # Anyone can type any ID into a profile or registration; only Hack Club
+    # Auth's counts.
+    it "ignores Slack IDs typed onto the participant or registration" do
+      create(:participant_event, event: event, participant: create(:participant, slack_user_id: "U0TESTPART"))
+      create(:participant_event, event: event, slack_user_id: "U0TESTPART")
+
+      get "/api/v1/events/#{event.id}/participants/lookup",
+        params: { slack_id: "U0TESTPART" }, headers: support_headers
+
+      expect(JSON.parse(response.body)["registered"]).to be(false)
+    end
+
+    it "refuses to guess when several registrations share a Slack ID" do
+      2.times do
+        user = create(:user, oidc_claims: { "slack_id" => "U0TESTPART" })
+        create(:participant_event, event: event, participant: create(:participant, user: user))
+      end
+
+      get "/api/v1/events/#{event.id}/participants/lookup",
+        params: { slack_id: "U0TESTPART" }, headers: support_headers
+
+      expect(response).to have_http_status(:conflict)
+    end
+
+    context "when the caller isn't the support bot" do
+      let(:series) { create(:event_series, name: "Moonbeam Series", slug: "moonbeam-lookup-api") }
+      let(:series_owner) do
+        User.create!(email: "moonbeam-owner@example.com", name: "Moonbeam Owner").tap do |user|
+          SeriesRoleAssignment.create!(user: user, event_series: series, role: "owner")
+        end
+      end
+
+      before do
+        event.update!(event_series: series)
+        user = create(:user, oidc_claims: { "slack_id" => "U0TESTPART" })
+        create(:participant_event, event: event, participant: create(:participant, user: user))
+      end
+
+      {
+        "a legacy event API key" => -> { { "Authorization" => "Bearer #{api_key}" } },
+        "an event API token" => -> {
+          { "Authorization" => "Bearer #{EventApiToken.generate_for(event, user: series_owner, name: 'lookup').token}" }
+        },
+        "a series API token" => -> {
+          { "Authorization" => "Bearer #{SeriesApiToken.generate_for(series, user: series_owner, name: 'lookup').token}" }
+        },
+        "a signed-in global admin on the mobile app" => -> { auth_headers }
+      }.each do |caller, headers|
+        it "refuses a Slack ID lookup from #{caller}" do
+          get "/api/v1/events/#{event.id}/participants/lookup",
+            params: { slack_id: "U0TESTPART" }, headers: instance_exec(&headers)
+
+          expect(response).to have_http_status(:forbidden)
+          expect(JSON.parse(response.body)["error"]).to include("support:read")
+        end
+
+        it "still answers an email lookup from #{caller}" do
+          get "/api/v1/events/#{event.id}/participants/lookup",
+            params: { email: "stranger@example.com" }, headers: instance_exec(&headers)
+
+          expect(response).to have_http_status(:ok)
+          expect(JSON.parse(response.body)["registered"]).to be(false)
+        end
+      end
+    end
+
+    it "lets an unrestricted global token look up by Slack ID, as it can every support endpoint" do
+      user = create(:user, oidc_claims: { "slack_id" => "U0TESTPART" })
+      create(:participant_event, event: event, participant: create(:participant, user: user))
+      token = GlobalApiToken.generate_for(admin).token
+
+      get "/api/v1/events/#{event.id}/participants/lookup",
+        params: { slack_id: "U0TESTPART" }, headers: { "Authorization" => "Bearer #{token}" }
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)["registered"]).to be(true)
+    end
+
+    # Only one key is ever matched on, so echoing both would claim a match the
+    # lookup never checked.
+    it "rejects an email and a Slack ID sent together" do
+      participant = create(:participant, email: "voter@example.com")
+      create(:participant_event, participant: participant, event: event)
+
+      get "/api/v1/events/#{event.id}/participants/lookup",
+        params: { email: "voter@example.com", slack_id: "U0SOMEONEELSE" }, headers: support_headers
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)["error"]).to eq("Send email or slack_id, not both")
+    end
+
+    # Both lookup queries go through @event.participant_events, so Rails'
+    # automatic inverse hands each registration @event and the admin link's
+    # slug costs nothing. A scope or option on that association would quietly
+    # break the inverse; this catches it.
+    it "builds the admin link from the event it already loaded" do
+      participant = create(:participant, email: "voter@example.com")
+      pe = create(:participant_event, participant: participant, event: event)
+      headers = api_key_headers
+
+      event_selects = []
+      counter = lambda do |*, payload|
+        event_selects << payload[:sql] if payload[:sql].match?(/\ASELECT .* FROM "events"/)
+      end
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") do
+        get "/api/v1/events/#{event.id}/participants/lookup", params: { email: "voter@example.com" }, headers: headers
+      end
+
+      expect(JSON.parse(response.body)["admin_url"]).to end_with("/admin/events/#{event.slug}/participants/#{pe.id}")
+      # The legacy key resolves its event, then set_event loads it from the URL.
+      # Building the admin link must not add a third.
+      expect(event_selects.size).to eq(2), event_selects.join("\n")
+    end
+
+    it "is reachable by a global token scoped to support:read" do
+      token = GlobalApiToken.generate_for(admin, scopes: [ "support:read" ]).token
+      headers = { "Authorization" => "Bearer #{token}" }
+
+      get "/api/v1/events/#{event.id}/participants/lookup", params: { email: "stranger@example.com" }, headers: headers
+      expect(response).to have_http_status(:ok)
+
+      get "/api/v1/events/#{event.id}/participants", headers: headers
+      expect(response).to have_http_status(:forbidden)
     end
 
     it "still forbids an event API key from reading the full roster" do

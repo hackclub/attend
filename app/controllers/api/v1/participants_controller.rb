@@ -10,6 +10,8 @@ module Api
         render json: { error: "Forbidden" }, status: :forbidden
       end
 
+      requires_scope "support:read", only: :lookup
+
       before_action :restrict_api_key_actions
       before_action :set_event
       before_action :set_participant_event, only: [ :show, :update, :destroy ]
@@ -144,20 +146,49 @@ module Api
 
       # Read-only participation check. Unlike `create`, this never sends an
       # invitation or mutates anything, so it is safe to call on every sign-in.
+      # Takes `email` or `slack_id`, never both: the response echoes the key it
+      # matched on, and echoing one that wasn't checked would read as a match.
+      # `participant_event_id` is the id the admin participant page and #show
+      # are keyed on.
+      #
+      # Email works for every caller that can reach the event. Slack ID is for
+      # the support bot only (see #slack_lookup_allowed?).
       def lookup
         email = params[:email].to_s.strip.downcase
+        slack_id = params[:slack_id].to_s.strip.upcase
 
-        if email.blank?
-          return render json: { error: "Email is required" }, status: :unprocessable_entity
+        if email.blank? && slack_id.blank?
+          return render json: { error: "Email or slack_id is required" }, status: :unprocessable_entity
         end
 
-        participant = @event.participants.find_by(email: email)
-        participant_event = participant && @event.participant_events.find_by(participant_id: participant.id)
+        if email.present? && slack_id.present?
+          return render json: { error: "Send email or slack_id, not both" }, status: :unprocessable_entity
+        end
+
+        if slack_id.present? && !slack_lookup_allowed?
+          return render json: {
+            error: "Looking up by slack_id needs a global API token with the support:read scope"
+          }, status: :forbidden
+        end
+
+        participant_event = if email.present?
+          participant = @event.participants.find_by(email: email)
+          participant && @event.participant_events.find_by(participant_id: participant.id)
+        else
+          matches = participant_events_for_slack_id(slack_id).limit(2).to_a
+          if matches.size > 1
+            return render json: { error: "More than one registration matches that Slack ID" }, status: :conflict
+          end
+          matches.first
+        end
 
         render json: {
-          email: email,
+          email: email.presence,
+          slack_id: slack_id.presence,
           registered: participant_event.present?,
-          participant_id: participant&.id,
+          participant_id: participant_event&.participant_id,
+          participant_event_id: participant_event&.id,
+          admin_url: participant_event && AttendUrls.registration_url(participant_event),
           status: participant_event&.status
         }
       end
@@ -301,6 +332,23 @@ module Api
         legal_first_name legal_last_name preferred_name email
         date_of_birth phone pronouns tshirt_size
       ].freeze
+
+      # Resolving a Slack ID to a registration is a support-bot capability, not
+      # part of what an event or series key (or a signed-in person on the
+      # mobile app) is for. Matches how Api::V1::UsersController gates its
+      # Slack lookup: a global token that permits support:read, which includes
+      # an unrestricted one.
+      def slack_lookup_allowed?
+        current_token.is_a?(GlobalApiToken) && current_token.permits?("support:read")
+      end
+
+      # Only the Slack ID Hack Club Auth verified for the participant's account
+      # counts. The participant and registration columns are typed by people,
+      # and anyone can type someone else's ID there, so a registration nobody
+      # has signed in to can't be found this way.
+      def participant_events_for_slack_id(slack_id)
+        @event.participant_events.joins(participant: :user).where(users: { verified_slack_id: slack_id })
+      end
 
       def participant_update_params
         return {} if params[:participant].blank?
