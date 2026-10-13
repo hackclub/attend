@@ -21,6 +21,13 @@ class Setting < ApplicationRecord
   # in production so dev and staging never invite people to the real channel.
   DEFAULT_ADMIN_HELP_SLACK_CHANNEL_ID = "C0C6QQ6M23D".freeze
 
+  ORG_SUPPORT_SLACK_CHANNEL_ID = "org_support_slack_channel_id".freeze
+  ORG_SUPPORT_SLACK_LAST_SYNC = "org_support_slack_last_sync".freeze
+
+  # Slack channel (#attend-org-support) holding every kind of admin while
+  # their events are on. Production-only default, as above.
+  DEFAULT_ORG_SUPPORT_SLACK_CHANNEL_ID = "C0C8FDYLNR3".freeze
+
   class << self
     def maintenance_mode?
       get(MAINTENANCE_MODE) == "true"
@@ -148,6 +155,26 @@ class Setting < ApplicationRecord
 
     def admin_help_slack_last_sync=(summary)
       set(ADMIN_HELP_SLACK_LAST_SYNC, summary.to_json)
+    end
+
+    def org_support_slack_channel_id
+      get(ORG_SUPPORT_SLACK_CHANNEL_ID).presence ||
+        (Rails.env.production? ? DEFAULT_ORG_SUPPORT_SLACK_CHANNEL_ID : nil)
+    end
+
+    def org_support_slack_channel_id=(channel_id)
+      set(ORG_SUPPORT_SLACK_CHANNEL_ID, channel_id.to_s.strip)
+    end
+
+    # Counts from the last full sync, e.g. { "at" => ..., "added" => 3, "removed" => 1 }.
+    def org_support_slack_last_sync
+      JSON.parse(get(ORG_SUPPORT_SLACK_LAST_SYNC).presence || "{}")
+    rescue JSON::ParserError
+      {}
+    end
+
+    def org_support_slack_last_sync=(summary)
+      set(ORG_SUPPORT_SLACK_LAST_SYNC, summary.to_json)
     end
 
     def get(key)

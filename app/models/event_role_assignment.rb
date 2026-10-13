@@ -120,6 +120,7 @@ class EventRoleAssignment < ApplicationRecord
   validates :role, presence: true, uniqueness: { scope: %i[user_id event_id] }
 
   after_commit :invite_to_admin_help_channel, on: %i[create update], if: :saved_change_to_role?
+  after_commit :invite_to_org_support_channel, on: :create
 
   # Series owners and organizers act as event admins on every event in their
   # series, so their access to this event is inherited from the series rather
@@ -143,5 +144,11 @@ class EventRoleAssignment < ApplicationRecord
     return unless User::ADMIN_HELP_CHANNEL_ROLES.include?(role)
 
     SyncAdminHelpSlackChannelJob.perform_later([ user_id ])
+  end
+
+  # Every role counts for the org support channel, so only a new assignment
+  # can change anything; the job re-checks the event's window.
+  def invite_to_org_support_channel
+    SyncOrgSupportSlackChannelJob.perform_later([ user_id ])
   end
 end

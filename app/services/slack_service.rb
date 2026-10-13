@@ -19,6 +19,20 @@ class SlackService
     end
   end
 
+  # Needs the bot in the channel and the channels:manage (public) or
+  # groups:write (private) scope.
+  def remove_from_channel(channel_id:, user_id:)
+    response = post("conversations.kick", channel: channel_id, user: user_id)
+
+    if response["ok"]
+      { success: true }
+    elsif response["error"] == "not_in_channel"
+      { success: true, not_member: true }
+    else
+      raise Error, "Failed to remove user from channel: #{response["error"]}"
+    end
+  end
+
   def get_user_info(user_id:)
     response = post("users.info", user: user_id)
 
