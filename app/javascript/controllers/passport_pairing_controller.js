@@ -64,7 +64,11 @@ export default class extends Controller {
       }
       this.verifying = false
       this.setProgress(`Tap the ${result.serial_number} passport to write it.`)
-      this.bridge.send(JSON.stringify({ action: "write", attend_token: result.token }))
+      this.bridge.send(JSON.stringify({
+        action: "write",
+        badge_url: result.badge_url,
+        attend_token: result.token
+      }))
     } catch (error) {
       this.clearPendingPassport()
       this.setProgress(error.message, true)
@@ -75,7 +79,11 @@ export default class extends Controller {
   handleBridgeMessage(data) {
     if (!this.pendingPassport) return
 
-    if (data.type === "write_pending") {
+    if (data.type === "error") {
+      this.clearPendingPassport()
+      this.setProgress(`Bridge error: ${data.message || "Unknown error"}`, true)
+      this.pairButtonTarget.disabled = false
+    } else if (data.type === "write_pending") {
       this.setProgress("Tap the passport to the reader…")
     } else if (data.type === "write_result") {
       if (data.success) {
