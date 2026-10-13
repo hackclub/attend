@@ -64,3 +64,6 @@ package-lock.json
 
 # Local gem installs (bundle config set path vendor/bundle)
 /vendor/bundle/
+
+# Data files
+*.csv
