@@ -23,7 +23,12 @@ class SyncOrgSupportSlackChannelJob < ApplicationJob
     members = User.org_support_channel_members
     invite_all(user_ids ? members.where(id: user_ids) : members)
 
-    stale = SlackChannelInvite.where(channel_id: channel_id).where.not(user_id: members.select(:id))
+    # Kept only while the row's user still exists, is still eligible, and
+    # still has that Slack ID; a deleted user or a changed ID leaves a row
+    # whose Slack account must go.
+    current = members.where("users.id = slack_channel_invites.user_id")
+      .where("users.verified_slack_id = slack_channel_invites.slack_user_id")
+    stale = SlackChannelInvite.where(channel_id: channel_id).where(current.arel.exists.not)
     remove_all(user_ids ? stale.where(user_id: user_ids) : stale)
 
     Setting.org_support_slack_last_sync = @counts.merge("at" => Time.current.iso8601) if user_ids.nil?
@@ -70,8 +75,8 @@ class SyncOrgSupportSlackChannelJob < ApplicationJob
   end
 
   def record_invite(user, slack_id)
-    invite = SlackChannelInvite.find_or_initialize_by(user: user, channel_id: @channel_id)
-    invite.update!(slack_user_id: slack_id)
+    invite = SlackChannelInvite.find_or_initialize_by(channel_id: @channel_id, slack_user_id: slack_id)
+    invite.update!(user: user)
   rescue ActiveRecord::RecordNotUnique
     retry
   end

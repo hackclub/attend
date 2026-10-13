@@ -62,7 +62,7 @@ class User < ApplicationRecord
   has_many :event_role_assignments, dependent: :destroy
   has_many :assigned_events, through: :event_role_assignments, source: :event
   has_many :series_role_assignments, dependent: :destroy
-  has_many :slack_channel_invites, dependent: :delete_all
+  has_many :slack_channel_invites, dependent: :nullify
   has_many :event_series, through: :series_role_assignments
   has_one :participant
   has_one :guardian

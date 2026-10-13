@@ -105,6 +105,31 @@ RSpec.describe SyncOrgSupportSlackChannelJob, type: :job do
     expect(SlackChannelInvite.where(user: ex_staff).pluck(:channel_id)).to eq([ "COTHER" ])
   end
 
+  it "removes a deleted user's Slack account" do
+    member = staff("event_admin")
+    described_class.perform_now
+    slack_id = member.verified_slack_id
+
+    member.destroy!
+    expect(SlackChannelInvite.find_by(slack_user_id: slack_id).user_id).to be_nil
+    described_class.perform_now
+
+    expect(slack_service).to have_received(:remove_from_channel).with(channel_id: "CORG", user_id: slack_id)
+    expect(SlackChannelInvite.exists?(slack_user_id: slack_id)).to be(false)
+  end
+
+  it "removes the old Slack account when someone's Slack ID changes" do
+    member = staff("event_admin", slack_id: "UOLDID")
+    described_class.perform_now
+
+    member.update!(oidc_claims: { "slack_id" => "UNEWID" })
+    described_class.perform_now
+
+    expect(slack_service).to have_received(:invite_to_channel).with(channel_id: "CORG", user_id: "UNEWID")
+    expect(slack_service).to have_received(:remove_from_channel).with(channel_id: "CORG", user_id: "UOLDID").once
+    expect(SlackChannelInvite.where(user: member).pluck(:slack_user_id)).to eq([ "UNEWID" ])
+  end
+
   it "keeps the invite row when a removal fails, so the next sync retries" do
     old = staff("ops", event: long_ended_event)
     SlackChannelInvite.create!(user: old, channel_id: "CORG", slack_user_id: old.verified_slack_id)
