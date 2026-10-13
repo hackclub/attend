@@ -210,7 +210,8 @@
               <%= @org_support_last_sync["already_member"] %> already in the channel,
               <%= @org_support_last_sync["removed"] %> removed,
               <%= @org_support_last_sync["failed"] %> failed,
-              <%= @org_support_last_sync["no_slack"] %> without Slack.
+              <%= @org_support_last_sync["no_slack"] %> without Slack<% if @org_support_last_sync["not_in_workspace"].to_i.positive? %>,
+              <%= @org_support_last_sync["not_in_workspace"] %> not in this Slack workspace<% end %>.
             </p>
           <% end %>
         </div>

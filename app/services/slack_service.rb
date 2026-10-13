@@ -3,6 +3,21 @@ class SlackService
 
   class Error < StandardError; end
 
+  # Slack refused the call for going over the method's rate limit; wait
+  # retry_after seconds before trying again.
+  class RateLimited < Error
+    attr_reader :retry_after
+
+    def initialize(retry_after)
+      @retry_after = retry_after
+      super("Slack API rate limited (retry after #{retry_after}s)")
+    end
+  end
+
+  # The account belongs to the Enterprise org but not to the workspace the
+  # channel is in, so it can't be invited until someone adds it there.
+  class NotInWorkspace < Error; end
+
   def initialize(bot_token: nil)
     @bot_token = bot_token || Rails.application.credentials.dig(:slack, :bot_token)
   end
@@ -14,13 +29,17 @@ class SlackService
       { success: true }
     elsif response["error"] == "already_in_channel"
       { success: true, already_member: true }
+    elsif response["error"] == "org_user_not_in_team"
+      raise NotInWorkspace, "Failed to invite user to channel: #{response["error"]}"
     else
       raise Error, "Failed to invite user to channel: #{response["error"]}"
     end
   end
 
   # Needs the bot in the channel and the channels:manage (public) or
-  # groups:write (private) scope.
+  # groups:write (private) scope. Slack also answers not_in_channel when the
+  # bot itself isn't in the channel, so callers can't take not_member as proof
+  # the user is gone unless they know the bot is there.
   def remove_from_channel(channel_id:, user_id:)
     response = post("conversations.kick", channel: channel_id, user: user_id)
 
@@ -177,8 +196,17 @@ class SlackService
       req.body = params.to_json
     end
 
-    JSON.parse(response.body)
+    raise RateLimited.new(retry_after(response)) if response.status == 429
+
+    parsed = JSON.parse(response.body)
+    raise RateLimited.new(retry_after(response)) if parsed["error"] == "ratelimited"
+
+    parsed
   rescue Faraday::Error, JSON::ParserError => e
     raise Error, "Slack API error: #{e.message}"
+  end
+
+  def retry_after(response)
+    response.headers["Retry-After"].to_i.clamp(1, 60)
   end
 end

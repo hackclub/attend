@@ -12,14 +12,14 @@ module Admin
       @support_sms_notifications_enabled = Setting.support_sms_notifications_enabled?
       @support_sms_notification_numbers = Setting.support_sms_notification_number_list
       @admin_help_slack_channel_id = Setting.admin_help_slack_channel_id
-      admin_help_members = User.admin_help_channel_members.to_a
-      @admin_help_member_count = admin_help_members.size
-      @admin_help_members_without_slack = admin_help_members.count { |user| user.verified_slack_id.nil? }
+      admin_help_members = User.admin_help_channel_members
+      @admin_help_member_count = admin_help_members.count
+      @admin_help_members_without_slack = admin_help_members.where(verified_slack_id: nil).count
       @admin_help_last_sync = Setting.admin_help_slack_last_sync
       @org_support_slack_channel_id = Setting.org_support_slack_channel_id
-      org_support_members = User.org_support_channel_members.to_a
-      @org_support_member_count = org_support_members.size
-      @org_support_members_without_slack = org_support_members.count { |user| user.verified_slack_id.nil? }
+      org_support_members = User.org_support_channel_members
+      @org_support_member_count = org_support_members.count
+      @org_support_members_without_slack = org_support_members.where(verified_slack_id: nil).count
       @org_support_last_sync = Setting.org_support_slack_last_sync
     end
 
