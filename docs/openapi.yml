@@ -27,8 +27,8 @@ info:
       when issued, in which case it reaches only the endpoints that accept
       that scope and returns `403` everywhere else, read-only endpoints
       included. An unscoped token carries its owner's full access. Scopes are
-      noted on the endpoints that accept them; the only one today is
-      `bans:write`.
+      noted on the endpoints that accept them: `bans:write` and
+      `support:read`.
     - **Series API key** — one key for a whole event series, issued from
       **Series → API Keys** in the dashboard by a series owner. Does **not** set
       a current user. It acts as an event API key on *every* event in its
@@ -255,6 +255,9 @@ paths:
         and lists the events they run that haven't ended: those where they are
         an event admin, ops or safeguarding lead, plus every event in a series
         they belong to. Global admin access on its own lists no events.
+
+
+        Reachable by a global API token scoped to `support:read`.
       parameters:
         - name: slack_id
           in: query
@@ -1178,9 +1181,10 @@ paths:
         Read-only check of whether an email or Slack ID is registered for the
         event. Pass exactly one of `email` or `slack_id`; `email` wins if both
         are sent. Safe to call on every sign-in; never mutates. Available to
-        event API keys. `participant_event_id` is the id the admin participant
-        page (`/admin/events/{slug}/participants/{participant_event_id}`) and
-        `GET /events/{event_id}/participants/{id}` take.
+        event API keys, and to global API tokens scoped to `support:read`.
+        `admin_url` links to the registration's admin page;
+        `participant_event_id` is the id
+        `GET /events/{event_id}/participants/{id}` takes.
       parameters:
         - $ref: "#/components/parameters/EventId"
         - name: email
@@ -1191,8 +1195,10 @@ paths:
           in: query
           required: false
           description: >-
-            Matches the registration's own Slack ID, falling back to the
-            participant's when the registration has none.
+            Matches only the Slack ID Hack Club Auth verified for the
+            participant's account, case-insensitively. Slack IDs typed onto a
+            profile or registration are ignored, so someone who has never
+            signed in to Attend can't be found this way.
           schema: { type: string, example: U0123ABCDEF }
       responses:
         "200":
@@ -1207,11 +1213,17 @@ paths:
                   registered: { type: boolean }
                   participant_id: { type: string, format: uuid, nullable: true }
                   participant_event_id: { type: string, format: uuid, nullable: true }
+                  admin_url: { type: string, format: uri, nullable: true }
                   status:
                     allOf: [{ $ref: "#/components/schemas/ParticipantStatus" }]
                     nullable: true
         "422":
           description: Email or slack_id is required.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: More than one registration matches that Slack ID.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }

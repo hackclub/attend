@@ -113,6 +113,21 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#verified_slack_id" do
+    it "keeps a plain, upcased copy of the Hack Club Auth Slack ID in step with the claims" do
+      user = create(:user, oidc_claims: { "slack_id" => " u123abc " })
+      expect(user.reload.verified_slack_id).to eq("U123ABC")
+
+      user.update!(oidc_claims: { "slack_id" => "U1,U2" })
+      expect(user.reload.verified_slack_id).to be_nil
+    end
+
+    it "ignores the profile override" do
+      user = create(:user, slack_user_id: "U999XYZ")
+      expect(user.verified_slack_id).to be_nil
+    end
+  end
+
   describe "#sync_email_to_participant" do
     let(:user) { create(:user, email: "new@example.com") }
     let!(:participant) { create(:participant, user: user, email: "old@example.com") }

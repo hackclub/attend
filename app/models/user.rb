@@ -38,6 +38,10 @@ class User < ApplicationRecord
   encrypts :oidc_claims
   encrypts :phone_number
 
+  # A plain, indexed copy of the Slack ID inside the claims, so lookups by it
+  # don't have to decrypt every row. See verified_slack_id_from.
+  before_save :sync_verified_slack_id, if: :oidc_claims_changed?
+
   normalizes_phone_number :phone_number
   # Guarded on `_changed?`: sign-in refreshes claims through `user.update`,
   # and a pre-existing bad number must never block that.
@@ -429,9 +433,10 @@ class User < ApplicationRecord
 
   # The Slack ID Hack Club Auth vouches for, ignoring the profile override —
   # anyone can type someone else's ID (or a comma-separated list) into that,
-  # so it must not decide who gets invited to a channel.
-  def verified_slack_id
-    id = oidc_claims&.dig("slack_id").to_s
+  # so it must not decide who gets invited to a channel or who a support lookup
+  # says someone is. Stored upcased in `verified_slack_id`.
+  def self.verified_slack_id_from(claims)
+    id = claims&.dig("slack_id").to_s.strip.upcase
     id if id.match?(/\A[UW][A-Z0-9]+\z/)
   end
 
@@ -452,6 +457,10 @@ class User < ApplicationRecord
   end
 
   private
+
+  def sync_verified_slack_id
+    self.verified_slack_id = self.class.verified_slack_id_from(oidc_claims)
+  end
 
   def invite_to_admin_help_channel
     SyncAdminHelpSlackChannelJob.perform_later([ id ])

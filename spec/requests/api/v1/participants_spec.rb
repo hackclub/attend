@@ -139,28 +139,54 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
     end
 
-    it "finds a registration by Slack ID and returns the id admin pages use" do
-      participant = create(:participant, slack_user_id: "U0TESTPART")
+    it "finds a registration by the Slack ID Hack Club Auth verified, with its admin link" do
+      user = create(:user, oidc_claims: { "slack_id" => "U0TESTPART" })
+      participant = create(:participant, user: user)
       pe = create(:participant_event, participant: participant, event: event)
 
       get "/api/v1/events/#{event.id}/participants/lookup",
-        params: { slack_id: "u0testpart" }, headers: api_key_headers
+        params: { slack_id: " u0testpart " }, headers: api_key_headers
 
       body = JSON.parse(response.body)
       expect(body["registered"]).to be(true)
       expect(body["participant_id"]).to eq(participant.id)
       expect(body["participant_event_id"]).to eq(pe.id)
+      expect(body["admin_url"]).to end_with("/admin/events/#{event.slug}/participants/#{pe.id}")
     end
 
-    it "prefers a registration's own Slack ID over the person's" do
-      create(:participant_event, event: event, participant: create(:participant, slack_user_id: "U0TESTPART"),
-        slack_user_id: "U0TESTOTHR")
-      pe = create(:participant_event, event: event, slack_user_id: "U0TESTPART")
+    # Anyone can type any ID into a profile or registration; only Hack Club
+    # Auth's counts.
+    it "ignores Slack IDs typed onto the participant or registration" do
+      create(:participant_event, event: event, participant: create(:participant, slack_user_id: "U0TESTPART"))
+      create(:participant_event, event: event, slack_user_id: "U0TESTPART")
 
       get "/api/v1/events/#{event.id}/participants/lookup",
         params: { slack_id: "U0TESTPART" }, headers: api_key_headers
 
-      expect(JSON.parse(response.body)["participant_event_id"]).to eq(pe.id)
+      expect(JSON.parse(response.body)["registered"]).to be(false)
+    end
+
+    it "refuses to guess when several registrations share a Slack ID" do
+      2.times do
+        user = create(:user, oidc_claims: { "slack_id" => "U0TESTPART" })
+        create(:participant_event, event: event, participant: create(:participant, user: user))
+      end
+
+      get "/api/v1/events/#{event.id}/participants/lookup",
+        params: { slack_id: "U0TESTPART" }, headers: api_key_headers
+
+      expect(response).to have_http_status(:conflict)
+    end
+
+    it "is reachable by a global token scoped to support:read" do
+      token = GlobalApiToken.generate_for(admin, scopes: [ "support:read" ]).token
+      headers = { "Authorization" => "Bearer #{token}" }
+
+      get "/api/v1/events/#{event.id}/participants/lookup", params: { email: "stranger@example.com" }, headers: headers
+      expect(response).to have_http_status(:ok)
+
+      get "/api/v1/events/#{event.id}/participants", headers: headers
+      expect(response).to have_http_status(:forbidden)
     end
 
     it "still forbids an event API key from reading the full roster" do

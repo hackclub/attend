@@ -22,7 +22,8 @@ class GlobalApiToken < ApplicationRecord
   # when issuing one. An API controller opts into a scope with
   # `required_scope`; anything that hasn't is unreachable by a scoped token.
   SCOPES = {
-    "bans:write" => "Add emails to the ban list"
+    "bans:write" => "Add emails to the ban list",
+    "support:read" => "Look up event admins and registrations by Slack ID"
   }.freeze
 
   def self.generate_for(user, name: nil, expires_in: nil, scopes: [])

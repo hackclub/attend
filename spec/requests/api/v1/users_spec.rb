@@ -48,6 +48,17 @@ RSpec.describe "Api::V1::Users", type: :request do
       expect(response).to have_http_status(:not_found)
     end
 
+    it "is reachable by a token scoped to support:read, which can't reach anything else" do
+      create(:event_role_assignment, user: organizer, event: create(:event), role: "event_admin")
+      scoped = { "Authorization" => "Bearer #{GlobalApiToken.generate_for(admin, scopes: [ "support:read" ]).token}" }
+
+      get "/api/v1/users/lookup", params: { slack_id: "U0TESTORG1" }, headers: scoped
+      expect(response).to have_http_status(:ok)
+
+      get "/api/v1/events", headers: scoped
+      expect(response).to have_http_status(:forbidden)
+    end
+
     it "requires a slack_id" do
       get "/api/v1/users/lookup", headers: headers
 

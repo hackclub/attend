@@ -10,6 +10,8 @@ module Api
         render json: { error: "Forbidden" }, status: :forbidden
       end
 
+      requires_scope "support:read", only: :lookup
+
       before_action :restrict_api_key_actions
       before_action :set_event
       before_action :set_participant_event, only: [ :show, :update, :destroy ]
@@ -158,7 +160,11 @@ module Api
           participant = @event.participants.find_by(email: email)
           participant && @event.participant_events.find_by(participant_id: participant.id)
         else
-          participant_event_for_slack_id(slack_id)
+          matches = participant_events_for_slack_id(slack_id).limit(2).to_a
+          if matches.size > 1
+            return render json: { error: "More than one registration matches that Slack ID" }, status: :conflict
+          end
+          matches.first
         end
 
         render json: {
@@ -167,6 +173,7 @@ module Api
           registered: participant_event.present?,
           participant_id: participant_event&.participant_id,
           participant_event_id: participant_event&.id,
+          admin_url: participant_event && AttendUrls.registration_url(participant_event),
           status: participant_event&.status
         }
       end
@@ -311,15 +318,12 @@ module Api
         date_of_birth phone pronouns tshirt_size
       ].freeze
 
-      # A registration's own Slack ID overrides the person's, the same
-      # precedence SendIncidentToSlackJob uses.
-      def participant_event_for_slack_id(slack_id)
-        @event.participant_events.joins(:participant)
-          .where(slack_user_id: slack_id)
-          .or(@event.participant_events.joins(:participant)
-            .where(slack_user_id: [ nil, "" ], participants: { slack_user_id: slack_id }))
-          .order(:created_at)
-          .first
+      # Only the Slack ID Hack Club Auth verified for the participant's account
+      # counts. The participant and registration columns are typed by people,
+      # and anyone can type someone else's ID there, so a registration nobody
+      # has signed in to can't be found this way.
+      def participant_events_for_slack_id(slack_id)
+        @event.participant_events.joins(participant: :user).where(users: { verified_slack_id: slack_id })
       end
 
       def participant_update_params

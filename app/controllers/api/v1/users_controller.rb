@@ -3,16 +3,16 @@ module Api
     # Global-admin only. Lets a support bot sitting in the admin help Slack
     # channel work out which events the person asking runs.
     class UsersController < BaseController
+      requires_scope "support:read"
       before_action :require_global_admin!
 
       # Matches on the Slack ID Hack Club Auth vouches for, never the profile
-      # override, and only among admin help channel members: that column is
-      # encrypted, so the match happens in Ruby over a deliberately small set.
+      # override, and only among admin help channel members.
       def lookup
         slack_id = params[:slack_id].to_s.strip.upcase
         return render_error("slack_id is required") if slack_id.blank?
 
-        user = User.admin_help_channel_members.find { |member| member.verified_slack_id == slack_id }
+        user = User.admin_help_channel_members.find_by(verified_slack_id: slack_id)
         return render json: { error: "Not found" }, status: :not_found unless user
 
         render json: {
