@@ -39,8 +39,10 @@ class User < ApplicationRecord
   encrypts :phone_number
 
   # A plain, indexed copy of the Slack ID inside the claims, so lookups by it
-  # don't have to decrypt every row. See verified_slack_id_from.
-  before_save :sync_verified_slack_id, if: :oidc_claims_changed?
+  # don't have to decrypt every row. See verified_slack_id_from. Runs on every
+  # save, not just when the claims change, so a copy left stale by a write
+  # that skipped this callback heals on that person's next sign-in or save.
+  before_save :sync_verified_slack_id
 
   normalizes_phone_number :phone_number
   # Guarded on `_changed?`: sign-in refreshes claims through `user.update`,
@@ -302,17 +304,11 @@ class User < ApplicationRecord
     save(validate: false)
   end
 
-  # Global admins, plus staff holding an ADMIN_HELP_CHANNEL_ROLES role (or a
-  # series role) on an event that hasn't ended. Undated drafts count, since
-  # setting an event up is when people most need help.
+  # Global admins, plus anyone with at least one Event.admin_help_events_for
+  # event (the rule lives there, shared with the support bot's user lookup).
   def self.admin_help_channel_members
-    events = Event.not_ended
-    via_event = EventRoleAssignment.where(role: ADMIN_HELP_CHANNEL_ROLES, event_id: events.select(:id))
-    via_series = SeriesRoleAssignment.where(event_series_id: events.where.not(event_series_id: nil).select(:event_series_id))
-
     where(global_role: "global_admin")
-      .or(where(id: via_event.select(:user_id)))
-      .or(where(id: via_series.select(:user_id)))
+      .or(where(Event.admin_help_events_for(arel_table[:id]).arel.exists))
   end
 
   def self.extract_oidc_claims(auth)
@@ -458,8 +454,14 @@ class User < ApplicationRecord
 
   private
 
+  # Assigning an equal value leaves the attribute clean, so a save where the
+  # copy already matches writes nothing extra.
   def sync_verified_slack_id
-    self.verified_slack_id = self.class.verified_slack_id_from(oidc_claims)
+    derived = self.class.verified_slack_id_from(oidc_claims)
+    self.verified_slack_id = derived unless verified_slack_id == derived
+  rescue ActiveRecord::Encryption::Errors::Decryption
+    # Claims that won't decrypt must not block an unrelated save; the copy
+    # stays as it is until the claims are rewritten.
   end
 
   def invite_to_admin_help_channel

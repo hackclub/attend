@@ -10,6 +10,16 @@ RSpec.describe "Api::V1::Users", type: :request do
   end
 
   describe "GET /api/v1/users/lookup" do
+    # Links go to APP_HOST like every other URL Attend hands out, not to
+    # whatever host the bot happened to call.
+    around do |example|
+      original = ENV["APP_HOST"]
+      ENV["APP_HOST"] = "attend.example.test"
+      example.run
+    ensure
+      ENV["APP_HOST"] = original
+    end
+
     it "lists the events someone runs, with a link to each dashboard" do
       event = create(:event, name: "Pancake Hack")
       create(:event_role_assignment, user: organizer, event: event, role: "event_admin")
@@ -20,7 +30,7 @@ RSpec.describe "Api::V1::Users", type: :request do
       expect(json["user"]["id"]).to eq(organizer.id)
       entry = json["events"].sole
       expect(entry).to include("name" => "Pancake Hack", "slug" => event.slug)
-      expect(entry["dashboard_url"]).to end_with("/admin/#{event.slug}")
+      expect(entry["dashboard_url"]).to eq("https://attend.example.test/admin/#{event.slug}")
     end
 
     it "counts series membership and leaves out ended events and non-admin roles" do
@@ -59,6 +69,20 @@ RSpec.describe "Api::V1::Users", type: :request do
       expect(response).to have_http_status(:forbidden)
     end
 
+    # Nothing makes a verified Slack ID unique, so two accounts can carry
+    # one. Answering for either would be a guess.
+    it "refuses to pick between two accounts with the same Slack ID" do
+      twin = create(:user, oidc_claims: { "slack_id" => "U0TESTORG1" })
+      [ organizer, twin ].each do |user|
+        create(:event_role_assignment, user: user, event: create(:event), role: "event_admin")
+      end
+
+      get "/api/v1/users/lookup", params: { slack_id: "U0TESTORG1" }, headers: headers
+
+      expect(response).to have_http_status(:conflict)
+      expect(json).to eq("error" => "More than one user matches that Slack ID")
+    end
+
     it "requires a slack_id" do
       get "/api/v1/users/lookup", headers: headers
 
@@ -72,6 +96,7 @@ RSpec.describe "Api::V1::Users", type: :request do
         headers: { "Authorization" => "Bearer #{MobileToken.generate_for(organizer).token}" }
 
       expect(response).to have_http_status(:forbidden)
+      expect(json).to eq("error" => "Only global admins can look up users")
     end
   end
 end

@@ -3,22 +3,32 @@ class AddVerifiedSlackIdToUsers < ActiveRecord::Migration[8.1]
   # oidc_claims blob, so finding someone by it meant decrypting every
   # candidate in Ruby. A Slack ID isn't secret, so it gets its own plain,
   # indexed column, kept in step with the claims on every save.
-  def up
-    add_column :users, :verified_slack_id, :string
-    add_index :users, :verified_slack_id
+  #
+  # Schema only: this runs in every pod's entrypoint, so anything that can
+  # raise here crash-loops the deploy. The index is built concurrently so it
+  # doesn't lock users, and the backfill runs as a job instead.
+  disable_ddl_transaction!
 
-    User.reset_column_information
-    User.where.not(oidc_claims: nil).find_each do |user|
-      slack_id = User.verified_slack_id_from(user.oidc_claims)
-      user.update_column(:verified_slack_id, slack_id) if slack_id
-    rescue ActiveRecord::Encryption::Errors::Decryption => e
-      # A row that won't decrypt must not crash-loop the deploy; it fills in
-      # on that person's next sign-in instead.
-      say "Skipped user #{user.id}: #{e.class}"
-    end
+  def up
+    add_column :users, :verified_slack_id, :string, if_not_exists: true
+    add_index :users, :verified_slack_id, algorithm: :concurrently, if_not_exists: true
+
+    enqueue_backfill
   end
 
   def down
     remove_column :users, :verified_slack_id
+  end
+
+  private
+
+  # Delayed so the rolling deploy has finished before a worker picks it up: an
+  # old-code worker doesn't know the job class and would fail it outright.
+  # Failing to enqueue must never fail the migration; sign-ins heal rows
+  # anyway, and `rails backfill:verified_slack_ids` reruns it.
+  def enqueue_backfill
+    BackfillVerifiedSlackIdsJob.set(wait: 15.minutes).perform_later
+  rescue StandardError => e
+    say "Could not enqueue BackfillVerifiedSlackIdsJob (#{e.class}: #{e.message}); run `rails backfill:verified_slack_ids` instead"
   end
 end

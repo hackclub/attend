@@ -145,6 +145,15 @@ module Api
         end
       end
 
+      # For before_action, where a render halts the chain:
+      #   before_action -> { require_global_admin!("Only global admins can ...") }
+      # API keys have no user, so they're refused here too.
+      def require_global_admin!(message)
+        return if current_user&.global_admin?
+
+        render json: { error: message }, status: :forbidden
+      end
+
       def render_error(message, status: :unprocessable_entity)
         render json: { error: message }, status: status
       end

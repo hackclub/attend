@@ -146,14 +146,29 @@ module Api
 
       # Read-only participation check. Unlike `create`, this never sends an
       # invitation or mutates anything, so it is safe to call on every sign-in.
-      # Takes `email` or `slack_id`. `participant_event_id` is the id the admin
-      # participant page and #show are keyed on.
+      # Takes `email` or `slack_id`, never both: the response echoes the key it
+      # matched on, and echoing one that wasn't checked would read as a match.
+      # `participant_event_id` is the id the admin participant page and #show
+      # are keyed on.
+      #
+      # Email works for every caller that can reach the event. Slack ID is for
+      # the support bot only (see #slack_lookup_allowed?).
       def lookup
         email = params[:email].to_s.strip.downcase
         slack_id = params[:slack_id].to_s.strip.upcase
 
         if email.blank? && slack_id.blank?
           return render json: { error: "Email or slack_id is required" }, status: :unprocessable_entity
+        end
+
+        if email.present? && slack_id.present?
+          return render json: { error: "Send email or slack_id, not both" }, status: :unprocessable_entity
+        end
+
+        if slack_id.present? && !slack_lookup_allowed?
+          return render json: {
+            error: "Looking up by slack_id needs a global API token with the support:read scope"
+          }, status: :forbidden
         end
 
         participant_event = if email.present?
@@ -317,6 +332,15 @@ module Api
         legal_first_name legal_last_name preferred_name email
         date_of_birth phone pronouns tshirt_size
       ].freeze
+
+      # Resolving a Slack ID to a registration is a support-bot capability, not
+      # part of what an event or series key (or a signed-in person on the
+      # mobile app) is for. Matches how Api::V1::UsersController gates its
+      # Slack lookup: a global token that permits support:read, which includes
+      # an unrestricted one.
+      def slack_lookup_allowed?
+        current_token.is_a?(GlobalApiToken) && current_token.permits?("support:read")
+      end
 
       # Only the Slack ID Hack Club Auth verified for the participant's account
       # counts. The participant and registration columns are typed by people,
