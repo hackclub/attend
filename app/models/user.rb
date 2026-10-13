@@ -28,6 +28,8 @@ class User < ApplicationRecord
 
   after_commit :invite_to_admin_help_channel, on: %i[create update],
     if: -> { saved_change_to_global_role? && global_admin? }
+  after_commit :invite_to_org_support_channel, on: %i[create update],
+    if: -> { saved_change_to_global_role? && !no_role? }
 
   # `oidc_claims` holds PII straight from Hack Club Auth (phone number,
   # birthdate, home address). Encrypting the whole jsonb blob works because the
@@ -60,6 +62,7 @@ class User < ApplicationRecord
   has_many :event_role_assignments, dependent: :destroy
   has_many :assigned_events, through: :event_role_assignments, source: :event
   has_many :series_role_assignments, dependent: :destroy
+  has_many :slack_channel_invites, dependent: :delete_all
   has_many :event_series, through: :series_role_assignments
   has_one :participant
   has_one :guardian
@@ -311,6 +314,14 @@ class User < ApplicationRecord
       .or(where(Event.admin_help_events_for(arel_table[:id]).arel.exists))
   end
 
+  # Every kind of admin: global admins and global read-only users, plus anyone
+  # holding any event or series role (limited and read-only included) on an
+  # Event.org_support_events_for event.
+  def self.org_support_channel_members
+    where(global_role: %w[global_admin read_only])
+      .or(where(Event.org_support_events_for(arel_table[:id]).arel.exists))
+  end
+
   def self.extract_oidc_claims(auth)
     raw = auth.extra&.raw_info&.to_h&.with_indifferent_access || {}
 
@@ -466,6 +477,10 @@ class User < ApplicationRecord
 
   def invite_to_admin_help_channel
     SyncAdminHelpSlackChannelJob.perform_later([ id ])
+  end
+
+  def invite_to_org_support_channel
+    SyncOrgSupportSlackChannelJob.perform_later([ id ])
   end
 
   def acceptable_avatar

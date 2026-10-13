@@ -2,6 +2,8 @@ module Admin
   class SettingsController < BaseController
     before_action :require_global_admin
 
+    SLACK_CHANNEL_ID = /\A[CG][A-Z0-9]+\z/
+
     def show
       @maintenance_mode = Setting.maintenance_mode?
       @twilio_enabled = Setting.twilio_enabled?
@@ -14,6 +16,11 @@ module Admin
       @admin_help_member_count = admin_help_members.size
       @admin_help_members_without_slack = admin_help_members.count { |user| user.verified_slack_id.nil? }
       @admin_help_last_sync = Setting.admin_help_slack_last_sync
+      @org_support_slack_channel_id = Setting.org_support_slack_channel_id
+      org_support_members = User.org_support_channel_members.to_a
+      @org_support_member_count = org_support_members.size
+      @org_support_members_without_slack = org_support_members.count { |user| user.verified_slack_id.nil? }
+      @org_support_last_sync = Setting.org_support_slack_last_sync
     end
 
     def toggle_maintenance
@@ -85,7 +92,7 @@ module Admin
 
     def update_admin_help_slack_channel
       channel_id = params[:admin_help_slack_channel_id].to_s.strip
-      unless channel_id.blank? || channel_id.match?(/\A[CG][A-Z0-9]+\z/)
+      unless channel_id.blank? || channel_id.match?(SLACK_CHANNEL_ID)
         redirect_to admin_settings_path, alert: "That doesn't look like a Slack channel ID (e.g. C0123ABCD)."
         return
       end
@@ -103,6 +110,28 @@ module Admin
       SyncAdminHelpSlackChannelJob.perform_later
       redirect_to admin_settings_path,
         notice: "Syncing global and active event admins to the Slack channel. Refresh in a minute to see the results."
+    end
+
+    def update_org_support_slack_channel
+      channel_id = params[:org_support_slack_channel_id].to_s.strip
+      unless channel_id.blank? || channel_id.match?(SLACK_CHANNEL_ID)
+        redirect_to admin_settings_path, alert: "That doesn't look like a Slack channel ID (e.g. C0123ABCD)."
+        return
+      end
+
+      Setting.org_support_slack_channel_id = channel_id
+      redirect_to admin_settings_path, notice: "Org support channel updated."
+    end
+
+    def sync_org_support_slack_channel
+      if Setting.org_support_slack_channel_id.blank?
+        redirect_to admin_settings_path, alert: "Set the org support channel ID before syncing."
+        return
+      end
+
+      SyncOrgSupportSlackChannelJob.perform_later
+      redirect_to admin_settings_path,
+        notice: "Syncing admins to the org support Slack channel. Refresh in a minute to see the results."
     end
 
     private

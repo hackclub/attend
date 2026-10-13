@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_13_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_13_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1222,6 +1222,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_13_120000) do
     t.index ["sent_by_user_id"], name: "index_slack_blasts_on_sent_by_user_id"
   end
 
+  create_table "slack_channel_invites", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "channel_id", null: false
+    t.datetime "created_at", null: false
+    t.string "slack_user_id", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["channel_id"], name: "index_slack_channel_invites_on_channel_id"
+    t.index ["user_id", "channel_id"], name: "index_slack_channel_invites_on_user_id_and_channel_id", unique: true
+  end
+
   create_table "ticket_messages", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.boolean "automated", default: false, null: false
     t.text "body", null: false
@@ -1533,6 +1543,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_13_120000) do
   add_foreign_key "slack_blast_recipients", "slack_blasts"
   add_foreign_key "slack_blasts", "events"
   add_foreign_key "slack_blasts", "users", column: "sent_by_user_id"
+  add_foreign_key "slack_channel_invites", "users", on_delete: :cascade
   add_foreign_key "ticket_messages", "tickets"
   add_foreign_key "ticket_messages", "tickets", column: "merged_from_ticket_id"
   add_foreign_key "ticket_messages", "users"

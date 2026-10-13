@@ -47,5 +47,8 @@ class SeriesRoleAssignment < ApplicationRecord
 
   # Series members act as event admins on every event in the series; the job
   # skips them if none of those events are still to come.
-  after_create_commit { SyncAdminHelpSlackChannelJob.perform_later([ user_id ]) }
+  after_create_commit do
+    SyncAdminHelpSlackChannelJob.perform_later([ user_id ])
+    SyncOrgSupportSlackChannelJob.perform_later([ user_id ])
+  end
 end

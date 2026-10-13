@@ -210,6 +210,21 @@ class Event < ApplicationRecord
     not_ended.where(id: via_event).or(not_ended.where(event_series_id: via_series))
   }
 
+  # The events that put `user` in the org support Slack channel: any role on
+  # the event or its series, from before the event until ORG_SUPPORT_GRACE
+  # after it ends. Undated drafts count. Takes the same `user` forms as
+  # admin_help_events_for.
+  ORG_SUPPORT_GRACE = 7.days
+
+  scope :org_support_events_for, ->(user) {
+    user = user.id if user.is_a?(User)
+    via_event = EventRoleAssignment.where(EventRoleAssignment.arel_table[:user_id].eq(user)).select(:event_id)
+    via_series = SeriesRoleAssignment.where(SeriesRoleAssignment.arel_table[:user_id].eq(user)).select(:event_series_id)
+    window = where(ends_at: nil).or(where(ends_at: ORG_SUPPORT_GRACE.ago..))
+
+    window.where(id: via_event).or(window.where(event_series_id: via_series))
+  }
+
   def setup_complete?
     setup_completed_at.present?
   end
