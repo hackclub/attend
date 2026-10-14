@@ -45,7 +45,7 @@
           <dt class="cs-kv-label">Dates</dt>
           <dd class="cs-kv-value">
             <% if @event.starts_at && @event.ends_at %>
-              <%= cs_date_range(@event.starts_at, @event.ends_at) %>
+              <%= cs_event_date_range(@event) %>
             <% else %>
               <span class="cs-muted">Not set</span>
             <% end %>

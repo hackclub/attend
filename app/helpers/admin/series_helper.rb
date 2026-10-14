@@ -40,7 +40,7 @@ module Admin::SeriesHelper
         lon: coordinates[:lon],
         name: event.name,
         location: [ event.location_city, event.location_country ].compact_blank.join(", "),
-        dates: event_date_range(event.starts_at, event.ends_at),
+        dates: event_date_range(event.starts_at, event.ends_at, zone: event.event_time_zone),
         url: admin_event_dashboard_path(event.slug),
         active: row[:active],
         blocked: blocked,

@@ -25,7 +25,7 @@
     </div>
   </td>
   <td class="whitespace-nowrap"><%= event_phase_status(event) %></td>
-  <td class="whitespace-nowrap"><%= cs_date_range(event.starts_at, event.ends_at) %></td>
+  <td class="whitespace-nowrap"><%= cs_event_date_range(event) %></td>
   <td class="whitespace-nowrap tabular-nums"><%= pluralize(event_participant_count(event), "participant") %></td>
   <td>
     <% if event.location_city.present? %>

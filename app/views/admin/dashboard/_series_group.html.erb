@@ -1,7 +1,8 @@
 <%# A collapsible row grouping a series' events on the events list. %>
 <%# Locals: series, events (this series' events, in list order), first %>
-<% series_start = events.filter_map(&:starts_at).min %>
-<% series_end = events.filter_map(&:ends_at).max %>
+<%# Each event's local dates, so the span matches what its rows show. %>
+<% series_start = events.filter_map { |event| event.starts_at&.in_time_zone(event.event_time_zone)&.to_date }.min %>
+<% series_end = events.filter_map { |event| event.ends_at&.in_time_zone(event.event_time_zone)&.to_date }.max %>
 <% series_participants = events.sum { |event| event_participant_count(event) } %>
 <% live_count = events.count(&:active?) %>
 <li class="<%= "border-t border-gray-100" unless first %>">

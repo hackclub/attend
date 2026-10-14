@@ -170,4 +170,13 @@ RSpec.describe ConsoleHelper, type: :helper do
         .to eq("October 9 – 11, 2026")
     end
   end
+
+  describe "#cs_event_date_range" do
+    it "reads an event's dates in the event's own zone" do
+      event = Event.new(timezone: "Pacific Time (US & Canada)",
+        starts_at: Time.utc(2026, 11, 6, 0), ends_at: Time.utc(2026, 11, 9, 23))
+
+      expect(helper.cs_event_date_range(event)).to eq("November 5 – 9, 2026")
+    end
+  end
 end
