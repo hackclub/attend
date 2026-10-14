@@ -458,6 +458,10 @@ Rails.application.routes.draw do
   end
 
   namespace :api do
+    # GDPR deletion and export, called by the Hack Club privacy hub. See app/services/privacy/README.md.
+    post "privacy/delete", to: "privacy#delete"
+    post "privacy/export", to: "privacy#export"
+
     namespace :v1 do
       resources :webhooks, only: [] do
         collection do
