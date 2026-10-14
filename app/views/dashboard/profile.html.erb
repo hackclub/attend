@@ -288,7 +288,7 @@
                       <span class="text-sm text-(--text)">
                         <%= participant_event.event.name %>
                         <% if participant_event.event.starts_at.present? %>
-                          <span class="text-(--text-faint)">· <%= participant_event.event.starts_at.strftime("%b %Y") %></span>
+                          <span class="text-(--text-faint)">· <%= participant_event.event.local_starts_at.strftime("%b %Y") %></span>
                         <% end %>
                       </span>
                     </label>
@@ -308,7 +308,7 @@
                       <span class="text-sm text-(--text)">
                         <%= event.name %>
                         <% if event.starts_at.present? %>
-                          <span class="text-(--text-faint)">· <%= event.starts_at.strftime("%b %Y") %></span>
+                          <span class="text-(--text-faint)">· <%= event.local_starts_at.strftime("%b %Y") %></span>
                         <% end %>
                       </span>
                     </label>
@@ -561,7 +561,7 @@
                                             class: "size-3.5 accent-(--brand)" %>
                                       <span><%= event.name %></span>
                                       <% if event.starts_at %>
-                                        <span class="ml-auto text-[11px] text-(--text-muted)"><%= event.starts_at.strftime("%b %Y") %></span>
+                                        <span class="ml-auto text-[11px] text-(--text-muted)"><%= event.local_starts_at.strftime("%b %Y") %></span>
                                       <% end %>
                                     </label>
                                   <% end %>

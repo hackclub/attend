@@ -42,7 +42,7 @@
                   <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Invitation pending</p>
                   <h3 class="text-lg font-semibold text-amber-900 truncate"><%= invitation.event.name %></h3>
                   <p class="text-sm text-amber-800">
-                    <%= invitation.event.starts_at&.strftime("%b %d") %> – <%= invitation.event.ends_at&.strftime("%b %d, %Y") %>
+                    <%= invitation.event.local_starts_at&.strftime("%b %d") %> – <%= invitation.event.local_ends_at&.strftime("%b %d, %Y") %>
                   </p>
                 </div>
               </div>
@@ -60,7 +60,7 @@
     <% if next_event %>
       <% ev = next_event.event %>
       <% completion = @completion_presenters.fetch(next_event) %>
-      <% days_until = ev.starts_at.present? ? (ev.starts_at.to_date - Date.current).to_i : nil %>
+      <% days_until = ev.starts_at.present? ? (ev.local_start_date - ev.local_today).to_i : nil %>
       <% progress = next_event.onboarding_progress %>
       <% done_count = progress[:steps].count { |s| s[:done] } %>
       <% total_count = progress[:steps].size %>
@@ -114,7 +114,7 @@
                   <% end %>
                   <% if ev.starts_at.present? %>
                     <p class="mt-2 text-sm text-(--text-on-dark)/70">
-                      <%= ev.starts_at.strftime("%A, %B %d") %>
+                      <%= ev.local_starts_at.strftime("%A, %B %d") %>
                     </p>
                   <% end %>
                 </div>
@@ -180,7 +180,7 @@
                   <%= ev.name %>
                 </p>
                 <p class="text-sm text-(--text-muted)">
-                  <%= ev.starts_at&.strftime("%b %d") %><%= " – #{ev.ends_at.strftime('%b %d, %Y')}" if ev.ends_at %>
+                  <%= ev.local_starts_at&.strftime("%b %d") %><%= " – #{ev.local_ends_at.strftime('%b %d, %Y')}" if ev.ends_at %>
                 </p>
               </div>
               <span class="hidden sm:inline-flex shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium <%= completion_status_badge_class(completion.state) %>">

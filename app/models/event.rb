@@ -236,7 +236,7 @@ class Event < ApplicationRecord
   end
 
   def completed?
-    ends_at.present? && ends_at.to_date < Date.current
+    ends_at.present? && local_end_date < local_today
   end
 
   def registration_open?
@@ -299,12 +299,33 @@ class Event < ApplicationRecord
     end
   end
 
+  # Start and end on the event's own clock. Times are stored in UTC, so an
+  # evening start west of UTC reads as the next day unless converted first.
+  def local_starts_at
+    starts_at&.in_time_zone(event_time_zone)
+  end
+
+  def local_ends_at
+    ends_at&.in_time_zone(event_time_zone)
+  end
+
+  def local_start_date
+    local_starts_at&.to_date
+  end
+
+  def local_end_date
+    local_ends_at&.to_date
+  end
+
+  def local_today
+    Time.current.in_time_zone(event_time_zone).to_date
+  end
+
   def formatted_date_range
     return nil if starts_at.nil? || ends_at.nil?
 
-    tz = event_time_zone
-    start_date = starts_at.in_time_zone(tz).to_date
-    end_date = ends_at.in_time_zone(tz).to_date
+    start_date = local_start_date
+    end_date = local_end_date
 
     if start_date == end_date
       start_date.strftime("%B %-d, %Y")

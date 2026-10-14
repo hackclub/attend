@@ -172,7 +172,7 @@ class ParticipantEvent < ApplicationRecord
   def requires_guardian?
     return true unless participant.date_of_birth.present?
 
-    participant.minor_on?(event.starts_at&.to_date || Date.current)
+    participant.minor_on?(event.local_start_date || Date.current)
   end
 
   # A waiver was reset, so guardians who'd finished the portal have something
@@ -189,7 +189,7 @@ class ParticipantEvent < ApplicationRecord
   end
 
   def age_on_event
-    participant.age_on(event.starts_at&.to_date || Date.current)
+    participant.age_on(event.local_start_date || Date.current)
   end
 
   def is_18_on_event?
@@ -521,7 +521,7 @@ class ParticipantEvent < ApplicationRecord
   def participant_not_too_old
     return unless participant&.date_of_birth.present? && event&.ends_at.present?
 
-    age_at_event_end = participant.age_on(event.ends_at.to_date)
+    age_at_event_end = participant.age_on(event.local_end_date)
     if age_at_event_end && age_at_event_end >= 19
       errors.add(:base, "You will be 19 or older during this event. Please contact event staff for assistance.")
     end

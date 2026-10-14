@@ -51,7 +51,7 @@
               <p class="portal-body text-sm">For <%= participant_event.participant.full_name %></p>
               <% if event.starts_at.present? && event.ends_at.present? %>
                 <p class="portal-hint text-sm mt-0.5">
-                  <%= event.starts_at.strftime("%B %-d") %> – <%= event.ends_at.strftime("%B %-d, %Y") %>
+                  <%= event.local_starts_at.strftime("%B %-d") %> – <%= event.local_ends_at.strftime("%B %-d, %Y") %>
                 </p>
               <% end %>
             </div>

@@ -148,7 +148,7 @@
                       disabled: @mcp_event_scope != "selected" %>
                 <span><%= event.name %></span>
                 <% if event.starts_at %>
-                  <span class="tc-event-dates"><%= event.starts_at.strftime("%b %Y") %></span>
+                  <span class="tc-event-dates"><%= event.local_starts_at.strftime("%b %Y") %></span>
                 <% end %>
               </label>
             <% end %>

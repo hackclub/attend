@@ -123,7 +123,7 @@
               <% end %>
               <% if event.starts_at.present? %>
                 <p class="text-base sm:text-sm text-(--text-muted)">
-                  <%= event.starts_at.strftime("%b %-d") %><% if event.ends_at.present? && event.ends_at.to_date != event.starts_at.to_date %> – <%= event.ends_at.strftime("%b %-d") %><% end %>, <%= (event.ends_at || event.starts_at).year %>
+                  <%= event.local_starts_at.strftime("%b %-d") %><% if event.ends_at.present? && event.local_end_date != event.local_start_date %> – <%= event.local_ends_at.strftime("%b %-d") %><% end %>, <%= (event.local_ends_at || event.local_starts_at).year %>
                 </p>
               <% end %>
             </div>

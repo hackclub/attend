@@ -446,7 +446,7 @@ module Admin
         .where(status: %w[complete in_progress])
         .joins(:accommodation)
 
-      event_date = @event.starts_at&.to_date || Date.current
+      event_date = @event.local_start_date || Date.current
 
       stats = {
         total: participant_events.count,

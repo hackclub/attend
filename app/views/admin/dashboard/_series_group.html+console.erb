@@ -3,8 +3,9 @@
     group starts collapsed unless it holds the event being managed. %>
 <%# Locals: series, events (this series' events, in list order) %>
 <% group = { id: "series-#{series.id}-#{SecureRandom.hex(3)}", expanded: current_event.present? && events.any? { |event| event.id == current_event.id } } %>
-<% series_start = events.filter_map(&:starts_at).min %>
-<% series_end = events.filter_map(&:ends_at).max %>
+<%# Each event's local dates, so the span matches what its rows show. %>
+<% series_start = events.filter_map { |event| event.starts_at&.in_time_zone(event.event_time_zone)&.to_date }.min %>
+<% series_end = events.filter_map { |event| event.ends_at&.in_time_zone(event.event_time_zone)&.to_date }.max %>
 <% series_participants = events.sum { |event| event_participant_count(event) } %>
 <% live_count = events.count(&:active?) %>
 <tr>

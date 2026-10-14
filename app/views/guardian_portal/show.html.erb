@@ -30,7 +30,7 @@
         <dd class="portal-heading text-base"><%= @event.name %></dd>
         <% if @event.starts_at.present? && @event.ends_at.present? %>
           <dd class="portal-hint text-sm mt-0.5">
-            <%= @event.starts_at.strftime("%B %-d") %> – <%= @event.ends_at.strftime("%B %-d, %Y") %>
+            <%= @event.local_starts_at.strftime("%B %-d") %> – <%= @event.local_ends_at.strftime("%B %-d, %Y") %>
           </dd>
         <% end %>
       </div>

@@ -30,7 +30,7 @@
     </td>
   <% end %>
   <td class="px-2 py-1.5 whitespace-nowrap" data-column="age">
-    <% age = pe.participant.age_on(current_event.starts_at&.to_date || Date.current) %>
+    <% age = pe.participant.age_on(current_event.local_start_date || Date.current) %>
     <% if age %>
       <span class="<%= age < 18 ? 'text-amber-600 font-medium' : 'text-gray-700' %>"><%= age %></span>
     <% else %>

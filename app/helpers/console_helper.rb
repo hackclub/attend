@@ -276,6 +276,12 @@ module ConsoleHelper
     end
   end
 
+  # An event's dates as its attendees see them. Events store UTC, so an
+  # evening start in a zone behind UTC would otherwise land on the next day.
+  def cs_event_date_range(event)
+    cs_date_range(event.starts_at, event.ends_at, zone: event.event_time_zone)
+  end
+
   # Internals for the timestamp helpers above.
   def cs_absolute_date(time)
     time.strftime("%B %-d, %Y")

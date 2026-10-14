@@ -424,8 +424,8 @@ class OnboardingController < ApplicationController
       @travel_inbound.travel_legs.build(position: 0) if @travel_inbound.travel_legs.empty?
       @travel_outbound = @participant_event.travel_outbound || @participant_event.travels.build(direction: "outbound")
       @travel_outbound.travel_legs.build(position: 0) if @travel_outbound.travel_legs.empty?
-      @default_inbound_date = current_event.starts_at&.to_date&.strftime("%Y-%m-%d")
-      @default_outbound_date = current_event.ends_at&.to_date&.strftime("%Y-%m-%d")
+      @default_inbound_date = current_event.local_start_date&.strftime("%Y-%m-%d")
+      @default_outbound_date = current_event.local_end_date&.strftime("%Y-%m-%d")
     when "accommodation"
       @accommodation = @participant_event.accommodation || @participant_event.build_accommodation
     when "health"
