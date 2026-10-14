@@ -21,6 +21,20 @@ RSpec.describe "Admin::Passports", type: :request do
       )
     end
 
+    it "returns a badge URL for the NFC bridge's URI record" do
+      owner.update!(slack_user_id: "U0FAKE123")
+
+      post admin_user_passports_path(owner)
+
+      expect(response.parsed_body.fetch("badge_url")).to eq("https://badge.hackclub.com/t/U0FAKE123")
+    end
+
+    it "falls back to the Attend root when the user has no Slack ID" do
+      post admin_user_passports_path(owner)
+
+      expect(response.parsed_body.fetch("badge_url")).to eq(root_url)
+    end
+
     it "reuses the newest pending passport" do
       pending = create(:passport, user: owner)
 
