@@ -187,4 +187,16 @@ RSpec.describe ParticipantMailer, type: :mailer do
       end
     end
   end
+  describe "#waiver_dates_changed" do
+    it "tells the participant the new dates and links to their waiver page" do
+      participant_event = create(:participant_event)
+
+      mail = described_class.waiver_dates_changed(participant_event: participant_event)
+
+      expect(mail.to).to eq([ participant_event.participant.email ])
+      body = mail.text_part.body.to_s
+      expect(body).to include(participant_event.event.formatted_date_range)
+      expect(body).to include("/onboarding/")
+    end
+  end
 end

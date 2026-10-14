@@ -214,6 +214,129 @@ RSpec.describe "Api::V1::Webhooks", type: :request do
         consent.reload
         expect(consent.status).to eq("signed")
       end
+
+      # A re-issued waiver reuses the same consent row, so the old submission's
+      # metadata still points at it. Late events from that old submission must
+      # not land on the fresh waiver.
+      context "when the event comes from a submission the consent no longer points at" do
+        let(:old_submission_completed) do
+          {
+            "event_type" => "submission.completed",
+            "data" => {
+              "id" => 111,
+              "metadata" => { "consent_id" => consent.id.to_s },
+              "documents" => [ { "url" => "https://example.com/old.pdf" } ]
+            }
+          }
+        end
+
+        it "ignores submission.completed when the consent has moved on to a newer submission" do
+          consent.update!(docuseal_envelope_id: "222")
+
+          post docuseal_api_v1_webhooks_path, params: old_submission_completed.to_json, headers: headers
+
+          expect(response).to have_http_status(:ok)
+          consent.reload
+          expect(consent.status).to eq("sent")
+          expect(consent.signed_at).to be_nil
+          expect(consent.document_url).to be_nil
+        end
+
+        it "ignores submission.completed when the consent was just reset and has no submission yet" do
+          consent.update!(status: :pending, docuseal_envelope_id: nil)
+
+          post docuseal_api_v1_webhooks_path, params: old_submission_completed.to_json, headers: headers
+
+          expect(response).to have_http_status(:ok)
+          consent.reload
+          expect(consent.status).to eq("pending")
+          expect(consent.signed_at).to be_nil
+        end
+
+        it "ignores form.completed whose submission_id is not the current one" do
+          consent.update!(docuseal_envelope_id: "222", pending_on: "participant")
+
+          payload = {
+            "event_type" => "form.completed",
+            "data" => {
+              "id" => 999,
+              "submission_id" => 111,
+              "role" => "Participant",
+              "metadata" => { "consent_id" => consent.id.to_s }
+            }
+          }
+
+          post docuseal_api_v1_webhooks_path, params: payload.to_json, headers: headers
+
+          expect(response).to have_http_status(:ok)
+          consent.reload
+          expect(consent.participant_signed_at).to be_nil
+          expect(consent.pending_on).to eq("participant")
+        end
+
+        it "ignores a stale guardian form.completed on a freedom waiver" do
+          freedom_consent = create(:consent,
+            participant_event: participant_event,
+            consent_type: :freedom_waiver,
+            status: :pending,
+            docuseal_envelope_id: nil
+          )
+
+          payload = {
+            "event_type" => "form.completed",
+            "data" => {
+              "id" => 999,
+              "submission" => { "id" => 111 },
+              "role" => "Parent/Legal Guardian",
+              "metadata" => { "consent_id" => freedom_consent.id.to_s },
+              "values" => [ { "field" => "Freedom Waiver Granted", "value" => true } ]
+            }
+          }
+
+          post docuseal_api_v1_webhooks_path, params: payload.to_json, headers: headers
+
+          expect(response).to have_http_status(:ok)
+          expect(freedom_consent.reload.guardian_signed_at).to be_nil
+          expect(participant_event.reload.safeguarding_info&.freedom_waiver_granted).to be_falsey
+        end
+      end
+
+      it "applies submission.completed when the integer submission id matches the consent's envelope" do
+        payload = {
+          "event_type" => "submission.completed",
+          "data" => {
+            "id" => 12345,
+            "metadata" => { "consent_id" => consent.id.to_s },
+            "documents" => [ { "url" => "https://example.com/doc.pdf" } ]
+          }
+        }
+
+        post docuseal_api_v1_webhooks_path, params: payload.to_json, headers: headers
+
+        expect(response).to have_http_status(:ok)
+        expect(consent.reload.status).to eq("signed")
+      end
+
+      it "applies form.completed when its submission_id matches, even though the submitter id differs" do
+        consent.update!(pending_on: "participant")
+
+        payload = {
+          "event_type" => "form.completed",
+          "data" => {
+            "id" => 999,
+            "submission_id" => 12345,
+            "role" => "Participant",
+            "metadata" => { "consent_id" => consent.id.to_s }
+          }
+        }
+
+        post docuseal_api_v1_webhooks_path, params: payload.to_json, headers: headers
+
+        expect(response).to have_http_status(:ok)
+        consent.reload
+        expect(consent.participant_signed_at).to be_present
+        expect(consent.pending_on).to eq("guardian")
+      end
     end
 
     context "with invalid webhook secret" do

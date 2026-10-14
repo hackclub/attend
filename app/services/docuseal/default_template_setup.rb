@@ -52,6 +52,12 @@ module Docuseal
       end
     end
 
+    # Marks a template as one Attend cloned for this event, so it can be told
+    # apart from an organizer's own template later.
+    def self.external_id_for(event, template_type)
+      "attend_event_#{event.id}_#{template_type}"
+    end
+
     def initialize(event)
       @event = event
     end
@@ -72,16 +78,7 @@ module Docuseal
         Docuseal::HostConfig.default_host
       end
 
-      clone = Docuseal::Client.new(host: target_host).clone_template(
-        blueprint_id,
-        name: "#{@event.name} - #{label}",
-        folder_name: @event.name,
-        external_id: "attend_event_#{@event.id}_#{template_type}",
-        values: {
-          event_name: @event.name,
-          event_dates: @event.formatted_date_range.to_s
-        }
-      )
+      clone = clone_blueprint(blueprint_id, template_type, host: target_host)
 
       @event.update!(
         TEMPLATE_COLUMNS.fetch(template_type) => clone["id"],
@@ -101,7 +98,29 @@ module Docuseal
       Result.new(false, "Failed to use default template: #{e.message}")
     end
 
+    # The event's dates moved: clone a fresh copy of the blueprint with the new
+    # dates and point the event at it. Unlike #call, the field mappings are
+    # left alone — the blueprint is the same, so the field names still match,
+    # and an organizer may have adjusted them. Raises Docuseal::Error.
+    def refresh_dates(template_type)
+      clone = clone_blueprint(BLUEPRINT_IDS.fetch(template_type), template_type, host: @event.docuseal_host)
+      @event.update!(TEMPLATE_COLUMNS.fetch(template_type) => clone["id"])
+    end
+
     private
+
+    def clone_blueprint(blueprint_id, template_type, host:)
+      Docuseal::Client.new(host: host).clone_template(
+        blueprint_id,
+        name: "#{@event.name} - #{template_type.titleize}",
+        folder_name: @event.name,
+        external_id: self.class.external_id_for(@event, template_type),
+        values: {
+          event_name: @event.name,
+          event_dates: @event.formatted_date_range.to_s
+        }
+      )
+    end
 
     def event_has_any_template?
       @event.docuseal_waiver_template_id.present? ||

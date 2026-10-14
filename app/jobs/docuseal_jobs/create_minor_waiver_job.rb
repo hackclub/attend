@@ -4,7 +4,9 @@ module DocusealJobs
 
     DEFAULT_TEMPLATE_ID = 2274072
 
-    def perform(consent_id)
+    # dates_changed: the waiver replaces one voided because the event's dates
+    # moved (Docuseal::WaiverDateRegeneration), so the teen's email says why.
+    def perform(consent_id, dates_changed: false)
       consent = Consent.find(consent_id)
       return if consent.signed? || consent.voided?
       # Idempotency: the waiver page may enqueue this again while an earlier
@@ -95,10 +97,14 @@ module DocusealJobs
       )
 
       # Send email to teen with their signing link
-      ParticipantMailer.waiver_ready(participant_event: participant_event).deliver_later
+      if dates_changed
+        ParticipantMailer.waiver_dates_changed(participant_event: participant_event).deliver_later
+      else
+        ParticipantMailer.waiver_ready(participant_event: participant_event).deliver_later
+      end
     rescue Docuseal::RateLimitError => e
       Rails.logger.warn("Docuseal rate limit hit, retrying in 30 seconds")
-      self.class.set(wait: 30.seconds).perform_later(consent_id)
+      self.class.set(wait: 30.seconds).perform_later(consent_id, dates_changed: dates_changed)
     rescue Docuseal::ValidationError => e
       consent.update!(status: :failed, failure_reason: "validation_error: #{e.message}")
       Rails.logger.error("Docuseal validation error: #{e.message}")

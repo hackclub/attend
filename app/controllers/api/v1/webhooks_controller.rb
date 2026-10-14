@@ -149,12 +149,40 @@ module Api
 
       def find_consent(data)
         consent_id = data.dig("metadata", "consent_id")
-        return Consent.find(consent_id) if consent_id.present?
+        if consent_id.present?
+          consent = Consent.find(consent_id)
+          return consent unless stale_submission?(consent, data)
+
+          # Re-issuing a waiver resets this same consent row and points it at a
+          # new submission, but the old submission still carries our consent_id.
+          # If archiving the old one failed (or someone was mid-signing it), its
+          # late events would otherwise mark the fresh waiver as signed with the
+          # old document. Treat it like an unknown consent so DocuSeal stops retrying.
+          Rails.logger.warn("[Docuseal] Ignoring #{params[:event_type]} for consent #{consent.id}: submission #{payload_submission_id(data)} is not the current one (#{consent.docuseal_envelope_id.presence || 'none'})")
+          return nil
+        end
 
         # For form.completed, submission_id is nested under data["submission"]["id"]
         # For submission.completed, it may be at data["submission_id"] or data["id"]
         envelope_id = data["submission_id"] || data.dig("submission", "id") || data["id"]
         Consent.find_by(docuseal_envelope_id: envelope_id) if envelope_id.present?
+      end
+
+      def stale_submission?(consent, data)
+        submission_id = payload_submission_id(data)
+        return false if submission_id.blank?
+
+        consent.docuseal_envelope_id.to_s != submission_id.to_s
+      end
+
+      # submission.* events send the submission itself, so its "id" is the
+      # submission id. form.* events send a submitter, whose "id" is the
+      # submitter's own id, so only the explicit submission fields count there.
+      def payload_submission_id(data)
+        explicit = data["submission_id"] || data.dig("submission", "id")
+        return explicit if explicit.present?
+
+        data["id"] if params[:event_type].to_s.start_with?("submission.")
       end
 
       def process_freedom_waiver_result(consent, data)

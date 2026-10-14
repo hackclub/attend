@@ -76,6 +76,31 @@ class ParticipantMailer < ApplicationMailer
     )
   end
 
+  # The event's dates moved after this participant's waiver went out, so it's
+  # been voided and re-issued with the new dates (Docuseal::WaiverDateRegeneration).
+  # Minors get this from CreateMinorWaiverJob once their submission exists, so
+  # it can link straight to DocuSeal; adults get it while theirs is still being
+  # created, so it falls back to the waiver page.
+  def waiver_dates_changed(participant_event:)
+    @participant_event = participant_event
+    @participant = participant_event.participant
+    @event = participant_event.event
+    @emailable = @participant
+
+    @preferred_name = @participant.greeting_name || "there"
+    @event_name = @event.name
+    @event_dates = @event.formatted_date_range
+    @waiver_link = @participant_event.consents.waiver.first&.participant_signing_url || waiver_page_url
+    @support_email = @event.effective_support_email
+
+    mail(
+      to: @participant.email,
+      from: "Hack Club #{@event_name} <#{@support_email}>",
+      subject: "#{@event_name} has new dates. Please sign your updated waiver",
+      reply_to: @support_email
+    )
+  end
+
   def adult_waiver_completion(participant_event:)
     @participant_event = participant_event
     @participant = participant_event.participant

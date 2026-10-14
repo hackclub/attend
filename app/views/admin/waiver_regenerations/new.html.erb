@@ -1,0 +1,77 @@
+<div class="max-w-3xl space-y-6">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div>
+      <h1 class="text-2xl font-bold">Update Waivers for New Dates</h1>
+      <p class="text-gray-600 mt-1"><%= @event.name %> now runs <%= @event.formatted_date_range %>. Waivers sent before the change still show the old dates.</p>
+    </div>
+    <%= link_to "← Back to Dashboard", admin_event_dashboard_path(@event), class: "text-[#ec3750] hover:text-blue-800" %>
+  </div>
+
+  <div class="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+    <h2 class="text-lg font-medium text-gray-900">Templates</h2>
+
+    <% if @templates.empty? %>
+      <p class="text-sm text-gray-600">This event has no waiver templates of its own, so there's nothing to update on DocuSeal.</p>
+    <% else %>
+      <ul class="divide-y divide-gray-200">
+        <% @templates.each do |template| %>
+          <li class="flex items-center justify-between gap-4 py-2">
+            <span class="font-medium text-gray-900"><%= template.label %></span>
+            <% case template.status %>
+            <% when :default %>
+              <span class="text-sm text-green-700">Gets a new copy with the new dates</span>
+            <% when :custom %>
+              <span class="text-sm text-amber-700">Custom template, update it on DocuSeal</span>
+            <% else %>
+              <span class="text-sm text-red-700">Couldn't reach DocuSeal</span>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+
+    <% if @templates.any? { |t| t.status == :custom } %>
+      <div class="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        <p class="font-semibold">Fix custom templates first</p>
+        <p class="mt-1">Attend didn't create these templates, so it can't change them. Update the dates on DocuSeal before regenerating, or the new waivers will still show the old ones.</p>
+      </div>
+    <% end %>
+
+    <% if @blocked %>
+      <div class="rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+        <p class="font-semibold">DocuSeal didn't respond</p>
+        <p class="mt-1">Attend couldn't check these templates. Reload this page to try again.</p>
+      </div>
+    <% end %>
+  </div>
+
+  <%= form_with url: admin_event_waiver_regeneration_path(@event), method: :post, data: { turbo_confirm: "Replace these waivers and email everyone who has to sign again?" }, class: "space-y-6" do |f| %>
+    <fieldset class="bg-white rounded-lg border border-gray-200 p-6 space-y-3">
+      <legend class="sr-only">Who gets a new waiver</legend>
+      <h2 class="text-lg font-medium text-gray-900">Who Gets a New Waiver</h2>
+
+      <label class="flex items-start gap-3 rounded-md border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
+        <%= radio_button_tag :scope, "everyone", true, class: "mt-1" %>
+        <span>
+          <span class="block font-medium text-gray-900">Everyone with a waiver (<%= pluralize(@everyone_count, "participant") %>)</span>
+          <span class="block text-sm text-gray-600 mt-1">Signed waivers are replaced too. Those participants have to sign again and won't count as registered until they do.</span>
+        </span>
+      </label>
+
+      <label class="flex items-start gap-3 rounded-md border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
+        <%= radio_button_tag :scope, "unsigned", false, class: "mt-1" %>
+        <span>
+          <span class="block font-medium text-gray-900">Only unsigned waivers (<%= pluralize(@unsigned_count, "participant") %>)</span>
+          <span class="block text-sm text-gray-600 mt-1">Signed waivers keep the old dates.</span>
+        </span>
+      </label>
+
+      <p class="text-xs text-gray-500">Old signing links stop working, and everyone who has to sign again is emailed. For minors, that means the participant and their guardian.</p>
+    </fieldset>
+
+    <div class="flex justify-end gap-2">
+      <%= link_to "Cancel", admin_event_dashboard_path(@event), class: "px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-100" %>
+      <%= f.button "Regenerate Waivers", class: "px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed", disabled: @blocked %>
+    </div>
+  <% end %>
+</div>

@@ -1,0 +1,95 @@
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Update waivers for new dates", nil ]) %>
+<div class="cs-stack max-w-3xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Update waivers for new dates</h1>
+      <p class="cs-description"><%= @event.name %> now runs <%= @event.formatted_date_range %>. Waivers sent before the change still show the old dates.</p>
+    </div>
+  </div>
+
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided">
+      <h2 class="cs-h2">Templates</h2>
+    </div>
+    <div class="cs-container-body cs-stack">
+      <% if @templates.empty? %>
+        <p class="cs-secondary">This event has no waiver templates of its own, so there's nothing to update on DocuSeal.</p>
+      <% else %>
+        <dl class="cs-kv cs-kv-2">
+          <% @templates.each do |template| %>
+            <div>
+              <dt class="cs-kv-label"><%= template.label %></dt>
+              <dd class="cs-kv-value">
+                <% case template.status %>
+                <% when :default %>
+                  <%= cs_status :success, "Gets a new copy with the new dates" %>
+                <% when :custom %>
+                  <%= cs_status :warning, "Custom template, update it on DocuSeal" %>
+                <% else %>
+                  <%= cs_status :error, "Couldn't reach DocuSeal" %>
+                <% end %>
+              </dd>
+            </div>
+          <% end %>
+        </dl>
+      <% end %>
+
+      <% if @templates.any? { |t| t.status == :custom } %>
+        <div class="cs-alert cs-alert-warning">
+          <%= cs_status_icon(:warning) %>
+          <div>
+            <p class="cs-alert-title">Fix custom templates first</p>
+            <p>Attend didn't create these templates, so it can't change them. Update the dates on DocuSeal before regenerating, or the new waivers will still show the old ones.</p>
+          </div>
+        </div>
+      <% end %>
+
+      <% if @blocked %>
+        <div class="cs-alert cs-alert-error">
+          <%= cs_status_icon(:error) %>
+          <div>
+            <p class="cs-alert-title">DocuSeal didn't respond</p>
+            <p>Attend couldn't check these templates. Reload this page to try again.</p>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <%= form_with url: admin_event_waiver_regeneration_path(@event), method: :post, data: { turbo_confirm: "Replace these waivers and email everyone who has to sign again?" }, class: "cs-stack" do |f| %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Who gets a new waiver</h2>
+      </div>
+      <div class="cs-container-body">
+        <div class="cs-tiles" role="radiogroup" aria-label="Who gets a new waiver">
+          <label class="cs-tile">
+            <span class="cs-option">
+              <%= radio_button_tag :scope, "everyone", true %>
+              <span>
+                <span class="cs-option-label font-bold">Everyone with a waiver (<%= pluralize(@everyone_count, "participant") %>)</span>
+                <span class="cs-option-description block mt-1">Signed waivers are replaced too. Those participants have to sign again and won't count as registered until they do.</span>
+              </span>
+            </span>
+          </label>
+
+          <label class="cs-tile">
+            <span class="cs-option">
+              <%= radio_button_tag :scope, "unsigned", false %>
+              <span>
+                <span class="cs-option-label font-bold">Only unsigned waivers (<%= pluralize(@unsigned_count, "participant") %>)</span>
+                <span class="cs-option-description block mt-1">Signed waivers keep the old dates.</span>
+              </span>
+            </span>
+          </label>
+        </div>
+        <p class="cs-field-hint mt-3">Old signing links stop working, and everyone who has to sign again is emailed. For minors, that means the participant and their guardian.</p>
+      </div>
+    </section>
+
+    <div class="flex flex-col sm:flex-row justify-end gap-2">
+      <%= link_to "Cancel", admin_event_dashboard_path(@event), class: "cs-btn cs-btn-link cs-btn-full" %>
+      <%= f.button "Regenerate waivers", class: "cs-btn cs-btn-primary cs-btn-full", disabled: @blocked %>
+    </div>
+  <% end %>
+</div>

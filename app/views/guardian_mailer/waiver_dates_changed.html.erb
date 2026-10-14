@@ -1,0 +1,15 @@
+<p>Dear <%= @first_name %>,</p>
+
+<p><%= @event_name %> has moved to <strong><%= @event_dates %></strong>. The <%= @waiver_names %> for <%= @child_first_name %> showed the old dates, so we've replaced <%= @waiver_types.size > 1 ? "them" : "it" %> with updated <%= @waiver_types.size > 1 ? "copies" : "copy" %>, and we need you to sign again.</p>
+
+<% if @participant_signs_first %>
+<p><%= @child_first_name %> signs their part of the Waiver first. Once they have, you'll be able to sign yours from the link below.</p>
+<% end %>
+
+<p style="margin: 24px 0;">
+  <%= mail_button "Sign the updated #{@waiver_names}", @portal_url %>
+</p>
+
+<p>Please do this as soon as you can so <%= @child_first_name %>'s registration stays up to date.</p>
+
+<p>If you have any questions, don't hesitate to email us at <%= mail_to @support_email %>, or just hit reply to this email!</p>
