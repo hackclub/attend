@@ -1,0 +1,11 @@
+Hi <%= @preferred_name %>,
+
+<%= @event_name %> has moved to <%= @event_dates %>. Your waiver showed the old dates, so we've replaced it with an updated copy, and we need you to sign it again.
+
+Sign your updated waiver here: <%= @waiver_link %>
+
+<% if @participant_event.requires_guardian? %>
+Once you've signed, we'll send it to your parent/guardian for their signature.
+
+<% end %>
+If you have any questions, reach out to <%= @support_email %>.

@@ -129,4 +129,36 @@ RSpec.describe GuardianMailer, type: :mailer do
       ).to eq(guardian_participant_event)
     end
   end
+  describe "#waiver_dates_changed" do
+    let(:event) { create(:event) }
+    let(:participant_event) { create(:participant_event, event: event) }
+    let(:guardian_participant_event) do
+      create(:guardian_participant_event, participant_event: participant_event)
+    end
+
+    it "names every re-issued waiver and the new dates in one email" do
+      mail = described_class.waiver_dates_changed(
+        guardian_participant_event: guardian_participant_event,
+        waiver_types: [ :waiver, :freedom_waiver ]
+      )
+
+      expect(mail.subject).to include("Waiver and Freedom Waiver")
+      expect(mail.text_part.body.to_s).to include(event.formatted_date_range)
+      expect(mail.text_part.body.to_s).to include("signs their part of the Waiver first")
+    end
+
+    it "restarts the invite window so the emailed link still resolves" do
+      guardian_participant_event.generate_invite_token!
+      guardian_participant_event.update!(
+        invite_token_sent_at: (GuardianParticipantEvent::INVITE_VALIDITY + 1.day).ago
+      )
+
+      described_class.waiver_dates_changed(
+        guardian_participant_event: guardian_participant_event,
+        waiver_types: [ :freedom_waiver ]
+      ).deliver_now
+
+      expect(guardian_participant_event.reload.invite_expired?).to be(false)
+    end
+  end
 end

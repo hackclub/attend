@@ -202,6 +202,7 @@ Rails.application.routes.draw do
         patch :attach_image
         patch :clear_waiver_dates_warning
       end
+      resource :waiver_regeneration, only: [ :new, :create ]
       resources :participants, only: [ :index, :show, :edit, :update, :destroy ] do
         collection do
           get :table

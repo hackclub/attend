@@ -1,0 +1,13 @@
+<p>Hi <%= @preferred_name %>,</p>
+
+<p><%= @event_name %> has moved to <strong><%= @event_dates %></strong>. Your waiver showed the old dates, so we've replaced it with an updated copy, and we need you to sign it again.</p>
+
+<p style="margin: 24px 0;">
+  <%= mail_button "Sign Your Updated Waiver", @waiver_link %>
+</p>
+
+<% if @participant_event.requires_guardian? %>
+<p>Once you've signed, we'll send it to your parent/guardian for their signature.</p>
+<% end %>
+
+<p>If you have any questions, reach out to <%= mail_to @support_email %>.</p>

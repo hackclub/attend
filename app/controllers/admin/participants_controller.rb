@@ -387,18 +387,7 @@ module Admin
 
       waiver_consent = @participant_event.consents.find_by(consent_type: :waiver)
       if waiver_consent
-        waiver_consent.update!(
-          status: :pending,
-          docuseal_envelope_id: nil,
-          docuseal_guardian_slug: nil,
-          docuseal_participant_slug: nil,
-          docuseal_template_id: nil,
-          guardian_signed_at: nil,
-          participant_signed_at: nil,
-          signed_at: nil,
-          document_url: nil,
-          failure_reason: nil
-        )
+        waiver_consent.reset_for_reissue!
 
         reopen_guardian_portal_access
         send_waiver_reset_email(waiver_type: :waiver)
@@ -421,20 +410,8 @@ module Admin
 
       freedom_waiver_consent = @participant_event.consents.find_by(consent_type: :freedom_waiver)
       if freedom_waiver_consent
-        freedom_waiver_consent.update!(
-          status: :pending,
-          docuseal_envelope_id: nil,
-          docuseal_guardian_slug: nil,
-          docuseal_participant_slug: nil,
-          docuseal_template_id: nil,
-          guardian_signed_at: nil,
-          participant_signed_at: nil,
-          signed_at: nil,
-          document_url: nil,
-          failure_reason: nil
-        )
-
-        @participant_event.safeguarding_info&.update!(freedom_waiver_granted: false)
+        # Also clears safeguarding_info.freedom_waiver_granted.
+        freedom_waiver_consent.reset_for_reissue!
 
         reopen_guardian_portal_access
         send_waiver_reset_email(waiver_type: :freedom_waiver)
@@ -1700,9 +1677,7 @@ module Admin
     def reopen_guardian_portal_access
       return unless @participant_event.requires_guardian?
 
-      @participant_event.guardian_participant_events.each do |gpe|
-        gpe.update!(status: :in_progress) if gpe.completed?
-      end
+      @participant_event.reopen_guardian_portal_access!
     end
   end
 end

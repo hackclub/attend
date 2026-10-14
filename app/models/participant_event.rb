@@ -175,6 +175,15 @@ class ParticipantEvent < ApplicationRecord
     participant.minor_on?(event.starts_at&.to_date || Date.current)
   end
 
+  # A waiver was reset, so guardians who'd finished the portal have something
+  # to sign again. Defaults to every guardian; pass a subset to reopen only
+  # the ones the reset waiver belongs to.
+  def reopen_guardian_portal_access!(guardian_participant_events = self.guardian_participant_events)
+    guardian_participant_events.each do |gpe|
+      gpe.update!(status: :in_progress) if gpe.completed?
+    end
+  end
+
   def guardian_replacement_eligible?
     requires_guardian? && guardian_participant_events.exists?
   end
