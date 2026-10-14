@@ -30,7 +30,7 @@
     </td>
   <% end %>
   <td class="whitespace-nowrap" data-column="age">
-    <% age = pe.participant.age_on(current_event.starts_at&.to_date || Date.current) %>
+    <% age = pe.participant.age_on(current_event.local_start_date || Date.current) %>
     <% if age %>
       <% if age < 18 %>
         <span title="Under 18"><%= cs_badge(age, "yellow") %></span>

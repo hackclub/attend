@@ -1287,7 +1287,7 @@ module Admin
     end
 
     def apply_age_filter(scope, operator, value)
-      event_date = current_event.starts_at&.to_date || Date.current
+      event_date = current_event.local_start_date || Date.current
       birth_date = event_date - value.to_i.years
 
       case operator
@@ -1326,7 +1326,7 @@ module Admin
     end
 
     def apply_minor_filter(scope, operator, value)
-      event_date = current_event.starts_at&.to_date || Date.current
+      event_date = current_event.local_start_date || Date.current
       adult_birth_date = event_date - 18.years
       is_minor = value == "true"
 
@@ -1490,7 +1490,7 @@ module Admin
       when "tshirt_size"
         scope.group_by { |pe| pe.participant.tshirt_size || "Not set" }
       when "is_minor"
-        event_date = current_event.starts_at&.to_date || Date.current
+        event_date = current_event.local_start_date || Date.current
         scope.group_by { |pe| pe.participant.minor_on?(event_date) ? "Minor" : "Adult" }
       when "onboarding_complete"
         scope.group_by { |pe| pe.onboarding_complete? ? "Complete" : "Incomplete" }

@@ -106,6 +106,40 @@ RSpec.describe Event, type: :model do
     end
   end
 
+  describe "event-local dates" do
+    include ActiveSupport::Testing::TimeHelpers
+
+    # 5pm Pacific on Nov 5 is 01:00 UTC on Nov 6.
+    let(:event) do
+      build(:event, timezone: "Pacific Time (US & Canada)",
+        starts_at: Time.utc(2026, 11, 6, 1), ends_at: Time.utc(2026, 11, 10, 0))
+    end
+
+    it "reads start and end dates on the event's clock" do
+      expect(event.local_start_date).to eq(Date.new(2026, 11, 5))
+      expect(event.local_end_date).to eq(Date.new(2026, 11, 9))
+      expect(event.local_starts_at.strftime("%b %-d %-l%P")).to eq("Nov 5 5pm")
+    end
+
+    it "is nil-safe" do
+      event.starts_at = nil
+
+      expect(event.local_starts_at).to be_nil
+      expect(event.local_start_date).to be_nil
+    end
+
+    it "is completed once its last day is over where the event is" do
+      # 22:00 on Nov 9 Pacific: still the last day.
+      travel_to Time.utc(2026, 11, 10, 6) do
+        expect(event).not_to be_completed
+      end
+      # 01:00 on Nov 10 Pacific, though still Nov 10 in UTC as well.
+      travel_to Time.utc(2026, 11, 10, 9) do
+        expect(event).to be_completed
+      end
+    end
+  end
+
   describe "#airtable_sync_stale?" do
     def configured_event(**attrs)
       build(

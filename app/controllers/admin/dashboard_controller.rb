@@ -245,7 +245,7 @@ class Admin::DashboardController < Admin::BaseController
     if event.starts_at.nil? || event.ends_at.nil?
       { phase: :draft, label: "Dates not set", color: "gray" }
     elsif now < event.starts_at
-      days_until = (event.starts_at.to_date - Date.current).to_i
+      days_until = (event.local_start_date - event.local_today).to_i
       if days_until <= 0
         { phase: :starting, label: "Starts today!", color: "green" }
       elsif days_until == 1
