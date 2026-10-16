@@ -531,6 +531,28 @@ class Event < ApplicationRecord
     series_banner if series_banner&.attached?
   end
 
+  # Haven's onboarding (brand skin, intro, completion screen) and account
+  # linking are configured on the series, so every Haven city event shares them.
+  def haven_onboarding?
+    event_series&.haven_onboarding? || false
+  end
+
+  def account_linking_mode(provider)
+    event_series&.account_linking_mode(provider) || "off"
+  end
+
+  def linked_account_providers
+    EventSeries::ACCOUNT_LINKING_PROVIDERS.reject { |provider| account_linking_mode(provider) == "off" }
+  end
+
+  def required_account_providers
+    linked_account_providers.select { |provider| account_linking_mode(provider) == "required" }
+  end
+
+  def account_linking_step?
+    linked_account_providers.any?
+  end
+
   # Outbound-mail contact: the event's own support email, else its series'
   # contact email, else the global default.
   def effective_support_email

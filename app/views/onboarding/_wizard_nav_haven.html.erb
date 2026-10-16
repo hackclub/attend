@@ -1,0 +1,37 @@
+<%# Haven take on the wizard nav: the event card, a thin progress bar and a
+    row of step pills. Completed steps stay links back, as in the rail. %>
+<% current_index = @steps.index(@current_step) %>
+
+<div class="mb-6">
+  <%= render "shared/haven/event_card", event: current_event, compact: true %>
+</div>
+
+<nav class="mb-8" aria-label="Progress">
+  <p class="portal-hint text-sm mb-2">
+    Step <%= current_index + 1 %> of <%= @steps.length %> ·
+    <span class="portal-heading"><%= @current_step.to_s.titleize %></span>
+  </p>
+
+  <div class="portal-progress">
+    <div class="portal-progress-fill"
+         style="--portal-progress: <%= ((current_index + 1).to_f / @steps.length).round(3) %>"></div>
+  </div>
+
+  <ol class="hidden sm:flex flex-wrap gap-2 mt-3">
+    <% @steps.each_with_index do |step, index| %>
+      <% is_completed = index < current_index %>
+      <% is_current = step == @current_step %>
+      <li>
+        <% if is_completed %>
+          <%= link_to step.to_s.titleize, onboarding_step_path(step: step, event_id: current_event.id),
+                class: "portal-badge portal-badge-done hover:underline",
+                aria: { label: "Back to #{step.to_s.titleize}" } %>
+        <% elsif is_current %>
+          <span class="portal-badge portal-badge-pending" aria-current="step"><%= step.to_s.titleize %></span>
+        <% else %>
+          <span class="portal-badge portal-badge-neutral"><%= step.to_s.titleize %></span>
+        <% end %>
+      </li>
+    <% end %>
+  </ol>
+</nav>

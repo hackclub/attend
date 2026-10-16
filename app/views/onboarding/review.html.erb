@@ -4,6 +4,9 @@
   <header class="mb-8">
     <h1 class="portal-title text-2xl">Review Your Information</h1>
     <p class="portal-body mt-2">Please review your information below before submitting. Click any section to make changes.</p>
+    <% if haven_page? %>
+      <%= render "shared/haven/laptop_note", class: "mt-4" %>
+    <% end %>
   </header>
 
   <div class="space-y-6">

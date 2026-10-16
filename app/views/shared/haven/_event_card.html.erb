@@ -1,0 +1,22 @@
+<%# Daydream-style event card for Haven onboarding pages.
+    locals: event:, compact: false, eyebrow: "You're registering for" %>
+<% compact = local_assigns.fetch(:compact, false) %>
+<% eyebrow = local_assigns.fetch(:eyebrow, "You're registering for") %>
+<% location = haven_event_location(event) %>
+<% details = [ location.presence, event.formatted_date_range ].compact %>
+
+<div class="haven-event-card <%= compact ? "p-4" : "p-5 sm:p-6" %>">
+  <div class="haven-glow haven-glow-orange <%= compact ? "size-32 -top-12 -right-8" : "size-48 -top-16 -right-10" %>" aria-hidden="true"></div>
+  <div class="haven-glow haven-glow-green <%= compact ? "size-28 -bottom-14 -left-8" : "size-40 -bottom-16 -left-10" %>" aria-hidden="true"></div>
+
+  <div class="flex items-center gap-4">
+    <%= image_tag "haven/hedgehog.webp", alt: "", class: "#{compact ? 'w-14' : 'w-20 sm:w-24'} shrink-0 h-auto" %>
+    <div class="min-w-0">
+      <p class="text-sm"><%= eyebrow %></p>
+      <p class="haven-display <%= compact ? "text-2xl" : "text-3xl sm:text-4xl" %> break-words"><%= event.name %></p>
+      <% if details.any? %>
+        <p class="mt-1 text-sm"><%= details.join(" · ") %></p>
+      <% end %>
+    </div>
+  </div>
+</div>

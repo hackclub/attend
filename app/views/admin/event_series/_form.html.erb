@@ -54,6 +54,18 @@
     </div>
   </div>
 
+  <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+    <h2 class="text-base font-semibold text-gray-900">Onboarding</h2>
+
+    <label class="flex items-start gap-3">
+      <%= f.check_box :haven_onboarding, { checked: @series.haven_onboarding?, class: "mt-1 rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" }, "1", "0" %>
+      <span>
+        <span class="block text-sm font-medium text-gray-700">Haven onboarding</span>
+        <span class="block text-sm text-gray-500">Registration for every event in this series uses the Haven look, a welcome screen, Haven copy, and a "you're registered" screen with the entry ticket.</span>
+      </span>
+    </label>
+  </div>
+
   <div class="flex flex-col sm:flex-row justify-between gap-3">
     <%= link_to "Cancel", @series.persisted? ? admin_series_path(@series) : admin_series_index_path, class: "w-full sm:w-auto text-center text-gray-500 hover:text-gray-700 font-medium py-2 px-4" %>
     <%= f.submit @series.persisted? ? "Save changes" : "Create series", class: "w-full sm:w-auto bg-[#d42f46] hover:bg-[#b82840] text-white font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer" %>

@@ -142,6 +142,15 @@ RSpec.describe "Admin::EventSeries", type: :request do
       expect(series.reload.name).to eq("Sunbeam Renamed")
     end
 
+    it "lets owners switch Haven onboarding on" do
+      sign_in owner
+
+      patch admin_series_path(series), params: { event_series: { haven_onboarding: "1" } }
+
+      expect(series.reload.haven_onboarding?).to be(true)
+      expect(sub_event.reload.haven_onboarding?).to be(true)
+    end
+
     it "only lets global admins create a series" do
       sign_in owner
       post admin_series_index_path, params: { event_series: { name: "Another Series" } }

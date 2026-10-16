@@ -69,6 +69,9 @@
       </div>
 
       <div data-controller="address-autocomplete" data-address-autocomplete-fill-components-value="true" class="space-y-4">
+        <% if haven_page? %>
+          <p class="portal-hint text-sm">We ask for your address for safety reasons, and so we can ship prizes to attendees in the US.</p>
+        <% end %>
         <div>
           <%= f.label :address_line_1, label_text("Address Line 1", required: true), class: "portal-label" %>
           <%= f.text_field :address_line_1, class: "portal-input", required: true, data: { address_autocomplete_target: "input" } %>
@@ -105,9 +108,17 @@
         </div>
       </div>
 
-      <div>
-        <%= f.label :tshirt_size, label_text("T-Shirt Size", required: true), class: "portal-label" %>
-        <%= f.select :tshirt_size, [["Select size", ""], "XS", "S", "M", "L", "XL", "XXL", "XXXL"], {}, required: true, class: "portal-select" %>
+      <div class="<%= "flex items-end gap-4" if haven_page? && haven_tshirt_image? %>">
+        <div class="flex-1">
+          <%= f.label :tshirt_size, label_text("T-Shirt Size", required: true), class: "portal-label" %>
+          <%= f.select :tshirt_size, [["Select size", ""], "XS", "S", "M", "L", "XL", "XXL", "XXXL"], {}, required: true, class: "portal-select" %>
+          <% if haven_page? %>
+            <p class="mt-1 portal-hint text-sm">Unisex, US sizing. You'll pick it up at the event.</p>
+          <% end %>
+        </div>
+        <% if haven_page? && haven_tshirt_image? %>
+          <%= image_tag HavenHelper::HAVEN_TSHIRT_IMAGE, alt: "The Haven event t-shirt", class: "w-28 sm:w-36 h-auto shrink-0 -mb-2" %>
+        <% end %>
       </div>
 
       <div class="portal-inset pt-6">

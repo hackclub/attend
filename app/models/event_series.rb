@@ -19,6 +19,16 @@ class EventSeries < ApplicationRecord
 
   RESERVED_SLUGS = %w[new].freeze
 
+  # Account linking modes for the onboarding accounts step.
+  ACCOUNT_LINKING_MODES = %w[off optional required].freeze
+  ACCOUNT_LINKING_PROVIDERS = %w[github itch].freeze
+
+  # Haven-specific onboarding (skin, intro, copy, completion screen) is
+  # switched on per series; account linking modes apply to every event in it.
+  store_accessor :config, :haven_onboarding, :github_linking, :itch_linking
+
+  validates :github_linking, :itch_linking, inclusion: { in: ACCOUNT_LINKING_MODES }, allow_blank: true
+
   validates :name, presence: true
   validates :contact_email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
   validates :slug, presence: true,
@@ -34,6 +44,15 @@ class EventSeries < ApplicationRecord
 
   def effective_logo
     logo if logo.attached?
+  end
+
+  def haven_onboarding?
+    ActiveModel::Type::Boolean.new.cast(haven_onboarding) || false
+  end
+
+  def account_linking_mode(provider)
+    mode = config&.[]("#{provider}_linking")
+    ACCOUNT_LINKING_MODES.include?(mode) ? mode : "off"
   end
 
   def logo_displayable?
