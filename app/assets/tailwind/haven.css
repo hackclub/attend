@@ -116,6 +116,12 @@ html[data-brand="haven"] {
   color-scheme: light;
 }
 
+/* The entry ticket's header is a literal Hack Club red utility; unlayered so
+ * it beats the utilities layer. */
+html[data-brand="haven"] .entry-ticket-header {
+  background-color: var(--haven-orange-fill);
+}
+
 html[data-brand="haven"] body {
   font-family: var(--haven-font-body);
   /* Jua and Darumadrop ship one weight; haven.hackclub.com sets everything
@@ -188,6 +194,20 @@ html[data-brand="haven"] body {
   [data-brand="haven"] .portal-step-marker-done {
     background-color: var(--haven-olive);
     border-color: var(--haven-olive);
+  }
+
+  /* --- notes --------------------------------------------------------- */
+
+  /* Attend's info blue fights the palette; Haven's info notes are warm. The
+   * icon takes the orange fill, which clears 3:1 on the tint. */
+  [data-brand="haven"] .portal-note-info {
+    background-color: color-mix(in oklab, var(--haven-gold) 14%, white);
+    border-color: color-mix(in oklab, var(--haven-gold) 40%, white);
+    border-radius: 0.875rem;
+  }
+
+  [data-brand="haven"] .portal-note-info .portal-note-icon {
+    color: var(--haven-orange-fill);
   }
 
   /* --- progress ------------------------------------------------------ */

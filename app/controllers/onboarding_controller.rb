@@ -11,7 +11,7 @@ class OnboardingController < ApplicationController
   before_action :load_participant_event
   before_action :apply_haven_skin
   before_action :redirect_if_withdrawn
-  before_action :redirect_if_locked, except: [ :index, :waiver, :waiver_complete ]
+  before_action :redirect_if_locked, except: [ :index, :waiver, :waiver_complete, :done ]
 
   BASE_STEPS = %w[profile travel accommodation health].freeze
   GUARDIAN_STEP = "guardian"
@@ -30,8 +30,40 @@ class OnboardingController < ApplicationController
       return
     end
 
+    if show_haven_welcome?
+      redirect_to onboarding_welcome_path(event_id: current_event.id)
+      return
+    end
+
     current_step = steps[@participant_event.onboarding_step] || steps.first
     redirect_to onboarding_step_path(step: current_step, event_id: current_event.id)
+  end
+
+  # Haven's "what to expect" screen, shown once before the first step.
+  def welcome
+    unless current_event.haven_onboarding?
+      redirect_to onboarding_path(event_id: current_event.id)
+      return
+    end
+
+    @steps = steps
+  end
+
+  def start
+    @participant_event.update!(onboarding_intro_seen_at: Time.current) if @participant_event.onboarding_intro_seen_at.nil?
+    redirect_to onboarding_step_path(step: steps.first, event_id: current_event.id)
+  end
+
+  # Haven's "you're registered" screen after submitting: the entry ticket once
+  # the registration is confirmed, otherwise what's still outstanding.
+  def done
+    unless current_event.haven_onboarding? && @participant_event.code_of_conduct_accepted_at.present?
+      redirect_to onboarding_path(event_id: current_event.id)
+      return
+    end
+
+    @participant = @participant_event.participant
+    @completion = RegistrationCompletionPresenter.new(@participant_event, viewer: :participant)
   end
 
   def show
@@ -148,7 +180,7 @@ class OnboardingController < ApplicationController
 
     # The webhook will mark it as signed, but we redirect immediately
     # so we just go back to dashboard and let them see the updated status
-    redirect_to dashboard_path, notice: "Thank you for signing! Your waiver is being processed."
+    redirect_after_submit "Thank you for signing! Your waiver is being processed."
   end
 
   # Fired by the documents step when an embedded DocuSeal form completes (or
@@ -301,13 +333,13 @@ class OnboardingController < ApplicationController
       # bailed on the missing code of conduct, so accepting it here can be the
       # last piece; nothing else would re-check.
       if @participant_event.mark_complete_if_eligible!
-        redirect_to dashboard_path, notice: completion_notice("Registration submitted — you're all set!")
+        redirect_after_submit completion_notice("Registration submitted — you're all set!")
       elsif current_event.guardian_invites_locked? || Setting.waiver_sending_paused?
-        redirect_to dashboard_path, notice: completion_notice("Registration submitted! We'll notify you when waivers are ready to sign.")
+        redirect_after_submit completion_notice("Registration submitted! We'll notify you when waivers are ready to sign.")
       elsif waiver_participant_portion_signed?
         # Already signed during the documents step
         send_guardian_invites
-        redirect_to dashboard_path, notice: completion_notice("Registration submitted! We've invited your guardian to complete their portion.")
+        redirect_after_submit completion_notice("Registration submitted! We've invited your guardian to complete their portion.")
       else
         trigger_minor_waiver
         send_guardian_invites
@@ -325,12 +357,12 @@ class OnboardingController < ApplicationController
       @participant_event.safeguarding_info || @participant_event.create_safeguarding_info!
 
       if current_event.guardian_invites_locked? || Setting.waiver_sending_paused?
-        redirect_to dashboard_path, notice: completion_notice("Registration submitted! We'll notify you when waivers are ready to sign.")
+        redirect_after_submit completion_notice("Registration submitted! We'll notify you when waivers are ready to sign.")
       elsif waiver_participant_portion_signed?
         # Already signed during the documents step — completion lands via
         # webhook/sync now that the code of conduct is accepted.
         @participant_event.mark_complete_if_eligible!
-        redirect_to dashboard_path, notice: completion_notice("Registration submitted — you're all set!")
+        redirect_after_submit completion_notice("Registration submitted — you're all set!")
       else
         trigger_adult_waiver
         redirect_to onboarding_waiver_path(event_id: current_event.id), notice: completion_notice("Almost done! Please sign the waiver to complete your registration.")
@@ -1184,6 +1216,22 @@ class OnboardingController < ApplicationController
 
   def all_steps_complete?
     @participant_event.onboarding_step >= steps.length - 1
+  end
+
+  def show_haven_welcome?
+    current_event.haven_onboarding? &&
+      @participant_event.onboarding_intro_seen_at.nil? &&
+      @participant_event.onboarding_step.zero?
+  end
+
+  # Haven registrations land on the "you're registered" screen, which shows
+  # the same status the notice would; everyone else goes to the dashboard.
+  def redirect_after_submit(notice)
+    if current_event.haven_onboarding?
+      redirect_to onboarding_done_path(event_id: current_event.id)
+    else
+      redirect_to dashboard_path, notice: notice
+    end
   end
 
   def completion_notice(base)

@@ -143,6 +143,9 @@ Rails.application.routes.draw do
     delete "/optional_documents/:custom_document_id", to: "onboarding#withdraw_optional_document", as: :onboarding_withdraw_optional_document
     post "/documents/:consent_id/physical_upload", to: "onboarding#physical_document_upload", as: :onboarding_physical_document_upload
     delete "/documents/:consent_id/physical_uploads/:upload_id", to: "onboarding#remove_physical_upload", as: :onboarding_remove_physical_upload
+    get "/welcome", to: "onboarding#welcome", as: :onboarding_welcome
+    post "/welcome", to: "onboarding#start", as: :onboarding_start
+    get "/done", to: "onboarding#done", as: :onboarding_done
     get "/:step", to: "onboarding#show", as: :onboarding_step
     patch "/:step", to: "onboarding#update"
     post "/complete", to: "onboarding#complete", as: :complete_onboarding

@@ -2,6 +2,10 @@
 module HavenHelper
   HAVEN_TSHIRT_IMAGE = "haven/tshirt.webp"
 
+  # Luma page for Haven's online workshop series, promoted on the
+  # "you're registered" screen. The card stays hidden while this is nil.
+  HAVEN_WORKSHOPS_URL = nil
+
   # The shirt art isn't final yet; the image slot stays hidden until
   # app/assets/images/haven/tshirt.webp exists.
   def haven_tshirt_image?
