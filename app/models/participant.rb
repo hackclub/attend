@@ -22,6 +22,7 @@ class Participant < ApplicationRecord
   has_many :guardian_participant_events, through: :participant_events
   has_many :guardians, through: :guardian_participant_events
   has_many :sibling_memberships, dependent: :destroy
+  has_many :connected_accounts, dependent: :destroy
   has_many :sibling_groups, through: :sibling_memberships
 
   has_one_attached :headshot, dependent: :purge_later

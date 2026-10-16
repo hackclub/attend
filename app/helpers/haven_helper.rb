@@ -6,6 +6,10 @@ module HavenHelper
   # "you're registered" screen. The card stays hidden while this is nil.
   HAVEN_WORKSHOPS_URL = nil
 
+  # Screen recording of making a GitHub account, linked from the accounts
+  # step for people who don't have one yet. Hidden while nil.
+  HAVEN_GITHUB_HELP_URL = nil
+
   # The shirt art isn't final yet; the image slot stays hidden until
   # app/assets/images/haven/tshirt.webp exists.
   def haven_tshirt_image?

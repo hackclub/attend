@@ -1,0 +1,87 @@
+<% return_to = onboarding_step_path(step: @step, event_id: current_event.id) %>
+<% sign_up_urls = { "github" => AccountLinking::GithubClient::SIGN_UP_URL, "itch" => AccountLinking::ItchClient::SIGN_UP_URL } %>
+<% uses = { "github" => "to share your code", "itch" => "to publish your game" } %>
+<% articles = { "github" => "a", "itch" => "an" } %>
+
+<div class="w-full max-w-2xl mx-auto">
+  <%= render "wizard_nav" %>
+
+  <header class="mb-6">
+    <h1 class="portal-title text-2xl">Connect your accounts</h1>
+    <p class="portal-hint text-sm mt-2">
+      <% if @account_modes.value?("required") %>
+        Connect the accounts marked required to continue. Optional ones you can skip.
+      <% else %>
+        These are optional, so you can skip this step if you like.
+      <% end %>
+    </p>
+  </header>
+
+  <div class="space-y-4">
+    <% @account_modes.each do |provider, mode| %>
+      <% name = AccountLinking.provider_name(provider) %>
+      <% account = @connected_accounts[provider] %>
+      <section class="portal-card p-5 sm:p-6" aria-labelledby="account-<%= provider %>">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h2 id="account-<%= provider %>" class="portal-heading text-lg"><%= name %></h2>
+            <p class="portal-hint text-sm mt-1">You'll use <%= name %> at the event <%= uses[provider] %>.</p>
+          </div>
+          <% if mode == "required" %>
+            <span class="portal-badge portal-badge-pending">Required</span>
+          <% else %>
+            <span class="portal-badge portal-badge-neutral">Optional</span>
+          <% end %>
+        </div>
+
+        <% if account %>
+          <div class="mt-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <p class="portal-body flex-1">
+              <span class="portal-badge portal-badge-done">Connected</span>
+              as <%= link_to account.username, account.profile_url, class: "portal-link", target: "_blank", rel: "noopener" %>
+            </p>
+            <%= button_to "Disconnect", disconnect_account_path(provider: provider, return_to: return_to),
+                  method: :delete, class: "portal-btn portal-btn-secondary w-full sm:w-auto", form: { data: { turbo: false } } %>
+          </div>
+        <% elsif !AccountLinking.available?(provider) %>
+          <p class="portal-body text-sm mt-4"><%= name %> linking isn't available right now, so you can carry on without it.</p>
+        <% else %>
+          <fieldset class="mt-4" data-controller="wizard-reveal">
+            <legend class="portal-label">Do you already have <%= articles[provider] %> <%= name %> account?</legend>
+            <div class="flex gap-4">
+              <label class="flex items-center gap-2 portal-body">
+                <%= radio_button_tag "has_#{provider}_account", "yes", false, class: "portal-check", data: { wizard_reveal_target: "input", action: "change->wizard-reveal#update" } %>
+                Yes
+              </label>
+              <label class="flex items-center gap-2 portal-body">
+                <%= radio_button_tag "has_#{provider}_account", "no", false, class: "portal-check", data: { wizard_reveal_target: "input", action: "change->wizard-reveal#update" } %>
+                No
+              </label>
+            </div>
+
+            <div class="hidden mt-4" data-wizard-reveal-target="panel" data-show-when="yes">
+              <%= button_to "Sign in with #{name}", connect_account_path(provider: provider, return_to: return_to),
+                    class: "portal-btn portal-btn-primary w-full sm:w-auto", form: { data: { turbo: false } } %>
+            </div>
+
+            <div class="hidden mt-4 space-y-2" data-wizard-reveal-target="panel" data-show-when="no">
+              <p class="portal-body text-sm">
+                <%= link_to "Make a free #{name} account", sign_up_urls[provider], class: "portal-link", target: "_blank", rel: "noopener" %>,
+                then come back here and choose Yes to connect it.
+              </p>
+              <% if provider == "github" && haven_page? && HavenHelper::HAVEN_GITHUB_HELP_URL %>
+                <p class="portal-hint text-sm"><%= link_to "Watch how to make a GitHub account", HavenHelper::HAVEN_GITHUB_HELP_URL, class: "portal-link", target: "_blank", rel: "noopener" %></p>
+              <% end %>
+            </div>
+          </fieldset>
+        <% end %>
+      </section>
+    <% end %>
+  </div>
+
+  <%= form_with url: onboarding_step_path(step: @step, event_id: current_event.id), method: :patch, local: true, data: { turbo: false } do %>
+    <div class="mt-6">
+      <%= render "step_navigation" %>
+    </div>
+  <% end %>
+</div>

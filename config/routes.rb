@@ -133,6 +133,12 @@ Rails.application.routes.draw do
     resources :messages, only: [ :index, :show ], controller: "dashboard/messages", as: :dashboard_messages
   end
 
+  scope "/connected_accounts", controller: :connected_accounts, constraints: { provider: /github|itch/ } do
+    post ":provider", action: :create, as: :connect_account
+    get ":provider/callback", action: :callback, as: :connected_account_callback
+    delete ":provider", action: :destroy, as: :disconnect_account
+  end
+
   scope "/onboarding" do
     get "/", to: "onboarding#index", as: :onboarding
     get "/waiver", to: "onboarding#waiver", as: :onboarding_waiver
