@@ -69,8 +69,11 @@ module AccountLinking
       raise Error, "Couldn't reach GitHub: #{e.message}"
     end
 
+    # Revokes just this token. The /grant endpoint would revoke every token
+    # the GitHub user has given Attend, including ones other participants
+    # linked with the same account.
     def revoke(access_token)
-      AccountLinking.http("https://api.github.com").delete("/applications/#{client_id}/grant") do |req|
+      AccountLinking.http("https://api.github.com").delete("/applications/#{client_id}/token") do |req|
         req.headers["Accept"] = "application/vnd.github+json"
         req.headers["Authorization"] = "Basic #{Base64.strict_encode64("#{client_id}:#{client_secret}")}"
         req.headers["Content-Type"] = "application/json"

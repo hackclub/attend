@@ -141,9 +141,11 @@ RSpec.describe "Connected accounts", type: :request do
       expect(flash[:alert]).to include("isn't set up")
     end
 
-    it "disconnects and revokes the grant" do
+    it "disconnects and revokes only that token" do
       participant.connected_accounts.create!(provider: "github", uid: "1", username: "octocat", access_token: "gho_token", connected_at: Time.current)
-      revoke = stub_request(:delete, "https://api.github.com/applications/gh-client/grant").to_return(status: 204)
+      revoke = stub_request(:delete, "https://api.github.com/applications/gh-client/token")
+        .with(body: { access_token: "gho_token" }.to_json)
+        .to_return(status: 204)
 
       delete disconnect_account_path(provider: "github"), params: { return_to: return_to }
 
@@ -154,7 +156,7 @@ RSpec.describe "Connected accounts", type: :request do
 
     it "still disconnects when GitHub can't be reached" do
       participant.connected_accounts.create!(provider: "github", uid: "1", username: "octocat", access_token: "gho_token", connected_at: Time.current)
-      stub_request(:delete, "https://api.github.com/applications/gh-client/grant").to_timeout
+      stub_request(:delete, "https://api.github.com/applications/gh-client/token").to_timeout
 
       delete disconnect_account_path(provider: "github"), params: { return_to: return_to }
 
