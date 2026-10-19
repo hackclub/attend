@@ -27,6 +27,22 @@ RSpec.describe "onboarding invitation entry", type: :request do
     expect(response.body).to include("trailblazer@hackclub.com")
   end
 
+  it "prefills Hack Club Auth's signup form from the invitation" do
+    create(:participant, email: "invited@example.com", legal_first_name: "Dana", legal_last_name: "Lee",
+      date_of_birth: Date.new(2009, 4, 2), country_of_residence: "United States")
+    get onboarding_path(invite: invitation.token)
+
+    post user_hack_club_omniauth_authorize_path
+
+    uri = URI.parse(response.location)
+    query = Rack::Utils.parse_query(uri.query)
+    expect(uri.host).to eq("auth.hackclub.com")
+    expect(query).to include(
+      "login_hint" => "invited@example.com", "email" => "invited@example.com",
+      "first_name" => "Dana", "last_name" => "Lee", "birthday" => "2009-04-02", "country" => "US"
+    )
+  end
+
   it "returns a matching account to the invited event after authentication" do
     get onboarding_path(invite: invitation.token)
     user = create(:user, email: invitation.email)
