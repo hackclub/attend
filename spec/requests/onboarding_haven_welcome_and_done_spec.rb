@@ -93,6 +93,51 @@ RSpec.describe "Haven onboarding welcome and done screens", type: :request do
       expect(response).to redirect_to(onboarding_path(event_id: event.id))
     end
 
+    it "waits for a minor's submission to go through, not just the code of conduct" do
+      participant.update!(date_of_birth: 15.years.ago)
+      participant_event.update!(code_of_conduct_accepted_at: Time.current)
+
+      get onboarding_done_path(event_id: event.id)
+
+      expect(response).to redirect_to(onboarding_path(event_id: event.id))
+    end
+
+    it "waits for an adult's emergency contact, not just the code of conduct" do
+      participant_event.update!(code_of_conduct_accepted_at: Time.current)
+
+      get onboarding_done_path(event_id: event.id)
+
+      expect(response).to redirect_to(onboarding_path(event_id: event.id))
+    end
+
+    it "sends rejected registrations to the dashboard" do
+      participant_event.update!(status: :rejected, code_of_conduct_accepted_at: Time.current)
+      participant_event.emergency_contacts.create!(name: "Erin", phone: "+14155550100")
+
+      get onboarding_done_path(event_id: event.id)
+
+      expect(response).to redirect_to(dashboard_path)
+    end
+
+    it "doesn't ask for the waiver again right after it was signed" do
+      participant_event.update!(code_of_conduct_accepted_at: Time.current, onboarding_step: 99)
+      participant_event.emergency_contacts.create!(name: "Erin", phone: "+14155550100")
+      consent = create(:consent, participant_event: participant_event, status: :sent,
+        docuseal_envelope_id: "sub-1", docuseal_participant_slug: "abc123")
+      client = instance_double(Docuseal::Client)
+      allow(Docuseal::Client).to receive(:for).and_return(client)
+      allow(client).to receive(:get_submission).and_return(
+        "submitters" => [ { "slug" => "abc123", "completed_at" => Time.current.iso8601 } ]
+      )
+
+      post onboarding_waiver_complete_path(event_id: event.id)
+
+      expect(response).to redirect_to(onboarding_done_path(event_id: event.id))
+      expect(consent.reload).to be_participant_portion_signed
+      follow_redirect!
+      expect(response.body).not_to include("Sign the event waiver")
+    end
+
     it "shows the entry ticket once the registration is confirmed" do
       participant_event.update!(status: :complete, code_of_conduct_accepted_at: Time.current)
       participant_event.emergency_contacts.create!(name: "Erin", phone: "+14155550100")

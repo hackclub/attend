@@ -57,7 +57,12 @@ class OnboardingController < ApplicationController
   # Haven's "you're registered" screen after submitting: the entry ticket once
   # the registration is confirmed, otherwise what's still outstanding.
   def done
-    unless current_event.haven_onboarding? && @participant_event.code_of_conduct_accepted_at.present?
+    if @participant_event.withdrawn? || @participant_event.rejected?
+      redirect_to dashboard_path
+      return
+    end
+
+    unless current_event.haven_onboarding? && submitted?
       redirect_to onboarding_path(event_id: current_event.id)
       return
     end
@@ -170,6 +175,9 @@ class OnboardingController < ApplicationController
 
   def waiver_complete
     @consent = @participant_event.consents.waiver.first
+    # The webhook marks it signed too, but it can land after this redirect and
+    # the done screen would ask them to sign again. Pull it from the API now.
+    @consent.sync_from_docuseal! if @consent && !@consent.participant_portion_signed?
 
     pending_docs = @participant_event.pending_custom_documents.select(&:participant_signs?)
     if pending_docs.any?
@@ -178,8 +186,6 @@ class OnboardingController < ApplicationController
       return
     end
 
-    # The webhook will mark it as signed, but we redirect immediately
-    # so we just go back to dashboard and let them see the updated status
     redirect_after_submit "Thank you for signing! Your waiver is being processed."
   end
 
@@ -1222,6 +1228,19 @@ class OnboardingController < ApplicationController
     current_event.haven_onboarding? &&
       @participant_event.onboarding_intro_seen_at.nil? &&
       @participant_event.onboarding_step.zero?
+  end
+
+  # `complete` records the code of conduct before checking for a guardian or
+  # an emergency contact, so an accepted code of conduct alone doesn't mean
+  # the registration went through.
+  def submitted?
+    return false if @participant_event.code_of_conduct_accepted_at.blank?
+
+    if @participant_event.requires_guardian?
+      @participant_event.awaiting_guardian? || @participant_event.complete?
+    else
+      @participant_event.emergency_contacts.any?
+    end
   end
 
   # Haven registrations land on the "you're registered" screen, which shows
