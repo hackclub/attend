@@ -1083,6 +1083,14 @@ paths:
         legal names that are replaced from their account on first sign-in.
 
 
+        `date_of_birth`, `phone` and `country` are optional too. Everything sent
+        is stored on the participant and used to prefill the Hack Club Auth
+        signup form when they open the invitation and don't have an account
+        yet. If the email already belongs to someone Attend knows (from another
+        event), only the fields they have no value for are filled in; nothing
+        they entered is overwritten.
+
+
         While the event is holding onboarding invitations
         (`modules.onboarding_invites_held`), the invitation is recorded but not
         emailed: it goes out when the event's held invitations are released
@@ -1102,6 +1110,13 @@ paths:
                 email: { type: string, format: email }
                 first_name: { type: string }
                 last_name: { type: string }
+                date_of_birth: { type: string, format: date, example: "2009-04-02" }
+                phone:
+                  type: string
+                  description: E.164 format, e.g. +12025550100
+                country:
+                  type: string
+                  description: ISO 3166-1 alpha-2 code (e.g. `US`) or the country's English name.
       responses:
         "201":
           description: Invitation enqueued, or recorded as held.
@@ -1321,6 +1336,13 @@ paths:
         Date of birth and phone number are writable by every caller that gets
         this far, including API keys and PII-restricted roles, which cannot
         read them back: the response is redacted exactly as a read would be.
+
+        To backfill details without overwriting anything the participant
+        entered themselves, send `fill_blanks: true`. Only fields that are
+        empty (or legal names still on the "Unknown" placeholder) are written,
+        and the response lists the fields that were left alone in
+        `skipped_fields`. Find the registration id for an email with the
+        lookup endpoint.
       parameters:
         - $ref: "#/components/parameters/EventId"
         - $ref: "#/components/parameters/RegistrationId"
@@ -1334,6 +1356,10 @@ paths:
                 status:
                   type: string
                   enum: [invited, in_progress, awaiting_guardian, complete, withdrawn, rejected]
+                fill_blanks:
+                  type: boolean
+                  default: false
+                  description: Only write participant fields that have no value yet.
                 participant:
                   type: object
                   properties:
@@ -1347,6 +1373,9 @@ paths:
                       description: E.164 format, e.g. +12025550100
                     pronouns: { type: string }
                     tshirt_size: { type: string }
+                    country_of_residence:
+                      type: string
+                      description: ISO 3166-1 alpha-2 code (e.g. `US`) or the country's English name.
       responses:
         "200":
           description: The updated participant.
@@ -1356,6 +1385,12 @@ paths:
                 type: object
                 properties:
                   participant: { $ref: "#/components/schemas/Participant" }
+                  skipped_fields:
+                    type: array
+                    items: { type: string }
+                    description: >-
+                      Only with `fill_blanks`: the fields sent that already had
+                      a value, so were not written.
         "422":
           description: >-
             Nothing to update, an unknown status, or the model rejected the

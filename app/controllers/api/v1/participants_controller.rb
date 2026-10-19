@@ -85,6 +85,11 @@ module Api
         last_name = params[:last_name]&.strip
         name = [ first_name, last_name ].compact.join(" ").presence
 
+        details, details_error = invitee_details
+        if details_error
+          return render json: { success: false, error: details_error }, status: :unprocessable_entity
+        end
+
         if email.blank?
           return render json: { success: false, error: "Email is required" }, status: :unprocessable_entity
         end
@@ -117,7 +122,7 @@ module Api
           # entry nobody was invited to, are both worse than neither.
           ActiveRecord::Base.transaction do
             invitation = Invitation.issue!(event: @event, email: email, name: name, send: false)
-            participant_event = register_invitee(email: email, first_name: first_name, last_name: last_name)
+            participant_event = register_invitee(email: email, first_name: first_name, last_name: last_name, details: details)
           end
 
           # Only once both rows are committed. The mail job is enqueued
@@ -212,6 +217,22 @@ module Api
           return render_error("Nothing to update. Send a `participant` object and/or a `status`.")
         end
 
+        if attributes[:country_of_residence].present?
+          country = CountryCodes.normalize(attributes[:country_of_residence])
+          return render_error(unknown_country_error(attributes[:country_of_residence])) unless country
+
+          attributes[:country_of_residence] = country
+        end
+
+        # Backfills send fill_blanks so they only add what's missing and
+        # never overwrite something the participant entered themselves.
+        fill_blanks = ActiveModel::Type::Boolean.new.cast(params[:fill_blanks])
+        if fill_blanks
+          sent_fields = attributes.keys
+          attributes = participant.blank_attributes_only(attributes)
+          skipped_fields = sent_fields - attributes.keys
+        end
+
         ActiveRecord::Base.transaction do
           participant.update!(attributes) if attributes.any?
           @participant_event.update!(status: status) if status
@@ -220,7 +241,9 @@ module Api
         audit_api_change!(:record_update, participant) if attributes.any?
         audit_api_change!(status_audit_action(status), @participant_event, metadata: { status: status }) if status
 
-        render json: { participant: participant_json(@participant_event.reload) }
+        response = { participant: participant_json(@participant_event.reload) }
+        response[:skipped_fields] = skipped_fields if fill_blanks
+        render json: response
       rescue ActiveRecord::RecordInvalid => e
         render_error(e.record.errors.full_messages.to_sentence)
       end
@@ -280,7 +303,7 @@ module Api
       # `invited` specifically, never `in_progress`: ParticipantEvent#onboarding_held?
       # keys off that status, and it is what keeps the wizard shut for someone
       # whose invitation is still held by the event.
-      def register_invitee(email:, first_name:, last_name:)
+      def register_invitee(email:, first_name:, last_name:, details: {})
         # LOWER() rather than an exact match: participant emails are not
         # normalized on write, so an existing person may be stored in another
         # case. Missing them here would fork the same human into two records.
@@ -288,17 +311,51 @@ module Api
         # and without an order the pick would vary between invitations.
         participant = Participant.where("LOWER(participants.email) = ?", email).order(:created_at).first
 
-        participant ||= Participant.create!(
-          email: email,
-          # Legal names are validated on every save, but an invitation only
-          # carries an address. "Unknown" is the placeholder the onboarding OIDC
-          # backfill looks for, so the real name lands on first sign-in.
-          legal_first_name: first_name.presence || "Unknown",
-          legal_last_name: last_name.presence || "Unknown"
-        )
+        if participant
+          # Someone Attend already knows (from another event): only fill in
+          # what's missing, never overwrite what they entered themselves.
+          known = { legal_first_name: first_name.presence, legal_last_name: last_name.presence, **details }.compact
+          participant.update!(participant.blank_attributes_only(known))
+        else
+          participant = Participant.create!(
+            email: email,
+            # Legal names are validated on every save, but an invitation may
+            # only carry an address. "Unknown" is the placeholder the
+            # onboarding OIDC backfill looks for, so the real name lands on
+            # first sign-in.
+            legal_first_name: first_name.presence || "Unknown",
+            legal_last_name: last_name.presence || "Unknown",
+            **details
+          )
+        end
 
         ParticipantEvent.create_with(status: :invited)
                         .find_or_create_by!(participant: participant, event: @event)
+      end
+
+      # Optional details an integration can send with an invitation, so the
+      # participant's record (and the Hack Club Auth signup form they're sent
+      # to, see HackClubAuthPrefill) starts filled in. Returns
+      # [attributes, error].
+      def invitee_details
+        details = {}
+        details[:date_of_birth] = Date.iso8601(params[:date_of_birth].to_s) if params[:date_of_birth].present?
+        details[:phone] = params[:phone].to_s.strip if params[:phone].present?
+
+        if params[:country].present?
+          country = CountryCodes.normalize(params[:country])
+          return [ nil, unknown_country_error(params[:country]) ] unless country
+
+          details[:country_of_residence] = country
+        end
+
+        [ details, nil ]
+      rescue Date::Error
+        [ nil, "date_of_birth must be a date in YYYY-MM-DD format" ]
+      end
+
+      def unknown_country_error(value)
+        "#{value.to_s.inspect} isn't a country Attend knows. Send an ISO 3166-1 alpha-2 code (e.g. US) or the country's English name."
       end
 
       # An API key may send invitations, read minimal identity/registration
@@ -330,7 +387,7 @@ module Api
       # see what was there before.
       PARTICIPANT_WRITABLE_FIELDS = %i[
         legal_first_name legal_last_name preferred_name email
-        date_of_birth phone pronouns tshirt_size
+        date_of_birth phone pronouns tshirt_size country_of_residence
       ].freeze
 
       # Resolving a Slack ID to a registration is a support-bot capability, not

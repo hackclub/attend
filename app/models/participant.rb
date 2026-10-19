@@ -114,6 +114,16 @@ class Participant < ApplicationRecord
     value.blank? || value == NAME_PLACEHOLDER
   end
 
+  # The subset of +attributes+ this participant has no real value for yet:
+  # blank fields, and legal names still on the placeholder. Backfills use it
+  # so they never overwrite something the person entered themselves.
+  def blank_attributes_only(attributes)
+    attributes.select do |field, _value|
+      current = public_send(field)
+      field.to_sym.in?(%i[legal_first_name legal_last_name]) ? self.class.name_placeholder?(current) : current.blank?
+    end
+  end
+
   # True until the participant has given us any real legal name.
   def name_pending?
     known_legal_names.empty?

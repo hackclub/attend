@@ -617,6 +617,71 @@ RSpec.describe "Api::V1::Participants", type: :request do
     end
   end
 
+  describe "POST /api/v1/events/:event_id/participants with details" do
+    let(:event_token) { EventApiToken.generate_for(event, user: create(:user), name: "integration") }
+
+    def invite(params)
+      post "/api/v1/events/#{event.id}/participants", params: params,
+        headers: { "Authorization" => "Bearer #{event_token.token}" }
+    end
+
+    it "records the birthday, phone and country sent with the invitation" do
+      invite(email: "detailed@example.com", first_name: "Dana", last_name: "Lee",
+        date_of_birth: "2009-04-02", phone: "+1 202 555 0143", country: "US")
+
+      expect(response).to have_http_status(:created)
+      participant = Participant.find(JSON.parse(response.body)["participant_id"])
+      expect(participant).to have_attributes(
+        legal_first_name: "Dana", date_of_birth: Date.new(2009, 4, 2),
+        phone: "+12025550143", country_of_residence: "United States"
+      )
+    end
+
+    it "accepts a country by name" do
+      invite(email: "named-country@example.com", country: "united kingdom")
+
+      expect(Participant.find(JSON.parse(response.body)["participant_id"]).country_of_residence).to eq("United Kingdom")
+    end
+
+    it "only fills in what a returning person is missing" do
+      existing = create(:participant, email: "back@example.com", legal_first_name: "Unknown", legal_last_name: "Okafor",
+        date_of_birth: nil, phone: "+12025550100")
+
+      invite(email: "back@example.com", first_name: "Ada", last_name: "Changed",
+        date_of_birth: "2008-01-31", phone: "+12025550199")
+
+      expect(response).to have_http_status(:created)
+      expect(existing.reload).to have_attributes(
+        legal_first_name: "Ada", legal_last_name: "Okafor",
+        date_of_birth: Date.new(2008, 1, 31), phone: "+12025550100"
+      )
+    end
+
+    it "rejects a birthday that isn't a date" do
+      expect {
+        invite(email: "bad-date@example.com", date_of_birth: "02/04/2009")
+      }.not_to change(Invitation, :count)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)["error"]).to include("YYYY-MM-DD")
+    end
+
+    it "rejects a country it doesn't know" do
+      invite(email: "narnia@example.com", country: "Narnia")
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)["error"]).to include("Narnia")
+    end
+
+    it "rejects an invalid phone number without inviting" do
+      expect {
+        invite(email: "bad-phone@example.com", phone: "12345")
+      }.not_to change(Invitation, :count)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+  end
+
   describe "PATCH /api/v1/events/:event_id/participants/:id" do
     let(:participant) { create(:participant, legal_first_name: "Robin", preferred_name: nil, phone: "+12025550100") }
     let!(:participant_event) { create(:participant_event, participant: participant, event: event) }
@@ -662,6 +727,52 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
       expect(JSON.parse(response.body)["error"]).to include("in_progress")
       expect(participant_event.reload.status).to eq("in_progress")
+    end
+
+    it "sets the country from a code or a name" do
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        params: { participant: { country_of_residence: "ca" } }, headers: api_key_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(participant.reload.country_of_residence).to eq("Canada")
+
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        params: { participant: { country_of_residence: "Atlantis" } }, headers: api_key_headers
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(participant.reload.country_of_residence).to eq("Canada")
+    end
+
+    describe "fill_blanks" do
+      before { participant.update!(legal_last_name: "Unknown", date_of_birth: nil, country_of_residence: nil) }
+
+      it "only writes fields the participant has no value for, and says which it skipped" do
+        patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+          params: {
+            fill_blanks: true,
+            participant: {
+              legal_first_name: "Overwritten", legal_last_name: "Backfilled",
+              date_of_birth: "2008-06-01", phone: "+12025550188", country_of_residence: "US"
+            }
+          },
+          headers: api_key_headers
+
+        expect(response).to have_http_status(:ok)
+        expect(JSON.parse(response.body)["skipped_fields"]).to contain_exactly("legal_first_name", "phone")
+        expect(participant.reload).to have_attributes(
+          legal_first_name: "Robin", legal_last_name: "Backfilled", date_of_birth: Date.new(2008, 6, 1),
+          phone: "+12025550100", country_of_residence: "United States"
+        )
+      end
+
+      it "succeeds without writing when everything sent is already filled in" do
+        patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+          params: { fill_blanks: true, participant: { legal_first_name: "Other" } }, headers: api_key_headers
+
+        expect(response).to have_http_status(:ok)
+        expect(JSON.parse(response.body)["skipped_fields"]).to eq([ "legal_first_name" ])
+        expect(participant.reload.legal_first_name).to eq("Robin")
+      end
     end
 
     it "rejects an empty request rather than reporting a no-op as success" do
