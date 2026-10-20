@@ -294,6 +294,15 @@ Attend's most-repeated pattern on Clipboard surfaces and the closest thing it ha
 - **Participant header:** 64px tall, white, hairline bottom border. Links are 14px/500 in `{colors.text}`, 6px radius, and the active item takes an `{colors.accent-soft}` background with `{colors.accent}` text. Collapses to a hamburger below `md`.
 - **Admin navigation:** the light 256px admin sidebar, its uppercase section eyebrows, the full-round user/event selector pills and the faux-input search trigger were all retired when `/admin` moved to the console. Admin navigation is now documented in *Admin Console*; don't rebuild those pieces on a Clipboard surface.
 
+## Haven Skin
+
+Events in a series with **Haven onboarding** switched on (`EventSeries#haven_onboarding?`) render their onboarding pages in Haven's brand instead of Attend's: `<html data-theme="light" data-brand="haven">`, tokens and component overrides in `app/assets/tailwind/haven.css`, artwork in `app/assets/images/haven/`. It is the one sanctioned exception to the rules below, and it is scoped to participant onboarding for Haven — the app shell, admin, dashboard and guardian portal stay on the system above.
+
+- **What it changes:** a cream page (`#fff6d6`) with Haven's bushes along the bottom, translucent white cards at 16px radius, a butter-to-gold gradient event card, self-hosted Jua (body) and Darumadrop One (titles) at a single weight, and Haven orange for fills and progress.
+- **What it keeps:** every contrast floor. Haven's orange (`#ed5615`, 3.5:1 on white) and green never carry words; text uses a brown ink ramp (`--haven-ink` `#4a2a12` and the remapped `--text-*`, all ≥ 4.5:1), white-on-orange fills use `#b8430f` (5.46:1), and `--border-strong` clears 3:1 for form controls.
+- **Why the fonts are self-hosted:** the CSP allows no font hosts, and Haven participants are mostly minors whose browsers shouldn't be sent to Google. The files and their OFL licences are in `app/assets/fonts/haven/`.
+- Users' own themes are overridden to light on these pages only; the skin has no dark variant.
+
 ## Do's and Don'ts
 
 ### Do:

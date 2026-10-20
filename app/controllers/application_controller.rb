@@ -20,12 +20,19 @@ class ApplicationController < ActionController::Base
   rescue_from ActionController::InvalidAuthenticityToken, with: :handle_invalid_authenticity_token
   rescue_from ActiveRecord::RecordNotFound, with: :handle_record_not_found
 
-  helper_method :current_event, :impersonating?, :impersonator
+  helper_method :current_event, :impersonating?, :impersonator, :haven_page?
 
   def current_event
     return @current_event if defined?(@current_event)
 
     @current_event = Event.find_by(id: session[:current_event_id])
+  end
+
+  # Pages that render in the Haven skin (see app/assets/tailwind/haven.css)
+  # set @haven_page; the layout then forces the light theme and adds
+  # data-brand="haven".
+  def haven_page?
+    @haven_page == true
   end
 
   def set_current_event(event)

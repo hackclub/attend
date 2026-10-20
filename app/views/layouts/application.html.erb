@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full" data-theme="<%= current_theme %>">
+<html lang="en" class="h-full" data-theme="<%= haven_page? ? "light" : current_theme %>"<%= ' data-brand="haven"'.html_safe if haven_page? %>>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="application-name" content="Attend">
-    <meta name="theme-color" content="<%= current_theme_color %>">
+    <meta name="theme-color" content="<%= haven_page? ? "#fff6d6" : current_theme_color %>">
     <link rel="manifest" href="<%= pwa_manifest_path(format: :json) %>">
 
     <title><%= content_for(:title) || "Attend – Hack Club" %></title>
@@ -194,6 +194,10 @@
     <main class="flex-1 <%= content_for?(:full_bleed) ? "w-full" : "container mx-auto px-4 sm:px-6 lg:px-8 py-8" %>">
       <%= yield %>
     </main>
+
+    <% if haven_page? %>
+      <div class="haven-bottom-strip" aria-hidden="true"></div>
+    <% end %>
 
     <footer class="bg-[#17171d] mt-auto">
       <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">

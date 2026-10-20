@@ -9,6 +9,7 @@ class OnboardingController < ApplicationController
   before_action :authenticate_user!
   before_action :process_invitation
   before_action :load_participant_event
+  before_action :apply_haven_skin
   before_action :redirect_if_withdrawn
   before_action :redirect_if_locked, except: [ :index, :waiver, :waiver_complete ]
 
@@ -338,6 +339,10 @@ class OnboardingController < ApplicationController
   end
 
   private
+
+  def apply_haven_skin
+    @haven_page = current_event.haven_onboarding?
+  end
 
   def load_participant_event
     participant = current_user.participant
@@ -1479,6 +1484,7 @@ class OnboardingController < ApplicationController
 
   def prepare_invitation_presentation
     @invitation_event = @invitation.event
+    @haven_page = @invitation_event.haven_onboarding?
     @invitation_support_email = @invitation_event.effective_support_email
     @invitation_location = [
       @invitation_event.venue_name,
