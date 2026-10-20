@@ -2521,8 +2521,8 @@
 }
 
 @layer components {
-  /* The opt-in beta notice under the top nav (layouts/admin.html+console.erb).
-   * Cloudscape's info treatment, one quiet line that wraps on phones. Its
+  /* The new-admin notice, with its switch-back link, under the top nav
+   * (layouts/admin.html+console.erb). Cloudscape's info treatment, one quiet line that wraps on phones. Its
    * gutters match .cs-breadcrumbs and .cs-main so the text lines up with the
    * page below it. */
   .cs-beta-bar {

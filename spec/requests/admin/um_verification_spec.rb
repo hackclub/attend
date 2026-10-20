@@ -4,7 +4,7 @@ RSpec.describe "Admin UM verification", type: :request do
   include Devise::Test::IntegrationHelpers
 
   let(:event) { create(:event) }
-  let(:admin) { User.create!(email: "ga-um@example.com", name: "Global Admin", global_role: "global_admin") }
+  let(:admin) { User.create!(email: "ga-um@example.com", name: "Global Admin", global_role: "global_admin", admin_console_beta: false) }
   let(:participant_event) { create(:participant_event, event: event, um_status: :pending) }
 
   before do

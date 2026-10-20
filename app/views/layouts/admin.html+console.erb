@@ -124,15 +124,16 @@
         </aside>
 
         <div class="cs-content">
-          <%# Staff opt in from the original admin (Admin::ConsoleBetaController).
-              Switching back skips Turbo so the redirect is a full page load. %>
-          <div class="cs-beta-bar" role="region" aria-label="New admin beta">
-            <p>You're testing the new admin.</p>
+          <%# Every staff member gets the console by default; switching back to
+              the original admin is per person (Admin::ConsoleBetaController).
+              It skips Turbo so the redirect is a full page load. %>
+          <div class="cs-beta-bar" role="region" aria-label="New admin">
+            <p>You're using the new admin.</p>
             <div class="cs-beta-bar-actions">
               <%# mail_to URL-encodes subject and body with ERB::Util.url_encode. %>
               <%= mail_to "attend@hackclub.com", "Give feedback", class: "cs-beta-bar-link",
                     subject: "New admin feedback", body: "Page: #{request.path}\n\n" %>
-              <%= button_to "Switch back", admin_console_beta_path, method: :patch, params: { enabled: false },
+              <%= button_to "Switch back to the old admin", admin_console_beta_path, method: :patch, params: { enabled: false },
                     class: "cs-beta-bar-link", form: { data: { turbo: false } } %>
             </div>
           </div>

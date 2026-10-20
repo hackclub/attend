@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Admin::RoomingWizard", type: :request do
   include Devise::Test::IntegrationHelpers
 
-  let(:admin) { User.create!(email: "admin-rooming@example.com", name: "Admin", global_role: "global_admin") }
+  let(:admin) { User.create!(email: "admin-rooming@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
   let(:event) { create(:event) }
   let!(:rooming_plan) do
     event.create_rooming_plan!(created_by_user: admin, room_capacity: 2, status: :draft)

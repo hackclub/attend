@@ -22,7 +22,7 @@ RSpec.describe "Limited event role", type: :request do
   let!(:participant_event) { create(:participant_event, event: event, participant: participant) }
 
   def sign_in_with_role(role, email: "#{role}-limited-spec@example.com")
-    user = User.create!(email: email, name: role.titleize)
+    user = User.create!(email: email, name: role.titleize, admin_console_beta: false)
     EventRoleAssignment.create!(user: user, event: event, role: role)
     sign_in user
     user

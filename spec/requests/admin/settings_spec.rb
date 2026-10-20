@@ -4,9 +4,9 @@ RSpec.describe "Admin::Settings", type: :request do
   include Devise::Test::IntegrationHelpers
 
   let(:event) { create(:event) }
-  let(:global_admin) { User.create!(email: "ga-settings@example.com", name: "Global Admin", global_role: "global_admin") }
+  let(:global_admin) { User.create!(email: "ga-settings@example.com", name: "Global Admin", global_role: "global_admin", admin_console_beta: false) }
   let(:event_admin) do
-    User.create!(email: "ea-settings@example.com", name: "Event Admin").tap do |user|
+    User.create!(email: "ea-settings@example.com", name: "Event Admin", admin_console_beta: false).tap do |user|
       EventRoleAssignment.create!(user: user, event: event, role: "event_admin")
     end
   end
