@@ -35,6 +35,8 @@ module Admin
     end
 
     def update
+      @badge.image.purge_later if params.dig(:training_badge, :remove_image) == "1"
+
       if @badge.update(badge_params)
         redirect_to admin_training_badge_path(@badge), notice: "Badge updated."
       else
@@ -53,12 +55,12 @@ module Admin
     private
 
     def set_badge
-      @badge = TrainingBadge.find(params[:id])
+      @badge = TrainingBadge.with_attached_image.find(params[:id])
       @record = @badge
     end
 
     def badge_params
-      params.require(:training_badge).permit(:name, :slug, :description, :validity_months, required_roles: [])
+      params.require(:training_badge).permit(:name, :slug, :description, :validity_months, :image, required_roles: [])
     end
   end
 end

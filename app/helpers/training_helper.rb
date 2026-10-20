@@ -1,4 +1,7 @@
 module TrainingHelper
+  # Hack Club's LinkedIn company page, so a badge added to someone's profile
+  # shows Hack Club's logo and links to its page.
+  HACK_CLUB_LINKEDIN_ORGANIZATION_ID = "18031480".freeze
   LESSON_TAGS = %w[
     p br hr h1 h2 h3 h4 strong em b i u s del blockquote code pre
     ul ol li a img table thead tbody tr th td sup sub
@@ -16,7 +19,8 @@ module TrainingHelper
   end
 
   # The learner nav shows Training to anyone who might need it: staff,
-  # volunteers, and anyone who has started a course. Participants don't.
+  # volunteers, invitees, anyone who has started a course or holds a badge.
+  # Participants don't.
   def training_nav_visible?
     return false unless user_signed_in?
     return @training_nav_visible if defined?(@training_nav_visible)
@@ -24,12 +28,51 @@ module TrainingHelper
     @training_nav_visible = TrainingCourse.published.exists? &&
       (current_user.admin? || current_user.event_role_assignments.exists? ||
         current_user.event_volunteers.exists? || current_user.training_course_invitations.exists? ||
-        current_user.training_enrollments.exists?)
+        current_user.training_enrollments.exists? || current_user.training_badge_awards.exists?)
   end
 
   # Events whose roster gave the signed-in person access to an invite-only course.
   def training_access_events(course)
     TrainingAccess.new(current_user).events_for(course)
+  end
+
+  # LinkedIn's add-to-profile form, prefilled under Licenses & certifications.
+  # No API or app approval: it's a link that opens the person's own profile
+  # editor. The award must be shared, so the credential can point at its
+  # public verification page.
+  def linkedin_add_to_profile_url(award)
+    params = {
+      startTask: "CERTIFICATION_NAME",
+      name: award.badge.name,
+      organizationId: HACK_CLUB_LINKEDIN_ORGANIZATION_ID,
+      issueYear: award.awarded_at.year,
+      issueMonth: award.awarded_at.month,
+      expirationYear: award.expires_at&.year,
+      expirationMonth: award.expires_at&.month,
+      certUrl: badge_verification_url(award.share_token),
+      certId: training_credential_id(award)
+    }.compact
+    "https://www.linkedin.com/profile/add?#{params.to_query}"
+  end
+
+  # A short, stable ID for the award, shown as the credential ID.
+  def training_credential_id(award)
+    "HC-#{award.id.delete("-").first(12).upcase}"
+  end
+
+  # The holder's name as the public verification page shows it. Never falls
+  # back to the email address, the way display_name_or_fallback does.
+  def training_public_name(user)
+    user.display_name.presence || user.name.presence || "A Hack Club member"
+  end
+
+  # The badge's artwork, or the shield medallion when it has none.
+  def training_badge_art(badge, size: "size-16", tone: "accent")
+    if badge.image.attached?
+      image_tag badge.image, alt: "", class: "#{size} shrink-0 rounded-xl object-contain"
+    else
+      render "training/badge_medallion", size: size, tone: tone
+    end
   end
 
   # Where a lesson's video length comes from, for the lesson form.

@@ -13,6 +13,13 @@ class TrainingBadge < ApplicationRecord
   has_many :courses, class_name: "TrainingCourse", dependent: :nullify
   has_many :awards, class_name: "TrainingBadgeAward", dependent: :restrict_with_error
 
+  # Artwork shown on badge pages, the public verification page and its link
+  # previews. Optional: a shield stands in without it.
+  has_one_attached :image
+
+  IMAGE_CONTENT_TYPES = %w[image/png image/jpeg image/webp].freeze
+  validate :acceptable_image, if: -> { image.attached? }
+
   validates :name, presence: true
   validates :slug, presence: true, uniqueness: true, format: { with: /\A[a-z0-9-]+\z/ }
   validates :validity_months, numericality: { only_integer: true, greater_than: 0 }, allow_nil: true
@@ -41,6 +48,11 @@ class TrainingBadge < ApplicationRecord
 
   def generate_slug
     self.slug = name.downcase.gsub(/[^a-z0-9]+/, "-").gsub(/\A-|-\z/, "")
+  end
+
+  def acceptable_image
+    errors.add(:image, "must be a PNG, JPEG or WebP") unless image.blob.content_type.in?(IMAGE_CONTENT_TYPES)
+    errors.add(:image, "must be smaller than 5 MB") if image.blob.byte_size > 5.megabytes
   end
 
   def required_roles_are_known

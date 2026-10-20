@@ -2,6 +2,9 @@
 
 <div class="cs-stack">
   <div class="cs-header">
+    <% if @badge.image.attached? %>
+      <%= image_tag @badge.image, alt: "", class: "size-14 rounded-xl object-contain shrink-0" %>
+    <% end %>
     <div class="cs-header-text">
       <h1 class="cs-h1"><%= @badge.name %></h1>
       <% if @badge.description.present? %><p class="cs-description"><%= @badge.description %></p><% end %>
@@ -67,6 +70,9 @@
                   <%= cs_status({ current: :success, expiring: :warning, expired: :stopped, revoked: :error }.fetch(state), training_award_state_label(award)) %>
                   <% if award.revoked? && award.revoked_reason.present? %>
                     <div class="cs-small cs-secondary"><%= award.revoked_reason %></div>
+                  <% end %>
+                  <% if award.shared? %>
+                    <div class="cs-small"><%= link_to "Public link", badge_verification_path(award.share_token), class: "cs-link", target: "_blank", rel: "noopener" %></div>
                   <% end %>
                 </td>
                 <td class="whitespace-nowrap"><%= cs_absolute_time(award.awarded_at, date_only: true) %></td>
