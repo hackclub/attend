@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_20_190000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_20_200000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1483,6 +1483,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_190000) do
     t.string "title", null: false
     t.uuid "training_course_id", null: false
     t.datetime "updated_at", null: false
+    t.float "video_duration_seconds"
     t.string "video_url"
     t.index ["training_course_id"], name: "index_training_lessons_on_training_course_id"
   end

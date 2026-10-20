@@ -67,6 +67,10 @@ module Training
         return
       end
 
+      # An admin's preview is trusted for the video's real length; learners'
+      # reports never are once it's known (TrainingLesson#known_video_duration).
+      @lesson.learn_video_duration!(params[:duration]) if current_user.global_admin?
+
       view = @enrollment.video_view_for(@lesson)
       view.record_heartbeat!(position: params[:position], duration: params[:duration])
       render json: { watched: view.watched_seconds, complete: @enrollment.video_watched?(@lesson) }

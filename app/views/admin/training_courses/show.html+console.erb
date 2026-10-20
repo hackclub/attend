@@ -61,6 +61,9 @@
                 <td class="whitespace-nowrap">
                   <% if lesson.video? %>
                     <%= lesson.video_source.to_s.titleize %><span class="cs-secondary"><%= lesson.require_full_watch? ? " · must watch" : " · optional" %></span>
+                    <% if lesson.watch_required? && lesson.known_video_duration.nil? %>
+                      <div title="Play it once in the course preview so Attend learns its real length."><%= cs_status(:warning, "Length unknown — preview it") %></div>
+                    <% end %>
                   <% else %>
                     <span class="cs-muted">—</span>
                   <% end %>

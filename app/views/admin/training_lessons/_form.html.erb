@@ -16,6 +16,7 @@
     <% end %>
     <div><%= f.label :video_file, "Upload a video (MP4, WebM or MOV, up to 1 GB)", class: "block text-sm font-medium text-gray-700" %><%= f.file_field :video_file, accept: TrainingLesson::VIDEO_CONTENT_TYPES.join(","), class: "mt-1 text-sm" %></div>
     <div><%= f.label :video_url, "Or a YouTube or Vimeo link", class: "block text-sm font-medium text-gray-700" %><%= f.url_field :video_url, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+    <div><%= f.label :video_duration_seconds, "Video length (seconds) — filled in when a global admin previews the video", class: "block text-sm font-medium text-gray-700" %><%= f.number_field :video_duration_seconds, min: 1, step: "any", class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
     <label class="flex items-start gap-2 text-sm"><%= f.check_box :require_full_watch, class: "mt-1" %> <span><strong>Must watch the whole video</strong> — no skipping ahead; the quiz and done button stay locked until the end.</span></label>
   </div>
   <div class="flex justify-end gap-2">

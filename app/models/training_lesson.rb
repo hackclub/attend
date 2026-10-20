@@ -32,6 +32,12 @@ class TrainingLesson < ApplicationRecord
   validate :one_video_source
 
   normalizes :video_url, with: ->(url) { url.strip.presence }
+  validates :video_duration_seconds, numericality: { greater_than: 0 }, allow_nil: true
+
+  # A new video has a new length; the old one would let learners finish early
+  # (or never). The next admin preview fills it back in.
+  before_save :forget_video_duration, if: -> { will_save_change_to_video_url? && !will_save_change_to_video_duration_seconds? }
+  after_commit :forget_replaced_video_duration, on: :update, if: -> { attachment_changes.key?("video_file") }
 
   def quiz?
     questions.any?
@@ -59,19 +65,38 @@ class TrainingLesson < ApplicationRecord
     video? && require_full_watch?
   end
 
-  # Length of an uploaded video when Active Storage could analyse it (needs
-  # ffprobe on the host); nil otherwise, and the player reports it instead.
+  # The video's real length, when the server knows it: set by hand or from a
+  # global admin's preview, or analysed from an upload (needs ffprobe on the
+  # host). Until then the learner's player reports a length, which a forged
+  # request could understate — so admins should preview each video once.
   def known_video_duration
+    return video_duration_seconds if video_duration_seconds&.positive?
     return unless video_source == :upload
 
     duration = video_file.blob.metadata["duration"]
     duration.to_f if duration.to_f.positive?
   end
 
+  # Called with the length an admin's player reported while previewing.
+  def learn_video_duration!(seconds)
+    seconds = Float(seconds, exception: false)
+    return if video_duration_seconds.present? || seconds.nil? || !seconds.finite? || !seconds.positive?
+
+    update_column(:video_duration_seconds, seconds)
+  end
+
   private
 
   def siblings
     TrainingLesson.where(training_course_id: training_course_id)
+  end
+
+  def forget_video_duration
+    self.video_duration_seconds = nil
+  end
+
+  def forget_replaced_video_duration
+    update_column(:video_duration_seconds, nil) unless previous_changes.key?("video_duration_seconds")
   end
 
   def video_id_for(source)

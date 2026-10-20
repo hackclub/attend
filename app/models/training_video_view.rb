@@ -22,8 +22,9 @@ class TrainingVideoView < ApplicationRecord
 
   def record_heartbeat!(position:, duration:, now: Time.current)
     with_lock do
-      # The first duration reported sticks, so it can't be shortened later
-      # to finish sooner. An analysed upload's real length beats either.
+      # The lesson's known length beats anything the player says; failing
+      # that, the first duration reported sticks, so it can't be shortened
+      # later to finish sooner.
       self.duration_seconds = lesson.known_video_duration || duration_seconds || positive(duration)
 
       # The row is created when the lesson page loads (LessonsController#show),

@@ -46,4 +46,22 @@ RSpec.describe TrainingVideoView do
     view.record_heartbeat!(position: 3, duration: 600, now: start + 25)
     expect(view.watched_seconds).to eq(20)
   end
+
+  describe "when the lesson's real length is known" do
+    before { lesson.update!(video_duration_seconds: 600) }
+
+    it "ignores a learner's player claiming a shorter video" do
+      view.record_heartbeat!(position: 2, duration: 2, now: start + 2)
+      expect(view.duration_seconds).to eq(600)
+      expect(view).not_to be_completed
+    end
+
+    it "learns nothing more from later admin previews, and forgets it when the video changes" do
+      lesson.learn_video_duration!(5)
+      expect(lesson.reload.video_duration_seconds).to eq(600)
+
+      lesson.update!(video_url: "https://vimeo.com/654321")
+      expect(lesson.reload.video_duration_seconds).to be_nil
+    end
+  end
 end

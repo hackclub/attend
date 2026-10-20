@@ -110,6 +110,18 @@ RSpec.describe "Training", type: :request do
       expect(enrollment.reload.lesson_completed?(reading)).to be(true)
     end
 
+    it "learns the real length from a global admin's preview, not a learner's" do
+      enroll
+      post video_progress_training_course_lesson_path(course, reading), params: { position: 0, duration: 3 }, as: :json
+      expect(reading.reload.video_duration_seconds).to be_nil
+
+      admin = create(:user, global_role: "global_admin")
+      sign_in admin
+      post enroll_training_course_path(course)
+      post video_progress_training_course_lesson_path(course, reading), params: { position: 0, duration: 212.5 }, as: :json
+      expect(reading.reload.video_duration_seconds).to eq(212.5)
+    end
+
     it "renders the gated player" do
       enroll
       get training_course_lesson_path(course, reading)

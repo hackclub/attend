@@ -36,6 +36,9 @@
       <%= cs_form_field f, :video_url, label: "Or a YouTube or Vimeo link", optional: true do |aria| %>
         <%= f.url_field :video_url, class: "cs-input", placeholder: "https://www.youtube.com/watch?v=…", **aria %>
       <% end %>
+      <%= cs_form_field f, :video_duration_seconds, label: "Video length (seconds)", optional: true,
+            description: "Filled in automatically when a global admin plays the video in the course preview. Until it's known, a learner's browser reports the length, which can't be fully trusted.",
+            as: :number_field, input: { min: 1, step: "any" } %>
       <%= cs_form_field f, :require_full_watch, label: "Must watch the whole video", bare: true do |aria| %>
         <div class="cs-option">
           <%= f.check_box :require_full_watch, **aria %>

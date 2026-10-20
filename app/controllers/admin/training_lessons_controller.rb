@@ -49,7 +49,7 @@ module Admin
     end
 
     def lesson_params
-      params.require(:training_lesson).permit(:title, :body, :video_url, :video_file, :require_full_watch)
+      params.require(:training_lesson).permit(:title, :body, :video_url, :video_file, :require_full_watch, :video_duration_seconds)
     end
   end
 end
