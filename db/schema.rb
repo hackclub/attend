@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_20_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_20_170100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -94,6 +94,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_150000) do
     t.bigint "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
+
+  create_table "airtable_connections", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "access_token", null: false
+    t.datetime "access_token_expires_at", null: false
+    t.string "airtable_email"
+    t.string "airtable_user_id"
+    t.jsonb "bases", default: [], null: false
+    t.uuid "connected_by_id"
+    t.datetime "created_at", null: false
+    t.uuid "event_id", null: false
+    t.text "refresh_token", null: false
+    t.datetime "refresh_token_expires_at", null: false
+    t.string "scope"
+    t.datetime "updated_at", null: false
+    t.index ["connected_by_id"], name: "index_airtable_connections_on_connected_by_id"
+    t.index ["event_id"], name: "index_airtable_connections_on_event_id", unique: true
   end
 
   create_table "audit_logs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -426,6 +443,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_150000) do
   end
 
   create_table "events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "airtable_api_key"
     t.uuid "airtable_config_updated_by_id"
     t.text "airtable_sync_error"
     t.datetime "airtable_sync_error_at"
@@ -1454,6 +1472,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_150000) do
   add_foreign_key "accommodations", "participant_events"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "airtable_connections", "events"
+  add_foreign_key "airtable_connections", "users", column: "connected_by_id", on_delete: :nullify
   add_foreign_key "audit_logs", "events"
   add_foreign_key "audit_logs", "users", column: "actor_user_id"
   add_foreign_key "badge_redirects", "users", on_delete: :nullify

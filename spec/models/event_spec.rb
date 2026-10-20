@@ -146,7 +146,8 @@ RSpec.describe Event, type: :model do
         :event,
         airtable_sync_source_id: "sncTest",
         airtable_sync_table_id: "tblTest",
-        config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" },
+        airtable_api_key: "key-test",
+        config: { "airtable_base_id" => "app-test" },
         **attrs
       )
     end
@@ -180,7 +181,8 @@ RSpec.describe Event, type: :model do
         :event,
         airtable_sync_source_id: "sncTest",
         airtable_sync_table_id: "tblTest",
-        config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" },
+        airtable_api_key: "key-test",
+        config: { "airtable_base_id" => "app-test" },
         **attrs
       )
     end
@@ -190,7 +192,8 @@ RSpec.describe Event, type: :model do
         event.update_columns(
           airtable_sync_source_id: source,
           airtable_sync_table_id: table,
-          config: event.config.merge("airtable_api_key" => key, "airtable_base_id" => base)
+          airtable_api_key: key,
+          config: event.config.merge("airtable_base_id" => base)
         )
       end
     end
@@ -253,7 +256,8 @@ RSpec.describe Event, type: :model do
         :event,
         airtable_sync_source_id: "sncTest",
         airtable_sync_table_id: "tblTest",
-        config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" }
+        airtable_api_key: "key-test",
+        config: { "airtable_base_id" => "app-test" }
       )
     end
 

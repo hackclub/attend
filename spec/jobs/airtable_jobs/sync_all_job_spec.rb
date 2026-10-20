@@ -6,7 +6,8 @@ RSpec.describe AirtableJobs::SyncAllJob do
       :event,
       airtable_sync_source_id: "sncTest",
       airtable_sync_table_id: "tblTest",
-      config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" },
+      airtable_api_key: "key-test",
+      config: { "airtable_base_id" => "app-test" },
       **attrs
     )
   end

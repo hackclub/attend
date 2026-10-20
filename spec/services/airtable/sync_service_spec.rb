@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe Airtable::SyncService do
   # Check-in is a Scan in a checks_in context, so the sync reads it from scans.
   let(:event) do
-    create(:event, config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" })
+    create(:event, airtable_api_key: "key-test", config: { "airtable_base_id" => "app-test" })
   end
   let(:user) { create(:user) }
   let(:check_in) { event.scan_contexts.find_by!(checks_in: true) }

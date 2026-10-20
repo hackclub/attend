@@ -135,35 +135,72 @@
         </div>
       </div>
       <div class="cs-container-body cs-stack">
-        <div class="cs-field-grid">
-          <%= cs_form_field f, :airtable_api_key, label: "Personal access token", optional: true,
-                constraint: safe_join([ "Needs the ", content_tag(:code, "data.records:write"), " and ", content_tag(:code, "schema.bases:write"), " scopes. Starts with pat." ]) do |aria| %>
-            <%= f.password_field :airtable_api_key, value: current_event.airtable_api_key, class: "cs-input font-mono", autocomplete: "off", **aria %>
-          <% end %>
-          <%= cs_form_field f, :airtable_base_id, label: "Base ID", optional: true,
-                constraint: safe_join([ "In the Airtable URL: airtable.com/", content_tag(:strong, "appXXXXX"), "/… For example: appAbc123" ]) do |aria| %>
-            <%= f.text_field :airtable_base_id, class: "cs-input font-mono", **aria %>
-          <% end %>
-          <%= cs_form_field f, :airtable_sync_source_id, label: "Sync source ID", optional: true,
-                constraint: safe_join([ "The ", content_tag(:code, "apiEndpointSyncId"), " from the Sync API setup in Airtable. Starts with snc." ]) do |aria| %>
-            <%= f.text_field :airtable_sync_source_id, class: "cs-input font-mono", **aria %>
-          <% end %>
-          <%= cs_form_field f, :airtable_sync_table_id, label: "Sync table", optional: true,
-                constraint: "The table ID (starts with tbl) or name where the sync source was created." do |aria| %>
-            <%= f.text_field :airtable_sync_table_id, class: "cs-input font-mono", **aria %>
-          <% end %>
+        <%# Connection. The buttons submit forms that sit after this one: a
+            form nested in the settings form would be dropped by the browser. %>
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div>
+            <h3 class="cs-h3">Airtable account</h3>
+            <p class="cs-secondary cs-small mt-1">
+              <% if @airtable_connection %>
+                Connected<% if @airtable_connection.account_label.present? %> as <strong><%= @airtable_connection.account_label %></strong><% end %>
+              <% elsif current_event.airtable_api_key.present? %>
+                Using a personal access token. Connect Airtable to replace it.
+              <% else %>
+                Not connected
+              <% end %>
+            </p>
+          </div>
+          <div class="cs-actions shrink-0">
+            <% if @airtable_connection %>
+              <button type="submit" form="airtable-disconnect-form" class="cs-btn whitespace-nowrap">Disconnect</button>
+            <% end %>
+            <% if @airtable_oauth_configured %>
+              <button type="submit" form="airtable-connect-form" class="cs-btn whitespace-nowrap<%= " cs-btn-primary" unless @airtable_connection %>">
+                <%= @airtable_connection ? "Reconnect" : "Connect Airtable" %>
+              </button>
+            <% end %>
+          </div>
         </div>
+
+        <% unless @airtable_oauth_configured || @airtable_connection %>
+          <div class="cs-alert">
+            <%= cs_status_icon(:info) %>
+            <p>Connecting with Airtable isn't set up on this server yet, so this event needs a personal access token (under Advanced).</p>
+          </div>
+        <% end %>
+
+        <% if @airtable_base_not_granted %>
+          <div class="cs-alert cs-alert-warning">
+            <%= cs_status_icon(:warning) %>
+            <p>The connected Airtable account didn't give Attend access to this base. Reconnect and select the base on Airtable's consent screen.</p>
+          </div>
+        <% end %>
+
+        <%= cs_form_field f, :airtable_sync_endpoint_url, label: "Sync endpoint URL", optional: true,
+              constraint: safe_join([ "In Airtable, add a synced table from the Sync API and copy its endpoint URL: https://api.airtable.com/v0/", content_tag(:strong, "app…"), "/", content_tag(:strong, "tbl…"), "/sync/…" ]) do |aria| %>
+          <%= f.text_field :airtable_sync_endpoint_url, class: "cs-input font-mono", autocomplete: "off", spellcheck: false, **aria %>
+        <% end %>
+
+        <% unless @airtable_connection %>
+          <details class="cs-expandable" <%= "open" if current_event.airtable_api_key.present? || current_event.errors.include?(:airtable_api_key) %>>
+            <summary>Advanced: use a personal access token instead</summary>
+            <div class="cs-expandable-content">
+              <%= cs_form_field f, :airtable_api_key, label: "Personal access token", optional: true,
+                    constraint: safe_join([ "Needs the ", content_tag(:code, "data.records:write"), " and ", content_tag(:code, "schema.bases:write"), " scopes. Leave blank to keep the saved token." ]) do |aria| %>
+                <%= f.password_field :airtable_api_key, value: nil, placeholder: (current_event.airtable_api_key.present? ? "Saved, hidden" : "pat…"), class: "cs-input font-mono", autocomplete: "off", **aria %>
+              <% end %>
+            </div>
+          </details>
+        <% end %>
 
         <% if @airtable_sync_configured %>
           <%# Sync status %>
           <div class="border-t border-(--cs-border-divider-secondary) pt-4 cs-stack">
             <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <h3 class="cs-h3">Sync status</h3>
-              <%= button_to @airtable_sync_paused ? "Resume & Sync Now" : "Sync Now",
-                  admin_event_trigger_airtable_sync_path(current_event),
-                  method: :post,
-                  class: "cs-btn whitespace-nowrap",
-                  form: { class: "shrink-0 self-start" } %>
+              <button type="submit" form="airtable-sync-now-form" class="cs-btn whitespace-nowrap shrink-0 self-start">
+                <%= @airtable_sync_paused ? "Resume & Sync Now" : "Sync Now" %>
+              </button>
             </div>
 
             <% if @airtable_sync_paused %>
@@ -205,8 +242,8 @@
                   </p>
                   <p>
                     <% unless @airtable_synced_at %>If you just saved these settings, a sync is already running — refresh in a minute. Otherwise, <% end %>
-                    Airtable is showing stale data — check that the Base ID, Sync Table and Sync Source ID
-                    above still exist in Airtable and that the token can see that base.
+                    Airtable is showing stale data — check that the sync endpoint above still exists in
+                    Airtable and that the connected account can see that base.
                   </p>
                 </div>
               </div>
@@ -259,6 +296,12 @@
       <%= f.button "Save integration settings", class: "cs-btn cs-btn-primary" %>
     </div>
   <% end %>
+
+  <%# Targets for the Airtable buttons inside the settings form above. %>
+  <%= form_with url: admin_event_trigger_airtable_sync_path(current_event), method: :post, id: "airtable-sync-now-form", class: "hidden" do %><% end %>
+  <%= form_with url: admin_event_airtable_connection_path(current_event), method: :post, id: "airtable-connect-form", class: "hidden", data: { turbo: false } do %><% end %>
+  <%= form_with url: admin_event_airtable_connection_path(current_event), method: :delete, id: "airtable-disconnect-form", class: "hidden",
+        data: { turbo_confirm: "Disconnect Airtable? The sync stops until someone connects it again." } do %><% end %>
 
   <%# Custom documents (not part of the form) %>
   <% active_custom_documents = current_event.custom_documents.active.order(:created_at) %>

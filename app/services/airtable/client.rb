@@ -4,6 +4,17 @@ module Airtable
   class Client
     BASE_URL = "https://api.airtable.com/v0".freeze
 
+    # The OAuth connection wins over a pasted personal access token; the app-wide
+    # credentials are a last resort for events configured neither way.
+    def self.for_event(event)
+      api_key = event.airtable_connection&.fresh_access_token! ||
+        event.airtable_api_key.presence ||
+        Rails.application.credentials.dig(:airtable, :api_key)
+      base_id = event.airtable_base_id.presence || Rails.application.credentials.dig(:airtable, :base_id)
+
+      new(api_key: api_key, base_id: base_id)
+    end
+
     def initialize(api_key: nil, base_id: nil)
       @api_key = api_key || ENV["AIRTABLE_API_KEY"] || Rails.application.credentials.dig(:airtable, :api_key)
       @base_id = base_id || ENV["AIRTABLE_BASE_ID"] || Rails.application.credentials.dig(:airtable, :base_id)

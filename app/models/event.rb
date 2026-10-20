@@ -4,7 +4,8 @@ class Event < ApplicationRecord
   include DecodableImageAttachment
   include TravelCalendarCacheInvalidatable
 
-  has_paper_trail
+  # The Airtable token is encrypted; a version would store it in plaintext.
+  has_paper_trail skip: %i[airtable_api_key]
 
   self.implicit_order_column = "created_at"
 
@@ -20,7 +21,6 @@ class Event < ApplicationRecord
     :nfc_badges_enabled,
     :nfc_badge_write_on_checkin_enabled,
     :groups_enabled,
-    :airtable_api_key,
     :airtable_base_id,
     :vote_event_id,
     :vote_event_slug,
@@ -34,14 +34,44 @@ class Event < ApplicationRecord
 
   after_initialize :set_default_config, if: :new_record?
 
-  # Airtable ids/keys are copy-pasted; stray whitespace yields baffling
-  # 403/404s from the API. The api key and base id live in the config store,
-  # which `normalizes` doesn't cover, so their writers strip too.
-  normalizes :airtable_sync_source_id, :airtable_sync_table_id, with: ->(v) { v.strip.presence }
+  # A personal access token, from before organisers could connect Airtable
+  # with OAuth (AirtableConnection). Still honoured when there's no connection.
+  encrypts :airtable_api_key
 
-  def airtable_api_key=(value)
-    super(value.is_a?(String) ? value.strip.presence : value)
+  # Airtable ids/keys are copy-pasted; stray whitespace yields baffling
+  # 403/404s from the API. The base id lives in the config store, which
+  # `normalizes` doesn't cover, so its writer strips too.
+  normalizes :airtable_api_key, :airtable_sync_source_id, :airtable_sync_table_id, with: ->(v) { v.strip.presence }
+
+  # The URL Airtable shows when you set up a Sync API source:
+  # https://api.airtable.com/v0/{baseId}/{tableIdOrName}/sync/{apiEndpointSyncId}
+  AIRTABLE_SYNC_ENDPOINT = %r{\Ahttps://api\.airtable\.com/v0/(?<base>app\w+)/(?<table>[^/?#]+)/sync/(?<sync>[^/?#]+)/?\z}
+
+  attr_reader :airtable_sync_endpoint_url_error
+
+  # One pasted URL instead of three ids to dig out of it by hand.
+  def airtable_sync_endpoint_url
+    return airtable_sync_endpoint_url_error if airtable_sync_endpoint_url_error
+    return if airtable_base_id.blank? || airtable_sync_table_id.blank? || airtable_sync_source_id.blank?
+
+    "https://api.airtable.com/v0/#{airtable_base_id}/#{airtable_sync_table_id}/sync/#{airtable_sync_source_id}"
   end
+
+  def airtable_sync_endpoint_url=(value)
+    value = value.to_s.strip
+    @airtable_sync_endpoint_url_error = nil
+    if value.blank?
+      self.airtable_base_id = self.airtable_sync_table_id = self.airtable_sync_source_id = nil
+    elsif (match = AIRTABLE_SYNC_ENDPOINT.match(value))
+      self.airtable_base_id = match[:base]
+      self.airtable_sync_table_id = CGI.unescape(match[:table])
+      self.airtable_sync_source_id = CGI.unescape(match[:sync])
+    else
+      @airtable_sync_endpoint_url_error = value
+    end
+  end
+
+  validate :airtable_sync_endpoint_url_parses
 
   def airtable_base_id=(value)
     super(value.is_a?(String) ? value.strip.presence : value)
@@ -83,6 +113,7 @@ class Event < ApplicationRecord
   has_many :incident_reports, dependent: :nullify
   has_many :tickets, dependent: :nullify
   has_one :rooming_plan, dependent: :destroy
+  has_one :airtable_connection, dependent: :destroy
   belongs_to :hotel_scan_context, class_name: "ScanContext", optional: true
   belongs_to :airtable_config_updated_by, class_name: "User", optional: true
 
@@ -429,7 +460,7 @@ class Event < ApplicationRecord
   end
 
   def airtable_sync_configured?
-    airtable_api_key.present? &&
+    (airtable_connection.present? || airtable_api_key.present?) &&
       airtable_base_id.present? &&
       airtable_sync_source_id.present? &&
       airtable_sync_table_id.present?
@@ -446,7 +477,7 @@ class Event < ApplicationRecord
   scope :with_airtable_sync_configured, -> {
     where("NULLIF(BTRIM(events.airtable_sync_source_id), '') IS NOT NULL")
       .where("NULLIF(BTRIM(events.airtable_sync_table_id), '') IS NOT NULL")
-      .where("NULLIF(BTRIM(events.config ->> 'airtable_api_key'), '') IS NOT NULL")
+      .where("events.airtable_api_key IS NOT NULL OR EXISTS (SELECT 1 FROM airtable_connections WHERE airtable_connections.event_id = events.id)")
       .where("NULLIF(BTRIM(events.config ->> 'airtable_base_id'), '') IS NOT NULL")
   }
 
@@ -612,6 +643,13 @@ class Event < ApplicationRecord
 
   def assign_default_docuseal_host
     self.docuseal_host = Docuseal::HostConfig.default_host
+  end
+
+  def airtable_sync_endpoint_url_parses
+    return if airtable_sync_endpoint_url_error.nil?
+
+    errors.add(:airtable_sync_endpoint_url,
+      "doesn't look like an Airtable sync endpoint. It should look like https://api.airtable.com/v0/appXXXX/tblXXXX/sync/XXXX")
   end
 
   def acceptable_logo

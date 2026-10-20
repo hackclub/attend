@@ -1,10 +1,7 @@
 namespace :airtable do
   desc "Report which events' Airtable sync config still resolves (read-only)"
   task diagnose: :environment do
-    events = Event.where.not(airtable_sync_source_id: [ nil, "" ])
-                  .where.not(airtable_sync_table_id: [ nil, "" ])
-                  .where("config->>'airtable_api_key' IS NOT NULL")
-                  .where("config->>'airtable_base_id' IS NOT NULL")
+    events = Event.with_airtable_sync_configured.includes(:airtable_connection)
 
     if events.empty?
       puts "No events have Airtable sync configured."
@@ -15,6 +12,7 @@ namespace :airtable do
       last_sync = event.airtable_synced_at ? "#{time_ago(event.airtable_synced_at)} ago" : "never"
       puts "\n#{event.slug} (#{event.id})"
       puts "  base=#{event.airtable_base_id} table=#{event.airtable_sync_table_id} source=#{event.airtable_sync_source_id}"
+      puts "  auth=#{event.airtable_connection ? "oauth (#{event.airtable_connection.account_label})" : 'personal access token'}"
       puts "  last successful sync: #{last_sync}#{event.airtable_sync_stale? ? '  [STALE]' : ''}"
       puts "  #{probe(event)}"
     end
@@ -25,12 +23,13 @@ namespace :airtable do
 
   # Reads one record through the same token/base/table the sync uses, so a 404
   # here rules the table (or the token's visibility of the base) in or out.
+  # For an OAuth connection this may refresh the access token, as a sync would.
   def probe(event)
-    client = Airtable::Client.new(api_key: event.airtable_api_key, base_id: event.airtable_base_id)
+    client = Airtable::Client.for_event(event)
     client.list_records(event.airtable_sync_table_id, max_records: 1)
     "table reads OK — token, base and table all resolve"
-  rescue Airtable::AuthenticationError
-    "401 — the personal access token is invalid or revoked"
+  rescue Airtable::AuthenticationError => e
+    "401 — the token is invalid or revoked (#{e.message})"
   rescue Airtable::NotFoundError
     # Airtable answers 404 (not 403) for a base the token cannot see, so a
     # revoked or rescoped token is indistinguishable from a deleted base here.
