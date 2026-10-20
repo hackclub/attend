@@ -314,8 +314,17 @@ module Api
         if participant
           # Someone Attend already knows (from another event): only fill in
           # what's missing, never overwrite what they entered themselves.
+          # Skip the save when there's nothing to fill in: an older record
+          # may not pass today's validations, and that shouldn't fail an
+          # invite that changes nothing.
           known = { legal_first_name: first_name.presence, legal_last_name: last_name.presence, **details }.compact
-          participant.update!(participant.blank_attributes_only(known))
+          fills = participant.blank_attributes_only(known)
+          if fills.any?
+            participant.update!(fills)
+            # Another event's records may rely on these (age checks use the
+            # birthday), so log it the way `update` does.
+            audit_api_change!(:record_update, participant)
+          end
         else
           participant = Participant.create!(
             email: email,

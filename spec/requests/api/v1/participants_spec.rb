@@ -657,6 +657,30 @@ RSpec.describe "Api::V1::Participants", type: :request do
       )
     end
 
+    it "logs what it fills in on a returning person's record" do
+      existing = create(:participant, email: "logged@example.com", date_of_birth: nil)
+
+      invite(email: "logged@example.com", date_of_birth: "2008-01-31")
+
+      expect(response).to have_http_status(:created)
+      log = AuditLog.record_update.find_by(record: existing)
+      expect(log).to be_present
+      expect(log.event).to eq(event)
+      expect(log.changed_fields.keys).to include("date_of_birth")
+    end
+
+    it "leaves a returning person's record alone when there's nothing to fill in" do
+      existing = create(:participant, email: "complete@example.com", date_of_birth: Date.new(2008, 1, 31))
+      # An older record that wouldn't pass today's validations.
+      existing.update_columns(phone: "12345")
+
+      invite(email: "complete@example.com", date_of_birth: "2009-04-02")
+
+      expect(response).to have_http_status(:created)
+      expect(existing.reload.date_of_birth).to eq(Date.new(2008, 1, 31))
+      expect(AuditLog.record_update.where(record: existing)).not_to exist
+    end
+
     it "rejects a birthday that isn't a date" do
       expect {
         invite(email: "bad-date@example.com", date_of_birth: "02/04/2009")
