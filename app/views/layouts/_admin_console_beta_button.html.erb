@@ -1,5 +1,6 @@
-<%# Opts the signed-in staff member into the console redesign. Submitted
-    without Turbo so the redirect is a full page load into the other layout.
+<%# Moves a staff member who switched back to the original admin onto the
+    console again. Submitted without Turbo so the redirect is a full page
+    load into the other layout.
     A Deepened Red fill (DESIGN.md): themes.css remaps bg-[#d42f46] /
     hover:bg-[#b82840] per theme and pins their foreground to --accent-on.
     `compact` is the one-line version for the mobile header. %>
@@ -16,11 +17,11 @@
     <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"/>
   </svg>
   <% if compact %>
-    <span>Try the new admin</span>
+    <span>Use the new admin</span>
   <% else %>
     <span class="min-w-0">
-      <span class="block text-sm font-semibold leading-5">Try the new admin</span>
-      <span class="block text-xs leading-4">Beta · you can switch back anytime</span>
+      <span class="block text-sm font-semibold leading-5">Use the new admin</span>
+      <span class="block text-xs leading-4">You can switch back anytime</span>
     </span>
   <% end %>
 <% end %>

@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Admin::Messages", type: :request do
   include Devise::Test::IntegrationHelpers
 
-  let(:admin) { User.create!(email: "admin-test@example.com", name: "Admin", global_role: "global_admin") }
+  let(:admin) { User.create!(email: "admin-test@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
   let(:event) { create(:event) }
 
   before { sign_in admin }

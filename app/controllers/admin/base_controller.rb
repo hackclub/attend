@@ -39,8 +39,8 @@ module Admin
 
     private
 
-    # Staff who opt into the beta (Admin::ConsoleBetaController) get the
-    # console redesign: every *.html+console.erb template, layout included,
+    # Staff get the console redesign unless they've switched back to the
+    # original admin (Admin::ConsoleBetaController): every *.html+console.erb template, layout included,
     # wins over its *.html.erb original. Set before any action runs so
     # renders, Turbo Stream responses and render_to_string all see it.
     def set_admin_ui_variant
