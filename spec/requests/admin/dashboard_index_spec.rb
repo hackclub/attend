@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Admin::Dashboard#index", type: :request do
   include Devise::Test::IntegrationHelpers
 
-  let(:global_admin) { User.create!(email: "ga-events@example.com", name: "Global Admin", global_role: "global_admin") }
+  let(:global_admin) { User.create!(email: "ga-events@example.com", name: "Global Admin", global_role: "global_admin", admin_console_beta: false) }
 
   before { sign_in global_admin }
 

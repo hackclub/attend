@@ -7,7 +7,7 @@ RSpec.describe "Custom documents", type: :request do
   let(:event) { create(:event) }
 
   describe "admin management" do
-    let(:admin) { User.create!(email: "admin-docs@example.com", name: "Admin", global_role: "global_admin") }
+    let(:admin) { User.create!(email: "admin-docs@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
 
     before { sign_in admin }
 

@@ -4,7 +4,7 @@ RSpec.describe "Admin::Participants", type: :request do
   include Devise::Test::IntegrationHelpers
 
   let(:event) { create(:event, accommodation_enabled: false) }
-  let(:global_admin) { User.create!(email: "ga-participants@example.com", name: "Global Admin", global_role: "global_admin") }
+  let(:global_admin) { User.create!(email: "ga-participants@example.com", name: "Global Admin", global_role: "global_admin", admin_console_beta: false) }
 
   def complete_onboarding!(pe)
     pe.travels.create!(direction: "inbound", mode: "car")
