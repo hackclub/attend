@@ -1,0 +1,14 @@
+<%# The signed-in staff member hasn't got the training their role on this
+    event requires. Shown on every admin page for the event until they do;
+    it can't be dismissed, because the requirement can't be either. %>
+<% status = TrainingStatus.for_user_at_event(current_user, event) %>
+<% if status.missing.any? %>
+  <div class="border-b-2 border-red-300 bg-red-50" role="alert" data-testid="training-banner">
+    <div class="px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+      <p class="flex-1 text-sm text-red-900">
+        <strong>Training needed:</strong> your role on <%= event.name %> requires <%= status.missing.map(&:name).to_sentence %>.
+      </p>
+      <%= link_to "Start training", training_path, class: "self-start sm:self-center px-3 py-2 text-sm font-medium rounded-md bg-[#d42f46] text-white hover:bg-[#b82840]" %>
+    </div>
+  </div>
+<% end %>

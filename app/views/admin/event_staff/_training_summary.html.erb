@@ -1,0 +1,13 @@
+<%# How many people on this event's roster are missing required training.
+    Locals: summary (TrainingStatus#summary) %>
+<% if summary[:untrained].positive? %>
+  <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-800">
+    <p class="font-semibold"><%= summary[:untrained] %> of <%= summary[:required] %> people need to complete their training</p>
+    <p>They're marked "Not trained" below. Send them to <%= link_to training_url, training_url, class: "underline" %> to do it.</p>
+  </div>
+<% elsif summary[:required].positive? %>
+  <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-800">
+    <p class="font-semibold">Everyone who needs training has done it</p>
+    <% if summary[:expiring].positive? %><p><%= pluralize(summary[:expiring], "person") %> should renew soon.</p><% end %>
+  </div>
+<% end %>

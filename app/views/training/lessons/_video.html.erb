@@ -1,0 +1,37 @@
+<%# The lesson's video. With watching required, training_video_controller.js
+    (on the page wrapper) stops seeking ahead; otherwise it's a plain player.
+    Locals: lesson, gated %>
+<% gated = local_assigns[:gated] %>
+<% target = gated ? { training_video_target: "player" } : {} %>
+<div class="aspect-video w-full overflow-hidden rounded-lg mb-3 bg-black">
+  <% case lesson.video_source %>
+  <% when :upload %>
+    <%= tag.video src: rails_blob_path(lesson.video_file, disposition: "inline"), controls: true, playsinline: true, preload: "metadata",
+          controlslist: ("nodownload noplaybackrate" if gated), disablepictureinpicture: gated,
+          class: "size-full", data: target, "aria-label": "#{lesson.title} video" %>
+  <% when :youtube %>
+    <% if gated %>
+      <%= tag.div class: "size-full", data: target %>
+    <% else %>
+      <iframe src="https://www.youtube-nocookie.com/embed/<%= lesson.video_id %>?rel=0" title="<%= lesson.title %> video" class="size-full" allow="fullscreen; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+    <% end %>
+  <% when :vimeo %>
+    <% if gated %>
+      <%= tag.div class: "size-full [&>iframe]:size-full", data: target %>
+    <% else %>
+      <iframe src="https://player.vimeo.com/video/<%= lesson.video_id %>?dnt=1" title="<%= lesson.title %> video" class="size-full" allow="fullscreen; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+    <% end %>
+  <% end %>
+</div>
+<% if gated && lesson.known_video_duration.nil? && !current_user.global_admin? %>
+  <p class="portal-note portal-note-warn portal-body text-sm mb-6">
+    This video isn't ready yet, so the lesson can't be finished. Let your event organizer know.
+  </p>
+<% elsif gated %>
+  <p class="portal-meta text-xs mb-6" aria-live="polite">
+    Watch the whole video to continue — you can rewind, but not skip ahead.
+    <span data-training-video-target="status" class="font-semibold"></span>
+  </p>
+<% else %>
+  <div class="mb-6"></div>
+<% end %>

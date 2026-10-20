@@ -1,0 +1,28 @@
+<% questions = @lesson.questions.includes(:options).to_a %>
+<div class="max-w-3xl space-y-6">
+  <%= link_to "← #{@course.title}", admin_training_course_path(@course), class: "text-sm text-gray-500 hover:text-[#ec3750]" %>
+  <div class="flex justify-between items-start gap-4">
+    <h1 class="text-2xl font-bold text-gray-900"><%= @lesson.title_in_database %></h1>
+    <%= button_to "Delete Lesson", admin_training_course_lesson_path(@course, @lesson), method: :delete, class: "text-sm text-red-600 hover:text-red-900", data: { turbo_confirm: "Delete this lesson and its quiz?" } %>
+  </div>
+  <%= render "form", lesson: @lesson %>
+
+  <div id="quiz" class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+      <h2 class="text-lg font-medium text-gray-900">Quiz (<%= questions.size %>)</h2>
+      <%= link_to "Add Question", new_admin_training_course_lesson_question_path(@course, @lesson), class: "text-sm text-[#ec3750] hover:underline" %>
+    </div>
+    <% if questions.empty? %>
+      <p class="px-6 py-6 text-sm text-gray-500">No questions — this lesson is finished by marking it done.</p>
+    <% else %>
+      <ul class="divide-y divide-gray-100">
+        <% questions.each_with_index do |question, index| %>
+          <li class="px-6 py-3 flex items-center justify-between gap-4 text-sm">
+            <%= link_to "#{index + 1}. #{question.prompt.truncate(100)}", edit_admin_training_course_lesson_question_path(@course, @lesson, question), class: "text-gray-900 hover:text-[#ec3750]" %>
+            <%= render "admin/training/move_buttons", path: move_admin_training_course_lesson_question_path(@course, @lesson, question), label: "question #{index + 1}", first: index.zero?, last: index == questions.size - 1 %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </div>
+</div>

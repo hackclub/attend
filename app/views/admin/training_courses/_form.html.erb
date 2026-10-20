@@ -1,0 +1,19 @@
+<%= form_with model: course, url: (course.persisted? ? admin_training_course_path(course.slug_in_database) : admin_training_courses_path), class: "space-y-6" do |f| %>
+  <%= render "admin/training/errors", record: course %>
+  <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+    <div><%= f.label :title, class: "block text-sm font-medium text-gray-700" %><%= f.text_field :title, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+    <div><%= f.label :summary, class: "block text-sm font-medium text-gray-700" %><%= f.text_area :summary, rows: 3, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+    <div><%= f.label :slug, "URL (/training/…)", class: "block text-sm font-medium text-gray-700" %><%= f.text_field :slug, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %><p class="text-xs text-gray-500 mt-1">Leave blank to make one from the title.</p></div>
+    <div><%= f.label :training_badge_id, "Awards badge", class: "block text-sm font-medium text-gray-700" %><%= f.select :training_badge_id, TrainingBadge.ordered.map { |b| [ b.name, b.id ] }, { include_blank: "No badge" }, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div><%= f.label :pass_mark, "Quiz pass mark (%)", class: "block text-sm font-medium text-gray-700" %><%= f.number_field :pass_mark, min: 1, max: 100, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+      <div><%= f.label :estimated_minutes, class: "block text-sm font-medium text-gray-700" %><%= f.number_field :estimated_minutes, min: 1, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+    </div>
+    <div><%= f.label :access, "Who can take it", class: "block text-sm font-medium text-gray-700" %><%= f.select :access, [ [ "Invite-only (plus people whose event role needs the badge)", "invite_only" ], [ "Anyone signed in to Attend", "open" ] ], {}, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+    <div><%= f.label :reveal_answers, "Show correct answers", class: "block text-sm font-medium text-gray-700" %><%= f.select :reveal_answers, [ [ "Once they pass", "after_pass" ], [ "After every attempt", "every_attempt" ] ], {}, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+  </div>
+  <div class="flex justify-end gap-2">
+    <%= link_to "Cancel", (course.persisted? ? admin_training_course_path(course.slug_in_database) : admin_training_path), class: "px-4 py-2 text-sm text-gray-600" %>
+    <%= f.button (course.persisted? ? "Save Course" : "Create Course"), class: "px-4 py-2 bg-[#d42f46] text-white rounded-md text-sm hover:bg-[#b82840]" %>
+  </div>
+<% end %>

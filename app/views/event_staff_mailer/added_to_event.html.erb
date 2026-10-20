@@ -39,6 +39,14 @@
 
 <p><%= mail_button "Open #{@event_name}", @dashboard_url %></p>
 
+<% if @training_badges.any? %>
+  <p>
+    Before you work the event, you'll need to hold
+    <%= @training_badges.map { |badge| "<strong>#{ERB::Util.h(badge.name)}</strong>" }.to_sentence.html_safe %>.
+    You can do the training on Attend: <%= link_to @training_url, @training_url %>
+  </p>
+<% end %>
+
 <p>
   Everything in Attend is audit-logged, and staff often see participants' medical,
   travel, and safeguarding details — please only look at what you need for your role.

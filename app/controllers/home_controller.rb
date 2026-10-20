@@ -8,6 +8,8 @@ class HomeController < ApplicationController
       redirect_to admin_root_path
     elsif current_user.participant.present?
       redirect_to dashboard_path
+    elsif current_user.event_volunteers.exists? || current_user.training_course_invitations.exists?
+      redirect_to training_path
     end
   end
 

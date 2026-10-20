@@ -1,0 +1,46 @@
+<%= form_with model: question, url: (question.persisted? ? admin_training_course_lesson_question_path(course, lesson, question) : admin_training_course_lesson_questions_path(course, lesson)), class: "space-y-6" do |f| %>
+  <%= render "admin/training/errors", record: question %>
+  <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+    <div><%= f.label :prompt, "Question", class: "block text-sm font-medium text-gray-700" %><%= f.text_area :prompt, rows: 2, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+    <div><%= f.label :explanation, "Explanation (shown with the correct answer)", class: "block text-sm font-medium text-gray-700" %><%= f.text_area :explanation, rows: 3, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-4" data-controller="nested-form">
+    <h2 class="text-lg font-medium text-gray-900">Answers</h2>
+    <p class="text-sm text-gray-500">Tick every correct answer. The reason shows whenever a learner picks that answer.</p>
+    <div data-nested-form-target="container" class="space-y-3">
+      <% question.options.each_with_index do |option, index| %>
+        <%= f.fields_for :options, option do |of| %>
+          <div data-nested-form-target="item" class="border border-gray-200 rounded-md p-3 space-y-2 <%= "hidden" if of.object.marked_for_destruction? %>">
+            <div class="flex items-center gap-2">
+              <%= of.text_field :body, placeholder: "Answer #{index + 1}", class: "flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm", "aria-label": "Answer #{index + 1}" %>
+              <label class="inline-flex items-center gap-1 text-sm"><%= of.check_box :correct %> Correct</label>
+              <% if of.object.persisted? %><%= of.hidden_field :_destroy, data: { nested_form_target: "destroyField" } %><% end %>
+              <button type="button" data-action="nested-form#remove" class="text-sm text-red-600">Remove</button>
+            </div>
+            <%= of.text_area :explanation, rows: 2, placeholder: "Why this answer is right or wrong (optional)", class: "w-full border border-gray-300 rounded-md px-3 py-2 text-sm", "aria-label": "Reason for answer #{index + 1}" %>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+    <template data-nested-form-target="template">
+      <%= f.fields_for :options, TrainingQuestionOption.new, child_index: "NEW_RECORD" do |of| %>
+        <div data-nested-form-target="item" class="border border-gray-200 rounded-md p-3 space-y-2">
+          <div class="flex items-center gap-2">
+            <%= of.text_field :body, placeholder: "Another answer", class: "flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm", "aria-label": "Another answer" %>
+            <label class="inline-flex items-center gap-1 text-sm"><%= of.check_box :correct %> Correct</label>
+            <button type="button" data-action="nested-form#remove" class="text-sm text-red-600">Remove</button>
+          </div>
+          <%= of.text_area :explanation, rows: 2, placeholder: "Why this answer is right or wrong (optional)", class: "w-full border border-gray-300 rounded-md px-3 py-2 text-sm", "aria-label": "Reason for this answer" %>
+        </div>
+      <% end %>
+    </template>
+    <button type="button" data-action="nested-form#add" class="text-sm text-[#ec3750] hover:underline">Add another answer</button>
+  </div>
+  <div class="flex justify-between gap-2">
+    <div><% if question.persisted? %><%= link_to "Delete Question", admin_training_course_lesson_question_path(course, lesson, question), class: "px-4 py-2 text-sm text-red-600", data: { turbo_method: :delete, turbo_confirm: "Delete this question?" } %><% end %></div>
+    <div class="flex gap-2">
+      <%= link_to "Cancel", edit_admin_training_course_lesson_path(course, lesson, anchor: "quiz"), class: "px-4 py-2 text-sm text-gray-600" %>
+      <%= f.button (question.persisted? ? "Save Question" : "Add Question"), class: "px-4 py-2 bg-[#d42f46] text-white rounded-md text-sm hover:bg-[#b82840]" %>
+    </div>
+  </div>
+<% end %>

@@ -1,0 +1,16 @@
+<%# The signed-in staff member hasn't got the training their role on this
+    event requires. Sits at the top of every admin page for the event until
+    they do; it can't be dismissed, because the requirement can't be either. %>
+<% status = TrainingStatus.for_user_at_event(current_user, event) %>
+<% if status.missing.any? %>
+  <div class="cs-alert cs-alert-error mb-5" role="alert" data-testid="training-banner">
+    <%= cs_status_icon(:error) %>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+      <div>
+        <p class="cs-alert-title">Training needed</p>
+        <p>Your role on <%= event.name %> requires <%= status.missing.map(&:name).to_sentence %>.</p>
+      </div>
+      <%= link_to "Start training", training_path, class: "cs-btn self-start sm:self-auto whitespace-nowrap" %>
+    </div>
+  </div>
+<% end %>

@@ -76,6 +76,7 @@ class AuditLog < ApplicationRecord
     refresh_all: "refresh_all",
     revoke: "revoke",
     reinstate: "reinstate",
+    move: "move",
     rotate_api_token: "rotate",
     reorder_groups: "reorder",
     unassign: "unassign",

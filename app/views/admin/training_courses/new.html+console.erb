@@ -1,0 +1,5 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Training", admin_training_path ], [ "New course", nil ]) %>
+<div class="cs-stack">
+  <div class="cs-header"><div class="cs-header-text"><h1 class="cs-h1">New course</h1></div></div>
+  <%= render "form", course: @course %>
+</div>

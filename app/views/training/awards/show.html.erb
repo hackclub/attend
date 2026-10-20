@@ -1,0 +1,41 @@
+<% content_for :title, "#{@award.badge.name} – Attend" %>
+<% state = training_award_state(@award) %>
+
+<div class="w-full max-w-2xl mx-auto">
+  <%= link_to "← All training", training_path, class: "portal-link text-sm inline-block mb-6" %>
+
+  <div class="portal-card p-8 sm:p-10 text-center">
+    <div class="flex justify-center mb-5">
+      <%= render "training/badge_medallion", size: "size-20",
+            tone: { current: "success", expiring: "warn", expired: "neutral", revoked: "neutral" }.fetch(state) %>
+    </div>
+    <p class="portal-meta text-xs uppercase tracking-wide mb-2">Hack Club training badge</p>
+    <h1 class="portal-title text-2xl sm:text-3xl mb-2"><%= @award.badge.name %></h1>
+    <p class="portal-body mb-6">Held by <strong class="portal-heading"><%= @award.user.display_name_or_fallback %></strong></p>
+
+    <dl class="grid gap-4 sm:grid-cols-2 text-left portal-inset p-4 rounded-lg">
+      <div>
+        <dt class="portal-meta text-xs uppercase tracking-wide">Awarded</dt>
+        <dd class="portal-body"><%= @award.awarded_at.to_date.to_fs(:long) %></dd>
+      </div>
+      <div>
+        <dt class="portal-meta text-xs uppercase tracking-wide">Status</dt>
+        <dd class="portal-body"><%= training_award_state_label(@award) %></dd>
+      </div>
+      <div class="sm:col-span-2">
+        <dt class="portal-meta text-xs uppercase tracking-wide">How it was earned</dt>
+        <dd class="portal-body">
+          <% if @award.course %>
+            Completed <%= @award.course.title %>
+          <% else %>
+            Training recorded by Hack Club<%= ": #{@award.note}" if @award.note.present? %>
+          <% end %>
+        </dd>
+      </div>
+    </dl>
+
+    <% if @award.badge.description.present? %>
+      <p class="portal-hint text-sm mt-6"><%= @award.badge.description %></p>
+    <% end %>
+  </div>
+</div>

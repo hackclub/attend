@@ -176,6 +176,8 @@
     <% end %>
   </div>
 
+  <%= render "admin/users/training", user: @user, awards: @training_awards, enrollments: @training_enrollments %>
+
   <% if @event_role_assignments.any? %>
     <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
       <div class="px-6 py-4 border-b border-gray-200">

@@ -1,0 +1,55 @@
+<%# Who can take an invite-only course: people invited here by hand, plus
+    everyone whose role at an upcoming event needs the badge it awards. %>
+<section class="cs-container" id="invitations">
+  <div class="cs-container-header cs-container-header-divided">
+    <div>
+      <h2 class="cs-h2">Invitations <span class="cs-counter">(<%= invitations.size %>)</span></h2>
+      <p class="cs-container-description">
+        <% if course.access_open? %>
+          This course is open to anyone signed in, so invitations only send an email.
+        <% elsif course.badge&.required? %>
+          Staff and volunteers whose role at an upcoming event needs <%= course.badge.name %> (<%= course.badge.required_roles.map { |role| TrainingBadge.role_label(role) }.to_sentence %>) are invited automatically. Invite anyone else here.
+        <% else %>
+          Only the people invited here can take this course.
+        <% end %>
+      </p>
+    </div>
+  </div>
+  <div class="cs-container-body">
+    <%= form_with url: admin_training_course_invitations_path(course), method: :post, class: "flex flex-col sm:flex-row gap-2 sm:items-start" do %>
+      <%= text_area_tag :emails, nil, rows: 2, class: "cs-input flex-1", placeholder: "One or more email addresses, separated by commas or new lines", "aria-label": "Email addresses to invite" %>
+      <%= button_tag "Invite", class: "cs-btn cs-btn-full" %>
+    <% end %>
+  </div>
+  <% if invitations.any? %>
+    <div class="cs-table-wrap">
+      <table class="cs-table">
+        <thead>
+          <tr>
+            <th scope="col">Person</th>
+            <th scope="col">Invited</th>
+            <th scope="col"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% invitations.each do |invitation| %>
+            <tr>
+              <td>
+                <%= link_to invitation.user.display_name_or_fallback, admin_user_path(invitation.user), class: "cs-link" %>
+                <div class="cs-small cs-secondary"><%= invitation.user.email %></div>
+              </td>
+              <td class="whitespace-nowrap">
+                <%= cs_relative_time(invitation.created_at) %>
+                <% if invitation.invited_by %><span class="cs-secondary">by <%= invitation.invited_by.display_name_or_fallback %></span><% end %>
+              </td>
+              <td class="whitespace-nowrap text-right">
+                <%= button_to "Remove", admin_training_course_invitation_path(course, invitation), method: :delete, class: "cs-btn cs-btn-link",
+                      data: { turbo_confirm: "Remove #{invitation.user.email}'s invitation? They keep any progress and badge, but can't continue unless an event needs this course." } %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+</section>

@@ -1,0 +1,5 @@
+<%# Up/down reorder buttons. Locals: path (the record's move path), label, first, last %>
+<span class="inline-flex gap-1">
+  <%= button_to "↑", path, method: :patch, params: { direction: "up" }, class: "cs-btn cs-btn-link px-1!", disabled: first, "aria-label": "Move #{label} up" %>
+  <%= button_to "↓", path, method: :patch, params: { direction: "down" }, class: "cs-btn cs-btn-link px-1!", disabled: last, "aria-label": "Move #{label} down" %>
+</span>

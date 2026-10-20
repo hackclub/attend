@@ -186,6 +186,8 @@
     <% end %>
   </div>
 
+  <%= render "admin/users/training", user: @user, awards: @training_awards, enrollments: @training_enrollments %>
+
   <% if @event_role_assignments.any? %>
     <section class="cs-container">
       <div class="cs-container-header cs-container-header-divided">

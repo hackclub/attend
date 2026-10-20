@@ -164,6 +164,9 @@
           <% end %>
 
           <main class="cs-main" id="main" data-controller="cs-date-picker">
+            <% if current_event %>
+              <%= render "layouts/training_banner", event: current_event %>
+            <% end %>
             <%= yield %>
           </main>
         </div>

@@ -1,0 +1,5 @@
+<% case course.status %>
+<% when "published" %><%= cs_status(:success, "Published") %>
+<% when "archived" %><%= cs_status(:stopped, "Archived") %>
+<% else %><%= cs_status(:pending, "Draft") %>
+<% end %>

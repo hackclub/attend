@@ -99,6 +99,7 @@ class Event < ApplicationRecord
   has_many :participants, through: :participant_events
   has_many :event_role_assignments, dependent: :destroy
   has_many :staff_users, through: :event_role_assignments, source: :user
+  has_many :event_volunteers, dependent: :destroy
   has_many :incidents, dependent: :destroy
   has_many :notes, dependent: :destroy
   has_many :audit_logs, dependent: :delete_all

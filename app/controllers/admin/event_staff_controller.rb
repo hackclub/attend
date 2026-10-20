@@ -8,6 +8,8 @@ module Admin
       @event_role_assignments = current_event.event_role_assignments
         .includes(:user)
         .order("users.email")
+      @volunteers = current_event.event_volunteers.includes(:user).order("users.email")
+      @training_status = TrainingStatus.for_event(current_event)
     end
 
     def new
