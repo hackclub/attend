@@ -528,7 +528,7 @@ class ParticipantEvent < ApplicationRecord
   end
 
   def participant_not_banned
-    return unless participant && Ban.banned?(participant.email)
+    return unless participant && Ban.banned?(participant.email, slack_ids: Ban.slack_ids_for(participant) + [ slack_user_id ])
 
     errors.add(:base, "#{participant.email} is banned from events")
   end

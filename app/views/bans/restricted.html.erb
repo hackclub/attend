@@ -1,0 +1,19 @@
+<% content_for :title, "Access restricted – Attend" %>
+
+<div class="w-full max-w-2xl mx-auto">
+  <div class="portal-card p-6 sm:p-8 mb-6">
+    <span class="portal-medallion portal-medallion-danger mb-5">
+      <svg class="size-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636"/>
+      </svg>
+    </span>
+
+    <h1 class="portal-title text-2xl mb-3">You've been restricted from attending Hack Club events</h1>
+
+    <p class="portal-body text-lg max-w-prose">
+      Your account can't be used to register for or attend Hack Club events.
+      If you have questions or need more support, please reach out to
+      <%= mail_to "attend@hackclub.com", nil, class: "portal-link" %>.
+    </p>
+  </div>
+</div>

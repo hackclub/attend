@@ -4,7 +4,7 @@ module Admin
     before_action :set_ban, only: [ :show, :edit, :update, :destroy, :revoke, :reinstate ]
 
     def index
-      @bans = Ban.includes(:ban_emails, :created_by).order(created_at: :desc)
+      @bans = Ban.includes(:ban_emails, :ban_slack_ids, :created_by).order(created_at: :desc)
     end
 
     def show

@@ -38,7 +38,7 @@
             <% @bans.each do |ban| %>
               <tr>
                 <td>
-                  <div><%= ban.ban_emails.map(&:email).join(", ") %></div>
+                  <div><%= (ban.ban_emails.map(&:email) + ban.ban_slack_ids.map { "Slack #{_1.slack_id}" }).join(", ") %></div>
                   <% if ban.reason.present? %>
                     <div class="cs-small cs-muted truncate max-w-[280px]" title="<%= ban.reason %>"><%= ban.reason %></div>
                   <% end %>
@@ -56,7 +56,7 @@
                 <td class="whitespace-nowrap">
                   <%= ban.expires_at ? cs_absolute_time_tag(ban.expires_at) : "—" %>
                 </td>
-                <td class="whitespace-nowrap"><%= ban.created_by&.email || "—" %></td>
+                <td class="whitespace-nowrap"><%= ban.ucat? ? "UCAT sync" : (ban.created_by&.email || "—") %></td>
                 <td class="whitespace-nowrap text-right">
                   <%= link_to "View", admin_ban_path(ban), class: "cs-link" %>
                   <%= link_to "Edit", edit_admin_ban_path(ban), class: "cs-link ml-4" %>
