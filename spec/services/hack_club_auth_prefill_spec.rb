@@ -22,6 +22,13 @@ RSpec.describe HackClubAuthPrefill do
     )
   end
 
+  it "sends the preferred name as the first name when there is one" do
+    create(:participant, email: "invitee@example.com", legal_first_name: "Daniel", legal_last_name: "Lee",
+      preferred_name: "Dana")
+
+    expect(prefill_for(invitation.token)).to include(first_name: "Dana", last_name: "Lee")
+  end
+
   it "leaves out placeholder names and anything missing" do
     create(:participant, email: "invitee@example.com", legal_first_name: "Unknown", legal_last_name: "Unknown",
       date_of_birth: nil, phone: nil, country_of_residence: nil)

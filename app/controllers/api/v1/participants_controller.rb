@@ -348,6 +348,7 @@ module Api
       # [attributes, error].
       def invitee_details
         details = {}
+        details[:preferred_name] = params[:preferred_name].to_s.strip if params[:preferred_name].present?
         details[:date_of_birth] = Date.iso8601(params[:date_of_birth].to_s) if params[:date_of_birth].present?
         details[:phone] = params[:phone].to_s.strip if params[:phone].present?
 

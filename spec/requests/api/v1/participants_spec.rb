@@ -637,6 +637,14 @@ RSpec.describe "Api::V1::Participants", type: :request do
       )
     end
 
+    it "records a preferred name sent with the invitation" do
+      invite(email: "preferred@example.com", first_name: "Daniel", last_name: "Lee", preferred_name: "Dana")
+
+      expect(response).to have_http_status(:created)
+      participant = Participant.find(JSON.parse(response.body)["participant_id"])
+      expect(participant).to have_attributes(legal_first_name: "Daniel", preferred_name: "Dana")
+    end
+
     it "accepts a country by name" do
       invite(email: "named-country@example.com", country: "united kingdom")
 

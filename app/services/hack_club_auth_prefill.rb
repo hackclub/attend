@@ -29,7 +29,10 @@ class HackClubAuthPrefill
     {
       login_hint: @invitation.email,
       email: @invitation.email,
-      first_name: real_name(participant&.legal_first_name),
+      # HCA's first_name is the everyday name it greets people by; its own
+      # legal_first_name is a separate field. So send the preferred name when
+      # there is one, the way #display_name and #greeting_name pick it.
+      first_name: participant&.preferred_name.presence || real_name(participant&.legal_first_name),
       last_name: real_name(participant&.legal_last_name),
       birthday: participant&.date_of_birth&.iso8601,
       phone_number: participant&.phone.presence,
