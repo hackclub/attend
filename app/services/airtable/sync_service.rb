@@ -77,6 +77,16 @@ module Airtable
       end
     end
 
+    # --- Records API (events connected with OAuth) ---
+
+    def sync_via_records
+      rows = load_participant_events.to_h do |pe|
+        cells = SYNC_COLUMNS.zip(serialize_row(pe)).to_h { |column, value| [ column, value&.to_s ] }
+        [ pe.id, cells ]
+      end
+      RecordsSync.new(@event, @client).call(rows)
+    end
+
     # --- Legacy per-record push (used by PushRecordJob / resync button) ---
 
     def push_participant_event(participant_event)

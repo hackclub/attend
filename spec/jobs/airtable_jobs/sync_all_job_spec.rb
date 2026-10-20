@@ -192,6 +192,16 @@ RSpec.describe AirtableJobs::SyncAllJob do
       expect(broken.reload.airtable_sync_paused?).to be(true)
     end
 
+    it "records a rate limit without pausing, so the next run retries" do
+      throttled = configured_event
+      stub_sync(throttled, raising: Airtable::RateLimitError.new)
+
+      described_class.perform_now
+
+      expect(throttled.reload.airtable_sync_paused?).to be(false)
+      expect(throttled.airtable_sync_error).to be_present
+    end
+
     it "does not touch a healthy event's pause state" do
       healthy = configured_event
       stub_sync(healthy)

@@ -139,6 +139,10 @@ class Admin::DashboardController < Admin::BaseController
     @airtable_oauth_configured = Airtable::Oauth.new.configured?
     # Airtable only shows the bases ticked on its consent screen; the list is
     # empty when it couldn't be read at connect time, so don't guess then.
+    @airtable_base_options = Array(@airtable_connection&.bases).map { |base| [ "#{base['name']} (#{base['id']})", base["id"] ] }
+    if @airtable_base_options.any? && current_event.airtable_base_id.present? && @airtable_base_options.none? { |_, id| id == current_event.airtable_base_id }
+      @airtable_base_options.unshift([ current_event.airtable_base_id, current_event.airtable_base_id ])
+    end
     @airtable_base_not_granted = @airtable_connection.present? &&
       @airtable_connection.bases.any? &&
       current_event.airtable_base_id.present? &&

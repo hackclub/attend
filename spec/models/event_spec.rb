@@ -238,6 +238,25 @@ RSpec.describe Event, type: :model do
       expect(described_class.with_airtable_sync_active).not_to include(event)
     end
 
+    it "counts a connected event with just a base, since Attend creates its own table" do
+      event = create(:event, config: { "airtable_base_id" => "app-test" })
+      event.create_airtable_connection!(access_token: "fictional", refresh_token: "fictional",
+        access_token_expires_at: 1.hour.from_now, refresh_token_expires_at: 60.days.from_now)
+
+      expect(event.reload).to be_airtable_sync_configured
+      expect(described_class.with_airtable_sync_configured).to include(event)
+    end
+
+    it "forgets Attend's table when a connected event moves to another base" do
+      event = create(:event, airtable_sync_table_id: "tblOurs", config: { "airtable_base_id" => "app-old" })
+      event.create_airtable_connection!(access_token: "fictional", refresh_token: "fictional",
+        access_token_expires_at: 1.hour.from_now, refresh_token_expires_at: 60.days.from_now)
+
+      event.update!(airtable_base_id: "app-new")
+
+      expect(event.reload.airtable_sync_table_id).to be_nil
+    end
+
     it "matches the record-level #airtable_sync_configured? for every event" do
       configured_event
       create(:event)

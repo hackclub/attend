@@ -7,8 +7,13 @@ module AirtableJobs
     # Client#initialize), and an unrescued error kills the run for every event
     # after it while recording nothing on the one that broke.
     def perform
-      Event.with_airtable_sync_active.find_each do |event|
+      Event.with_airtable_sync_active.includes(:airtable_connection).find_each do |event|
         sync_event(event)
+      rescue Airtable::RateLimitError => e
+        # Airtable throttling the base isn't broken config; the next run in 5
+        # minutes retries, so record it without pausing.
+        Rails.logger.warn("[AirtableSyncAll] Rate limited on event #{event.id}")
+        event.update_columns(airtable_sync_error: e.message, airtable_sync_error_at: Time.current)
       rescue StandardError => e
         handle_failure(event, e)
       end
@@ -18,7 +23,11 @@ module AirtableJobs
 
     def sync_event(event)
       service = Airtable::SyncService.new(event)
-      service.sync_via_api(event.airtable_sync_table_id, event.airtable_sync_source_id)
+      if event.airtable_sync_via_records?
+        service.sync_via_records
+      else
+        service.sync_via_api(event.airtable_sync_table_id, event.airtable_sync_source_id)
+      end
       event.update_columns(airtable_synced_at: Time.current, airtable_sync_error: nil, airtable_sync_error_at: nil)
     end
 

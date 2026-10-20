@@ -155,7 +155,7 @@
         </div>
         <div>
           <h2 class="font-semibold text-gray-900">Airtable Sync</h2>
-          <p class="text-sm text-gray-500">Read-only mirror of participant data via the Sync API</p>
+          <p class="text-sm text-gray-500">Mirror of participant data in an Airtable table</p>
         </div>
         <% if @airtable_sync_paused %>
           <span class="ml-auto inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
@@ -211,26 +211,45 @@
           </p>
         <% end %>
 
-        <div>
-          <%= f.label :airtable_sync_endpoint_url, "Sync Endpoint URL", class: "block text-sm font-medium text-gray-700 mb-1" %>
-          <%= f.text_field :airtable_sync_endpoint_url,
-              class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm",
-              autocomplete: "off", spellcheck: false,
-              placeholder: "https://api.airtable.com/v0/app.../tbl.../sync/..." %>
-          <p class="text-xs text-gray-500 mt-1">In Airtable, add a synced table from the Sync API and copy its endpoint URL</p>
-        </div>
-
-        <% unless @airtable_connection %>
-          <details <%= "open" if current_event.airtable_api_key.present? %>>
+        <% if @airtable_connection %>
+          <div>
+            <%= f.label :airtable_base_id, "Base", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <% if @airtable_base_options.any? %>
+              <%= f.select :airtable_base_id, @airtable_base_options, { include_blank: "Choose a base" },
+                  class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm" %>
+            <% else %>
+              <%= f.text_field :airtable_base_id, class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm", placeholder: "app...", autocomplete: "off" %>
+            <% end %>
+            <p class="text-xs text-gray-500 mt-1">Only bases you selected on Airtable's consent screen are listed. Reconnect to add more.</p>
+          </div>
+          <p class="text-sm text-gray-600">
+            Attend keeps a table called <strong><%= Airtable::RecordsSync::TABLE_NAME %></strong> in this base up to date, creating it on the first sync.
+            Columns you add are left alone; edits to Attend's columns are overwritten on the next sync.
+            <% if current_event.airtable_base_id.present? && current_event.airtable_sync_table_id.present? %>
+              <%= link_to "Open in Airtable", "https://airtable.com/#{current_event.airtable_base_id}/#{current_event.airtable_sync_table_id}", target: "_blank", rel: "noopener", class: "text-yellow-700 underline" %>
+            <% end %>
+          </p>
+        <% else %>
+          <details <%= "open" if current_event.airtable_api_key.present? || current_event.errors.include?(:airtable_sync_endpoint_url) %>>
             <summary class="text-sm font-medium text-gray-700 cursor-pointer">Advanced: use a personal access token instead</summary>
-            <div class="mt-3">
-              <%= f.label :airtable_api_key, "Personal Access Token", class: "block text-sm font-medium text-gray-700 mb-1" %>
-              <%= f.password_field :airtable_api_key,
-                  value: nil,
-                  class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm",
-                  autocomplete: "off",
-                  placeholder: current_event.airtable_api_key.present? ? "Saved, hidden" : "pat..." %>
-              <p class="text-xs text-gray-500 mt-1">Requires <code>data.records:write</code> and <code>schema.bases:write</code> scopes. Leave blank to keep the saved token.</p>
+            <div class="mt-3 space-y-4">
+              <div>
+                <%= f.label :airtable_api_key, "Personal Access Token", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.password_field :airtable_api_key,
+                    value: nil,
+                    class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm",
+                    autocomplete: "off",
+                    placeholder: current_event.airtable_api_key.present? ? "Saved, hidden" : "pat..." %>
+                <p class="text-xs text-gray-500 mt-1">Requires <code>data.records:write</code> and <code>schema.bases:write</code> scopes. Leave blank to keep the saved token.</p>
+              </div>
+              <div>
+                <%= f.label :airtable_sync_endpoint_url, "Sync Endpoint URL", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :airtable_sync_endpoint_url,
+                    class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm",
+                    autocomplete: "off", spellcheck: false,
+                    placeholder: "https://api.airtable.com/v0/app.../tbl.../sync/..." %>
+                <p class="text-xs text-gray-500 mt-1">A token syncs through Airtable's Sync API. Add a synced table from the Sync API and copy its endpoint URL.</p>
+              </div>
             </div>
           </details>
         <% end %>
@@ -275,8 +294,12 @@
                     </p>
                     <p class="text-sm text-red-600">
                       <% unless @airtable_synced_at %>If you just saved these settings, a sync is already running — refresh in a minute. Otherwise, <% end %>
-                      Airtable is showing stale data — check that the sync endpoint above still exists in
-                      Airtable and that the connected account can see that base.
+                      <% if @airtable_connection %>
+                        Airtable is showing stale data — check that the connected account can still see the base above.
+                      <% else %>
+                        Airtable is showing stale data — check that the sync endpoint above still exists in
+                        Airtable and that the token can see that base.
+                      <% end %>
                     </p>
                   <% else %>
                     <p class="text-sm text-gray-600">

@@ -73,6 +73,9 @@ class Event < ApplicationRecord
 
   validate :airtable_sync_endpoint_url_parses
 
+  # Attend's table lives in one base; a new base means a new table.
+  before_save :forget_airtable_table, if: -> { airtable_connection.present? && airtable_base_id_changed? }
+
   def airtable_base_id=(value)
     super(value.is_a?(String) ? value.strip.presence : value)
   end
@@ -459,11 +462,20 @@ class Event < ApplicationRecord
     ActiveModel::Type::Boolean.new.cast(groups_enabled)
   end
 
+  # A connected event only needs a base: Attend creates its own table there
+  # (Airtable::RecordsSync). A pasted token drives the Sync API, which needs
+  # the synced table and its sync source too.
   def airtable_sync_configured?
-    (airtable_connection.present? || airtable_api_key.present?) &&
+    return airtable_base_id.present? if airtable_connection.present?
+
+    airtable_api_key.present? &&
       airtable_base_id.present? &&
       airtable_sync_source_id.present? &&
       airtable_sync_table_id.present?
+  end
+
+  def airtable_sync_via_records?
+    airtable_connection.present?
   end
 
   # The SQL counterpart of #airtable_sync_configured?, for the scheduled sync.
@@ -475,10 +487,15 @@ class Event < ApplicationRecord
   # integrations form was ever saved blank). Those events then reach
   # Airtable::Client, which raises on the blank key, once per event per run.
   scope :with_airtable_sync_configured, -> {
-    where("NULLIF(BTRIM(events.airtable_sync_source_id), '') IS NOT NULL")
-      .where("NULLIF(BTRIM(events.airtable_sync_table_id), '') IS NOT NULL")
-      .where("events.airtable_api_key IS NOT NULL OR EXISTS (SELECT 1 FROM airtable_connections WHERE airtable_connections.event_id = events.id)")
-      .where("NULLIF(BTRIM(events.config ->> 'airtable_base_id'), '') IS NOT NULL")
+    where("NULLIF(BTRIM(events.config ->> 'airtable_base_id'), '') IS NOT NULL")
+      .where(<<~SQL.squish)
+        EXISTS (SELECT 1 FROM airtable_connections WHERE airtable_connections.event_id = events.id)
+        OR (
+          events.airtable_api_key IS NOT NULL
+          AND NULLIF(BTRIM(events.airtable_sync_source_id), '') IS NOT NULL
+          AND NULLIF(BTRIM(events.airtable_sync_table_id), '') IS NOT NULL
+        )
+      SQL
   }
 
   scope :with_airtable_sync_active, -> {
@@ -643,6 +660,10 @@ class Event < ApplicationRecord
 
   def assign_default_docuseal_host
     self.docuseal_host = Docuseal::HostConfig.default_host
+  end
+
+  def forget_airtable_table
+    self.airtable_sync_table_id = nil
   end
 
   def airtable_sync_endpoint_url_parses

@@ -122,7 +122,7 @@
       <div class="cs-container-header">
         <div>
           <h2 class="cs-h2">Airtable sync</h2>
-          <p class="cs-container-description">Read-only mirror of participant data via the Sync API</p>
+          <p class="cs-container-description">Mirror of participant data in an Airtable table</p>
         </div>
         <div class="cs-actions">
           <% if @airtable_sync_paused %>
@@ -176,18 +176,33 @@
           </div>
         <% end %>
 
-        <%= cs_form_field f, :airtable_sync_endpoint_url, label: "Sync endpoint URL", optional: true,
-              constraint: safe_join([ "In Airtable, add a synced table from the Sync API and copy its endpoint URL: https://api.airtable.com/v0/", content_tag(:strong, "app…"), "/", content_tag(:strong, "tbl…"), "/sync/…" ]) do |aria| %>
-          <%= f.text_field :airtable_sync_endpoint_url, class: "cs-input font-mono", autocomplete: "off", spellcheck: false, **aria %>
-        <% end %>
-
-        <% unless @airtable_connection %>
-          <details class="cs-expandable" <%= "open" if current_event.airtable_api_key.present? || current_event.errors.include?(:airtable_api_key) %>>
+        <% if @airtable_connection %>
+          <%= cs_form_field f, :airtable_base_id, label: "Base",
+                constraint: "Only bases you selected on Airtable's consent screen are listed. Reconnect to add more." do |aria| %>
+            <% if @airtable_base_options.any? %>
+              <%= f.select :airtable_base_id, @airtable_base_options, { include_blank: "Choose a base" }, class: "cs-select", **aria %>
+            <% else %>
+              <%= f.text_field :airtable_base_id, class: "cs-input font-mono", placeholder: "app…", autocomplete: "off", **aria %>
+            <% end %>
+          <% end %>
+          <p class="cs-secondary cs-small">
+            Attend keeps a table called <strong><%= Airtable::RecordsSync::TABLE_NAME %></strong> in this base up to date, creating it on the first sync.
+            Columns you add are left alone; edits to Attend's columns are overwritten on the next sync.
+            <% if current_event.airtable_base_id.present? && current_event.airtable_sync_table_id.present? %>
+              <%= link_to "Open in Airtable", "https://airtable.com/#{current_event.airtable_base_id}/#{current_event.airtable_sync_table_id}", target: "_blank", rel: "noopener", class: "cs-link" %>
+            <% end %>
+          </p>
+        <% else %>
+          <details class="cs-expandable" <%= "open" if current_event.airtable_api_key.present? || current_event.errors.include?(:airtable_api_key) || current_event.errors.include?(:airtable_sync_endpoint_url) %>>
             <summary>Advanced: use a personal access token instead</summary>
-            <div class="cs-expandable-content">
+            <div class="cs-expandable-content cs-stack">
               <%= cs_form_field f, :airtable_api_key, label: "Personal access token", optional: true,
                     constraint: safe_join([ "Needs the ", content_tag(:code, "data.records:write"), " and ", content_tag(:code, "schema.bases:write"), " scopes. Leave blank to keep the saved token." ]) do |aria| %>
                 <%= f.password_field :airtable_api_key, value: nil, placeholder: (current_event.airtable_api_key.present? ? "Saved, hidden" : "pat…"), class: "cs-input font-mono", autocomplete: "off", **aria %>
+              <% end %>
+              <%= cs_form_field f, :airtable_sync_endpoint_url, label: "Sync endpoint URL", optional: true,
+                    constraint: safe_join([ "A token syncs through Airtable's Sync API. Add a synced table from the Sync API and copy its endpoint URL: https://api.airtable.com/v0/", content_tag(:strong, "app…"), "/", content_tag(:strong, "tbl…"), "/sync/…" ]) do |aria| %>
+                <%= f.text_field :airtable_sync_endpoint_url, class: "cs-input font-mono", autocomplete: "off", spellcheck: false, **aria %>
               <% end %>
             </div>
           </details>
@@ -242,8 +257,12 @@
                   </p>
                   <p>
                     <% unless @airtable_synced_at %>If you just saved these settings, a sync is already running — refresh in a minute. Otherwise, <% end %>
-                    Airtable is showing stale data — check that the sync endpoint above still exists in
-                    Airtable and that the connected account can see that base.
+                    <% if @airtable_connection %>
+                      Airtable is showing stale data — check that the connected account can still see the base above.
+                    <% else %>
+                      Airtable is showing stale data — check that the sync endpoint above still exists in
+                      Airtable and that the token can see that base.
+                    <% end %>
                   </p>
                 </div>
               </div>

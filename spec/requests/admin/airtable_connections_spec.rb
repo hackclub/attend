@@ -78,6 +78,10 @@ RSpec.describe "Admin::AirtableConnections", type: :request do
       expect(connection.base_granted?("appTest")).to be(true)
       expect(connection.connected_by).to eq(admin)
       expect(event.airtable_api_key).to be_nil
+      # The old Sync API table can't take records-API writes.
+      expect(event.airtable_sync_source_id).to be_nil
+      expect(event.airtable_sync_table_id).to be_nil
+      expect(event.airtable_base_id).to eq("appTest")
       expect(event.airtable_sync_paused?).to be(false)
       expect(event.airtable_config_updated_by).to eq(admin)
       expect(flash[:notice]).to eq("Airtable connected as organiser@example.com. Sync started.")
@@ -87,17 +91,38 @@ RSpec.describe "Admin::AirtableConnections", type: :request do
       expect(log.changed_fields.to_s).not_to include("fictional-access")
     end
 
-    it "sends the sync through the connection's token" do
+    it "syncs through the records API with the connection's token" do
       stub_airtable
       state = start_connect["state"]
       get admin_airtable_oauth_callback_path, params: { code: "fictional-code", state: state }
-      sync = stub_request(:post, "https://api.airtable.com/v0/appTest/tblTest/sync/sncTest")
-        .with(headers: { "Authorization" => "Bearer fictional-access" })
-        .to_return(status: 200, body: { success: true }.to_json)
+      create(:participant_event, event: event)
+      allow_any_instance_of(Airtable::RecordsSync).to receive(:sleep)
+      auth = { "Authorization" => "Bearer fictional-access" }
+      stub_request(:get, "https://api.airtable.com/v0/meta/bases/appTest/tables").with(headers: auth)
+        .to_return(status: 200, body: { tables: [] }.to_json)
+      stub_request(:post, "https://api.airtable.com/v0/meta/bases/appTest/tables").with(headers: auth)
+        .to_return(status: 200, body: { id: "tblOurs", name: "Attend Participants",
+          fields: Airtable::SyncService::SYNC_COLUMNS.map { |c| { name: c } } }.to_json)
+      stub_request(:get, %r{/v0/appTest/tblOurs}).with(headers: auth).to_return(status: 200, body: { records: [] }.to_json)
+      upsert = stub_request(:patch, "https://api.airtable.com/v0/appTest/tblOurs").with(headers: auth)
+        .to_return(status: 200, body: { records: [] }.to_json)
 
       AirtableJobs::SyncAllJob.perform_now
 
-      expect(sync).to have_been_requested
+      expect(upsert).to have_been_requested
+      expect(event.reload.airtable_synced_at).to be_present
+      expect(event.airtable_sync_paused?).to be(false)
+    end
+
+    it "picks the base automatically when only one was granted" do
+      stub_airtable
+      event.update!(airtable_sync_endpoint_url: "")
+      state = start_connect["state"]
+
+      get admin_airtable_oauth_callback_path, params: { code: "fictional-code", state: state }
+
+      expect(event.reload.airtable_base_id).to eq("appTest")
+      expect(event.airtable_sync_configured?).to be(true)
     end
 
     it "rejects a callback whose state doesn't match" do

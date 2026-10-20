@@ -26,6 +26,13 @@ namespace :airtable do
   # For an OAuth connection this may refresh the access token, as a sync would.
   def probe(event)
     client = Airtable::Client.for_event(event)
+    if event.airtable_sync_via_records?
+      # Attend creates its own table on first sync, so check the base.
+      tables = client.list_tables.fetch("tables", [])
+      ours = tables.find { |t| t["id"] == event.airtable_sync_table_id || t["name"] == Airtable::RecordsSync::TABLE_NAME }
+      return "base reads OK — #{ours ? "Attend's table is #{ours['id']}" : 'no Attend table yet (the next sync creates it)'}"
+    end
+
     client.list_records(event.airtable_sync_table_id, max_records: 1)
     "table reads OK — token, base and table all resolve"
   rescue Airtable::AuthenticationError => e
