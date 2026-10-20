@@ -2012,9 +2012,13 @@
 
   .cs-tiles { display: flex; flex-direction: column; gap: 12px; }
 
-  li > .cs-status, dd > .cs-status { white-space: normal; align-items: flex-start; }
+  /* Status chips stay on one line in tables, but inside key-value and list
+   * layouts the column can be narrower than the label (e.g. "Awaiting
+   * Participant" in a 4-up grid with a vertical tab bar eating the width),
+   * so let them wrap instead of overflowing into the next column. */
+  li > .cs-status, dt > .cs-status, dd > .cs-status { white-space: normal; align-items: flex-start; }
 
-  li > .cs-status svg, dd > .cs-status svg { margin-top: 2px; }
+  li > .cs-status svg, dt > .cs-status svg, dd > .cs-status svg { margin-top: 2px; }
 
   .cs-field-description { margin: -2px 0 6px; font-size: 12px; line-height: 16px; color: var(--cs-text-muted); }
 
