@@ -38,7 +38,8 @@ module Training
     # finished, so the page can say what's required and by when.
     def upcoming_requirements
       event_ids = current_user.event_role_assignments.pluck(:event_id) + current_user.event_volunteers.pluck(:event_id)
-      events = Event.where(id: event_ids.uniq)
+      series_ids = current_user.series_role_assignments.select(:event_series_id)
+      events = Event.where(id: event_ids.uniq).or(Event.where(event_series_id: series_ids))
         .where("events.ends_at IS NULL OR events.ends_at >= ?", Time.current)
         .order(:starts_at)
 

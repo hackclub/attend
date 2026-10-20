@@ -34,4 +34,20 @@ RSpec.describe TrainingAccess do
     user.update!(global_role: "global_admin")
     expect(access.reason(course)).to eq(:admin)
   end
+
+  it "counts series owners and organizers as event admins on upcoming events in their series" do
+    badge.update!(required_roles: %w[event_admin])
+    series = create(:event_series)
+    series_event = create(:event, event_series: series, starts_at: 1.week.from_now, ends_at: 8.days.from_now)
+    SeriesRoleAssignment.create!(user: user, event_series: series, role: "owner")
+
+    expect(access.reason(course)).to eq(:event)
+    expect(access.events_for(course)).to eq([ series_event ])
+  end
+
+  it "counts any role at all for a badge required of everyone" do
+    badge.update!(required_roles: [ TrainingBadge::EVERYONE ])
+    create(:event_role_assignment, event: upcoming, user: user, role: "read_only")
+    expect(access.reason(course)).to eq(:event)
+  end
 end

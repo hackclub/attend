@@ -35,7 +35,7 @@ class TrainingAccess
     return [] if course.badge.nil?
 
     current_roles_by_event.filter_map do |event, roles|
-      event if (course.badge.required_roles & roles).any?
+      event if course.badge.required_for?(roles)
     end
   end
 
@@ -48,17 +48,20 @@ class TrainingAccess
   def event_badge_ids
     @event_badge_ids ||= begin
       roles = current_roles_by_event.values.flatten.uniq
-      roles.empty? ? Set.new : TrainingBadge.where("required_roles && ARRAY[?]::varchar[]", roles).pluck(:id).to_set
+      roles.empty? ? Set.new : TrainingBadge.required_of_any(roles).pluck(:id).to_set
     end
   end
 
-  # { event => [role, ...] } for events that haven't finished.
+  # { event => [role, ...] } for events that haven't finished. Series owners
+  # and organizers count as event admins on every event in their series.
   def current_roles_by_event
     @current_roles_by_event ||= begin
       live = Event.where("events.ends_at IS NULL OR events.ends_at >= ?", @now)
       roles = Hash.new { |hash, key| hash[key] = [] }
       @user.event_role_assignments.joins(:event).merge(live).includes(:event).each { |a| roles[a.event] << a.role }
       @user.event_volunteers.joins(:event).merge(live).includes(:event).each { |v| roles[v.event] << "volunteer" }
+      series_ids = @user.series_role_assignments.select(:event_series_id)
+      live.where(event_series_id: series_ids).each { |event| roles[event] |= [ "event_admin" ] }
       roles
     end
   end

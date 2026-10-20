@@ -33,12 +33,19 @@
       <%= hidden_field_tag "training_badge[required_roles][]", "" %>
       <% cs_claim_errors(badge, :required_roles) %>
       <div class="space-y-3">
+        <div class="cs-option">
+          <%= check_box_tag "training_badge[required_roles][]", TrainingBadge::EVERYONE, badge.required_of_everyone?, id: "required_role_everyone" %>
+          <div>
+            <label for="required_role_everyone" class="cs-option-label">Everyone working an event</label>
+            <p class="cs-option-description">Every event role, volunteers, and series owners and organizers — including any role added later. Overrides the choices below.</p>
+          </div>
+        </div>
         <% TrainingBadge::REQUIRABLE_ROLES.each do |role| %>
           <div class="cs-option">
             <%= check_box_tag "training_badge[required_roles][]", role, badge.required_roles.include?(role), id: "required_role_#{role}" %>
             <div>
               <label for="required_role_<%= role %>" class="cs-option-label"><%= TrainingBadge.role_label(role) %></label>
-              <p class="cs-option-description"><%= role == "volunteer" ? "Works the event without access to Attend." : EventRoleAssignment::ROLE_DETAILS.dig(role, :summary) %></p>
+              <p class="cs-option-description"><%= role == "volunteer" ? "Works the event without access to Attend." : EventRoleAssignment::ROLE_DETAILS.dig(role, :summary) %><%= " Series owners and organizers count as event admins." if role == "event_admin" %></p>
             </div>
           </div>
         <% end %>

@@ -61,6 +61,38 @@
     <% end %>
   </section>
 
+  <% if @series_team.any? %>
+    <section class="cs-container" id="series-team">
+      <div class="cs-container-header cs-container-header-divided">
+        <div>
+          <h2 class="cs-h2">Series team <span class="cs-counter">(<%= @series_team.size %>)</span></h2>
+          <p class="cs-container-description">Owners and organizers of <%= current_event.event_series.name %>, who act as event admins here. Manage them from the series members page.</p>
+        </div>
+      </div>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Person</th>
+              <th scope="col">Training</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @series_team.each do |user| %>
+              <tr>
+                <td class="whitespace-nowrap">
+                  <div><%= user.display_name_or_fallback %></div>
+                  <div class="cs-small cs-secondary"><%= user.email %></div>
+                </td>
+                <td class="whitespace-nowrap"><%= training_status_flag(@training_status.for(user.id)) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% end %>
+
   <section class="cs-container" id="volunteers">
     <div class="cs-container-header cs-container-header-divided">
       <div>

@@ -76,6 +76,28 @@
     <% end %>
   </div>
 
+  <% if @series_team.any? %>
+    <div id="series-team" class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-900">Series Team (<%= @series_team.size %>)</h2>
+        <p class="text-sm text-gray-500">Owners and organizers of <%= current_event.event_series.name %>, who act as event admins here.</p>
+      </div>
+      <table class="min-w-full divide-y divide-gray-100">
+        <tbody class="bg-white divide-y divide-gray-100">
+          <% @series_team.each do |user| %>
+            <tr>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900"><%= user.display_name_or_fallback %></div>
+                <div class="text-sm text-gray-500"><%= user.email %></div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap"><%= training_status_flag(@training_status.for(user.id)) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+
   <div id="volunteers" class="bg-white border border-gray-200 rounded-lg overflow-hidden">
     <div class="px-6 py-4 border-b border-gray-100">
       <h2 class="text-lg font-semibold text-gray-900">Volunteers (<%= @volunteers.size %>)</h2>

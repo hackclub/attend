@@ -27,18 +27,28 @@ class TrainingStatus
 
   NOT_REQUIRED = Result.new(required: [], missing: [], lapsed: [], expiring: [], awards: [])
 
-  # Staff by their event roles, and volunteers as "volunteer".
+  # Staff by their event roles, volunteers as "volunteer", and the event's
+  # series owners and organizers as "event_admin" — they act as event admins
+  # on every event in the series without a role on each.
   def self.for_event(event)
     roles = Hash.new { |hash, key| hash[key] = [] }
     event.event_role_assignments.pluck(:user_id, :role).each { |user_id, role| roles[user_id] << role }
     event.event_volunteers.pluck(:user_id).each { |user_id| roles[user_id] << "volunteer" }
+    series_member_ids(event).each { |user_id| roles[user_id] |= [ "event_admin" ] }
     new(roles)
   end
 
   def self.for_user_at_event(user, event)
     roles = user.event_role_assignments.where(event: event).pluck(:role)
     roles << "volunteer" if event.event_volunteers.exists?(user: user)
+    roles |= [ "event_admin" ] if user.series_member_for_event?(event)
     new({ user.id => roles }).for(user)
+  end
+
+  def self.series_member_ids(event)
+    return [] if event.event_series_id.blank?
+
+    SeriesRoleAssignment.where(event_series_id: event.event_series_id).pluck(:user_id)
   end
 
   # roles_by_user_id: { user_id => [role, ...] }
@@ -65,14 +75,14 @@ class TrainingStatus
   def results
     @results ||= begin
       all_roles = @roles_by_user_id.values.flatten.uniq
-      badges = all_roles.empty? ? [] : TrainingBadge.where("required_roles && ARRAY[?]::varchar[]", all_roles).ordered.to_a
+      badges = all_roles.empty? ? [] : TrainingBadge.required_of_any(all_roles).ordered.to_a
       awards = badges.empty? ? [] : TrainingBadgeAward.unrevoked.includes(:badge)
         .where(user_id: @roles_by_user_id.keys, training_badge_id: badges.map(&:id))
         .order(:expires_at).to_a
       awards_by_user = awards.group_by(&:user_id)
 
       @roles_by_user_id.to_h do |user_id, roles|
-        required = badges.select { |badge| (badge.required_roles & roles).any? }
+        required = badges.select { |badge| badge.required_for?(roles) }
         held = awards_by_user.fetch(user_id, [])
         current = required.filter_map { |badge| best_award(held, badge) { |award| award.current?(@now) } }
         missing = required.reject { |badge| current.any? { |award| award.training_badge_id == badge.id } }

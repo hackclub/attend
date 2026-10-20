@@ -54,4 +54,23 @@ RSpec.describe "Event staff training flags", type: :request do
     get admin_event_dashboard_path(event.slug)
     expect(response.body).to include('data-testid="training-banner"')
   end
+
+  it "lists the series team with their training, without a role on the event" do
+    series = create(:event_series)
+    event.update!(event_series: series)
+    organizer = create(:user, name: "Example Organizer", email: "series-organizer@example.com")
+    SeriesRoleAssignment.create!(user: organizer, event_series: series, role: "organizer")
+    badge.update!(required_roles: %w[event_admin])
+
+    get admin_event_staff_index_path(event_slug: event.slug)
+    expect(response.body).to include("Series team", "series-organizer@example.com", "Not trained")
+  end
+
+  it "saves a badge required of everyone working an event" do
+    patch admin_training_badge_path(badge), params: { training_badge: { required_roles: [ "", TrainingBadge::EVERYONE ] } }
+    expect(badge.reload).to be_required_of_everyone
+
+    get admin_training_badge_path(badge)
+    expect(response.body).to include("Everyone working an event")
+  end
 end

@@ -4,8 +4,13 @@ class TrainingBadge < ApplicationRecord
   has_paper_trail
 
   # Who can be required to hold a badge: every event role, plus volunteers,
-  # who are on an event's roster without a role (see EventVolunteer).
+  # who are on an event's roster without a role (see EventVolunteer). Series
+  # owners and organizers act as event admins, so they count as event_admin.
   REQUIRABLE_ROLES = (EventRoleAssignment.roles.keys + [ "volunteer" ]).freeze
+
+  # Required of anyone working an event, whatever their role — including
+  # roles added after the badge was set up.
+  EVERYONE = "everyone".freeze
 
   # How far ahead of expiry a badge starts showing as due for renewal.
   RENEWAL_WINDOW = 30.days
@@ -26,18 +31,37 @@ class TrainingBadge < ApplicationRecord
   validate :required_roles_are_known
 
   before_validation :generate_slug, if: -> { slug.blank? && name.present? }
-  before_validation { self.required_roles = Array(required_roles).compact_blank.uniq }
+  before_validation do
+    roles = Array(required_roles).compact_blank.uniq
+    self.required_roles = roles.include?(EVERYONE) ? [ EVERYONE ] : roles
+  end
 
   scope :ordered, -> { order(:position, :name) }
-  scope :required_for, ->(role) { where("? = ANY(required_roles)", role.to_s) }
+  scope :required_for, ->(role) { required_of_any([ role ]) }
   scope :required, -> { where("cardinality(required_roles) > 0") }
+  # Badges at least one of these roles needs.
+  scope :required_of_any, ->(roles) { where("required_roles && ARRAY[?]::varchar[]", roles.map(&:to_s) + [ EVERYONE ]) }
 
   def self.role_label(role)
-    role.to_s == "volunteer" ? "Volunteer" : EventRoleAssignment::ROLE_DETAILS.dig(role.to_s, :label) || role.to_s.titleize
+    case role.to_s
+    when EVERYONE then "Everyone working an event"
+    when "volunteer" then "Volunteer"
+    else EventRoleAssignment::ROLE_DETAILS.dig(role.to_s, :label) || role.to_s.titleize
+    end
   end
 
   def required?
     required_roles.any?
+  end
+
+  def required_of_everyone?
+    required_roles.include?(EVERYONE)
+  end
+
+  # Whether someone holding these roles at an event must hold this badge.
+  def required_for?(roles)
+    roles = Array(roles).map(&:to_s)
+    roles.any? && (required_of_everyone? || (required_roles & roles).any?)
   end
 
   def expires?
@@ -56,7 +80,7 @@ class TrainingBadge < ApplicationRecord
   end
 
   def required_roles_are_known
-    unknown = required_roles - REQUIRABLE_ROLES
+    unknown = required_roles - REQUIRABLE_ROLES - [ EVERYONE ]
     errors.add(:required_roles, "includes an unknown role: #{unknown.join(", ")}") if unknown.any?
   end
 end
