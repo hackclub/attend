@@ -1,0 +1,53 @@
+<% content_for :title, "Register for #{current_event.name} - Attend" %>
+<% participant = @participant_event.participant %>
+<% first_name = participant.preferred_name.presence || (participant.legal_first_name unless Participant.name_placeholder?(participant.legal_first_name)) %>
+<% step_copy = {
+     "profile" => "Confirm your details and your t-shirt size, and add a clear photo of your face for check-in.",
+     "travel" => "Tell us how you're getting there and back.",
+     "accommodation" => "Share your rooming preferences.",
+     "health" => "Let us know about food, allergies, and anything that helps you have a great time.",
+     "guardian" => "Add your parent or guardian. They'll get their own invite to finish their part.",
+     "emergency" => "Add someone we can reach in an emergency.",
+     "documents" => "Sign the event documents.",
+     "review" => "Check everything over and submit."
+   } %>
+
+<div class="w-full max-w-2xl mx-auto">
+  <%= image_tag "haven/haven-logo-color.webp", alt: "Hack Club Haven", class: "mx-auto mb-6 w-40 sm:w-48 h-auto" %>
+
+  <%= render "shared/haven/event_card", event: current_event %>
+
+  <header class="mt-8 mb-6">
+    <h1 class="portal-title text-3xl sm:text-4xl"><%= first_name ? "Hey #{first_name}!" : "Hey there!" %></h1>
+    <p class="portal-body mt-3 flex items-center gap-2">
+      <svg class="size-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+      </svg>
+      This should take about 5 minutes.
+    </p>
+    <p class="portal-hint mt-2">We'll walk you through a few steps to get you ready for <%= current_event.name %>.</p>
+  </header>
+
+  <ol class="space-y-3">
+    <% @steps.each_with_index do |step, index| %>
+      <% next unless step_copy[step] %>
+      <li class="haven-bullet-card">
+        <span class="portal-step-marker shrink-0" aria-hidden="true"><%= index + 1 %></span>
+        <span>
+          <span class="block portal-heading"><%= step.titleize %></span>
+          <span class="block text-sm portal-hint"><%= step_copy[step] %></span>
+        </span>
+      </li>
+    <% end %>
+  </ol>
+
+  <%= render "shared/haven/laptop_note", class: "mt-6" %>
+
+  <p class="portal-hint text-sm mt-6">You can come back and finish later. Your progress saves as you go.</p>
+
+  <div class="mt-6">
+    <%= button_to "Let's go", onboarding_start_path(event_id: current_event.id),
+          class: "portal-btn portal-btn-primary w-full sm:w-auto px-8 py-3 text-base",
+          form: { data: { turbo: false } } %>
+  </div>
+</div>

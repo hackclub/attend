@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_16_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -893,6 +893,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
     t.uuid "nfc_badge_assigned_by_id"
     t.uuid "nfc_badge_token", default: -> { "gen_random_uuid()" }
     t.datetime "onboarding_completed_at"
+    t.datetime "onboarding_intro_seen_at"
     t.jsonb "onboarding_payload", default: {}
     t.integer "onboarding_step", default: 0
     t.uuid "participant_id", null: false
