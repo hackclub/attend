@@ -4,13 +4,8 @@ class HomeController < ApplicationController
 
     return unless user_signed_in?
 
-    if current_user.global_admin? || current_user.event_role_assignments.exists?
-      redirect_to admin_root_path
-    elsif current_user.participant.present?
-      redirect_to dashboard_path
-    elsif current_user.event_volunteers.exists? || current_user.training_course_invitations.exists?
-      redirect_to training_path
-    end
+    landing = landing_path_for(current_user)
+    redirect_to landing if landing
   end
 
   def dev_sign_in

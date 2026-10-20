@@ -39,12 +39,8 @@ class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
       onboarding_path(invite: session[:invitation_token])
     elsif (stored = stored_location_for(:user))
       stored
-    elsif @user.global_admin? || @user.event_role_assignments.exists?
-      admin_root_path
-    elsif @user.participant.present?
-      dashboard_path
     else
-      root_path
+      landing_path_for(@user) || root_path
     end
   end
 end
