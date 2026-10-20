@@ -1,5 +1,6 @@
-# Links a participant's GitHub or itch.io account (the onboarding accounts
-# step, EventSeries#github_linking / #itch_linking). Both providers use the
+# Links a participant's GitHub or itch.io account, from the onboarding
+# accounts step (when an event asks for one) or the Connections section of
+# the profile page. Both providers use the
 # authorization code flow with PKCE; the state, verifier and return path
 # live in the session for one round trip.
 class ConnectedAccountsController < ApplicationController
