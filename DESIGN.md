@@ -294,14 +294,16 @@ Attend's most-repeated pattern on Clipboard surfaces and the closest thing it ha
 - **Participant header:** 64px tall, white, hairline bottom border. Links are 14px/500 in `{colors.text}`, 6px radius, and the active item takes an `{colors.accent-soft}` background with `{colors.accent}` text. Collapses to a hamburger below `md`.
 - **Admin navigation:** the light 256px admin sidebar, its uppercase section eyebrows, the full-round user/event selector pills and the faux-input search trigger were all retired when `/admin` moved to the console. Admin navigation is now documented in *Admin Console*; don't rebuild those pieces on a Clipboard surface.
 
-## Haven Skin
+## Event Branding
 
-Events in a series with **Haven onboarding** switched on (`EventSeries#haven_onboarding?`) render their onboarding pages in Haven's brand instead of Attend's: `<html data-theme="light" data-brand="haven">`, tokens and component overrides in `app/assets/tailwind/haven.css`, artwork in `app/assets/images/haven/`. It is the one sanctioned exception to the rules below, and it is scoped to participant onboarding for Haven — the app shell, admin, dashboard and guardian portal stay on the system above.
+A series can brand registration for all of its events (**Registration branding** on the series form, in both the classic admin and the console). Onboarding pages for those events, including the signed-out invitation page, render with `<html data-branded>` plus a `<style>` of token values from `BrandTheme`. It is the one sanctioned exception to the rules below, and it is scoped to participant onboarding: the app shell, admin, dashboard and guardian portal stay on the system above. No code is specific to any one brand; a brand is data on the series.
 
-- **What it changes:** a cream page (`#fff6d6`) with Haven's bushes along the bottom, translucent white cards at 16px radius, a butter-to-gold gradient event card, self-hosted Jua (body) and Darumadrop One (titles) at a single weight, and Haven orange for fills and progress.
-- **What it keeps:** every contrast floor. Haven's orange (`#ed5615`, 3.5:1 on white) and green never carry words; text uses a brown ink ramp (`--haven-ink` `#4a2a12` and the remapped `--text-*`, all ≥ 4.5:1), white-on-orange fills use `#b8430f` (5.46:1), and `--border-strong` clears 3:1 for form controls.
-- **Why the fonts are self-hosted:** the CSP allows no font hosts, and Haven participants are mostly minors whose browsers shouldn't be sent to Google. The files and their OFL licences are in `app/assets/fonts/haven/`.
-- Users' own themes are overridden to light on these pages only; the skin has no dark variant.
+- **What an admin sets:** page background, text colour (ink) and accent (required); optionally a button colour, secondary, highlight and event-card gradient; body and heading fonts; logo, mascot, footer and t-shirt images; and the step navigation (numbered steps or a progress bar). Fonts are self-hosted files listed in `BrandTheme::FONTS` (`app/assets/fonts/<font>/`, declared in `app/assets/tailwind/brand.css`). Images are picked from `app/assets/images/brands/`. Adding a brand means pushing its assets and then filling in the form.
+- **How the tokens are made:** `BrandTheme#resolved_tokens` works out the full light-theme set (`--bg-*`, `--text-*`, `--border-*`, `--accent-*`, `--success-*`, plus `--brand-*` extras) from those colours. Text shades are mixed from the ink and pulled back until they clear 4.5:1, and fills are darkened until white text clears 4.5:1. Any token can be pinned to an exact value under "Exact token values".
+- **What it keeps:** every contrast floor. A brand won't save unless every text token clears 4.5:1 on the page and on cards, white clears 4.5:1 on every fill, ink clears 4.5:1 on both card gradient stops, and `--border-strong` and `--focus-ring` clear 3:1. The accent is for decoration and never carries words.
+- **Themes:** the colours apply only on the light theme. Someone who picked another theme keeps it on branded pages, with the brand's fonts and artwork on top.
+- **Why the fonts are self-hosted:** the CSP allows no font hosts, and registrants are mostly minors whose browsers shouldn't be sent to Google. Each font's OFL licence sits next to its files.
+- **Every event, branded or not,** gets the welcome screen before the first step and the "you're registered" screen after submitting, both headed by the event card.
 
 ## Do's and Don'ts
 

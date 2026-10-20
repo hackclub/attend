@@ -53,6 +53,10 @@ class DashboardController < ApplicationController
     # needs a way to clear the (now dead) connection out.
     @mcp_connections = mcp_connections
     @show_mcp_connections = current_user.admin? || @mcp_connections.any?
+    # Linked GitHub and itch.io accounts belong to the participant, so anyone
+    # with a participant record gets the section to connect them.
+    @connected_accounts = @participant ? @participant.connected_accounts.index_by(&:provider) : {}
+    @show_connections = @participant.present? || @show_mcp_connections
 
     # Badge links are keyed by Slack ID (that's what the printed QR encodes),
     # so someone whose account has no Slack ID gets the section as a prompt to

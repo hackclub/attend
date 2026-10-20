@@ -1,0 +1,254 @@
+/* ====================================================================
+ * Event branding: onboarding pages for an event whose series has
+ * branding set (BrandTheme, configured on the series in admin).
+ *
+ * The layout renders <html data-branded> on those pages, and a <style>
+ * with the brand's token values (BrandHelper#brand_style_tag):
+ * - on every theme: --brand-font-body, --brand-font-heading and
+ *   --brand-footer-image, plus data-brand-body-font,
+ *   data-brand-heading-font and data-brand-single-weight;
+ * - on the light theme only: the theme tokens from themes.css, and the
+ *   brand-only ones below (--brand-accent-fill-hover, --brand-done-fill,
+ *   --brand-highlight, --brand-card-from/to, --brand-glow-1/2).
+ *
+ * So the rules here split the same way: shape and type for every theme,
+ * colour only under [data-theme="light"]. Someone on a dark theme keeps it,
+ * with the brand's fonts and artwork. BrandTheme checks every token pair
+ * used for text, fills and control outlines against WCAG before a brand
+ * can be saved, so nothing here needs its own contrast exceptions.
+ *
+ * Fonts are self-hosted (OFL, see app/assets/fonts/<font>/OFL.txt): the
+ * CSP allows no font hosts, and registrants are mostly minors whose
+ * browsers shouldn't be sent to Google. A font is only downloaded on pages
+ * that use it. To add one, put its files next to these and add it to
+ * BrandTheme::FONTS.
+ * ==================================================================== */
+
+@font-face {
+  font-family: "Jua";
+  src: url("/jua/jua-latin-400-normal.woff2") format("woff2");
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Accented letters, curly quotes and dashes Jua lacks, built by haven-site's
+ * scripts/build-jua-extras.py. Only fetched when a page uses one. */
+@font-face {
+  font-family: "Jua Extras";
+  src: url("/jua/jua-extras.woff2") format("woff2");
+  font-display: swap;
+  unicode-range: U+60, U+A1-AC, U+AE-17E, U+18F, U+192, U+1CD-1CE, U+1D4, U+218-21B, U+237, U+259,
+    U+2C6-2CC, U+2D8-2DD, U+1E9E, U+1EA0-1EF9, U+2010, U+2012-2015, U+2018-201A, U+201C-201E,
+    U+2020-2022, U+2026, U+2030, U+2032-2033, U+2039-203A, U+2044, U+20AC, U+20B9, U+2122, U+2212,
+    U+2248, U+2260, U+2264-2265;
+}
+
+@font-face {
+  font-family: "Darumadrop One";
+  src: url("/darumadrop-one/darumadrop-one-latin-400-normal.woff2") format("woff2");
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Darumadrop One";
+  src: url("/darumadrop-one/darumadrop-one-latin-ext-400-normal.woff2") format("woff2");
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/* Unlayered so they beat the utilities layer. The entry ticket's header is a
+ * literal Hack Club red utility. */
+html[data-branded][data-theme="light"] .entry-ticket-header {
+  background-color: var(--accent-fill);
+}
+
+html[data-brand-body-font] body {
+  font-family: var(--brand-font-body);
+  letter-spacing: -0.005em;
+}
+
+/* Fonts that ship one weight get set at 400 rather than let the browser
+ * smear a fake bold. */
+html[data-brand-single-weight] body {
+  font-synthesis-weight: none;
+}
+
+@layer components {
+  /* --- surfaces (every theme) --------------------------------------- */
+
+  [data-branded] .portal-card {
+    border-color: var(--border-card);
+    border-radius: 1rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  [data-branded][data-theme="light"] .portal-card {
+    background-color: rgb(255 255 255 / 0.8);
+  }
+
+  [data-branded] .portal-panel {
+    border-radius: 0.75rem;
+  }
+
+  /* --- type ---------------------------------------------------------- */
+
+  [data-brand-heading-font] .portal-title,
+  [data-brand-heading-font] .brand-display {
+    font-family: var(--brand-font-heading);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+  }
+
+  [data-brand-single-weight] .portal-heading,
+  [data-brand-single-weight] .portal-label,
+  [data-brand-single-weight] .portal-btn {
+    font-weight: 400;
+  }
+
+  /* --- controls ------------------------------------------------------ */
+
+  [data-branded] .portal-input,
+  [data-branded] .portal-select,
+  [data-branded] .portal-textarea {
+    border-radius: 0.625rem;
+    font-family: inherit;
+  }
+
+  [data-branded] .portal-btn {
+    border-radius: 0.625rem;
+    padding-inline: 1.25rem;
+  }
+
+  [data-branded] .portal-btn:focus-visible {
+    outline-color: var(--focus-ring);
+  }
+
+  [data-branded][data-theme="light"] .portal-btn-primary {
+    background-color: var(--accent-fill);
+    box-shadow: 0 2px 0 color-mix(in srgb, var(--text-strong) 25%, transparent);
+  }
+
+  [data-branded][data-theme="light"] .portal-btn-primary:hover {
+    background-color: var(--brand-accent-fill-hover);
+  }
+
+  [data-branded][data-theme="light"] .portal-step-marker-current {
+    background-color: var(--accent-fill);
+    border-color: var(--accent-fill);
+  }
+
+  [data-branded][data-theme="light"] .portal-step-marker-done {
+    background-color: var(--brand-done-fill);
+    border-color: var(--brand-done-fill);
+  }
+
+  /* --- notes --------------------------------------------------------- */
+
+  /* Attend's info blue fights most palettes, so info notes take the
+   * brand's highlight colour. The icon takes the accent fill, which clears
+   * 3:1 on the tint. */
+  [data-branded] .portal-note-info {
+    border-radius: 0.875rem;
+  }
+
+  [data-branded][data-theme="light"] .portal-note-info {
+    background-color: color-mix(in oklab, var(--brand-highlight) 14%, white);
+    border-color: color-mix(in oklab, var(--brand-highlight) 40%, white);
+  }
+
+  [data-branded][data-theme="light"] .portal-note-info .portal-note-icon {
+    color: var(--accent-fill);
+  }
+
+  /* --- progress ------------------------------------------------------ */
+
+  [data-branded] .portal-progress {
+    height: 0.375rem;
+    background-color: color-mix(in oklab, var(--border-card) 60%, transparent);
+  }
+
+  [data-branded] .portal-progress-fill {
+    background-color: var(--accent);
+  }
+
+  /* --- onboarding pieces ----------------------------------------------
+   * The event card heads the welcome, done and invitation screens and the
+   * progress nav for every event; branded pages add a gradient and blurred
+   * glow blobs on light. Branded pages can also have artwork along the
+   * bottom of the page. */
+
+  .event-card {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    border: 1px solid var(--border-card);
+    border-radius: 1.25rem;
+    background-color: var(--bg-elev);
+    box-shadow: var(--shadow-md);
+    color: var(--text-strong);
+  }
+
+  [data-branded][data-theme="light"] .event-card {
+    background: linear-gradient(135deg, var(--brand-card-from), var(--brand-card-to));
+  }
+
+  .event-card-glow {
+    display: none;
+    position: absolute;
+    z-index: -1;
+    border-radius: 999px;
+    filter: blur(40px);
+    pointer-events: none;
+  }
+
+  [data-branded][data-theme="light"] .event-card-glow {
+    display: block;
+  }
+
+  .event-card-glow-1 {
+    background-color: var(--brand-glow-1);
+  }
+
+  .event-card-glow-2 {
+    background-color: var(--brand-glow-2);
+  }
+
+  .brand-display {
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .bullet-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1.25rem;
+    border: 1px solid var(--border-card);
+    border-radius: 0.875rem;
+    background-color: var(--bg-elev);
+    color: var(--text);
+  }
+
+  [data-branded][data-theme="light"] .bullet-card {
+    background-color: rgb(255 255 255 / 0.75);
+  }
+
+  /* A flex child of the full-height body, so it must not shrink away when
+   * the page is taller than the viewport. */
+  .brand-bottom-strip {
+    flex-shrink: 0;
+    height: clamp(64px, 11vw, 160px);
+    margin-top: 2rem;
+    background-image: var(--brand-footer-image);
+    background-repeat: repeat-x;
+    background-position: bottom center;
+    background-size: auto 100%;
+    pointer-events: none;
+  }
+}

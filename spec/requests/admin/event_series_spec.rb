@@ -142,13 +142,17 @@ RSpec.describe "Admin::EventSeries", type: :request do
       expect(series.reload.name).to eq("Sunbeam Renamed")
     end
 
-    it "lets owners switch Haven onboarding on" do
+    it "lets owners brand registration for every event in the series" do
       sign_in owner
 
-      patch admin_series_path(series), params: { event_series: { haven_onboarding: "1" } }
+      patch admin_series_path(series), params: { event_series: {
+        brand: { background: "#FFF6D6", ink: "#4a2a12", accent: "#ed5615", heading_font: "darumadrop-one" },
+        registration_note: "Bring a laptop!"
+      } }
 
-      expect(series.reload.haven_onboarding?).to be(true)
-      expect(sub_event.reload.haven_onboarding?).to be(true)
+      expect(series.reload.brand).to include("background" => "#fff6d6", "heading_font" => "darumadrop-one")
+      expect(sub_event.reload.brand_theme).to be_active
+      expect(sub_event.registration_note).to eq("Bring a laptop!")
     end
 
     it "lets owners choose which accounts onboarding asks for" do

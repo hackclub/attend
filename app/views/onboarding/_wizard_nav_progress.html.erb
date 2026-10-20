@@ -1,9 +1,10 @@
-<%# Haven take on the wizard nav: the event card, a thin progress bar and a
-    row of step pills. Completed steps stay links back, as in the rail. %>
+<%# The "progress" wizard nav a brand can pick: the event card, a thin
+    progress bar and a row of step pills. Completed steps stay links back,
+    as in the default rail. %>
 <% current_index = @steps.index(@current_step) %>
 
 <div class="mb-6">
-  <%= render "shared/haven/event_card", event: current_event, compact: true %>
+  <%= render "onboarding/event_card", event: current_event, compact: true %>
 </div>
 
 <nav class="mb-8" aria-label="Progress">

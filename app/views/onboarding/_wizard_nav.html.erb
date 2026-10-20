@@ -1,5 +1,5 @@
-<% if haven_page? %>
-  <%= render "onboarding/wizard_nav_haven" %>
+<% if page_brand&.nav_style == "progress" %>
+  <%= render "onboarding/wizard_nav_progress" %>
 <% else %>
   <div class="mb-6 text-center">
     <p class="portal-meta text-sm">Registering for</p>

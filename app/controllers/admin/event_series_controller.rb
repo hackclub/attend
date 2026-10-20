@@ -79,7 +79,12 @@ module Admin
     end
 
     def series_params
-      params.require(:event_series).permit(:name, :slug, :description, :contact_email, :logo, :banner, :haven_onboarding, :github_linking, :itch_linking)
+      params.require(:event_series).permit(
+        :name, :slug, :description, :contact_email, :logo, :banner,
+        :registration_note, :address_note, :tshirt_note,
+        :github_linking, :itch_linking, :github_help_url, :itch_help_url,
+        brand: BrandTheme::FIELDS
+      )
     end
   end
 end

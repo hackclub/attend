@@ -111,7 +111,7 @@ RSpec.describe "Onboarding documents step", type: :request do
       }.to have_enqueued_job(ActionMailer::Base.delivery_job)
         .with("GuardianMailer", "invitation", "deliver_now", args: [ { guardian_participant_event: gpe } ])
 
-      expect(response).to redirect_to(dashboard_path)
+      expect(response).to redirect_to(onboarding_done_path(event_id: event.id))
       expect(participant_event.reload).to be_awaiting_guardian
     end
   end

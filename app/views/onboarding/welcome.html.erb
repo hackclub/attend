@@ -8,14 +8,17 @@
      "health" => "Let us know about food, allergies, and anything that helps you have a great time.",
      "guardian" => "Add your parent or guardian. They'll get their own invite to finish their part.",
      "emergency" => "Add someone we can reach in an emergency.",
+     "accounts" => "Connect the accounts you'll use at the event.",
      "documents" => "Sign the event documents.",
      "review" => "Check everything over and submit."
    } %>
 
 <div class="w-full max-w-2xl mx-auto">
-  <%= image_tag "haven/haven-logo-color.webp", alt: "Hack Club Haven", class: "mx-auto mb-6 w-40 sm:w-48 h-auto" %>
+  <% if page_brand&.logo_image %>
+    <%= image_tag page_brand.logo_image, alt: current_event.event_series&.name || current_event.name, class: "mx-auto mb-6 w-40 sm:w-48 h-auto" %>
+  <% end %>
 
-  <%= render "shared/haven/event_card", event: current_event %>
+  <%= render "onboarding/event_card", event: current_event %>
 
   <header class="mt-8 mb-6">
     <h1 class="portal-title text-3xl sm:text-4xl"><%= first_name ? "Hey #{first_name}!" : "Hey there!" %></h1>
@@ -31,7 +34,7 @@
   <ol class="space-y-3">
     <% @steps.each_with_index do |step, index| %>
       <% next unless step_copy[step] %>
-      <li class="haven-bullet-card">
+      <li class="bullet-card">
         <span class="portal-step-marker shrink-0" aria-hidden="true"><%= index + 1 %></span>
         <span>
           <span class="block portal-heading"><%= step.titleize %></span>
@@ -41,7 +44,7 @@
     <% end %>
   </ol>
 
-  <%= render "shared/haven/laptop_note", class: "mt-6" %>
+  <%= render "onboarding/registration_note", event: current_event, class: "mt-6" %>
 
   <p class="portal-hint text-sm mt-6">You can come back and finish later. Your progress saves as you go.</p>
 

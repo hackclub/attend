@@ -317,7 +317,7 @@ RSpec.describe "Onboarding invitations held", type: :request do
 
       get onboarding_path(event_id: event.id)
 
-      expect(response).to redirect_to(onboarding_step_path(step: "profile", event_id: event.id))
+      expect(response).to redirect_to(onboarding_welcome_path(event_id: event.id))
     end
   end
 end

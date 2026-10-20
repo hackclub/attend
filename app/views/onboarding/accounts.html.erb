@@ -69,8 +69,8 @@
                 <%= link_to "Make a free #{name} account", sign_up_urls[provider], class: "portal-link", target: "_blank", rel: "noopener" %>,
                 then come back here and choose Yes to connect it.
               </p>
-              <% if provider == "github" && haven_page? && HavenHelper::HAVEN_GITHUB_HELP_URL %>
-                <p class="portal-hint text-sm"><%= link_to "Watch how to make a GitHub account", HavenHelper::HAVEN_GITHUB_HELP_URL, class: "portal-link", target: "_blank", rel: "noopener" %></p>
+              <% if (help_url = current_event.account_help_url(provider)) %>
+                <p class="portal-hint text-sm"><%= link_to "See how to make #{articles[provider]} #{name} account", help_url, class: "portal-link", target: "_blank", rel: "noopener" %></p>
               <% end %>
             </div>
           </fieldset>

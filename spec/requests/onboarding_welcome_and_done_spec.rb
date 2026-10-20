@@ -1,11 +1,11 @@
 require "rails_helper"
 
-RSpec.describe "Haven onboarding welcome and done screens", type: :request do
+RSpec.describe "Onboarding welcome and done screens", type: :request do
   include Devise::Test::IntegrationHelpers
   include ActiveJob::TestHelper
 
-  let(:haven) { create(:event_series, name: "Haven", haven_onboarding: "1") }
-  let(:event) { create(:event, name: "Haven Boston", event_series: haven, travel_enabled: false, accommodation_enabled: false) }
+  let(:series) { create(:event_series, name: "Sunbeam", registration_note: "Bring a laptop!") }
+  let(:event) { create(:event, name: "Sunbeam Springfield", event_series: series, travel_enabled: false, accommodation_enabled: false) }
   let(:user) { create(:user) }
   let(:participant) { create(:participant, user: user, email: user.email, preferred_name: "Robin", date_of_birth: 18.years.ago - 1.month) }
   let!(:participant_event) do
@@ -45,14 +45,16 @@ RSpec.describe "Haven onboarding welcome and done screens", type: :request do
       expect(response).to redirect_to(onboarding_step_path(step: "health", event_id: event.id))
     end
 
-    it "doesn't exist for events outside Haven" do
+    it "greets registrants for events outside any series too, without a note" do
       event.update!(event_series: nil)
 
       get onboarding_path(event_id: event.id)
-      expect(response).to redirect_to(onboarding_step_path(step: "profile", event_id: event.id))
+      expect(response).to redirect_to(onboarding_welcome_path(event_id: event.id))
 
       get onboarding_welcome_path(event_id: event.id)
-      expect(response).to redirect_to(onboarding_path(event_id: event.id))
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Hey Robin!")
+      expect(response.body).not_to include("Bring a laptop!")
     end
   end
 
@@ -68,7 +70,7 @@ RSpec.describe "Haven onboarding welcome and done screens", type: :request do
       }
     end
 
-    it "lands Haven registrants on the done screen" do
+    it "lands registrants on the done screen" do
       create(:consent, :signed, participant_event: participant_event)
 
       submit
@@ -76,13 +78,13 @@ RSpec.describe "Haven onboarding welcome and done screens", type: :request do
       expect(response).to redirect_to(onboarding_done_path(event_id: event.id))
     end
 
-    it "still lands everyone else on the dashboard" do
+    it "does the same for events outside any series" do
       event.update!(event_series: nil)
       create(:consent, :signed, participant_event: participant_event)
 
       submit
 
-      expect(response).to redirect_to(dashboard_path)
+      expect(response).to redirect_to(onboarding_done_path(event_id: event.id))
     end
   end
 
