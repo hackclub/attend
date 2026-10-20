@@ -59,7 +59,7 @@ module Airtable
 
     def initialize(event)
       @event = event
-      @client = build_client
+      @client = Client.for_event(event)
     end
 
     # --- Sync API (CSV-based full sync) ---
@@ -75,6 +75,16 @@ module Airtable
         csv << SYNC_COLUMNS
         participant_events.each { |pe| csv << serialize_row(pe) }
       end
+    end
+
+    # --- Records API (events connected with OAuth) ---
+
+    def sync_via_records
+      rows = load_participant_events.to_h do |pe|
+        cells = SYNC_COLUMNS.zip(serialize_row(pe)).to_h { |column, value| [ column, value&.to_s ] }
+        [ pe.id.to_s, cells ]
+      end
+      RecordsSync.new(@event, @client).call(rows)
     end
 
     # --- Legacy per-record push (used by PushRecordJob / resync button) ---
@@ -209,13 +219,6 @@ module Airtable
       return nil unless travel&.plane? && travel.travel_legs.any?
 
       travel.travel_legs.filter_map(&:flight_code).join(", ").presence
-    end
-
-    def build_client
-      Client.new(
-        api_key: @event.config&.dig("airtable_api_key").presence || Rails.application.credentials.dig(:airtable, :api_key),
-        base_id: @event.config&.dig("airtable_base_id").presence || Rails.application.credentials.dig(:airtable, :base_id)
-      )
     end
 
     def serialize_participant_event(participant_event)

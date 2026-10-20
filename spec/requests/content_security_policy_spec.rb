@@ -108,6 +108,14 @@ RSpec.describe "Content Security Policy", type: :request do
       form_action = response.headers["Content-Security-Policy"][/form-action[^;]*/]
       expect(form_action).to include("https://auth.hackclub.com")
     end
+
+    # Same for the integrations page's Connect Airtable button, which posts to
+    # Attend and is 302'd to Airtable's consent screen.
+    it "allows Airtable's OAuth host in form-action" do
+      get root_path
+
+      expect(response.headers["Content-Security-Policy"][/form-action[^;]*/]).to include("https://airtable.com")
+    end
   end
 
   ADMIN_UIS.each do |ui, console|

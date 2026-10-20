@@ -146,7 +146,8 @@ RSpec.describe Event, type: :model do
         :event,
         airtable_sync_source_id: "sncTest",
         airtable_sync_table_id: "tblTest",
-        config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" },
+        airtable_api_key: "key-test",
+        config: { "airtable_base_id" => "app-test" },
         **attrs
       )
     end
@@ -180,7 +181,8 @@ RSpec.describe Event, type: :model do
         :event,
         airtable_sync_source_id: "sncTest",
         airtable_sync_table_id: "tblTest",
-        config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" },
+        airtable_api_key: "key-test",
+        config: { "airtable_base_id" => "app-test" },
         **attrs
       )
     end
@@ -190,7 +192,8 @@ RSpec.describe Event, type: :model do
         event.update_columns(
           airtable_sync_source_id: source,
           airtable_sync_table_id: table,
-          config: event.config.merge("airtable_api_key" => key, "airtable_base_id" => base)
+          airtable_api_key: key,
+          config: event.config.merge("airtable_base_id" => base)
         )
       end
     end
@@ -235,6 +238,25 @@ RSpec.describe Event, type: :model do
       expect(described_class.with_airtable_sync_active).not_to include(event)
     end
 
+    it "counts a connected event with just a base, since Attend creates its own table" do
+      event = create(:event, config: { "airtable_base_id" => "app-test" })
+      event.create_airtable_connection!(access_token: "fictional", refresh_token: "fictional",
+        access_token_expires_at: 1.hour.from_now, refresh_token_expires_at: 60.days.from_now)
+
+      expect(event.reload).to be_airtable_sync_configured
+      expect(described_class.with_airtable_sync_configured).to include(event)
+    end
+
+    it "forgets Attend's table when a connected event moves to another base" do
+      event = create(:event, airtable_sync_table_id: "tblOurs", config: { "airtable_base_id" => "app-old" })
+      event.create_airtable_connection!(access_token: "fictional", refresh_token: "fictional",
+        access_token_expires_at: 1.hour.from_now, refresh_token_expires_at: 60.days.from_now)
+
+      event.update!(airtable_base_id: "app-new")
+
+      expect(event.reload.airtable_sync_table_id).to be_nil
+    end
+
     it "matches the record-level #airtable_sync_configured? for every event" do
       configured_event
       create(:event)
@@ -253,7 +275,8 @@ RSpec.describe Event, type: :model do
         :event,
         airtable_sync_source_id: "sncTest",
         airtable_sync_table_id: "tblTest",
-        config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" }
+        airtable_api_key: "key-test",
+        config: { "airtable_base_id" => "app-test" }
       )
     end
 

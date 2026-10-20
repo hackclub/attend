@@ -423,11 +423,17 @@ Rails.application.routes.draw do
     get "incidents/:id", to: "incident_reports#show", as: :incident
     post "incidents/:incident_id/comments", to: "incident_report_comments#create", as: :incident_comments
 
+    # Airtable redirects only to a registered URI, so the OAuth callback can't
+    # carry the event slug (see Admin::AirtableConnectionsController).
+    get "airtable/oauth/callback", to: "airtable_connections#callback", as: :airtable_oauth_callback
+
     # Slug-based routes must come last to avoid matching other routes
     get ":slug", to: "dashboard#show", as: :event_dashboard, constraints: { slug: /[a-z0-9-]+/ }
     get ":slug/integrations", to: "dashboard#integrations", as: :event_integrations, constraints: { slug: /[a-z0-9-]+/ }
     patch ":slug/integrations", to: "dashboard#update_integrations", constraints: { slug: /[a-z0-9-]+/ }
     post ":slug/integrations/airtable_sync", to: "dashboard#trigger_airtable_sync", as: :event_trigger_airtable_sync, constraints: { slug: /[a-z0-9-]+/ }
+    post ":slug/integrations/airtable/connection", to: "airtable_connections#create", as: :event_airtable_connection, constraints: { slug: /[a-z0-9-]+/ }
+    delete ":slug/integrations/airtable/connection", to: "airtable_connections#destroy", constraints: { slug: /[a-z0-9-]+/ }
     post ":slug/integrations/vote_event", to: "dashboard#create_vote_event", as: :event_create_vote_event, constraints: { slug: /[a-z0-9-]+/ }
     post ":slug/integrations/api_tokens", to: "event_api_tokens#create", as: :event_api_tokens, constraints: { slug: /[a-z0-9-]+/ }
     post ":slug/integrations/api_tokens/:id/rotate", to: "event_api_tokens#rotate", as: :rotate_event_api_token, constraints: { slug: /[a-z0-9-]+/ }

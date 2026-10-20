@@ -135,18 +135,35 @@ class Admin::DashboardController < Admin::BaseController
     @airtable_sync_paused_at = current_event.airtable_sync_paused_at
     @airtable_config_owner = current_event.airtable_config_last_saved_by if @airtable_sync_paused
     @airtable_participant_count = current_event.participant_events.count if @airtable_sync_configured
+    @airtable_connection = current_event.airtable_connection
+    @airtable_oauth_configured = Airtable::Oauth.new.configured?
+    # Airtable only shows the bases ticked on its consent screen; the list is
+    # empty when it couldn't be read at connect time, so don't guess then.
+    @airtable_base_options = Array(@airtable_connection&.bases).map { |base| [ "#{base['name']} (#{base['id']})", base["id"] ] }
+    if @airtable_base_options.any? && current_event.airtable_base_id.present? && @airtable_base_options.none? { |_, id| id == current_event.airtable_base_id }
+      @airtable_base_options.unshift([ current_event.airtable_base_id, current_event.airtable_base_id ])
+    end
+    @airtable_base_not_granted = @airtable_connection.present? &&
+      @airtable_connection.bases.any? &&
+      current_event.airtable_base_id.present? &&
+      !@airtable_connection.base_granted?(current_event.airtable_base_id)
   end
 
   def integration_params
-    params.require(:event).permit(
+    permitted = params.require(:event).permit(
       :docuseal_waiver_template_id,
       :docuseal_freedom_waiver_template_id,
       :slack_channel_id,
       :airtable_api_key,
+      :airtable_sync_endpoint_url,
       :airtable_base_id,
       :airtable_sync_source_id,
       :airtable_sync_table_id
     )
+    # The saved token is never echoed back into the form, so a blank field
+    # means "keep it", not "delete it".
+    permitted.delete(:airtable_api_key) if permitted[:airtable_api_key].blank?
+    permitted
   end
 
   def load_dashboard_stats

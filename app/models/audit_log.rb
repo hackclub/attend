@@ -89,6 +89,8 @@ class AuditLog < ApplicationRecord
     link_guardian: "link_guardian",
     refresh_flight_tracking: "refresh_flight_tracking",
     resync_airtable: "resync_airtable",
+    connect_airtable: "connect_airtable",
+    disconnect_airtable: "disconnect_airtable",
     revoke_invite: "revoke_invite",
     send_held_invitations: "send_held_invitations",
     destroy_avatar: "destroy_avatar",
