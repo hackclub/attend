@@ -80,7 +80,16 @@ RSpec.describe Bans::UcatSync do
       expect(sync.unchanged).to eq(1)
     end
 
-    it "skips an email already on a manual ban" do
+    it "takes over an email from an expired or revoked ban so the person stays blocked" do
+      lapsed = create(:ban, :expired, email: "banned@example.com")
+
+      expect(sync.added).to eq(1)
+      expect(Ban.banned?("banned@example.com")).to be true
+      expect(Ban.ucat.sole.ban_emails.map(&:email)).to eq([ "banned@example.com" ])
+      expect(lapsed.reload.ban_emails).to be_empty
+    end
+
+    it "skips an email already on an active manual ban" do
       create(:ban, email: "banned@example.com")
 
       expect(sync.skipped_existing).to eq(1)

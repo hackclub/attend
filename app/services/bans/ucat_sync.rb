@@ -190,15 +190,21 @@ module Bans
       reinstating ? result.reinstated += 1 : result.unchanged += 1
     end
 
-    # Identifiers held by some other ban are left where they are: a manual ban
-    # already blocks them, and another UCAT ban means the person's cases were
-    # split differently last run; they're still blocked either way.
+    # Identifiers on another *active* ban are left where they are: they're
+    # blocked either way. Ones on an expired or revoked ban are moved onto this
+    # person's ban (emails and Slack IDs are unique across bans), otherwise a
+    # lapsed manual ban would silently keep a UCAT-banned person unblocked.
+    # PaperTrail keeps the moved rows' history; the old ban record stays.
     def unclaimed_identifiers(person, ban)
       other_bans = ban ? Ban.where.not(id: ban.id) : Ban.all
-      taken_emails = BanEmail.where(ban: other_bans).where("LOWER(email) IN (?)", person.emails).pluck(:email).map(&:downcase)
-      taken_slack = BanSlackId.where(ban: other_bans, slack_id: person.slack_ids).pluck(:slack_id)
+      other_emails = BanEmail.where(ban: other_bans).where("LOWER(email) IN (?)", person.emails).includes(:ban)
+      other_slack = BanSlackId.where(ban: other_bans, slack_id: person.slack_ids).includes(:ban)
 
-      [ person.emails - taken_emails, person.slack_ids - taken_slack ]
+      held_emails, lapsed_emails = other_emails.partition { _1.ban.active? }
+      held_slack, lapsed_slack = other_slack.partition { _1.ban.active? }
+      (lapsed_emails + lapsed_slack).each(&:destroy!)
+
+      [ person.emails - held_emails.map { _1.email.downcase }, person.slack_ids - held_slack.map(&:slack_id) ]
     end
 
     def sync_identifiers(ban, emails, slack_ids)
