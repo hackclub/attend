@@ -168,22 +168,35 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_170100) do
     t.datetime "created_at", null: false
     t.string "email", null: false
     t.datetime "updated_at", null: false
-    t.index "lower((email)::text)", name: "index_ban_emails_on_lower_email", unique: true
+    t.index "ban_id, lower((email)::text)", name: "index_ban_emails_on_ban_id_and_lower_email", unique: true
+    t.index "lower((email)::text)", name: "index_ban_emails_on_lower_email"
     t.index ["ban_id"], name: "index_ban_emails_on_ban_id"
+  end
+
+  create_table "ban_slack_ids", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "ban_id", null: false
+    t.datetime "created_at", null: false
+    t.string "slack_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["ban_id", "slack_id"], name: "index_ban_slack_ids_on_ban_id_and_slack_id", unique: true
+    t.index ["slack_id"], name: "index_ban_slack_ids_on_slack_id"
   end
 
   create_table "bans", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.uuid "created_by_id"
     t.datetime "expires_at"
+    t.string "external_key"
     t.text "reason"
     t.datetime "revoked_at"
     t.uuid "revoked_by_id"
+    t.string "source", default: "manual", null: false
     t.datetime "updated_at", null: false
     t.index ["created_by_id"], name: "index_bans_on_created_by_id"
     t.index ["expires_at"], name: "index_bans_on_expires_at"
     t.index ["revoked_at"], name: "index_bans_on_revoked_at"
     t.index ["revoked_by_id"], name: "index_bans_on_revoked_by_id"
+    t.index ["source", "external_key"], name: "index_bans_on_source_and_external_key", unique: true, where: "(external_key IS NOT NULL)"
   end
 
   create_table "blazer_audits", force: :cascade do |t|
@@ -1478,6 +1491,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_170100) do
   add_foreign_key "audit_logs", "users", column: "actor_user_id"
   add_foreign_key "badge_redirects", "users", on_delete: :nullify
   add_foreign_key "ban_emails", "bans"
+  add_foreign_key "ban_slack_ids", "bans"
   add_foreign_key "bans", "users", column: "created_by_id"
   add_foreign_key "bans", "users", column: "revoked_by_id"
   add_foreign_key "connected_accounts", "participants"

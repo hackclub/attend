@@ -12,6 +12,12 @@
     </div>
   </div>
 
+  <% if @ban.ucat? %>
+    <div class="bg-blue-50 border border-blue-200 rounded-md p-4 text-sm text-blue-800">
+      Synced nightly from the UCAT conduct base. It is revoked automatically when the case no longer records a ban. If you revoke it here, the sync leaves it revoked. Edits are overwritten.
+    </div>
+  <% end %>
+
   <% if @ban.revoked? %>
     <div class="bg-amber-50 border border-amber-200 rounded-md p-4 text-sm text-amber-800">
       This ban is revoked and no longer blocks anyone. Reinstate it to enforce again, or delete it to remove the record.
@@ -28,6 +34,17 @@
       </ul>
     </div>
 
+    <% if @ban.ban_slack_ids.any? %>
+      <div>
+        <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Banned Slack IDs</h2>
+        <ul class="mt-1 text-sm text-gray-900 list-disc list-inside">
+          <% @ban.ban_slack_ids.each do |ban_slack_id| %>
+            <li><code><%= ban_slack_id.slack_id %></code></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div>
         <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Status</h2>
@@ -39,7 +56,7 @@
       </div>
       <div>
         <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider">Added by</h2>
-        <p class="mt-1 text-sm text-gray-900"><%= @ban.created_by&.email || "—" %></p>
+        <p class="mt-1 text-sm text-gray-900"><%= @ban.ucat? ? "UCAT sync" : (@ban.created_by&.email || "—") %></p>
       </div>
     </div>
 
@@ -65,7 +82,7 @@
     <p class="text-sm text-gray-500 mb-4">This ban does not remove anyone already added. Review and withdraw these manually if needed.</p>
 
     <% if @affected_participants.empty? %>
-      <p class="text-sm text-gray-500">No existing participants match these emails.</p>
+      <p class="text-sm text-gray-500">No existing participants match this ban.</p>
     <% else %>
       <ul class="divide-y divide-gray-100">
         <% @affected_participants.each do |participant| %>

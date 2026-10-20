@@ -26,7 +26,7 @@
         <% @bans.each do |ban| %>
           <tr>
             <td class="px-6 py-4">
-              <div class="text-sm font-medium text-gray-900"><%= ban.ban_emails.map(&:email).join(", ") %></div>
+              <div class="text-sm font-medium text-gray-900"><%= (ban.ban_emails.map(&:email) + ban.ban_slack_ids.map { "Slack #{_1.slack_id}" }).join(", ") %></div>
               <% if ban.reason.present? %>
                 <div class="text-sm text-gray-500 truncate max-w-[280px]" title="<%= ban.reason %>"><%= ban.reason %></div>
               <% end %>
@@ -44,7 +44,7 @@
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
               <%= ban.expires_at ? l(ban.expires_at, format: :long) : "—" %>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><%= ban.created_by&.email || "—" %></td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><%= ban.ucat? ? "UCAT sync" : (ban.created_by&.email || "—") %></td>
             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
               <%= link_to "View", admin_ban_path(ban), class: "text-[#ec3750] hover:text-blue-900" %>
               <%= link_to "Edit", edit_admin_ban_path(ban), class: "text-[#ec3750] hover:text-blue-900 ml-4" %>
