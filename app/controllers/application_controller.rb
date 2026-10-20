@@ -53,6 +53,22 @@ class ApplicationController < ActionController::Base
 
   private
 
+  # Where a signed-in person starts out: the admin for anyone who can use it
+  # (User#admin? — global admins, event staff, series owners and organizers),
+  # their dashboard if they're a participant, and the training page for
+  # people working events who can't use the admin (read-only staff,
+  # volunteers) or who've been invited to a course. nil means the home page.
+  # Shared by the home page and the sign-in callback so they can't disagree.
+  def landing_path_for(user)
+    if user.admin?
+      admin_root_path
+    elsif user.participant.present?
+      dashboard_path
+    elsif user.event_role_assignments.exists? || user.event_volunteers.exists? || user.training_course_invitations.exists?
+      training_path
+    end
+  end
+
   def preserve_invitation_token_for_sign_out
     return unless devise_controller? && action_name == "destroy"
 
