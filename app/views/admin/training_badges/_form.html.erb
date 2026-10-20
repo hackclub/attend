@@ -19,6 +19,7 @@
     <h2 class="text-lg font-medium text-gray-900">Required for</h2>
     <p class="text-sm text-gray-500">People in these roles show as untrained on an event's staff page until they hold a current badge.</p>
     <%= hidden_field_tag "training_badge[required_roles][]", "" %>
+    <label class="flex items-center gap-2 text-sm font-medium"><%= check_box_tag "training_badge[required_roles][]", TrainingBadge::EVERYONE, badge.required_of_everyone?, id: "required_role_everyone" %> Everyone working an event (every role, volunteers and series members — overrides the rest)</label>
     <% TrainingBadge::REQUIRABLE_ROLES.each do |role| %>
       <label class="flex items-center gap-2 text-sm"><%= check_box_tag "training_badge[required_roles][]", role, badge.required_roles.include?(role), id: "required_role_#{role}" %> <%= TrainingBadge.role_label(role) %></label>
     <% end %>

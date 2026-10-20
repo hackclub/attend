@@ -8,7 +8,7 @@
         <% if course.access_open? %>
           This course is open to anyone signed in, so invitations only send an email.
         <% elsif course.badge&.required? %>
-          Staff and volunteers whose role at an upcoming event needs <%= course.badge.name %> (<%= course.badge.required_roles.map { |role| TrainingBadge.role_label(role) }.to_sentence %>) are invited automatically. Invite anyone else here.
+          Staff and volunteers whose role at an upcoming event needs <%= course.badge.name %> (<%= course.badge.required_of_everyone? ? "every role" : course.badge.required_roles.map { |role| TrainingBadge.role_label(role) }.to_sentence %>) are invited automatically. Invite anyone else here.
         <% else %>
           Only the people invited here can take this course.
         <% end %>
