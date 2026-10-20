@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_20_170100) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_20_190000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -453,6 +453,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_170100) do
     t.string "slug", null: false
     t.datetime "updated_at", null: false
     t.index ["slug"], name: "index_event_series_on_slug", unique: true
+  end
+
+  create_table "event_volunteers", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "added_by_id"
+    t.datetime "created_at", null: false
+    t.uuid "event_id", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["added_by_id"], name: "index_event_volunteers_on_added_by_id"
+    t.index ["event_id", "user_id"], name: "index_event_volunteers_on_event_id_and_user_id", unique: true
+    t.index ["user_id"], name: "index_event_volunteers_on_user_id"
   end
 
   create_table "events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1382,6 +1393,146 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_170100) do
     t.index ["uid"], name: "index_toolchest_oauth_applications_on_uid", unique: true
   end
 
+  create_table "training_badge_awards", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "awarded_at", null: false
+    t.uuid "awarded_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "expires_at"
+    t.text "note"
+    t.datetime "revoked_at"
+    t.uuid "revoked_by_id"
+    t.text "revoked_reason"
+    t.uuid "training_badge_id", null: false
+    t.uuid "training_course_id"
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["awarded_by_id"], name: "index_training_badge_awards_on_awarded_by_id"
+    t.index ["revoked_by_id"], name: "index_training_badge_awards_on_revoked_by_id"
+    t.index ["training_badge_id"], name: "index_training_badge_awards_on_training_badge_id"
+    t.index ["training_course_id"], name: "index_training_badge_awards_on_training_course_id"
+    t.index ["user_id", "training_badge_id"], name: "index_training_badge_awards_on_user_id_and_training_badge_id"
+  end
+
+  create_table "training_badges", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.string "required_roles", default: [], null: false, array: true
+    t.string "slug", null: false
+    t.datetime "updated_at", null: false
+    t.integer "validity_months"
+    t.index ["slug"], name: "index_training_badges_on_slug", unique: true
+  end
+
+  create_table "training_course_invitations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "invited_by_id"
+    t.uuid "training_course_id", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["invited_by_id"], name: "index_training_course_invitations_on_invited_by_id"
+    t.index ["training_course_id", "user_id"], name: "index_training_course_invitations_on_course_and_user", unique: true
+    t.index ["user_id"], name: "index_training_course_invitations_on_user_id"
+  end
+
+  create_table "training_courses", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "access", default: "invite_only", null: false
+    t.datetime "created_at", null: false
+    t.integer "estimated_minutes"
+    t.integer "pass_mark", default: 80, null: false
+    t.integer "position", default: 0, null: false
+    t.string "reveal_answers", default: "after_pass", null: false
+    t.string "slug", null: false
+    t.string "status", default: "draft", null: false
+    t.text "summary"
+    t.string "title", null: false
+    t.uuid "training_badge_id"
+    t.datetime "updated_at", null: false
+    t.index ["slug"], name: "index_training_courses_on_slug", unique: true
+    t.index ["training_badge_id"], name: "index_training_courses_on_training_badge_id"
+  end
+
+  create_table "training_enrollments", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.datetime "started_at", null: false
+    t.uuid "training_course_id", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["training_course_id"], name: "index_training_enrollments_on_training_course_id"
+    t.index ["user_id", "training_course_id"], name: "index_training_enrollments_on_user_id_and_training_course_id", unique: true
+  end
+
+  create_table "training_lesson_completions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "completed_at", null: false
+    t.datetime "created_at", null: false
+    t.integer "score"
+    t.uuid "training_enrollment_id", null: false
+    t.uuid "training_lesson_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["training_enrollment_id", "training_lesson_id"], name: "index_training_lesson_completions_on_enrollment_and_lesson", unique: true
+    t.index ["training_lesson_id"], name: "index_training_lesson_completions_on_training_lesson_id"
+  end
+
+  create_table "training_lessons", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "body"
+    t.datetime "created_at", null: false
+    t.integer "position", default: 0, null: false
+    t.boolean "require_full_watch", default: true, null: false
+    t.string "title", null: false
+    t.uuid "training_course_id", null: false
+    t.datetime "updated_at", null: false
+    t.string "video_url"
+    t.index ["training_course_id"], name: "index_training_lessons_on_training_course_id"
+  end
+
+  create_table "training_question_options", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "body", null: false
+    t.boolean "correct", default: false, null: false
+    t.datetime "created_at", null: false
+    t.text "explanation"
+    t.integer "position", default: 0, null: false
+    t.uuid "training_question_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["training_question_id"], name: "index_training_question_options_on_training_question_id"
+  end
+
+  create_table "training_questions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "explanation"
+    t.integer "position", default: 0, null: false
+    t.text "prompt", null: false
+    t.uuid "training_lesson_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["training_lesson_id"], name: "index_training_questions_on_training_lesson_id"
+  end
+
+  create_table "training_quiz_attempts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.boolean "passed", null: false
+    t.jsonb "responses", default: {}, null: false
+    t.integer "score", null: false
+    t.uuid "training_enrollment_id", null: false
+    t.uuid "training_lesson_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["training_enrollment_id"], name: "index_training_quiz_attempts_on_training_enrollment_id"
+    t.index ["training_lesson_id"], name: "index_training_quiz_attempts_on_training_lesson_id"
+  end
+
+  create_table "training_video_views", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.float "duration_seconds"
+    t.datetime "last_heartbeat_at"
+    t.uuid "training_enrollment_id", null: false
+    t.uuid "training_lesson_id", null: false
+    t.datetime "updated_at", null: false
+    t.float "watched_seconds", default: 0.0, null: false
+    t.index ["training_enrollment_id", "training_lesson_id"], name: "index_training_video_views_on_enrollment_and_lesson", unique: true
+    t.index ["training_lesson_id"], name: "index_training_video_views_on_training_lesson_id"
+  end
+
   create_table "travel_legs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "arrival_airport"
     t.datetime "arrival_time"
@@ -1508,6 +1659,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_170100) do
   add_foreign_key "event_api_tokens", "users", on_delete: :nullify
   add_foreign_key "event_role_assignments", "events"
   add_foreign_key "event_role_assignments", "users"
+  add_foreign_key "event_volunteers", "events", on_delete: :cascade
+  add_foreign_key "event_volunteers", "users", column: "added_by_id", on_delete: :nullify
+  add_foreign_key "event_volunteers", "users", on_delete: :cascade
   add_foreign_key "events", "event_series"
   add_foreign_key "events", "scan_contexts", column: "hotel_scan_context_id"
   add_foreign_key "events", "users", column: "airtable_config_updated_by_id"
@@ -1608,6 +1762,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_170100) do
   add_foreign_key "tickets", "users", column: "merged_by_id"
   add_foreign_key "toolchest_oauth_access_grants", "toolchest_oauth_applications", column: "application_id"
   add_foreign_key "toolchest_oauth_access_tokens", "toolchest_oauth_applications", column: "application_id"
+  add_foreign_key "training_badge_awards", "training_badges"
+  add_foreign_key "training_badge_awards", "training_courses", on_delete: :nullify
+  add_foreign_key "training_badge_awards", "users", column: "awarded_by_id", on_delete: :nullify
+  add_foreign_key "training_badge_awards", "users", column: "revoked_by_id", on_delete: :nullify
+  add_foreign_key "training_badge_awards", "users", on_delete: :cascade
+  add_foreign_key "training_course_invitations", "training_courses", on_delete: :cascade
+  add_foreign_key "training_course_invitations", "users", column: "invited_by_id", on_delete: :nullify
+  add_foreign_key "training_course_invitations", "users", on_delete: :cascade
+  add_foreign_key "training_courses", "training_badges"
+  add_foreign_key "training_enrollments", "training_courses", on_delete: :cascade
+  add_foreign_key "training_enrollments", "users", on_delete: :cascade
+  add_foreign_key "training_lesson_completions", "training_enrollments", on_delete: :cascade
+  add_foreign_key "training_lesson_completions", "training_lessons", on_delete: :cascade
+  add_foreign_key "training_lessons", "training_courses", on_delete: :cascade
+  add_foreign_key "training_question_options", "training_questions", on_delete: :cascade
+  add_foreign_key "training_questions", "training_lessons", on_delete: :cascade
+  add_foreign_key "training_quiz_attempts", "training_enrollments", on_delete: :cascade
+  add_foreign_key "training_quiz_attempts", "training_lessons", on_delete: :cascade
+  add_foreign_key "training_video_views", "training_enrollments", on_delete: :cascade
+  add_foreign_key "training_video_views", "training_lessons", on_delete: :cascade
   add_foreign_key "travel_legs", "travels"
   add_foreign_key "travels", "participant_events"
 end

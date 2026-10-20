@@ -1,0 +1,43 @@
+<div class="space-y-6">
+  <%= link_to "← Training", admin_training_path, class: "text-sm text-gray-500 hover:text-[#ec3750]" %>
+  <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900"><%= @badge.name %></h1>
+      <p class="text-sm text-gray-500 mt-1"><%= training_validity(@badge) %></p>
+      <div class="mt-2"><%= render "admin/training/required_roles", badge: @badge %></div>
+    </div>
+    <div class="flex gap-2">
+      <%= link_to "Edit", edit_admin_training_badge_path(@badge), class: "px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50" %>
+      <%= link_to "Award Manually", new_admin_training_badge_award_path(@badge), class: "px-4 py-2 bg-[#d42f46] text-white rounded-md text-sm hover:bg-[#b82840]" %>
+    </div>
+  </div>
+
+  <div class="flex gap-2 text-sm">
+    <% Admin::TrainingBadgesController::STATUS_FILTERS.each do |filter| %>
+      <%= link_to filter.titleize, admin_training_badge_path(@badge, status: filter), class: "px-3 py-1 rounded-full #{filter == @filter ? "bg-[#ec3750] text-white" : "bg-gray-100 text-gray-700"}" %>
+    <% end %>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-100">
+      <tbody class="divide-y divide-gray-100 text-sm">
+        <% if @awards.empty? %><tr><td class="px-6 py-8 text-center text-gray-500">No awards.</td></tr><% end %>
+        <% @awards.each do |award| %>
+          <tr>
+            <td class="px-6 py-4"><%= link_to award.user.display_name_or_fallback, admin_user_path(award.user), class: "font-medium text-gray-900 hover:text-[#ec3750]" %><div class="text-gray-500"><%= award.user.email %></div></td>
+            <td class="px-6 py-4 text-gray-600"><%= training_award_state_label(award) %><% if award.revoked_reason.present? %><div class="text-xs text-gray-500"><%= award.revoked_reason %></div><% end %></td>
+            <td class="px-6 py-4 text-gray-600"><%= award.course ? "Completed #{award.course.title}" : "By #{award.awarded_by&.display_name_or_fallback || "an admin"}: #{award.note}" %></td>
+            <td class="px-6 py-4 text-right">
+              <% unless award.revoked? %>
+                <%= form_with url: revoke_admin_training_badge_award_path(@badge, award), method: :patch, class: "inline-flex gap-2" do %>
+                  <%= text_field_tag :reason, nil, placeholder: "Reason", class: "border border-gray-300 rounded-md px-2 py-1 text-sm", "aria-label": "Reason for revoking" %>
+                  <%= button_tag "Revoke", class: "text-sm text-red-600 hover:text-red-900", data: { turbo_confirm: "Revoke this award?" } %>
+                <% end %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>

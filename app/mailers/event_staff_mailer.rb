@@ -15,6 +15,8 @@ class EventStaffMailer < ApplicationMailer
     @role_cannot = Array(details[:cannot])
 
     @first_name = @user.name.presence&.split&.first || @user.email.split("@").first
+    @training_badges = TrainingBadge.required_for(@assignment.role).ordered.to_a
+    @training_url = Rails.application.routes.url_helpers.training_url(host: default_host, protocol: default_protocol)
     @event_name = @event.name
     @dashboard_url = Rails.application.routes.url_helpers.admin_event_dashboard_url(
       @event,

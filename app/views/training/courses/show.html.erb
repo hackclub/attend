@@ -1,0 +1,106 @@
+<% content_for :title, "#{@course.title} – Training – Attend" %>
+<% next_lesson = @enrollment&.next_lesson %>
+<% award_state = @award && training_award_state(@award) %>
+
+<div class="w-full max-w-3xl mx-auto">
+  <%= link_to "← All training", training_path, class: "portal-link text-sm inline-block mb-6" %>
+
+  <% if @course.access_invite_only? && (events = training_access_events(@course)).any? %>
+    <p class="portal-hint text-sm mb-4">Required for your role at <%= events.map(&:name).to_sentence %>.</p>
+  <% end %>
+
+  <% if @course.draft? %>
+    <div class="portal-note portal-note-info mb-6">
+      <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/>
+      </svg>
+      <p class="portal-body text-sm">This course is a draft, so only admins can see it. Completing it won't award a badge.</p>
+    </div>
+  <% end %>
+
+  <div class="portal-card p-6 sm:p-8 mb-6">
+    <div class="flex flex-col sm:flex-row gap-5">
+      <%= render "training/badge_medallion", size: "size-16",
+            tone: { nil => "accent", current: "success", expiring: "warn", expired: "neutral", revoked: "neutral" }.fetch(award_state) %>
+      <div class="min-w-0 flex-1">
+        <h1 class="portal-title text-2xl sm:text-3xl mb-2"><%= @course.title %></h1>
+        <% if @course.summary.present? %>
+          <p class="portal-body mb-3"><%= @course.summary %></p>
+        <% end %>
+        <p class="portal-meta text-sm">
+          <%= pluralize(@course.lessons.size, "lesson") %>
+          <% if @course.estimated_minutes %> · about <%= @course.estimated_minutes %> minutes<% end %>
+          <% if @course.lessons.any?(&:quiz?) %> · quizzes need <%= @course.pass_mark %>% to pass<% end %>
+        </p>
+        <% if @course.badge %>
+          <p class="portal-hint text-sm mt-1">Earns <strong class="portal-heading"><%= @course.badge.name %></strong> · <%= training_validity(@course.badge).downcase %></p>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="mt-6 flex flex-col sm:flex-row gap-3">
+      <% if @enrollment.nil? %>
+        <%= button_to "Start course", enroll_training_course_path(@course), class: "portal-btn portal-btn-primary w-full sm:w-auto", disabled: @course.lessons.empty? %>
+      <% elsif !@enrollment.completed? %>
+        <%= link_to "Continue", training_course_lesson_path(@course, next_lesson), class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+      <% else %>
+        <% if @award %>
+          <%= link_to "View badge", training_award_path(@award), class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+        <% end %>
+        <% if @award.nil? || award_state == :expiring %>
+          <%= button_to (@award ? "Retake to renew" : "Retake course"), restart_training_course_path(@course),
+                class: "portal-btn portal-btn-secondary w-full sm:w-auto",
+                data: { turbo_confirm: "Start this course again from the first lesson?" } %>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+
+  <% if @award %>
+    <div class="portal-note <%= award_state == :expiring ? "portal-note-warn" : "portal-note-success" %> mb-6">
+      <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+      </svg>
+      <p class="portal-body text-sm">You hold <%= @award.badge.name %>. <%= training_award_state_label(@award) %>.</p>
+    </div>
+  <% end %>
+
+  <section aria-labelledby="lessons-heading">
+    <h2 id="lessons-heading" class="portal-heading text-lg mb-3">Lessons</h2>
+    <ol class="space-y-2">
+      <% @course.lessons.each_with_index do |lesson, index| %>
+        <% done = @enrollment&.lesson_completed?(lesson) %>
+        <% open = @enrollment&.lesson_unlocked?(lesson) %>
+        <li class="portal-step-row <%= "portal-step-row-done" if done %>">
+          <div class="flex items-start gap-3 min-w-0">
+            <span class="portal-step-marker <%= done ? "portal-step-marker-done" : (lesson == next_lesson ? "portal-step-marker-current" : "") %>">
+              <% if done %>
+                <svg class="size-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+                </svg>
+                <span class="sr-only">Completed:</span>
+              <% else %>
+                <%= index + 1 %>
+              <% end %>
+            </span>
+            <div class="min-w-0">
+              <p class="portal-heading text-sm sm:text-base">
+                <% if open %>
+                  <%= link_to lesson.title, training_course_lesson_path(@course, lesson), class: "hover:underline" %>
+                <% else %>
+                  <%= lesson.title %>
+                <% end %>
+              </p>
+              <p class="portal-hint text-xs mt-0.5">
+                <%= lesson.quiz? ? "Quiz · #{pluralize(lesson.questions.size, "question")}" : (lesson.video? ? "Video and reading" : "Reading") %>
+              </p>
+            </div>
+          </div>
+          <% if @enrollment && !open %>
+            <span class="portal-badge portal-badge-neutral">Locked</span>
+          <% end %>
+        </li>
+      <% end %>
+    </ol>
+  </section>
+</div>

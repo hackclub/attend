@@ -182,4 +182,31 @@ if Rails.env.development?
   puts "Created Haven registrations for #{participant.email} and #{minor.email}"
 end
 
+# Staff training: the two badges, and a draft course with placeholder
+# content to build the real one from. Requirements are set per badge in
+# /admin/training.
+event_badge = TrainingBadge.find_or_create_by!(slug: "hack-club-child-safety-event") do |badge|
+  badge.name = "Hack Club Child Safety Event"
+  badge.description = "Completed Hack Club's child safety training for working at events."
+  badge.validity_months = 12
+  badge.required_roles = %w[event_admin ops limited safeguarding_lead volunteer]
+end
+TrainingBadge.find_or_create_by!(slug: "safeguarding-child-safety-trained") do |badge|
+  badge.name = "Safeguarding/Child Safety Trained"
+  badge.description = "Completed Hack Club's in-depth safeguarding training."
+  badge.validity_months = 24
+  badge.required_roles = %w[safeguarding_lead]
+end
+unless TrainingCourse.exists?(slug: "example-child-safety")
+  course = TrainingCourse.create!(title: "Example child safety course", slug: "example-child-safety", badge: event_badge,
+    summary: "Placeholder content for trying the course flow in development.", estimated_minutes: 10)
+  course.lessons.create!(title: "Why this matters", body: "## Placeholder\n\nReplace this with the real lesson.\n\n> Callouts look like this.")
+  quiz = course.lessons.create!(title: "Check your understanding", body: "A short quiz.", require_full_watch: true)
+  question = quiz.questions.new(prompt: "Placeholder: who should you tell about a concern?", explanation: "Placeholder explanation.")
+  question.options.build(body: "The safeguarding lead", correct: true, explanation: "Placeholder: why this is right.")
+  question.options.build(body: "Nobody", explanation: "Placeholder: why this is wrong.")
+  question.save!
+end
+puts "Created training badges and an example draft course"
+
 puts "Seeding complete!"

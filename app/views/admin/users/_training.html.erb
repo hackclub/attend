@@ -1,0 +1,25 @@
+<%# Training badges this person holds (or held). Locals: user, awards, enrollments %>
+<div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+    <h2 class="text-lg font-medium text-gray-900">Training (<%= awards.size %>)</h2>
+    <%= link_to "Training admin", admin_training_path, class: "text-sm text-[#ec3750] hover:underline" %>
+  </div>
+  <% if awards.empty? && enrollments.empty? %>
+    <p class="px-6 py-6 text-sm text-gray-500">No training badges.</p>
+  <% else %>
+    <ul class="divide-y divide-gray-100">
+      <% awards.each do |award| %>
+        <li class="px-6 py-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <%= link_to award.badge.name, admin_training_badge_path(award.badge), class: "font-medium text-gray-900 hover:text-[#ec3750]" %>
+          <span class="text-gray-500"><%= training_award_state_label(award) %> · <%= award.course ? "completed #{award.course.title}" : "awarded by #{award.awarded_by&.display_name_or_fallback || "an admin"}" %></span>
+        </li>
+      <% end %>
+      <% enrollments.each do |enrollment| %>
+        <li class="px-6 py-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span class="font-medium text-gray-900"><%= enrollment.course.title %></span>
+          <span class="text-gray-500">In progress · <%= enrollment.progress_percent %>%</span>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</div>

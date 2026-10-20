@@ -71,6 +71,10 @@ class User < ApplicationRecord
   has_many :mobile_tokens, dependent: :destroy
   has_many :push_tokens, dependent: :destroy
   has_many :passports, dependent: :destroy
+  has_many :training_enrollments, dependent: :destroy
+  has_many :training_badge_awards, dependent: :destroy
+  has_many :training_course_invitations, dependent: :destroy
+  has_many :event_volunteers, dependent: :destroy
   # API tokens name their creator, and each kind survives that person
   # differently. Event and series keys belong to the event or series and keep
   # working with a null creator; a global key's authority *is* its owner's
@@ -249,6 +253,25 @@ class User < ApplicationRecord
           assignment.destroy!
         else
           assignment.update!(user: self)
+        end
+      end
+
+      placeholder.event_volunteers.each do |volunteer|
+        if EventVolunteer.exists?(user_id: id, event_id: volunteer.event_id)
+          volunteer.destroy!
+        else
+          volunteer.update!(user: self)
+        end
+      end
+
+      # Training an admin credited, or invited them to, before this person
+      # first signed in.
+      placeholder.training_badge_awards.update_all(user_id: id)
+      placeholder.training_course_invitations.each do |invitation|
+        if TrainingCourseInvitation.exists?(user_id: id, training_course_id: invitation.training_course_id)
+          invitation.destroy!
+        else
+          invitation.update!(user: self)
         end
       end
 

@@ -53,6 +53,7 @@
             <% dashboard_active = request.path == dashboard_path || request.path.start_with?("#{dashboard_path}/events") %>
             <% messages_active = request.path.start_with?(dashboard_messages_path) %>
             <% incident_active = request.path.start_with?(incident_report_path) %>
+            <% training_active = request.path == training_path || request.path.start_with?("#{training_path}/") %>
             <div class="flex items-center gap-8">
               <%= link_to root_path, class: "flex items-center gap-2.5", aria: { label: "Homepage" } do %>
                 <img src="/icon-512.png" alt="" class="size-8">
@@ -61,6 +62,7 @@
               <div class="hidden md:flex items-center gap-1">
                 <%= link_to "Dashboard", dashboard_path, class: "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors #{dashboard_active ? 'bg-[#ec3750]/10 text-[#ec3750]' : 'text-[#3c4858] hover:bg-[#f9fafc] hover:text-[#ec3750]'}" %>
                 <%= link_to "Messages", dashboard_messages_path, class: "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors #{messages_active ? 'bg-[#ec3750]/10 text-[#ec3750]' : 'text-[#3c4858] hover:bg-[#f9fafc] hover:text-[#ec3750]'}" %>
+                <%= link_to "Training", training_path, class: "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors #{training_active ? 'bg-[#ec3750]/10 text-[#ec3750]' : 'text-[#3c4858] hover:bg-[#f9fafc] hover:text-[#ec3750]'}" if training_nav_visible? %>
                 <%= link_to "Report Incident", incident_report_path, class: "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors #{incident_active ? 'bg-[#ec3750]/10 text-[#ec3750]' : 'text-[#3c4858] hover:bg-[#f9fafc] hover:text-[#ec3750]'}" %>
               </div>
             </div>
@@ -119,6 +121,7 @@
                 </span>
               <% end %>
             <% end %>
+            <%= link_to "Training", training_path, class: "block px-3 py-2 rounded-lg text-base font-medium #{training_active ? 'bg-[#ec3750]/10 text-[#ec3750]' : 'text-[#3c4858] hover:bg-[#f9fafc] hover:text-[#ec3750]'}" if training_nav_visible? %>
             <%= link_to "Report Incident", incident_report_path, class: "block px-3 py-2 rounded-lg text-base font-medium #{incident_active ? 'bg-[#ec3750]/10 text-[#ec3750]' : 'text-[#3c4858] hover:bg-[#f9fafc] hover:text-[#ec3750]'}" %>
             <% if current_user.admin? %>
               <div class="border-2 border-dashed border-[#ff8c37] rounded-lg">

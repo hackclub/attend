@@ -1,0 +1,5 @@
+<div class="max-w-3xl space-y-6">
+  <%= link_to "← #{@course.title}", admin_training_course_path(@course), class: "text-sm text-gray-500 hover:text-[#ec3750]" %>
+  <h1 class="text-2xl font-bold text-gray-900">New Lesson</h1>
+  <%= render "form", lesson: @lesson %>
+</div>

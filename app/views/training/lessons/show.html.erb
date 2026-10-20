@@ -1,0 +1,112 @@
+<% content_for :title, "#{@lesson.title} – #{@course.title} – Attend" %>
+<% lessons = @course.lessons %>
+<% done = @enrollment.lesson_completed?(@lesson) %>
+<% next_lesson = lessons[@lesson_index + 1] %>
+<% watched = @enrollment.video_watched?(@lesson) %>
+<% gated = @lesson.watch_required? && !done %>
+<% award = @enrollment.completed? && @course.badge && current_user.training_badge_awards.current.where(training_badge_id: @course.training_badge_id).order(:awarded_at).last %>
+
+<%= tag.div class: "w-full max-w-3xl mx-auto",
+      data: (gated ? {
+        controller: "training-video",
+        training_video_source_value: @lesson.video_source,
+        training_video_video_id_value: @lesson.video_id,
+        training_video_progress_url_value: video_progress_training_course_lesson_path(@course, @lesson),
+        training_video_watched_value: @video_view&.watched_seconds || 0,
+        training_video_complete_value: watched
+      } : {}) do %>
+  <div class="flex items-center justify-between gap-4 mb-6">
+    <%= link_to "← #{@course.title}", training_course_path(@course), class: "portal-link text-sm truncate" %>
+    <span class="portal-meta text-sm shrink-0">Lesson <%= @lesson_index + 1 %> of <%= lessons.size %></span>
+  </div>
+
+  <div class="portal-progress mb-8" role="progressbar" aria-valuenow="<%= @enrollment.progress_percent %>" aria-valuemin="0" aria-valuemax="100" aria-label="Course progress">
+    <div class="portal-progress-fill <%= "portal-progress-fill-done" if @enrollment.completed? %>" style="--portal-progress: <%= @enrollment.progress_percent / 100.0 %>"></div>
+  </div>
+
+  <% if @attempt %>
+    <%= render "training/lessons/review", attempt: @attempt, lesson: @lesson, course: @course %>
+  <% end %>
+
+  <article class="portal-card p-6 sm:p-8 mb-6">
+    <h1 class="portal-title text-2xl sm:text-3xl mb-6"><%= @lesson.title %></h1>
+
+    <% if @lesson.video? %>
+      <%= render "training/lessons/video", lesson: @lesson, gated: gated %>
+    <% end %>
+
+    <% if @lesson.body.present? %>
+      <div class="portal-prose"><%= training_markdown(@lesson.body) %></div>
+    <% end %>
+  </article>
+
+  <% if @lesson.quiz? && !done %>
+    <%= form_with url: quiz_training_course_lesson_path(@course, @lesson), method: :post, class: "portal-card p-6 sm:p-8", data: { turbo: false } do %>
+      <h2 class="portal-heading text-lg mb-1"><%= @attempt ? "Try again" : "Check your understanding" %></h2>
+      <p class="portal-hint text-sm mb-6">Answer every question. You need <%= @course.pass_mark %>% to pass, and you can try as many times as you need.</p>
+
+      <% if gated %>
+        <p class="portal-note portal-note-info portal-body text-sm mb-6 <%= "hidden" if watched %>" data-training-video-target="locked">
+          The quiz opens once you've watched the video.
+        </p>
+      <% end %>
+
+      <%= tag.fieldset class: "space-y-8 disabled:opacity-60", disabled: (gated && !watched), data: (gated ? { training_video_target: "gate" } : {}) do %>
+        <% @lesson.questions.each_with_index do |question, qi| %>
+          <% multiple = question.multiple_answers? %>
+          <% chosen = Array(@answers&.dig(question.id)) %>
+          <% blank = @unanswered_ids&.include?(question.id) %>
+          <fieldset <%= "aria-invalid=true" if blank %> class="<%= "portal-note portal-note-warn" if blank %>">
+            <legend class="portal-heading text-base mb-1"><%= qi + 1 %>. <%= question.prompt %></legend>
+            <p class="portal-meta text-xs mb-2"><%= multiple ? "Choose all that apply." : "Choose one." %><%= " This one still needs an answer." if blank %></p>
+            <% question.options.each do |option| %>
+              <label class="portal-check-row">
+                <% if multiple %>
+                  <%= check_box_tag "answers[#{question.id}][]", option.id, chosen.include?(option.id), id: "option-#{option.id}", class: "portal-check mt-1" %>
+                <% else %>
+                  <%= radio_button_tag "answers[#{question.id}][]", option.id, chosen.include?(option.id), id: "option-#{option.id}", class: "portal-check mt-1", required: true %>
+                <% end %>
+                <span><%= option.body %></span>
+              </label>
+            <% end %>
+          </fieldset>
+        <% end %>
+
+        <div class="flex justify-end">
+          <%= button_tag "Submit answers", type: "submit", class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+        </div>
+      <% end %>
+    <% end %>
+  <% else %>
+    <div class="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
+      <% if @lesson_index.positive? %>
+        <%= link_to "Previous lesson", training_course_lesson_path(@course, lessons[@lesson_index - 1]), class: "portal-btn portal-btn-quiet w-full sm:w-auto" %>
+      <% else %>
+        <span></span>
+      <% end %>
+
+      <% if done %>
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+          <% score = @lesson.quiz? && @enrollment.lesson_completions.find_by(lesson: @lesson)&.score %>
+          <span class="portal-badge portal-badge-done self-start sm:self-auto"><%= score ? "Passed with #{score}%" : "Done" %></span>
+          <% if award %>
+            <%= link_to "View your badge", training_award_path(award), class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+          <% elsif next_lesson %>
+            <%= link_to "Next lesson", training_course_lesson_path(@course, next_lesson), class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+          <% else %>
+            <%= link_to "Back to course", training_course_path(@course), class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+          <% end %>
+        </div>
+      <% else %>
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+          <% if gated %>
+            <span class="portal-meta text-sm <%= "hidden" if watched %>" data-training-video-target="locked">Finish the video to continue.</span>
+          <% end %>
+          <%= button_to (next_lesson ? "Mark as done and continue" : "Mark as done and finish"), complete_training_course_lesson_path(@course, @lesson),
+                class: "portal-btn portal-btn-primary w-full sm:w-auto", form_class: "w-full sm:w-auto",
+                disabled: (gated && !watched), data: (gated ? { training_video_target: "gate" } : {}) %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

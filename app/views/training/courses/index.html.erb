@@ -1,0 +1,96 @@
+<% content_for :title, "Training – Attend" %>
+
+<div class="w-full max-w-3xl mx-auto">
+  <div class="mb-8">
+    <h1 class="portal-title text-3xl mb-2">Training</h1>
+    <p class="portal-hint">Courses everyone working at a Hack Club event needs to complete.</p>
+  </div>
+
+  <% @requirements.each do |event, status| %>
+    <div class="portal-note <%= status.missing.any? ? "portal-note-warn" : "portal-note-info" %> mb-4">
+      <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/>
+      </svg>
+      <div class="portal-body text-sm">
+        <% if status.missing.any? %>
+          <p><strong class="portal-heading"><%= event.name %></strong> needs you to hold <%= status.missing.map(&:name).to_sentence %> before you work it.</p>
+        <% else %>
+          <p>Your <%= status.expiring.map(&:name).to_sentence %> is due for renewal before <strong class="portal-heading"><%= event.name %></strong>.</p>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <section class="mb-10" aria-labelledby="courses-heading">
+    <h2 id="courses-heading" class="portal-heading text-lg mb-3">Courses</h2>
+    <% if @courses.empty? %>
+      <div class="portal-card p-6 text-center">
+        <p class="portal-body">You haven't been invited to any training yet.</p>
+        <p class="portal-hint text-sm mt-1">Courses show up here once you're added to an event that needs them, or someone at Hack Club invites you.</p>
+      </div>
+    <% else %>
+      <ul class="space-y-3">
+        <% @courses.each do |course| %>
+          <% enrollment = @enrollments[course.id] %>
+          <% progress = enrollment&.progress_percent || 0 %>
+          <li class="portal-card p-5">
+            <div class="flex flex-col sm:flex-row sm:items-start gap-4">
+              <%= render "training/badge_medallion", tone: enrollment&.completed? ? "success" : "accent" %>
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                  <h3 class="portal-heading text-base"><%= link_to course.title, training_course_path(course), class: "hover:underline" %></h3>
+                  <% if course.draft? %>
+                    <span class="portal-badge portal-badge-neutral">Draft</span>
+                  <% end %>
+                  <% if enrollment&.completed? %>
+                    <span class="portal-badge portal-badge-done">Completed</span>
+                  <% elsif enrollment %>
+                    <span class="portal-badge portal-badge-waiting">In progress</span>
+                  <% end %>
+                </div>
+                <% if course.summary.present? %>
+                  <p class="portal-body text-sm"><%= course.summary %></p>
+                <% end %>
+                <p class="portal-meta text-xs mt-2">
+                  <%= pluralize(course.lessons.size, "lesson") %>
+                  <% if course.estimated_minutes %> · about <%= course.estimated_minutes %> minutes<% end %>
+                  <% if course.badge %> · earns <%= course.badge.name %><% end %>
+                </p>
+                <% if enrollment && !enrollment.completed? %>
+                  <div class="portal-progress mt-3" role="progressbar" aria-valuenow="<%= progress %>" aria-valuemin="0" aria-valuemax="100" aria-label="Course progress">
+                    <div class="portal-progress-fill" style="--portal-progress: <%= progress / 100.0 %>"></div>
+                  </div>
+                <% end %>
+              </div>
+              <%= link_to (enrollment.nil? ? "Start" : enrollment.completed? ? "Review" : "Continue"), training_course_path(course),
+                    class: "portal-btn #{enrollment&.completed? ? "portal-btn-secondary" : "portal-btn-primary"} shrink-0 w-full sm:w-auto" %>
+            </div>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+
+  <section aria-labelledby="badges-heading">
+    <h2 id="badges-heading" class="portal-heading text-lg mb-3">Your badges</h2>
+    <% if @awards.empty? %>
+      <p class="portal-hint text-sm">Badges you earn will show up here.</p>
+    <% else %>
+      <ul class="grid gap-3 sm:grid-cols-2">
+        <% @awards.each do |award| %>
+          <% state = training_award_state(award) %>
+          <li>
+            <%= link_to training_award_path(award), class: "portal-card p-4 flex items-center gap-3 hover:border-(--border-strong) transition-colors" do %>
+              <%= render "training/badge_medallion", size: "size-10",
+                    tone: { current: "success", expiring: "warn", expired: "neutral", revoked: "neutral" }.fetch(state) %>
+              <span class="min-w-0">
+                <span class="portal-heading text-sm block"><%= award.badge.name %></span>
+                <span class="portal-hint text-xs block"><%= training_award_state_label(award) %></span>
+              </span>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </section>
+</div>

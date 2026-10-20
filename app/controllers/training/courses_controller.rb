@@ -1,0 +1,51 @@
+module Training
+  class CoursesController < BaseController
+    before_action :set_course, except: :index
+
+    def index
+      @courses = training_access.courses(visible_courses).ordered.includes(:badge, :lessons)
+      @enrollments = current_user.training_enrollments.index_by(&:training_course_id)
+      @awards = current_user.training_badge_awards.includes(:badge, :course).newest_first
+      @requirements = upcoming_requirements
+    end
+
+    def show
+      @award = current_user.training_badge_awards.includes(:badge).current
+        .where(training_badge_id: @course.training_badge_id).order(:expires_at).last if @course.badge
+    end
+
+    def enroll
+      enrollment = current_user.training_enrollments.find_or_create_by!(course: @course)
+      redirect_to training_course_lesson_path(@course, enrollment.next_lesson || @course.lessons.first)
+    rescue ActiveRecord::RecordNotUnique
+      retry
+    end
+
+    def restart
+      if @enrollment.nil?
+        redirect_to training_course_path(@course)
+        return
+      end
+
+      @enrollment.restart!
+      redirect_to training_course_lesson_path(@course, @course.lessons.first),
+        notice: "Course restarted. Your badge stays valid until it expires."
+    end
+
+    private
+
+    # Badges this person still needs for an event they're working that hasn't
+    # finished, so the page can say what's required and by when.
+    def upcoming_requirements
+      event_ids = current_user.event_role_assignments.pluck(:event_id) + current_user.event_volunteers.pluck(:event_id)
+      events = Event.where(id: event_ids.uniq)
+        .where("events.ends_at IS NULL OR events.ends_at >= ?", Time.current)
+        .order(:starts_at)
+
+      events.filter_map do |event|
+        status = TrainingStatus.for_user_at_event(current_user, event)
+        [ event, status ] if status.missing.any? || status.expiring.any?
+      end
+    end
+  end
+end

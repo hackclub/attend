@@ -139,6 +139,28 @@ Rails.application.routes.draw do
     delete ":provider", action: :destroy, as: :disconnect_account
   end
 
+  # Staff training: courses that award badges, which event roles can be
+  # required to hold (see TrainingBadge). Open to anyone signed in, so
+  # volunteers with no admin access can take it too. Awards are routed ahead
+  # of courses because a course lives at /training/:slug.
+  get "training", to: "training/courses#index", as: :training
+  namespace :training do
+    resources :awards, only: :show, path: "badges"
+    resources :courses, only: :show, param: :slug, path: "" do
+      member do
+        post :enroll
+        post :restart
+      end
+      resources :lessons, only: :show do
+        member do
+          post :complete
+          post :quiz
+          post :video_progress
+        end
+      end
+    end
+  end
+
   scope "/onboarding" do
     get "/", to: "onboarding#index", as: :onboarding
     get "/waiver", to: "onboarding#waiver", as: :onboarding_waiver
@@ -281,6 +303,7 @@ Rails.application.routes.draw do
           end
         end
       resources :staff, only: [ :index, :new, :create, :update, :destroy ], controller: "event_staff"
+      resources :volunteers, only: [ :create, :destroy ], controller: "event_volunteers"
       resources :registration_change_requests, only: [ :index, :show ] do
         member do
           patch :approve
@@ -377,6 +400,26 @@ Rails.application.routes.draw do
       resource :impersonation, only: [ :create ]
       resources :passports, only: [ :create, :destroy ] do
         post :confirm, on: :member
+      end
+    end
+
+    # Authoring for staff training; the learner side is /training.
+    get "training", to: "training_courses#index", as: :training
+    scope "training", as: "training" do
+      resources :courses, controller: "training_courses", param: :slug, except: :index do
+        patch :move, on: :member
+        resources :invitations, controller: "training_course_invitations", only: [ :create, :destroy ]
+        resources :lessons, controller: "training_lessons", except: [ :index, :show ] do
+          patch :move, on: :member
+          resources :questions, controller: "training_questions", except: [ :index, :show ] do
+            patch :move, on: :member
+          end
+        end
+      end
+      resources :badges, controller: "training_badges", except: :index do
+        resources :awards, controller: "training_badge_awards", only: [ :new, :create ] do
+          patch :revoke, on: :member
+        end
       end
     end
 

@@ -1,0 +1,45 @@
+<%# Training badges this person holds (or held), with a manual award and
+    revoke from the badge's own page. Locals: user, awards, enrollments %>
+<section class="cs-container">
+  <div class="cs-container-header cs-container-header-divided">
+    <div>
+      <h2 class="cs-h2">Training <span class="cs-counter">(<%= awards.size %>)</span></h2>
+    </div>
+    <div class="cs-actions"><%= link_to "Training admin", admin_training_path, class: "cs-btn" %></div>
+  </div>
+  <% if awards.empty? && enrollments.empty? %>
+    <div class="cs-empty"><p class="cs-empty-title">No training badges</p></div>
+  <% else %>
+    <div class="cs-table-wrap">
+      <table class="cs-table">
+        <thead>
+          <tr>
+            <th scope="col">Badge</th>
+            <th scope="col">Status</th>
+            <th scope="col">Awarded</th>
+            <th scope="col">How</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% awards.each do |award| %>
+            <% state = training_award_state(award) %>
+            <tr>
+              <td><%= link_to award.badge.name, admin_training_badge_path(award.badge), class: "cs-link" %></td>
+              <td class="whitespace-nowrap"><%= cs_status({ current: :success, expiring: :warning, expired: :stopped, revoked: :error }.fetch(state), training_award_state_label(award)) %></td>
+              <td class="whitespace-nowrap"><%= cs_absolute_time(award.awarded_at, date_only: true) %></td>
+              <td><%= award.course ? "Completed #{award.course.title}" : "Awarded by #{award.awarded_by&.display_name_or_fallback || "an admin"}" %></td>
+            </tr>
+          <% end %>
+          <% enrollments.each do |enrollment| %>
+            <tr>
+              <td><%= link_to enrollment.course.title, admin_training_course_path(enrollment.course), class: "cs-link" %></td>
+              <td class="whitespace-nowrap"><%= cs_status(:in_progress, "In progress · #{enrollment.progress_percent}%") %></td>
+              <td class="whitespace-nowrap cs-secondary">Started <%= cs_relative_time(enrollment.started_at, inline: true) %></td>
+              <td></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+</section>

@@ -17,16 +17,23 @@ Rails.application.configure do
   mintlify_widget = "https://widget.mintlify.com"
   mintlify_api = %w[https://api.mintlify.com https://ph.mintlify.com]
   hcaptcha = %w[https://js.hcaptcha.com https://*.hcaptcha.com]
+  # Video players a training lesson can use (TrainingLesson::VIDEO_LINKS):
+  # their frames, plus the player APIs training_video_controller.js loads to
+  # stop learners seeking ahead.
+  training_video_players = %w[https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com]
+  training_video_apis = %w[https://www.youtube.com https://player.vimeo.com]
 
   config.content_security_policy do |policy|
     policy.default_src :self
     policy.font_src    :self, :data, "https://cdn.docuseal.com", *docuseal_origins, mintlify_widget
     policy.img_src     :self, :data, :https
     policy.object_src  :none
-    policy.script_src  :self, "https://cdn.docuseal.com", *docuseal_origins, "https://cdn.cloudflare.com", "https://unpkg.com", "https://cdn.jsdelivr.net", "https://challenges.cloudflare.com", "https://plausible.io", mintlify_widget, *hcaptcha
+    # Uploaded lesson videos stream from the storage bucket.
+    policy.media_src   :self, :https
+    policy.script_src  :self, "https://cdn.docuseal.com", *docuseal_origins, "https://cdn.cloudflare.com", "https://unpkg.com", "https://cdn.jsdelivr.net", "https://challenges.cloudflare.com", "https://plausible.io", mintlify_widget, *hcaptcha, *training_video_apis
     policy.style_src   :self, :unsafe_inline, "https://cdn.docuseal.com", *docuseal_origins, "https://cdn.jsdelivr.net", mintlify_widget
     policy.connect_src :self, "https://api.docuseal.com", *docuseal_origins, "ws://localhost:9876", "ws://127.0.0.1:9876", "https://challenges.cloudflare.com", "https://plausible.io", mintlify_widget, *mintlify_api, *hcaptcha
-    policy.frame_src   :self, *docuseal_origins, "https://challenges.cloudflare.com", *hcaptcha
+    policy.frame_src   :self, *docuseal_origins, "https://challenges.cloudflare.com", *hcaptcha, *training_video_players
     policy.frame_ancestors :self
     policy.base_uri    :self
     # HCA sign-in: the button posts to /users/auth/hack_club (self), which then

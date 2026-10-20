@@ -541,6 +541,93 @@
 }
 
 /* ====================================================================
+ * Training lessons — author-written markdown rendered on the portal
+ * surfaces. There's no typography plugin, so this sets a readable rhythm
+ * for the handful of elements lesson bodies use, in the portal's tokens.
+ * ==================================================================== */
+@layer components {
+  .portal-prose {
+    color: var(--text);
+    line-height: 1.7;
+  }
+
+  .portal-prose > * + * {
+    margin-top: 1em;
+  }
+
+  .portal-prose :is(h1, h2, h3, h4) {
+    color: var(--text-strong);
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    margin-top: 1.75em;
+  }
+
+  .portal-prose h1 { font-size: 1.5rem; }
+  .portal-prose h2 { font-size: 1.25rem; }
+  .portal-prose h3 { font-size: 1.075rem; }
+  .portal-prose > :first-child { margin-top: 0; }
+
+  .portal-prose a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .portal-prose :is(ul, ol) {
+    padding-left: 1.4em;
+  }
+
+  .portal-prose ul { list-style: disc; }
+  .portal-prose ol { list-style: decimal; }
+  .portal-prose li + li { margin-top: 0.35em; }
+
+  .portal-prose blockquote {
+    border-left: 3px solid var(--accent);
+    background-color: var(--bg-elev-2);
+    border-radius: 0 var(--portal-r-control) var(--portal-r-control) 0;
+    padding: 0.75rem 1rem;
+    color: var(--text-strong);
+  }
+
+  .portal-prose img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--portal-r-control);
+  }
+
+  .portal-prose hr {
+    border: 0;
+    border-top: 1px solid var(--border-card);
+  }
+
+  .portal-prose code {
+    font-size: 0.9em;
+    background-color: var(--bg-elev-2);
+    border-radius: 4px;
+    padding: 0.1em 0.3em;
+  }
+
+  .portal-prose table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+  }
+
+  .portal-prose :is(th, td) {
+    border: 1px solid var(--border-card);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .portal-prose th {
+    background-color: var(--bg-elev-2);
+    color: var(--text-strong);
+  }
+}
+
+/* ====================================================================
  * Series dashboard — the cross-event ops view at /admin/series/:slug.
  *
  * The marks here (funnel bars, per-event completion bars, map markers)
