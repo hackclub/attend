@@ -80,20 +80,25 @@ RSpec.describe Bans::UcatSync do
       expect(sync.unchanged).to eq(1)
     end
 
-    it "takes over an email from an expired or revoked ban so the person stays blocked" do
-      lapsed = create(:ban, :expired, email: "banned@example.com")
+    [ :expired, :revoked_by_admin, :active ].each do |state|
+      it "bans the person alongside a #{state} manual ban on the same email, leaving that ban untouched" do
+        admin = create(:user)
+        manual = create(:ban, email: "banned@example.com", expires_at: (1.day.ago if state == :expired))
+        manual.revoke!(by: admin) if state == :revoked_by_admin
 
-      expect(sync.added).to eq(1)
-      expect(Ban.banned?("banned@example.com")).to be true
-      expect(Ban.ucat.sole.ban_emails.map(&:email)).to eq([ "banned@example.com" ])
-      expect(lapsed.reload.ban_emails).to be_empty
+        expect(sync.added).to eq(1)
+        expect(Ban.banned?("banned@example.com")).to be true
+        expect(manual.reload.ban_emails.map(&:email)).to eq([ "banned@example.com" ])
+        expect(manual.revoked_by).to eq(state == :revoked_by_admin ? admin : nil)
+      end
     end
 
-    it "skips an email already on an active manual ban" do
-      create(:ban, email: "banned@example.com")
+    it "still stops an admin adding a manual ban for an email that's already listed" do
+      sync
+      duplicate = build(:ban, email: "banned@example.com")
 
-      expect(sync.skipped_existing).to eq(1)
-      expect(Ban.ucat).to be_empty
+      expect(duplicate).not_to be_valid
+      expect(duplicate.errors.full_messages.join).to include("already on a ban list")
     end
   end
 

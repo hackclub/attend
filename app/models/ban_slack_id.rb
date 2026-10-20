@@ -10,5 +10,5 @@ class BanSlackId < ApplicationRecord
   normalizes :slack_id, with: ->(id) { id.strip.upcase }
 
   validates :slack_id, presence: true, format: { with: FORMAT }
-  validates :slack_id, uniqueness: { message: "is already on a ban list" }
+  validates :slack_id, uniqueness: { scope: :ban_id }
 end

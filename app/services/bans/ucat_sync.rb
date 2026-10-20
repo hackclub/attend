@@ -8,9 +8,9 @@ module Bans
   # deleted) has their ban revoked; if they come back the same row is
   # reinstated, so history stays on one record.
   #
-  # A ban an admin revoked by hand (revoked_by set) is left alone: the sync
-  # never overrides a human decision. Identifiers already on a manual ban are
-  # skipped, since they're unique and blocked either way.
+  # A UCAT ban an admin revoked by hand (revoked_by set) is left alone: the
+  # sync never overrides a human decision. Manual bans are never touched; a
+  # synced ban keeps its own copy of identifiers that also sit on one.
   class UcatSync
     BASE_ID = "appvV4A3BuC7ttTEP".freeze
     TABLE_ID = "tblYd0CsHO4PGkdwF".freeze
@@ -41,7 +41,7 @@ module Bans
 
     class SafetyLimitExceeded < StandardError; end
 
-    Result = Struct.new(:added, :reinstated, :revoked, :unchanged, :skipped_existing, :cases_without_identity, keyword_init: true)
+    Result = Struct.new(:added, :reinstated, :revoked, :unchanged, :cases_without_identity, keyword_init: true)
 
     Person = Struct.new(:emails, :slack_ids, :case_ids, keyword_init: true) do
       # Stable while the person keeps any email; Slack-only people key on their ID.
@@ -65,7 +65,7 @@ module Bans
 
     def call
       people, cases_without_identity = fetch_people
-      result = Result.new(added: 0, reinstated: 0, revoked: 0, unchanged: 0, skipped_existing: 0, cases_without_identity: cases_without_identity)
+      result = Result.new(added: 0, reinstated: 0, revoked: 0, unchanged: 0, cases_without_identity: cases_without_identity)
 
       existing = Ban.ucat.includes(:ban_emails, :ban_slack_ids).to_a
       by_identifier = existing.each_with_object({}) { |ban, index| identifiers_of(ban).each { index[_1] = ban } }
@@ -167,22 +167,16 @@ module Bans
 
     def upsert(person, ban, result)
       reason = "UCAT ban (#{'case'.pluralize(person.case_ids.size)} #{person.case_ids.join(', ')})"
-      emails, slack_ids = unclaimed_identifiers(person, ban)
 
       if ban.nil?
-        if emails.empty? && slack_ids.empty?
-          result.skipped_existing += 1
-          return
-        end
-
         Ban.create!(source: :ucat, external_key: person.key, reason: reason,
-          ban_emails: emails.map { BanEmail.new(email: _1) }, ban_slack_ids: slack_ids.map { BanSlackId.new(slack_id: _1) })
+          ban_emails: person.emails.map { BanEmail.new(email: _1) }, ban_slack_ids: person.slack_ids.map { BanSlackId.new(slack_id: _1) })
         result.added += 1
         return
       end
 
       reinstating = ban.revoked? && ban.revoked_by_id.nil?
-      sync_identifiers(ban, emails, slack_ids)
+      sync_identifiers(ban, person.emails, person.slack_ids)
       ban.assign_attributes(external_key: person.key, reason: reason)
       ban.revoked_at = nil if reinstating
       ban.save! if ban.changed?
@@ -190,26 +184,7 @@ module Bans
       reinstating ? result.reinstated += 1 : result.unchanged += 1
     end
 
-    # Identifiers on another *active* ban are left where they are: they're
-    # blocked either way. Ones on an expired or revoked ban are moved onto this
-    # person's ban (emails and Slack IDs are unique across bans), otherwise a
-    # lapsed manual ban would silently keep a UCAT-banned person unblocked.
-    # PaperTrail keeps the moved rows' history; the old ban record stays.
-    def unclaimed_identifiers(person, ban)
-      other_bans = ban ? Ban.where.not(id: ban.id) : Ban.all
-      other_emails = BanEmail.where(ban: other_bans).where("LOWER(email) IN (?)", person.emails).includes(:ban)
-      other_slack = BanSlackId.where(ban: other_bans, slack_id: person.slack_ids).includes(:ban)
-
-      held_emails, lapsed_emails = other_emails.partition { _1.ban.active? }
-      held_slack, lapsed_slack = other_slack.partition { _1.ban.active? }
-      (lapsed_emails + lapsed_slack).each(&:destroy!)
-
-      [ person.emails - held_emails.map { _1.email.downcase }, person.slack_ids - held_slack.map(&:slack_id) ]
-    end
-
     def sync_identifiers(ban, emails, slack_ids)
-      return if emails.empty? && slack_ids.empty? # keep what it has rather than leave it unidentifiable
-
       ban.ban_emails.reject { emails.include?(_1.email) }.each(&:destroy!)
       (emails - ban.ban_emails.map(&:email)).each { ban.ban_emails.create!(email: _1) }
       ban.ban_slack_ids.reject { slack_ids.include?(_1.slack_id) }.each(&:destroy!)

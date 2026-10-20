@@ -151,7 +151,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_153712) do
     t.datetime "created_at", null: false
     t.string "email", null: false
     t.datetime "updated_at", null: false
-    t.index "lower((email)::text)", name: "index_ban_emails_on_lower_email", unique: true
+    t.index "ban_id, lower((email)::text)", name: "index_ban_emails_on_ban_id_and_lower_email", unique: true
+    t.index "lower((email)::text)", name: "index_ban_emails_on_lower_email"
     t.index ["ban_id"], name: "index_ban_emails_on_ban_id"
   end
 
@@ -160,8 +161,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_153712) do
     t.datetime "created_at", null: false
     t.string "slack_id", null: false
     t.datetime "updated_at", null: false
-    t.index ["ban_id"], name: "index_ban_slack_ids_on_ban_id"
-    t.index ["slack_id"], name: "index_ban_slack_ids_on_slack_id", unique: true
+    t.index ["ban_id", "slack_id"], name: "index_ban_slack_ids_on_ban_id_and_slack_id", unique: true
+    t.index ["slack_id"], name: "index_ban_slack_ids_on_slack_id"
   end
 
   create_table "bans", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
