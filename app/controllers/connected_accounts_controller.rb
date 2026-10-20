@@ -4,6 +4,7 @@
 # authorization code flow with PKCE; the state, verifier and return path
 # live in the session for one round trip.
 class ConnectedAccountsController < ApplicationController
+  include RestrictsBannedUsers
   STATE_TTL = 10.minutes
   RETURN_PREFIXES = %w[/onboarding /dashboard].freeze
 

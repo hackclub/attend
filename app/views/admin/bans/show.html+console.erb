@@ -16,6 +16,13 @@
     </div>
   </div>
 
+  <% if @ban.ucat? %>
+    <div class="cs-alert">
+      <%= cs_status_icon(:info) %>
+      <p>Synced nightly from the UCAT conduct base. It is revoked automatically when the case no longer records a ban. If you revoke it here, the sync leaves it revoked. Edits are overwritten.</p>
+    </div>
+  <% end %>
+
   <% if @ban.revoked? %>
     <div class="cs-alert cs-alert-warning">
       <%= cs_status_icon(:warning) %>
@@ -48,7 +55,7 @@
         </div>
         <div>
           <dt class="cs-kv-label">Added by</dt>
-          <dd class="cs-kv-value"><%= @ban.created_by&.email || "—" %></dd>
+          <dd class="cs-kv-value"><%= @ban.ucat? ? "UCAT sync" : (@ban.created_by&.email || "—") %></dd>
         </div>
       </dl>
 
@@ -63,6 +70,19 @@
             </ul>
           </dd>
         </div>
+
+        <% if @ban.ban_slack_ids.any? %>
+          <div>
+            <dt class="cs-kv-label">Banned Slack IDs</dt>
+            <dd class="cs-kv-value">
+              <ul class="space-y-0.5">
+                <% @ban.ban_slack_ids.each do |ban_slack_id| %>
+                  <li><code><%= ban_slack_id.slack_id %></code></li>
+                <% end %>
+              </ul>
+            </dd>
+          </div>
+        <% end %>
 
         <% if @ban.revoked? %>
           <div>
@@ -93,7 +113,7 @@
 
     <% if @affected_participants.empty? %>
       <div class="cs-empty">
-        <p>No existing participants match these emails.</p>
+        <p>No existing participants match this ban.</p>
       </div>
     <% else %>
       <div class="cs-table-wrap">

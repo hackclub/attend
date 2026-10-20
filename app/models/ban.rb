@@ -8,20 +8,62 @@ class Ban < ApplicationRecord
 
   has_many :ban_emails, dependent: :destroy
   accepts_nested_attributes_for :ban_emails, allow_destroy: true, reject_if: :all_blank
+  has_many :ban_slack_ids, dependent: :destroy
 
-  validates :ban_emails, presence: true
+  # manual: added by an admin here. ucat: mirrored nightly from the UCAT
+  # conduct base by Bans::UcatSync, which owns adding and revoking these.
+  enum :source, { manual: "manual", ucat: "ucat" }, default: :manual
+
+  validate :identifies_someone
 
   # Active = not manually revoked and not past its expiry.
   scope :active, -> { where(revoked_at: nil).where("bans.expires_at IS NULL OR bans.expires_at > ?", Time.current) }
 
-  # Single chokepoint used by every "add to event" path.
-  def self.banned?(email)
-    return false if email.blank?
+  # Single chokepoint used by every "add to event" path. Pass whatever Slack
+  # IDs are known (from Hack Club Auth or the participant record); many paths
+  # only have an email.
+  def self.banned?(emails, slack_ids: [])
+    emails = Array(emails).compact_blank.map { |email| email.strip.downcase }
+    slack_ids = Array(slack_ids).compact_blank.map { |id| id.strip.upcase }
 
-    BanEmail.joins(:ban)
-      .merge(Ban.active)
-      .where("LOWER(ban_emails.email) = ?", email.strip.downcase)
-      .exists?
+    (emails.any? && BanEmail.joins(:ban).merge(Ban.active).where("LOWER(ban_emails.email) IN (?)", emails).exists?) ||
+      (slack_ids.any? && BanSlackId.joins(:ban).merge(Ban.active).where(slack_id: slack_ids).exists?)
+  end
+
+  # The Slack IDs we know for a participant, for passing to banned?.
+  def self.slack_ids_for(participant)
+    [ participant&.slack_user_id, participant&.user&.verified_slack_id ]
+  end
+
+  # A signed-in user, by their own email, their participant record's email,
+  # and any Slack ID we know for either.
+  def self.user_banned?(user)
+    return false if user.nil?
+
+    participant = user.participant
+    banned?([ user.email, participant&.email ],
+      slack_ids: [ user.verified_slack_id, user.slack_user_id, participant&.slack_user_id ])
+  end
+
+  # Enrollments on events that haven't ended whose participant is on an active
+  # ban by email or Slack ID. Ban.banned? only stops new adds, so these are
+  # people who got in before the ban, or whose Slack ID only became known
+  # after they signed in with Hack Club Auth.
+  def self.upcoming_enrollments
+    emails = BanEmail.joins(:ban).merge(Ban.active).select("LOWER(ban_emails.email)").to_sql
+    slack_ids = BanSlackId.joins(:ban).merge(Ban.active).select("ban_slack_ids.slack_id").to_sql
+
+    ParticipantEvent.joins(:participant, :event)
+      .joins("LEFT JOIN users ON users.id = participants.user_id")
+      .merge(Event.not_ended)
+      .where.not(status: %w[withdrawn rejected])
+      .where(<<~SQL.squish)
+        LOWER(participants.email) IN (#{emails})
+        OR UPPER(participants.slack_user_id) IN (#{slack_ids})
+        OR UPPER(participant_events.slack_user_id) IN (#{slack_ids})
+        OR users.verified_slack_id IN (#{slack_ids})
+      SQL
+      .includes(:participant, :event)
   end
 
   def revoked?
@@ -56,8 +98,19 @@ class Ban < ApplicationRecord
   # The ban does not remove them — this just surfaces who is affected.
   def affected_participants
     emails = ban_emails.map { |be| be.email&.downcase }.compact
-    return Participant.none if emails.empty?
+    slack_ids = ban_slack_ids.map(&:slack_id)
+    return Participant.none if emails.empty? && slack_ids.empty?
 
-    Participant.where("LOWER(email) IN (?)", emails).includes(:events)
+    Participant.left_joins(:user)
+      .where("LOWER(participants.email) IN (?) OR UPPER(participants.slack_user_id) IN (?) OR users.verified_slack_id IN (?)", emails, slack_ids, slack_ids)
+      .includes(:events)
+  end
+
+  private
+
+  def identifies_someone
+    return if ban_emails.any? { |e| !e.marked_for_destruction? } || ban_slack_ids.any? { |s| !s.marked_for_destruction? }
+
+    errors.add(:ban_emails, :blank)
   end
 end

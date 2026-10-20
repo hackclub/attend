@@ -1584,7 +1584,7 @@ module Admin
       end
 
       return "#{participant.email} is bouncing — correct their email address before resending." if participant.email_undeliverable?
-      return "#{participant.email} is banned from events and cannot be invited." if Ban.banned?(participant.email)
+      return "#{participant.email} is banned from events and cannot be invited." if Ban.banned?(participant.email, slack_ids: Ban.slack_ids_for(participant))
 
       nil
     end

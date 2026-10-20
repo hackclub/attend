@@ -1,4 +1,5 @@
 class OnboardingController < ApplicationController
+  include RestrictsBannedUsers
   include TravelLegDateMerging
   include PhysicalDocumentUploads
   include OptionalDocumentEnrolment

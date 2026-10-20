@@ -1,4 +1,5 @@
 class DashboardController < ApplicationController
+  include RestrictsBannedUsers
   include TravelLegDateMerging
   include PhysicalDocumentUploads
   include OptionalDocumentEnrolment

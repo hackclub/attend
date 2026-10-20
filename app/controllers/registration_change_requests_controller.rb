@@ -1,4 +1,5 @@
 class RegistrationChangeRequestsController < ApplicationController
+  include RestrictsBannedUsers
   CHANGE_FIELDS = {
     "signed_identity" => %w[legal_first_name legal_last_name date_of_birth],
     "guardian" => %w[legal_first_name legal_last_name email phone relationship],
