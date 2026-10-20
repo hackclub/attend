@@ -82,7 +82,7 @@ module Airtable
     def sync_via_records
       rows = load_participant_events.to_h do |pe|
         cells = SYNC_COLUMNS.zip(serialize_row(pe)).to_h { |column, value| [ column, value&.to_s ] }
-        [ pe.id, cells ]
+        [ pe.id.to_s, cells ]
       end
       RecordsSync.new(@event, @client).call(rows)
     end

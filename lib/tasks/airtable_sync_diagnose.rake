@@ -29,7 +29,7 @@ namespace :airtable do
     if event.airtable_sync_via_records?
       # Attend creates its own table on first sync, so check the base.
       tables = client.list_tables.fetch("tables", [])
-      ours = tables.find { |t| t["id"] == event.airtable_sync_table_id || t["name"] == Airtable::RecordsSync::TABLE_NAME }
+      ours = tables.find { |t| t["id"] == event.airtable_sync_table_id || t["name"] == Airtable::RecordsSync.table_name_for(event) }
       return "base reads OK — #{ours ? "Attend's table is #{ours['id']}" : 'no Attend table yet (the next sync creates it)'}"
     end
 

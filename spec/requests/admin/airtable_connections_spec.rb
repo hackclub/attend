@@ -101,7 +101,7 @@ RSpec.describe "Admin::AirtableConnections", type: :request do
       stub_request(:get, "https://api.airtable.com/v0/meta/bases/appTest/tables").with(headers: auth)
         .to_return(status: 200, body: { tables: [] }.to_json)
       stub_request(:post, "https://api.airtable.com/v0/meta/bases/appTest/tables").with(headers: auth)
-        .to_return(status: 200, body: { id: "tblOurs", name: "Attend Participants",
+        .to_return(status: 200, body: { id: "tblOurs", name: Airtable::RecordsSync.table_name_for(event),
           fields: Airtable::SyncService::SYNC_COLUMNS.map { |c| { name: c } } }.to_json)
       stub_request(:get, %r{/v0/appTest/tblOurs}).with(headers: auth).to_return(status: 200, body: { records: [] }.to_json)
       upsert = stub_request(:patch, "https://api.airtable.com/v0/appTest/tblOurs").with(headers: auth)

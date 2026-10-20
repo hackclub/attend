@@ -4,13 +4,15 @@ module Airtable
   # personal access tokens use only accepts those tokens, so a connected event
   # can't use it.
   #
-  # Attend owns one table per base, found by its stored id or by name and
-  # created on first sync. Each run adds any missing columns, writes only the
-  # rows whose cells differ from Attend's, and deletes rows for participants
-  # who are gone. Columns and rows organisers add themselves (no Participant
-  # Event ID) are left alone; edits to Attend's columns are overwritten.
+  # Each event owns one table, named after it, found by its stored id or name
+  # and created on first sync. Two events can share a base but never a table:
+  # one event's sync deletes rows the other needs. Each run adds any missing
+  # columns, writes only the rows whose cells differ from Attend's, and deletes
+  # rows for this event's departed participants. Columns and rows organisers
+  # add themselves are left alone; edits to Attend's columns are overwritten.
   class RecordsSync
-    TABLE_NAME = "Attend Participants".freeze
+    TABLE_NAME_PREFIX = "Attend Participants".freeze
+    UUID = /\A\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\z/
     KEY_FIELD = SyncService::SYNC_COLUMNS.first
     FIELD_TYPE = "singleLineText".freeze
     BATCH_SIZE = 10
@@ -26,12 +28,17 @@ module Airtable
       @last_request_at = nil
     end
 
+    def self.table_name_for(event)
+      "#{TABLE_NAME_PREFIX} (#{event.slug})"
+    end
+
     # rows: { participant_event_id => { column => string or nil } }
     def call(rows)
+      rows = rows.transform_keys(&:to_s)
       table_id = resolve_table
       existing, duplicate_ids = existing_records(table_id)
 
-      stale_ids = existing.except(*rows.keys).values.pluck("id") + duplicate_ids
+      stale_ids = existing.slice(*departed_keys(existing.keys - rows.keys)).values.pluck("id") + duplicate_ids
       # Duplicates go first: an upsert matching two rows is rejected.
       stale_ids.each_slice(BATCH_SIZE) { |ids| request { @client.delete_records(table_id, ids) } }
 
@@ -47,11 +54,15 @@ module Airtable
 
     def resolve_table
       tables = request { @client.list_tables }.fetch("tables", [])
+      # Never adopt a table another event already syncs into.
+      claimed = Event.where.not(id: @event.id).where(airtable_sync_table_id: tables.pluck("id")).pluck(:airtable_sync_table_id)
+      tables = tables.reject { |t| claimed.include?(t["id"]) }
+
       table = tables.find { |t| t["id"] == @event.airtable_sync_table_id } ||
-        tables.find { |t| t["name"] == TABLE_NAME }
+        tables.find { |t| t["name"] == self.class.table_name_for(@event) }
       table ||= request do
         # The first field becomes the table's primary field.
-        @client.create_table(TABLE_NAME, SyncService::SYNC_COLUMNS.map { |name| { name: name, type: FIELD_TYPE } })
+        @client.create_table(self.class.table_name_for(@event), SyncService::SYNC_COLUMNS.map { |name| { name: name, type: FIELD_TYPE } })
       end
 
       present = Array(table["fields"]).pluck("name")
@@ -85,6 +96,14 @@ module Airtable
       end
 
       [ by_key, duplicate_ids ]
+    end
+
+    # Rows Attend may delete: keys that are participant event ids and don't
+    # belong to another event (so a departed participant of this one). A key
+    # an organiser typed in, or another event's row pasted across, stays.
+    def departed_keys(keys)
+      ids = keys.grep(UUID)
+      ids - ParticipantEvent.where(id: ids).where.not(event_id: @event.id).pluck(:id)
     end
 
     # Airtable leaves empty cells out of the response entirely.

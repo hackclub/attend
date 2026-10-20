@@ -186,7 +186,7 @@
             <% end %>
           <% end %>
           <p class="cs-secondary cs-small">
-            Attend keeps a table called <strong><%= Airtable::RecordsSync::TABLE_NAME %></strong> in this base up to date, creating it on the first sync.
+            Attend keeps a table called <strong><%= Airtable::RecordsSync.table_name_for(current_event) %></strong> in this base up to date, creating it on the first sync.
             Columns you add are left alone; edits to Attend's columns are overwritten on the next sync.
             <% if current_event.airtable_base_id.present? && current_event.airtable_sync_table_id.present? %>
               <%= link_to "Open in Airtable", "https://airtable.com/#{current_event.airtable_base_id}/#{current_event.airtable_sync_table_id}", target: "_blank", rel: "noopener", class: "cs-link" %>
