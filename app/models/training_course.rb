@@ -60,7 +60,7 @@ class TrainingCourse < ApplicationRecord
     elsif (unanswerable = lessons.flat_map(&:questions).reject(&:answerable?)).any?
       errors.add(:status, "can't be published while #{unanswerable.size == 1 ? "a question has" : "#{unanswerable.size} questions have"} no correct answer")
     elsif (unknown = lessons.select { |lesson| lesson.watch_required? && lesson.known_video_duration.nil? }).any?
-      errors.add(:status, "can't be published until Attend knows how long #{unknown.map { |lesson| "“#{lesson.title}”" }.to_sentence}'s video is — play it once in the preview, or enter its length on the lesson")
+      errors.add(:status, "can't be published until Attend knows how long #{unknown.map { |lesson| "“#{lesson.title}”" }.to_sentence}'s video is — re-save the lesson to look it up, play it once in the preview, or enter its length on the lesson")
     end
   end
 end

@@ -39,6 +39,8 @@ class TrainingLesson < ApplicationRecord
   # Checked before save: Active Storage drops its record of a new upload in its
   # own commit callback, before any of ours would see it.
   before_save :forget_video_duration, if: :video_changed_without_new_length?
+  after_commit :fetch_video_length, on: %i[create update],
+    if: -> { saved_change_to_video_url? && video_url.present? && video_duration_seconds.nil? }
 
   def quiz?
     questions.any?
@@ -66,9 +68,10 @@ class TrainingLesson < ApplicationRecord
     video? && require_full_watch?
   end
 
-  # The video's real length, when the server knows it: set by hand or from a
-  # global admin's preview, or analysed from an upload (needs ffprobe on the
-  # host). A learner's player is never trusted for it — a forged request could
+  # The video's real length, when the server knows it: looked up from YouTube
+  # or Vimeo when the link is saved (FetchTrainingVideoLengthJob), set by hand
+  # or from a global admin's preview, or analysed from an upload (needs
+  # ffprobe on the host). A learner's player is never trusted for it — a forged request could
   # understate it — so until it's known the video can't be finished
   # (TrainingVideoView), and the course can't be published.
   def known_video_duration
@@ -95,6 +98,10 @@ class TrainingLesson < ApplicationRecord
 
   def forget_video_duration
     self.video_duration_seconds = nil
+  end
+
+  def fetch_video_length
+    FetchTrainingVideoLengthJob.perform_later(id, video_url)
   end
 
   def video_changed_without_new_length?

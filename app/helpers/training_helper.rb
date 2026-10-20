@@ -32,6 +32,15 @@ module TrainingHelper
     TrainingAccess.new(current_user).events_for(course)
   end
 
+  # Where a lesson's video length comes from, for the lesson form.
+  def training_video_length_hint(lesson)
+    if lesson.video_source == :youtube && !TrainingVideoLength.youtube_configured?
+      "No YouTube API key is configured, so this isn't looked up automatically. Play the video once in the course preview, or enter its length here."
+    else
+      "Looked up automatically from YouTube and Vimeo links when you save, and read from uploads where possible. You can also play the video once in the course preview, or enter its length here."
+    end
+  end
+
   def training_validity(badge)
     return "Never expires" unless badge.expires?
 

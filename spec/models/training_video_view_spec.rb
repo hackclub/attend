@@ -75,7 +75,7 @@ RSpec.describe TrainingVideoView do
       course = create(:training_course, :with_lessons)
       course.lessons.first.update!(video_url: "https://vimeo.com/123456")
       expect(course.reload.update(status: "published")).to be(false)
-      expect(course.errors[:status].join).to include("play it once in the preview")
+      expect(course.errors[:status].join).to include("re-save the lesson to look it up")
 
       course.lessons.first.update!(video_duration_seconds: 90)
       expect(course.reload.update(status: "published")).to be(true)

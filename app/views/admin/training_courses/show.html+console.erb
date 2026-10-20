@@ -62,7 +62,7 @@
                   <% if lesson.video? %>
                     <%= lesson.video_source.to_s.titleize %><span class="cs-secondary"><%= lesson.require_full_watch? ? " · must watch" : " · optional" %></span>
                     <% if lesson.watch_required? && lesson.known_video_duration.nil? %>
-                      <div title="Play it once in the course preview so Attend learns its real length."><%= cs_status(:warning, "Length unknown — preview it") %></div>
+                      <div title="Learners can't finish it until its length is known. Re-save the lesson to look it up again, play it once in the course preview, or enter it on the lesson."><%= cs_status(:warning, "Length unknown") %></div>
                     <% end %>
                   <% else %>
                     <span class="cs-muted">—</span>

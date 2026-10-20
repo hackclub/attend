@@ -29,7 +29,7 @@
           <tr>
             <td class="px-6 py-4 text-gray-400"><%= index + 1 %></td>
             <td class="px-6 py-4"><%= link_to lesson.title, edit_admin_training_course_lesson_path(@course, lesson), class: "font-medium text-gray-900 hover:text-[#ec3750]" %></td>
-            <td class="px-6 py-4 text-gray-600"><%= lesson.video? ? "#{lesson.video_source.to_s.titleize} video" : "—" %><% if lesson.watch_required? && lesson.known_video_duration.nil? %><div class="text-xs text-amber-700">Length unknown — preview it once</div><% end %></td>
+            <td class="px-6 py-4 text-gray-600"><%= lesson.video? ? "#{lesson.video_source.to_s.titleize} video" : "—" %><% if lesson.watch_required? && lesson.known_video_duration.nil? %><div class="text-xs text-amber-700">Length unknown — learners can't finish it yet</div><% end %></td>
             <td class="px-6 py-4 text-gray-600"><%= lesson.quiz? ? pluralize(lesson.questions.size, "question") : "—" %></td>
             <td class="px-6 py-4 text-right"><%= render "admin/training/move_buttons", path: move_admin_training_course_lesson_path(@course, lesson), label: lesson.title, first: index.zero?, last: index == @lessons.size - 1 %></td>
           </tr>
