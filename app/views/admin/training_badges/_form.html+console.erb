@@ -1,10 +1,21 @@
-<%= form_with model: badge, url: (badge.persisted? ? admin_training_badge_path(badge) : admin_training_badges_path), class: "cs-stack", html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+<%= form_with model: badge, url: (badge.persisted? ? admin_training_badge_path(badge) : admin_training_badges_path), class: "cs-stack", html: { novalidate: true, multipart: true }, data: { controller: "cs-form-validation" } do |f| %>
   <section class="cs-container">
     <div class="cs-container-header"><h2 class="cs-h2">Badge details</h2></div>
     <div class="cs-container-body">
       <%= cs_form_field f, :name, label: "Name", example: "Hack Club Child Safety Event" %>
       <%= cs_form_field f, :description, label: "Description", optional: true, description: "Shown on the badge page." do |aria| %>
         <%= f.text_area :description, rows: 3, class: "cs-input", **aria %>
+      <% end %>
+      <%= cs_form_field f, :image, label: "Artwork", optional: true,
+            description: "Shown on badge pages and when someone shares their badge. A square PNG, at least 400 pixels wide, looks best.",
+            constraint: "PNG, JPEG or WebP, up to 5 MB." do |aria| %>
+        <% if badge.image.attached? && badge.persisted? %>
+          <div class="flex items-center gap-3 mb-2">
+            <%= image_tag badge.image, alt: "", class: "size-16 rounded-xl object-contain border border-(--cs-border-divider-secondary)" %>
+            <span class="cs-option"><%= check_box_tag "training_badge[remove_image]", "1", false, id: "remove_badge_image" %><label for="remove_badge_image" class="cs-option-label">Remove artwork</label></span>
+          </div>
+        <% end %>
+        <%= f.file_field :image, accept: TrainingBadge::IMAGE_CONTENT_TYPES.join(","), class: "cs-input", **aria %>
       <% end %>
       <%= cs_form_field f, :validity_months, label: "Valid for (months)", optional: true, as: :number_field, input: { min: 1 },
             constraint: "Leave blank for a badge that never expires. People are prompted to renew 30 days before." %>

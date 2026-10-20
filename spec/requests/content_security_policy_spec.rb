@@ -109,6 +109,15 @@ RSpec.describe "Content Security Policy", type: :request do
       expect(form_action).to include("https://auth.hackclub.com")
     end
 
+    # "Add to LinkedIn" on a training badge posts to Attend, which 302s to
+    # LinkedIn's add-to-profile form.
+    it "allows LinkedIn in form-action" do
+      get root_path
+
+      form_action = response.headers["Content-Security-Policy"][/form-action[^;]*/]
+      expect(form_action).to include("https://www.linkedin.com")
+    end
+
     # Same for the integrations page's Connect Airtable button, which posts to
     # Attend and is 302'd to Airtable's consent screen.
     it "allows Airtable's OAuth host in form-action" do

@@ -81,8 +81,8 @@
           <% state = training_award_state(award) %>
           <li>
             <%= link_to training_award_path(award), class: "portal-card p-4 flex items-center gap-3 hover:border-(--border-strong) transition-colors" do %>
-              <%= render "training/badge_medallion", size: "size-10",
-                    tone: { current: "success", expiring: "warn", expired: "neutral", revoked: "neutral" }.fetch(state) %>
+              <%= training_badge_art(award.badge, size: "size-10",
+                    tone: { current: "success", expiring: "warn", expired: "neutral", revoked: "neutral" }.fetch(state)) %>
               <span class="min-w-0">
                 <span class="portal-heading text-sm block"><%= award.badge.name %></span>
                 <span class="portal-hint text-xs block"><%= training_award_state_label(award) %></span>

@@ -40,6 +40,23 @@ class TrainingBadgeAward < ApplicationRecord
     current?(now) && expires_at.present? && expires_at <= now + TrainingBadge::RENEWAL_WINDOW
   end
 
+  def shared?
+    share_token.present?
+  end
+
+  # Turns on the public verification link (/verify/:token). The token is
+  # random rather than derived from the award, so it can be withdrawn: turning
+  # sharing off and on again makes a new link and kills the old one.
+  def share!
+    return if shared?
+
+    update!(share_token: SecureRandom.urlsafe_base64(24), shared_at: Time.current)
+  end
+
+  def unshare!
+    update!(share_token: nil, shared_at: nil)
+  end
+
   def revoke!(by:, reason: nil)
     update!(revoked_at: Time.current, revoked_by: by, revoked_reason: reason.presence)
   end

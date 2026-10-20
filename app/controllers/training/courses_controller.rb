@@ -5,7 +5,7 @@ module Training
     def index
       @courses = training_access.courses(visible_courses).ordered.includes(:badge, :lessons)
       @enrollments = current_user.training_enrollments.index_by(&:training_course_id)
-      @awards = current_user.training_badge_awards.includes(:badge, :course).newest_first
+      @awards = current_user.training_badge_awards.includes(:course, badge: { image_attachment: :blob }).newest_first
       @requirements = upcoming_requirements
     end
 

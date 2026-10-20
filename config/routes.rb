@@ -51,6 +51,10 @@ Rails.application.routes.draw do
   get "p/:slug/markers", to: "public_profiles#markers", as: :public_profile_markers, constraints: { slug: /[A-Za-z0-9-]+/ }, defaults: { format: :json }
   get "p/:slug", to: "public_profiles#show", as: :public_profile, constraints: { slug: /[A-Za-z0-9-]+/ }
 
+  # Public verification of a training badge its holder chose to share
+  # (attend.hackclub.com/verify/:token). Unauthenticated by design.
+  get "verify/:token", to: "badge_verifications#show", as: :badge_verification, constraints: { token: /[A-Za-z0-9_-]{20,64}/ }
+
   # Public incident reporting (attend.hackclub.com/incident)
   get "incident", to: "incident_reports#new", as: :incident_report
   post "incident", to: "incident_reports#create"
@@ -145,7 +149,13 @@ Rails.application.routes.draw do
   # of courses because a course lives at /training/:slug.
   get "training", to: "training/courses#index", as: :training
   namespace :training do
-    resources :awards, only: :show, path: "badges"
+    resources :awards, only: :show, path: "badges" do
+      member do
+        post :share
+        delete :share, action: :unshare
+        post :linkedin
+      end
+    end
     resources :courses, only: :show, param: :slug, path: "" do
       member do
         post :enroll

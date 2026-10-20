@@ -41,8 +41,10 @@ Rails.application.configure do
     # across the whole redirect chain, so the OAuth host has to be listed here
     # or the POST is blocked before it ever leaves the page. The same goes for
     # connecting GitHub and itch.io accounts (ConnectedAccountsController)
-    # and an event's Airtable sync (Admin::AirtableConnectionsController).
-    policy.form_action :self, *docuseal_origins, "https://auth.hackclub.com", "https://github.com", "https://itch.io",
+    # and an event's Airtable sync (Admin::AirtableConnectionsController),
+    # and for "Add to LinkedIn" on a training badge, which posts to Attend and
+    # is 302'd to LinkedIn's add-to-profile form (Training::AwardsController).
+    policy.form_action :self, *docuseal_origins, "https://auth.hackclub.com", "https://github.com", "https://itch.io", "https://www.linkedin.com",
       "https://airtable.com"
   end
 

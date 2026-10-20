@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_20_200000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_20_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1402,12 +1402,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_20_200000) do
     t.datetime "revoked_at"
     t.uuid "revoked_by_id"
     t.text "revoked_reason"
+    t.string "share_token"
+    t.datetime "shared_at"
     t.uuid "training_badge_id", null: false
     t.uuid "training_course_id"
     t.datetime "updated_at", null: false
     t.uuid "user_id", null: false
     t.index ["awarded_by_id"], name: "index_training_badge_awards_on_awarded_by_id"
     t.index ["revoked_by_id"], name: "index_training_badge_awards_on_revoked_by_id"
+    t.index ["share_token"], name: "index_training_badge_awards_on_share_token", unique: true
     t.index ["training_badge_id"], name: "index_training_badge_awards_on_training_badge_id"
     t.index ["training_course_id"], name: "index_training_badge_awards_on_training_course_id"
     t.index ["user_id", "training_badge_id"], name: "index_training_badge_awards_on_user_id_and_training_badge_id"

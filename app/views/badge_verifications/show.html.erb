@@ -1,0 +1,79 @@
+<% badge = @award.badge %>
+<% state = training_award_state(@award) %>
+<% name = training_public_name(@award.user) %>
+<% valid = %i[current expiring].include?(state) %>
+<% content_for :title, "#{badge.name} – #{name} – Hack Club" %>
+<% content_for :head do %>
+  <%# Link-shareable, deliberately kept out of search engines. The Open Graph
+      tags give LinkedIn, Slack and the like a proper preview card. %>
+  <meta name="robots" content="noindex, nofollow">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Hack Club">
+  <meta property="og:title" content="<%= name %> holds <%= badge.name %>">
+  <meta property="og:description" content="Hack Club training badge, awarded <%= @award.awarded_at.to_date.to_fs(:long) %>. Verify its current status.">
+  <meta property="og:url" content="<%= badge_verification_url(@award.share_token) %>">
+  <% if badge.image.attached? %>
+    <meta property="og:image" content="<%= url_for(badge.image) %>">
+  <% end %>
+<% end %>
+
+<div class="w-full max-w-xl mx-auto">
+  <%= render "shared/portal_masthead", subtitle: "Training badge verification" unless user_signed_in? %>
+
+  <div class="portal-card p-8 sm:p-10 text-center">
+    <div class="flex justify-center mb-5">
+      <%= training_badge_art(badge, size: "size-24", tone: valid ? "success" : "neutral") %>
+    </div>
+
+    <div class="mb-6">
+      <% case state %>
+      <% when :current, :expiring %>
+        <span class="portal-badge portal-badge-done text-sm">
+          <svg class="size-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+          Valid
+        </span>
+      <% when :expired %>
+        <span class="portal-badge portal-badge-pending text-sm">Expired</span>
+      <% else %>
+        <span class="portal-badge portal-badge-neutral text-sm">Revoked</span>
+      <% end %>
+    </div>
+
+    <p class="portal-meta text-xs uppercase tracking-wide mb-2">Hack Club training badge</p>
+    <h1 class="portal-title text-2xl sm:text-3xl mb-2"><%= badge.name %></h1>
+    <p class="portal-body mb-6">Held by <strong class="portal-heading"><%= name %></strong></p>
+
+    <dl class="grid gap-4 sm:grid-cols-2 text-left portal-inset p-4 rounded-lg">
+      <div>
+        <dt class="portal-meta text-xs uppercase tracking-wide">Awarded</dt>
+        <dd class="portal-body"><%= @award.awarded_at.to_date.to_fs(:long) %></dd>
+      </div>
+      <div>
+        <dt class="portal-meta text-xs uppercase tracking-wide"><%= state == :expired ? "Expired" : "Expires" %></dt>
+        <dd class="portal-body"><%= @award.expires_at ? @award.expires_at.to_date.to_fs(:long) : "Never" %></dd>
+      </div>
+      <div>
+        <dt class="portal-meta text-xs uppercase tracking-wide">Issued by</dt>
+        <dd class="portal-body">Hack Club</dd>
+      </div>
+      <div>
+        <dt class="portal-meta text-xs uppercase tracking-wide">Credential ID</dt>
+        <dd class="portal-body font-mono text-sm"><%= training_credential_id(@award) %></dd>
+      </div>
+    </dl>
+
+    <% if badge.description.present? %>
+      <p class="portal-hint text-sm mt-6"><%= badge.description %></p>
+    <% end %>
+
+    <p class="portal-meta text-xs mt-6">
+      <% if valid %>
+        Checked live against Hack Club's records — this page would say if the badge were revoked or had expired.
+      <% elsif state == :expired %>
+        This badge has expired. Its holder needs to renew their training.
+      <% else %>
+        Hack Club has revoked this badge. It is no longer valid.
+      <% end %>
+    </p>
+  </div>
+</div>
