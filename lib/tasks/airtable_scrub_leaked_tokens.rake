@@ -22,29 +22,45 @@ namespace :airtable do
       event.update_columns(config: event.config.except("airtable_api_key"))
     end
 
-    PaperTrail::Version.where(item_type: "Event")
+    versions = PaperTrail::Version.where(item_type: "Event")
       .where("object LIKE '%airtable_api_key%' OR object_changes LIKE '%airtable_api_key%'")
-      .find_each do |version|
-        object = Airtable::TokenScrubber.scrub_text(version.object)
-        object_changes = Airtable::TokenScrubber.scrub_text(version.object_changes)
-        next if object == version.object && object_changes == version.object_changes
+    versions.find_each do |version|
+      object = Airtable::TokenScrubber.scrub_serialized(version.object)
+      object_changes = Airtable::TokenScrubber.scrub_serialized(version.object_changes)
+      next if object == version.object && object_changes == version.object_changes
 
-        counts[:versions] += 1
-        version.update_columns(object: object, object_changes: object_changes) if apply
-      end
+      counts[:versions] += 1
+      version.update_columns(object: object, object_changes: object_changes) if apply
+    end
 
-    AuditLog.where("changed_fields::text LIKE '%airtable_api_key%' OR metadata::text LIKE '%airtable_api_key%'").find_each do |log|
+    audit_logs = AuditLog.where("changed_fields::text LIKE '%airtable_api_key%' OR metadata::text LIKE '%airtable_api_key%'")
+    audit_logs.find_each do |log|
       changed_fields = Airtable::TokenScrubber.scrub_value(log.changed_fields)
       metadata = Airtable::TokenScrubber.scrub_value(log.metadata)
       next if changed_fields == log.changed_fields && metadata == log.metadata
 
       counts[:audit_logs] += 1
-      log.update_columns(changed_fields: changed_fields, metadata: metadata) if apply
+      # AuditLog is read-only once written, and should stay that way; taking a
+      # leaked secret out is the one edit worth going around it for.
+      AuditLog.where(id: log.id).update_all(changed_fields: changed_fields, metadata: metadata) if apply
+    end
+
+    # Re-read everything that mentions the key and prove nothing live is left.
+    if apply
+      leftover = versions.reload.count do |version|
+        Airtable::TokenScrubber.serialized_leaks?(version.object) ||
+          Airtable::TokenScrubber.serialized_leaks?(version.object_changes)
+      end
+      leftover += audit_logs.reload.count do |log|
+        Airtable::TokenScrubber.leaks?(log.changed_fields) || Airtable::TokenScrubber.leaks?(log.metadata)
+      end
+      leftover += Event.where("config ? 'airtable_api_key'").count
+      abort "#{leftover} rows still hold an Airtable token — investigate before trusting this scrub." if leftover.positive?
     end
 
     puts "Events with a token in config: #{counts[:events]}"
     puts "Event versions holding a token: #{counts[:versions]}"
     puts "Audit logs holding a token: #{counts[:audit_logs]}"
-    puts apply ? "Scrubbed." : "Dry run — re-run with APPLY=1 to write changes."
+    puts apply ? "Scrubbed, and verified nothing is left." : "Dry run — re-run with APPLY=1 to write changes."
   end
 end
