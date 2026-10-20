@@ -2,9 +2,9 @@
 <% content_for :title, event_name ? "Register for #{event_name} - Attend" : "Invitation unavailable - Attend" %>
 
 <div class="mx-auto max-w-2xl">
-  <% if haven_page? && @invitation_event %>
+  <% if page_brand && @invitation_event %>
     <div class="mb-6">
-      <%= render "shared/haven/event_card", event: @invitation_event, eyebrow: "You're invited to" %>
+      <%= render "onboarding/event_card", event: @invitation_event, eyebrow: "You're invited to" %>
     </div>
   <% end %>
   <div class="portal-card p-6 shadow-[var(--shadow-sm)] sm:p-8">

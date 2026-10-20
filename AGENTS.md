@@ -23,4 +23,4 @@ Rails 8.1 app with PostgreSQL, Hotwire, Tailwind. UUID primary keys (set `self.i
 
 ## Test Users (dev)
 admin@hackclub.com / eventadmin@hackclub.com / ops@hackclub.com / safeguarding@hackclub.com / participant@example.com / minor@example.com (no passwords; sign in via the dev-only email sign-in on the home page)
-The "Haven" series has Haven onboarding switched on; participant@example.com (adult) and minor@example.com are registered for its "Haven Boston" event.
+The "Haven" series has registration branding set up (see DESIGN.md, Event Branding); participant@example.com (adult) and minor@example.com are registered for its "Haven Boston" event.

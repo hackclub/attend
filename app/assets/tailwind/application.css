@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "./haven.css";
+@import "./brand.css";
 
 /* The text-safe state colours from themes.css. Safelisted because the tokens
  * are the accessible replacement for text-(--warning-strong) /

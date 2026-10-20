@@ -26,7 +26,11 @@ class Event < ApplicationRecord
     :vote_event_slug,
     :vote_event_admin_url,
     :vote_event_gallery_url,
-    :vote_event_linked_at
+    :vote_event_linked_at,
+    :github_linking,
+    :itch_linking,
+    :github_help_url,
+    :itch_help_url
 
   after_initialize :set_default_config, if: :new_record?
 
@@ -96,6 +100,10 @@ class Event < ApplicationRecord
   ].freeze
 
   validates :name, presence: true
+
+  # Blank linking modes mean "same as the series".
+  validates :github_linking, :itch_linking, inclusion: { in: EventSeries::ACCOUNT_LINKING_MODES }, allow_blank: true
+  validates :github_help_url, :itch_help_url, format: { with: %r{\Ahttps://\S+\z}, message: "must start with https://" }, allow_blank: true
 
   # Support email is the from/reply-to on every participant- and guardian-facing
   # email, so it has to be an address we actually control. Required from setup
@@ -531,14 +539,36 @@ class Event < ApplicationRecord
     series_banner if series_banner&.attached?
   end
 
-  # Haven's onboarding (brand skin, intro, completion screen) and account
-  # linking are configured on the series, so every Haven city event shares them.
-  def haven_onboarding?
-    event_series&.haven_onboarding? || false
+  # Onboarding branding and registration notes come from the series, so
+  # every event in it looks and reads the same.
+  def brand_theme
+    theme = event_series&.brand_theme
+    theme if theme&.active?
   end
 
+  def registration_note
+    event_series&.registration_note.presence
+  end
+
+  def address_note
+    event_series&.address_note.presence
+  end
+
+  def tshirt_note
+    event_series&.tshirt_note.presence
+  end
+
+  # Account linking is set on the event, falling back to its series; an
+  # event outside a series can still ask for accounts.
   def account_linking_mode(provider)
+    own = config&.[]("#{provider}_linking")
+    return own if EventSeries::ACCOUNT_LINKING_MODES.include?(own)
+
     event_series&.account_linking_mode(provider) || "off"
+  end
+
+  def account_help_url(provider)
+    config&.[]("#{provider}_help_url").presence || event_series&.account_help_url(provider)
   end
 
   def linked_account_providers

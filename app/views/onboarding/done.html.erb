@@ -1,7 +1,7 @@
 <% content_for :title, "You're registered for #{current_event.name} - Attend" %>
 
 <div class="w-full max-w-2xl mx-auto">
-  <%= render "shared/haven/event_card", event: current_event, eyebrow: "You're registered for" %>
+  <%= render "onboarding/event_card", event: current_event, eyebrow: "You're registered for" %>
 
   <header class="mt-8 mb-6">
     <% if @completion.confirmed? %>
@@ -36,25 +36,12 @@
     <p class="portal-body text-sm mb-6">Since you're travelling as an unaccompanied minor, we'll reach out to you with pickup/dropoff information within 2 weeks of the event.</p>
   <% end %>
 
-  <section>
-    <h2 class="portal-title text-2xl mb-4">Next steps</h2>
-    <div class="space-y-3">
-      <%= render "shared/haven/laptop_note" %>
-
-      <% if HavenHelper::HAVEN_WORKSHOPS_URL %>
-        <div class="haven-bullet-card">
-          <svg class="size-6 shrink-0 text-(--accent-strong)" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/>
-          </svg>
-          <div>
-            <p class="portal-heading">Join our online workshops</p>
-            <p class="text-sm portal-hint mt-1">Get a head start before the event. Come to a workshop and we'll send you a free sticker!</p>
-            <%= link_to "See the workshop schedule", HavenHelper::HAVEN_WORKSHOPS_URL, class: "portal-link text-sm mt-2 inline-block", target: "_blank", rel: "noopener" %>
-          </div>
-        </div>
-      <% end %>
-    </div>
-  </section>
+  <% if current_event.registration_note %>
+    <section>
+      <h2 class="portal-title text-2xl mb-4">Next steps</h2>
+      <%= render "onboarding/registration_note", event: current_event %>
+    </section>
+  <% end %>
 
   <div class="mt-8">
     <%= link_to "Go to your dashboard", dashboard_event_path(@participant_event), class: "portal-btn portal-btn-secondary w-full sm:w-auto" %>

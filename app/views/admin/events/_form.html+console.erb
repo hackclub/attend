@@ -252,6 +252,29 @@
 
   <section class="cs-container">
     <div class="cs-container-header">
+      <h2 class="cs-h2">Account linking</h2>
+      <p class="cs-container-description">Ask registrants to connect a GitHub or itch.io account in an extra onboarding step.<% if f.object.event_series %> Leave on "Same as series" to follow <%= f.object.event_series.name %>.<% end %></p>
+    </div>
+    <div class="cs-container-body">
+      <div class="cs-field-grid">
+        <% EventSeries::ACCOUNT_LINKING_PROVIDERS.each do |provider| %>
+          <% provider_name = AccountLinking.provider_name(provider) %>
+          <div class="cs-stack">
+            <%= cs_form_field f, :"#{provider}_linking", label: "#{provider_name} account", warning: account_linking_credentials_warning(provider) do |aria| %>
+              <%= f.select :"#{provider}_linking", event_account_linking_options(f.object, provider), {}, class: "cs-select", **aria %>
+            <% end %>
+            <%= cs_form_field f, :"#{provider}_help_url", label: "#{provider_name} how-to link", optional: true,
+                  constraint: "Shown to people who don't have an account yet.#{" Blank uses the series' link." if f.object.event_series}" do |aria| %>
+              <%= f.url_field :"#{provider}_help_url", class: "cs-input", placeholder: f.object.event_series&.account_help_url(provider) || "https://", **aria %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
       <div>
         <h2 class="cs-h2">NFC badges</h2>
         <p class="cs-container-description">Enable NFC badge support for events with physical PCB badges or NFC wristbands.</p>
