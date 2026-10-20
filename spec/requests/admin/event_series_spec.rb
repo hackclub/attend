@@ -151,6 +151,24 @@ RSpec.describe "Admin::EventSeries", type: :request do
       expect(sub_event.reload.haven_onboarding?).to be(true)
     end
 
+    it "lets owners choose which accounts onboarding asks for" do
+      sign_in owner
+
+      patch admin_series_path(series), params: { event_series: { github_linking: "required", itch_linking: "optional" } }
+
+      expect(sub_event.reload.required_account_providers).to eq(%w[github])
+      expect(sub_event.linked_account_providers).to eq(%w[github itch])
+    end
+
+    it "rejects an unknown linking mode" do
+      sign_in owner
+
+      patch admin_series_path(series), params: { event_series: { github_linking: "sometimes" } }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(series.reload.account_linking_mode("github")).to eq("off")
+    end
+
     it "only lets global admins create a series" do
       sign_in owner
       post admin_series_index_path, params: { event_series: { name: "Another Series" } }

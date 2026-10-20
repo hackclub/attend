@@ -331,6 +331,23 @@
         <% end %>
       </section>
     <% end %>
+
+    <% if @account_modes.present? %>
+      <section class="portal-card p-5 sm:p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="portal-heading text-lg">Accounts</h2>
+          <%= link_to "Edit", onboarding_step_path(step: "accounts", event_id: current_event.id), class: "portal-btn portal-btn-quiet text-sm" %>
+        </div>
+        <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+          <% @account_modes.each_key do |provider| %>
+            <div>
+              <dt class="portal-hint"><%= AccountLinking.provider_name(provider) %></dt>
+              <dd class="portal-body"><%= @connected_accounts[provider]&.username || "Not connected" %></dd>
+            </div>
+          <% end %>
+        </dl>
+      </section>
+    <% end %>
   </div>
 
   <%= form_with url: complete_onboarding_path(event_id: current_event.id), method: :post, local: true, data: { turbo: false } do |f| %>

@@ -2,6 +2,7 @@ class OnboardingController < ApplicationController
   include TravelLegDateMerging
   include PhysicalDocumentUploads
   include OptionalDocumentEnrolment
+  include OnboardingAccountsStep
 
   before_action :force_html_format, except: [ :documents_status ]
   before_action :store_invitation_token
@@ -143,6 +144,8 @@ class OnboardingController < ApplicationController
       @medical.present? && @dietary.present? && @accessibility.present?
     when "documents"
       !@documents.nil?
+    when ACCOUNTS_STEP
+      !@account_modes.nil?
     else
       false
     end
@@ -309,6 +312,12 @@ class OnboardingController < ApplicationController
   def complete
     unless all_steps_complete?
       redirect_to onboarding_path(event_id: current_event.id), alert: "Please complete all steps before submitting."
+      return
+    end
+
+    if (missing = missing_required_accounts).any?
+      redirect_to onboarding_step_path(step: ACCOUNTS_STEP, event_id: current_event.id),
+                  alert: "Please connect your #{missing.map { |provider| AccountLinking.provider_name(provider) }.to_sentence} account before submitting."
       return
     end
 
@@ -481,6 +490,8 @@ class OnboardingController < ApplicationController
       @guardian = @existing_gpe&.guardian || Guardian.new
     when "emergency"
       load_emergency_step_data
+    when ACCOUNTS_STEP
+      load_accounts_step_data
     when "documents"
       load_documents_step_data
     when "review"
@@ -498,6 +509,7 @@ class OnboardingController < ApplicationController
     @accessibility = @participant_event.accessibility
     @guardians = @participant_event.guardian_participant_events.includes(:guardian)
     @emergency_contacts = @participant_event.emergency_contacts.by_priority
+    load_accounts_step_data if current_event.account_linking_step?
   end
 
   def save_step_data
@@ -525,6 +537,8 @@ class OnboardingController < ApplicationController
       save_guardian_data
     when "emergency"
       save_emergency_data
+    when ACCOUNTS_STEP
+      save_accounts_step
     when "documents"
       save_documents_step
     when "review"
@@ -1207,6 +1221,7 @@ class OnboardingController < ApplicationController
       else
         s << EMERGENCY_STEP
       end
+      s << ACCOUNTS_STEP if current_event.account_linking_step?
       s << DOCUMENTS_STEP
       s << REVIEW_STEP
       s

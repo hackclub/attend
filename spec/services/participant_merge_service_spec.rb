@@ -25,6 +25,24 @@ RSpec.describe ParticipantMergeService do
     expect(Participant.exists?(duplicate.id)).to be(false)
   end
 
+  describe "connected accounts" do
+    def connect(participant, provider, username)
+      participant.connected_accounts.create!(provider: provider, uid: username, username: username, access_token: "t", connected_at: Time.current)
+    end
+
+    it "moves accounts the primary hasn't connected and keeps the primary's own" do
+      connect(primary, "github", "primary-gh")
+      connect(duplicate, "github", "duplicate-gh")
+      connect(duplicate, "itch", "duplicate-itch")
+
+      merge!
+
+      expect(primary.connected_accounts.reload.pluck(:provider, :username)).to contain_exactly(
+        [ "github", "primary-gh" ], [ "itch", "duplicate-itch" ]
+      )
+    end
+  end
+
   it "keeps the primary's email" do
     merge!
     expect(primary.reload.email).to eq("real@example.com")

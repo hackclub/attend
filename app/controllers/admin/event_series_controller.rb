@@ -79,7 +79,7 @@ module Admin
     end
 
     def series_params
-      params.require(:event_series).permit(:name, :slug, :description, :contact_email, :logo, :banner, :haven_onboarding)
+      params.require(:event_series).permit(:name, :slug, :description, :contact_email, :logo, :banner, :haven_onboarding, :github_linking, :itch_linking)
     end
   end
 end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_16_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_16_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -223,6 +223,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_16_130000) do
     t.string "status"
     t.datetime "updated_at", null: false
     t.index ["creator_id"], name: "index_blazer_queries_on_creator_id"
+  end
+
+  create_table "connected_accounts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "access_token", null: false
+    t.datetime "connected_at", null: false
+    t.datetime "created_at", null: false
+    t.uuid "participant_id", null: false
+    t.jsonb "profile", default: {}, null: false
+    t.string "provider", null: false
+    t.string "scope"
+    t.string "uid", null: false
+    t.datetime "updated_at", null: false
+    t.string "username", null: false
+    t.index ["participant_id", "provider"], name: "index_connected_accounts_on_participant_id_and_provider", unique: true
+    t.index ["participant_id"], name: "index_connected_accounts_on_participant_id"
+    t.index ["provider", "uid"], name: "index_connected_accounts_on_provider_and_uid"
   end
 
   create_table "consents", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1444,6 +1460,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_16_130000) do
   add_foreign_key "ban_emails", "bans"
   add_foreign_key "bans", "users", column: "created_by_id"
   add_foreign_key "bans", "users", column: "revoked_by_id"
+  add_foreign_key "connected_accounts", "participants"
   add_foreign_key "consents", "custom_documents"
   add_foreign_key "consents", "guardian_participant_events"
   add_foreign_key "consents", "participant_events"

@@ -434,6 +434,29 @@
         </section>
       <% end %>
 
+      <% connected_accounts = @participant_event.participant.connected_accounts.to_a %>
+      <% if current_event.account_linking_step? || connected_accounts.any? %>
+        <section class="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 class="text-lg font-semibold mb-4">Connected Accounts</h2>
+          <dl class="space-y-2 text-sm">
+            <% EventSeries::ACCOUNT_LINKING_PROVIDERS.each do |provider| %>
+              <% account = connected_accounts.find { |a| a.provider == provider } %>
+              <% next unless account || current_event.account_linking_mode(provider) != "off" %>
+              <div class="flex items-center justify-between gap-3">
+                <dt class="text-gray-600"><%= AccountLinking.provider_name(provider) %></dt>
+                <dd>
+                  <% if account %>
+                    <%= link_to account.username, account.profile_url, class: "font-medium text-gray-900 hover:underline", target: "_blank", rel: "noopener" %>
+                  <% else %>
+                    <span class="text-gray-500">Not connected</span>
+                  <% end %>
+                </dd>
+              </div>
+            <% end %>
+          </dl>
+        </section>
+      <% end %>
+
       <section class="bg-white rounded-lg border border-gray-200 p-6">
         <h2 class="text-lg font-semibold mb-4">Onboarding Progress</h2>
         <ul class="space-y-2">
