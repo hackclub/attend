@@ -20,12 +20,12 @@ class TrainingVideoView < ApplicationRecord
     completed_at.present?
   end
 
-  def record_heartbeat!(position:, duration:, now: Time.current)
+  def record_heartbeat!(position:, now: Time.current)
     with_lock do
-      # The lesson's known length beats anything the player says; failing
-      # that, the first duration reported sticks, so it can't be shortened
-      # later to finish sooner.
-      self.duration_seconds = lesson.known_video_duration || duration_seconds || positive(duration)
+      # Only the lesson's known length counts; what the player reports is
+      # ignored. Unknown means the view can't finish — fail closed rather than
+      # trust a length a forged request could shorten.
+      self.duration_seconds = lesson.known_video_duration
 
       # The row is created when the lesson page loads (LessonsController#show),
       # so the first heartbeat is measured from then.

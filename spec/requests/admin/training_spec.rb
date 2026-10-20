@@ -47,7 +47,7 @@ RSpec.describe "Admin training", type: :request do
     course = TrainingCourse.last
     expect(response).to redirect_to(admin_training_course_path(course))
 
-    post admin_training_course_lessons_path(course), params: { training_lesson: { title: "Spotting concerns", body: "Read this.", video_url: "https://vimeo.com/123456", require_full_watch: "1" } }
+    post admin_training_course_lessons_path(course), params: { training_lesson: { title: "Spotting concerns", body: "Read this.", video_url: "https://vimeo.com/123456", require_full_watch: "1", video_duration_seconds: "95" } }
     lesson = course.lessons.last
     expect(lesson.video_source).to eq(:vimeo)
 

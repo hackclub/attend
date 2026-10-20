@@ -72,7 +72,7 @@ module Training
       @lesson.learn_video_duration!(params[:duration]) if current_user.global_admin?
 
       view = @enrollment.video_view_for(@lesson)
-      view.record_heartbeat!(position: params[:position], duration: params[:duration])
+      view.record_heartbeat!(position: params[:position])
       render json: { watched: view.watched_seconds, complete: @enrollment.video_watched?(@lesson) }
     end
 

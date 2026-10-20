@@ -52,13 +52,15 @@ class TrainingCourse < ApplicationRecord
   end
 
   # A published course with nothing in it would award its badge on a single
-  # click, so it needs at least one lesson, and every quiz question needs a
-  # right answer to be markable.
+  # click, so it needs at least one lesson, every quiz question needs a right
+  # answer to be markable, and every must-watch video needs a known length.
   def publishable
     if lessons.empty?
       errors.add(:status, "can't be published until the course has a lesson")
     elsif (unanswerable = lessons.flat_map(&:questions).reject(&:answerable?)).any?
       errors.add(:status, "can't be published while #{unanswerable.size == 1 ? "a question has" : "#{unanswerable.size} questions have"} no correct answer")
+    elsif (unknown = lessons.select { |lesson| lesson.watch_required? && lesson.known_video_duration.nil? }).any?
+      errors.add(:status, "can't be published until Attend knows how long #{unknown.map { |lesson| "“#{lesson.title}”" }.to_sentence}'s video is — play it once in the preview, or enter its length on the lesson")
     end
   end
 end

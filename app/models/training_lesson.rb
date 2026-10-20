@@ -36,8 +36,9 @@ class TrainingLesson < ApplicationRecord
 
   # A new video has a new length; the old one would let learners finish early
   # (or never). The next admin preview fills it back in.
-  before_save :forget_video_duration, if: -> { will_save_change_to_video_url? && !will_save_change_to_video_duration_seconds? }
-  after_commit :forget_replaced_video_duration, on: :update, if: -> { attachment_changes.key?("video_file") }
+  # Checked before save: Active Storage drops its record of a new upload in its
+  # own commit callback, before any of ours would see it.
+  before_save :forget_video_duration, if: :video_changed_without_new_length?
 
   def quiz?
     questions.any?
@@ -67,8 +68,9 @@ class TrainingLesson < ApplicationRecord
 
   # The video's real length, when the server knows it: set by hand or from a
   # global admin's preview, or analysed from an upload (needs ffprobe on the
-  # host). Until then the learner's player reports a length, which a forged
-  # request could understate — so admins should preview each video once.
+  # host). A learner's player is never trusted for it — a forged request could
+  # understate it — so until it's known the video can't be finished
+  # (TrainingVideoView), and the course can't be published.
   def known_video_duration
     return video_duration_seconds if video_duration_seconds&.positive?
     return unless video_source == :upload
@@ -95,8 +97,9 @@ class TrainingLesson < ApplicationRecord
     self.video_duration_seconds = nil
   end
 
-  def forget_replaced_video_duration
-    update_column(:video_duration_seconds, nil) unless previous_changes.key?("video_duration_seconds")
+  def video_changed_without_new_length?
+    (will_save_change_to_video_url? || attachment_changes.key?("video_file")) &&
+      !will_save_change_to_video_duration_seconds?
   end
 
   def video_id_for(source)

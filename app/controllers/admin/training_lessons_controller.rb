@@ -23,7 +23,10 @@ module Admin
     end
 
     def update
-      @lesson.video_file.purge_later if params.dig(:training_lesson, :remove_video_file) == "1"
+      if params.dig(:training_lesson, :remove_video_file) == "1"
+        @lesson.video_file.purge_later
+        @lesson.video_duration_seconds = nil
+      end
 
       if @lesson.update(lesson_params)
         redirect_to edit_admin_training_course_lesson_path(@course, @lesson), notice: "Lesson saved."

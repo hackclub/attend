@@ -23,7 +23,11 @@
     <% end %>
   <% end %>
 </div>
-<% if gated %>
+<% if gated && lesson.known_video_duration.nil? && !current_user.global_admin? %>
+  <p class="portal-note portal-note-warn portal-body text-sm mb-6">
+    This video isn't ready yet, so the lesson can't be finished. Let your event organizer know.
+  </p>
+<% elsif gated %>
   <p class="portal-meta text-xs mb-6" aria-live="polite">
     Watch the whole video to continue — you can rewind, but not skip ahead.
     <span data-training-video-target="status" class="font-semibold"></span>

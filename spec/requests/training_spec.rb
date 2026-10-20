@@ -86,7 +86,7 @@ RSpec.describe "Training", type: :request do
   end
 
   describe "a lesson with a video that must be watched" do
-    before { reading.update!(video_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ") }
+    before { reading.update!(video_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", video_duration_seconds: 20) }
 
     it "won't mark the lesson done until the video is watched" do
       enroll
@@ -111,6 +111,7 @@ RSpec.describe "Training", type: :request do
     end
 
     it "learns the real length from a global admin's preview, not a learner's" do
+      reading.update!(video_duration_seconds: nil)
       enroll
       post video_progress_training_course_lesson_path(course, reading), params: { position: 0, duration: 3 }, as: :json
       expect(reading.reload.video_duration_seconds).to be_nil
@@ -120,6 +121,13 @@ RSpec.describe "Training", type: :request do
       post enroll_training_course_path(course)
       post video_progress_training_course_lesson_path(course, reading), params: { position: 0, duration: 212.5 }, as: :json
       expect(reading.reload.video_duration_seconds).to eq(212.5)
+    end
+
+    it "tells learners when the video isn't ready yet" do
+      reading.update!(video_duration_seconds: nil)
+      enroll
+      get training_course_lesson_path(course, reading)
+      expect(response.body).to include("This video isn't ready yet")
     end
 
     it "renders the gated player" do
