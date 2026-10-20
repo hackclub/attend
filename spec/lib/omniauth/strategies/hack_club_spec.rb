@@ -69,6 +69,26 @@ RSpec.describe OmniAuth::Strategies::HackClub do
     end
   end
 
+  describe "#authorize_params" do
+    def authorize_params_with(prefill)
+      strategy = described_class.new(nil, prefill: prefill)
+      strategy.instance_variable_set(:@env, { "rack.session" => {}, "test.email" => "dana@example.com" })
+      strategy.authorize_params
+    end
+
+    it "adds the prefill to the authorize URL, without blanks" do
+      params = authorize_params_with(->(env) { { email: env["test.email"], first_name: "Dana", last_name: "" } })
+
+      expect(params).to include("email" => "dana@example.com", "first_name" => "Dana")
+      expect(params).not_to have_key("last_name")
+      expect(params["state"]).to be_present
+    end
+
+    it "works without a prefill" do
+      expect(authorize_params_with(nil).keys).to eq([ "state" ])
+    end
+  end
+
   describe "#uid" do
     it "keeps using the HCA identity id" do
       stub_endpoints(userinfo: userinfo_response)

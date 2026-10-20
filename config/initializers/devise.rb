@@ -281,7 +281,10 @@ Devise.setup do |config|
       # discovery document; `email`, `slack_id` and `verification_status` are
       # extras HCA honours. `profile` is what gets us the name claims and
       # `birthdate` the date of birth, both read from /oauth/userinfo.
-      scope: "openid profile email slack_id phone birthdate verification_status"
+      scope: "openid profile email slack_id phone birthdate verification_status",
+      # Someone arriving from an invitation gets HCA's signup form started
+      # with what the invitation already knows about them.
+      prefill: ->(env) { HackClubAuthPrefill.from_session(env["rack.session"]) }
   end
 
   # ==> Warden configuration
