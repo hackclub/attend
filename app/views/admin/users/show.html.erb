@@ -3,7 +3,7 @@
     <h1 class="text-2xl font-bold text-gray-900"><%= @user.display_name_or_fallback %></h1>
     <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
       <% if current_user.global_admin? && @user != current_user %>
-        <%= button_to "Impersonate", admin_user_impersonation_path(@user), method: :post, class: "w-full sm:w-auto text-center px-4 py-2 rounded-md transition-colors", style: "background-color: #f97316; color: white;", data: { confirm: "You will be signed in as #{@user.display_name_or_fallback}. Continue?" } %>
+        <%= button_to "Impersonate", admin_user_impersonation_path(@user), method: :post, class: "w-full sm:w-auto text-center px-4 py-2 rounded-md transition-colors", style: "background-color: #f97316; color: white;", form: { data: { turbo_confirm: "You will be signed in as #{@user.display_name_or_fallback}. Continue?" } } %>
       <% end %>
       <%= link_to "Edit", edit_admin_user_path(@user), class: "w-full sm:w-auto text-center px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] transition-colors" %>
     </div>

@@ -35,7 +35,7 @@
       <% if @message.scheduled? %>
         <%= button_to "Cancel", cancel_admin_event_message_path(current_event, @message),
             method: :post,
-            data: { confirm: "Are you sure you want to cancel this scheduled message?" },
+            form: { data: { turbo_confirm: "Are you sure you want to cancel this scheduled message?" } },
             class: "cs-btn" %>
       <% end %>
 
@@ -50,7 +50,7 @@
 
         <%= button_to "Send now", send_now_admin_event_message_path(current_event, @message),
             method: :post,
-            data: { confirm: "Are you sure you want to send this message now?" },
+            form: { data: { turbo_confirm: "Are you sure you want to send this message now?" } },
             class: "cs-btn cs-btn-primary" %>
       <% end %>
     </div>

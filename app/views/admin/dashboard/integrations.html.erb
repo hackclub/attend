@@ -567,11 +567,11 @@
                 <% if policy(current_event).manage_api_tokens? %>
                   <%= button_to "Rotate", admin_rotate_event_api_token_path(current_event.slug, token.id),
                       method: :post,
-                      data: { confirm: "Rotating issues a new secret and invalidates the current one. Integrations using this token will stop working until updated. Continue?" },
+                      form: { data: { turbo_confirm: "Rotating issues a new secret and invalidates the current one. Integrations using this token will stop working until updated. Continue?" } },
                       class: "shrink-0 text-sm font-medium text-[#ec3750] hover:text-[#d42f46]" %>
                   <%= button_to "Revoke", admin_event_api_token_path(current_event.slug, token.id),
                       method: :delete,
-                      data: { confirm: "This permanently revokes the token. Any integration using it will stop working. Continue?" },
+                      form: { data: { turbo_confirm: "This permanently revokes the token. Any integration using it will stop working. Continue?" } },
                       class: "shrink-0 text-sm font-medium text-gray-500 hover:text-gray-700" %>
                 <% end %>
               </div>
@@ -611,7 +611,7 @@
               <%= button_to "Regenerate",
                   regenerate_api_key_admin_event_path(current_event),
                   method: :post,
-                  data: { confirm: "This will invalidate the existing legacy API key. Any integrations using it will stop working. Continue?" },
+                  form: { data: { turbo_confirm: "This will invalidate the existing legacy API key. Any integrations using it will stop working. Continue?" } },
                   class: "shrink-0 text-sm font-medium text-gray-500 hover:text-gray-700" %>
             <% end %>
           </div>
@@ -687,7 +687,7 @@
               admin_event_create_vote_event_path(current_event),
               method: :post,
               disabled: !vote_ready,
-              data: { confirm: "Create a new DRAFT event on vote.hackclub.com for \"#{current_event.name}\"?" },
+              form: { data: { turbo_confirm: "Create a new DRAFT event on vote.hackclub.com for \"#{current_event.name}\"?" } },
               class: "bg-[#d42f46] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#b82840] disabled:opacity-50 disabled:cursor-not-allowed" %>
         </div>
       <% end %>
