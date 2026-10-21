@@ -122,7 +122,8 @@
             *(current_event.travel_enabled? ? [["Missing Travel", "missing_travel"]] : []),
             ["Missing Medical", "missing_medical"],
             ["High Support", "high_support"],
-            ["Anaphylaxis Risk", "anaphylaxis"]
+            ["Anaphylaxis Risk", "anaphylaxis"],
+            ["19+ During Event", "over_age_limit"]
           ], params[:flag]),
           class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
       <%= select_tag :checked_in,

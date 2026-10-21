@@ -51,6 +51,36 @@ class RegistrationCorrectionMailer < ApplicationMailer
     )
   end
 
+  # The participant may be waiting on this to carry on, e.g. held at the
+  # onboarding profile step until their birthday is corrected (see
+  # OnboardingController#hold_at_profile_if_too_old), so the link goes back
+  # into the wizard while they're still in it.
+  def participant_approved(change_request:)
+    @change_request = change_request
+    @participant_event = change_request.participant_event
+    @participant = @participant_event.participant
+    @event = @participant_event.event
+    @emailable = @participant
+    @event_name = @event.name
+    @preferred_name = @participant.greeting_name || "there"
+    @support_email = @event.effective_support_email
+    @request_label = SECTION_LABELS.fetch(change_request.kind)
+    url_helpers = Rails.application.routes.url_helpers
+    @in_onboarding = @participant_event.in_onboarding?
+    @link = if @in_onboarding
+      url_helpers.onboarding_url(event_id: @event.id, host: default_host, protocol: default_protocol)
+    else
+      url_helpers.dashboard_event_url(@participant_event, host: default_host, protocol: default_protocol)
+    end
+
+    mail(
+      to: @participant.email,
+      from: "Hack Club #{@event_name} <#{@support_email}>",
+      subject: "Your #{@event_name} #{@request_label} was approved",
+      reply_to: @support_email
+    )
+  end
+
   private
 
   def default_host

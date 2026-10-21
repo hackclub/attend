@@ -583,7 +583,13 @@ class GuardianPortalController < ApplicationController
     end
     ActiveRecord::Base.transaction { health_records.each { |record, _attributes, _label| record.save! } }
 
-    participant_saved = @participant.update(all_params[:participant])
+    # A birthday that ages the participant out is locked for guardians too;
+    # it only moves through a staff-reviewed change request (see
+    # OnboardingController#assign_profile_attributes).
+    birthday_locked = @participant_event.too_old_for_event?
+    @participant.assign_attributes(all_params[:participant])
+    @participant.restore_attributes([ :date_of_birth ]) if birthday_locked
+    participant_saved = @participant.save
     medical_saved = dietary_saved = accessibility_saved = true
 
     # Save travel data

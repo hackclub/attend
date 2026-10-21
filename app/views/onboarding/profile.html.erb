@@ -7,6 +7,41 @@
     <p class="portal-hint text-sm mt-2">Your contact and identity details are used for registration and safeguarding. They are visible to relevant event staff. <%= "Your parent or guardian can also see and edit these details in their portal." if @participant_event.requires_guardian? %></p>
   </header>
 
+  <% birthday_locked = @participant_event.too_old_for_event? %>
+  <% if birthday_locked %>
+    <div class="portal-note portal-note-warn mb-6" data-testid="age-limit-hold">
+      <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/>
+      </svg>
+      <div class="flex-1 min-w-0">
+        <p class="portal-heading text-sm">You can't continue registering with this date of birth</p>
+        <p class="portal-body text-sm mt-0.5">Your registration says you were born on <strong><%= @participant.date_of_birth.strftime("%B %-d, %Y") %></strong>, so you'd be 19 or older during <%= current_event.name %>. Attendees must be 18 or younger for the whole event.</p>
+
+        <% if @identity_correction&.pending? %>
+          <p class="portal-body text-sm mt-3">You've asked staff to correct it. Once they've reviewed your request, come back here to continue.</p>
+        <% elsif @identity_correction&.awaiting_staff_reset? %>
+          <p class="portal-body text-sm mt-3">Staff need to check a few things before they can apply your correction. They'll be in touch, so there's no need to ask again.</p>
+        <% else %>
+          <% if @identity_correction&.follow_up_needed? && @identity_correction.staff_response.present? %>
+            <p class="portal-body text-sm mt-3"><strong>Staff replied to your last request:</strong> <%= @identity_correction.staff_response %></p>
+          <% end %>
+          <p class="portal-body text-sm mt-3">If this date is wrong, ask staff to correct it. They review every correction before it's applied.</p>
+          <%= form_with url: dashboard_event_registration_change_requests_path(@participant_event), scope: :registration_change_request, local: true, data: { turbo: false }, class: "mt-3 space-y-3" do |f| %>
+            <%= f.hidden_field :kind, value: "signed_identity" %>
+            <%= hidden_field_tag :return_to, "onboarding" %>
+            <%= f.fields_for :requested_changes do |c| %>
+              <%= c.label :date_of_birth, "Correct date of birth", class: "portal-label" %>
+              <%= c.date_field :date_of_birth, class: "portal-input", required: true %>
+            <% end %>
+            <%= f.label :requester_note, "Anything staff should know", class: "portal-label" %>
+            <%= f.text_area :requester_note, class: "portal-textarea", rows: 2 %>
+            <%= f.submit "Ask staff to correct it", class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
   <%= form_with model: @participant, url: onboarding_step_path(step: @step, event_id: current_event.id), scope: :participant, method: :patch, local: true, multipart: true, data: { turbo: false, controller: "phone-input autosave", autosave_url_value: onboarding_step_path(step: @step, event_id: current_event.id), action: "input->autosave#input change->autosave#change" } do |f| %>
     <%= render "autosave_status" %>
     <div class="portal-card p-5 sm:p-6 space-y-6">
@@ -30,7 +65,10 @@
 
       <div>
         <%= f.label :date_of_birth, label_text("Date of Birth", required: true), class: "portal-label" %>
-        <%= f.date_field :date_of_birth, class: "portal-input", required: true %>
+        <%= f.date_field :date_of_birth, class: "portal-input", required: !birthday_locked, disabled: birthday_locked %>
+        <% if birthday_locked %>
+          <p class="mt-1 portal-hint text-sm">Only staff can change this now. Ask them to correct it above.</p>
+        <% end %>
       </div>
 
       <div>

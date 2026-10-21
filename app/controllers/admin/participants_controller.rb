@@ -61,6 +61,8 @@ module Admin
           @participant_events = @participant_events.joins(:safeguarding_info).where(safeguarding_infos: { high_support_flag: true })
         when "anaphylaxis"
           @participant_events = @participant_events.joins(:medical).where(medicals: { has_anaphylaxis_risk: true })
+        when "over_age_limit"
+          @participant_events = @participant_events.where(id: over_age_limit_ids(@participant_events))
         end
       end
 
@@ -956,6 +958,21 @@ module Admin
         next if checked_in.include?(pe.id) || pe.onboarding_progress[:blocking_step]
 
         pe.id
+      end
+    end
+
+    # Evaluated in Ruby, like the blocking stages, so the list matches
+    # ParticipantEvent#too_old_for_event? to the day, leap-day birthdays
+    # included.
+    def over_age_limit_ids(scope)
+      # Only the birthday is needed here; the roster preloads are run once,
+      # on the filtered set.
+      scope.unscope(:preload, :includes, :eager_load, :order)
+           .select(:id, :participant_id, :event_id)
+           .preload(:participant)
+           .filter_map do |pe|
+        pe.association(:event).target = current_event
+        pe.id if pe.too_old_for_event?
       end
     end
 

@@ -16,6 +16,10 @@ module RegistrationChangeRequests
       pending_on: nil,
       sent_at: nil
     }.freeze
+    # Set automatically, so it is written for staff. Participants see a
+    # generic "staff will be in touch" message instead (see #mark_follow_up).
+    SHARED_IDENTITY_FOLLOW_UP = "This identity is shared across events with signed registrations. " \
+      "Staff must review and reset every affected registration before applying it.".freeze
 
     def self.call(request:, reviewer:)
       new(request: request, reviewer: reviewer).call
@@ -40,7 +44,10 @@ module RegistrationChangeRequests
         end
       end
 
-      enqueue_guardian_work if result == :approved && request.guardian?
+      if result == :approved
+        enqueue_guardian_work if request.guardian?
+        RegistrationCorrectionMailer.participant_approved(change_request: request).deliver_later
+      end
       result
     end
 
@@ -50,9 +57,7 @@ module RegistrationChangeRequests
 
     def approve_identity
       if identity_bound_acceptance_exists?
-        return mark_follow_up(
-          "This identity is shared across events with signed registrations. Staff must review and reset every affected registration before applying it."
-        )
+        return mark_follow_up(SHARED_IDENTITY_FOLLOW_UP, reason: "shared_identity")
       end
 
       attributes = request.requested_changes.slice(*IDENTITY_FIELDS)
@@ -146,10 +151,13 @@ module RegistrationChangeRequests
       :approved
     end
 
-    def mark_follow_up(message)
+    # reason marks a note Approve wrote for staff rather than one staff wrote
+    # for the participant (see RegistrationChangeRequest#awaiting_staff_reset?).
+    def mark_follow_up(message, reason: nil)
       request.update!(
         status: :follow_up_needed,
         staff_response: message,
+        follow_up_reason: reason,
         resolved_by: reviewer,
         resolved_at: Time.current
       )

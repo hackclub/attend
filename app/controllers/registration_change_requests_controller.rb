@@ -27,10 +27,9 @@ class RegistrationChangeRequestsController < ApplicationController
 
     if @change_request.save
       RegistrationCorrectionNotifications.change_request(@change_request)
-      redirect_to dashboard_event_path(@participant_event), notice: "Change request submitted."
+      redirect_to return_path, notice: "Change request submitted."
     else
-      redirect_to edit_dashboard_event_correction_path(@participant_event, section: section_for_kind),
-        alert: @change_request.errors.full_messages.to_sentence
+      redirect_to return_path(failed: true), alert: @change_request.errors.full_messages.to_sentence
     end
   end
 
@@ -78,6 +77,19 @@ class RegistrationChangeRequestsController < ApplicationController
     return "event_admin" unless request_params[:kind] == "support"
 
     %w[operations safeguarding].include?(request_params[:staff_audience]) ? request_params[:staff_audience] : "event_admin"
+  end
+
+  # A birthday correction asked for from the onboarding profile step (see
+  # OnboardingController#hold_at_profile_if_too_old) goes back there, where
+  # the participant is waiting on it.
+  def return_path(failed: false)
+    if params[:return_to] == "onboarding"
+      onboarding_step_path(step: "profile", event_id: @event.id)
+    elsif failed
+      edit_dashboard_event_correction_path(@participant_event, section: section_for_kind)
+    else
+      dashboard_event_path(@participant_event)
+    end
   end
 
   def section_for_kind
