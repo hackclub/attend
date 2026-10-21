@@ -117,24 +117,25 @@ class Message < ApplicationRecord
   # email rather than a foreign key because that is the only link between the
   # two — an Invitation belongs to an event and an address, not to a person.
   def notified_invitee_ids
-    invitee_ids_where("invitations.sent_at IS NOT NULL")
+    invitee_ids_with(Invitation.sent)
   end
 
   # Invited registrations whose invitation is still held (see Invitation.held).
   def held_invitee_ids
-    invitee_ids_where("invitations.sent_at IS NULL AND invitations.accepted_at IS NULL")
+    invitee_ids_with(Invitation.held)
   end
 
-  def invitee_ids_where(invitation_condition)
+  # `invitations` is an Invitation scope, correlated with each registration
+  # as an EXISTS subquery.
+  def invitee_ids_with(invitations)
+    matching = invitations
+      .where("invitations.event_id = participant_events.event_id")
+      .where("LOWER(invitations.email) = LOWER(participants.email)")
+
     event.participant_events
       .invited
       .joins(:participant)
-      .where(
-        "EXISTS (SELECT 1 FROM invitations " \
-        "WHERE invitations.event_id = participant_events.event_id " \
-        "AND #{invitation_condition} " \
-        "AND LOWER(invitations.email) = LOWER(participants.email))"
-      )
+      .where(matching.arel.exists)
       .select(:id)
   end
 
