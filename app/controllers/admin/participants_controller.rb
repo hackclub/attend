@@ -965,7 +965,12 @@ module Admin
     # ParticipantEvent#too_old_for_event? to the day, leap-day birthdays
     # included.
     def over_age_limit_ids(scope)
-      scope.includes(:participant).filter_map do |pe|
+      # Only the birthday is needed here; the roster preloads are run once,
+      # on the filtered set.
+      scope.unscope(:preload, :includes, :eager_load, :order)
+           .select(:id, :participant_id, :event_id)
+           .preload(:participant)
+           .filter_map do |pe|
         pe.association(:event).target = current_event
         pe.id if pe.too_old_for_event?
       end

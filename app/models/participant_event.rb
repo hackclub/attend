@@ -211,6 +211,13 @@ class ParticipantEvent < ApplicationRecord
     age_at_event_end.present? && age_at_event_end >= 19
   end
 
+  # Still filling the wizard in for the first time. Adding an optional
+  # document reopens a completed participant, so in_progress on its own
+  # doesn't mean this.
+  def in_onboarding?
+    invited? || (in_progress? && onboarding_completed_at.nil?)
+  end
+
   def assigned_to_room?
     room_assignment.present?
   end

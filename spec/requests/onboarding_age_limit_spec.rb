@@ -48,11 +48,27 @@ RSpec.describe "Onboarding age limit", type: :request do
     expect(participant_event.reload.code_of_conduct_accepted_at).to be_nil
   end
 
-  it "ignores a birthday changed on the profile form" do
-    patch profile_path, params: { participant: { tshirt_size: "m", date_of_birth: "2011-05-05" } }
+  it "keeps them off the waiver, even when every step is done" do
+    allow_any_instance_of(OnboardingController).to receive(:all_steps_complete?).and_return(true)
 
-    expect(response).to have_http_status(:unprocessable_entity)
-    expect(participant.reload.date_of_birth).to eq(aged_out_birthday)
+    get onboarding_path(event_id: event.id)
+    expect(response).to redirect_to(profile_path)
+
+    expect { get onboarding_waiver_path(event_id: event.id) }
+      .not_to have_enqueued_job(DocusealJobs::CreateAdultWaiverJob)
+    expect(response).to redirect_to(profile_path)
+    expect(participant_event.consents.waiver).to be_empty
+
+    post onboarding_waiver_complete_path(event_id: event.id)
+    expect(response).to redirect_to(profile_path)
+  end
+
+  it "saves the rest of the profile without moving them on" do
+    patch profile_path, params: { participant: { tshirt_size: "l", date_of_birth: "2011-05-05" } }
+
+    expect(response).to redirect_to(profile_path)
+    expect(flash[:alert]).to be_nil
+    expect(participant.reload).to have_attributes(tshirt_size: "l", date_of_birth: aged_out_birthday)
     expect(participant_event.reload.onboarding_step).to eq(0)
   end
 
@@ -70,7 +86,7 @@ RSpec.describe "Onboarding age limit", type: :request do
     it "ignores it on the profile form" do
       patch profile_path, params: { participant: { tshirt_size: "m", **date_parts } }
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to redirect_to(profile_path)
       expect(participant.reload.date_of_birth).to eq(aged_out_birthday)
       expect(participant_event.reload.onboarding_step).to eq(0)
     end
@@ -80,6 +96,46 @@ RSpec.describe "Onboarding age limit", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(participant.reload).to have_attributes(preferred_name: "Sam", date_of_birth: aged_out_birthday)
+    end
+  end
+
+  # A birthday already on file (another event, or the OIDC claim) that ages
+  # them out holds them the same way, rather than failing the registration.
+  context "arriving from an invitation" do
+    let!(:participant_event) { nil }
+
+    before do
+      participant
+      create(:invitation, event: event, email: user.email, sent_at: 1.day.ago)
+    end
+
+    it "registers them and holds them at the profile step" do
+      get onboarding_path(event_id: event.id)
+
+      expect(response).to redirect_to(profile_path)
+      expect(event.participant_events.find_by!(participant: participant)).to be_too_old_for_event
+    end
+  end
+
+  context "in the guardian portal" do
+    let(:guardian) { create(:guardian) }
+    let!(:gpe) { create(:guardian_participant_event, guardian: guardian, participant_event: participant_event) }
+    let(:token) { gpe.generate_invite_token! }
+
+    it "locks the birthday for the guardian too" do
+      get guardian_portal_step_path(token: token, step: "participant_info")
+      expect(document.at_css("input[name='participant[date_of_birth]']")["disabled"]).to be_present
+
+      patch guardian_portal_update_step_path(token: token, step: "participant_info"), params: {
+        participant: { legal_first_name: "Kid", legal_last_name: "Tester", date_of_birth: "2011-05-05" },
+        medical: { section_response: "nothing_to_add" },
+        dietary: { section_response: "nothing_to_add" },
+        accessibility: { section_response: "nothing_to_add" }
+      }
+
+      expect(response).to have_http_status(:redirect)
+      expect(participant.reload).to have_attributes(legal_first_name: "Kid", date_of_birth: aged_out_birthday)
+      expect(participant_event.reload).to be_too_old_for_event
     end
   end
 
@@ -143,7 +199,9 @@ RSpec.describe "Onboarding age limit", type: :request do
 
     it "lets them continue once staff approve it" do
       request_correction("2010-05-05")
-      RegistrationChangeRequests::Approve.call(request: participant_event.registration_change_requests.last, reviewer: staff)
+      expect {
+        RegistrationChangeRequests::Approve.call(request: participant_event.registration_change_requests.last, reviewer: staff)
+      }.to have_enqueued_mail(RegistrationCorrectionMailer, :participant_approved)
 
       patch profile_path, params: { participant: { tshirt_size: "m" } }
 
@@ -164,6 +222,21 @@ RSpec.describe "Onboarding age limit", type: :request do
       expect(hold.text).to include("Staff need to check a few things")
       expect(hold.text).not_to include("This identity is shared")
       expect(hold.at_css("form")).to be_nil
+    end
+
+    it "still hides the automatic note after staff add to it" do
+      past_event = create(:event, starts_at: 8.years.ago, ends_at: 8.years.ago + 2.days)
+      create(:participant_event, participant: participant, event: past_event, code_of_conduct_accepted_at: 8.years.ago)
+      request_correction("2010-05-05")
+      change_request = participant_event.registration_change_requests.last
+      RegistrationChangeRequests::Approve.call(request: change_request, reviewer: staff)
+      change_request.update!(staff_response: change_request.staff_response + " Checked the other event; waiting on ops.")
+
+      get profile_path
+
+      hold = document.at_css("[data-testid='age-limit-hold']")
+      expect(hold.text).to include("Staff need to check a few things")
+      expect(hold.text).not_to include("waiting on ops")
     end
 
     it "shows what staff wrote when they ask for more" do

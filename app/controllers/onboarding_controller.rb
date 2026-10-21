@@ -14,7 +14,7 @@ class OnboardingController < ApplicationController
   before_action :apply_event_brand
   before_action :redirect_if_withdrawn
   before_action :redirect_if_locked, except: [ :index, :waiver, :waiver_complete, :done ]
-  before_action :hold_at_profile_if_too_old, only: [ :show, :update, :complete ]
+  before_action :hold_at_profile_if_too_old, except: [ :welcome, :start, :done ]
 
   BASE_STEPS = %w[profile travel accommodation health].freeze
   GUARDIAN_STEP = "guardian"
@@ -111,6 +111,14 @@ class OnboardingController < ApplicationController
     end
 
     if save_step_data
+      # Held at the profile step (see #hold_at_profile_if_too_old): the rest
+      # of the profile saved, but they go no further until staff correct the
+      # birthday.
+      if @step == "profile" && @participant_event.too_old_for_event?
+        redirect_to onboarding_step_path(step: "profile", event_id: current_event.id), notice: "Progress saved."
+        return
+      end
+
       advance_to_next_step
       next_step = steps[@participant_event.onboarding_step]
 
@@ -432,11 +440,15 @@ class OnboardingController < ApplicationController
         return
       end
 
+      # Like an integration's invitation, a birthday already on file that ages
+      # them out doesn't block the registration: onboarding holds them at the
+      # profile step instead (see #hold_at_profile_if_too_old).
       @participant_event = ParticipantEvent.create!(
         participant: participant,
         event: current_event,
         status: :in_progress,
-        onboarding_step: 0
+        onboarding_step: 0,
+        skip_age_check: true
       )
 
       # Apply any group memberships specified at invite time
@@ -514,6 +526,7 @@ class OnboardingController < ApplicationController
     case @step
     when "profile"
       load_identity_correction
+      birthday_locked = @participant_event.too_old_for_event?
       @participant = assign_profile_attributes(profile_params)
       if profile_params[:tshirt_size].blank?
         flash.now[:alert] = "Please select a t-shirt size"
@@ -527,8 +540,9 @@ class OnboardingController < ApplicationController
       end
 
       # Saved even so: it's what they told us. From here the birthday is
-      # locked and they can only ask staff to correct it.
-      if @participant_event.too_old_for_event?
+      # locked and they can only ask staff to correct it. Someone already
+      # held can still save the rest of their profile (see #update).
+      if !birthday_locked && @participant_event.too_old_for_event?
         flash.now[:alert] = "You will be 19 or older during this event, so you can't continue registering."
         return false
       end

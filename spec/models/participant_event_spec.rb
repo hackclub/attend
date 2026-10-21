@@ -50,6 +50,18 @@ RSpec.describe ParticipantEvent, type: :model do
     end
   end
 
+  describe "#in_onboarding?" do
+    it "is true until the wizard is first submitted" do
+      expect(build(:participant_event, status: :invited)).to be_in_onboarding
+      expect(build(:participant_event, status: :in_progress, onboarding_completed_at: nil)).to be_in_onboarding
+    end
+
+    it "is false once submitted, even if an optional document reopened them" do
+      expect(build(:participant_event, status: :in_progress, onboarding_completed_at: 1.day.ago)).not_to be_in_onboarding
+      expect(build(:participant_event, status: :complete, onboarding_completed_at: 1.day.ago)).not_to be_in_onboarding
+    end
+  end
+
   describe ".missing_onboarding_data" do
     def build_pe(event, travel_in: false, travel_out: false, medical: false, dietary: false,
                  accessibility: false, safeguarding: false, consent: false, accommodation: false)

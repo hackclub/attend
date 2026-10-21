@@ -50,7 +50,7 @@ class RegistrationChangeRequest < ApplicationRecord
   # Approve could not apply an identity change on its own, and staff have
   # not written anything for the participant yet.
   def awaiting_staff_reset?
-    follow_up_needed? && staff_response == RegistrationChangeRequests::Approve::SHARED_IDENTITY_FOLLOW_UP
+    follow_up_needed? && follow_up_reason == "shared_identity"
   end
 
   private

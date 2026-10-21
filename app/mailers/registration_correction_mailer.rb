@@ -66,9 +66,7 @@ class RegistrationCorrectionMailer < ApplicationMailer
     @support_email = @event.effective_support_email
     @request_label = SECTION_LABELS.fetch(change_request.kind)
     url_helpers = Rails.application.routes.url_helpers
-    # Same test the dashboard uses for "still in the wizard".
-    @in_onboarding = @participant_event.invited? ||
-      (@participant_event.in_progress? && @participant_event.onboarding_completed_at.nil?)
+    @in_onboarding = @participant_event.in_onboarding?
     @link = if @in_onboarding
       url_helpers.onboarding_url(event_id: @event.id, host: default_host, protocol: default_protocol)
     else

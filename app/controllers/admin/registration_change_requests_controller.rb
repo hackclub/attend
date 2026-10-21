@@ -18,7 +18,6 @@ module Admin
     def approve
       authorize @change_request, :approve?
       result = RegistrationChangeRequests::Approve.call(request: @change_request, reviewer: current_user)
-      RegistrationCorrectionMailer.participant_approved(change_request: @change_request).deliver_later if result == :approved
       notice = result == :approved ? "Change request approved." : "Request marked for staff follow-up."
       redirect_to admin_event_registration_change_request_path(current_event, @change_request), notice: notice
     rescue ActiveRecord::RecordInvalid, ArgumentError => e

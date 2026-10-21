@@ -28,8 +28,12 @@
         </div>
 
         <div>
-          <label for="participant_date_of_birth" class="portal-label"><%= label_text("Date of Birth", required: true) %></label>
-          <input type="date" name="participant[date_of_birth]" id="participant_date_of_birth" value="<%= @participant_data.date_of_birth&.to_s %>" class="portal-input" required>
+          <% birthday_locked = @participant_event.too_old_for_event? %>
+          <label for="participant_date_of_birth" class="portal-label"><%= label_text("Date of Birth", required: !birthday_locked) %></label>
+          <input type="date" name="participant[date_of_birth]" id="participant_date_of_birth" value="<%= @participant_data.date_of_birth&.to_s %>" class="portal-input" <%= birthday_locked ? "disabled" : "required" %>>
+          <% if birthday_locked %>
+            <p class="mt-1 portal-hint text-sm">This date of birth means they'd be 19 or older during the event, so only event staff can change it. Please contact them.</p>
+          <% end %>
         </div>
 
         <div>
