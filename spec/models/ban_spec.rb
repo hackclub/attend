@@ -43,6 +43,27 @@ RSpec.describe Ban, type: :model do
     end
   end
 
+  describe ".user_banned?" do
+    it "matches a ban on an imported participant row that only shares the person's email" do
+      user = create(:user, email: "account@example.com")
+      create(:participant, user: nil, email: "account@example.com", slack_user_id: "U0IMPORTED")
+      ban = create(:ban, email: "unrelated@example.com")
+      ban.ban_slack_ids.create!(slack_id: "U0IMPORTED")
+
+      expect(Ban.user_banned?(user)).to be true
+      expect(Ban.active_for_user(user)).to contain_exactly(ban)
+      expect(ban.identifiers_matching(user)).to eq([ "Slack U0IMPORTED" ])
+    end
+
+    it "is false when nothing about the person is banned" do
+      user = create(:user, email: "clean@example.com")
+      create(:participant, user: user)
+      create(:ban, email: "someone-else@example.com")
+
+      expect(Ban.user_banned?(user)).to be false
+    end
+  end
+
   describe "validations" do
     it "requires at least one email" do
       expect(Ban.new(reason: "x")).not_to be_valid

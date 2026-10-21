@@ -150,6 +150,16 @@ RSpec.describe Bans::UcatSync do
       expect(legacy.reload.ucat_cases.map { _1["record_id"] }).to eq(%w[recA1 recA2])
     end
 
+    it "copes with a numeric case ID next to a row whose ID is blank" do
+      records.replace([
+        row(id: 42, email: "banned@example.com"),
+        { "id" => "recBLANK", "fields" => { "Subject Email" => "banned@example.com", "Action Taken" => "Perma Ban", "Status" => "resolved" } }
+      ])
+
+      expect { sync }.not_to raise_error
+      expect(Ban.ucat.sole.ucat_cases.map { _1["id"] }).to contain_exactly("42", "recBLANK")
+    end
+
     it "is idempotent" do
       sync
       expect { sync }.not_to change(Ban, :count)
@@ -220,6 +230,16 @@ RSpec.describe Bans::UcatSync do
       records << row(id: "L", email: "lifted@example.com")
       expect(sync.reinstated).to eq(1)
       expect(lifted.reload).to be_active
+    end
+
+    it "counts an expired temp ban that UCAT extended as reinstated" do
+      expired = create(:ban, :expired, source: :ucat, external_key: "temp@example.com", email: "temp@example.com")
+      records << row(id: "T", email: "temp@example.com", action: "Temp Ban", until_at: 2.weeks.from_now)
+
+      result = sync
+      expect(result.reinstated).to eq(1)
+      expect(result.unchanged).to eq(kept.size)
+      expect(expired.reload).to be_active
     end
 
     it "leaves a ban an admin revoked by hand alone" do

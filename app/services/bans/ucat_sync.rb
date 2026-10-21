@@ -147,7 +147,11 @@ module Bans
 
           identifiers = identifiers_from(fields)
           if identifiers.any?
-            cases << { id: fields[ID_FIELD].presence || record["id"], record_id: record["id"], until: self.class.action_until(fields), identifiers: identifiers }
+            # Case IDs are strings throughout: Airtable hands an autonumber
+            # back as an Integer, and a row with a blank ID falls back to its
+            # record id, so mixed types would make the sort in
+            # group_into_people raise.
+            cases << { id: (fields[ID_FIELD].presence || record["id"]).to_s, record_id: record["id"], until: self.class.action_until(fields), identifiers: identifiers }
           else
             without_identity += 1
           end
@@ -214,7 +218,11 @@ module Bans
         return
       end
 
-      reinstating = ban.revoked? && ban.revoked_by_id.nil?
+      # A matched person always qualifies now, so after this the ban is in
+      # force. If it wasn't before (revoked by an earlier sync, or a temp ban
+      # that had run out before UCAT extended it) that's a reinstatement, and
+      # the run should say so rather than file it under "unchanged".
+      reinstating = !ban.active? && ban.revoked_by_id.nil?
       sync_identifiers(ban, person.emails, person.slack_ids)
       ban.assign_attributes(attributes)
       ban.revoked_at = nil if reinstating
