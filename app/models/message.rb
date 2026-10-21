@@ -9,6 +9,7 @@ class Message < ApplicationRecord
 
   AUDIENCES = {
     all_attendees: "All Attendees",
+    all_attendees_and_held: "All Attendees + Held Invitations",
     confirmed_attendees: "Confirmed Attendees",
     attendees_with_flights: "Attendees with Flights",
     attendees_incomplete: "Incomplete Onboarding",
@@ -66,6 +67,13 @@ class Message < ApplicationRecord
       event.participant_events
         .where(status: %w[in_progress awaiting_guardian complete])
         .or(event.participant_events.where(id: notified_invitee_ids))
+    when :all_attendees_and_held
+      # The same audience plus held invitees, for when staff decide a message
+      # should reach people before their invitation has gone out.
+      event.participant_events
+        .where(status: %w[in_progress awaiting_guardian complete])
+        .or(event.participant_events.where(id: notified_invitee_ids))
+        .or(event.participant_events.where(id: held_invitee_ids))
     when :confirmed_attendees
       event.participant_events.complete
     when :attendees_with_flights
@@ -109,13 +117,22 @@ class Message < ApplicationRecord
   # email rather than a foreign key because that is the only link between the
   # two — an Invitation belongs to an event and an address, not to a person.
   def notified_invitee_ids
+    invitee_ids_where("invitations.sent_at IS NOT NULL")
+  end
+
+  # Invited registrations whose invitation is still held (see Invitation.held).
+  def held_invitee_ids
+    invitee_ids_where("invitations.sent_at IS NULL AND invitations.accepted_at IS NULL")
+  end
+
+  def invitee_ids_where(invitation_condition)
     event.participant_events
       .invited
       .joins(:participant)
       .where(
         "EXISTS (SELECT 1 FROM invitations " \
         "WHERE invitations.event_id = participant_events.event_id " \
-        "AND invitations.sent_at IS NOT NULL " \
+        "AND #{invitation_condition} " \
         "AND LOWER(invitations.email) = LOWER(participants.email))"
       )
       .select(:id)
