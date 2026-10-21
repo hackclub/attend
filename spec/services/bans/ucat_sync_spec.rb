@@ -119,6 +119,14 @@ RSpec.describe Bans::UcatSync do
       expect(Ban.banned?("warned@example.com")).to be false
     end
 
+    it "fills case links on a ban synced before they were stored" do
+      legacy = create(:ban, source: :ucat, external_key: "banned@example.com", email: "banned@example.com", reason: "UCAT ban (cases A1, A2)")
+      expect(legacy.ucat_cases).to eq([])
+
+      expect(sync.unchanged).to eq(1)
+      expect(legacy.reload.ucat_cases.map { _1["record_id"] }).to eq(%w[recA1 recA2])
+    end
+
     it "is idempotent" do
       sync
       expect { sync }.not_to change(Ban, :count)
