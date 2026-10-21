@@ -513,9 +513,8 @@ class OnboardingController < ApplicationController
   def save_step_data
     case @step
     when "profile"
-      @participant = @participant_event.participant
       load_identity_correction
-      @participant.assign_attributes(editable_profile_params)
+      @participant = assign_profile_attributes(profile_params)
       if profile_params[:tshirt_size].blank?
         flash.now[:alert] = "Please select a t-shirt size"
         return false
@@ -565,9 +564,9 @@ class OnboardingController < ApplicationController
       # Autosave never ages someone out either: a date field reports the year
       # as it's typed ("0002", "0020", "0200"), and saving one of those would
       # lock the birthday mid-keystroke. Submitting the form saves it.
-      attributes = editable_profile_params.except(:headshot)
-      attributes = attributes.except(:date_of_birth) if attributes.key?(:date_of_birth) && birthday_ages_out?(attributes[:date_of_birth])
-      autosave_record(@participant_event.participant, attributes)
+      participant = assign_profile_attributes(profile_params.except(:headshot))
+      participant.restore_attributes([ :date_of_birth ]) if participant.date_of_birth_changed? && @participant_event.too_old_for_event?
+      autosave_record(participant, {})
     when "travel"
       autosave_travel_data
     when "accommodation"
@@ -1113,15 +1112,15 @@ class OnboardingController < ApplicationController
 
   # A birthday that ages the participant out is locked: changing it to one
   # that doesn't would let anyone past the age limit by retyping a year, so
-  # it goes through staff as a change request instead.
-  def editable_profile_params
-    return profile_params unless @participant_event.too_old_for_event?
-
-    profile_params.except(:date_of_birth)
-  end
-
-  def birthday_ages_out?(value)
-    ParticipantEvent.new(event: current_event, participant: Participant.new(date_of_birth: value)).too_old_for_event?
+  # it goes through staff as a change request instead. The lock is applied
+  # to the attribute rather than the param keys, because Rails also accepts
+  # a date as date_of_birth(1i), (2i) and (3i).
+  def assign_profile_attributes(attributes)
+    participant = @participant_event.participant
+    locked = @participant_event.too_old_for_event?
+    participant.assign_attributes(attributes)
+    participant.restore_attributes([ :date_of_birth ]) if locked
+    participant
   end
 
   # Someone 19 or older by the end of the event can't attend. Their birthday

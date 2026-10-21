@@ -63,6 +63,26 @@ RSpec.describe "Onboarding age limit", type: :request do
     expect(participant.reload).to have_attributes(preferred_name: "Sam", date_of_birth: aged_out_birthday)
   end
 
+  # Rails also accepts a date as separate year, month and day params.
+  describe "with the birthday sent in parts" do
+    let(:date_parts) { { "date_of_birth(1i)" => "2011", "date_of_birth(2i)" => "5", "date_of_birth(3i)" => "5" } }
+
+    it "ignores it on the profile form" do
+      patch profile_path, params: { participant: { tshirt_size: "m", **date_parts } }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(participant.reload.date_of_birth).to eq(aged_out_birthday)
+      expect(participant_event.reload.onboarding_step).to eq(0)
+    end
+
+    it "ignores it on autosave" do
+      patch profile_path, params: { autosave: "true", participant: { preferred_name: "Sam", **date_parts } }
+
+      expect(response).to have_http_status(:ok)
+      expect(participant.reload).to have_attributes(preferred_name: "Sam", date_of_birth: aged_out_birthday)
+    end
+  end
+
   context "with a birthday under the limit" do
     let(:participant) { create(:participant, user: user, date_of_birth: 16.years.ago.to_date, tshirt_size: "m") }
 
