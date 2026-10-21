@@ -61,7 +61,7 @@ class MessagesToolbox < ApplicationToolbox
     unless @message.draft? || @message.scheduled?
       halt error: "Message is already #{@message.status}."
     end
-    @message.send!
+    halt error: "Message is already #{@message.status}." unless @message.send!
     render json: serialize_message(@message, full: true)
   end
 

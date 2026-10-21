@@ -29,12 +29,8 @@ class MessageDelivery < ApplicationRecord
 
   delegate :event, to: :message
 
-  # Created by Message#send_to_new_recipients! rather than the original send.
-  # The original send creates its rows right after stamping sent_at, so a
-  # minute's slack covers a large audience.
-  def added_after_send?
-    message.sent_at.present? && created_at > message.sent_at + 1.minute
-  end
+  # `catch_up?` (from the column) is true for deliveries created by
+  # Message#send_to_new_recipients! rather than the original send.
 
   def recipient
     participant_event&.participant || guardian
@@ -52,6 +48,8 @@ class MessageDelivery < ApplicationRecord
       recipient_email
     when "sms"
       recipient_phone
+    when "push"
+      participant_event&.participant&.user&.email || "App"
     end
   end
 

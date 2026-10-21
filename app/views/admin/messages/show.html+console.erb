@@ -137,7 +137,7 @@
                         <% elsif first_delivery.guardian.present? %>
                           <div class="cs-small cs-muted">Guardian</div>
                         <% end %>
-                        <% if first_delivery.added_after_send? %>
+                        <% if first_delivery.catch_up? %>
                           <div class="mt-1"><%= cs_badge("Sent later") %></div>
                         <% end %>
                       </td>

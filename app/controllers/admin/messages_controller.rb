@@ -17,7 +17,7 @@ module Admin
       @deliveries = @message.message_deliveries
         .includes(:participant_event, :guardian)
         .order(:status, :created_at)
-      @new_recipient_count = @message.sent_at.present? ? @message.new_recipients.count : 0
+      @new_recipient_count = @message.can_send_to_new_recipients? ? @message.new_recipients.count : 0
     end
 
     def new
@@ -134,10 +134,14 @@ module Admin
         @message.update!(status: :scheduled)
         redirect_to admin_event_message_path(current_event, @message),
           notice: "Message scheduled for #{@message.scheduled_at.strftime("%B %d, %Y at %l:%M %p")}."
-      else
-        @message.send!
+      elsif @message.send!
         redirect_to admin_event_message_path(current_event, @message),
           notice: "Message is being sent to #{@message.recipient_count} recipients."
+      else
+        # The lock inside send! found it already sent: a double-click or a
+        # concurrent send beat us. Nothing changed, so nothing is audit-logged.
+        redirect_to admin_event_message_path(current_event, @message),
+          alert: "This message has already been sent."
       end
     end
 
@@ -195,9 +199,9 @@ module Admin
     def send_to_new_recipients
       authorize current_event, :update?
 
-      if @message.sent_at.blank?
-        redirect_to admin_event_message_path(current_event, @message),
-          alert: "This message hasn't been sent yet."
+      unless @message.can_send_to_new_recipients?
+        alert = @message.sent_at.blank? ? "This message hasn't been sent yet." : "This message is still sending."
+        redirect_to admin_event_message_path(current_event, @message), alert: alert
         return
       end
 

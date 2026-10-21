@@ -146,7 +146,7 @@
                 <% elsif first_delivery.guardian.present? %>
                   <div class="text-xs text-gray-500">Guardian</div>
                 <% end %>
-                <% if first_delivery.added_after_send? %>
+                <% if first_delivery.catch_up? %>
                   <span class="inline-flex items-center mt-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">Sent later</span>
                 <% end %>
               </div>
