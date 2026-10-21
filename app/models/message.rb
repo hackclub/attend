@@ -174,11 +174,14 @@ class Message < ApplicationRecord
   # any channel: people who joined the audience after it went out, plus anyone
   # who had no reachable channel at the time. Keyed on the person rather than
   # the channel, so someone who has since linked Slack isn't messaged twice.
+  # Only people reachable on one of the message's channels count, so the
+  # number staff see is the number a send would add.
+  #
   # The nil filter matters: NOT IN against a subquery holding a NULL matches
   # nothing, and guardian deliveries have no participant_event_id.
   def new_recipients
     column = guardian_audience? ? :guardian_id : :participant_event_id
-    recipients.where.not(id: message_deliveries.where.not(column => nil).select(column))
+    reachable(recipients).where.not(id: message_deliveries.where.not(column => nil).select(column))
   end
 
   # First send of a draft or scheduled message. Returns false if it had
@@ -259,6 +262,25 @@ class Message < ApplicationRecord
         recipient_slack_id: participant.slack_user_id
       }
     end
+  end
+
+  # SQL counterpart of #deliverable?, keep the two in sync. Built as
+  # subqueries on Participant and Guardian so the deterministic encryption on
+  # phone can rewrite the blank-string comparison.
+  def reachable(scope)
+    owner = guardian_audience? ? Guardian : Participant
+    conditions = channels.filter_map do |channel|
+      case channel.to_s
+      when "email" then owner.where.not(email: [ nil, "" ])
+      when "sms" then owner.where.not(phone: [ nil, "" ])
+      when "slack" then owner.where.not(slack_user_id: [ nil, "" ]) unless guardian_audience?
+      when "push" then owner.where.not(user_id: nil) unless guardian_audience?
+      end
+    end
+    return scope.none if conditions.empty?
+
+    reachable_ids = conditions.reduce(:or).select(:id)
+    guardian_audience? ? scope.where(id: reachable_ids) : scope.where(participant_id: reachable_ids)
   end
 
   # Guardians have no Slack link or app account, so they only get email and SMS.

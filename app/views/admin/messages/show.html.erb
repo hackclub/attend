@@ -120,7 +120,7 @@
       <% if @new_recipient_count > 0 %>
         <%= button_to "Send to #{pluralize(@new_recipient_count, "New Recipient")}", send_to_new_recipients_admin_event_message_path(current_event, @message),
             method: :post,
-            data: { confirm: "Send this message to #{pluralize(@new_recipient_count, "new recipient")}? They match this audience now but haven't received it." },
+            form: { data: { turbo_confirm: "Send this message to #{pluralize(@new_recipient_count, "new recipient")}? They match this audience now but haven't received it." } },
             class: "bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg" %>
       <% end %>
     </div>

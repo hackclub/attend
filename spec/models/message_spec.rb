@@ -213,6 +213,28 @@ RSpec.describe Message, type: :model do
       expect(message.new_recipients).to contain_exactly(pe)
     end
 
+    it "leaves out anyone the message's channels can't reach" do
+      create(:participant_event, event: event, status: :complete)
+      message = sent_message("confirmed_attendees", channels: %w[slack sms])
+      no_slack_no_phone = create(:participant_event, event: event, status: :complete,
+        participant: create(:participant, phone: nil))
+      blank_phone = create(:participant_event, event: event, status: :complete,
+        participant: create(:participant, phone: ""))
+      with_phone = create(:participant_event, event: event, status: :complete)
+
+      # Counting them would offer a button that sends nothing and never goes away.
+      expect(message.new_recipients).to contain_exactly(with_phone)
+      expect(message.new_recipients).not_to include(no_slack_no_phone, blank_phone)
+      expect(message.send_to_new_recipients!).to eq(1)
+    end
+
+    it "only reaches guardians by email and SMS" do
+      message = sent_message("all_guardians", channels: %w[slack push])
+      create(:guardian_participant_event, participant_event: create(:participant_event, event: event))
+
+      expect(message.new_recipients).to be_empty
+    end
+
     it "works for guardian audiences" do
       first = create(:guardian_participant_event, participant_event: create(:participant_event, event: event))
       message = sent_message("all_guardians")
