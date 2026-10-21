@@ -546,20 +546,47 @@ RSpec.describe "Api::V1::Participants", type: :request do
     end
 
     it "does not email a registration link when a real validation rejects the registration" do
-      # Someone already on file who will be too old by the end of the event:
-      # ParticipantEvent#participant_not_too_old fails the roster entry after
-      # the invitation row has been written inside the same transaction.
-      create(:participant, email: "aged-out@example.com", date_of_birth: event.ends_at.to_date - 25.years)
+      # Someone already on file whose Slack ID is banned: the email check up
+      # front passes, and ParticipantEvent#participant_not_banned fails the
+      # roster entry after the invitation row has been written inside the
+      # same transaction.
+      create(:participant, email: "slack-banned@example.com", slack_user_id: "UBANNED1")
+      ban = build(:ban, email: "someone-else@example.com")
+      ban.ban_slack_ids.build(slack_id: "UBANNED1")
+      ban.save!
 
       post "/api/v1/events/#{event.id}/participants",
-        params: { email: "aged-out@example.com" }, headers: sign_in_headers_for("event_admin")
+        params: { email: "slack-banned@example.com" }, headers: sign_in_headers_for("event_admin")
       expect(response).to have_http_status(:unprocessable_entity)
 
       # The mailer find-or-creates the invitation, so a job that survived the
       # rollback would resurrect it and send the link the API said it hadn't.
       perform_enqueued_jobs
-      expect(Invitation.where(event: event).for_email("aged-out@example.com")).to be_empty
+      expect(Invitation.where(event: event).for_email("slack-banned@example.com")).to be_empty
       expect(ActionMailer::Base.deliveries).to be_empty
+    end
+
+    # Signup forms see typos. Onboarding holds them until staff correct it
+    # (spec/requests/onboarding_age_limit_spec.rb).
+    it "invites someone whose birthday ages them out, keeping the birthday" do
+      birthday = event.ends_at.to_date - 25.years
+
+      post "/api/v1/events/#{event.id}/participants",
+        params: { email: "typo@example.com", date_of_birth: birthday.iso8601 }, headers: sign_in_headers_for("event_admin")
+
+      expect(response).to have_http_status(:created)
+      participant = Participant.find_by!(email: "typo@example.com")
+      expect(participant.date_of_birth).to eq(birthday)
+      expect(event.participant_events.find_by!(participant: participant)).to be_too_old_for_event
+    end
+
+    it "invites someone already on file whose birthday ages them out" do
+      create(:participant, email: "aged-out@example.com", date_of_birth: event.ends_at.to_date - 25.years)
+
+      post "/api/v1/events/#{event.id}/participants",
+        params: { email: "aged-out@example.com" }, headers: sign_in_headers_for("event_admin")
+
+      expect(response).to have_http_status(:created)
     end
 
     it "409s for someone already registered under another casing of the address" do

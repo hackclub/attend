@@ -1,0 +1,12 @@
+Hi <%= @preferred_name %>,
+
+The event team approved your <%= @request_label %> for <%= @event_name %>.
+
+<% if @in_onboarding %>
+You can now continue registering:
+<% else %>
+View your registration:
+<% end %>
+<%= @link %>
+
+Questions? Reply to this email.

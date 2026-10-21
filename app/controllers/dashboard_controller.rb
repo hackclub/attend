@@ -190,10 +190,7 @@ class DashboardController < ApplicationController
     @optional_documents = @participant_event.relevant_optional_custom_documents
     # Documents live in the wizard while the participant is still filling it
     # in for the first time, and on the dashboard once they've submitted.
-    # Adding an optional document reopens a completed participant, so
-    # "in_progress" on its own no longer means "still in the wizard".
-    @show_documents_section = @custom_documents.any? && !@participant_event.invited? &&
-      (!@participant_event.in_progress? || @participant_event.onboarding_completed_at.present?)
+    @show_documents_section = @custom_documents.any? && !@participant_event.in_onboarding?
     @custom_document_consents = @participant_event.consents
       .select(&:custom_document_id)
       .index_by(&:custom_document_id)

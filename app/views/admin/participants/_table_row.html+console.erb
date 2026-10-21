@@ -32,7 +32,9 @@
   <td class="whitespace-nowrap" data-column="age">
     <% age = pe.participant.age_on(current_event.local_start_date || Date.current) %>
     <% if age %>
-      <% if age < 18 %>
+      <% if pe.too_old_for_event? %>
+        <span title="19 or older during the event"><%= cs_badge("#{age} · 19+", "red") %></span>
+      <% elsif age < 18 %>
         <span title="Under 18"><%= cs_badge(age, "yellow") %></span>
       <% else %>
         <%= age %>

@@ -43,6 +43,43 @@ RSpec.describe "Admin::Participants", type: :request do
     end
   end
 
+  describe "participants over the age limit" do
+    let!(:aged_out) do
+      create(:participant_event, event: event, status: :invited, skip_age_check: true,
+        participant: create(:participant, legal_first_name: "Aged", legal_last_name: "Out", date_of_birth: event.ends_at.to_date - 25.years))
+    end
+    let!(:eligible) do
+      create(:participant_event, event: event,
+        participant: create(:participant, legal_first_name: "Still", legal_last_name: "Eligible"))
+    end
+
+    it "lists only them under flag=over_age_limit, in both admin UIs" do
+      [ false, true ].each do |console|
+        global_admin.update!(admin_console_beta: console)
+        sign_in global_admin
+
+        get admin_event_participants_path(event.slug), params: { flag: "over_age_limit" }
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include(aged_out.participant.full_name)
+        expect(response.body).not_to include(eligible.participant.full_name)
+      end
+    end
+
+    it "warns on their participant page, in both admin UIs" do
+      [ false, true ].each do |console|
+        global_admin.update!(admin_console_beta: console)
+        sign_in global_admin
+
+        get admin_event_participant_path(event.slug, aged_out)
+        expect(Nokogiri::HTML(response.body).at_css("[data-testid='over-age-limit']")).to be_present
+
+        get admin_event_participant_path(event.slug, eligible)
+        expect(Nokogiri::HTML(response.body).at_css("[data-testid='over-age-limit']")).to be_nil
+      end
+    end
+  end
+
   describe "accommodation when disabled for the event" do
     let(:participant_event) { create(:participant_event, event: event) }
 

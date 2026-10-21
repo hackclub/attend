@@ -3,6 +3,16 @@
 <div>
   <%= render "header" %>
 
+  <% if @participant_event.too_old_for_event? %>
+    <div class="cs-alert cs-alert-warning mb-5" data-testid="over-age-limit">
+      <%= cs_status_icon(:warning) %>
+      <div>
+        <p class="cs-alert-title">19 or older during this event</p>
+        <p>Their date of birth ages them out by <%= current_event.local_end_date.strftime("%B %-d, %Y") %>, so onboarding won't let them past their profile. If it's a typo, correct it here or approve their change request; otherwise withdraw them.</p>
+      </div>
+    </div>
+  <% end %>
+
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
     <div class="lg:col-span-2 cs-stack">
       <section class="cs-container">

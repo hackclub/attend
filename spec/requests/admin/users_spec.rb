@@ -135,6 +135,93 @@ RSpec.describe "Admin::Users", type: :request do
   end
 
   describe "GET show" do
+    def ban_alert_for(user)
+      sign_in global_admin
+      get admin_user_path(user)
+      expect(response).to have_http_status(:ok)
+      response.body.include?("user-ban-alert")
+    end
+
+    it "flags a user whose email is on an active ban" do
+      user = User.create!(email: "flagged@example.com", name: "Flagged")
+      ban = create(:ban, email: "Flagged@example.com", reason: "Conduct at a past event")
+
+      expect(ban_alert_for(user)).to be(true)
+      expect(response.body).to include("Conduct at a past event")
+      expect(response.body).to include(admin_ban_path(ban))
+    end
+
+    it "flags a user whose participant record email is on an active ban" do
+      user = User.create!(email: "account@example.com", name: "Account")
+      create(:participant, user: user, email: "imported@example.com")
+      create(:ban, email: "imported@example.com")
+
+      expect(ban_alert_for(user)).to be(true)
+    end
+
+    it "only shows the identifiers that belong to this user" do
+      user = User.create!(email: "one@example.com", name: "One")
+      ban = Ban.new(reason: "Grouped case")
+      ban.ban_emails.build(email: "one@example.com")
+      ban.ban_emails.build(email: "other-address@example.com")
+      ban.ban_slack_ids.build(slack_id: "U0NOTTHISUSER")
+      ban.save!
+
+      expect(ban_alert_for(user)).to be(true)
+      alert = response.body[/data-testid="user-ban-alert".*?<\/(section|div)>/m]
+      expect(alert).to include("matched on one@example.com")
+      expect(alert).not_to include("other-address@example.com", "U0NOTTHISUSER")
+    end
+
+    it "does not dangle a UCAT case label when the ban has no stored cases" do
+      user = User.create!(email: "legacy-ucat@example.com", name: "Legacy")
+      create(:ban, email: "legacy-ucat@example.com", source: :ucat, external_key: "legacy-ucat@example.com")
+
+      expect(ban_alert_for(user)).to be(true)
+      expect(response.body).not_to include("UCAT case")
+    end
+
+    it "flags a user whose verified Slack ID is on an active ban" do
+      user = User.create!(email: "slacker@example.com", name: "Slacker", oidc_claims: { "slack_id" => "U0SLACKBAN1" })
+      ban = Ban.new(reason: "Slack ban")
+      ban.ban_slack_ids.build(slack_id: "U0SLACKBAN1")
+      ban.save!
+
+      expect(ban_alert_for(user)).to be(true)
+      expect(response.body).to include("Slack U0SLACKBAN1")
+    end
+
+    it "links a UCAT ban back to its Airtable cases" do
+      user = User.create!(email: "ucat@example.com", name: "Ucat")
+      create(:ban, email: "ucat@example.com", source: :ucat, external_key: "ucat@example.com",
+        reason: "UCAT ban (case X9)", ucat_cases: [ { "id" => "X9", "record_id" => "recX9000000000000" } ])
+
+      expect(ban_alert_for(user)).to be(true)
+      expect(response.body).to include("https://airtable.com/#{Bans::UcatSync::BASE_ID}/#{Bans::UcatSync::TABLE_ID}/recX9000000000000")
+      expect(response.body).to include(">X9<")
+    end
+
+    it "does not flag a user whose only ban is revoked" do
+      user = User.create!(email: "revoked@example.com", name: "Revoked")
+      create(:ban, email: "revoked@example.com").revoke!(by: global_admin)
+
+      expect(ban_alert_for(user)).to be(false)
+    end
+
+    it "does not flag a user whose only ban has expired" do
+      user = User.create!(email: "expired@example.com", name: "Expired")
+      create(:ban, :expired, email: "expired@example.com")
+
+      expect(ban_alert_for(user)).to be(false)
+    end
+
+    it "does not flag an unbanned user" do
+      user = User.create!(email: "fine@example.com", name: "Fine")
+      create(:ban, email: "someone-else@example.com")
+
+      expect(ban_alert_for(user)).to be(false)
+    end
+
     it "lists registrations held by an unlinked participant record and offers the merge" do
       event = create(:event, name: "Sunbeam Dhaka")
       user = User.create!(email: "afnan@example.com", name: "Afnan")

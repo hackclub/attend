@@ -99,6 +99,13 @@
             <dd class="cs-kv-value whitespace-pre-line"><%= @ban.reason %></dd>
           </div>
         <% end %>
+
+        <% if @ban.ucat? && @ban.ucat_cases.any? %>
+          <div>
+            <dt class="cs-kv-label">UCAT <%= "case".pluralize(@ban.ucat_cases.size) %></dt>
+            <dd class="cs-kv-value"><%= render "admin/bans/ucat_cases", ban: @ban, link_class: "cs-link" %></dd>
+          </div>
+        <% end %>
       </dl>
     </div>
   </section>

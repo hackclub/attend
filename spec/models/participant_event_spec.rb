@@ -19,6 +19,49 @@ RSpec.describe ParticipantEvent, type: :model do
     end
   end
 
+  describe "age limit" do
+    let(:event) { create(:event, starts_at: Time.zone.local(2027, 2, 20, 9), ends_at: Time.zone.local(2027, 2, 28, 17)) }
+
+    def registration(date_of_birth)
+      build(:participant_event, event: event, participant: create(:participant, date_of_birth: date_of_birth))
+    end
+
+    it "is too old when the participant turns 19 by the last day of the event" do
+      expect(registration(Date.new(2008, 2, 28))).to be_too_old_for_event
+      expect(registration(Date.new(2008, 3, 1))).not_to be_too_old_for_event
+    end
+
+    it "isn't too old without a birthday" do
+      expect(registration(nil)).not_to be_too_old_for_event
+    end
+
+    it "refuses to create a registration for someone too old" do
+      pe = registration(Date.new(2000, 1, 1))
+
+      expect(pe).not_to be_valid
+      expect(pe.errors[:base]).to include("You will be 19 or older during this event. Please contact event staff for assistance.")
+    end
+
+    it "creates it anyway when asked to skip the check" do
+      pe = registration(Date.new(2000, 1, 1))
+      pe.skip_age_check = true
+
+      expect(pe).to be_valid
+    end
+  end
+
+  describe "#in_onboarding?" do
+    it "is true until the wizard is first submitted" do
+      expect(build(:participant_event, status: :invited)).to be_in_onboarding
+      expect(build(:participant_event, status: :in_progress, onboarding_completed_at: nil)).to be_in_onboarding
+    end
+
+    it "is false once submitted, even if an optional document reopened them" do
+      expect(build(:participant_event, status: :in_progress, onboarding_completed_at: 1.day.ago)).not_to be_in_onboarding
+      expect(build(:participant_event, status: :complete, onboarding_completed_at: 1.day.ago)).not_to be_in_onboarding
+    end
+  end
+
   describe ".missing_onboarding_data" do
     def build_pe(event, travel_in: false, travel_out: false, medical: false, dietary: false,
                  accessibility: false, safeguarding: false, consent: false, accommodation: false)
