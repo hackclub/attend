@@ -75,6 +75,13 @@
         <p class="mt-1 text-sm text-gray-900 whitespace-pre-line"><%= @ban.reason %></p>
       </div>
     <% end %>
+
+    <% if @ban.ucat? && @ban.ucat_cases.any? %>
+      <div>
+        <h2 class="text-sm font-medium text-gray-500 uppercase tracking-wider">UCAT <%= "case".pluralize(@ban.ucat_cases.size) %></h2>
+        <p class="mt-1 text-sm text-gray-900"><%= render "admin/bans/ucat_cases", ban: @ban, link_class: "text-[#ec3750] underline" %></p>
+      </div>
+    <% end %>
   </div>
 
   <div class="bg-white border border-gray-200 rounded-lg p-6">

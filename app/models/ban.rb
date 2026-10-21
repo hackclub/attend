@@ -38,11 +38,38 @@ class Ban < ApplicationRecord
   # A signed-in user, by their own email, their participant record's email,
   # and any Slack ID we know for either.
   def self.user_banned?(user)
-    return false if user.nil?
+    active_for_user(user).exists?
+  end
 
+  # Everything we'd match a user on, normalised the way banned? does.
+  def self.identity_of(user)
     participant = user.participant
-    banned?([ user.email, participant&.email ],
-      slack_ids: [ user.verified_slack_id, user.slack_user_id, participant&.slack_user_id ])
+    {
+      emails: [ user.email, participant&.email ].compact_blank.map { |email| email.strip.downcase }.uniq,
+      slack_ids: [ user.verified_slack_id, user.slack_user_id, participant&.slack_user_id ].compact_blank.map { |id| id.strip.upcase }.uniq
+    }
+  end
+
+  # The active bans behind user_banned?, for showing an admin which ban(s)
+  # apply and why. user_banned? is defined on top of this, so the two can't
+  # disagree.
+  def self.active_for_user(user)
+    return none if user.nil?
+
+    identity = identity_of(user)
+    by_email = identity[:emails].any? ? BanEmail.where("LOWER(ban_emails.email) IN (?)", identity[:emails]).select(:ban_id) : BanEmail.none.select(:ban_id)
+    by_slack = identity[:slack_ids].any? ? BanSlackId.where(slack_id: identity[:slack_ids]).select(:ban_id) : BanSlackId.none.select(:ban_id)
+
+    active.where(id: by_email).or(active.where(id: by_slack)).includes(:ban_emails, :ban_slack_ids).order(created_at: :desc)
+  end
+
+  # Which of this ban's identifiers belong to the user, as display strings.
+  # A synced ban can carry a person's other addresses; those aren't shown
+  # against a user they don't belong to.
+  def identifiers_matching(user)
+    identity = self.class.identity_of(user)
+    ban_emails.map(&:email).select { identity[:emails].include?(_1.to_s.strip.downcase) } +
+      ban_slack_ids.map(&:slack_id).select { identity[:slack_ids].include?(_1) }.map { "Slack #{_1}" }
   end
 
   # Enrollments on events that haven't ended whose participant is on an active
@@ -64,6 +91,15 @@ class Ban < ApplicationRecord
         OR users.verified_slack_id IN (#{slack_ids})
       SQL
       .includes(:participant, :event)
+  end
+
+  # [[label, airtable url], ...] for the UCAT cases behind a synced ban.
+  # Cases synced before record IDs were stored have no link.
+  def ucat_case_links
+    Array(ucat_cases).map do |c|
+      url = c["record_id"].present? ? "https://airtable.com/#{Bans::UcatSync::BASE_ID}/#{Bans::UcatSync::TABLE_ID}/#{c['record_id']}" : nil
+      [ c["id"].to_s, url ]
+    end
   end
 
   def revoked?
