@@ -29,6 +29,14 @@ RSpec.describe "Admin::Bans", type: :request do
       expect(response.body).not_to include("alpha@example.com")
     end
 
+    it "ignores array-shaped filter params instead of raising" do
+      create(:ban, email: "scalar@example.com")
+
+      get admin_bans_path, params: { search: [ "x" ], page: [ "2" ], status: { a: 1 } }
+
+      expect(response).to have_http_status(:ok)
+    end
+
     it "escapes LIKE wildcards in the search term" do
       create(:ban, email: "percent@example.com")
 

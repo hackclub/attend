@@ -26,10 +26,10 @@
                 <%= ban.reason.presence || "No reason recorded" %>
               <% end %>
               <span class="cs-muted">
-                — matched on <%= (ban.ban_emails.map(&:email) + ban.ban_slack_ids.map { "Slack #{_1.slack_id}" }).join(", ") %>,
+                — matched on <%= ban.identifiers_matching(@user).join(", ") %>,
                 <%= ban.expires_at ? "expires #{l(ban.expires_at, format: :long)}" : "indefinite" %>
               </span>
-              <% if ban.ucat? %>
+              <% if ban.ucat? && ban.ucat_cases.any? %>
                 <span class="cs-muted">— UCAT <%= "case".pluralize(ban.ucat_case_links.size) %>: <%= render "admin/bans/ucat_cases", ban: ban, link_class: "cs-link" %></span>
               <% end %>
             </li>

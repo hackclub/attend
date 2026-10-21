@@ -159,6 +159,28 @@ RSpec.describe "Admin::Users", type: :request do
       expect(ban_alert_for(user)).to be(true)
     end
 
+    it "only shows the identifiers that belong to this user" do
+      user = User.create!(email: "one@example.com", name: "One")
+      ban = Ban.new(reason: "Grouped case")
+      ban.ban_emails.build(email: "one@example.com")
+      ban.ban_emails.build(email: "other-address@example.com")
+      ban.ban_slack_ids.build(slack_id: "U0NOTTHISUSER")
+      ban.save!
+
+      expect(ban_alert_for(user)).to be(true)
+      alert = response.body[/data-testid="user-ban-alert".*?<\/(section|div)>/m]
+      expect(alert).to include("matched on one@example.com")
+      expect(alert).not_to include("other-address@example.com", "U0NOTTHISUSER")
+    end
+
+    it "does not dangle a UCAT case label when the ban has no stored cases" do
+      user = User.create!(email: "legacy-ucat@example.com", name: "Legacy")
+      create(:ban, email: "legacy-ucat@example.com", source: :ucat, external_key: "legacy-ucat@example.com")
+
+      expect(ban_alert_for(user)).to be(true)
+      expect(response.body).not_to include("UCAT case")
+    end
+
     it "flags a user whose verified Slack ID is on an active ban" do
       user = User.create!(email: "slacker@example.com", name: "Slacker", oidc_claims: { "slack_id" => "U0SLACKBAN1" })
       ban = Ban.new(reason: "Slack ban")

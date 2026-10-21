@@ -29,9 +29,11 @@ module Bans
     # exactly "ban" (telescreen's value), so "Temp Ban" and "Channel Ban" do not.
     PERMA_SEGMENT = /\A\s*(i.?ve\s+)?(perma|indef)/i
     BAN_SEGMENT = /\A\s*ban\s*\z/i
-    # A temp ban only counts when the case says when it ends ("Action Until"):
-    # the ban then expires in Attend at that moment, so a temp ban without a
-    # date is ignored rather than mirrored as indefinite.
+    # A temp ban only counts while it is still running: the case must say
+    # when it ends ("Action Until") and that must be in the future. The ban
+    # then expires in Attend at that moment. A temp ban without a date is
+    # ignored rather than mirrored as indefinite, and one already served is
+    # not mirrored as an expired row.
     TEMP_SEGMENT = /\A\s*temp(orary)?\s+ban/i
     EXCLUDED_STATUSES = %w[removed].freeze
 
@@ -64,15 +66,25 @@ module Bans
       segments = fields[ACTION_FIELD].to_s.split(",")
       return true if segments.any? { |segment| segment.match?(PERMA_SEGMENT) || segment.match?(BAN_SEGMENT) }
 
-      segments.any? { |segment| segment.match?(TEMP_SEGMENT) } && action_until(fields).present?
+      return false unless segments.any? { |segment| segment.match?(TEMP_SEGMENT) }
+
+      until_at = action_until(fields)
+      until_at.present? && until_at.future?
     end
 
     # When a temp ban ends, or nil for an indefinite one (or a temp ban whose
-    # date won't parse, which then doesn't qualify).
+    # date won't parse, which then doesn't qualify). A date with no time
+    # means the whole of that day, so it ends at the end of it.
     def self.action_until(fields)
       return nil if fields[ACTION_FIELD].to_s.split(",").any? { |segment| segment.match?(PERMA_SEGMENT) || segment.match?(BAN_SEGMENT) }
 
-      Time.zone.parse(fields[UNTIL_FIELD].to_s)
+      raw = fields[UNTIL_FIELD].to_s.strip
+      return nil if raw.blank?
+
+      parsed = Time.zone.parse(raw)
+      return nil if parsed.nil?
+
+      raw.match?(/\A\d{4}-\d{2}-\d{2}\z/) ? parsed.end_of_day : parsed
     rescue ArgumentError
       nil
     end

@@ -9,8 +9,9 @@ module Admin
     def index
       scope = Ban.all
 
-      if params[:search].present?
-        term = "%#{ActiveRecord::Base.sanitize_sql_like(params[:search].strip)}%"
+      @search = params[:search].to_s.strip.presence
+      if @search
+        term = "%#{ActiveRecord::Base.sanitize_sql_like(@search)}%"
         scope = scope.where(<<~SQL.squish, term: term)
           bans.reason ILIKE :term
           OR EXISTS (SELECT 1 FROM ban_emails WHERE ban_emails.ban_id = bans.id AND ban_emails.email ILIKE :term)
@@ -18,7 +19,7 @@ module Admin
         SQL
       end
 
-      @status = params[:status].presence_in(STATUS_FILTERS)
+      @status = params[:status].to_s.presence_in(STATUS_FILTERS)
       case @status
       when "active"  then scope = scope.active
       when "revoked" then scope = scope.where.not(revoked_at: nil)
@@ -28,7 +29,7 @@ module Admin
       @per_page = PER_PAGE
       @total_count = scope.count
       @total_pages = [ (@total_count.to_f / @per_page).ceil, 1 ].max
-      @page = (params[:page] || 1).to_i.clamp(1, @total_pages)
+      @page = params[:page].to_s.to_i.clamp(1, @total_pages)
 
       @bans = scope.includes(:ban_emails, :ban_slack_ids, :created_by)
         .order(created_at: :desc)

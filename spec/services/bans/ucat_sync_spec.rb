@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe Bans::UcatSync do
+  include ActiveSupport::Testing::TimeHelpers
+
   let(:client) { instance_double(Airtable::Client) }
   let(:records) { [] }
 
@@ -41,10 +43,16 @@ RSpec.describe Bans::UcatSync do
       expect(described_class.qualifies?("Action Taken" => "Perma Ban", "Status" => "removed")).to be false
     end
 
-    it "counts a temp ban only when the case says when it ends" do
+    it "counts a temp ban only while the case says it is still running" do
       expect(described_class.qualifies?("Action Taken" => "Temp Ban", "Action Until" => "2030-01-01T00:00:00.000Z", "Status" => "resolved")).to be true
       expect(described_class.qualifies?("Action Taken" => "Temporary ban, 2 weeks", "Action Until" => "2030-01-01T00:00:00.000Z", "Status" => "resolved")).to be true
+      expect(described_class.qualifies?("Action Taken" => "Temp Ban", "Action Until" => "2020-01-01T00:00:00.000Z", "Status" => "resolved")).to be false
       expect(described_class.qualifies?("Action Taken" => "Temp Ban", "Action Until" => "not a date", "Status" => "resolved")).to be false
+    end
+
+    it "treats a date-only end as lasting the whole day" do
+      expect(described_class.action_until("Action Taken" => "Temp Ban", "Action Until" => "2030-01-01")).to eq(Time.zone.parse("2030-01-01").end_of_day)
+      expect(described_class.action_until("Action Taken" => "Temp Ban", "Action Until" => "2030-01-01T09:30:00.000Z")).to eq(Time.zone.parse("2030-01-01T09:30:00Z"))
     end
   end
 
@@ -59,16 +67,31 @@ RSpec.describe Bans::UcatSync do
       expect(ban).to be_active
     end
 
+    it "does not create a row for a temp ban already served" do
+      records[0] = row(id: "T1", email: "served@example.com", action: "Temp Ban", until_at: 1.day.ago)
+      expect(sync.added).to eq(0)
+      expect(Ban.count).to eq(0)
+    end
+
     it "lets the ban expire rather than revoking it once the date has passed" do
       sync
-      records[0] = row(id: "T1", email: "temp@example.com", action: "Temp Ban", until_at: 1.day.ago.change(usec: 0))
 
-      result = sync
-      expect(result.revoked).to eq(0)
-      ban = Ban.ucat.sole
-      expect(ban).not_to be_revoked
-      expect(ban.status).to eq("Expired")
-      expect(Ban.banned?("temp@example.com")).to be false
+      travel_to(until_at + 1.day) do
+        result = sync
+        expect(result.revoked).to eq(0)
+        ban = Ban.ucat.sole
+        expect(ban).not_to be_revoked
+        expect(ban.status).to eq("Expired")
+        expect(Ban.banned?("temp@example.com")).to be false
+      end
+    end
+
+    it "revokes the ban when UCAT ends the temp ban early" do
+      sync
+      records[0] = row(id: "T1", email: "temp@example.com", action: "Temp Ban", until_at: 1.day.ago)
+
+      expect(sync(force: true).revoked).to eq(1)
+      expect(Ban.ucat.sole).to be_revoked
     end
 
     it "becomes indefinite when the same person also has a perma ban" do
