@@ -60,7 +60,7 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm space-x-3">
                   <%= link_to "Edit", edit_admin_event_scan_context_path(current_event, context), class: "text-[#ec3750] hover:text-blue-800" %>
                   <% if context.scans.none? %>
-                    <%= button_to "Delete", admin_event_scan_context_path(current_event, context), method: :delete, class: "text-red-600 hover:text-red-800", data: { confirm: "Are you sure you want to delete this context?" } %>
+                    <%= button_to "Delete", admin_event_scan_context_path(current_event, context), method: :delete, class: "text-red-600 hover:text-red-800", form: { data: { turbo_confirm: "Are you sure you want to delete this context?" } } %>
                   <% else %>
                     <span class="text-gray-400 cursor-not-allowed" title="Cannot delete: has associated scans">Delete</span>
                   <% end %>

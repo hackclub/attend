@@ -54,7 +54,7 @@
                 send_travel_update_reminder_admin_event_participant_path(current_event, @participant_event),
                 method: :post,
                 class: "cs-btn",
-                data: { confirm: "Send a travel update reminder email to #{@participant.email}?" } %>
+                form: { data: { turbo_confirm: "Send a travel update reminder email to #{@participant.email}?" } } %>
             <%= link_to "Edit", travel_admin_event_participant_path(current_event, @participant_event), class: "cs-btn" %>
           </div>
         </div>

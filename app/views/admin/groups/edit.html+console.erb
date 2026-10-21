@@ -42,8 +42,7 @@
                     <%= button_to "Remove", unassign_admin_event_group_path(current_event, @group, participant_event_ids: [pe.id]),
                         method: :post,
                         class: "cs-btn cs-btn-link",
-                        form: { class: "contents" },
-                        data: { confirm: "Remove this participant from the group?" } %>
+                        form: { class: "contents", data: { turbo_confirm: "Remove this participant from the group?" } } %>
                   </td>
                 </tr>
               <% end %>

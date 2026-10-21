@@ -7,7 +7,7 @@
     </div>
     <div class="cs-actions">
       <% if current_user.global_admin? && @user != current_user %>
-        <%= button_to "Impersonate", admin_user_impersonation_path(@user), method: :post, class: "cs-btn cs-btn-full", data: { confirm: "You will be signed in as #{@user.display_name_or_fallback}. Continue?" } %>
+        <%= button_to "Impersonate", admin_user_impersonation_path(@user), method: :post, class: "cs-btn cs-btn-full", form: { data: { turbo_confirm: "You will be signed in as #{@user.display_name_or_fallback}. Continue?" } } %>
       <% end %>
       <%= link_to "Edit", edit_admin_user_path(@user), class: "cs-btn cs-btn-primary cs-btn-full" %>
     </div>

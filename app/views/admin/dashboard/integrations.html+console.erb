@@ -546,14 +546,12 @@
                         <div class="flex items-center justify-end gap-1 whitespace-nowrap">
                           <%= button_to "Rotate", admin_rotate_event_api_token_path(current_event.slug, token.id),
                               method: :post,
-                              data: { confirm: "Rotating issues a new secret and invalidates the current one. Integrations using this token will stop working until updated. Continue?" },
-                              class: "cs-btn cs-btn-link",
-                              form: { class: "contents" } %>
+                              form: { class: "contents", data: { turbo_confirm: "Rotating issues a new secret and invalidates the current one. Integrations using this token will stop working until updated. Continue?" } },
+                              class: "cs-btn cs-btn-link" %>
                           <%= button_to "Revoke", admin_event_api_token_path(current_event.slug, token.id),
                               method: :delete,
-                              data: { confirm: "This permanently revokes the token. Any integration using it will stop working. Continue?" },
-                              class: "cs-btn cs-btn-link",
-                              form: { class: "contents" } %>
+                              form: { class: "contents", data: { turbo_confirm: "This permanently revokes the token. Any integration using it will stop working. Continue?" } },
+                              class: "cs-btn cs-btn-link" %>
                         </div>
                       </td>
                     <% end %>
@@ -601,9 +599,8 @@
               <%= button_to "Regenerate",
                   regenerate_api_key_admin_event_path(current_event),
                   method: :post,
-                  data: { confirm: "This will invalidate the existing legacy API key. Any integrations using it will stop working. Continue?" },
-                  class: "cs-btn",
-                  form: { class: "shrink-0" } %>
+                  form: { class: "shrink-0", data: { turbo_confirm: "This will invalidate the existing legacy API key. Any integrations using it will stop working. Continue?" } },
+                  class: "cs-btn" %>
             <% end %>
           </div>
           <p class="cs-small cs-muted mt-2">The single-key access from before named tokens. Still works; prefer named tokens above.</p>
@@ -679,7 +676,7 @@
               admin_event_create_vote_event_path(current_event),
               method: :post,
               disabled: !vote_ready,
-              data: { confirm: "Create a new DRAFT event on vote.hackclub.com for \"#{current_event.name}\"?" },
+              form: { data: { turbo_confirm: "Create a new DRAFT event on vote.hackclub.com for \"#{current_event.name}\"?" } },
               class: "cs-btn" %>
         </div>
       <% end %>

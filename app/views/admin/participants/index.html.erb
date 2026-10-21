@@ -202,7 +202,7 @@
               <td class="px-4 py-3 text-right text-sm space-x-3">
                 <% if policy(current_event).invite_participants? %>
                   <%= button_to invitation.held? ? "Send now" : "Resend", send_invite_admin_event_participants_path(current_event, invite: { email: invitation.email, send_now: "1" }), method: :post, class: "text-[#ec3750] hover:text-[#d42f46] text-sm font-medium" %>
-                  <%= button_to "Revoke", revoke_invite_admin_event_participants_path(current_event, id: invitation.id), method: :delete, data: { confirm: "Are you sure you want to revoke the invitation for #{invitation.email}?" }, class: "text-gray-500 hover:text-red-600 text-sm" %>
+                  <%= button_to "Revoke", revoke_invite_admin_event_participants_path(current_event, id: invitation.id), method: :delete, form: { data: { turbo_confirm: "Are you sure you want to revoke the invitation for #{invitation.email}?" } }, class: "text-gray-500 hover:text-red-600 text-sm" %>
                 <% end %>
               </td>
             </tr>

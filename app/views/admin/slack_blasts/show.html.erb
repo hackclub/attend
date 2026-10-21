@@ -51,7 +51,7 @@
             retry_failed_admin_event_slack_blast_path(current_event, @slack_blast),
             method: :post,
             class: "bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-medium py-1.5 px-3 rounded",
-            data: { confirm: "Retry sending to all #{@slack_blast.failed_count} failed recipients?" } %>
+            form: { data: { turbo_confirm: "Retry sending to all #{@slack_blast.failed_count} failed recipients?" } } %>
       <% end %>
     </div>
     <table class="min-w-full divide-y divide-gray-100">
