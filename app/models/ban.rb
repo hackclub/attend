@@ -41,12 +41,15 @@ class Ban < ApplicationRecord
     active_for_user(user).exists?
   end
 
-  # Everything we'd match a user on, normalised the way banned? does.
+  # Everything we'd match a user on, normalised the way banned? does. Uses
+  # every participant row that is this person (see User#participant_records),
+  # not just the linked one: an imported row under another address still
+  # belongs to them, and a ban on that address has to stop them.
   def self.identity_of(user)
-    participant = user.participant
+    participants = user.participant_records.to_a
     {
-      emails: [ user.email, participant&.email ].compact_blank.map { |email| email.strip.downcase }.uniq,
-      slack_ids: [ user.verified_slack_id, user.slack_user_id, participant&.slack_user_id ].compact_blank.map { |id| id.strip.upcase }.uniq
+      emails: ([ user.email ] + participants.map(&:email)).compact_blank.map { |email| email.strip.downcase }.uniq,
+      slack_ids: ([ user.verified_slack_id, user.slack_user_id ] + participants.map(&:slack_user_id)).compact_blank.map { |id| id.strip.upcase }.uniq
     }
   end
 
