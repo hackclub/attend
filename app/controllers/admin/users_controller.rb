@@ -86,10 +86,6 @@ module Admin
 
     private
 
-    def search_like(term)
-      "%#{ActiveRecord::Base.sanitize_sql_like(term)}%"
-    end
-
     def load_participant_events
       @participant_records = @user.participant_records.includes(participant_events: :event).to_a
       @participant_events = @participant_records

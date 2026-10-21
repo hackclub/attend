@@ -1,7 +1,7 @@
 namespace :backfill do
   desc "Fill ucat_cases (Airtable record links) and temp-ban expiries on existing UCAT bans by running the sync once"
   task ucat_ban_cases: :environment do
-    unless ENV["UCAT_AIRTABLE_API_KEY"].present? || Rails.application.credentials.dig(:ucat, :airtable_api_key).present?
+    unless Bans::UcatSync.api_key.present?
       abort "No UCAT Airtable key configured (UCAT_AIRTABLE_API_KEY); nothing to sync from."
     end
 
@@ -10,9 +10,11 @@ namespace :backfill do
     puts "UCAT bans: #{Ban.ucat.count} total, #{missing_before} without case links, #{expiring_before} with an expiry."
 
     # The ordinary sync already rewrites changed attributes on every synced
-    # ban, so one run fills both columns. Not forced: the revoke safety limit
-    # still applies, and a tripped limit means the base needs a look first.
-    result = Bans::UcatSync.new(force: ENV["FORCE"] == "1").call
+    # ban, so one run fills both columns. Goes through the job so the run is
+    # logged and newly imported bans get the upcoming-enrollments alert, same
+    # as the nightly run. Not forced: the revoke safety limit still applies,
+    # and a tripped limit means the base needs a look first.
+    result = SyncUcatBansJob.perform_now(force: ENV["FORCE"] == "1")
     puts "Sync: #{result.to_h}"
 
     missing_after = Ban.ucat.where("ucat_cases = '[]'::jsonb").count

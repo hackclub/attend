@@ -51,7 +51,8 @@ RSpec.describe Bans::UcatSync do
     end
 
     it "treats a date-only end as lasting the whole day" do
-      expect(described_class.action_until("Action Taken" => "Temp Ban", "Action Until" => "2030-01-01")).to eq(Time.zone.parse("2030-01-01").end_of_day)
+      expect(described_class.action_until("Action Taken" => "Temp Ban", "Action Until" => "2030-01-01")).to eq(Time.find_zone!(described_class::TIME_ZONE).parse("2030-01-01").end_of_day)
+      expect(described_class.action_until("Action Taken" => "Temp Ban", "Action Until" => "2030-01-01").utc.hour).to eq(4) # 23:59:59 ET is 04:59:59 UTC next day
       expect(described_class.action_until("Action Taken" => "Temp Ban", "Action Until" => "2030-01-01T09:30:00.000Z")).to eq(Time.zone.parse("2030-01-01T09:30:00Z"))
     end
   end

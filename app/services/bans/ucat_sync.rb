@@ -36,6 +36,9 @@ module Bans
     # not mirrored as an expired row.
     TEMP_SEGMENT = /\A\s*temp(orary)?\s+ban/i
     EXCLUDED_STATUSES = %w[removed].freeze
+    # "Action Until" dates with no time mean the whole of that day where the
+    # moderators are, not in UTC; the app's own Time.zone is UTC.
+    TIME_ZONE = "Eastern Time (US & Canada)".freeze
 
     # Narrows the fetch server-side; qualifies? re-checks every row precisely.
     PREFILTER = %{OR(FIND("ban", LOWER({#{ACTION_FIELD}})), FIND("perma", LOWER({#{ACTION_FIELD}})), FIND("indef", LOWER({#{ACTION_FIELD}})))}.freeze
@@ -62,26 +65,31 @@ module Bans
 
     def self.qualifies?(fields)
       return false if EXCLUDED_STATUSES.include?(fields[STATUS_FIELD].to_s.downcase)
-
-      segments = fields[ACTION_FIELD].to_s.split(",")
-      return true if segments.any? { |segment| segment.match?(PERMA_SEGMENT) || segment.match?(BAN_SEGMENT) }
-
-      return false unless segments.any? { |segment| segment.match?(TEMP_SEGMENT) }
+      return true if indefinite?(fields)
+      return false unless action_segments(fields).any? { _1.match?(TEMP_SEGMENT) }
 
       until_at = action_until(fields)
       until_at.present? && until_at.future?
     end
 
+    def self.action_segments(fields) = fields[ACTION_FIELD].to_s.split(",")
+
+    # A perma/indef segment anywhere makes the case indefinite, whatever else
+    # (including a temp ban with a date) sits alongside it.
+    def self.indefinite?(fields)
+      action_segments(fields).any? { _1.match?(PERMA_SEGMENT) || _1.match?(BAN_SEGMENT) }
+    end
+
     # When a temp ban ends, or nil for an indefinite one (or a temp ban whose
     # date won't parse, which then doesn't qualify). A date with no time
-    # means the whole of that day, so it ends at the end of it.
+    # means the whole of that day in TIME_ZONE, so it ends at the end of it.
     def self.action_until(fields)
-      return nil if fields[ACTION_FIELD].to_s.split(",").any? { |segment| segment.match?(PERMA_SEGMENT) || segment.match?(BAN_SEGMENT) }
+      return nil if indefinite?(fields)
 
       raw = fields[UNTIL_FIELD].to_s.strip
       return nil if raw.blank?
 
-      parsed = Time.zone.parse(raw)
+      parsed = Time.find_zone!(TIME_ZONE).parse(raw)
       return nil if parsed.nil?
 
       raw.match?(/\A\d{4}-\d{2}-\d{2}\z/) ? parsed.end_of_day : parsed
@@ -89,11 +97,13 @@ module Bans
       nil
     end
 
+    # Env var first so staging/one-off runs can point at another base's key.
+    def self.api_key
+      ENV["UCAT_AIRTABLE_API_KEY"].presence || Rails.application.credentials.dig(:ucat, :airtable_api_key)
+    end
+
     def initialize(client: nil, force: false)
-      @client = client || Airtable::Client.new(
-        api_key: ENV["UCAT_AIRTABLE_API_KEY"] || Rails.application.credentials.dig(:ucat, :airtable_api_key),
-        base_id: BASE_ID
-      )
+      @client = client || Airtable::Client.new(api_key: self.class.api_key, base_id: BASE_ID)
       @force = force
     end
 

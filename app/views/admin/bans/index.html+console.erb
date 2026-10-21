@@ -1,7 +1,7 @@
 <% content_for :breadcrumbs, cs_breadcrumbs([ "Ban list", nil ]) %>
 <%# The filters carried onto pagination links. Built by hand rather than with
     params.permit: these are query-string filters, not model attributes. %>
-<% pagination_params = { search: params[:search].presence, status: @status }.compact %>
+<% pagination_params = { search: @search, status: @status }.compact %>
 <% filtering = pagination_params.any? %>
 
 <div class="cs-stack">
@@ -22,7 +22,7 @@
     <%= form_with url: admin_bans_path, method: :get, class: "cs-filter-bar", data: { turbo_frame: "_top" } do |f| %>
       <label class="cs-search flex-1 min-w-[14rem]">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
-        <%= f.search_field :search, value: params[:search], placeholder: "Find bans by email, Slack ID or reason", "aria-label": "Find bans by email, Slack ID or reason", class: "cs-input" %>
+        <%= f.search_field :search, value: @search, placeholder: "Find bans by email, Slack ID or reason", "aria-label": "Find bans by email, Slack ID or reason", class: "cs-input" %>
       </label>
       <%= f.select :status, [ [ "All statuses", "" ], [ "Active", "active" ], [ "Revoked", "revoked" ], [ "Expired", "expired" ] ], { selected: @status }, class: "cs-select w-auto!", "aria-label": "Status" %>
       <%= f.button "Search", name: "commit", value: "Search", class: "cs-btn" %>
@@ -33,7 +33,7 @@
     <% if @bans.empty? %>
       <div class="cs-empty border-t border-(--cs-border-divider-secondary)">
         <% if filtering %>
-          <p class="cs-empty-title">No bans match<%= " &ldquo;#{h(params[:search])}&rdquo;".html_safe if params[:search].present? %>.</p>
+          <p class="cs-empty-title">No bans match<% if @search %> &ldquo;<%= @search %>&rdquo;<% end %>.</p>
           <div class="cs-actions">
             <%= link_to "Clear filters", admin_bans_path, class: "cs-btn" %>
           </div>

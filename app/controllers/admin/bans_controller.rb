@@ -11,8 +11,7 @@ module Admin
 
       @search = params[:search].to_s.strip.presence
       if @search
-        term = "%#{ActiveRecord::Base.sanitize_sql_like(@search)}%"
-        scope = scope.where(<<~SQL.squish, term: term)
+        scope = scope.where(<<~SQL.squish, term: search_like(@search))
           bans.reason ILIKE :term
           OR EXISTS (SELECT 1 FROM ban_emails WHERE ban_emails.ban_id = bans.id AND ban_emails.email ILIKE :term)
           OR EXISTS (SELECT 1 FROM ban_slack_ids WHERE ban_slack_ids.ban_id = bans.id AND ban_slack_ids.slack_id ILIKE :term)

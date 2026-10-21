@@ -39,6 +39,12 @@ module Admin
 
     private
 
+    # An ILIKE pattern for a user-typed search term, with the term's own
+    # wildcards escaped so they match literally.
+    def search_like(term)
+      "%#{ActiveRecord::Base.sanitize_sql_like(term)}%"
+    end
+
     # Staff get the console redesign unless they've switched back to the
     # original admin (Admin::ConsoleBetaController): every *.html+console.erb template, layout included,
     # wins over its *.html.erb original. Set before any action runs so

@@ -11,14 +11,14 @@
     <div class="p-4 border-b border-gray-200">
       <%= form_with url: admin_bans_path, method: :get, class: "flex flex-col sm:flex-row gap-4", data: { turbo_frame: "_top" } do |f| %>
         <div class="flex-1">
-          <%= f.text_field :search, value: params[:search], placeholder: "Search by email, Slack ID or reason...", class: "w-full px-3 py-2 rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750]" %>
+          <%= f.text_field :search, value: @search, placeholder: "Search by email, Slack ID or reason...", class: "w-full px-3 py-2 rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750]" %>
         </div>
         <div>
           <%= f.select :status, [["All statuses", ""], ["Active", "active"], ["Revoked", "revoked"], ["Expired", "expired"]], { selected: @status }, class: "w-full px-3 py-2 rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750]" %>
         </div>
         <div class="flex gap-2">
           <%= f.submit "Search", class: "px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] transition-colors cursor-pointer" %>
-          <% if params[:search].present? || @status.present? %>
+          <% if @search || @status %>
             <%= link_to "Clear", admin_bans_path, class: "px-4 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 inline-flex items-center" %>
           <% end %>
         </div>
@@ -40,8 +40,8 @@
         <% if @bans.empty? %>
           <tr>
             <td colspan="5" class="px-6 py-8 text-center text-gray-500">
-              <% if params[:search].present? || @status.present? %>
-                No bans match<%= " &ldquo;#{h(params[:search])}&rdquo;".html_safe if params[:search].present? %>.
+              <% if @search || @status %>
+                No bans match<% if @search %> &ldquo;<%= @search %>&rdquo;<% end %>.
               <% else %>
                 No bans yet.
               <% end %>
@@ -86,11 +86,11 @@
       <div class="text-sm text-gray-500"><%= "Showing #{(@page - 1) * @per_page + 1} to #{[ (@page * @per_page), @total_count ].min} of #{@total_count} bans" %></div>
       <div class="flex gap-2">
         <% if @page > 1 %>
-          <%= link_to "← Previous", admin_bans_path({ search: params[:search].presence, status: @status, page: @page - 1 }.compact), "aria-label": "Previous page",
+          <%= link_to "← Previous", admin_bans_path({ search: @search, status: @status, page: @page - 1 }.compact), "aria-label": "Previous page",
               class: "px-4 py-2 bg-white border border-gray-300 rounded-md text-sm hover:bg-gray-50" %>
         <% end %>
         <% if @page < @total_pages %>
-          <%= link_to "Next →", admin_bans_path({ search: params[:search].presence, status: @status, page: @page + 1 }.compact), "aria-label": "Next page",
+          <%= link_to "Next →", admin_bans_path({ search: @search, status: @status, page: @page + 1 }.compact), "aria-label": "Next page",
               class: "px-4 py-2 bg-white border border-gray-300 rounded-md text-sm hover:bg-gray-50" %>
         <% end %>
       </div>
