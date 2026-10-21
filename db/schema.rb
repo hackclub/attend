@@ -191,6 +191,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
     t.datetime "revoked_at"
     t.uuid "revoked_by_id"
     t.string "source", default: "manual", null: false
+    t.jsonb "ucat_cases", default: [], null: false
     t.datetime "updated_at", null: false
     t.index ["created_by_id"], name: "index_bans_on_created_by_id"
     t.index ["expires_at"], name: "index_bans_on_expires_at"

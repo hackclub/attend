@@ -42,6 +42,7 @@ module Admin
     end
 
     def show
+      @active_bans = Ban.active_for_user(@user).load
       @event_role_assignments = @user.event_role_assignments.includes(:event).order("events.starts_at DESC")
       load_participant_events
       @passports = @user.passports.includes(:paired_by, :revoked_by).order(created_at: :desc)

@@ -87,6 +87,39 @@ RSpec.describe Message, type: :model do
     end
   end
 
+  describe "#recipients for all_attendees_and_held" do
+    it "adds held invitees to everyone all_attendees reaches" do
+      held = invite!("held@example.com", sent: false)
+      notified = invite!("notified@example.com")
+      done = create(:participant_event, event: event, status: :complete)
+
+      expect(message_for("all_attendees_and_held").recipients).to include(held, notified, done)
+    end
+
+    it "still omits withdrawn and rejected, and invitees with no invitation" do
+      withdrawn = create(:participant_event, event: event, status: :withdrawn)
+      rejected = create(:participant_event, event: event, status: :rejected)
+      uninvited = create(:participant_event, event: event, status: :invited)
+
+      expect(message_for("all_attendees_and_held").recipients).not_to include(withdrawn, rejected, uninvited)
+    end
+
+    it "ignores a held invitation for a different event" do
+      participant = create(:participant, email: "elsewhere@example.com")
+      Invitation.create!(event: create(:event), email: "elsewhere@example.com")
+      pe = create(:participant_event, participant: participant, event: event, status: :invited)
+
+      expect(message_for("all_attendees_and_held").recipients).not_to include(pe)
+    end
+
+    it "counts each recipient once" do
+      invite!("held@example.com", sent: false)
+      invite!("notified@example.com")
+
+      expect(message_for("all_attendees_and_held").recipient_count_estimate).to eq(2)
+    end
+  end
+
   describe "#recipients for attendees_incomplete" do
     it "reaches a held invitee, which all_attendees deliberately will not" do
       pe = invite!("chase@example.com", sent: false)

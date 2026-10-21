@@ -1,0 +1,3 @@
+<%# Links to the UCAT Airtable cases behind a synced ban. link_class styles
+    the anchor per UI variant; cases without a stored record id render plain. %>
+<% ban.ucat_case_links.each_with_index do |(label, url), i| %><%= ", " if i.positive? %><% if url %><%= link_to label, url, target: "_blank", rel: "noopener", class: link_class %><% else %><%= label %><% end %><% end %>
