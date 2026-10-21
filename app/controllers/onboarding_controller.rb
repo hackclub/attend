@@ -14,6 +14,7 @@ class OnboardingController < ApplicationController
   before_action :apply_event_brand
   before_action :redirect_if_withdrawn
   before_action :redirect_if_locked, except: [ :index, :waiver, :waiver_complete, :done ]
+  before_action :hold_at_profile_if_too_old, only: [ :show, :update, :complete ]
 
   BASE_STEPS = %w[profile travel accommodation health].freeze
   GUARDIAN_STEP = "guardian"
@@ -467,6 +468,7 @@ class OnboardingController < ApplicationController
     case @step
     when "profile"
       @participant = @participant_event.participant
+      load_identity_correction
     when "travel"
       @travel_inbound = @participant_event.travel_inbound || @participant_event.travels.build(direction: "inbound")
       @travel_inbound.travel_legs.build(position: 0) if @travel_inbound.travel_legs.empty?
@@ -512,17 +514,27 @@ class OnboardingController < ApplicationController
     case @step
     when "profile"
       @participant = @participant_event.participant
-      @participant.assign_attributes(profile_params)
+      load_identity_correction
+      @participant.assign_attributes(editable_profile_params)
       if profile_params[:tshirt_size].blank?
         flash.now[:alert] = "Please select a t-shirt size"
         return false
       end
       # The profile form has no error summary, so say what was actually wrong
       # (e.g. an email that belongs to this participant's guardian).
-      return true if @participant.save
+      unless @participant.save
+        flash.now[:alert] = @participant.errors.full_messages.to_sentence
+        return false
+      end
 
-      flash.now[:alert] = @participant.errors.full_messages.to_sentence
-      false
+      # Saved even so: it's what they told us. From here the birthday is
+      # locked and they can only ask staff to correct it.
+      if @participant_event.too_old_for_event?
+        flash.now[:alert] = "You will be 19 or older during this event, so you can't continue registering."
+        return false
+      end
+
+      true
     when "travel"
       save_travel_data
     when "accommodation"
@@ -549,7 +561,13 @@ class OnboardingController < ApplicationController
       # field on every save, so attaching here would purge and recreate the
       # attachment each time — two overlapping autosaves then deadlock deleting
       # the same active_storage_attachments row. The photo is attached on submit.
-      autosave_record(@participant_event.participant, profile_params.except(:headshot))
+      #
+      # Autosave never ages someone out either: a date field reports the year
+      # as it's typed ("0002", "0020", "0200"), and saving one of those would
+      # lock the birthday mid-keystroke. Submitting the form saves it.
+      attributes = editable_profile_params.except(:headshot)
+      attributes = attributes.except(:date_of_birth) if attributes.key?(:date_of_birth) && birthday_ages_out?(attributes[:date_of_birth])
+      autosave_record(@participant_event.participant, attributes)
     when "travel"
       autosave_travel_data
     when "accommodation"
@@ -1091,6 +1109,40 @@ class OnboardingController < ApplicationController
       :state, :postal_code, :country_of_residence, :tshirt_size,
       :headshot, :engagement_preference, :engagement_notes
     )
+  end
+
+  # A birthday that ages the participant out is locked: changing it to one
+  # that doesn't would let anyone past the age limit by retyping a year, so
+  # it goes through staff as a change request instead.
+  def editable_profile_params
+    return profile_params unless @participant_event.too_old_for_event?
+
+    profile_params.except(:date_of_birth)
+  end
+
+  def birthday_ages_out?(value)
+    ParticipantEvent.new(event: current_event, participant: Participant.new(date_of_birth: value)).too_old_for_event?
+  end
+
+  # Someone 19 or older by the end of the event can't attend. Their birthday
+  # may have come from an integration's invitation (see
+  # ParticipantEvent#skip_age_check) or from their own profile. Either way
+  # they stay on the profile step, where they can ask staff to correct it.
+  def hold_at_profile_if_too_old
+    return unless @participant_event.too_old_for_event?
+    return if action_name != "complete" && params[:step] == "profile"
+
+    redirect_to onboarding_step_path(step: "profile", event_id: current_event.id)
+  end
+
+  # The newest identity correction, so the profile step can say whether one
+  # is already with staff or what staff asked for.
+  def load_identity_correction
+    @identity_correction = @participant_event.registration_change_requests
+      .signed_identity
+      .where(requested_by: current_user)
+      .order(created_at: :desc)
+      .first
   end
 
   def travel_params(direction)

@@ -33,6 +33,9 @@
     <% age = pe.participant.age_on(current_event.local_start_date || Date.current) %>
     <% if age %>
       <span class="<%= age < 18 ? 'text-amber-600 font-medium' : 'text-gray-700' %>"><%= age %></span>
+      <% if pe.too_old_for_event? %>
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800" title="19 or older during the event">19+</span>
+      <% end %>
     <% else %>
       <span class="text-gray-400">—</span>
     <% end %>

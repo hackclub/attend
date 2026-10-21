@@ -74,7 +74,12 @@ class ParticipantEvent < ApplicationRecord
   validates :participant_id, presence: true
   validates :event_id, presence: true
   validates :participant_id, uniqueness: { scope: :event_id }
-  validate :participant_not_too_old, on: :create
+  # An integration's invitation records whatever birthday it was sent, even
+  # one that ages the participant out: signup forms see typos, and the signup
+  # shouldn't be lost over one. Onboarding then holds them at the profile step
+  # until staff correct it (see #too_old_for_event?).
+  attr_accessor :skip_age_check
+  validate :participant_not_too_old, on: :create, unless: :skip_age_check
   validate :participant_not_banned, on: :create
 
   # SQL mirror of !onboarding_complete? so list filters don't have to load
@@ -194,6 +199,16 @@ class ParticipantEvent < ApplicationRecord
 
   def is_18_on_event?
     age_on_event == 18
+  end
+
+  # 19 or older by the last day of the event. Nobody that old may attend, so
+  # onboarding won't let them past their profile, and they can't change the
+  # birthday themselves: only staff can, through a change request.
+  def too_old_for_event?
+    return false unless participant&.date_of_birth.present? && event&.ends_at.present?
+
+    age_at_event_end = participant.age_on(event.local_end_date)
+    age_at_event_end.present? && age_at_event_end >= 19
   end
 
   def assigned_to_room?
@@ -519,12 +534,9 @@ class ParticipantEvent < ApplicationRecord
   end
 
   def participant_not_too_old
-    return unless participant&.date_of_birth.present? && event&.ends_at.present?
+    return unless too_old_for_event?
 
-    age_at_event_end = participant.age_on(event.local_end_date)
-    if age_at_event_end && age_at_event_end >= 19
-      errors.add(:base, "You will be 19 or older during this event. Please contact event staff for assistance.")
-    end
+    errors.add(:base, "You will be 19 or older during this event. Please contact event staff for assistance.")
   end
 
   def participant_not_banned

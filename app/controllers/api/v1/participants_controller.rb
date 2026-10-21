@@ -338,7 +338,9 @@ module Api
           )
         end
 
-        ParticipantEvent.create_with(status: :invited)
+        # The birthday is kept even if it ages them out; onboarding holds them
+        # until staff sort it out (see ParticipantEvent#skip_age_check).
+        ParticipantEvent.create_with(status: :invited, skip_age_check: true)
                         .find_or_create_by!(participant: participant, event: @event)
       end
 

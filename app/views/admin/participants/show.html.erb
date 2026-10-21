@@ -3,6 +3,13 @@
 <div>
   <%= render "header" %>
 
+  <% if @participant_event.too_old_for_event? %>
+    <div class="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" data-testid="over-age-limit">
+      <p class="font-semibold">19 or older during this event</p>
+      <p class="mt-1">Their date of birth ages them out by <%= current_event.local_end_date.strftime("%B %-d, %Y") %>, so onboarding won't let them past their profile. If it's a typo, correct it here or approve their change request; otherwise withdraw them.</p>
+    </div>
+  <% end %>
+
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="lg:col-span-2 space-y-6">
       <section class="bg-white rounded-lg border border-gray-200 p-6">

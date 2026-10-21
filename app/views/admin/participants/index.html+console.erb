@@ -137,7 +137,8 @@
          *(current_event.travel_enabled? ? [["Missing travel", "missing_travel"]] : []),
          ["Missing medical", "missing_medical"],
          ["High support", "high_support"],
-         ["Anaphylaxis risk", "anaphylaxis"]
+         ["Anaphylaxis risk", "anaphylaxis"],
+         ["19+ during event", "over_age_limit"]
        ]
        check_in_options = [["Checked in", "yes"], ["Not checked in", "no"]]
        show_group_filter = current_event.groups_enabled? && current_event.groups.any?

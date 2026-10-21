@@ -1,0 +1,13 @@
+<p>Hi <%= @preferred_name %>,</p>
+
+<p>The event team approved your <%= @request_label %> for <strong><%= @event_name %></strong>.</p>
+
+<% if @in_onboarding %>
+  <p>You can now continue registering.</p>
+
+  <p><a class="button" href="<%= @link %>">Continue registering</a></p>
+<% else %>
+  <p><a class="button" href="<%= @link %>">View your registration</a></p>
+<% end %>
+
+<p>Questions? Reply to this email.</p>

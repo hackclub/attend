@@ -72,6 +72,9 @@
         <% if participant.minor_on?(event&.starts_at || Date.current) %>
           <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">Minor</span>
         <% end %>
+        <% if participant_event.too_old_for_event? %>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800" title="19 or older during the event">19+</span>
+        <% end %>
       </div>
     </div>
   <% end %>

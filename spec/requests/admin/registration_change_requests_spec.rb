@@ -46,6 +46,36 @@ RSpec.describe "Admin registration change requests", type: :request do
     expect(log.changed_fields.to_json).not_to include("Please add a time we can call.")
   end
 
+  it "emails the participant when an event admin approves their request" do
+    request_record.update!(kind: :signed_identity, staff_audience: :event_admin,
+      requested_changes: { "date_of_birth" => "2010-05-05" })
+    admin = create(:user)
+    create(:event_role_assignment, event: event, user: admin, role: :event_admin)
+    sign_in admin
+
+    expect {
+      patch approve_admin_event_registration_change_request_path(event, request_record)
+    }.to have_enqueued_mail(RegistrationCorrectionMailer, :participant_approved)
+
+    expect(request_record.reload).to be_approved
+    expect(participant.reload.date_of_birth).to eq(Date.new(2010, 5, 5))
+  end
+
+  it "doesn't email the participant when approving only flags it for staff follow-up" do
+    request_record.update!(kind: :signed_identity, staff_audience: :event_admin,
+      requested_changes: { "date_of_birth" => "2010-05-05" })
+    participant_event.update!(code_of_conduct_accepted_at: Time.current)
+    admin = create(:user)
+    create(:event_role_assignment, event: event, user: admin, role: :event_admin)
+    sign_in admin
+
+    expect {
+      patch approve_admin_event_registration_change_request_path(event, request_record)
+    }.not_to have_enqueued_mail(RegistrationCorrectionMailer, :participant_approved)
+
+    expect(request_record.reload).to be_follow_up_needed
+  end
+
   it "does not expose a consequential request to ops" do
     request_record.update!(kind: :signed_identity, staff_audience: :event_admin,
       requested_changes: { "legal_first_name" => "Corrected" })
