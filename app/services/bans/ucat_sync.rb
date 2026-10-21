@@ -19,6 +19,7 @@ module Bans
     EMAIL_FIELD = "Subject Email".freeze
     SLACK_FIELD = "Subject Slack ID".freeze
     ACTION_FIELD = "Action Taken".freeze
+    UNTIL_FIELD = "Action Until".freeze
     STATUS_FIELD = "Status".freeze
 
     # "Action Taken" is free text ("Perma Ban", "Perma Ban, indefinite ban +
@@ -28,6 +29,10 @@ module Bans
     # exactly "ban" (telescreen's value), so "Temp Ban" and "Channel Ban" do not.
     PERMA_SEGMENT = /\A\s*(i.?ve\s+)?(perma|indef)/i
     BAN_SEGMENT = /\A\s*ban\s*\z/i
+    # A temp ban only counts when the case says when it ends ("Action Until"):
+    # the ban then expires in Attend at that moment, so a temp ban without a
+    # date is ignored rather than mirrored as indefinite.
+    TEMP_SEGMENT = /\A\s*temp(orary)?\s+ban/i
     EXCLUDED_STATUSES = %w[removed].freeze
 
     # Narrows the fetch server-side; qualifies? re-checks every row precisely.
@@ -43,16 +48,33 @@ module Bans
 
     Result = Struct.new(:added, :reinstated, :revoked, :unchanged, :cases_without_identity, keyword_init: true)
 
-    Person = Struct.new(:emails, :slack_ids, :case_ids, keyword_init: true) do
+    # cases: [{ id:, record_id:, until: }]. expires_at is nil while any case is
+    # indefinite; otherwise the latest temp ban end.
+    Person = Struct.new(:emails, :slack_ids, :cases, keyword_init: true) do
       # Stable while the person keeps any email; Slack-only people key on their ID.
       def key = emails.min || "slack:#{slack_ids.min}"
       def identifiers = emails.map { "email:#{_1}" } + slack_ids.map { "slack:#{_1}" }
+      def case_ids = cases.map { _1[:id] }
+      def expires_at = cases.any? { _1[:until].nil? } ? nil : cases.map { _1[:until] }.max
     end
 
     def self.qualifies?(fields)
       return false if EXCLUDED_STATUSES.include?(fields[STATUS_FIELD].to_s.downcase)
 
-      fields[ACTION_FIELD].to_s.split(",").any? { |segment| segment.match?(PERMA_SEGMENT) || segment.match?(BAN_SEGMENT) }
+      segments = fields[ACTION_FIELD].to_s.split(",")
+      return true if segments.any? { |segment| segment.match?(PERMA_SEGMENT) || segment.match?(BAN_SEGMENT) }
+
+      segments.any? { |segment| segment.match?(TEMP_SEGMENT) } && action_until(fields).present?
+    end
+
+    # When a temp ban ends, or nil for an indefinite one (or a temp ban whose
+    # date won't parse, which then doesn't qualify).
+    def self.action_until(fields)
+      return nil if fields[ACTION_FIELD].to_s.split(",").any? { |segment| segment.match?(PERMA_SEGMENT) || segment.match?(BAN_SEGMENT) }
+
+      Time.zone.parse(fields[UNTIL_FIELD].to_s)
+    rescue ArgumentError
+      nil
     end
 
     def initialize(client: nil, force: false)
@@ -105,7 +127,7 @@ module Bans
       offset = nil
 
       loop do
-        page = @client.list_records(TABLE_ID, filter: PREFILTER, fields: [ ID_FIELD, EMAIL_FIELD, SLACK_FIELD, ACTION_FIELD, STATUS_FIELD ], page_size: 100, offset: offset)
+        page = @client.list_records(TABLE_ID, filter: PREFILTER, fields: [ ID_FIELD, EMAIL_FIELD, SLACK_FIELD, ACTION_FIELD, UNTIL_FIELD, STATUS_FIELD ], page_size: 100, offset: offset)
 
         page.fetch("records").each do |record|
           fields = record.fetch("fields", {})
@@ -113,7 +135,7 @@ module Bans
 
           identifiers = identifiers_from(fields)
           if identifiers.any?
-            cases << { id: fields[ID_FIELD].presence || record["id"], identifiers: identifiers }
+            cases << { id: fields[ID_FIELD].presence || record["id"], record_id: record["id"], until: self.class.action_until(fields), identifiers: identifiers }
           else
             without_identity += 1
           end
@@ -151,7 +173,7 @@ module Bans
         Person.new(
           emails: identifiers.filter_map { _1.delete_prefix("email:") if _1.start_with?("email:") },
           slack_ids: identifiers.filter_map { _1.delete_prefix("slack:") if _1.start_with?("slack:") },
-          case_ids: group.map { _1[:id] }.uniq.sort
+          cases: group.uniq { _1[:id] }.sort_by { _1[:id] }.map { _1.slice(:id, :record_id, :until) }
         )
       end
     end
@@ -166,10 +188,15 @@ module Bans
     end
 
     def upsert(person, ban, result)
-      reason = "UCAT ban (#{'case'.pluralize(person.case_ids.size)} #{person.case_ids.join(', ')})"
+      attributes = {
+        external_key: person.key,
+        reason: "UCAT ban (#{'case'.pluralize(person.case_ids.size)} #{person.case_ids.join(', ')})",
+        expires_at: person.expires_at,
+        ucat_cases: person.cases.map { { "id" => _1[:id], "record_id" => _1[:record_id] } }
+      }
 
       if ban.nil?
-        Ban.create!(source: :ucat, external_key: person.key, reason: reason,
+        Ban.create!(source: :ucat, **attributes,
           ban_emails: person.emails.map { BanEmail.new(email: _1) }, ban_slack_ids: person.slack_ids.map { BanSlackId.new(slack_id: _1) })
         result.added += 1
         return
@@ -177,7 +204,7 @@ module Bans
 
       reinstating = ban.revoked? && ban.revoked_by_id.nil?
       sync_identifiers(ban, person.emails, person.slack_ids)
-      ban.assign_attributes(external_key: person.key, reason: reason)
+      ban.assign_attributes(attributes)
       ban.revoked_at = nil if reinstating
       ban.save! if ban.changed?
 

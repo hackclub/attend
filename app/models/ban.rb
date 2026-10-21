@@ -45,6 +45,21 @@ class Ban < ApplicationRecord
       slack_ids: [ user.verified_slack_id, user.slack_user_id, participant&.slack_user_id ])
   end
 
+  # The active bans behind user_banned?, for showing an admin which ban(s)
+  # apply and why. Same identity set, so the two never disagree.
+  def self.active_for_user(user)
+    return none if user.nil?
+
+    participant = user.participant
+    emails = [ user.email, participant&.email ].compact_blank.map { |email| email.strip.downcase }
+    slack_ids = [ user.verified_slack_id, user.slack_user_id, participant&.slack_user_id ].compact_blank.map { |id| id.strip.upcase }
+
+    by_email = emails.any? ? BanEmail.where("LOWER(ban_emails.email) IN (?)", emails).select(:ban_id) : BanEmail.none.select(:ban_id)
+    by_slack = slack_ids.any? ? BanSlackId.where(slack_id: slack_ids).select(:ban_id) : BanSlackId.none.select(:ban_id)
+
+    active.where(id: by_email).or(active.where(id: by_slack)).includes(:ban_emails, :ban_slack_ids).order(created_at: :desc)
+  end
+
   # Enrollments on events that haven't ended whose participant is on an active
   # ban by email or Slack ID. Ban.banned? only stops new adds, so these are
   # people who got in before the ban, or whose Slack ID only became known
@@ -64,6 +79,15 @@ class Ban < ApplicationRecord
         OR users.verified_slack_id IN (#{slack_ids})
       SQL
       .includes(:participant, :event)
+  end
+
+  # [[label, airtable url], ...] for the UCAT cases behind a synced ban.
+  # Cases synced before record IDs were stored have no link.
+  def ucat_case_links
+    Array(ucat_cases).map do |c|
+      url = c["record_id"].present? ? "https://airtable.com/#{Bans::UcatSync::BASE_ID}/#{Bans::UcatSync::TABLE_ID}/#{c['record_id']}" : nil
+      [ c["id"].to_s, url ]
+    end
   end
 
   def revoked?

@@ -4,8 +4,8 @@ RSpec.describe Bans::UcatSync do
   let(:client) { instance_double(Airtable::Client) }
   let(:records) { [] }
 
-  def row(id:, email:, slack: nil, action: "Perma Ban", status: "resolved")
-    { "id" => "rec#{id}", "fields" => { "ID" => id, "Subject Email" => email, "Subject Slack ID" => slack, "Action Taken" => action, "Status" => status }.compact }
+  def row(id:, email:, slack: nil, action: "Perma Ban", status: "resolved", until_at: nil)
+    { "id" => "rec#{id}", "fields" => { "ID" => id, "Subject Email" => email, "Subject Slack ID" => slack, "Action Taken" => action, "Action Until" => until_at&.iso8601, "Status" => status }.compact }
   end
 
   def sync(force: false)
@@ -25,7 +25,7 @@ RSpec.describe Bans::UcatSync do
       "ive perma banned with appeal" => true,
       "ban" => true,
       "Warning, Ban" => true,
-      "Temp Ban" => false,
+      "Temp Ban" => false, # no Action Until
       "Channel Ban" => false,
       "Banned for 3 months" => false,
       "Warning, any further incidents will lead to a permanent ban" => false,
@@ -39,6 +39,49 @@ RSpec.describe Bans::UcatSync do
 
     it "ignores cases marked removed" do
       expect(described_class.qualifies?("Action Taken" => "Perma Ban", "Status" => "removed")).to be false
+    end
+
+    it "counts a temp ban only when the case says when it ends" do
+      expect(described_class.qualifies?("Action Taken" => "Temp Ban", "Action Until" => "2030-01-01T00:00:00.000Z", "Status" => "resolved")).to be true
+      expect(described_class.qualifies?("Action Taken" => "Temporary ban, 2 weeks", "Action Until" => "2030-01-01T00:00:00.000Z", "Status" => "resolved")).to be true
+      expect(described_class.qualifies?("Action Taken" => "Temp Ban", "Action Until" => "not a date", "Status" => "resolved")).to be false
+    end
+  end
+
+  describe "temp bans" do
+    let(:until_at) { 2.weeks.from_now.change(usec: 0) }
+    let(:records) { [ row(id: "T1", email: "temp@example.com", action: "Temp Ban", until_at: until_at) ] }
+
+    it "mirrors the case's end date as the ban expiry" do
+      expect(sync.added).to eq(1)
+      ban = Ban.ucat.sole
+      expect(ban.expires_at).to eq(until_at)
+      expect(ban).to be_active
+    end
+
+    it "lets the ban expire rather than revoking it once the date has passed" do
+      sync
+      records[0] = row(id: "T1", email: "temp@example.com", action: "Temp Ban", until_at: 1.day.ago.change(usec: 0))
+
+      result = sync
+      expect(result.revoked).to eq(0)
+      ban = Ban.ucat.sole
+      expect(ban).not_to be_revoked
+      expect(ban.status).to eq("Expired")
+      expect(Ban.banned?("temp@example.com")).to be false
+    end
+
+    it "becomes indefinite when the same person also has a perma ban" do
+      records << row(id: "T2", email: "temp@example.com", action: "Perma Ban")
+      sync
+      expect(Ban.ucat.sole.expires_at).to be_nil
+    end
+
+    it "takes the latest end date across several temp bans" do
+      later = 4.weeks.from_now.change(usec: 0)
+      records << row(id: "T2", email: "temp@example.com", action: "Temp Ban", until_at: later)
+      sync
+      expect(Ban.ucat.sole.expires_at).to eq(later)
     end
   end
 
@@ -70,6 +113,8 @@ RSpec.describe Bans::UcatSync do
       ban = Ban.ucat.sole
       expect(ban.external_key).to eq("banned@example.com")
       expect(ban.reason).to include("A1, A2")
+      expect(ban.ucat_cases).to eq([ { "id" => "A1", "record_id" => "recA1" }, { "id" => "A2", "record_id" => "recA2" } ])
+      expect(ban.ucat_case_links.map(&:last)).to all(start_with("https://airtable.com/#{described_class::BASE_ID}/#{described_class::TABLE_ID}/rec"))
       expect(Ban.banned?("banned@example.com")).to be true
       expect(Ban.banned?("warned@example.com")).to be false
     end

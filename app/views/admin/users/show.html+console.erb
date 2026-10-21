@@ -13,6 +13,32 @@
     </div>
   </div>
 
+  <% if @active_bans.any? %>
+    <section class="cs-alert cs-alert-error" data-testid="user-ban-alert">
+      <%= cs_status_icon(:error) %>
+      <div class="flex-1 min-w-0">
+        <p class="cs-alert-title">This user is on the ban list</p>
+        <p>They are blocked from being added to any event. <%= link_to "Open the ban list", admin_bans_path, class: "cs-link" %>.</p>
+        <ul class="mt-2 space-y-1">
+          <% @active_bans.each do |ban| %>
+            <li>
+              <%= link_to admin_ban_path(ban), class: "cs-link" do %>
+                <%= ban.reason.presence || "No reason recorded" %>
+              <% end %>
+              <span class="cs-muted">
+                — matched on <%= (ban.ban_emails.map(&:email) + ban.ban_slack_ids.map { "Slack #{_1.slack_id}" }).join(", ") %>,
+                <%= ban.expires_at ? "expires #{l(ban.expires_at, format: :long)}" : "indefinite" %>
+              </span>
+              <% if ban.ucat? %>
+                <span class="cs-muted">— UCAT <%= "case".pluralize(ban.ucat_case_links.size) %>: <%= render "admin/bans/ucat_cases", ban: ban, link_class: "cs-link" %></span>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    </section>
+  <% end %>
+
   <section class="cs-container">
     <div class="cs-container-header">
       <h2 class="cs-h2">User details</h2>

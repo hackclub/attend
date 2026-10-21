@@ -3,6 +3,7 @@ require "rails_helper"
 RSpec.describe "Admin::Bans", type: :request do
   include Devise::Test::IntegrationHelpers
 
+  let(:console) { true }
   let(:global_admin) { User.create!(email: "ga-bans@example.com", name: "Global Admin", global_role: "global_admin", admin_console_beta: console) }
 
   before { sign_in global_admin }
@@ -86,6 +87,22 @@ RSpec.describe "Admin::Bans", type: :request do
       expect(response.body).to include("search=shared")
       expect(response.body).to include("status=active")
       expect(response.body).to include("page=2")
+    end
+  end
+
+  describe "GET show" do
+    [ true, false ].each do |console_variant|
+      it "links a UCAT ban to its Airtable cases (console=#{console_variant})" do
+        global_admin.update!(admin_console_beta: console_variant)
+        ban = create(:ban, email: "ucat@example.com", source: :ucat, external_key: "ucat@example.com",
+          ucat_cases: [ { "id" => "C1", "record_id" => "recC1000000000000" }, { "id" => "C2", "record_id" => nil } ])
+
+        get admin_ban_path(ban)
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("https://airtable.com/#{Bans::UcatSync::BASE_ID}/#{Bans::UcatSync::TABLE_ID}/recC1000000000000")
+        expect(response.body).to include("C2")
+      end
     end
   end
 

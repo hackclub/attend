@@ -9,6 +9,27 @@
     </div>
   </div>
 
+  <% if @active_bans.any? %>
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-900" data-testid="user-ban-alert">
+      <p class="font-semibold">This user is on the ban list</p>
+      <p class="mt-1">They are blocked from being added to any event. <%= link_to "Open the ban list", admin_bans_path, class: "underline" %>.</p>
+      <ul class="mt-2 space-y-1">
+        <% @active_bans.each do |ban| %>
+          <li>
+            <%= link_to (ban.reason.presence || "No reason recorded"), admin_ban_path(ban), class: "underline font-medium" %>
+            <span class="text-red-700">
+              — matched on <%= (ban.ban_emails.map(&:email) + ban.ban_slack_ids.map { "Slack #{_1.slack_id}" }).join(", ") %>,
+              <%= ban.expires_at ? "expires #{l(ban.expires_at, format: :long)}" : "indefinite" %>
+            </span>
+            <% if ban.ucat? %>
+              <span class="text-red-700">— UCAT <%= "case".pluralize(ban.ucat_case_links.size) %>: <%= render "admin/bans/ucat_cases", ban: ban, link_class: "underline" %></span>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
   <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
     <div class="px-6 py-4 border-b border-gray-200">
       <h2 class="text-lg font-medium text-gray-900">User Details</h2>
