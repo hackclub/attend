@@ -2,6 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Admin::Messages", type: :request do
   include Devise::Test::IntegrationHelpers
+  include ActiveSupport::Testing::TimeHelpers
 
   let(:admin) { User.create!(email: "admin-test@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
   let(:event) { create(:event) }
@@ -57,6 +58,70 @@ RSpec.describe "Admin::Messages", type: :request do
       expect(body["success"]).to be(true)
       expect(body["update_url"]).to be_present
       expect(body["edit_url"]).to be_present
+    end
+  end
+
+  describe "POST send_to_new_recipients" do
+    let(:message) do
+      event.messages.create!(audience: "confirmed_attendees", channels: [ "email" ], body: "<p>Hello</p>",
+        sent_by_user: admin, status: :draft)
+    end
+
+    it "sends a sent message to people who joined the audience since" do
+      create(:participant_event, event: event, status: :complete)
+      message.send!
+      travel 2.minutes
+      latecomer = create(:participant_event, event: event, status: :complete)
+
+      get admin_event_message_path(event_slug: event.slug, id: message)
+      expect(response.body).to include("Send to 1 New Recipient")
+
+      expect {
+        post send_to_new_recipients_admin_event_message_path(event_slug: event.slug, id: message)
+      }.to change(MessageDelivery, :count).by(1)
+
+      expect(message.message_deliveries.last.participant_event).to eq(latecomer)
+      expect(response).to redirect_to(admin_event_message_path(event_slug: event.slug, id: message))
+      expect(flash[:notice]).to eq("Sending to 1 new recipient...")
+
+      get admin_event_message_path(event_slug: event.slug, id: message)
+      expect(response.body).not_to include("New Recipient")
+      expect(response.body).to include("Sent later")
+    end
+
+    it "offers the button and marks late deliveries in the admin console beta" do
+      admin.update!(admin_console_beta: true)
+      create(:participant_event, event: event, status: :complete)
+      message.send!
+      travel 2.minutes
+      create(:participant_event, event: event, status: :complete)
+
+      get admin_event_message_path(event_slug: event.slug, id: message)
+      expect(response.body).to include("Send to 1 new recipient")
+
+      post send_to_new_recipients_admin_event_message_path(event_slug: event.slug, id: message)
+      get admin_event_message_path(event_slug: event.slug, id: message)
+      expect(response.body).not_to include("Send to 1 new recipient")
+      expect(response.body).to include("Sent later")
+    end
+
+    it "refuses a message that hasn't been sent" do
+      create(:participant_event, event: event, status: :complete)
+
+      expect {
+        post send_to_new_recipients_admin_event_message_path(event_slug: event.slug, id: message)
+      }.not_to change(MessageDelivery, :count)
+
+      expect(flash[:alert]).to eq("This message hasn't been sent yet.")
+    end
+
+    it "refuses a cancelled scheduled message" do
+      create(:participant_event, event: event, status: :complete)
+      message.update!(status: :cancelled, scheduled_at: 1.day.from_now)
+
+      expect {
+        post send_to_new_recipients_admin_event_message_path(event_slug: event.slug, id: message)
+      }.not_to change(MessageDelivery, :count)
     end
   end
 end

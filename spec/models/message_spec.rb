@@ -128,4 +128,109 @@ RSpec.describe Message, type: :model do
       expect(message_for("all_attendees").recipients).not_to include(pe)
     end
   end
+
+  describe "#send!" do
+    it "creates a pending delivery per reachable channel and stamps the send" do
+      reachable = create(:participant_event, event: event, status: :complete)
+      no_phone = create(:participant_event, event: event, status: :complete,
+        participant: create(:participant, phone: nil))
+      message = message_for("confirmed_attendees")
+      message.update!(channels: %w[email sms], body: "<p>Hi</p>")
+
+      expect { expect(message.send!).to be(true) }.to have_enqueued_job(MessageDeliveryJob)
+
+      expect(message.reload).to be_sending
+      expect(message.sent_at).to be_present
+      expect(message.message_deliveries.where(participant_event: reachable).pluck(:channel)).to contain_exactly("email", "sms")
+      expect(message.message_deliveries.where(participant_event: no_phone).pluck(:channel)).to contain_exactly("email")
+      expect(message.recipient_count).to eq(2)
+    end
+
+    it "does nothing for a message that has already gone out" do
+      create(:participant_event, event: event, status: :complete)
+      message = message_for("confirmed_attendees")
+      message.update!(body: "<p>Hi</p>")
+      message.send!
+
+      expect { expect(message.send!).to be(false) }.not_to change(MessageDelivery, :count)
+    end
+
+    it "creates push deliveries for participants with an app account" do
+      with_app = create(:participant_event, event: event, status: :complete,
+        participant: create(:participant, user: create(:user)))
+      create(:participant_event, event: event, status: :complete)
+      message = message_for("confirmed_attendees")
+      message.update!(channels: %w[push], body: "<p>Hi</p>")
+
+      message.send!
+
+      expect(message.message_deliveries.pluck(:participant_event_id)).to eq([ with_app.id ])
+    end
+  end
+
+  describe "#new_recipients and #send_to_new_recipients!" do
+    def sent_message(audience, channels: %w[email])
+      message_for(audience).tap do |message|
+        message.update!(channels: channels, body: "<p>Hi</p>")
+        message.send!
+      end
+    end
+
+    it "picks up attendees who joined the audience after the send, once" do
+      original = create(:participant_event, event: event, status: :complete)
+      message = sent_message("confirmed_attendees")
+      latecomer = create(:participant_event, event: event, status: :in_progress)
+      latecomer.update!(status: :complete)
+
+      expect(message.new_recipients).to contain_exactly(latecomer)
+
+      expect { expect(message.send_to_new_recipients!).to eq(1) }.to have_enqueued_job(MessageDeliveryJob)
+      expect(message.message_deliveries.where(participant_event: original).count).to eq(1)
+      expect(message.message_deliveries.where(participant_event: latecomer).count).to eq(1)
+      expect(message.reload.recipient_count).to eq(2)
+
+      expect(message.new_recipients).to be_empty
+      expect { expect(message.send_to_new_recipients!).to eq(0) }.not_to have_enqueued_job(MessageDeliveryJob)
+    end
+
+    it "skips anyone already reached on another channel" do
+      pe = create(:participant_event, event: event, status: :complete)
+      message = sent_message("confirmed_attendees", channels: %w[email slack])
+      pe.participant.update!(slack_user_id: "U123")
+
+      # They have an email delivery, so linking Slack afterwards doesn't
+      # earn them a second copy.
+      expect(message.new_recipients).to be_empty
+    end
+
+    it "picks up someone who had no reachable channel at send time" do
+      pe = create(:participant_event, event: event, status: :complete)
+      message = sent_message("confirmed_attendees", channels: %w[slack])
+      expect(message.message_deliveries).to be_empty
+
+      pe.participant.update!(slack_user_id: "U123")
+
+      expect(message.new_recipients).to contain_exactly(pe)
+    end
+
+    it "works for guardian audiences" do
+      first = create(:guardian_participant_event, participant_event: create(:participant_event, event: event))
+      message = sent_message("all_guardians")
+      later = create(:guardian_participant_event, participant_event: create(:participant_event, event: event))
+
+      expect(message.new_recipients).to contain_exactly(later.guardian)
+      expect(message.new_recipients).not_to include(first.guardian)
+    end
+
+    it "leaves the status for the delivery jobs to settle" do
+      create(:participant_event, event: event, status: :complete)
+      message = sent_message("confirmed_attendees")
+      message.update!(status: :completed)
+      create(:participant_event, event: event, status: :complete)
+
+      message.send_to_new_recipients!
+
+      expect(message.reload).to be_completed
+    end
+  end
 end

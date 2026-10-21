@@ -170,6 +170,40 @@ class Message < ApplicationRecord
     recipients.count
   end
 
+  # Everyone the audience matches now who has no delivery for this message on
+  # any channel: people who joined the audience after it went out, plus anyone
+  # who had no reachable channel at the time. Keyed on the person rather than
+  # the channel, so someone who has since linked Slack isn't messaged twice.
+  # The nil filter matters: NOT IN against a subquery holding a NULL matches
+  # nothing, and guardian deliveries have no participant_event_id.
+  def new_recipients
+    column = guardian_audience? ? :guardian_id : :participant_event_id
+    recipients.where.not(id: message_deliveries.where.not(column => nil).select(column))
+  end
+
+  # First send of a draft or scheduled message. Returns false if it had
+  # already gone out, e.g. a double-clicked Send Now.
+  def send!
+    sent = with_lock do
+      next false unless draft? || scheduled?
+
+      update!(status: :sending, sent_at: Time.current)
+      create_deliveries_for(recipients)
+      true
+    end
+    MessageDeliveryJob.perform_later(message_id: id) if sent
+    sent
+  end
+
+  # Sends an already-sent message to #new_recipients. Leaves status alone:
+  # SingleDeliveryJob settles it once the new deliveries drain. Returns the
+  # number of people added.
+  def send_to_new_recipients!
+    added = with_lock { create_deliveries_for(new_recipients) }
+    MessageDeliveryJob.perform_later(message_id: id) if added.positive?
+    added
+  end
+
   def update_counts!
     update!(
       sent_count: message_deliveries.where(status: "delivered").count,
@@ -194,6 +228,58 @@ class Message < ApplicationRecord
   end
 
   private
+
+  def create_deliveries_for(scope)
+    scope = scope.preload(:participant) unless guardian_audience?
+    added = 0
+
+    scope.find_each do |recipient|
+      reachable = channels.select { |channel| deliverable?(recipient, channel) }
+      next if reachable.empty?
+
+      reachable.each do |channel|
+        message_deliveries.create!(delivery_attributes(recipient).merge(channel: channel, status: :pending))
+      end
+      added += 1
+    end
+
+    update!(recipient_count: message_deliveries.distinct.count(Arel.sql("COALESCE(participant_event_id, guardian_id)")))
+    added
+  end
+
+  def delivery_attributes(recipient)
+    if guardian_audience?
+      { guardian: recipient, recipient_email: recipient.email, recipient_phone: recipient.phone }
+    else
+      participant = recipient.participant
+      {
+        participant_event: recipient,
+        recipient_email: participant.email,
+        recipient_phone: participant.phone,
+        recipient_slack_id: participant.slack_user_id
+      }
+    end
+  end
+
+  # Guardians have no Slack link or app account, so they only get email and SMS.
+  def deliverable?(recipient, channel)
+    if guardian_audience?
+      case channel.to_s
+      when "email" then recipient.email.present?
+      when "sms" then recipient.phone.present?
+      else false
+      end
+    else
+      participant = recipient.participant
+      case channel.to_s
+      when "slack" then participant.slack_user_id.present?
+      when "email" then participant.email.present?
+      when "sms" then participant.phone.present?
+      when "push" then participant.user_id.present?
+      else false
+      end
+    end
+  end
 
   def html_to_slack_markdown(html)
     return "" if html.blank?

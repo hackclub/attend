@@ -61,8 +61,7 @@ class MessagesToolbox < ApplicationToolbox
     unless @message.draft? || @message.scheduled?
       halt error: "Message is already #{@message.status}."
     end
-    @message.update!(status: "sending")
-    MessageDeliveryJob.perform_later(message_id: @message.id)
+    @message.send!
     render json: serialize_message(@message, full: true)
   end
 

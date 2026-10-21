@@ -333,6 +333,7 @@ Rails.application.routes.draw do
           post :cancel
           post :retry_failed
           post :retry_delivery
+          post :send_to_new_recipients
         end
       end
       resources :scans, only: [ :index, :create, :update ] do

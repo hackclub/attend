@@ -1,7 +1,7 @@
 module Admin
   class MessagesController < BaseController
     before_action :require_event_selected
-    before_action :set_message, only: [ :show, :edit, :update, :destroy, :preview, :send_now, :cancel, :retry_failed, :retry_delivery ]
+    before_action :set_message, only: [ :show, :edit, :update, :destroy, :preview, :send_now, :cancel, :retry_failed, :retry_delivery, :send_to_new_recipients ]
 
     def index
       authorize current_event, :update?
@@ -17,6 +17,7 @@ module Admin
       @deliveries = @message.message_deliveries
         .includes(:participant_event, :guardian)
         .order(:status, :created_at)
+      @new_recipient_count = @message.sent_at.present? ? @message.new_recipients.count : 0
     end
 
     def new
@@ -134,7 +135,7 @@ module Admin
         redirect_to admin_event_message_path(current_event, @message),
           notice: "Message scheduled for #{@message.scheduled_at.strftime("%B %d, %Y at %l:%M %p")}."
       else
-        send_message(@message)
+        @message.send!
         redirect_to admin_event_message_path(current_event, @message),
           notice: "Message is being sent to #{@message.recipient_count} recipients."
       end
@@ -191,6 +192,25 @@ module Admin
         notice: "Retrying delivery to #{delivery.recipient_name}..."
     end
 
+    def send_to_new_recipients
+      authorize current_event, :update?
+
+      if @message.sent_at.blank?
+        redirect_to admin_event_message_path(current_event, @message),
+          alert: "This message hasn't been sent yet."
+        return
+      end
+
+      added = @message.send_to_new_recipients!
+      notice = if added.zero?
+        "No one new matches this audience."
+      else
+        "Sending to #{added} new #{"recipient".pluralize(added)}..."
+      end
+
+      redirect_to admin_event_message_path(current_event, @message), notice: notice
+    end
+
     private
 
     def set_message
@@ -211,75 +231,6 @@ module Admin
 
       permitted[:audience_filters] = filters
       permitted
-    end
-
-    def send_message(message)
-      recipients = message.recipients
-
-      if message.guardian_audience?
-        recipients.find_each do |guardian|
-          message.channels.each do |channel|
-            next unless can_deliver_to_guardian?(guardian, channel)
-
-            message.message_deliveries.create!(
-              guardian: guardian,
-              channel: channel,
-              recipient_email: guardian.email,
-              recipient_phone: guardian.phone,
-              status: :pending
-            )
-          end
-        end
-      else
-        recipients.find_each do |participant_event|
-          message.channels.each do |channel|
-            next unless can_deliver_to_participant?(participant_event, channel)
-
-            message.message_deliveries.create!(
-              participant_event: participant_event,
-              channel: channel,
-              recipient_email: participant_event.participant.email,
-              recipient_phone: participant_event.participant.phone,
-              recipient_slack_id: participant_event.participant.slack_user_id,
-              status: :pending
-            )
-          end
-        end
-      end
-
-      message.update!(
-        status: :sending,
-        recipient_count: message.message_deliveries.select(:participant_event_id, :guardian_id).distinct.count,
-        sent_at: Time.current
-      )
-
-      MessageDeliveryJob.perform_later(message_id: message.id)
-    end
-
-    def can_deliver_to_participant?(participant_event, channel)
-      case channel.to_s
-      when "slack"
-        participant_event.participant.slack_user_id.present?
-      when "email"
-        participant_event.participant.email.present?
-      when "sms"
-        participant_event.participant.phone.present?
-      else
-        false
-      end
-    end
-
-    def can_deliver_to_guardian?(guardian, channel)
-      case channel.to_s
-      when "slack"
-        false
-      when "email"
-        guardian.email.present?
-      when "sms"
-        guardian.phone.present?
-      else
-        false
-      end
     end
   end
 end
