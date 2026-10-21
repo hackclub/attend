@@ -19,6 +19,8 @@
 
         <% if @identity_correction&.pending? %>
           <p class="portal-body text-sm mt-3">You've asked staff to correct it. Once they've reviewed your request, come back here to continue.</p>
+        <% elsif @identity_correction&.awaiting_staff_reset? %>
+          <p class="portal-body text-sm mt-3">Staff need to check a few things before they can apply your correction. They'll be in touch, so there's no need to ask again.</p>
         <% else %>
           <% if @identity_correction&.follow_up_needed? && @identity_correction.staff_response.present? %>
             <p class="portal-body text-sm mt-3"><strong>Staff replied to your last request:</strong> <%= @identity_correction.staff_response %></p>

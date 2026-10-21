@@ -16,6 +16,10 @@ module RegistrationChangeRequests
       pending_on: nil,
       sent_at: nil
     }.freeze
+    # Set automatically, so it is written for staff. Participants see a
+    # generic "staff will be in touch" message instead (see RegistrationChangeRequest#awaiting_staff_reset?).
+    SHARED_IDENTITY_FOLLOW_UP = "This identity is shared across events with signed registrations. " \
+      "Staff must review and reset every affected registration before applying it.".freeze
 
     def self.call(request:, reviewer:)
       new(request: request, reviewer: reviewer).call
@@ -50,9 +54,7 @@ module RegistrationChangeRequests
 
     def approve_identity
       if identity_bound_acceptance_exists?
-        return mark_follow_up(
-          "This identity is shared across events with signed registrations. Staff must review and reset every affected registration before applying it."
-        )
+        return mark_follow_up(SHARED_IDENTITY_FOLLOW_UP)
       end
 
       attributes = request.requested_changes.slice(*IDENTITY_FIELDS)

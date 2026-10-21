@@ -130,5 +130,32 @@ RSpec.describe "Onboarding age limit", type: :request do
       expect(participant.reload.date_of_birth).to eq(Date.new(2010, 5, 5))
       expect(participant_event.reload.onboarding_step).to eq(1)
     end
+
+    it "doesn't show staff's internal note when approval needs a manual reset" do
+      past_event = create(:event, starts_at: 8.years.ago, ends_at: 8.years.ago + 2.days)
+      create(:participant_event, participant: participant, event: past_event, code_of_conduct_accepted_at: 8.years.ago)
+      request_correction("2010-05-05")
+      result = RegistrationChangeRequests::Approve.call(request: participant_event.registration_change_requests.last, reviewer: staff)
+      expect(result).to eq(:follow_up_needed)
+
+      get profile_path
+
+      hold = document.at_css("[data-testid='age-limit-hold']")
+      expect(hold.text).to include("Staff need to check a few things")
+      expect(hold.text).not_to include("This identity is shared")
+      expect(hold.at_css("form")).to be_nil
+    end
+
+    it "shows what staff wrote when they ask for more" do
+      request_correction("2010-05-05")
+      participant_event.registration_change_requests.last
+        .update!(status: :follow_up_needed, staff_response: "Can you send a photo of your ID?", resolved_by: staff, resolved_at: Time.current)
+
+      get profile_path
+
+      hold = document.at_css("[data-testid='age-limit-hold']")
+      expect(hold.text).to include("Staff replied to your last request: Can you send a photo of your ID?")
+      expect(hold.at_css("form")).to be_present
+    end
   end
 end
