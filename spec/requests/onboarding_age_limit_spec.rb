@@ -61,6 +61,10 @@ RSpec.describe "Onboarding age limit", type: :request do
 
     post onboarding_waiver_complete_path(event_id: event.id)
     expect(response).to redirect_to(profile_path)
+
+    # Naming the profile step in the query string doesn't exempt other actions.
+    post onboarding_waiver_complete_path(event_id: event.id, step: "profile")
+    expect(response).to redirect_to(profile_path)
   end
 
   it "saves the rest of the profile without moving them on" do

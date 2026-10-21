@@ -1143,7 +1143,9 @@ class OnboardingController < ApplicationController
   # they stay on the profile step, where they can ask staff to correct it.
   def hold_at_profile_if_too_old
     return unless @participant_event.too_old_for_event?
-    return if action_name != "complete" && params[:step] == "profile"
+    # Only the profile step itself is exempt; the step is a path segment on
+    # these two routes, so a query string can't borrow it on another action.
+    return if %w[show update].include?(action_name) && params[:step] == "profile"
 
     redirect_to onboarding_step_path(step: "profile", event_id: current_event.id)
   end
