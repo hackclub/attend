@@ -562,6 +562,14 @@ RSpec.describe ParticipantEvent, type: :model do
         .to have_enqueued_job(InviteToEventSlackChannelJob)
     end
 
+    it "enqueues an invite when a merge moves a complete registration to another participant" do
+      pe = create(:participant_event, event: event, status: :complete)
+      primary = create(:participant, slack_user_id: "U1")
+
+      expect { pe.update!(participant: primary) }
+        .to have_enqueued_job(InviteToEventSlackChannelJob).with(pe.id)
+    end
+
     it "doesn't enqueue for other statuses or events without a channel" do
       pe = create(:participant_event, event: event)
       other = create(:participant_event, event: create(:event))

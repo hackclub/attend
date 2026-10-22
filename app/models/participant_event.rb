@@ -84,9 +84,10 @@ class ParticipantEvent < ApplicationRecord
 
   # Hooked on the status column rather than mark_complete_if_eligible!, so
   # every route to complete (DocuSeal, guardian portal, admin status edits,
-  # CSV import) invites without each one remembering to.
+  # CSV import) invites without each one remembering to. A participant change
+  # is a duplicate merge handing a complete registration to the Slack-linked row.
   after_commit :invite_to_slack_channel, on: %i[create update],
-    if: -> { saved_change_to_status? && complete? }
+    if: -> { (saved_change_to_status? || saved_change_to_participant_id?) && complete? }
 
   # SQL mirror of !onboarding_complete? so list filters don't have to load
   # every row into Ruby. Keep in sync with #onboarding_complete?.
