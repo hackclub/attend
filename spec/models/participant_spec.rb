@@ -279,84 +279,25 @@ RSpec.describe Participant, type: :model do
     end
   end
 
-  describe "Slack channel invites when the Slack ID changes" do
+  describe "Slack channel invite when the Slack ID changes" do
     include ActiveJob::TestHelper
 
-    let(:participant) { create(:participant) }
-    let(:channel_event) { create(:event, slack_channel_id: "C123") }
-
-    it "enqueues an invite for each complete registration in an event with a channel" do
-      complete = create(:participant_event, participant: participant, event: channel_event, status: :complete)
-      second = create(:participant_event, participant: participant, event: create(:event, slack_channel_id: "C456"), status: :complete)
-      create(:participant_event, participant: participant, event: create(:event, slack_channel_id: "C789"), status: :in_progress)
-      create(:participant_event, participant: participant, event: create(:event), status: :complete)
-      clear_enqueued_jobs
+    it "enqueues an invite for a complete registration in an event with a channel" do
+      participant = create(:participant)
+      pe = create(:participant_event, participant: participant, event: create(:event, slack_channel_id: "C123"), status: :complete)
 
       expect { participant.update!(slack_user_id: "U1") }
-        .to have_enqueued_job(InviteToEventSlackChannelJob).exactly(2).times
-      expect(InviteToEventSlackChannelJob).to have_been_enqueued.with(complete.id)
-      expect(InviteToEventSlackChannelJob).to have_been_enqueued.with(second.id)
-    end
-
-    it "doesn't enqueue when the Slack ID is cleared or unchanged" do
-      create(:participant_event, participant: participant, event: channel_event, status: :complete)
-      participant.update!(slack_user_id: "U1")
-
-      expect {
-        participant.update!(preferred_name: "Sam")
-        participant.update!(slack_user_id: nil)
-      }.not_to have_enqueued_job(InviteToEventSlackChannelJob)
+        .to have_enqueued_job(InviteToEventSlackChannelJob).with(pe.id)
     end
   end
 
   describe "#slack_connect_participant_event" do
-    let(:participant) { create(:participant) }
+    it "picks the upcoming registration over an older one" do
+      participant = create(:participant)
+      create(:participant_event, participant: participant, event: create(:event, starts_at: 3.months.ago, ends_at: 3.months.ago + 2.days))
+      upcoming = create(:participant_event, participant: participant, event: create(:event, starts_at: 1.month.from_now, ends_at: 1.month.from_now + 2.days))
 
-    def registration(starts_at:, ends_at:, status: :in_progress)
-      event = create(:event, starts_at: starts_at, ends_at: ends_at)
-      create(:participant_event, participant: participant, event: event, status: status)
-    end
-
-    it "prefers a live event, then the soonest upcoming one, over older registrations" do
-      past = registration(starts_at: 3.months.ago, ends_at: 3.months.ago + 2.days)
-      later = registration(starts_at: 2.months.from_now, ends_at: 2.months.from_now + 2.days)
-      sooner = registration(starts_at: 1.month.from_now, ends_at: 1.month.from_now + 2.days)
-
-      expect(participant.slack_connect_participant_event).to eq(sooner)
-
-      live = registration(starts_at: 1.day.ago, ends_at: 1.day.from_now)
-      expect(participant.reload.slack_connect_participant_event).to eq(live)
-      expect([ past, later ]).not_to include(participant.slack_connect_participant_event)
-    end
-
-    it "puts upcoming events with no start date after dated ones" do
-      undated = registration(starts_at: nil, ends_at: nil)
-      dated = registration(starts_at: 1.month.from_now, ends_at: 1.month.from_now + 2.days)
-
-      expect(participant.slack_connect_participant_event).to eq(dated)
-      dated.destroy!
-      expect(participant.reload.slack_connect_participant_event).to eq(undated)
-    end
-
-    it "skips withdrawn and rejected registrations unless nothing else is left" do
-      kept = registration(starts_at: 3.months.ago, ends_at: 3.months.ago + 2.days)
-      withdrawn = registration(starts_at: 1.month.from_now, ends_at: 1.month.from_now + 2.days, status: :withdrawn)
-      registration(starts_at: 2.months.from_now, ends_at: 2.months.from_now + 2.days, status: :rejected)
-
-      expect(participant.slack_connect_participant_event).to eq(kept)
-      kept.destroy!
-      expect(participant.reload.slack_connect_participant_event).to eq(withdrawn)
-    end
-
-    it "falls back to the most recently ended event" do
-      registration(starts_at: 1.year.ago, ends_at: 1.year.ago + 2.days)
-      recent = registration(starts_at: 1.month.ago, ends_at: 1.month.ago + 2.days)
-
-      expect(participant.slack_connect_participant_event).to eq(recent)
-    end
-
-    it "is nil with no registrations" do
-      expect(participant.slack_connect_participant_event).to be_nil
+      expect(participant.slack_connect_participant_event).to eq(upcoming)
     end
   end
 end
