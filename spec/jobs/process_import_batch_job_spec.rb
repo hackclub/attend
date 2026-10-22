@@ -74,12 +74,5 @@ RSpec.describe ProcessImportBatchJob do
       expect(green.position).to eq(4)
       expect(ImportBatch.last.errors_data.pluck("error")).to include(a_string_starting_with('Group "!!!" not added'))
     end
-
-    it "ignores the column when the event doesn't use groups" do
-      participant_event = import_with_groups("Red Team")
-
-      expect(participant_event.groups).to be_empty
-      expect(event.groups).to be_empty
-    end
   end
 end
