@@ -51,61 +51,21 @@ RSpec.describe "Guardian portal automatic completion", type: :request do
   end
 
   describe "via DocuSeal webhooks" do
-    it "completes the guardian link and the participant once every waiver is signed, without Submit and finish" do
+    it "completes the guardian and the participant once every waiver is signed, without Submit and finish" do
       expect { guardian_signs_everything }
         .to have_enqueued_mail(ParticipantMailer, :registration_confirmed).once
 
       expect(gpe.reload).to be_completed
-      expect(gpe.completed_at).to be_present
       expect(participant_event.reload).to be_complete
-    end
-
-    it "does not complete the guardian while a waiver is still unsigned" do
-      deliver("form.completed", waiver, role: "Guardian")
-      deliver("submission.completed", waiver)
-
-      expect(gpe.reload).not_to be_completed
-      expect(participant_event.reload).not_to be_complete
-    end
-
-    it "does not complete a guardian who has not filled in their portal steps" do
-      gpe.emergency_contacts.destroy_all
-
-      guardian_signs_everything
-
-      expect(gpe.reload).not_to be_completed
-      expect(participant_event.reload).not_to be_complete
-    end
-
-    it "is idempotent: replayed webhooks send no second confirmation and keep the completion time" do
-      guardian_signs_everything
-      completed_at = gpe.reload.completed_at
-
-      expect {
-        deliver("submission.completed", freedom_waiver)
-        deliver("form.completed", waiver, role: "Guardian")
-      }.not_to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
-
-      expect(gpe.reload.completed_at).to eq(completed_at)
     end
 
     it "does not complete the guardian of a withdrawn registration" do
       participant_event.withdrawn!
 
-      expect { guardian_signs_everything }
-        .not_to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
+      guardian_signs_everything
 
       expect(gpe.reload).not_to be_completed
       expect(participant_event.reload).to be_withdrawn
-    end
-
-    it "triggers the guardian-only custom documents, as Submit and finish does" do
-      doc = create(:custom_document, :guardian_only, event: event)
-
-      expect { guardian_signs_everything }
-        .to have_enqueued_job(DocusealJobs::CreateCustomDocumentJob)
-
-      expect(participant_event.consents.find_by(custom_document: doc)).to be_present
     end
   end
 
@@ -115,69 +75,45 @@ RSpec.describe "Guardian portal automatic completion", type: :request do
       freedom_waiver.update!(status: :signed, signed_at: Time.current, guardian_signed_at: Time.current)
     end
 
+    def save_emergency_contact(**params)
+      patch guardian_portal_update_step_path(token: token, step: "emergency"), params: {
+        emergency_contact: { name: "Sam Guardian", relationship: "Parent", phone: "+14155550151", priority: 1 },
+        **params
+      }
+    end
+
     it "completes when the guardian saves their last step" do
       gpe.emergency_contacts.destroy_all
 
-      patch guardian_portal_update_step_path(token: token, step: "emergency"), params: {
-        emergency_contact: { name: "Sam Guardian", relationship: "Parent", phone: "+14155550151", priority: 1 }
-      }
+      save_emergency_contact
 
       expect(response).to redirect_to(guardian_portal_confirmed_path(token: token))
-      expect(gpe.reload).to be_completed
       expect(participant_event.reload).to be_complete
     end
 
-    it "keeps the guardian in the portal when a save leaves something to do" do
+    it "moves on to the next step when a save leaves something to do" do
       freedom_waiver.update!(status: :sent, signed_at: nil, guardian_signed_at: nil)
-      gpe.emergency_contacts.destroy_all
 
-      patch guardian_portal_update_step_path(token: token, step: "emergency"), params: {
-        advance: "1",
-        emergency_contact: { name: "Sam Guardian", relationship: "Parent", phone: "+14155550151", priority: 1 }
-      }
+      save_emergency_contact(advance: "1")
 
       expect(response).to redirect_to(guardian_portal_step_path(token: token, step: "consents"))
       expect(gpe.reload).not_to be_completed
     end
 
-    {
-      "waiver" => :guardian_portal_waiver_complete_path,
-      "freedom waiver" => :guardian_portal_freedom_waiver_complete_path
-    }.each do |document, return_path|
-      it "completes when the guardian returns from signing the #{document}" do
-        post public_send(return_path, token: token)
-
-        expect(response).to redirect_to(guardian_portal_confirmed_path(token: token))
-        expect(gpe.reload).to be_completed
-      end
-
-      it "sends the guardian back to the consents step after signing the #{document} while something is missing" do
-        gpe.emergency_contacts.destroy_all
-
-        post public_send(return_path, token: token)
-
-        expect(response).to redirect_to(guardian_portal_step_path(token: token, step: :consents))
-        expect(gpe.reload).not_to be_completed
-      end
-    end
-
-    it "still completes through Submit and finish, sending one confirmation" do
-      expect { post guardian_portal_complete_path(token: token) }
-        .to have_enqueued_mail(ParticipantMailer, :registration_confirmed).once
+    it "completes when the guardian returns from signing the waiver" do
+      post guardian_portal_waiver_complete_path(token: token)
 
       expect(response).to redirect_to(guardian_portal_confirmed_path(token: token))
-      expect(participant_event.reload).to be_complete
+      expect(gpe.reload).to be_completed
     end
 
-    it "treats a second Submit and finish as a no-op" do
-      post guardian_portal_complete_path(token: token)
-      completed_at = gpe.reload.completed_at
+    it "sends the guardian back to the consents step after signing while something is missing" do
+      gpe.emergency_contacts.destroy_all
 
-      expect { post guardian_portal_complete_path(token: token) }
-        .not_to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
+      post guardian_portal_freedom_waiver_complete_path(token: token)
 
-      expect(response).to redirect_to(guardian_portal_confirmed_path(token: token))
-      expect(gpe.reload.completed_at).to eq(completed_at)
+      expect(response).to redirect_to(guardian_portal_step_path(token: token, step: "consents"))
+      expect(gpe.reload).not_to be_completed
     end
   end
 

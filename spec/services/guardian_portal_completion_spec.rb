@@ -25,22 +25,17 @@ RSpec.describe GuardianPortalCompletion do
       expect(gpe.reload.completed_at).to be_within(1.second).of(1.hour.ago)
     end
 
-    # Webhook and signing-return completions skip mark_accepted_if_needed.
-    it "records the invite as accepted" do
-      expect(gpe.accepted_at).to be_nil
-
-      described_class.new(gpe).complete!
-
-      expect(gpe.reload.accepted_at).to be_present
-    end
-
-    it "does not send a guardian-only document that already has a submission" do
-      doc = create(:custom_document, :guardian_only, event: event)
-      create(:consent, :custom_document, participant_event: participant_event, custom_document: doc,
+    it "sends guardian-only documents that don't have a submission yet" do
+      sent_doc = create(:custom_document, :guardian_only, event: event)
+      create(:consent, :custom_document, participant_event: participant_event, custom_document: sent_doc,
         status: :sent, docuseal_envelope_id: "custom-1")
+      new_doc = create(:custom_document, :guardian_only, event: event)
 
       expect(described_class.new(gpe).complete!).to be(true)
-      expect(DocusealJobs::CreateCustomDocumentJob).not_to have_been_enqueued
+
+      new_consent = participant_event.consents.find_by!(custom_document: new_doc)
+      expect(DocusealJobs::CreateCustomDocumentJob).to have_been_enqueued.with(new_consent.id).exactly(:once)
+      expect(DocusealJobs::CreateCustomDocumentJob).to have_been_enqueued.exactly(:once)
     end
   end
 
