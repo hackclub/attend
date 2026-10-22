@@ -24,7 +24,7 @@ export default class extends Controller {
     this.zoneTarget.classList.remove('border-blue-500', 'bg-blue-50')
     
     const files = e.dataTransfer.files
-    if (files.length > 0 && files[0].name.endsWith('.csv')) {
+    if (files.length > 0 && files[0].name.toLowerCase().endsWith('.csv')) {
       this.inputTarget.files = files
       this.showFileSelected(files[0].name)
     }

@@ -22,6 +22,13 @@
     </div>
   </div>
 
+  <% if @missing_columns.any? %>
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+      <h3 class="font-semibold text-red-800">The file has no <%= @missing_columns.to_sentence %> <%= "column".pluralize(@missing_columns.count) %></h3>
+      <p class="text-sm text-red-700 mt-1">New participants need a legal first and last name, so their rows can't be imported. Add the <%= "column".pluralize(@missing_columns.count) %> and upload the file again.</p>
+    </div>
+  <% end %>
+
   <% if @valid_rows.any? %>
     <div class="bg-white rounded-lg border border-gray-200 mb-6">
       <div class="px-4 py-3 border-b border-gray-200">
@@ -81,11 +88,11 @@
           </thead>
           <tbody class="bg-white divide-y divide-gray-100">
             <% @skipped_rows.first(50).each do |row| %>
-              <tr class="bg-yellow-50">
+              <tr class="<%= row[:failing] ? "bg-red-50" : "bg-yellow-50" %>">
                 <td class="px-4 py-3 text-sm text-gray-500"><%= row[:row_number] %></td>
                 <td class="px-4 py-3 text-sm font-medium text-gray-900"><%= row[:name].presence || "—" %></td>
                 <td class="px-4 py-3 text-sm text-gray-600"><%= row[:email] %></td>
-                <td class="px-4 py-3 text-sm text-yellow-700"><%= row[:reason] %></td>
+                <td class="px-4 py-3 text-sm <%= row[:failing] ? "text-red-700" : "text-yellow-700" %>"><%= row[:reason] %></td>
               </tr>
             <% end %>
             <% if @skipped_rows.count > 50 %>

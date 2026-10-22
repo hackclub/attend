@@ -72,6 +72,7 @@ class ProcessImportBatchJob < ApplicationJob
       create_medical(participant_event, row)
       create_guardian_and_emergency_contact(participant_event, row, row_number)
       create_travel(participant_event, row)
+      apply_groups(participant_event, row)
     end
 
     { imported: true, participant: participant }
@@ -158,6 +159,21 @@ class ProcessImportBatchJob < ApplicationJob
       event: @event,
       status: :invited
     )
+  end
+
+  # The template's Groups column: names separated by commas or semicolons,
+  # matched to the event's groups by name or slug, creating any that are new.
+  def apply_groups(participant_event, row)
+    return unless @event.groups_enabled?
+
+    names = row[:groups].to_s.split(/[;,]/).map(&:strip).reject(&:blank?)
+
+    names.each do |name|
+      group = @event.groups.find_by("LOWER(name) = ?", name.downcase) ||
+              @event.groups.find_by("LOWER(slug) = ?", name.downcase) ||
+              @event.groups.create!(name: name)
+      GroupMembership.find_or_create_by!(group: group, participant_event: participant_event)
+    end
   end
 
   def create_accommodation(participant_event, row)

@@ -3,7 +3,9 @@ module Admin
     before_action :require_event_selected
     before_action :authorize_import
 
-    COLUMN_MAPPING = CsvImportService::COLUMN_MAPPING
+    # The participant fields Participant validates, keyed as they're stored in
+    # rows_data, with the template header that fills them.
+    REQUIRED_COLUMNS = { "legal_first_name" => "First Name", "legal_last_name" => "Last Name" }.freeze
 
     def new
     end
@@ -30,7 +32,13 @@ module Admin
       # invitations are recorded and go out when the hold is released.
       send_invitations = params[:send_invitations] != "0" && !current_event.onboarding_invites_held?
 
-      rows = parse_csv(csv_content)
+      begin
+        rows = parse_csv(csv_content)
+      rescue CSV::MalformedCSVError => e
+        return reject_csv_file("This file isn't a valid CSV: #{e.message}")
+      rescue EncodingError, ArgumentError
+        return reject_csv_file("This file couldn't be read. Save it from your spreadsheet as \"CSV UTF-8\" and upload it again.")
+      end
 
       if rows.empty?
         return render_console_file_error("The file has no rows to import. Check it against the template.") if request.variant.include?(:console)
@@ -61,12 +69,16 @@ module Admin
       @rows = @import_batch.rows_data.map(&:with_indifferent_access)
       @valid_rows = []
       @skipped_rows = []
+      # A header the file lacks leaves its key out of every row.
+      @missing_columns = REQUIRED_COLUMNS.reject { |key, _| @rows.any? { |row| row.key?(key) } }.values
+      importing_rows = {}
 
       @rows.each_with_index do |row, index|
         email = row[:email]&.downcase&.strip
         next if email.blank?
 
-        existing_pe = Participant.find_by("LOWER(email) = ?", email)&.participant_events&.find_by(event: current_event)
+        existing_participant = Participant.find_by("LOWER(email) = ?", email)
+        existing_pe = existing_participant&.participant_events&.find_by(event: current_event)
 
         row_info = {
           row_number: index + 2,
@@ -81,7 +93,13 @@ module Admin
 
         if existing_pe
           @skipped_rows << row_info.merge(reason: "Already registered")
+        elsif importing_rows[email]
+          # The job imports the first row and skips this one as registered.
+          @skipped_rows << row_info.merge(reason: "Same email as row #{importing_rows[email]}")
+        elsif (failure = import_failure(row, email, existing_participant))
+          @skipped_rows << row_info.merge(reason: failure, failing: true)
         else
+          importing_rows[email] = row_info[:row_number]
           @valid_rows << row_info
         end
       end
@@ -125,6 +143,12 @@ module Admin
       render :new, status: :unprocessable_entity
     end
 
+    def reject_csv_file(message)
+      return render_console_file_error(message) if request.variant.include?(:console)
+
+      redirect_to new_admin_event_import_path(current_event), alert: message
+    end
+
     # Importing a CSV invites everyone in it, so it takes the same permission as
     # the invite form: event admins only.
     def authorize_import
@@ -132,19 +156,37 @@ module Admin
     end
 
     def parse_csv(csv_content)
-      csv_content = csv_content.force_encoding("UTF-8")
-      csv_content = csv_content.sub(/\A\xEF\xBB\xBF/u, "")
-
-      csv = CSV.parse(csv_content, headers: true)
+      csv = CSV.parse(decode_csv(csv_content), headers: true)
 
       csv.map do |row|
         mapped = {}
         row.each do |header, value|
-          key = COLUMN_MAPPING[header]
-          mapped[key.to_s] = value&.strip if key
+          key = CsvImportService.column_for(header)
+          # Two headers can name one field ("Email" and "Email Address"); the
+          # first with a value wins.
+          mapped[key.to_s] ||= value&.strip.presence if key
         end
         mapped
       end.reject { |row| row["email"].blank? }
+    end
+
+    # Excel's "CSV UTF-8" starts with a byte order mark, and its plain "CSV"
+    # on Windows is Windows-1252, where accented names aren't valid UTF-8.
+    def decode_csv(csv_content)
+      content = csv_content.b.delete_prefix("\xEF\xBB\xBF".b).force_encoding(Encoding::UTF_8)
+      return content if content.valid_encoding?
+
+      content.force_encoding(Encoding::Windows_1252).encode(Encoding::UTF_8)
+    end
+
+    # Why the import job would fail this row, so the preview doesn't count it
+    # as imported. A participant already in Attend keeps the names on file.
+    def import_failure(row, email, existing_participant)
+      return "Invalid email address" unless email.match?(URI::MailTo::EMAIL_REGEXP)
+      return if existing_participant
+
+      missing = REQUIRED_COLUMNS.select { |key, _| row[key].blank? }.values
+      "Missing #{missing.to_sentence.downcase}" if missing.any?
     end
   end
 end
