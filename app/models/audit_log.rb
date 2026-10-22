@@ -83,6 +83,7 @@ class AuditLog < ApplicationRecord
     cancel: "cancel",
     confirm: "confirm",
     send_to_slack: "send_to_slack",
+    escalate: "escalate",
     send_now: "send_now",
     retry_delivery: "retry_delivery",
     retry_failed: "retry_failed",

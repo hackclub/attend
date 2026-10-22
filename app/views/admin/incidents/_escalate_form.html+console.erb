@@ -1,0 +1,15 @@
+<details class="cs-container">
+  <summary class="cs-container-header cursor-pointer list-none">
+    <h2 class="cs-h2">Escalate to Hack Club HQ</h2>
+    <p class="cs-description">Files a confidential report with HQ's safeguarding team. They see this incident's summary, details and actions taken.</p>
+  </summary>
+  <div class="cs-container-body">
+    <%= form_with url: escalate_admin_event_incident_path(current_event, incident), method: :post, local: true, class: "cs-stack",
+          html: { novalidate: true }, data: { controller: "incident-escalation", action: "submit->incident-escalation#confirm", incident_escalation_always_value: true, incident_escalation_level_value: incident.severity } do %>
+      <%= render "admin/incidents/escalation_fields", phone: current_user.oidc_claims&.dig("phone_number") %>
+      <div class="flex justify-end">
+        <button type="submit" class="cs-btn cs-btn-primary">Escalate to HQ</button>
+      </div>
+    <% end %>
+  </div>
+</details>

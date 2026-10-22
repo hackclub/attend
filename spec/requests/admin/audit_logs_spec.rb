@@ -17,7 +17,7 @@ RSpec.describe "Admin::AuditLogs", type: :request do
       event: event,
       reported_by: reporter,
       category: "behavior",
-      severity: "low",
+      severity: "s3",
       summary: "Confidential summary",
       details: "Confidential details",
       visible_to_roles: visible_to_roles
@@ -99,7 +99,7 @@ RSpec.describe "Admin::AuditLogs", type: :request do
     it "does not let an event admin read another event's logs via event_id param" do
       other_event = create(:event)
       other_incident = Incident.create!(
-        event: other_event, reported_by: reporter, category: "behavior", severity: "low",
+        event: other_event, reported_by: reporter, category: "behavior", severity: "s3",
         summary: "Other event", visible_to_roles: [ "event_admin" ]
       )
       AuditLog.log!(action: "update", record: other_incident, actor: reporter, event: other_event)
@@ -145,7 +145,7 @@ RSpec.describe "Admin::AuditLogs", type: :request do
       incident = nil
       PaperTrail.request(whodunnit: reporter.id) do
         incident = create_incident(visible_to_roles: [])
-        incident.update!(summary: "updated secret", severity: "high")
+        incident.update!(summary: "updated secret", severity: "s1")
       end
 
       changesets = incident.versions.map(&:changeset)
@@ -169,13 +169,13 @@ RSpec.describe "Admin::AuditLogs", type: :request do
       get admin_event_incident_path(event_slug: event.slug, id: incident.id)
 
       patch admin_event_incident_path(event_slug: event.slug, id: incident.id),
-        params: { incident: { summary: "new secret summary", severity: "high" } }
+        params: { incident: { summary: "new secret summary", severity: "s1" } }
 
       log = AuditLog.where(record_type: "Incident", record_id: incident.id, action: "update").last
       expect(log).to be_present
       expect(log.changed_fields["summary"]).to eq("[REDACTED]")
       expect(log.changed_fields.to_json).not_to include("new secret summary")
-      expect(log.changed_fields["severity"]).to eq([ "low", "high" ])
+      expect(log.changed_fields["severity"]).to eq([ "s3", "s1" ])
     end
   end
 end

@@ -14,7 +14,7 @@ RSpec.describe "Admin::IncidentReportComments", type: :request do
       reporter_phone: "+14155550150",
       reporter_role: "participant",
       incident_type: "other",
-      priority: "standard",
+      priority: "s2",
       summary: "Summary",
       details: "Details"
     )
@@ -24,7 +24,7 @@ RSpec.describe "Admin::IncidentReportComments", type: :request do
 
   it "attaches uploaded files to the comment" do
     expect {
-      post admin_incident_comments_path(incident_report), params: {
+      post admin_incident_report_comments_path(incident_report), params: {
         incident_report_comment: {
           body: "Adding evidence",
           attachments: [ fixture_file_upload(Rails.root.join("spec/fixtures/files/evidence.txt"), "text/plain") ]
@@ -38,7 +38,7 @@ RSpec.describe "Admin::IncidentReportComments", type: :request do
   end
 
   it "creates a comment with no attachments when none are provided" do
-    post admin_incident_comments_path(incident_report), params: {
+    post admin_incident_report_comments_path(incident_report), params: {
       incident_report_comment: { body: "No files here" }
     }
 
