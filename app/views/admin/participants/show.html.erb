@@ -420,7 +420,7 @@
         <section class="bg-white rounded-lg border border-gray-200 p-6">
           <h2 class="text-lg font-semibold mb-4">Slack Integration</h2>
           <% if @participant_event.participant.slack_user_id.present? %>
-            <div class="flex items-center gap-2 mb-3">
+            <div class="flex items-center gap-2 <%= "mb-3" if @participant_event.complete? %>">
               <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Connected</span>
               <%= link_to "slack://user?team=T0266FRGM&id=#{@participant_event.participant.slack_user_id}", class: "hover:underline" do %><code class="text-xs bg-gray-100 px-1.5 py-0.5 rounded"><%= @participant_event.participant.slack_user_id %></code><% end %>
               <button type="button"
