@@ -4,6 +4,9 @@ module Admin
   # every event's incident log. Global admins only.
   class IncidentReportsController < BaseController
     VIEWS = %w[all reports logs].freeze
+    # The inbox is a triage view, not an archive: show the newest rows and
+    # say when there are more, rather than decrypting every summary ever.
+    LIMIT = 200
 
     def index
       authorize IncidentReport
@@ -12,13 +15,17 @@ module Admin
 
       reports = policy_scope(IncidentReport).includes(:event, :user, incident: :event).order(created_at: :desc)
       reports = reports.where(priority: params[:priority]) if IncidentLevel::KEYS.include?(params[:priority])
-      @incident_reports = reports
+      @incident_reports = reports.limit(LIMIT + 1).to_a
+      @reports_truncated = @incident_reports.size > LIMIT
+      @incident_reports = @incident_reports.first(LIMIT)
       @reports_by_status = @incident_reports.group_by(&:status)
 
       logs = Incident.includes(:event, :reported_by, :hq_report).order(created_at: :desc)
       logs = logs.where(event_id: params[:event_id]) if params[:event_id].present?
       logs = logs.open_incidents if params[:open] == "1"
-      @incidents = logs
+      @incidents = logs.limit(LIMIT + 1).to_a
+      @incidents_truncated = @incidents.size > LIMIT
+      @incidents = @incidents.first(LIMIT)
       @log_events = Event.where(id: Incident.select(:event_id)).order(starts_at: :desc)
     end
 

@@ -1,7 +1,7 @@
 module Admin
   class IncidentsController < BaseController
     before_action :require_event_selected
-    before_action :set_incident, only: [ :show, :edit, :update, :send_to_slack, :escalate ]
+    before_action :set_incident, only: [ :show, :edit, :update, :escalate ]
 
     def index
       @incidents = policy_scope(current_event.incidents).includes(:reported_by, :participants, :hq_report).order(created_at: :desc)
@@ -23,11 +23,15 @@ module Admin
 
       escalation = build_escalation if escalate_requested?
 
-      # Check HQ-side requirements (a callback number, mostly) before the
-      # incident exists, so a failed escalation never leaves a half-done log entry.
-      if escalation && !escalation.valid?
-        escalation.errors.full_messages.each { |m| @incident.errors.add(:base, "Escalation: #{m}") }
-        return render :new, status: :unprocessable_entity
+      # Validate both halves up front so the organizer sees every problem at
+      # once, and a failed escalation never leaves a half-done log entry.
+      if escalation
+        incident_ok = @incident.valid?
+        escalation_ok = escalation.valid?
+        unless incident_ok && escalation_ok
+          escalation.errors.full_messages.each { |m| @incident.errors.add(:base, "Escalation: #{m}") }
+          return render :new, status: :unprocessable_entity
+        end
       end
 
       if @incident.save
@@ -64,37 +68,34 @@ module Admin
       end
     end
 
-    # Escalates an existing log entry to HQ. Idempotent: a second POST just
-    # lands back on the already-escalated incident.
+    # Escalates an existing log entry to HQ. Idempotent: a second POST, even a
+    # concurrent one, lands back on the already-escalated incident. The row
+    # lock serialises two organizers clicking at once; the unique index on
+    # incident_reports.incident_id is the backstop.
     def escalate
       authorize @incident
+      @record = @incident
 
-      if @incident.escalated?
-        return redirect_to admin_event_incident_path(current_event, @incident), notice: "This incident has already been escalated to Hack Club HQ."
+      report = nil
+      already = false
+      @incident.with_lock do
+        if @incident.escalated?
+          already = true
+        else
+          report = build_escalation.call
+        end
       end
 
-      escalation = build_escalation
-      report = escalation.call
-
-      if report.persisted?
-        @record = @incident
+      if already
+        redirect_to admin_event_incident_path(current_event, @incident), notice: "This incident has already been escalated to Hack Club HQ."
+      elsif report.persisted?
         notify_firehouse if firehouse_eligible?
         redirect_to admin_event_incident_path(current_event, @incident), notice: "Escalated to Hack Club HQ. Their safeguarding team has been notified."
       else
         redirect_to admin_event_incident_path(current_event, @incident), alert: "Couldn't escalate: #{report.errors.full_messages.to_sentence}"
       end
-    end
-
-    def send_to_slack
-      authorize @incident
-
-      unless firehouse_eligible?
-        redirect_to admin_event_incident_path(current_event, @incident), alert: "Medical incidents cannot be sent to Slack."
-        return
-      end
-
-      SendIncidentToSlackJob.perform_later(@incident.id, current_user.id)
-      redirect_to admin_event_incident_path(current_event, @incident), notice: "Conduct report is being sent to Slack."
+    rescue ActiveRecord::RecordNotUnique
+      redirect_to admin_event_incident_path(current_event, @incident), notice: "This incident has already been escalated to Hack Club HQ."
     end
 
     private

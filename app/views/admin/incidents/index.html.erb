@@ -39,7 +39,7 @@
                   <%= render_category_badge(incident.category) %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <%= render_severity_badge(incident.severity) %>
+                  <%= incident_level_badge(incident.severity) %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">
                   <%= render_status_badge(incident.status) %>

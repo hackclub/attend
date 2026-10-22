@@ -6,7 +6,7 @@
   </summary>
   <div class="px-6 pb-6 border-t border-gray-100 pt-4">
     <%= form_with url: escalate_admin_event_incident_path(current_event, incident), method: :post, local: true,
-          data: { controller: "incident-escalation", action: "submit->incident-escalation#confirm", incident_level: incident.severity } do %>
+          data: { controller: "incident-escalation", action: "submit->incident-escalation#confirm", incident_escalation_always_value: true, incident_escalation_level_value: incident.severity } do %>
       <%= render "admin/incidents/escalation_fields", phone: current_user.oidc_claims&.dig("phone_number") %>
       <div class="mt-4">
         <%= submit_tag "Escalate to HQ", class: "bg-[#d42f46] text-white px-4 py-2 rounded-md hover:bg-[#b82840] cursor-pointer" %>

@@ -12,6 +12,6 @@
   </div>
 </div>
 <label class="inline-flex items-center mt-3">
-  <%= check_box_tag "escalation[emergency_services_called]", "1", false, class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+  <%= check_box_tag "escalation[emergency_services_called]", "1", params.dig(:escalation, :emergency_services_called) == "1", class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
   <span class="ml-2 text-sm text-gray-700">Emergency services (police, ambulance) have been called</span>
 </label>

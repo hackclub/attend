@@ -296,7 +296,6 @@ Rails.application.routes.draw do
       end
       resources :incidents do
         member do
-          post :send_to_slack
           post :escalate
         end
         resources :comments, only: [ :create ], controller: "incident_comments"

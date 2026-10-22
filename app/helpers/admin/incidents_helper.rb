@@ -39,9 +39,6 @@ module Admin::IncidentsHelper
     safe_join([ badge, content_tag(:span, incident_level_text(key), class: text_class) ], " ")
   end
 
-  def render_severity_badge(severity)
-    incident_level_badge(severity)
-  end
 
   # Cloudscape status indicator for incident and incident-report statuses.
   def incident_status(status)
@@ -72,9 +69,6 @@ module Admin::IncidentsHelper
     content_tag(:span, category.humanize, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium #{color_class}")
   end
 
-  def incident_report_priority_badge(priority)
-    incident_level_badge(priority)
-  end
 
   # Tailwind pill, identical to main. Used by the original incident views and
   # for participant statuses in participants/_participant_card (also rendered

@@ -82,6 +82,9 @@
           </div>
         </section>
       <% end %>
+      <% if @reports_truncated %>
+        <p class="text-sm text-gray-500 mb-8">Showing the newest <%= Admin::IncidentReportsController::LIMIT %> reports. Filter by level to narrow it down.</p>
+      <% end %>
     <% else %>
       <div class="bg-white border border-gray-200 rounded-lg p-10 text-center text-gray-500 mb-8">
         No reports to HQ<%= " match this filter" if params[:priority].present? %>.
@@ -123,7 +126,7 @@
                     <span class="block truncate" title="<%= incident.summary %>"><%= incident.summary.presence || "No summary" %></span>
                     <span class="block"><%= render_category_badge(incident.category) %></span>
                   </td>
-                  <td class="px-4 py-3 whitespace-nowrap"><%= render_severity_badge(incident.severity) %></td>
+                  <td class="px-4 py-3 whitespace-nowrap"><%= incident_level_badge(incident.severity) %></td>
                   <td class="px-4 py-3 whitespace-nowrap"><%= render_status_badge(incident.status) %></td>
                   <td class="px-4 py-3 whitespace-nowrap text-gray-700"><%= incident.reported_by.display_name_or_fallback %></td>
                   <td class="px-4 py-3 whitespace-nowrap">
@@ -142,6 +145,9 @@
           </table>
         </div>
       </div>
+      <% if @incidents_truncated %>
+        <p class="text-sm text-gray-500 mb-8">Showing the newest <%= Admin::IncidentReportsController::LIMIT %> incidents. Filter by event to narrow it down.</p>
+      <% end %>
     <% else %>
       <div class="bg-white border border-gray-200 rounded-lg p-10 text-center text-gray-500">
         No event incidents<%= " match this filter" if params[:event_id].present? || params[:open] == "1" %>.

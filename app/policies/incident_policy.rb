@@ -15,10 +15,6 @@ class IncidentPolicy < ApplicationPolicy
     can_view_incident?
   end
 
-  def send_to_slack?
-    can_view_incident?
-  end
-
   def escalate?
     can_view_incident?
   end

@@ -47,7 +47,7 @@
                   <%= cs_absolute_time_tag(incident.occurred_at || incident.created_at) %>
                 </td>
                 <td><%= render_category_badge(incident.category) %></td>
-                <td><%= render_severity_badge(incident.severity) %></td>
+                <td><%= incident_level_badge(incident.severity) %></td>
                 <td><%= incident_status(incident.status) %></td>
                 <td>
                   <% if incident.participants.any? %>
