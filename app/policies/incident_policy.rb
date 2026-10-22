@@ -30,7 +30,7 @@ class IncidentPolicy < ApplicationPolicy
         if user_roles.empty?
           scope.none
         else
-          scope.for_roles(user_roles)
+          scope.visible_to_staff(user, user_roles)
         end
       end
     end
@@ -65,6 +65,8 @@ class IncidentPolicy < ApplicationPolicy
     user_roles = user.event_role_assignments.where(event: event).pluck(:role)
     return false if user_roles.empty?
 
-    (record.visible_to_roles & user_roles).any?
+    # Reporters keep access to what they filed, whichever roles it's shared
+    # with, for as long as they're still staff on the event.
+    record.reported_by_user_id == user.id || (record.visible_to_roles & user_roles).any?
   end
 end
