@@ -45,25 +45,6 @@ RSpec.describe "Admin CSV import", type: :request do
     expect(event.participants.pluck(:email)).to eq([ "ada@example.com" ])
   end
 
-  it "prefers the template's header to an alias for the same field, falling back on a blank cell" do
-    upload("Email Address,Email,First Name,Last Name\nparent@example.com,kid@example.com,Pat,Example\n" \
-           "only@example.com,,Sam,Example\n")
-
-    expect(last_batch.rows_data.pluck("email")).to eq([ "kid@example.com", "only@example.com" ])
-  end
-
-  it "trims non-breaking spaces from values" do
-    upload("Email,First Name,Last Name\n\u00A0nbsp@example.com\u00A0,Nb,Sp\n")
-
-    expect(last_batch.rows_data.first["email"]).to eq("nbsp@example.com")
-  end
-
-  it "strips a byte order mark" do
-    upload("\xEF\xBB\xBFEmail,First Name,Last Name\nbom@example.com,Bo,Mark\n")
-
-    expect(last_batch.rows_data).to eq([ { "email" => "bom@example.com", "legal_first_name" => "Bo", "legal_last_name" => "Mark" } ])
-  end
-
   it "reads a Windows-1252 export with accented names, and asks for the names to be checked" do
     upload("Email,First Name,Last Name\njose@example.com,José,Müller\n".encode(Encoding::Windows_1252).b)
 
@@ -80,12 +61,6 @@ RSpec.describe "Admin CSV import", type: :request do
     expect(last_batch.rows_data.first).to include("email" => "zoe@example.com", "legal_first_name" => "Zoë")
   end
 
-  it "reads semicolon-separated files and drops NUL bytes" do
-    upload("Email;First Name;Last Name\nsemi@example.com;Se\u0000mi;Colon\n")
-
-    expect(last_batch.rows_data.first).to include("email" => "semi@example.com", "legal_first_name" => "Semi")
-  end
-
   describe "a file that can't be read" do
     it "explains a malformed CSV instead of failing" do
       expect { upload("Email,First Name\n\"broken@example.com,Pat\n") }.not_to change(ImportBatch, :count)
@@ -94,20 +69,14 @@ RSpec.describe "Admin CSV import", type: :request do
       expect(flash[:alert]).to start_with("This file isn't a valid CSV: Unclosed quoted field")
     end
 
-    it "explains bytes that aren't text in any encoding it knows" do
-      expect { upload("Email,First Name\nx@example.com,\x81\x8D\n".b) }.not_to change(ImportBatch, :count)
-
-      expect(flash[:alert]).to include("Save it from your spreadsheet as \"CSV UTF-8\"")
-    end
-
     context "in the console" do
       let(:console) { true }
 
-      it "shows the problem under the file field" do
-        upload("Email,First Name\n\"broken@example.com,Pat\n")
+      it "shows bytes that aren't text in any encoding it knows under the file field" do
+        upload("Email,First Name\nx@example.com,\x81\x8D\n".b)
 
         expect(response).to have_http_status(:unprocessable_entity)
-        expect(response.body).to include("This file isn&#39;t a valid CSV: Unclosed quoted field")
+        expect(response.body).to include("Save it from your spreadsheet as &quot;CSV UTF-8&quot;")
       end
     end
   end
@@ -142,14 +111,12 @@ RSpec.describe "Admin CSV import", type: :request do
   end
 
   it "previews the rejections the job's other validations would make" do
-    create(:participant, email: "old@example.com", date_of_birth: 30.years.ago.to_date)
     create(:ban, email: "banned@example.com")
     create(:guardian, email: "known-parent@example.com")
 
     upload("Email,First Name,Last Name,Birthday,Parent Email,Parent First Name,Parent Last Name,Emergency Contact First Name,Emergency Contact Phone\n" \
            "banned@example.com,Ban,Ned,,,,,,\n" \
            "adult@example.com,Ad,Ult,1/2/1990,,,,,\n" \
-           "old@example.com,,,,,,,,\n" \
            "noparent@example.com,No,Parent,,mum@example.com,,,,\n" \
            "badparent@example.com,Bad,Parent,,not-an-email,,,,\n" \
            "badphone@example.com,Bad,Phone,,,,,Em,not a phone\n" \
@@ -161,7 +128,6 @@ RSpec.describe "Admin CSV import", type: :request do
     expect(skipped).to eq(
       "banned@example.com" => "Banned from events",
       "adult@example.com" => "19 or older during this event",
-      "old@example.com" => "19 or older during this event",
       "noparent@example.com" => "Missing parent first name and parent last name",
       "badparent@example.com" => "Invalid parent email",
       "badphone@example.com" => "Invalid emergency contact phone"

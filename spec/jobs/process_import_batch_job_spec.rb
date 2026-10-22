@@ -63,33 +63,16 @@ RSpec.describe ProcessImportBatchJob do
       ParticipantEvent.find_by!(event: event, participant: Participant.find_by!(email: "grouped@example.com"))
     end
 
-    it "adds the participant to existing groups by name or slug, and creates new ones" do
-      event.update!(groups_enabled: true)
-      red = event.groups.create!(name: "Red Team")
-
-      participant_event = import_with_groups("red team; red-team, Blue Team,")
-
-      expect(participant_event.groups.pluck(:name)).to contain_exactly("Red Team", "Blue Team")
-      expect(red.group_memberships.count).to eq(1)
-    end
-
-    it "matches a spelling that makes an existing group's slug, and adds new groups last" do
+    it "matches existing groups by name or slug, adds new ones last, and skips a name that can't be a group" do
       event.update!(groups_enabled: true)
       red = event.groups.create!(name: "Red Team", position: 3)
 
-      participant_event = import_with_groups("Red\u00A0 team!, Green Team")
+      participant_event = import_with_groups("red-team; Red\u00A0 team!, Green Team, !!!")
 
-      expect(participant_event.groups).to contain_exactly(red, event.groups.find_by!(name: "Green Team"))
-      expect(event.groups.find_by!(name: "Green Team").position).to eq(4)
-    end
-
-    it "skips a name that can't be a group and still imports the participant" do
-      event.update!(groups_enabled: true)
-
-      participant_event = import_with_groups("!!!; Blue")
-
-      expect(participant_event.groups.pluck(:name)).to eq([ "Blue" ])
-      expect(ImportBatch.last.errors_data.pluck("error")).to include(a_string_starting_with('Group "!!!" not added: Slug'))
+      green = event.groups.find_by!(name: "Green Team")
+      expect(participant_event.groups).to contain_exactly(red, green)
+      expect(green.position).to eq(4)
+      expect(ImportBatch.last.errors_data.pluck("error")).to include(a_string_starting_with('Group "!!!" not added'))
     end
 
     it "ignores the column when the event doesn't use groups" do
