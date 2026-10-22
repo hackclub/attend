@@ -43,6 +43,23 @@ RSpec.describe "Admin::Participants", type: :request do
     end
   end
 
+  describe "GET index filter form" do
+    before { sign_in global_admin }
+
+    it "auto-submits and keeps active filters, including the chase filter" do
+      event.update!(groups_enabled: true, slack_channel_id: "C123")
+      create(:group, event: event)
+      create(:custom_document, :optional, event: event)
+
+      get admin_event_participants_path(event.slug), params: { search: "ada", status: "", blocked_on: "travel" }
+
+      page = Nokogiri::HTML(response.body)
+      expect(page.css("#participant-filters select").map { |s| s["data-action"] }.uniq).to eq([ "change->auto-submit#submit" ])
+      expect(page.at_css("#participant-filters input[name='blocked_on']")["value"]).to eq("travel")
+      expect(page.at_css("a[title='Table view']")["href"]).to eq(table_admin_event_participants_path(event.slug, search: "ada", blocked_on: "travel"))
+    end
+  end
+
   describe "participants over the age limit" do
     let!(:aged_out) do
       create(:participant_event, event: event, status: :invited, skip_age_check: true,
