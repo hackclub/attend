@@ -64,4 +64,16 @@ RSpec.describe Airtable::SyncService do
 
     expect(queries).to eq(0)
   end
+
+  # Slack linking writes participants.slack_user_id; the participant_events
+  # column it replaced is no longer kept up to date.
+  it "takes the Slack User ID from the participant" do
+    participant = create(:participant, slack_user_id: "U0FICTION1")
+    pe = create(:participant_event, event: event, participant: participant)
+    pe.update_columns(slack_user_id: "U0STALE")
+
+    rows = CSV.parse(described_class.new(event).serialize_all_to_csv([ pe ]))
+
+    expect(rows[1][rows.first.index("Slack User ID")]).to eq("U0FICTION1")
+  end
 end

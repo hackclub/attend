@@ -47,4 +47,30 @@ RSpec.describe Airtable::Client do
       expect(WebMock).to have_requested(:post, records_url).once
     end
   end
+
+  describe "rate limiting" do
+    let(:list_url) { "https://api.airtable.com/v0/appTest/tblTest" }
+    let(:retry_sleeps) { [] }
+
+    before do
+      allow_any_instance_of(Faraday::Retry::Middleware).to receive(:sleep) { |_, seconds| retry_sleeps << seconds }
+    end
+
+    it "waits out Airtable's 30-second penalty and retries a 429" do
+      stub_request(:get, list_url).to_return(
+        { status: 429, body: '{"errors":[{"error":"RATE_LIMIT_REACHED"}]}' },
+        { status: 200, body: '{"records":[]}' }
+      )
+
+      expect(client.list_records("tblTest")).to eq("records" => [])
+      expect(retry_sleeps).to eq([ 30.0 ])
+    end
+  end
+
+  it "raises ForbiddenError on a 403" do
+    stub_request(:post, sync_url).to_return(status: 403, body: "")
+
+    expect { client.post_sync_csv("tblTest", "sncTest", "a,b\n") }
+      .to raise_error(Airtable::ForbiddenError, "Airtable denied access")
+  end
 end

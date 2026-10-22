@@ -301,6 +301,16 @@ RSpec.describe Event, type: :model do
     end
   end
 
+  describe "#airtable_sync_alert_due?" do
+    def event_with(**attrs)
+      build(:event, airtable_sync_failures: 0, **attrs)
+    end
+
+    it "is not due again once the streak was reported" do
+      expect(event_with(airtable_sync_failures: 50, airtable_sync_alerted_at: 1.hour.ago)).not_to be_airtable_sync_alert_due
+    end
+  end
+
   describe "#airtable_config_last_saved_by" do
     let(:event) { create(:event) }
 

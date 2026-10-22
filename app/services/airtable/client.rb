@@ -109,9 +109,22 @@ module Airtable
       (env.method == :post && env.url.path.include?("/sync/")) || env.method == :patch
     }
 
+    # Airtable answers a burst over 5 requests a second with a 429 and keeps
+    # refusing that base for 30 seconds, so a quick backoff would only burn the
+    # retries. Wait out the penalty, or longer if Retry-After asks for it; a
+    # Retry-After beyond the cap raises instead of holding the job up. A 429
+    # means the request was refused, not run, so any method is safe to replay.
+    RATE_LIMIT_WAIT = 30
+    RATE_LIMIT_MAX_WAIT = 60
+
     def connection
       @connection ||= Faraday.new(url: BASE_URL) do |conn|
-        conn.request :retry, max: 3, interval: 0.5, backoff_factor: 2,
+        conn.request :retry, max: 2, interval: RATE_LIMIT_WAIT, max_interval: RATE_LIMIT_MAX_WAIT,
+                     exceptions: [ Faraday::RetriableResponse ],
+                     retry_statuses: [ 429 ],
+                     methods: %i[get post put patch delete]
+        # The same cap stops a 5xx Retry-After from holding the job up.
+        conn.request :retry, max: 3, interval: 0.5, backoff_factor: 2, max_interval: RATE_LIMIT_MAX_WAIT,
                      exceptions: [ Faraday::TimeoutError, Faraday::ConnectionFailed, Faraday::RetriableResponse ],
                      retry_statuses: [ 500, 502, 503, 504 ],
                      retry_if: RETRY_SYNC_POST
@@ -151,6 +164,8 @@ module Airtable
         JSON.parse(response.body)
       when 401
         raise AuthenticationError.new(parse_error_message(response), response: response)
+      when 403
+        raise ForbiddenError.new(parse_error_message(response), response: response)
       when 404
         raise NotFoundError.new(parse_error_message(response), response: response)
       when 422
