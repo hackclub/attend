@@ -8,7 +8,7 @@
       <p class="cs-description flex flex-wrap items-center gap-x-2 gap-y-1">
         <span>Filed <%= cs_absolute_time_tag(@incident_report.created_at) %></span>
         <%= incident_status(@incident_report.status) %>
-        <%= incident_report_priority_badge(@incident_report.priority) %>
+        <%= incident_level_badge(@incident_report.priority, full: true) %>
       </p>
     </div>
   </div>

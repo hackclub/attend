@@ -12,6 +12,7 @@
         Reports to HQ come from the public form at <code class="font-mono">/incident</code> and from organizers escalating an event incident.
         Event incident logs are what organizers record for their own team.
       </p>
+      <%= render "shared/incident_level_legend" %>
     </div>
     <div class="cs-actions">
       <%= link_to "Notification settings", admin_incident_report_settings_path, class: "cs-btn" %>

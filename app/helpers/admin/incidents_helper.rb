@@ -22,15 +22,21 @@ module Admin::IncidentsHelper
   # Badge for an S0–S3 incident level, used for both an incident's severity
   # and a report's priority: a Cloudscape severity badge in the console, a
   # Tailwind pill elsewhere. Shows the code; the full name is the tooltip.
-  def incident_level_badge(key)
+  # With `full: true` the name and response target follow the badge, for
+  # pages that have room to explain the code.
+  def incident_level_badge(key, full: false)
     level = IncidentLevel.find(key)
     return content_tag(:span, key.to_s.humanize, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800") unless level
 
-    if console_ui?
+    badge = if console_ui?
       content_tag(:span, level.code, class: "cs-badge cs-badge-severity-#{level.console_severity}", title: level.short_label)
     else
       content_tag(:span, level.code, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium #{INCIDENT_LEVEL_PILLS[level.color]}", title: level.short_label)
     end
+    return badge unless full
+
+    text_class = console_ui? ? "cs-small" : "text-sm text-gray-600"
+    safe_join([ badge, content_tag(:span, incident_level_text(key), class: text_class) ], " ")
   end
 
   def render_severity_badge(severity)

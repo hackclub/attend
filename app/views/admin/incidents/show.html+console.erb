@@ -7,7 +7,7 @@
       <h1 class="cs-h1">Incident details</h1>
       <div class="cs-description flex flex-wrap items-center gap-2 mt-1">
         <%= render_category_badge(@incident.category) %>
-        <%= render_severity_badge(@incident.severity) %>
+        <%= incident_level_badge(@incident.severity, full: true) %>
         <%= incident_status(@incident.status) %>
       </div>
     </div>

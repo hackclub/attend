@@ -6,6 +6,7 @@
     <div class="cs-header-text">
       <h1 class="cs-h1">Incident log <span class="cs-counter">(<%= @incidents.size %>)</span></h1>
       <p class="cs-description">Private to your event team. Tick "Escalate to Hack Club HQ" on a new incident, or escalate an existing one from its page, to involve HQ's safeguarding team.</p>
+      <%= render "shared/incident_level_legend" %>
     </div>
     <div class="cs-actions">
       <%= link_to "New incident", new_admin_event_incident_path(current_event), class: "cs-btn cs-btn-primary" %>

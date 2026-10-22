@@ -19,7 +19,7 @@
     <div class="px-6 py-4 border-b border-gray-200">
       <div class="flex items-center space-x-4">
         <%= render_category_badge(@incident.category) %>
-        <%= render_severity_badge(@incident.severity) %>
+        <%= incident_level_badge(@incident.severity, full: true) %>
         <%= render_status_badge(@incident.status) %>
       </div>
     </div>

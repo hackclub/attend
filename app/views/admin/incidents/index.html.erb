@@ -11,6 +11,7 @@
     <%= link_to "log an incident", new_admin_event_incident_path(current_event), class: "text-[#ec3750] hover:text-[#d42f46] font-medium" %>
     and tick "Escalate to Hack Club HQ", or escalate an existing one from its page.
   </p>
+  <%= render "shared/incident_level_legend" %>
 
   <% if @incidents.any? %>
     <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">

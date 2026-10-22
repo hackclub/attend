@@ -21,8 +21,9 @@ RSpec.describe "Public incident form", type: :request do
     expect(response.body).not_to include("Organizing one of these events?")
   end
 
-  it "renders for signed-out visitors" do
+  it "renders for signed-out visitors with the levels and a link to the triage chart" do
     get incident_report_path
     expect(response).to have_http_status(:ok)
+    expect(response.body).to include("S0 · High priority", "/docs/organizers/reporting-incidents")
   end
 end

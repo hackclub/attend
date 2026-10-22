@@ -26,6 +26,7 @@ RSpec.describe "Admin::IncidentReports (HQ inbox)", type: :request do
     expect(response.body).to include("Filed from the public form", "Only in the event log", "Escalated entry")
     expect(response.body).to include("Escalated from event log", "Public form")
     expect(response.body).to include(admin_event_incident_path(other_event, escalated))
+    expect(response.body).to include("High priority · ≈ 5 minutes", "/docs/organizers/reporting-incidents")
   end
 
   it "filters the log section by event and open status" do
