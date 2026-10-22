@@ -4,7 +4,7 @@
 <div class="cs-stack">
   <div class="cs-header">
     <div class="cs-header-text">
-      <h1 class="cs-h1">Incident log <span class="cs-counter">(<%= @incidents.size %>)</span></h1>
+      <h1 class="cs-h1">Incidents <span class="cs-counter">(<%= @incidents.size %>)</span></h1>
       <p class="cs-description">Private to your event team. Tick "Escalate to Hack Club HQ" on a new incident, or escalate an existing one from its page, to involve HQ's safeguarding team.</p>
       <%= render "shared/incident_level_legend" %>
     </div>
@@ -15,7 +15,7 @@
 
   <section class="cs-container" data-controller="multiselect">
     <div class="cs-container-header">
-      <h2 class="cs-h2">Incident log</h2>
+      <h2 class="cs-h2">Incidents</h2>
     </div>
     <% if @incidents.any? %>
       <div class="cs-filter-bar">

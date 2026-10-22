@@ -7,7 +7,7 @@
 
 <div class="max-w-6xl mx-auto px-4 py-6">
   <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
-    <h1 class="text-3xl font-bold">HQ incident inbox</h1>
+    <h1 class="text-3xl font-bold">Incidents</h1>
     <%= link_to "Notification settings →", admin_incident_report_settings_path, class: "text-sm font-medium text-[#ec3750] hover:text-[#d42f46]" %>
   </div>
   <p class="text-gray-600 text-sm mb-6">
@@ -16,18 +16,27 @@
   </p>
   <%= render "shared/incident_level_legend" %>
 
-  <div class="flex flex-wrap gap-2 mb-6 text-sm">
-    <%= link_to "Everything", admin_incident_reports_path, class: pill.("", @view == "all") %>
-    <%= link_to "Reports to HQ", admin_incident_reports_path(view: "reports"), class: pill.("", @view == "reports") %>
-    <%= link_to "Event incident logs", admin_incident_reports_path(view: "logs"), class: pill.("", @view == "logs") %>
+  <% filters = { view: params[:view].presence, priority: params[:priority].presence, event_id: params[:event_id].presence, resolved: (@show_resolved ? "1" : nil) }.compact %>
+  <div class="flex flex-wrap items-center gap-2 mb-6 text-sm">
+    <%= link_to "Everything", admin_incident_reports_path(filters.except(:view)), class: pill.("", @view == "all") %>
+    <%= link_to "Reports to HQ", admin_incident_reports_path(filters.merge(view: "reports")), class: pill.("", @view == "reports") %>
+    <%= link_to "Event incident logs", admin_incident_reports_path(filters.merge(view: "logs")), class: pill.("", @view == "logs") %>
+    <%= form_with url: admin_incident_reports_path, method: :get, local: true, class: "ml-2", data: { controller: "auto-submit" } do %>
+      <% filters.except(:resolved).each { |key, value| %><%= hidden_field_tag key, value %><% } %>
+      <label class="inline-flex items-center gap-1">
+        <%= check_box_tag :resolved, "1", @show_resolved, class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]", data: { action: "change->auto-submit#submit" } %>
+        <span>Show resolved<% hidden = (show_reports ? @hidden_resolved_count : 0) + (show_logs ? @hidden_closed_count : 0) %><%= " (#{hidden} hidden)" if hidden.positive? %></span>
+      </label>
+      <noscript><%= submit_tag "Apply", class: pill.("", false) %></noscript>
+    <% end %>
   </div>
 
   <% if show_reports %>
     <div class="flex flex-wrap items-center gap-2 mb-4 text-sm">
       <h2 class="text-xl font-semibold text-gray-900 mr-2">Reports to HQ</h2>
-      <%= link_to "All levels", admin_incident_reports_path(view: params[:view]), class: pill.("", params[:priority].blank?) %>
+      <%= link_to "All levels", admin_incident_reports_path(filters.except(:priority)), class: pill.("", params[:priority].blank?) %>
       <% IncidentLevel::LEVELS.each do |level| %>
-        <%= link_to level.code, admin_incident_reports_path(view: params[:view], priority: level.key), class: pill.("", params[:priority] == level.key), title: level.short_label %>
+        <%= link_to level.code, admin_incident_reports_path(filters.merge(priority: level.key)), class: pill.("", params[:priority] == level.key), title: level.short_label %>
       <% end %>
     </div>
 
@@ -96,13 +105,10 @@
     <div class="flex flex-wrap items-center gap-2 mb-4 text-sm">
       <h2 class="text-xl font-semibold text-gray-900 mr-2">Event incident logs</h2>
       <%= form_with url: admin_incident_reports_path, method: :get, local: true, class: "flex flex-wrap items-center gap-2", data: { controller: "auto-submit" } do %>
-        <%= hidden_field_tag :view, params[:view] %>
+        <% filters.except(:event_id).each { |key, value| %><%= hidden_field_tag key, value %><% } %>
         <%= select_tag :event_id, options_from_collection_for_select(@log_events, :id, :name, params[:event_id]), include_blank: "All events",
               class: "border border-gray-300 rounded-md px-2 py-1.5 bg-white text-sm", data: { action: "change->auto-submit#submit" } %>
-        <label class="inline-flex items-center gap-1">
-          <%= check_box_tag :open, "1", params[:open] == "1", class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]", data: { action: "change->auto-submit#submit" } %>
-          <span>Open only</span>
-        </label>
+        <noscript><%= submit_tag "Apply", class: pill.("", false) %></noscript>
       <% end %>
     </div>
 
@@ -150,7 +156,7 @@
       <% end %>
     <% else %>
       <div class="bg-white border border-gray-200 rounded-lg p-10 text-center text-gray-500">
-        No event incidents<%= " match this filter" if params[:event_id].present? || params[:open] == "1" %>.
+        No <%= "open " unless @show_resolved %>event incidents<%= " match this filter" if params[:event_id].present? %>.
       </div>
     <% end %>
   <% end %>

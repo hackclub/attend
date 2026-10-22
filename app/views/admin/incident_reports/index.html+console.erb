@@ -1,13 +1,15 @@
 <% content_for :title, "HQ Incident Inbox – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ "HQ incident inbox", nil ]) %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Incidents", nil ]) %>
 <% show_reports = @view != "logs" %>
 <% show_logs = @view != "reports" %>
+<% filters = { view: params[:view].presence, priority: params[:priority].presence, event_id: params[:event_id].presence, resolved: (@show_resolved ? "1" : nil) }.compact %>
 <% segment = ->(label, path, active) { link_to label, path, class: "cs-segment", "aria-current": (active ? "page" : nil) } %>
+<% hidden_count = (show_reports ? @hidden_resolved_count : 0) + (show_logs ? @hidden_closed_count : 0) %>
 
 <div class="cs-stack">
   <div class="cs-header">
     <div class="cs-header-text">
-      <h1 class="cs-h1">HQ incident inbox</h1>
+      <h1 class="cs-h1">Incidents</h1>
       <p class="cs-description">
         Reports to HQ come from the public form at <code class="font-mono">/incident</code> and from organizers escalating an event incident.
         Event incident logs are what organizers record for their own team.
@@ -19,10 +21,20 @@
     </div>
   </div>
 
-  <div class="cs-segmented" role="group" aria-label="What to show">
-    <%= segment.("Everything", admin_incident_reports_path, @view == "all") %>
-    <%= segment.("Reports to HQ", admin_incident_reports_path(view: "reports"), @view == "reports") %>
-    <%= segment.("Event incident logs", admin_incident_reports_path(view: "logs"), @view == "logs") %>
+  <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+    <div class="cs-segmented" role="group" aria-label="What to show">
+      <%= segment.("Everything", admin_incident_reports_path(filters.except(:view)), @view == "all") %>
+      <%= segment.("Reports to HQ", admin_incident_reports_path(filters.merge(view: "reports")), @view == "reports") %>
+      <%= segment.("Event incident logs", admin_incident_reports_path(filters.merge(view: "logs")), @view == "logs") %>
+    </div>
+    <%= form_with url: admin_incident_reports_path, method: :get, local: true, data: { controller: "auto-submit" } do %>
+      <% filters.except(:resolved).each { |key, value| %><%= hidden_field_tag key, value %><% } %>
+      <label class="cs-option mt-0! cursor-pointer">
+        <%= check_box_tag :resolved, "1", @show_resolved, class: "cs-toggle", data: { action: "change->auto-submit#submit" } %>
+        <span class="cs-option-label">Show resolved<% if hidden_count.positive? %> <span class="cs-counter">(<%= hidden_count %> hidden)</span><% end %></span>
+      </label>
+      <noscript><button type="submit" class="cs-btn">Apply</button></noscript>
+    <% end %>
   </div>
 
   <% if show_reports %>
@@ -30,9 +42,9 @@
       <div class="cs-container-header cs-container-header-divided">
         <h2 class="cs-h2">Reports to HQ <span class="cs-counter">(<%= @incident_reports.size %>)</span></h2>
         <div class="cs-segmented" role="group" aria-label="Filter by level">
-          <%= segment.("All levels", admin_incident_reports_path(view: params[:view]), params[:priority].blank?) %>
+          <%= segment.("All levels", admin_incident_reports_path(filters.except(:priority)), params[:priority].blank?) %>
           <% IncidentLevel::LEVELS.each do |level| %>
-            <%= segment.(level.code, admin_incident_reports_path(view: params[:view], priority: level.key), params[:priority] == level.key) %>
+            <%= segment.(level.code, admin_incident_reports_path(filters.merge(priority: level.key)), params[:priority] == level.key) %>
           <% end %>
         </div>
       </div>
@@ -93,7 +105,7 @@
         <div class="cs-container-body">
           <div class="cs-empty">
             <p class="cs-empty-title">No reports to HQ</p>
-            <p>No reports<%= " match this filter" if params[:priority].present? %>.</p>
+            <p>No <%= "unresolved " unless @show_resolved %>reports<%= " match this filter" if params[:priority].present? %>.<% if @hidden_resolved_count.positive? %> <%= link_to "Show #{pluralize(@hidden_resolved_count, 'resolved report')}", admin_incident_reports_path(filters.merge(resolved: "1")), class: "cs-link" %>.<% end %></p>
           </div>
         </div>
       <% end %>
@@ -106,13 +118,10 @@
         <h2 class="cs-h2">Event incident logs <span class="cs-counter">(<%= @incidents.size %>)</span></h2>
       </div>
       <%= form_with url: admin_incident_reports_path, method: :get, local: true, class: "cs-filter-bar", data: { controller: "auto-submit" } do %>
-        <%= hidden_field_tag :view, params[:view] %>
+        <% filters.except(:event_id).each { |key, value| %><%= hidden_field_tag key, value %><% } %>
         <%= select_tag :event_id, options_from_collection_for_select(@log_events, :id, :name, params[:event_id]), include_blank: "All events",
               class: "cs-select w-full sm:max-w-xs", "aria-label": "Filter by event", data: { action: "change->auto-submit#submit" } %>
-        <label class="cs-option mt-0! cursor-pointer">
-          <%= check_box_tag :open, "1", params[:open] == "1", data: { action: "change->auto-submit#submit" } %>
-          <span class="cs-option-label">Open only</span>
-        </label>
+        <noscript><button type="submit" class="cs-btn">Apply</button></noscript>
       <% end %>
       <% if @incidents.any? %>
         <div class="cs-table-wrap">
@@ -163,7 +172,7 @@
         <div class="cs-container-body">
           <div class="cs-empty">
             <p class="cs-empty-title">No event incidents</p>
-            <p>No incidents<%= " match this filter" if params[:event_id].present? || params[:open] == "1" %>.</p>
+            <p>No <%= "open " unless @show_resolved %>incidents<%= " match this filter" if params[:event_id].present? %>.<% if @hidden_closed_count.positive? %> <%= link_to "Show #{pluralize(@hidden_closed_count, 'closed incident')}", admin_incident_reports_path(filters.merge(resolved: "1")), class: "cs-link" %>.<% end %></p>
           </div>
         </div>
       <% end %>

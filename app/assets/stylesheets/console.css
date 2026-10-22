@@ -2513,6 +2513,7 @@
     .cs-sidenav-group > summary { padding-top: 10px; padding-bottom: 10px; }
     .cs-menu-item { padding-top: 10px; padding-bottom: 10px; }
     .cs-tab, .cs-segment { padding-top: 10px; padding-bottom: 10px; }
+    .cs-option { min-height: 40px; }
     .cs-input, .cs-select { min-height: 40px; font-size: 16px; }
     .cs-calendar-day { padding: 8px 0; }
   }
