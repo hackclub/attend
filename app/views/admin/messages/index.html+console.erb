@@ -89,7 +89,7 @@
                   <% if message.draft? || message.scheduled? %>
                     <%= button_to admin_event_message_path(current_event, message),
                         method: :delete,
-                        data: { confirm: "Delete this draft?" },
+                        form: { data: { turbo_confirm: "Delete this draft?" } },
                         class: "cs-btn-inline-icon",
                         "aria-label": "Delete draft" do %>
                       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

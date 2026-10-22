@@ -239,4 +239,33 @@ RSpec.describe "Admin::Messages", type: :request do
       }.not_to change(MessageDelivery, :count)
     end
   end
+
+  describe "GET show" do
+    let(:message) do
+      event.messages.create!(audience: "confirmed_attendees", channels: [ "email" ], body: "<p>Hello</p>",
+        sent_by_user: admin, status: :draft)
+    end
+
+    # Turbo only reads data-turbo-confirm; a bare data-confirm sends on the
+    # first click.
+    def send_now_form
+      Nokogiri::HTML(response.body).at_css("form[action='#{send_now_admin_event_message_path(event_slug: event.slug, id: message)}']")
+    end
+
+    it "asks before sending a draft" do
+      get admin_event_message_path(event_slug: event.slug, id: message)
+
+      expect(send_now_form["data-turbo-confirm"]).to eq("Are you sure you want to send this message now?")
+    end
+
+    context "with the admin console beta" do
+      before { admin.update!(admin_console_beta: true) }
+
+      it "asks before sending a draft" do
+        get admin_event_message_path(event_slug: event.slug, id: message)
+
+        expect(send_now_form["data-turbo-confirm"]).to eq("Are you sure you want to send this message now?")
+      end
+    end
+  end
 end

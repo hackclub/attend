@@ -64,7 +64,7 @@
                 send_travel_update_reminder_admin_event_participant_path(current_event, @participant_event),
                 method: :post,
                 class: "cs-btn",
-                data: { confirm: "Send a travel update reminder email to #{@participant.email}?" } %>
+                form: { data: { turbo_confirm: "Send a travel update reminder email to #{@participant.email}?" } } %>
             <%= link_to "Edit", travel_admin_event_participant_path(current_event, @participant_event), class: "cs-btn" %>
           </div>
         </div>
@@ -396,24 +396,33 @@
         </section>
       <% end %>
 
-      <% if @participant_event.complete? %>
+      <% if @participant_event.complete? || @participant_event.participant.slack_user_id.present? %>
         <section class="cs-container">
           <div class="cs-container-header">
             <h2 class="cs-h2">Slack integration</h2>
           </div>
           <div class="cs-container-body">
             <% if @participant_event.participant.slack_user_id.present? %>
-              <div class="flex items-center gap-2 mb-3">
+              <div class="flex items-center gap-2 <%= "mb-3" if @participant_event.complete? %>">
                 <%= cs_status(:success, "Connected") %>
                 <%= link_to "slack://user?team=T0266FRGM&id=#{@participant_event.participant.slack_user_id}", class: "cs-link" do %><code class="cs-small"><%= @participant_event.participant.slack_user_id %></code><% end %>
+                <button type="button"
+                        data-controller="clipboard"
+                        data-clipboard-content-value="<%= @participant_event.participant.slack_user_id %>"
+                        data-action="click->clipboard#copy"
+                        class="cs-btn cs-btn-link">
+                  Copy
+                </button>
               </div>
-              <% if current_event.slack_channel_id.present? %>
-                <%= button_to "Invite to channel",
-                    invite_to_slack_channel_admin_event_participant_path(current_event, @participant_event),
-                    method: :post,
-                    class: "cs-btn" %>
-              <% else %>
-                <p class="cs-muted">No Slack channel configured for this event.</p>
+              <% if @participant_event.complete? %>
+                <% if current_event.slack_channel_id.present? %>
+                  <%= button_to "Invite to channel",
+                      invite_to_slack_channel_admin_event_participant_path(current_event, @participant_event),
+                      method: :post,
+                      class: "cs-btn" %>
+                <% else %>
+                  <p class="cs-muted">No Slack channel configured for this event.</p>
+                <% end %>
               <% end %>
             <% else %>
               <p class="cs-secondary mb-3">Participant has not linked their Slack account via Hack Club Auth.</p>
