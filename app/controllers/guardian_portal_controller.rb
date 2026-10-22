@@ -74,15 +74,15 @@ class GuardianPortalController < ApplicationController
   end
 
   def complete
-    unless @guardian_participant_event.completed? || all_guardian_steps_complete?
-      redirect_to guardian_portal_path(token: @token), alert: "Please complete all required steps before submitting."
-      return
-    end
-
     # Same path the DocuSeal webhooks and portal saves use, so the button and
     # automatic completion can't drift apart. Already-completed links are a
     # no-op (no second confirmation email).
     guardian_completion.complete!
+
+    unless @guardian_participant_event.completed?
+      redirect_to guardian_portal_path(token: @token), alert: "Please complete all required steps before submitting."
+      return
+    end
 
     redirect_to guardian_portal_confirmed_path(token: @token), notice: COMPLETED_NOTICE
   end
@@ -110,11 +110,7 @@ class GuardianPortalController < ApplicationController
   end
 
   def waiver_complete
-    if complete_guardian_if_ready
-      redirect_to guardian_portal_confirmed_path(token: @token), notice: "Thank you for signing the waiver! #{COMPLETED_NOTICE}"
-    else
-      redirect_to guardian_portal_step_path(token: @token, step: :consents), notice: "Thank you for signing the waiver!"
-    end
+    redirect_after_signing("Thank you for signing the waiver!")
   end
 
   def freedom_waiver
@@ -134,11 +130,7 @@ class GuardianPortalController < ApplicationController
   end
 
   def freedom_waiver_complete
-    if complete_guardian_if_ready
-      redirect_to guardian_portal_confirmed_path(token: @token), notice: "Thank you for completing the Freedom Waiver! #{COMPLETED_NOTICE}"
-    else
-      redirect_to guardian_portal_step_path(token: @token, step: :consents), notice: "Thank you for completing the Freedom Waiver!"
-    end
+    redirect_after_signing("Thank you for completing the Freedom Waiver!")
   end
 
   def custom_document
@@ -293,8 +285,16 @@ class GuardianPortalController < ApplicationController
     guardian_completion.complete!
   end
 
-  # After acting on a physical document, guardians mid-portal go back to the
-  # consents step; guardians who already completed go to the confirmed page.
+  # DocuSeal sends guardians back here after they sign. Signing was often the
+  # last thing left, so finish their part before sending them on.
+  def redirect_after_signing(thanks)
+    notice = complete_guardian_if_ready ? "#{thanks} Your portion is complete." : thanks
+    redirect_to after_guardian_document_path, notice: notice
+  end
+
+  # After signing or acting on a physical document, guardians mid-portal go
+  # back to the consents step; guardians who already completed go to the
+  # confirmed page.
   def after_guardian_document_path
     if @guardian_participant_event.completed?
       guardian_portal_confirmed_path(token: @token)
@@ -444,10 +444,6 @@ class GuardianPortalController < ApplicationController
       :address_line_1, :address_line_2,
       :city, :state, :postal_code, :country
     )
-  end
-
-  def all_guardian_steps_complete?
-    guardian_completion.steps_complete?
   end
 
   def details_complete?

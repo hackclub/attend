@@ -244,7 +244,7 @@ module Api
 
       def complete_ready_guardians(consent)
         participant_event = consent.participant_event
-        return unless participant_event&.requires_guardian?
+        return unless participant_event.requires_guardian?
 
         completed = GuardianPortalCompletion.complete_ready_guardians!(participant_event)
         Rails.logger.info("[Docuseal] Completed #{completed} guardian(s) for participant_event #{participant_event.id} after #{consent.consent_type} signed") if completed.positive?

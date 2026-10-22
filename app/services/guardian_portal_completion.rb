@@ -10,7 +10,9 @@ class GuardianPortalCompletion
   # Completes every guardian on this registration whose portal steps are all
   # done. Returns how many were completed by this call.
   def self.complete_ready_guardians!(participant_event)
-    participant_event.guardian_participant_events.reject(&:completed?).count do |guardian_participant_event|
+    # A fresh query rather than the association, so the caller's loaded
+    # guardian_participant_events (and their order) stay as they were.
+    participant_event.guardian_participant_events.where.not(status: :completed).count do |guardian_participant_event|
       new(guardian_participant_event).complete!
     end
   end
@@ -26,13 +28,20 @@ class GuardianPortalCompletion
   # the after_update_commit completion hook, and the confirmation email it
   # sends, fire once.
   def complete!
+    # Most calls (every step save, every signing webhook) come before the
+    # guardian is ready, so check without the lock first.
+    return false unless ready?
+
     completed_now = guardian_participant_event.with_lock do
-      next false if guardian_participant_event.completed?
-      next false unless steps_complete?
+      next false unless ready?
 
       # GuardianParticipantEvent's after_update_commit hook marks the
-      # participant complete once every guardian is done.
-      guardian_participant_event.update!(status: :completed, completed_at: Time.current)
+      # participant complete once every guardian is done. Links finished from
+      # a webhook or a signing return never went through
+      # mark_accepted_if_needed; without accepted_at, a later "Submit and
+      # finish" press would mark_accepted! the link back to in_progress.
+      guardian_participant_event.update!(status: :completed, completed_at: Time.current,
+        accepted_at: guardian_participant_event.accepted_at || Time.current)
       true
     end
 
@@ -51,35 +60,6 @@ class GuardianPortalCompletion
 
   def consents_complete?
     pending_consent_types.empty?
-  end
-
-  def pending_consent_types
-    pending = []
-
-    # Check waiver (requires guardian signature)
-    waiver_consent = participant_event.consents.find_by(consent_type: "waiver")
-    pending << "waiver" unless waiver_consent&.guardian_signed?
-
-    # Check freedom waiver (requires full signature since parent-only) - only if enabled
-    if event.freedom_waivers_enabled?
-      freedom_consent = participant_event.consents.find_by(consent_type: "freedom_waiver")
-      pending << "freedom_waiver" unless freedom_consent&.signed?
-    end
-
-    # Physical custom documents the guardian can act on right now block
-    # completion: guardian-only ones they must sign & upload themselves, and
-    # participant uploads awaiting their review. (Dual-signer documents the
-    # participant hasn't uploaded yet don't block — there's nothing to review.)
-    participant_event.applicable_custom_documents.select(&:physical?).select(&:guardian_signs?).each do |doc|
-      consent = participant_event.consents.find_by(consent_type: "custom_document", custom_document: doc)
-      next if consent&.signed?
-
-      if doc.signed_by_guardian? || consent&.physical_uploaded?
-        pending << "custom_document_#{doc.id}"
-      end
-    end
-
-    pending
   end
 
   def waivers_paused?
@@ -125,6 +105,46 @@ class GuardianPortalCompletion
     end
   end
 
+  private
+
+  # A withdrawn or rejected registration is closed: a guardian finishing a
+  # DocuSeal link that was still open must not complete, or the commit hook
+  # would flip the registration back to complete and send its confirmation.
+  def ready?
+    !guardian_participant_event.completed? &&
+      !(participant_event.withdrawn? || participant_event.rejected?) &&
+      steps_complete?
+  end
+
+  def pending_consent_types
+    pending = []
+
+    # Check waiver (requires guardian signature)
+    waiver_consent = participant_event.consents.find_by(consent_type: "waiver")
+    pending << "waiver" unless waiver_consent&.guardian_signed?
+
+    # Check freedom waiver (requires full signature since parent-only) - only if enabled
+    if event.freedom_waivers_enabled?
+      freedom_consent = participant_event.consents.find_by(consent_type: "freedom_waiver")
+      pending << "freedom_waiver" unless freedom_consent&.signed?
+    end
+
+    # Physical custom documents the guardian can act on right now block
+    # completion: guardian-only ones they must sign & upload themselves, and
+    # participant uploads awaiting their review. (Dual-signer documents the
+    # participant hasn't uploaded yet don't block — there's nothing to review.)
+    participant_event.applicable_custom_documents.select(&:physical?).select(&:guardian_signs?).each do |doc|
+      consent = participant_event.consents.find_by(consent_type: "custom_document", custom_document: doc)
+      next if consent&.signed?
+
+      if doc.signed_by_guardian? || consent&.physical_uploaded?
+        pending << "custom_document_#{doc.id}"
+      end
+    end
+
+    pending
+  end
+
   # Guardian-only custom documents are the guardian's to sign — create their
   # submissions as soon as the portal is completed (DocuSeal emails the link)
   # instead of waiting for anyone to open a signing page.
@@ -142,8 +162,6 @@ class GuardianPortalCompletion
       end
     end
   end
-
-  private
 
   def trigger_documents
     ensure_waiver_exists_and_triggered

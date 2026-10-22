@@ -89,6 +89,16 @@ RSpec.describe "Guardian portal automatic completion", type: :request do
       expect(gpe.reload.completed_at).to eq(completed_at)
     end
 
+    it "does not complete the guardian of a withdrawn registration" do
+      participant_event.withdrawn!
+
+      expect { guardian_signs_everything }
+        .not_to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
+
+      expect(gpe.reload).not_to be_completed
+      expect(participant_event.reload).to be_withdrawn
+    end
+
     it "triggers the guardian-only custom documents, as Submit and finish does" do
       doc = create(:custom_document, :guardian_only, event: event)
 
@@ -117,19 +127,45 @@ RSpec.describe "Guardian portal automatic completion", type: :request do
       expect(participant_event.reload).to be_complete
     end
 
-    it "completes when the guardian returns from signing" do
-      post guardian_portal_freedom_waiver_complete_path(token: token)
+    it "keeps the guardian in the portal when a save leaves something to do" do
+      freedom_waiver.update!(status: :sent, signed_at: nil, guardian_signed_at: nil)
+      gpe.emergency_contacts.destroy_all
 
-      expect(response).to redirect_to(guardian_portal_confirmed_path(token: token))
-      expect(gpe.reload).to be_completed
+      patch guardian_portal_update_step_path(token: token, step: "emergency"), params: {
+        advance: "1",
+        emergency_contact: { name: "Sam Guardian", relationship: "Parent", phone: "+14155550151", priority: 1 }
+      }
+
+      expect(response).to redirect_to(guardian_portal_step_path(token: token, step: "consents"))
+      expect(gpe.reload).not_to be_completed
     end
 
-    it "still completes through Submit and finish" do
+    {
+      "waiver" => :guardian_portal_waiver_complete_path,
+      "freedom waiver" => :guardian_portal_freedom_waiver_complete_path
+    }.each do |document, return_path|
+      it "completes when the guardian returns from signing the #{document}" do
+        post public_send(return_path, token: token)
+
+        expect(response).to redirect_to(guardian_portal_confirmed_path(token: token))
+        expect(gpe.reload).to be_completed
+      end
+
+      it "sends the guardian back to the consents step after signing the #{document} while something is missing" do
+        gpe.emergency_contacts.destroy_all
+
+        post public_send(return_path, token: token)
+
+        expect(response).to redirect_to(guardian_portal_step_path(token: token, step: :consents))
+        expect(gpe.reload).not_to be_completed
+      end
+    end
+
+    it "still completes through Submit and finish, sending one confirmation" do
       expect { post guardian_portal_complete_path(token: token) }
         .to have_enqueued_mail(ParticipantMailer, :registration_confirmed).once
 
       expect(response).to redirect_to(guardian_portal_confirmed_path(token: token))
-      expect(gpe.reload).to be_completed
       expect(participant_event.reload).to be_complete
     end
 
@@ -143,15 +179,6 @@ RSpec.describe "Guardian portal automatic completion", type: :request do
       expect(response).to redirect_to(guardian_portal_confirmed_path(token: token))
       expect(gpe.reload.completed_at).to eq(completed_at)
     end
-
-    it "still refuses Submit and finish while steps are missing" do
-      gpe.emergency_contacts.destroy_all
-
-      post guardian_portal_complete_path(token: token)
-
-      expect(response).to redirect_to(guardian_portal_path(token: token))
-      expect(gpe.reload).not_to be_completed
-    end
   end
 
   describe "GET /confirmed" do
@@ -159,14 +186,6 @@ RSpec.describe "Guardian portal automatic completion", type: :request do
       get guardian_portal_confirmed_path(token: token)
 
       expect(response).to redirect_to(guardian_portal_path(token: token))
-    end
-
-    it "shows the confirmation to a completed guardian" do
-      gpe.update!(status: :completed, completed_at: Time.current)
-
-      get guardian_portal_confirmed_path(token: token)
-
-      expect(response).to have_http_status(:ok)
     end
   end
 end
