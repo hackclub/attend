@@ -86,6 +86,7 @@ class AuditLog < ApplicationRecord
     send_now: "send_now",
     retry_delivery: "retry_delivery",
     retry_failed: "retry_failed",
+    send_to_new_recipients: "send_to_new_recipients",
     retry_recipient: "retry_recipient",
     link_guardian: "link_guardian",
     refresh_flight_tracking: "refresh_flight_tracking",
