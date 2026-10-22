@@ -3,31 +3,42 @@ class SingleDeliveryJob < ApplicationJob
 
   def perform(delivery_id:)
     delivery = MessageDelivery.find(delivery_id)
-    return if delivery.delivered?
+    return unless claim(delivery)
 
-    delivery.update!(status: :sending)
-
-    case delivery.channel
-    when "slack"
-      deliver_via_slack(delivery)
-    when "email"
-      deliver_via_email(delivery)
-    when "sms"
-      deliver_via_sms(delivery)
-    when "push"
-      deliver_via_push(delivery)
-    else
-      delivery.update!(status: :failed, error_message: "Unknown channel: #{delivery.channel}")
+    begin
+      case delivery.channel
+      when "slack"
+        deliver_via_slack(delivery)
+      when "email"
+        deliver_via_email(delivery)
+      when "sms"
+        deliver_via_sms(delivery)
+      when "push"
+        deliver_via_push(delivery)
+      else
+        delivery.update!(status: :failed, error_message: "Unknown channel: #{delivery.channel}")
+      end
+    rescue StandardError => e
+      delivery.update!(status: :failed, error_message: e.message)
+      Rails.logger.error("[MessageDelivery] Failed delivery #{delivery.id}: #{e.message}")
+    ensure
+      delivery.message.update_counts!
+      check_message_completion(delivery.message)
     end
-  rescue StandardError => e
-    delivery.update!(status: :failed, error_message: e.message)
-    Rails.logger.error("[MessageDelivery] Failed delivery #{delivery.id}: #{e.message}")
-  ensure
-    delivery.message.update_counts!
-    check_message_completion(delivery.message)
   end
 
   private
+
+  # Moves the delivery from pending to sending with a conditional UPDATE, so
+  # two jobs for the same row (a retry racing the original, a duplicate
+  # enqueue) can't both send it. Anything already sending, delivered, or
+  # failed is left alone; retries reset a row to pending first.
+  def claim(delivery)
+    claimed = MessageDelivery.where(id: delivery.id, status: :pending)
+      .update_all(status: "sending", updated_at: Time.current) == 1
+    delivery.reload if claimed
+    claimed
+  end
 
   # App push: notify the participant's mobile devices via Expo. Only participants
   # (not guardians) have the app, and they must have registered a push token.
@@ -168,14 +179,14 @@ class SingleDeliveryJob < ApplicationJob
     delivery.update!(status: :failed, error_message: e.message)
   end
 
+  # Settles the message once nothing is left in flight. A message that
+  # reached anyone is completed even if some rows failed (the failed count
+  # and per-row retry cover those); only a send that reached nobody is failed.
   def check_message_completion(message)
-    return if message.message_deliveries.pending.any? || message.message_deliveries.sending.any?
+    return if message.message_deliveries.where(status: %w[pending sending]).exists?
 
-    if message.message_deliveries.failed.any?
-      message.update!(status: :failed) if message.sent_count.zero?
-    else
-      message.update!(status: :completed)
-    end
+    nobody_reached = message.sent_count.zero? && message.message_deliveries.failed.exists?
+    message.update!(status: nobody_reached ? :failed : :completed)
   end
 
   def message_url_for(delivery)

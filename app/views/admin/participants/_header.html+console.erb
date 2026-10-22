@@ -88,6 +88,12 @@
               <span class="cs-menu-item-label">View on Slack</span>
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 2h5v5M14 2L7 9M12 9v5H2V4h5"/></svg>
             <% end %>
+            <%# Plain text, not a cs-menu-item-label span: the clipboard controller swaps the button's text for "Copied!" %>
+            <button type="button"
+                    data-controller="clipboard"
+                    data-clipboard-content-value="<%= slack_user_id %>"
+                    data-action="click->clipboard#copy"
+                    class="cs-menu-item">Copy Slack ID</button>
           <% end %>
           <% if (can_withdraw || can_destroy) && (can_resend_invitation || can_merge || slack_user_id) %>
             <div class="cs-menu-divider"></div>
