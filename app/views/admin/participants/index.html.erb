@@ -1,8 +1,10 @@
 <% content_for :title, "Participants – #{current_event.name} – Attend" %>
+<%# Filtering morphs the page rather than replacing it, so the filter controls keep focus and typing. %>
+<% turbo_refreshes_with method: :morph, scroll: :preserve %>
 
 <div<% if current_event.slack_channel_id.present? %> data-controller="sync-slack" data-sync-slack-preview-url-value="<%= sync_slack_channel_preview_admin_event_participants_path(current_event) %>" data-sync-slack-form-url-value="<%= sync_slack_channel_admin_event_participants_path(current_event) %>"<% end %>>
   <% if current_event.slack_channel_id.present? %>
-    <div data-controller="slack-sync-progress" data-slack-sync-progress-event-id-value="<%= current_event.id %>">
+    <div id="slack-sync-progress" data-turbo-permanent data-controller="slack-sync-progress" data-slack-sync-progress-event-id-value="<%= current_event.id %>">
       <div data-slack-sync-progress-target="banner" class="hidden mb-4 rounded-md bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800">
         <span data-slack-sync-progress-target="message">Syncing Slack channel…</span>
       </div>
@@ -95,11 +97,14 @@
 
   <!-- Filters -->
   <div class="mb-4">
-    <form action="<%= admin_event_participants_path(current_event) %>" method="get" class="flex flex-wrap items-center gap-2" data-controller="auto-submit" data-action="turbo:click@document->auto-submit#cancel" data-turbo-action="replace">
+    <form action="<%= admin_event_participants_path(current_event) %>" method="get" class="flex flex-wrap items-center gap-2" id="participant-filters" data-controller="auto-submit" data-turbo-action="replace"
+          data-action="turbo:click@document->auto-submit#cancel turbo:submit-start@document->auto-submit#cancel popstate@window->auto-submit#cancel formdata->auto-submit#dropBlank">
+      <%# The series dashboard's chase links filter by blocking stage; keep it while other filters change. %>
+      <%= hidden_field_tag :blocked_on, params[:blocked_on], id: nil if params[:blocked_on].present? %>
       <div class="flex-1 min-w-[200px] max-w-xs">
         <%= text_field_tag :search, params[:search],
             placeholder: "Search...",
-            data: { auto_submit_target: "search", action: "input->auto-submit#debouncedSubmit" },
+            data: { auto_submit_target: "search", action: "input->auto-submit#debouncedSubmit compositionend->auto-submit#debouncedSubmit turbo:before-morph-attribute->auto-submit#keepTypedSearch" },
             class: "w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750]" %>
       </div>
       <%= select_tag :status,
@@ -164,16 +169,16 @@
       <noscript>
         <%= submit_tag "Filter", class: "text-sm font-medium bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 cursor-pointer" %>
       </noscript>
-      <% if params[:search].present? || params[:status].present? || params[:flag].present? || params[:checked_in].present? || params[:group_id].present? || params[:optional_document].present? %>
+      <% filter_params = request.query_parameters.slice("search", "status", "flag", "checked_in", "group_id", "optional_document", "blocked_on").compact_blank %>
+      <% if filter_params.any? %>
         <%= link_to "Clear", admin_event_participants_path(current_event), class: "text-sm text-gray-500 hover:text-gray-700" %>
       <% end %>
       <%# Switching views keeps whatever filters are active. %>
-      <% view_params = request.query_parameters.slice("search", "status", "flag", "checked_in", "group_id", "optional_document") %>
       <div class="ml-auto flex items-center gap-1">
-        <%= link_to admin_event_participants_path(current_event, view_params), class: "p-1.5 rounded #{@show_pending_invitations || !request.path.include?('table') ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-600'}", title: "List view" do %>
+        <%= link_to admin_event_participants_path(current_event, filter_params), class: "p-1.5 rounded #{@show_pending_invitations || !request.path.include?('table') ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-600'}", title: "List view" do %>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
         <% end %>
-        <%= link_to table_admin_event_participants_path(current_event, view_params), class: "p-1.5 rounded text-gray-400 hover:text-gray-600", title: "Table view" do %>
+        <%= link_to table_admin_event_participants_path(current_event, filter_params), class: "p-1.5 rounded text-gray-400 hover:text-gray-600", title: "Table view" do %>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M3 12h18M3 18h18M9 4v16M15 4v16"/></svg>
         <% end %>
       </div>
@@ -313,7 +318,7 @@
   </div>
 
   <% if current_event.slack_channel_id.present? %>
-    <div data-sync-slack-target="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-action="click->sync-slack#closeOnBackdrop">
+    <div id="sync-slack-modal" data-turbo-permanent data-sync-slack-target="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-action="click->sync-slack#closeOnBackdrop">
       <div class="bg-white rounded-lg border border-gray-200 max-w-md w-full mx-4">
         <div class="p-6">
           <h3 class="text-base font-semibold mb-4">Sync Slack Channel</h3>

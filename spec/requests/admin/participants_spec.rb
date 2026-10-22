@@ -51,13 +51,25 @@ RSpec.describe "Admin::Participants", type: :request do
       create(:group, event: event)
       create(:custom_document, :optional, event: event)
 
-      get admin_event_participants_path(event.slug), params: { search: "ada", flag: "missing_medical" }
+      get admin_event_participants_path(event.slug), params: { search: "ada", status: "", flag: "missing_medical" }
 
       page = Nokogiri::HTML(response.body)
       form = page.at_css("form[data-controller='auto-submit']")
       expect(form["data-turbo-action"]).to eq("replace")
-      expect(form["data-action"]).to eq("turbo:click@document->auto-submit#cancel")
-      expect(form.at_css("input[name='search']")["data-action"]).to eq("input->auto-submit#debouncedSubmit")
+      expect(page.at_css("meta[name='turbo-refresh-method']")["content"]).to eq("morph")
+      expect(page.at_css("meta[name='turbo-refresh-scroll']")["content"]).to eq("preserve")
+      expect(form["data-action"].split).to eq(%w[
+        turbo:click@document->auto-submit#cancel
+        turbo:submit-start@document->auto-submit#cancel
+        popstate@window->auto-submit#cancel
+        formdata->auto-submit#dropBlank
+      ])
+      expect(form.at_css("input[name='search']")["data-action"].split).to eq(%w[
+        input->auto-submit#debouncedSubmit
+        compositionend->auto-submit#debouncedSubmit
+        turbo:before-morph-attribute->auto-submit#keepTypedSearch
+      ])
+      expect(form.at_css("input[name='blocked_on']")).to be_nil
       selects = form.css("select")
       expect(selects.map { |s| s["name"] }).to eq(%w[status flag checked_in group_id optional_document])
       expect(selects.map { |s| s["data-action"] }.uniq).to eq([ "change->auto-submit#submit" ])
@@ -67,6 +79,25 @@ RSpec.describe "Admin::Participants", type: :request do
       table_href = page.at_css("a[title='Table view']")["href"]
       expect(list_href).to eq(admin_event_participants_path(event.slug, search: "ada", flag: "missing_medical"))
       expect(table_href).to eq(table_admin_event_participants_path(event.slug, search: "ada", flag: "missing_medical"))
+    end
+
+    it "keeps the Slack sync banner and modal in place while filters morph the page" do
+      event.update!(slack_channel_id: "C123")
+
+      get admin_event_participants_path(event.slug)
+
+      page = Nokogiri::HTML(response.body)
+      expect(page.at_css("#slack-sync-progress[data-turbo-permanent]")).to be_present
+      expect(page.at_css("#sync-slack-modal[data-turbo-permanent]")).to be_present
+    end
+
+    it "keeps the series dashboard's blocking-stage filter when other filters change" do
+      get admin_event_participants_path(event.slug), params: { blocked_on: "travel" }
+
+      page = Nokogiri::HTML(response.body)
+      expect(page.at_css("form[data-controller='auto-submit'] input[type='hidden'][name='blocked_on']")["value"]).to eq("travel")
+      expect(page.at_css("a", text: "Clear")).to be_present
+      expect(page.at_css("a[title='List view']")["href"]).to eq(admin_event_participants_path(event.slug, blocked_on: "travel"))
     end
   end
 

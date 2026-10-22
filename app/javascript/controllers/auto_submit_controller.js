@@ -1,60 +1,63 @@
 import { Controller } from "@hotwired/stimulus"
 
-// The search a debounced submit sent, so the page it renders can pick up
-// where typing left off: cursor back in the field, and anything typed while
-// it loaded put back and searched for in turn.
-let lastSearch = null
-
 // Submits the form as soon as a filter changes, so there's no Filter button
 // to press. Text input is debounced so each keystroke isn't a request.
+//
+// The page morphs on these submits (turbo_refreshes_with :morph), so the
+// form, its controls and this controller stay in place: focus, caret and
+// anything typed while results load all carry over.
 export default class extends Controller {
   static targets = ["search"]
   static values = { delay: { type: Number, default: 300 } }
 
+  // Back restores a cached copy of the page with the controls as they were
+  // left, which can be a filter that never ran. Show what the results were
+  // filtered by instead.
   connect() {
-    const search = lastSearch
-    lastSearch = null
-    if (!search || !this.hasSearchTarget || location.search !== search.query) return
-
-    if (search.unsent !== undefined) {
-      this.searchTarget.value = search.unsent
-      this.debouncedSubmit()
-    }
-    if (search.refocus) {
-      const end = this.searchTarget.value.length
-      this.searchTarget.focus()
-      this.searchTarget.setSelectionRange(end, end)
-    }
+    this.element.reset()
   }
 
   disconnect() {
-    if (this.debounceTimer && lastSearch) lastSearch.unsent = this.searchTarget.value
     this.cancel()
   }
 
-  // Following a link drops a search that hasn't been sent yet, so it can't
-  // take over the navigation.
+  // A link, another form or Back/Forward drops a search that hasn't been
+  // sent yet, so it can't abort what the user just started.
   cancel() {
     clearTimeout(this.debounceTimer)
     this.debounceTimer = null
   }
 
+  // Keep what's being typed when results for an earlier search arrive.
+  keepTypedSearch(event) {
+    if (event.detail.attributeName !== "value") return
+    if (document.activeElement === this.searchTarget || this.debounceTimer) event.preventDefault()
+  }
+
+  // Leave empty filters out of the URL.
+  dropBlank({ formData }) {
+    for (const [name, value] of [...formData]) {
+      if (value === "") formData.delete(name)
+    }
+  }
+
   submit() {
-    this.cancel()
     this.element.requestSubmit()
   }
 
-  debouncedSubmit() {
+  debouncedSubmit(event) {
     this.cancel()
+    // Wait for IME and dead-key input to be committed before searching.
+    if (event.isComposing) return
+
     this.debounceTimer = setTimeout(() => {
       this.debounceTimer = null
-      if (this.hasSearchTarget) {
-        lastSearch = {
-          query: `?${new URLSearchParams(new FormData(this.element))}`,
-          refocus: document.activeElement === this.searchTarget
-        }
-      }
-      this.element.requestSubmit()
+      if (this.query() !== location.search) this.element.requestSubmit()
     }, this.delayValue)
+  }
+
+  query() {
+    const params = new URLSearchParams(new FormData(this.element)).toString()
+    return params ? `?${params}` : ""
   }
 }
