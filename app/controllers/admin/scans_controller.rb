@@ -159,6 +159,8 @@ module Admin
       end
 
       participant = participant_event.participant
+      # Flags only: the allergy free text stays on the medical page.
+      food_safety = participant_event.food_safety_summary
 
       render json: {
         success: true,
@@ -183,9 +185,11 @@ module Admin
           pronouns: participant.pronouns,
           tshirt_size: participant.tshirt_size,
           status: participant_event.status,
-          has_anaphylaxis_risk: participant_event.medical&.has_anaphylaxis_risk || false,
+          has_anaphylaxis_risk: food_safety.anaphylaxis_risk?,
           requires_refrigeration: participant_event.medical&.requires_refrigeration || false,
-          dietary: participant_event.dietary&.diet_type,
+          dietary: food_safety.diet_type,
+          has_life_threatening_food_allergies: food_safety.life_threatening_food_allergies?,
+          cross_contamination_risk: food_safety.cross_contamination_risk?,
           show_url: admin_event_participant_path(current_event, participant_event),
           nfc_badge_token: current_event.nfc_badges_enabled? ? participant_event.nfc_badge_token : nil,
           nfc_badge_assigned: participant_event.nfc_badge_assigned?,

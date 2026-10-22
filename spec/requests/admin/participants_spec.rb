@@ -377,4 +377,74 @@ RSpec.describe "Admin::Participants", type: :request do
       expect(participant_event.reload).to be_withdrawn
     end
   end
+
+  describe "food-allergy information" do
+    let(:participant_event) { create(:participant_event, event: event) }
+
+    def medical_summary
+      Nokogiri::HTML(response.body).xpath("//section[.//h2[contains(translate(., 'S', 's'), 'Medical summary')]]").text.squish
+    end
+
+    it "flags dietary-only food allergies in the medical summary, in both admin UIs" do
+      participant_event.create_dietary!(life_threatening_allergies: "Peanuts", cross_contamination_risk: true)
+
+      [ false, true ].each do |console|
+        global_admin.update!(admin_console_beta: console)
+        sign_in global_admin
+
+        get admin_event_participant_path(event, participant_event)
+
+        expect(medical_summary).to match(/life-threatening food allergies/i).and match(/cross-contamination risk/i)
+        expect(medical_summary).not_to match(/no special medical flags|no medical information provided/i)
+        expect(medical_summary).not_to include("Peanuts")
+      end
+    end
+
+    it "keeps the medical flags and refrigeration in the summary, in both admin UIs" do
+      participant_event.create_medical!(allergies: "Penicillin", has_anaphylaxis_risk: true, requires_refrigeration: true)
+
+      [ false, true ].each do |console|
+        global_admin.update!(admin_console_beta: console)
+        sign_in global_admin
+
+        get admin_event_participant_path(event, participant_event)
+
+        expect(medical_summary).to match(/anaphylaxis risk/i).and match(/has allergies/i).and match(/needs refrigeration/i)
+        expect(medical_summary).not_to match(/life-threatening food allergies|cross-contamination|no special medical flags/i)
+      end
+    end
+
+    it "still says there are no flags or no information, in both admin UIs" do
+      [ false, true ].each do |console|
+        global_admin.update!(admin_console_beta: console)
+        sign_in global_admin
+
+        get admin_event_participant_path(event, participant_event)
+        expect(medical_summary).to match(/no medical information provided/i)
+
+        participant_event.create_dietary!(diet_type: "vegan")
+        get admin_event_participant_path(event, participant_event)
+        expect(medical_summary).to match(/no special medical flags/i)
+        participant_event.dietary.destroy!
+        participant_event.reload
+      end
+    end
+
+    it "shows dietary food allergies and cross-contamination in the table, in both admin UIs" do
+      participant_event.create_dietary!(life_threatening_allergies: "Peanuts", cross_contamination_risk: true)
+      create(:participant_event, event: event).create_dietary!
+
+      [ false, true ].each do |console|
+        global_admin.update!(admin_console_beta: console)
+        sign_in global_admin
+
+        get table_admin_event_participants_path(event)
+
+        doc = Nokogiri::HTML(response.body)
+        expect(doc.css("th[data-column='food_allergies'], th[data-column='cross_contamination']").size).to eq(2)
+        expect(doc.css("td[data-column='food_allergies']").map { |td| td.text.strip }).to contain_exactly("Peanuts", "—")
+        expect(doc.css("td[data-column='cross_contamination']").map { |td| td.text.strip }).to contain_exactly("Yes", "No")
+      end
+    end
+  end
 end

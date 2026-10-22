@@ -61,6 +61,32 @@ RSpec.describe "Admin::Scans", type: :request do
       expect(response).to have_http_status(:not_found)
       expect(participation.scans).to be_empty
     end
+
+    it "flags food allergies from both health records without sending their free text" do
+      participant_event.create_medical!(allergies: "Penicillin", has_anaphylaxis_risk: true)
+      participant_event.create_dietary!(diet_type: "vegan", life_threatening_allergies: "Peanuts", cross_contamination_risk: true)
+
+      post admin_event_scans_path(event), params: {
+        participant_id: participant_event.id, scan_context_id: scan_context.id
+      }, as: :json
+
+      expect(response.parsed_body["participant"]).to include(
+        "has_anaphylaxis_risk" => true, "dietary" => "vegan",
+        "has_life_threatening_food_allergies" => true, "cross_contamination_risk" => true
+      )
+      expect(response.body).not_to include("Peanuts", "Penicillin")
+    end
+
+    it "sends false food-allergy flags when nothing is recorded" do
+      post admin_event_scans_path(event), params: {
+        participant_id: participant_event.id, scan_context_id: scan_context.id
+      }, as: :json
+
+      expect(response.parsed_body["participant"]).to include(
+        "has_anaphylaxis_risk" => false, "dietary" => nil,
+        "has_life_threatening_food_allergies" => false, "cross_contamination_risk" => false
+      )
+    end
   end
 
   it "shows NFC reading but hides writing when issuance is disabled" do

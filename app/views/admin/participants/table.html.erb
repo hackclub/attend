@@ -125,6 +125,8 @@
               ["gender_identity", "Gender Identity"],
               ["diet", "Diet Type"],
               ["intolerances", "Intolerances"],
+              ["food_allergies", "Life-Threatening Food Allergies"],
+              ["cross_contamination", "Cross-Contamination"],
               ["allergies", "Allergies"],
               ["anaphylaxis", "Anaphylaxis"],
               ["medical", "Medical Conditions"],
@@ -261,6 +263,8 @@
             </th>
             <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="diet">Diet</th>
             <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="intolerances">Intolerances</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="food_allergies">Food Allergies</th>
+            <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="cross_contamination">Cross-Contam.</th>
             <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="allergies">Allergies</th>
             <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="anaphylaxis">Anaphy.</th>
             <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap" data-column="medical">Medical</th>
@@ -291,7 +295,7 @@
           <% if @grouped_participants.present? %>
             <% @grouped_participants.each do |group_name, participants| %>
               <tr class="bg-gray-100 cursor-pointer" data-action="click->data-table#collapseGroup" data-group-id="<%= group_name.to_s.parameterize %>">
-                <td colspan="<%= 35 + @optional_documents.size %>" class="px-2 py-2">
+                <td colspan="<%= 37 + @optional_documents.size %>" class="px-2 py-2">
                   <div class="flex items-center gap-2 font-medium text-gray-700">
                     <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -313,7 +317,7 @@
 
           <% if @participant_events.empty? %>
             <tr>
-              <td colspan="35" class="px-6 py-12 text-center text-gray-500">
+              <td colspan="37" class="px-6 py-12 text-center text-gray-500">
                 No participants found.
               </td>
             </tr>

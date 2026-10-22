@@ -178,6 +178,8 @@
               ["gender_identity", "Gender identity"],
               ["diet", "Diet type"],
               ["intolerances", "Intolerances"],
+              ["food_allergies", "Life-threatening food allergies"],
+              ["cross_contamination", "Cross-contamination"],
               ["allergies", "Allergies"],
               ["anaphylaxis", "Anaphylaxis"],
               ["medical", "Medical conditions"],
@@ -320,6 +322,8 @@
             </th>
             <th scope="col" data-column="diet">Diet</th>
             <th scope="col" data-column="intolerances">Intolerances</th>
+            <th scope="col" data-column="food_allergies">Food allergies</th>
+            <th scope="col" data-column="cross_contamination">Cross-contam.</th>
             <th scope="col" data-column="allergies">Allergies</th>
             <th scope="col" data-column="anaphylaxis">Anaphy.</th>
             <th scope="col" data-column="medical">Medical</th>
@@ -350,7 +354,7 @@
           <% if @grouped_participants.present? %>
             <% @grouped_participants.each do |group_name, participants| %>
               <tr class="cursor-pointer" data-action="click->data-table#collapseGroup" data-group-id="<%= group_name.to_s.parameterize %>">
-                <td colspan="<%= 35 + @optional_documents.size %>" class="bg-(--cs-bg-shaded)">
+                <td colspan="<%= 37 + @optional_documents.size %>" class="bg-(--cs-bg-shaded)">
                   <div class="flex items-center gap-2 font-bold">
                     <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -372,7 +376,7 @@
 
           <% if @participant_events.empty? %>
             <tr>
-              <td colspan="<%= 35 + @optional_documents.size %>" class="cs-table-empty-cell">
+              <td colspan="<%= 37 + @optional_documents.size %>" class="cs-table-empty-cell">
                 <% if table_filtering %>
                   <%= cs_no_match(clear_href: clear_table_filters_href, data: { testid: "filter-no-match" }) %>
                 <% else %>
@@ -386,7 +390,7 @@
           <% else %>
             <%# Shown by data-table#search when the text filter hides every row. %>
             <tr class="hidden" data-data-table-target="noMatch">
-              <td colspan="<%= 35 + @optional_documents.size %>" class="cs-table-empty-cell">
+              <td colspan="<%= 37 + @optional_documents.size %>" class="cs-table-empty-cell">
                 <div class="cs-empty">
                   <p class="cs-empty-title">No matches</p>
                   <p>We can't find a match.</p>

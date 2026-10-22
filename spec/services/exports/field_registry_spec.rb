@@ -96,5 +96,16 @@ RSpec.describe Exports::FieldRegistry do
         expect(described_class::ROW_MODES).to include(preset[:row_mode])
       end
     end
+
+    it "puts the medical food-allergy fields in the Dietary preset, for the same roles" do
+      columns = described_class::PRESETS["dietary"][:columns]
+
+      expect(columns).to include("medical.allergies", "medical.allergy_severity", "medical.has_anaphylaxis_risk")
+      %w[event_admin ops limited safeguarding_lead].each do |role|
+        permitted = described_class.permitted_keys(role: role)
+        expect(columns.select { |key| key.start_with?("dietary.", "medical.") }.map { |key| permitted.include?(key) }.uniq.size).to eq(1),
+          "#{role} can export only part of the Dietary preset's health fields"
+      end
+    end
   end
 end

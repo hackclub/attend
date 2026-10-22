@@ -143,6 +143,16 @@
   <td class="cs-secondary max-w-[120px] truncate" data-column="intolerances" title="<%= pe.dietary&.intolerances %>">
     <%= pe.dietary&.intolerances.presence || "—" %>
   </td>
+  <td class="cs-secondary max-w-[120px] truncate" data-column="food_allergies" title="<%= pe.dietary&.life_threatening_allergies %>">
+    <%= pe.dietary&.life_threatening_allergies.presence || "—" %>
+  </td>
+  <td class="whitespace-nowrap" data-column="cross_contamination">
+    <% if pe.food_safety_summary.cross_contamination_risk? %>
+      <%= cs_badge("Yes", "red") %>
+    <% else %>
+      <span class="cs-muted">No</span>
+    <% end %>
+  </td>
   <td class="cs-secondary max-w-[120px] truncate" data-column="allergies" title="<%= pe.medical&.allergies %>">
     <%= pe.medical&.allergies.presence || "—" %>
   </td>
