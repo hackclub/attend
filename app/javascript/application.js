@@ -3,9 +3,11 @@ import "@hotwired/turbo-rails"
 import "controllers"
 import { startToggleHidden } from "utils/toggle_hidden"
 import { startConsoleConfirm } from "utils/console_confirm"
+import { startTurboScriptNonce } from "utils/turbo_script_nonce"
 
 startToggleHidden()
 startConsoleConfirm()
+startTurboScriptNonce()
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/service-worker", { scope: "/" })

@@ -640,7 +640,8 @@ function groupBadgeHtml(group, fallbackColor) {
   window.getCurrentContextId = getCurrentContextId;
 })();
 
-let currentModalParticipant = null;
+// var, not let: Turbo re-runs this script on each visit to the page.
+var currentModalParticipant = null;
 
 function showParticipantModal(data, scanContext, firstScan) {
   const modal = document.getElementById('participant-modal');
@@ -808,7 +809,7 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
 
 // NFC Bridge Integration
 (function() {
-  const nfcWriteOnCheckin = <%= current_event.nfc_badges_enabled? && current_event.nfc_badge_write_on_checkin_enabled? %>;
+  const nfcWriteOnCheckin = <%= !!(current_event.nfc_badges_enabled? && current_event.nfc_badge_write_on_checkin_enabled?) %>;
   const eventId = '<%= current_event.id %>';
   const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
   
@@ -1049,6 +1050,13 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
   };
   
   // Auto-connect on page load
-  setTimeout(connectNfcBridge, 1000);
+  const autoConnect = setTimeout(connectNfcBridge, 1000);
+
+  // Disconnect when we navigate away, otherwise the next visit opens a second
+  // connection and every tap is scanned twice.
+  document.addEventListener('turbo:before-render', function() {
+    clearTimeout(autoConnect);
+    if (nfcBridge) nfcBridge.close();
+  }, { once: true });
 })();
 </script>
