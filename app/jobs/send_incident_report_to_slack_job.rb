@@ -12,7 +12,7 @@ class SendIncidentReportToSlackJob < ApplicationJob
   def perform(incident_report_id)
     report = IncidentReport.find(incident_report_id)
 
-    text = "Incident report (#{report.priority.humanize}, #{report.status.humanize}) for #{report.event_name}"
+    text = "Incident report (#{report.priority_code}, #{report.status.humanize}) for #{report.event_name}"
     blocks = build_blocks(report)
     service = SlackService.new
 
@@ -46,7 +46,7 @@ class SendIncidentReportToSlackJob < ApplicationJob
   end
 
   def build_blocks(report)
-    priority_emoji = { "emergency" => "🚨", "elevated" => "⚠️", "standard" => "📝" }[report.priority] || "📝"
+    priority_emoji = { "s0" => "🚨", "s1" => "⚠️", "s2" => "📝", "s3" => "🗒️" }[report.priority] || "📝"
 
     [
       {

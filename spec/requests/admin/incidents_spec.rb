@@ -17,10 +17,10 @@ RSpec.describe "Admin::Incidents", type: :request do
   end
 
   let(:incident_params) do
-    { category: "behavior", severity: "medium", status: "open", summary: "Shoving in the queue",
+    { category: "behavior", severity: "s2", status: "open", summary: "Shoving in the queue",
       details: "Two attendees shoved each other.", visible_to_roles: [ "event_admin" ] }
   end
-  let(:escalation_params) { { priority: "elevated", reporter_phone: "+14155550177", emergency_services_called: "0" } }
+  let(:escalation_params) { { reporter_phone: "+14155550177", emergency_services_called: "0" } }
 
   before do
     sign_in event_admin
@@ -45,7 +45,7 @@ RSpec.describe "Admin::Incidents", type: :request do
         .and have_enqueued_job(SendIncidentToSlackJob)
 
       incident = Incident.last
-      expect(incident.hq_report).to have_attributes(priority: "elevated", reporter_phone: "+14155550177", user: event_admin)
+      expect(incident.hq_report).to have_attributes(priority: "s2", reporter_phone: "+14155550177", user: event_admin)
       follow_redirect!
       expect(response.body).to include("Escalated to Hack Club HQ")
     end

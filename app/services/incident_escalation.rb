@@ -14,10 +14,9 @@ class IncidentEscalation
 
   attr_reader :incident, :user
 
-  def initialize(incident:, user:, priority: "standard", emergency_services_called: false, reporter_phone: nil)
+  def initialize(incident:, user:, emergency_services_called: false, reporter_phone: nil)
     @incident = incident
     @user = user
-    @priority = priority.presence || "standard"
     @emergency_services_called = ActiveModel::Type::Boolean.new.cast(emergency_services_called) || false
     @reporter_phone = reporter_phone.presence
   end
@@ -67,7 +66,7 @@ class IncidentEscalation
       reporter_phone: @reporter_phone || user_phone,
       reporter_role: user.global_admin? ? "hq_employee" : "event_point_of_contact",
       incident_type: CATEGORY_TO_INCIDENT_TYPE.fetch(incident.category.to_s, "other"),
-      priority: @priority,
+      priority: incident.severity.presence || IncidentLevel::DEFAULT,
       emergency_services_called: @emergency_services_called,
       summary: incident.summary.presence || "#{incident.category.to_s.humanize} incident at #{incident.event.name}",
       details: details
@@ -83,7 +82,7 @@ class IncidentEscalation
     parts << "Location: #{incident.location}" if incident.location.present?
     parts << "Occurred at: #{incident.occurred_at.strftime('%Y-%m-%d %H:%M %Z')}" if incident.occurred_at.present?
     parts << "Actions taken so far:\n#{incident.actions_taken}" if incident.actions_taken.present?
-    parts << "Severity logged by the organizer: #{incident.severity}"
+    parts << "Level logged by the organizer: #{IncidentLevel.label(incident.severity)}"
     parts.join("\n\n")
   end
 end

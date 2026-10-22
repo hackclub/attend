@@ -1,0 +1,11 @@
+<dl class="cs-kv">
+  <% IncidentLevel::LEVELS.each do |level| %>
+    <div class="flex items-start gap-3 py-1">
+      <dt class="shrink-0 pt-0.5"><span class="cs-badge cs-badge-severity-<%= level.console_severity %>"><%= level.code %></span></dt>
+      <dd>
+        <span class="font-semibold"><%= level.name %></span> <span class="cs-muted">· <%= level.target %></span>
+        <p class="cs-small cs-muted"><%= level.examples.join(" · ") %></p>
+      </dd>
+    </div>
+  <% end %>
+</dl>

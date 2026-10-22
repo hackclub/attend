@@ -12,26 +12,29 @@ module Admin::IncidentsHelper
     "behavior" => "yellow"
   }.freeze
 
-  INCIDENT_REPORT_PRIORITY_SEVERITIES = {
-    "emergency" => "critical",
-    "elevated" => "medium",
-    "standard" => "neutral"
+  INCIDENT_LEVEL_PILLS = {
+    "red" => "bg-red-100 text-red-800",
+    "amber" => "bg-amber-100 text-amber-800",
+    "green" => "bg-green-100 text-green-800",
+    "blue" => "bg-blue-100 text-blue-800"
   }.freeze
 
-  # Severity badge for an incident's severity enum: a Cloudscape severity
-  # badge in the console, the original Tailwind pill elsewhere.
+  # Badge for an S0–S3 incident level, used for both an incident's severity
+  # and a report's priority: a Cloudscape severity badge in the console, a
+  # Tailwind pill elsewhere. Shows the code; the full name is the tooltip.
+  def incident_level_badge(key)
+    level = IncidentLevel.find(key)
+    return content_tag(:span, key.to_s.humanize, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800") unless level
+
+    if console_ui?
+      content_tag(:span, level.code, class: "cs-badge cs-badge-severity-#{level.console_severity}", title: level.short_label)
+    else
+      content_tag(:span, level.code, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium #{INCIDENT_LEVEL_PILLS[level.color]}", title: level.short_label)
+    end
+  end
+
   def render_severity_badge(severity)
-    return cs_severity_badge(severity) if console_ui?
-
-    colors = {
-      "low" => "bg-green-100 text-green-800",
-      "medium" => "bg-yellow-100 text-yellow-800",
-      "high" => "bg-orange-100 text-orange-800",
-      "critical" => "bg-red-100 text-red-800"
-    }
-    color_class = colors[severity] || "bg-gray-100 text-gray-800"
-
-    content_tag(:span, severity.humanize, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium #{color_class}")
+    incident_level_badge(severity)
   end
 
   # Cloudscape status indicator for incident and incident-report statuses.
@@ -63,10 +66,8 @@ module Admin::IncidentsHelper
     content_tag(:span, category.humanize, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium #{color_class}")
   end
 
-  # Incident-report priorities read as severities: emergency is the critical end.
   def incident_report_priority_badge(priority)
-    label = IncidentReport::PRIORITIES[priority]&.split(" – ")&.first || priority.to_s.humanize
-    cs_severity_badge(INCIDENT_REPORT_PRIORITY_SEVERITIES.fetch(priority.to_s, "neutral"), label)
+    incident_level_badge(priority)
   end
 
   # Tailwind pill, identical to main. Used by the original incident views and

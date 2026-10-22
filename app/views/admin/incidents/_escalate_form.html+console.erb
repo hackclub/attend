@@ -5,7 +5,7 @@
   </summary>
   <div class="cs-container-body">
     <%= form_with url: escalate_admin_event_incident_path(current_event, incident), method: :post, local: true, class: "cs-stack",
-          html: { novalidate: true }, data: { controller: "incident-escalation", action: "submit->incident-escalation#confirm" } do %>
+          html: { novalidate: true }, data: { controller: "incident-escalation", action: "submit->incident-escalation#confirm", incident_level: incident.severity } do %>
       <%= render "admin/incidents/escalation_fields", phone: current_user.oidc_claims&.dig("phone_number") %>
       <div class="flex justify-end">
         <button type="submit" class="cs-btn cs-btn-primary">Escalate to HQ</button>

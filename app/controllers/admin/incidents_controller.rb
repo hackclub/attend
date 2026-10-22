@@ -124,7 +124,7 @@ module Admin
     end
 
     def escalation_params
-      params.fetch(:escalation, {}).permit(:priority, :emergency_services_called, :reporter_phone)
+      params.fetch(:escalation, {}).permit(:emergency_services_called, :reporter_phone)
     end
 
     def build_escalation

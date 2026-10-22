@@ -28,9 +28,11 @@
     <section class="cs-container">
       <div class="cs-container-header cs-container-header-divided">
         <h2 class="cs-h2">Reports to HQ <span class="cs-counter">(<%= @incident_reports.size %>)</span></h2>
-        <div class="cs-segmented" role="group" aria-label="Filter by priority">
-          <%= segment.("All priorities", admin_incident_reports_path(view: params[:view]), params[:priority].blank?) %>
-          <%= segment.("Emergency only", admin_incident_reports_path(view: params[:view], priority: "emergency"), params[:priority] == "emergency") %>
+        <div class="cs-segmented" role="group" aria-label="Filter by level">
+          <%= segment.("All levels", admin_incident_reports_path(view: params[:view]), params[:priority].blank?) %>
+          <% IncidentLevel::LEVELS.each do |level| %>
+            <%= segment.(level.code, admin_incident_reports_path(view: params[:view], priority: level.key), params[:priority] == level.key) %>
+          <% end %>
         </div>
       </div>
       <% if @incident_reports.any? %>
@@ -45,7 +47,7 @@
               <thead>
                 <tr>
                   <th scope="col">Filed</th>
-                  <th scope="col">Priority</th>
+                  <th scope="col">Level</th>
                   <th scope="col">Summary</th>
                   <th scope="col">Event</th>
                   <th scope="col">Reporter</th>
@@ -116,7 +118,7 @@
                 <th scope="col">Incident time</th>
                 <th scope="col">Event</th>
                 <th scope="col">Summary</th>
-                <th scope="col">Severity</th>
+                <th scope="col">Level</th>
                 <th scope="col">Status</th>
                 <th scope="col">Reported by</th>
                 <th scope="col">HQ</th>

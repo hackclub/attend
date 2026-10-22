@@ -30,10 +30,15 @@
     </div>
 
     <div>
-      <%= f.label :severity, class: "block text-sm font-medium text-gray-700 mb-1" %>
-      <%= f.select :severity, Incident.severities.keys.map { |s| [s.humanize, s] }, { prompt: "Select severity" }, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+      <%= f.label :severity, "Level", class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= f.select :severity, IncidentLevel.select_options, { prompt: "Select level" }, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
     </div>
   </div>
+
+  <details class="border border-gray-200 rounded-lg px-4 py-3 bg-gray-50">
+    <summary class="cursor-pointer text-sm font-medium text-gray-900">Which level? The triage chart</summary>
+    <div class="mt-2"><%= render "shared/incident_levels" %></div>
+  </details>
 
   <div>
     <%= f.label :status, class: "block text-sm font-medium text-gray-700 mb-1" %>
@@ -176,7 +181,7 @@
               data: { incident_escalation_target: "checkbox", action: "change->incident-escalation#toggle" } %>
         <span class="ml-2">
           <span class="block text-sm font-medium text-gray-900">Escalate to Hack Club HQ</span>
-          <span class="block text-sm text-gray-500">Files a confidential report with HQ's safeguarding team. They're notified by email and Slack, and an emergency rings their phones. Conduct incidents also post to the HQ Firehouse channel.</span>
+          <span class="block text-sm text-gray-500">Files a confidential report with HQ's safeguarding team. They're notified by email and Slack, and an S0 rings their phones. Conduct incidents also post to the HQ Firehouse channel.</span>
         </span>
       </label>
       <div class="mt-4 hidden" data-incident-escalation-target="fields">

@@ -18,7 +18,7 @@ RSpec.describe "Admin console breadcrumbs", type: :request do
   let!(:participant_event) { create(:participant_event, event: event, participant: participant) }
   let(:participant_label) { participant.display_name }
   let!(:incident) do
-    Incident.create!(event: event, reported_by: admin, category: :other, severity: :low,
+    Incident.create!(event: event, reported_by: admin, category: :other, severity: :s3,
       summary: "A made-up incident")
   end
   let!(:change_request) do

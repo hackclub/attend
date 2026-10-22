@@ -28,7 +28,7 @@ class Incident < ApplicationRecord
   DEFAULT_VISIBLE_TO_ROLES = %w[event_admin safeguarding_lead].freeze
 
   enum :category, { safeguarding: "safeguarding", medical: "medical", behavior: "behavior", other: "other" }
-  enum :severity, { low: "low", medium: "medium", high: "high", critical: "critical" }
+  enum :severity, IncidentLevel::ENUM
   enum :status, { open: "open", in_review: "in_review", closed: "closed" }
 
   validates :event_id, presence: true

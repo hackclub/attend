@@ -36,11 +36,11 @@ export default class extends Controller {
   eventChanged() {
     if (!this.hasPriorityTarget) return
     const allowed = this.emergencyAllowed()
-    const emergencyOption = this.priorityTarget.querySelector('option[value="emergency"]')
+    const emergencyOption = this.priorityTarget.querySelector('option[value="s0"]')
     if (emergencyOption) emergencyOption.disabled = !allowed
 
-    if (!allowed && this.priorityTarget.value === "emergency") {
-      this.priorityTarget.value = "standard"
+    if (!allowed && this.priorityTarget.value === "s0") {
+      this.priorityTarget.value = "s2"
     }
     this.emergencyServicesChanged()
   }
@@ -102,7 +102,7 @@ export default class extends Controller {
     const force = this.hasEmergencyServicesTarget && this.emergencyServicesTarget.checked && this.emergencyAllowed()
 
     if (force) {
-      this.priorityTarget.value = "emergency"
+      this.priorityTarget.value = "s0"
       this.priorityTarget.disabled = true
     } else {
       this.priorityTarget.disabled = false

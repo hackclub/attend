@@ -13,8 +13,8 @@
           <%= f.select :category, Incident.categories.keys.map { |c| [c.humanize, c] }, { prompt: "Select category" }, class: "cs-select", required: true, **aria %>
         <% end %>
 
-        <%= cs_form_field f, :severity, label: "Severity", messages: { blank: "Severity is required.", inclusion: "Select a valid severity." } do |aria| %>
-          <%= f.select :severity, Incident.severities.keys.map { |s| [s.humanize, s] }, { prompt: "Select severity" }, class: "cs-select", required: true, **aria %>
+        <%= cs_form_field f, :severity, label: "Level", description: "S0 is the most urgent. The chart below has examples.", messages: { blank: "Level is required.", inclusion: "Select a valid level." } do |aria| %>
+          <%= f.select :severity, IncidentLevel.select_options, { prompt: "Select level" }, class: "cs-select", required: true, **aria %>
         <% end %>
 
         <%= cs_form_field f, :status, label: "Status" do |aria| %>
@@ -27,6 +27,10 @@
 
         <%= cs_form_field f, :location, label: "Location", optional: true, constraint: "For example: Main Hall, Room 204" %>
       </div>
+      <details class="mt-4">
+        <summary class="cs-link cursor-pointer">Which level? The triage chart</summary>
+        <div class="mt-2"><%= render "shared/incident_levels" %></div>
+      </details>
     </div>
   </section>
 
@@ -182,7 +186,7 @@
           <%= check_box_tag "escalate", "1", params[:escalate] == "1", data: { incident_escalation_target: "checkbox", action: "change->incident-escalation#toggle" } %>
           <span>
             <span class="cs-option-label block">Escalate to Hack Club HQ</span>
-            <span class="cs-option-description block">Files a confidential report with HQ's safeguarding team. They're notified by email and Slack, and an emergency rings their phones. Conduct incidents also post to the HQ Firehouse channel.</span>
+            <span class="cs-option-description block">Files a confidential report with HQ's safeguarding team. They're notified by email and Slack, and an S0 rings their phones. Conduct incidents also post to the HQ Firehouse channel.</span>
           </span>
         </label>
         <div class="mt-4 hidden" data-incident-escalation-target="fields">

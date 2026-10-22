@@ -38,11 +38,8 @@ class IncidentReport < ApplicationRecord
     "other" => "Other"
   }.freeze
 
-  PRIORITIES = {
-    "emergency" => "Emergency – Need resolution ASAP",
-    "elevated" => "Elevated – Need resolution in 2-3 hours",
-    "standard" => "Standard – 24-hour response is OK"
-  }.freeze
+  # Priority uses the platform-wide IncidentLevel scale (S0–S3).
+  PRIORITIES = IncidentLevel::LABELS
 
   enum :status, { open: "open", in_review: "in_review", resolved: "resolved" }
 
@@ -95,7 +92,11 @@ class IncidentReport < ApplicationRecord
   end
 
   def emergency?
-    priority == "emergency"
+    priority == IncidentLevel::EMERGENCY
+  end
+
+  def priority_code
+    IncidentLevel.code(priority)
   end
 
   # Records that the given caller acknowledged the emergency call. Idempotent
@@ -135,11 +136,11 @@ class IncidentReport < ApplicationRecord
   private
 
   def force_emergency_priority_if_services_called
-    self.priority = "emergency" if emergency_services_called? && emergency_allowed?
+    self.priority = IncidentLevel::EMERGENCY if emergency_services_called? && emergency_allowed?
   end
 
   def downgrade_emergency_for_old_events
-    self.priority = "elevated" if priority == "emergency" && !emergency_allowed?
+    self.priority = IncidentLevel::EMERGENCY_FALLBACK if priority == IncidentLevel::EMERGENCY && !emergency_allowed?
   end
 
   def event_or_custom_event_present

@@ -11,7 +11,7 @@ module Admin
       @view = VIEWS.include?(params[:view]) ? params[:view] : "all"
 
       reports = policy_scope(IncidentReport).includes(:event, :user, incident: :event).order(created_at: :desc)
-      reports = reports.where(priority: params[:priority]) if IncidentReport::PRIORITIES.key?(params[:priority])
+      reports = reports.where(priority: params[:priority]) if IncidentLevel::KEYS.include?(params[:priority])
       @incident_reports = reports
       @reports_by_status = @incident_reports.group_by(&:status)
 
