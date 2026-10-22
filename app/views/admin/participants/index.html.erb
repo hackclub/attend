@@ -95,7 +95,7 @@
 
   <!-- Filters -->
   <div class="mb-4">
-    <form action="<%= admin_event_participants_path(current_event) %>" method="get" class="flex flex-wrap items-center gap-2" data-controller="auto-submit" data-turbo-action="replace">
+    <form action="<%= admin_event_participants_path(current_event) %>" method="get" class="flex flex-wrap items-center gap-2" data-controller="auto-submit" data-action="turbo:click@document->auto-submit#cancel" data-turbo-action="replace">
       <div class="flex-1 min-w-[200px] max-w-xs">
         <%= text_field_tag :search, params[:search],
             placeholder: "Search...",

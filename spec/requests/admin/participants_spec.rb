@@ -47,12 +47,20 @@ RSpec.describe "Admin::Participants", type: :request do
     before { sign_in global_admin }
 
     it "submits filters on change and keeps them on the List/Table toggle links" do
+      event.update!(groups_enabled: true)
+      create(:group, event: event)
+      create(:custom_document, :optional, event: event)
+
       get admin_event_participants_path(event.slug), params: { search: "ada", flag: "missing_medical" }
 
       page = Nokogiri::HTML(response.body)
       form = page.at_css("form[data-controller='auto-submit']")
       expect(form["data-turbo-action"]).to eq("replace")
-      expect(form.at_css("select[name='flag']")["data-action"]).to eq("change->auto-submit#submit")
+      expect(form["data-action"]).to eq("turbo:click@document->auto-submit#cancel")
+      expect(form.at_css("input[name='search']")["data-action"]).to eq("input->auto-submit#debouncedSubmit")
+      selects = form.css("select")
+      expect(selects.map { |s| s["name"] }).to eq(%w[status flag checked_in group_id optional_document])
+      expect(selects.map { |s| s["data-action"] }.uniq).to eq([ "change->auto-submit#submit" ])
       expect(form.at_css("noscript").inner_html).to include("Filter")
 
       list_href = page.at_css("a[title='List view']")["href"]
