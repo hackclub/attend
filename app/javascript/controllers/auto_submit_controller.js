@@ -34,7 +34,10 @@ export default class extends Controller {
   keepTypedSearch({ detail: { newElement } }) {
     if (document.activeElement !== this.searchTarget && !this.debounceTimer) return
 
-    this.searchTarget.defaultValue = newElement.defaultValue
+    const results = newElement.defaultValue
+    this.searchTarget.defaultValue = results
+    // A blank search renders no value attribute, which makes the morph clear the field.
+    newElement.defaultValue = results
     newElement.value = this.searchTarget.value
   }
 
