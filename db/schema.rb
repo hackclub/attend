@@ -1447,6 +1447,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_130000) do
   create_table "training_courses", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "access", default: "invite_only", null: false
     t.datetime "created_at", null: false
+    t.text "disclosure_question"
+    t.boolean "disclosure_required", default: false, null: false
     t.integer "estimated_minutes"
     t.integer "pass_mark", default: 80, null: false
     t.integer "position", default: 0, null: false
@@ -1459,6 +1461,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_130000) do
     t.datetime "updated_at", null: false
     t.index ["slug"], name: "index_training_courses_on_slug", unique: true
     t.index ["training_badge_id"], name: "index_training_courses_on_training_badge_id"
+  end
+
+  create_table "training_disclosures", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "answer", null: false
+    t.datetime "answered_at", null: false
+    t.datetime "created_at", null: false
+    t.text "question", null: false
+    t.text "review_note"
+    t.string "review_status", null: false
+    t.datetime "reviewed_at"
+    t.uuid "reviewed_by_id"
+    t.uuid "training_course_id"
+    t.uuid "training_enrollment_id"
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["review_status"], name: "index_training_disclosures_on_review_status"
+    t.index ["reviewed_by_id"], name: "index_training_disclosures_on_reviewed_by_id"
+    t.index ["training_course_id"], name: "index_training_disclosures_on_training_course_id"
+    t.index ["training_enrollment_id"], name: "index_training_disclosures_on_training_enrollment_id"
+    t.index ["user_id"], name: "index_training_disclosures_on_user_id"
   end
 
   create_table "training_enrollments", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1781,6 +1803,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_130000) do
   add_foreign_key "training_course_invitations", "users", column: "invited_by_id", on_delete: :nullify
   add_foreign_key "training_course_invitations", "users", on_delete: :cascade
   add_foreign_key "training_courses", "training_badges"
+  add_foreign_key "training_disclosures", "training_courses", on_delete: :nullify
+  add_foreign_key "training_disclosures", "training_enrollments", on_delete: :nullify
+  add_foreign_key "training_disclosures", "users", column: "reviewed_by_id", on_delete: :nullify
+  add_foreign_key "training_disclosures", "users", on_delete: :cascade
   add_foreign_key "training_enrollments", "training_courses", on_delete: :cascade
   add_foreign_key "training_enrollments", "users", on_delete: :cascade
   add_foreign_key "training_lesson_completions", "training_enrollments", on_delete: :cascade

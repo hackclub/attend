@@ -6,6 +6,7 @@ module Admin
 
     def index
       @courses = TrainingCourse.ordered.includes(:badge, lessons: :questions)
+      @pending_disclosures = TrainingDisclosure.review_pending.count
       @badges = TrainingBadge.ordered
       @holder_counts = TrainingBadgeAward.current.group(:training_badge_id).distinct.count(:user_id)
       @enrollment_counts = TrainingEnrollment.group(:training_course_id).count
@@ -67,7 +68,7 @@ module Admin
     private
 
     def course_params
-      params.require(:training_course).permit(:title, :slug, :summary, :training_badge_id, :pass_mark, :estimated_minutes, :status, :access, :reveal_answers)
+      params.require(:training_course).permit(:title, :slug, :summary, :training_badge_id, :pass_mark, :estimated_minutes, :status, :access, :reveal_answers, :disclosure_required, :disclosure_question)
     end
   end
 end

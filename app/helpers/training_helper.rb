@@ -119,6 +119,8 @@ module TrainingHelper
       console_ui? ? tag.span("Not required", class: "cs-small cs-muted") : tag.span("Not required", class: "text-xs text-gray-400")
     when :trained
       training_flag(:success, "Trained", title: status.awards.map { |a| "#{a.badge.name}: #{training_award_state_label(a)}" }.join("\n"))
+    when :ineligible
+      training_flag(:error, "Ineligible", title: "Can't work events until the #{TrainingDisclosure::SAFETY_TEAM_NAME} clears them. Contact #{TrainingDisclosure::SAFETY_TEAM_EMAIL}.")
     when :expiring
       training_flag(:warning, "Renewal due", title: "#{status.expiring.map(&:name).to_sentence} expiring within #{TrainingBadge::RENEWAL_WINDOW.inspect}")
     else

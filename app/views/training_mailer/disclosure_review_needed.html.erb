@@ -1,0 +1,10 @@
+<p>Hi <%= TrainingDisclosure::SAFETY_TEAM_NAME %>,</p>
+
+<p>
+  Someone answered <strong>yes</strong> to the declaration<%= " before #{@course_title}" if @course_title %>.
+  They can't continue their training or work at events until it's reviewed.
+</p>
+
+<p><%= mail_button "Review it in Attend", @review_url %></p>
+
+<p>Their details and answer are only in Attend, where viewing them is logged.</p>
