@@ -67,7 +67,7 @@ RSpec.describe "Admin::Participants", type: :request do
       expect(form.at_css("input[name='search']")["data-action"].split).to eq(%w[
         input->auto-submit#debouncedSubmit
         compositionend->auto-submit#debouncedSubmit
-        turbo:before-morph-attribute->auto-submit#keepTypedSearch
+        turbo:before-morph-element->auto-submit#keepTypedSearch
       ])
       expect(form.at_css("input[name='blocked_on']")).to be_nil
       selects = form.css("select")

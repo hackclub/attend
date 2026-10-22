@@ -28,10 +28,14 @@ export default class extends Controller {
     this.debounceTimer = null
   }
 
-  // Keep what's being typed when results for an earlier search arrive.
-  keepTypedSearch(event) {
-    if (event.detail.attributeName !== "value") return
-    if (document.activeElement === this.searchTarget || this.debounceTimer) event.preventDefault()
+  // Keep what's being typed when results for an earlier search arrive. The
+  // field's default still follows the results, which is what connect()
+  // resets to on Back.
+  keepTypedSearch({ detail: { newElement } }) {
+    if (document.activeElement !== this.searchTarget && !this.debounceTimer) return
+
+    this.searchTarget.defaultValue = newElement.defaultValue
+    newElement.value = this.searchTarget.value
   }
 
   // Leave empty filters out of the URL.
