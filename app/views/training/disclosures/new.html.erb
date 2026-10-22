@@ -1,0 +1,33 @@
+<% content_for :title, "Declaration – #{@course.title} – Attend" %>
+
+<div class="w-full max-w-2xl mx-auto">
+  <%= link_to "← #{@course.title}", training_course_path(@course), class: "portal-link text-sm inline-block mb-6" %>
+
+  <%= form_with url: training_course_disclosure_path(@course), method: :post, class: "portal-card p-6 sm:p-8", data: { turbo: false } do %>
+    <h1 class="portal-title text-2xl mb-2">Before you start</h1>
+    <p class="portal-hint text-sm mb-6">
+      Everyone who works at a Hack Club event answers this question. Your answer is private: only the <%= TrainingDisclosure::SAFETY_TEAM_NAME %> can see it.
+    </p>
+
+    <fieldset>
+      <legend class="portal-heading text-base mb-3"><%= @course.disclosure_question_text %></legend>
+      <label class="portal-check-row">
+        <%= radio_button_tag :answer, "no", params[:answer] == "no", class: "portal-check mt-1", required: true %>
+        <span>No</span>
+      </label>
+      <label class="portal-check-row">
+        <%= radio_button_tag :answer, "yes", params[:answer] == "yes", class: "portal-check mt-1", required: true %>
+        <span>Yes</span>
+      </label>
+    </fieldset>
+
+    <label class="portal-check-row mt-4 portal-inset rounded-lg p-3">
+      <%= check_box_tag :confirm, "1", false, class: "portal-check mt-1", required: true %>
+      <span class="text-sm">I confirm my answer is true and complete.</span>
+    </label>
+
+    <div class="mt-6 flex justify-end">
+      <%= button_tag "Continue", type: "submit", class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+    </div>
+  <% end %>
+</div>

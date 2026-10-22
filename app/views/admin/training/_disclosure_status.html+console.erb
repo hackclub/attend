@@ -1,0 +1,6 @@
+<% case disclosure.review_status %>
+<% when "pending" %><%= cs_status(:pending, "Awaiting review") %>
+<% when "cleared" %><%= cs_status(:success, "Cleared") %>
+<% when "upheld" %><%= cs_status(:error, "Upheld — ineligible") %>
+<% else %><%= cs_status(:stopped, "Answered no") %>
+<% end %>

@@ -48,6 +48,7 @@ module Admin
       @passports = @user.passports.includes(:paired_by, :revoked_by).order(created_at: :desc)
       @training_awards = @user.training_badge_awards.includes(:badge, :course, :awarded_by).newest_first
       @training_enrollments = @user.training_enrollments.includes(course: :lessons).where(completed_at: nil)
+      @training_disclosure = @user.training_disclosures.where.not(review_status: "not_required").newest_first.first
     end
 
     def new
