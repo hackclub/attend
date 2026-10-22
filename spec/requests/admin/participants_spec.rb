@@ -110,6 +110,32 @@ RSpec.describe "Admin::Participants", type: :request do
     end
   end
 
+  describe "Slack ID copy controls on the participant page" do
+    let(:participant_event) do
+      create(:participant_event, event: event, participant: create(:participant, slack_user_id: "U0SLACKID1"))
+    end
+
+    before { sign_in global_admin }
+
+    it "renders copy controls with the Slack ID, even before onboarding is complete" do
+      get admin_event_participant_path(event, participant_event)
+
+      expect(response).to have_http_status(:ok)
+      page = Nokogiri::HTML(response.body)
+      copy_buttons = page.css('button[data-controller="clipboard"][data-clipboard-content-value="U0SLACKID1"]')
+      expect(copy_buttons.map { |b| b.text.strip }).to contain_exactly("Copy Slack ID", "Copy")
+      expect(response.body).not_to include(invite_to_slack_channel_admin_event_participant_path(event, participant_event))
+    end
+
+    it "does not render the copy controls without a Slack ID" do
+      participant_event.participant.update!(slack_user_id: nil)
+
+      get admin_event_participant_path(event, participant_event)
+
+      expect(response.body).not_to include("Copy Slack ID")
+    end
+  end
+
   describe "GET travel" do
     let(:participant_event) { create(:participant_event, event: event) }
 
