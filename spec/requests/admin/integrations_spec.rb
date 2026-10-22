@@ -78,6 +78,23 @@ RSpec.describe "Admin::Integrations", type: :request do
           expect(form["action"]).to eq(admin_event_trigger_airtable_sync_path(event))
         end
 
+        it "says how many runs in a row have failed while it keeps retrying" do
+          event.update_columns(airtable_sync_error: "HTTP 503", airtable_sync_error_at: 1.minute.ago, airtable_sync_failures: 3)
+
+          get admin_event_integrations_path(event)
+
+          expect(response.body).to include("3 failed attempts in a row. Attend keeps retrying every 5 minutes.")
+        end
+
+        it "leaves the retry count off a paused sync" do
+          event.update_columns(airtable_sync_failures: 3)
+          event.pause_airtable_sync!("HTTP 403: INVALID_PERMISSIONS")
+
+          get admin_event_integrations_path(event)
+
+          expect(response.body).not_to include("failed attempts in a row")
+        end
+
         it "lists the event's active API tokens" do
           EventApiToken.generate_for(event, user: admin, name: "fictional-widget-sync")
 
@@ -115,7 +132,7 @@ RSpec.describe "Admin::Integrations", type: :request do
         patch admin_event_integrations_path(event), params: {
           event: { airtable_api_key: "key-rotated" }
         }
-      }.to have_enqueued_job(AirtableJobs::SyncAllJob)
+      }.to have_enqueued_job(AirtableJobs::SyncAllJob).with(event.id)
 
       expect(flash[:notice]).to eq("Integration settings updated. Airtable sync started.")
     end
@@ -236,7 +253,7 @@ RSpec.describe "Admin::Integrations", type: :request do
 
       expect {
         post admin_event_trigger_airtable_sync_path(event)
-      }.to have_enqueued_job(AirtableJobs::SyncAllJob)
+      }.to have_enqueued_job(AirtableJobs::SyncAllJob).with(event.id)
 
       expect(event.reload.airtable_sync_paused?).to be(false)
       expect(flash[:notice]).to eq("Airtable sync resumed and triggered. It will complete shortly.")
@@ -245,7 +262,7 @@ RSpec.describe "Admin::Integrations", type: :request do
     it "just triggers a sync when nothing is paused" do
       expect {
         post admin_event_trigger_airtable_sync_path(event)
-      }.to have_enqueued_job(AirtableJobs::SyncAllJob)
+      }.to have_enqueued_job(AirtableJobs::SyncAllJob).with(event.id)
 
       expect(flash[:notice]).to eq("Airtable sync triggered. It will complete shortly.")
     end

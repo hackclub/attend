@@ -1,0 +1,34 @@
+<p>Hi <%= @first_name %>,</p>
+
+<p>
+  The Airtable sync for <strong><%= @event.name %></strong> has failed
+  <strong><%= pluralize(@failures, "time") %> in a row</strong>. This usually means
+  Airtable is rate limiting the base or having an outage, so Attend is still retrying
+  every 5 minutes. You don't need to change anything unless it keeps failing.
+</p>
+
+<p>You're getting this because you were the last person to save the Airtable settings for this event.</p>
+
+<div style="border: 1px solid #f5c2c7; background-color: #fdf2f3; border-radius: 6px; padding: 12px 16px; margin: 16px 0;">
+  <p style="margin: 0 0 4px 0;"><strong>What Airtable said:</strong></p>
+  <p style="margin: 0; font-family: monospace; font-size: 13px; word-break: break-all;"><%= @error_message %></p>
+</div>
+
+<p>
+  If it doesn't recover, check that nothing else is sending a lot of requests to the
+  same base, and look at <a href="https://status.airtable.com">status.airtable.com</a>.
+</p>
+
+<p><%= mail_button "View Airtable sync", @integrations_url %></p>
+
+<p style="color: #6b7280; font-size: 13px;">
+  <% if @last_synced_at %>
+    Last successful sync was <%= @last_synced_at.strftime("%b %-d, %Y at %-I:%M %p %Z") %> —
+    Airtable still shows that data.
+  <% else %>
+    This integration has never synced successfully.
+  <% end %>
+  We'll only email again if it fails for a while after its next successful sync.
+</p>
+
+<p>If you're not the right person for this any more, just reply and we'll sort it out.</p>

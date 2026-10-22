@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_22_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -470,8 +470,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
   create_table "events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.text "airtable_api_key"
     t.uuid "airtable_config_updated_by_id"
+    t.datetime "airtable_sync_alerted_at"
     t.text "airtable_sync_error"
     t.datetime "airtable_sync_error_at"
+    t.integer "airtable_sync_failures", default: 0, null: false
     t.datetime "airtable_sync_paused_at"
     t.string "airtable_sync_source_id"
     t.string "airtable_sync_table_id"

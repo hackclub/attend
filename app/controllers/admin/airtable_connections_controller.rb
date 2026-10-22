@@ -123,7 +123,7 @@ class Admin::AirtableConnectionsController < Admin::BaseController
       @event.update_columns(config: @event.config.merge("airtable_base_id" => bases.first["id"]))
     end
     @event.resume_airtable_sync!
-    AirtableJobs::SyncAllJob.perform_later if @event.airtable_sync_configured?
+    AirtableJobs::SyncAllJob.perform_later(@event.id) if @event.airtable_sync_configured?
 
     connection
   end

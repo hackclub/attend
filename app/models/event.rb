@@ -521,10 +521,10 @@ class Event < ApplicationRecord
     airtable_sync_paused_at.present?
   end
 
-  # One failure stops the schedule. Retrying broken credentials every 5 minutes
-  # never fixes them; it just buries the real signal under thousands of
-  # identical errors. A human re-saving the config (or hitting "Sync Now") is
-  # the only thing that resumes it.
+  # A configuration error stops the schedule. Retrying broken credentials
+  # every 5 minutes never fixes them; it just buries the real signal under
+  # thousands of identical errors. A human re-saving the config (or hitting
+  # "Sync Now") is the only thing that resumes it.
   def pause_airtable_sync!(error_message)
     update_columns(
       airtable_sync_paused_at: Time.current,
@@ -533,11 +533,48 @@ class Event < ApplicationRecord
     )
   end
 
+  # Rate limits, 5xx and timeouts clear up on their own, so the schedule keeps
+  # going and only the streak is recorded. increment! adds in SQL, so a manual
+  # "Sync Now" overlapping the scheduled run can't lose a count.
+  def record_airtable_sync_failure!(error_message)
+    increment!(:airtable_sync_failures)
+    update_columns(airtable_sync_error: error_message, airtable_sync_error_at: Time.current)
+  end
+
+  # Report a failing sync once per streak: after enough runs in a row fail, or
+  # once Airtable has been out of date for long enough that someone is likely
+  # relying on stale data, whichever comes first.
+  AIRTABLE_SYNC_ALERT_AFTER_FAILURES = 12
+  AIRTABLE_SYNC_ALERT_AFTER_STALE = 3.hours
+
+  def airtable_sync_alert_due?
+    return false if airtable_sync_alerted_at.present?
+
+    airtable_sync_failures >= AIRTABLE_SYNC_ALERT_AFTER_FAILURES ||
+      (airtable_synced_at.present? && airtable_synced_at < AIRTABLE_SYNC_ALERT_AFTER_STALE.ago)
+  end
+
+  def mark_airtable_sync_alerted!
+    update_columns(airtable_sync_alerted_at: Time.current)
+  end
+
+  def record_airtable_sync_success!
+    update_columns(
+      airtable_synced_at: Time.current,
+      airtable_sync_error: nil,
+      airtable_sync_error_at: nil,
+      airtable_sync_failures: 0,
+      airtable_sync_alerted_at: nil
+    )
+  end
+
   def resume_airtable_sync!
     update_columns(
       airtable_sync_paused_at: nil,
       airtable_sync_error: nil,
-      airtable_sync_error_at: nil
+      airtable_sync_error_at: nil,
+      airtable_sync_failures: 0,
+      airtable_sync_alerted_at: nil
     )
   end
 

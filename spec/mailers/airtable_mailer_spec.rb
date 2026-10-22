@@ -61,4 +61,39 @@ RSpec.describe AirtableMailer do
       expect(log.mailer_action).to eq("sync_paused")
     end
   end
+
+  describe "#sync_failing" do
+    let(:recipient) { create(:user, email: "ops@hackclub.com", name: "Sam Rivers") }
+    let(:event) { create(:event, name: "Horizons Polaris", slug: "horizons-polaris", airtable_sync_failures: 12) }
+
+    subject(:mail) do
+      described_class.sync_failing(event: event, recipient: recipient, error_message: "HTTP 503: Service Unavailable")
+    end
+
+    it "says the sync is failing, not paused, and how often" do
+      expect(mail.to).to eq([ "ops@hackclub.com" ])
+      expect(mail.subject).to eq("Airtable sync is failing for Horizons Polaris")
+      [ mail.html_part, mail.text_part ].each do |part|
+        body = part.body.to_s
+        expect(body).to include("HTTP 503: Service Unavailable")
+        expect(body).to include("12 times")
+        expect(body).to include("still retrying")
+        expect(body).to include("/admin/horizons-polaris/integrations")
+      end
+    end
+
+    it "tells them Airtable is still showing the last good snapshot" do
+      event.update_columns(airtable_synced_at: 4.hours.ago)
+
+      [ mail.html_part, mail.text_part ].each do |part|
+        expect(part.body.to_s).to include("Last successful sync was")
+      end
+    end
+
+    it "says so when the integration never synced" do
+      [ mail.html_part, mail.text_part ].each do |part|
+        expect(part.body.to_s).to include("never synced successfully")
+      end
+    end
+  end
 end

@@ -57,7 +57,7 @@ class Admin::DashboardController < Admin::BaseController
       # the button would look like it did nothing.
       was_paused = @event.airtable_sync_paused?
       @event.resume_airtable_sync!
-      AirtableJobs::SyncAllJob.perform_later
+      AirtableJobs::SyncAllJob.perform_later(@event.id)
 
       notice = if was_paused
         "Airtable sync resumed and triggered. It will complete shortly."
@@ -98,7 +98,7 @@ class Admin::DashboardController < Admin::BaseController
       end
 
       if airtable_settings_saved? && @event.airtable_sync_configured?
-        AirtableJobs::SyncAllJob.perform_later
+        AirtableJobs::SyncAllJob.perform_later(@event.id)
         redirect_to admin_event_integrations_path(@event), notice: "Integration settings updated. Airtable sync started."
       else
         redirect_to admin_event_integrations_path(@event), notice: "Integration settings updated."
@@ -130,6 +130,7 @@ class Admin::DashboardController < Admin::BaseController
     @airtable_synced_at = current_event.airtable_synced_at
     @airtable_sync_error = current_event.airtable_sync_error
     @airtable_sync_error_at = current_event.airtable_sync_error_at
+    @airtable_sync_failures = current_event.airtable_sync_failures
     @airtable_sync_stale = current_event.airtable_sync_stale?
     @airtable_sync_paused = current_event.airtable_sync_paused?
     @airtable_sync_paused_at = current_event.airtable_sync_paused_at
