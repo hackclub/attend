@@ -29,16 +29,28 @@ RSpec.describe "Admin::IncidentReports (HQ inbox)", type: :request do
     expect(response.body).to include("High priority · ≈ 5 minutes", "/docs/organizers/reporting-incidents")
   end
 
-  it "filters the log section by event and open status" do
+  it "filters the log section by event and hides closed entries until resolved ones are shown" do
     sign_in global_admin
     log_entry.update!(status: "closed")
 
-    get admin_incident_reports_path(view: "logs", event_id: event.id)
+    get admin_incident_reports_path(view: "logs", event_id: event.id, resolved: "1")
     expect(response.body).to include("Only in the event log")
     expect(response.body).not_to include("Filed from the public form")
 
-    get admin_incident_reports_path(view: "logs", event_id: event.id, open: "1")
+    get admin_incident_reports_path(view: "logs", event_id: event.id)
     expect(response.body).not_to include("Only in the event log")
+  end
+
+  it "hides resolved HQ reports until the toggle is on" do
+    sign_in global_admin
+    public_report.update!(status: "resolved")
+
+    get admin_incident_reports_path(view: "reports")
+    expect(response.body).not_to include("Filed from the public form")
+    expect(response.body).to include("HQ copy of escalated entry", "(1 hidden)")
+
+    get admin_incident_reports_path(view: "reports", resolved: "1")
+    expect(response.body).to include("Filed from the public form")
   end
 
   it "links an escalated report back to its incident" do
@@ -61,7 +73,7 @@ RSpec.describe "Admin::IncidentReports (HQ inbox)", type: :request do
       sign_in global_admin
       get admin_incident_reports_path
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("HQ incident inbox", "Only in the event log", "Escalated from event log")
+      expect(response.body).to include("Incidents", "Only in the event log", "Escalated from event log")
     end
   end
 end

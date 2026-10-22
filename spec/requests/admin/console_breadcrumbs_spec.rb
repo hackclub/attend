@@ -106,8 +106,8 @@ RSpec.describe "Admin console breadcrumbs", type: :request do
       expect_trail admin_settings_path, "Settings"
       expect_trail admin_global_api_tokens_path, "API tokens"
       expect_trail admin_audit_logs_path, "Audit log"
-      expect_trail admin_bans_path, "Ban list"
-      expect_trail admin_incident_reports_path, "HQ incident inbox"
+      expect_trail admin_bans_path, "Conduct bans"
+      expect_trail admin_incident_reports_path, "Incidents"
     end
   end
 

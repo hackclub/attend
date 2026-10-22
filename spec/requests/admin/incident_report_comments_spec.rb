@@ -37,6 +37,21 @@ RSpec.describe "Admin::IncidentReportComments", type: :request do
     expect(comment.attachments.first.filename.to_s).to eq("evidence.txt")
   end
 
+  it "changes the status even when the report itself no longer passes validation" do
+    # A legacy row whose phone predates the E.164 rule.
+    incident_report.update_column(:reporter_phone, "555-0150")
+    expect(incident_report.reload).not_to be_valid
+
+    expect {
+      post admin_incident_report_comments_path(incident_report), params: {
+        incident_report_comment: { body: "Looked into it", new_status: "resolved" }
+      }
+    }.to change { incident_report.comments.count }.by(1)
+
+    expect(response).to redirect_to(admin_incident_report_path(incident_report))
+    expect(incident_report.reload.status).to eq("resolved")
+  end
+
   it "creates a comment with no attachments when none are provided" do
     post admin_incident_report_comments_path(incident_report), params: {
       incident_report_comment: { body: "No files here" }

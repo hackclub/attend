@@ -4,8 +4,8 @@
      data-controller="incident-report"
      data-incident-report-signed-in-value="<%= user_signed_in? %>">
 
-  <h1 class="text-2xl font-bold text-[#1f2d3d] mb-1">File a Confidential Incident Report</h1>
-  <p class="text-sm text-[#33d6a6] font-semibold mb-6">Average response time: 4–5 hours</p>
+  <h1 class="text-2xl font-bold text-(--text-strong) mb-1">File a Confidential Incident Report</h1>
+  <p class="text-sm text-(--success-text) font-semibold mb-6">Average response time: 4–5 hours</p>
 
   <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 text-sm text-blue-900 space-y-3">
     <p>
@@ -50,9 +50,22 @@
       <%= button_to user_hack_club_omniauth_authorize_path,
             method: :post,
             data: { turbo: false },
-            class: "shrink-0 text-sm bg-white border border-gray-300 hover:border-gray-400 text-[#1f2d3d] font-medium px-3 py-1.5 rounded-lg transition-colors" do %>
+            class: "shrink-0 text-sm portal-btn-secondary border font-medium px-3 py-1.5 rounded-lg transition-colors" do %>
         Log in with Hack Club
       <% end %>
+    </div>
+  <% end %>
+
+  <% if @organizer_events.present? %>
+    <div class="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-6 text-sm text-gray-700">
+      <p class="font-medium text-gray-900">Organizing one of these events?</p>
+      <p class="mt-1">Your event's Incidents page keeps a record for your team and can escalate to HQ from there, with the same people notified:</p>
+      <ul class="mt-1 list-disc list-inside">
+        <% @organizer_events.each do |event| %>
+          <li><%= link_to "Log an incident for #{event.name}", new_admin_event_incident_path(event), class: "portal-link" %></li>
+        <% end %>
+      </ul>
+      <p class="mt-1 text-gray-500">Reporting as a participant or parent? Carry on below.</p>
     </div>
   <% end %>
 
@@ -152,7 +165,7 @@
           <label class="flex items-start gap-2 text-sm text-red-900">
             <%= f.check_box :emergency_services_called,
                   data: { incident_report_target: "persist emergencyServices", action: "change->incident-report#emergencyServicesChanged" },
-                  class: "mt-0.5 rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+                  class: "mt-0.5 rounded border-gray-300 text-(--accent-strong) focus:ring-(--accent)" %>
             <span>Emergency services (e.g. 911) have already been called for this incident.</span>
           </label>
         </div>
@@ -207,23 +220,10 @@
              data-action="<%= IncidentReportsController::TURNSTILE_ACTION %>"></div>
       <% end %>
 
-      <% if @organizer_events.present? %>
-        <div class="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700">
-          <p class="font-medium text-gray-900">Organizing one of these events?</p>
-          <p class="mt-1">Your event's incident log keeps a record for your team and can escalate to HQ from there, with the same people notified:</p>
-          <ul class="mt-1 list-disc list-inside">
-            <% @organizer_events.each do |event| %>
-              <li><%= link_to "Log an incident for #{event.name}", new_admin_event_incident_path(event), class: "text-[#ec3750] hover:text-[#d42f46] font-medium" %></li>
-            <% end %>
-          </ul>
-          <p class="mt-1 text-gray-500">Reporting as a participant or parent? Carry on below.</p>
-        </div>
-      <% end %>
-
       <div>
         <%= f.submit "Submit report",
               data: { incident_report_target: "submit" },
-              class: "w-full sm:w-auto bg-[#d42f46] hover:bg-[#b82840] text-white font-semibold px-6 py-2.5 rounded-lg transition-colors cursor-pointer" %>
+              class: "w-full sm:w-auto portal-btn-primary font-semibold px-6 py-2.5 rounded-lg transition-colors cursor-pointer" %>
       </div>
     </div>
   <% end %>

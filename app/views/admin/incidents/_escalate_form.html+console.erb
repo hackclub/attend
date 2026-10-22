@@ -1,9 +1,15 @@
-<details class="cs-container">
-  <summary class="cs-container-header cursor-pointer list-none">
-    <h2 class="cs-h2">Escalate to Hack Club HQ</h2>
-    <p class="cs-description">Files a confidential report with HQ's safeguarding team. They see this incident's summary, details and actions taken.</p>
+<%# Standalone "escalate to HQ" form for an incident that already exists.
+    Uses the console's expandable pattern (chevron marker, accent on hover) so
+    the header reads as something you can open, not just a heading. %>
+<details class="cs-expandable cs-expandable-container">
+  <summary>
+    <span class="flex flex-col gap-0.5 min-w-0">
+      <span>Escalate to Hack Club HQ</span>
+      <span class="cs-description font-normal">Files a confidential report with HQ's safeguarding team. They see this incident's summary, details and actions taken.</span>
+    </span>
+    <span class="cs-btn ml-auto shrink-0" aria-hidden="true">Escalate…</span>
   </summary>
-  <div class="cs-container-body">
+  <div class="cs-expandable-content">
     <%= form_with url: escalate_admin_event_incident_path(current_event, incident), method: :post, local: true, class: "cs-stack",
           html: { novalidate: true }, data: { controller: "incident-escalation", action: "submit->incident-escalation#confirm", incident_escalation_always_value: true, incident_escalation_level_value: incident.severity } do %>
       <%= render "admin/incidents/escalation_fields", phone: current_user.oidc_claims&.dig("phone_number") %>
