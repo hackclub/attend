@@ -11,6 +11,12 @@
     </div>
   </div>
 
+  <% if @pending_disclosures.positive? %>
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-800 flex justify-between items-center gap-4">
+      <span><strong><%= pluralize(@pending_disclosures, "declaration") %></strong> awaiting the <%= TrainingDisclosure::SAFETY_TEAM_NAME %>.</span>
+      <%= link_to "Review", admin_training_disclosures_path, class: "underline" %>
+    </div>
+  <% end %>
   <div class="bg-white border border-gray-200 rounded-lg overflow-x-auto">
     <table class="min-w-full divide-y divide-gray-100">
       <thead class="bg-gray-50">

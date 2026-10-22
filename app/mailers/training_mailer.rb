@@ -33,6 +33,16 @@ class TrainingMailer < ApplicationMailer
     )
   end
 
+  # Tells the Hack Club Safety Team a declaration needs reviewing. Says who
+  # and what only behind the link, where it's audit-logged.
+  def disclosure_review_needed(disclosure:)
+    @disclosure = disclosure
+    @course_title = disclosure.course&.title
+    @review_url = Rails.application.routes.url_helpers.admin_training_disclosure_url(disclosure, host: default_host, protocol: default_protocol)
+
+    mail(to: TrainingDisclosure::SAFETY_TEAM_EMAIL, subject: "A training declaration needs review")
+  end
+
   private
 
   def default_host

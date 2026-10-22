@@ -161,6 +161,7 @@ Rails.application.routes.draw do
         post :enroll
         post :restart
       end
+      resource :disclosure, only: [ :new, :create ]
       resources :lessons, only: :show do
         member do
           post :complete
@@ -427,6 +428,7 @@ Rails.application.routes.draw do
           end
         end
       end
+      resources :disclosures, controller: "training_disclosures", only: [ :index, :show, :update ]
       resources :badges, controller: "training_badges", except: :index do
         resources :awards, controller: "training_badge_awards", only: [ :new, :create ] do
           patch :revoke, on: :member
