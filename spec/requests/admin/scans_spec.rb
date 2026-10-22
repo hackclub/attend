@@ -79,4 +79,24 @@ RSpec.describe "Admin::Scans", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("NFC Scanner", 'id="nfc-write-panel"', 'id="modal-write-nfc-btn"')
   end
+
+  it "makes staff choose the scanner context when there are several, listed by start time" do
+    event.scan_contexts.create!(name: "Tomorrow", starts_at: 1.day.from_now, ends_at: 1.day.from_now + 1.hour, position: 1)
+    event.scan_contexts.create!(name: "Free time", starts_at: 1.hour.ago, ends_at: 1.hour.from_now, position: 2)
+
+    get scanner_admin_event_scans_path(event)
+
+    options = response.body.scan(/<option value="([^"]*)"( selected)?/)
+    expect(options.select { |_, selected| selected }).to eq([ [ "", " selected" ] ])
+    expect(response.body).to include('id="scan-context-required"')
+    expect(response.body.index("Free time")).to be < response.body.index("Tomorrow")
+  end
+
+  it "uses the only scan context without asking in the old admin" do
+    admin.update!(admin_console_beta: false)
+
+    get scanner_admin_event_scans_path(event)
+
+    expect(response.body).to include(%(<input type="hidden" id="scan-context" value="#{scan_context.id}">))
+  end
 end

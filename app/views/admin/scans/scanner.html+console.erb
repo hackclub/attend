@@ -31,16 +31,17 @@
       <% if @scan_contexts.size > 1 %>
         <div class="flex w-full items-center gap-2 sm:w-auto">
           <label for="scan-context" class="cs-kv-label whitespace-nowrap">Context</label>
-          <select id="scan-context" class="cs-select min-h-11 sm:min-h-8">
+          <select id="scan-context" class="cs-select min-h-11 sm:min-h-8" autocomplete="off" required aria-invalid="true" aria-describedby="scan-context-required">
+            <option value="" selected disabled>Choose a context</option>
             <% @scan_contexts.each do |context| %>
-              <option value="<%= context.id %>" <%= "selected" if context == @default_scan_context %>>
+              <option value="<%= context.id %>">
                 <%= context.name %><%= " — Travel pickup" if context.is_travel_pickup? %><% if context.checks_in? %> ✓<% end %>
               </option>
             <% end %>
           </select>
         </div>
       <% else %>
-        <input type="hidden" id="scan-context" value="<%= @default_scan_context&.id %>">
+        <input type="hidden" id="scan-context" value="<%= @scan_contexts.first.id %>">
       <% end %>
     </div>
 
@@ -58,6 +59,12 @@
                 class="hidden absolute inset-0 w-full h-full flex items-center justify-center text-white text-sm font-bold bg-black/80">
           Tap to start camera
         </button>
+        <% if @scan_contexts.size > 1 %>
+          <div id="scan-context-required" class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 px-6 text-center bg-(--cs-topnav-bg) text-(--cs-topnav-text)">
+            <p class="font-bold">Choose a context to start scanning</p>
+            <p class="cs-small text-(--cs-topnav-muted)">Pick where you're scanning people in from the Context menu.</p>
+          </div>
+        <% end %>
       </div>
 
       <div id="scan-result" class="mt-4 hidden" role="status" aria-live="polite">
@@ -298,10 +305,32 @@ function groupBadgeHtml(group) {
   let lastScannedCode = null;
   let scanCooldown = false;
   let searchTimeout = null;
+  let resultHideTimeout = null;
 
   function getCurrentContextId() {
     const contextSelect = document.getElementById('scan-context');
     return contextSelect ? contextSelect.value : null;
+  }
+
+  // Staff must pick a context themselves: until they do, flag the selector
+  // and cover the camera with an empty state. Start from the placeholder even
+  // if the browser restored an earlier choice, since that fires no change.
+  const contextSelect = document.querySelector('select#scan-context');
+  if (contextSelect) {
+    contextSelect.value = '';
+    contextSelect.addEventListener('change', () => {
+      contextSelect.removeAttribute('aria-invalid');
+      contextSelect.removeAttribute('aria-describedby');
+      document.getElementById('scan-context-required')?.classList.add('hidden');
+      lastScannedCode = null;
+    });
+  }
+
+  // Shows the "choose a context" error and returns null when none is picked.
+  function requireContextId() {
+    const scanContextId = getCurrentContextId();
+    if (!scanContextId) showResult('Choose a context before scanning', true);
+    return scanContextId;
   }
 
   function updateStatus(message, state = 'loading') {
@@ -344,7 +373,8 @@ function groupBadgeHtml(group) {
     result.innerHTML = (isError ? '<%= j cs_status_icon(:error) %>' : '<%= j cs_status_icon(:success) %>') + html`<p class="font-bold">${message}</p>`;
     result.classList.remove('hidden');
     
-    setTimeout(() => result.classList.add('hidden'), 3000);
+    clearTimeout(resultHideTimeout);
+    resultHideTimeout = setTimeout(() => result.classList.add('hidden'), 3000);
   }
 
   function parseQrCode(scannedValue) {
@@ -360,7 +390,11 @@ function groupBadgeHtml(group) {
     if (scannedValue === lastScannedCode) return;
     
     const participantId = parseQrCode(scannedValue);
-    const scanContextId = getCurrentContextId();
+    const scanContextId = requireContextId();
+    if (!scanContextId) {
+      lastScannedCode = scannedValue;
+      return;
+    }
     
     scanCooldown = true;
     lastScannedCode = scannedValue;
@@ -557,7 +591,7 @@ function groupBadgeHtml(group) {
     e.preventDefault();
     const input = document.getElementById('manual-participant-id');
     const participantId = input.value.trim();
-    if (participantId) {
+    if (participantId && requireContextId()) {
       processScan(participantId);
       input.value = '';
     }
@@ -610,7 +644,7 @@ function groupBadgeHtml(group) {
   // Handle search result click
   searchResults.addEventListener('click', function(e) {
     const result = e.target.closest('.search-result');
-    if (result) {
+    if (result && requireContextId()) {
       const participantId = result.dataset.participantId;
       processScan(participantId);
       searchInput.value = '';
@@ -932,6 +966,10 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
   async function processNfcScan(badgeToken) {
     const scanUrl = '<%= admin_event_scans_path(current_event) %>';
     const scanContextId = window.getCurrentContextId?.();
+    if (!scanContextId) {
+      window.showResult?.('Choose a context before scanning', true);
+      return;
+    }
     
     try {
       const response = await fetch(scanUrl, {

@@ -4,10 +4,7 @@ module Admin
     before_action :set_scan_context, only: [ :edit, :update, :destroy ]
 
     def index
-      @scan_contexts = current_event.scan_contexts.reorder(
-        ScanContext.arel_table[:starts_at].asc.nulls_last,
-        :position, :created_at
-      )
+      @scan_contexts = current_event.scan_contexts.by_schedule
     end
 
     def new
