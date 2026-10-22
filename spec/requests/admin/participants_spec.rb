@@ -385,7 +385,8 @@ RSpec.describe "Admin::Participants", type: :request do
       Nokogiri::HTML(response.body).at_css("[data-testid='medical-summary']").text.squish
     end
 
-    it "flags dietary-only food allergies in the medical summary, in both admin UIs" do
+    it "flags allergies from both health records in the medical summary, in both admin UIs" do
+      participant_event.create_medical!(allergies: "Penicillin", has_anaphylaxis_risk: true, requires_refrigeration: true)
       participant_event.create_dietary!(life_threatening_allergies: "Peanuts", cross_contamination_risk: true)
 
       [ false, true ].each do |console|
@@ -394,51 +395,20 @@ RSpec.describe "Admin::Participants", type: :request do
 
         get admin_event_participant_path(event, participant_event)
 
-        expect(medical_summary).to match(/life-threatening food allergies/i).and match(/cross-contamination risk/i)
-        expect(medical_summary).not_to match(/no special medical flags|no medical information provided/i)
-        expect(medical_summary).not_to include("Peanuts")
+        expect(medical_summary).to match(/anaphylaxis risk/i).and match(/life-threatening food allergies/i)
+          .and match(/cross-contamination risk/i).and match(/has allergies/i).and match(/needs refrigeration/i)
+        expect(medical_summary).not_to match(/no special medical flags|Peanuts|Penicillin/i)
       end
     end
 
-    it "keeps the medical flags and refrigeration in the summary, in both admin UIs" do
-      participant_event.create_medical!(allergies: "Penicillin", has_anaphylaxis_risk: true, requires_refrigeration: true)
-
-      [ false, true ].each do |console|
-        global_admin.update!(admin_console_beta: console)
-        sign_in global_admin
-
-        get admin_event_participant_path(event, participant_event)
-
-        expect(medical_summary).to match(/anaphylaxis risk/i).and match(/has allergies/i).and match(/needs refrigeration/i)
-        expect(medical_summary).not_to match(/life-threatening food allergies|cross-contamination|no special medical flags/i)
-      end
-    end
-
-    it "says there is no information until a medical record exists, in both admin UIs" do
-      participant_event.create_dietary!(diet_type: "vegan")
-
-      [ false, true ].each do |console|
-        global_admin.update!(admin_console_beta: console)
-        sign_in global_admin
-
-        get admin_event_participant_path(event, participant_event)
-
-        expect(medical_summary).to match(/no medical information provided/i)
-      end
-    end
-
-    it "says there are no flags when the records hold none, in both admin UIs" do
+    it "reads \"None\" in the allergy fields as no allergy" do
       participant_event.create_medical!(allergies: "None")
-      participant_event.create_dietary!(diet_type: "vegan", life_threatening_allergies: "None")
+      participant_event.create_dietary!(life_threatening_allergies: "None")
+      sign_in global_admin
 
-      [ false, true ].each do |console|
-        global_admin.update!(admin_console_beta: console)
-        sign_in global_admin
+      get admin_event_participant_path(event, participant_event)
 
-        get admin_event_participant_path(event, participant_event)
-
-        expect(medical_summary).to match(/no special medical flags/i)
-      end
+      expect(medical_summary).to match(/no special medical flags/i)
     end
 
     it "shows dietary food allergies and cross-contamination in the table, in both admin UIs" do

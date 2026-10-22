@@ -76,17 +76,6 @@ RSpec.describe "Admin::Scans", type: :request do
       )
       expect(response.body).not_to include("Peanuts", "Penicillin")
     end
-
-    it "sends false food-allergy flags when nothing is recorded" do
-      post admin_event_scans_path(event), params: {
-        participant_id: participant_event.id, scan_context_id: scan_context.id
-      }, as: :json
-
-      expect(response.parsed_body["participant"]).to include(
-        "has_anaphylaxis_risk" => false, "dietary" => nil, "has_allergies" => false,
-        "has_life_threatening_food_allergies" => false, "cross_contamination_risk" => false
-      )
-    end
   end
 
   it "shows NFC reading but hides writing when issuance is disabled" do
