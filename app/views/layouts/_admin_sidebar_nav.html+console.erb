@@ -67,7 +67,7 @@
     <% if current_user.global_admin? || current_user.event_admin_for?(current_event) || current_user.ops_for?(current_event) || current_user.safeguarding_lead_for?(current_event) %>
       <%= nav_link.call("Change requests", admin_event_registration_change_requests_path(current_event), request.path.include?("/registration_change_requests"), :change_requests) %>
     <% end %>
-    <%= nav_link.call("Incidents", admin_event_incidents_path(current_event), request.path.include?("/incidents") && !request.path.start_with?("/admin/incidents"), :incidents) %>
+    <%= nav_link.call("Incident log", admin_event_incidents_path(current_event), request.path.start_with?(admin_event_incidents_path(current_event)), :incidents) %>
     <%= nav_link.call("Check-ins", admin_event_scans_path(current_event), request.path.include?("/scans"), :check_ins) %>
     <% if current_event.travel_enabled? %>
       <%= nav_link.call("Travel calendar", admin_event_travel_path(current_event), request.path == admin_event_travel_path(current_event), :travel) %>
@@ -110,7 +110,7 @@
       <details class="cs-sidenav-group" <%= "open" if conduct_active %>>
         <summary><%= chevron %><%= icon.call(:conduct) %><span class="cs-sidenav-label">Conduct</span></summary>
         <%= nav_link.call("Ban list", admin_bans_path, request.path.start_with?("/admin/bans"), :bans) %>
-        <%= nav_link.call("Incident reports", admin_incidents_path, request.path.start_with?("/admin/incidents"), :incident_reports) %>
+        <%= nav_link.call("HQ incident inbox", admin_incident_reports_path, request.path.start_with?("/admin/incidents"), :incident_reports) %>
       </details>
 
       <% logs_active = request.path.start_with?("/admin/audit_logs") || request.path.start_with?("/admin/email_logs") %>

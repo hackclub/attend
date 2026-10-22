@@ -1,5 +1,5 @@
 <% content_for :title, "Incident Report – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Incident reports", admin_incidents_path ], [ truncate(@incident_report.summary.presence || "Incident report", length: 60), nil ]) %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Incident reports", admin_incident_reports_path ], [ truncate(@incident_report.summary.presence || "Incident report", length: 60), nil ]) %>
 
 <div class="cs-stack max-w-3xl">
   <div class="cs-header">
@@ -12,6 +12,13 @@
       </p>
     </div>
   </div>
+
+  <% if @incident_report.escalated? && @incident_report.incident %>
+    <div class="cs-alert">
+      <%= cs_status_icon(:info) %>
+      <p>Escalated by an organizer from the <%= link_to "#{@incident_report.incident.event.name} incident log", admin_event_incident_path(@incident_report.incident.event, @incident_report.incident), class: "cs-link" %>. The event team sees this report's status, not its comments.</p>
+    </div>
+  <% end %>
 
   <% if @incident_report.emergency? && @incident_report.acknowledger_names.any? %>
     <div class="cs-alert cs-alert-success">
@@ -75,7 +82,7 @@
       <h2 class="cs-h2">Add comment</h2>
     </div>
     <div class="cs-container-body">
-      <%= form_with model: @comment || IncidentReportComment.new, url: admin_incident_comments_path(@incident_report),
+      <%= form_with model: @comment || IncidentReportComment.new, url: admin_incident_report_comments_path(@incident_report),
             html: { multipart: true, novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
         <%= cs_form_field f, :body, label: "Comment", description: "A comment or note about this report." do |aria| %>
           <%= f.text_area :body, rows: 3, class: "cs-input", required: true, **aria %>

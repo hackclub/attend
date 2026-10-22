@@ -203,6 +203,19 @@
              data-action="<%= IncidentReportsController::TURNSTILE_ACTION %>"></div>
       <% end %>
 
+      <% if @organizer_events.present? %>
+        <div class="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700">
+          <p class="font-medium text-gray-900">Organizing one of these events?</p>
+          <p class="mt-1">Your event's incident log keeps a record for your team and can escalate to HQ from there, with the same people notified:</p>
+          <ul class="mt-1 list-disc list-inside">
+            <% @organizer_events.each do |event| %>
+              <li><%= link_to "Log an incident for #{event.name}", new_admin_event_incident_path(event), class: "text-[#ec3750] hover:text-[#d42f46] font-medium" %></li>
+            <% end %>
+          </ul>
+          <p class="mt-1 text-gray-500">Reporting as a participant or parent? Carry on below.</p>
+        </div>
+      <% end %>
+
       <div>
         <%= f.submit "Submit report",
               data: { incident_report_target: "submit" },

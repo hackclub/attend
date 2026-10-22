@@ -1,0 +1,16 @@
+<%# Standalone "escalate to HQ" form for an incident that already exists. %>
+<details class="bg-white border border-gray-200 rounded-lg mb-6">
+  <summary class="cursor-pointer px-6 py-4 text-sm font-medium text-gray-900 flex items-center justify-between">
+    <span>Escalate to Hack Club HQ</span>
+    <span class="text-xs text-gray-500 font-normal">Files a confidential report with HQ's safeguarding team</span>
+  </summary>
+  <div class="px-6 pb-6 border-t border-gray-100 pt-4">
+    <%= form_with url: escalate_admin_event_incident_path(current_event, incident), method: :post, local: true,
+          data: { controller: "incident-escalation", action: "submit->incident-escalation#confirm" } do %>
+      <%= render "admin/incidents/escalation_fields", phone: current_user.oidc_claims&.dig("phone_number") %>
+      <div class="mt-4">
+        <%= submit_tag "Escalate to HQ", class: "bg-[#d42f46] text-white px-4 py-2 rounded-md hover:bg-[#b82840] cursor-pointer" %>
+      </div>
+    <% end %>
+  </div>
+</details>

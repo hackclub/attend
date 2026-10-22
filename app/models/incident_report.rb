@@ -8,6 +8,8 @@ class IncidentReport < ApplicationRecord
 
   belongs_to :event, optional: true
   belongs_to :user, optional: true
+  # Set when an organizer escalated an event incident log entry to HQ.
+  belongs_to :incident, optional: true
 
   # An event is "recent" (and so eligible for emergency priority + calls) if it
   # is upcoming, running, or ended within the last month. Custom events (not on
@@ -44,6 +46,8 @@ class IncidentReport < ApplicationRecord
 
   enum :status, { open: "open", in_review: "in_review", resolved: "resolved" }
 
+  scope :escalated, -> { where.not(incident_id: nil) }
+
   normalizes_phone_number :reporter_phone
 
   validates :reporter_name, :reporter_email, :reporter_phone, presence: true
@@ -63,6 +67,20 @@ class IncidentReport < ApplicationRecord
 
   def event_name
     event&.name || custom_event_name
+  end
+
+  def escalated?
+    incident_id.present?
+  end
+
+  # Everything that should happen once a new report is on file: the HQ email,
+  # the Slack post, the reporter's confirmation text and, for emergencies,
+  # the phone calls. Shared by the public form and organizer escalation.
+  def dispatch_notifications!
+    IncidentReportMailer.new_report(self).deliver_later
+    SendIncidentReportToSlackJob.perform_later(id)
+    SendIncidentReportConfirmationSmsJob.perform_later(id)
+    InitiateEmergencyIncidentCallsJob.perform_later(id) if emergency?
   end
 
   def emergency_allowed?

@@ -1,0 +1,14 @@
+<div class="cs-field-grid">
+  <%= cs_field(id: "escalation_priority", label: "How urgently does HQ need to respond?",
+        description: "Emergency rings the safeguarding team's phones. Use it for anything happening right now.") do |aria| %>
+    <%= select_tag "escalation[priority]", options_for_select(IncidentReport::PRIORITIES.map { |k, v| [v, k] }, "standard"),
+          id: "escalation_priority", class: "cs-select", **aria %>
+  <% end %>
+  <%= cs_field(id: "escalation_reporter_phone", label: "Number HQ can call you on", constraint: "Include the country code, for example +1 555 555 0100.") do |aria| %>
+    <%= telephone_field_tag "escalation[reporter_phone]", phone, id: "escalation_reporter_phone", class: "cs-input", required: true, **aria %>
+  <% end %>
+</div>
+<label class="cs-option mt-4 cursor-pointer">
+  <%= check_box_tag "escalation[emergency_services_called]", "1", false %>
+  <span class="cs-option-label">Emergency services (police, ambulance) have been called</span>
+</label>

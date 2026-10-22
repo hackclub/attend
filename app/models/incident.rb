@@ -20,6 +20,13 @@ class Incident < ApplicationRecord
 
   has_many :comments, class_name: "IncidentComment", dependent: :destroy
 
+  # The confidential report HQ sees when an organizer escalates this incident.
+  # HQ's thread stays on the report; the incident only shows its status.
+  has_one :hq_report, class_name: "IncidentReport", dependent: :nullify
+
+  # What a fresh incident is visible to before the organizer adjusts it.
+  DEFAULT_VISIBLE_TO_ROLES = %w[event_admin safeguarding_lead].freeze
+
   enum :category, { safeguarding: "safeguarding", medical: "medical", behavior: "behavior", other: "other" }
   enum :severity, { low: "low", medium: "medium", high: "high", critical: "critical" }
   enum :status, { open: "open", in_review: "in_review", closed: "closed" }
@@ -28,7 +35,12 @@ class Incident < ApplicationRecord
   validates :reported_by_user_id, presence: true
   validates :category, presence: true
   validates :severity, presence: true
+  before_validation { self.visible_to_roles = Array(visible_to_roles).reject(&:blank?) }
 
   scope :open_incidents, -> { where(status: %w[open in_review]) }
   scope :for_roles, ->(roles) { where("visible_to_roles && ARRAY[?]::varchar[]", roles) }
+
+  def escalated?
+    hq_report.present?
+  end
 end

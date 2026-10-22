@@ -1,78 +1,163 @@
-<% content_for :title, "Incident Reports – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Incident reports", nil ]) %>
+<% content_for :title, "HQ Incident Inbox – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "HQ incident inbox", nil ]) %>
+<% show_reports = @view != "logs" %>
+<% show_logs = @view != "reports" %>
+<% segment = ->(label, path, active) { link_to label, path, class: "cs-segment", "aria-current": (active ? "page" : nil) } %>
 
 <div class="cs-stack">
   <div class="cs-header">
     <div class="cs-header-text">
-      <h1 class="cs-h1">Incident reports <span class="cs-counter">(<%= @incident_reports.size %>)</span></h1>
+      <h1 class="cs-h1">HQ incident inbox</h1>
       <p class="cs-description">
-        Confidential reports submitted through the public form at
-        <code class="font-mono">/incident</code>. Visible to global admins only.
+        Reports to HQ come from the public form at <code class="font-mono">/incident</code> and from organizers escalating an event incident.
+        Event incident logs are what organizers record for their own team.
       </p>
     </div>
     <div class="cs-actions">
-      <%= link_to "Notification settings", admin_incident_settings_path, class: "cs-btn" %>
+      <%= link_to "Notification settings", admin_incident_report_settings_path, class: "cs-btn" %>
     </div>
   </div>
 
-  <div class="cs-segmented" role="group" aria-label="Filter by priority">
-    <% nav_link = ->(label, params_hash) {
-         active = params_hash.all? { |k, v| params[k].to_s == v.to_s } && (params_hash.any? || params[:priority].blank?)
-         link_to label, admin_incidents_path(params_hash), class: "cs-segment", "aria-current": (active ? "page" : nil)
-       } %>
-    <%= nav_link.("All priorities", {}) %>
-    <%= nav_link.("Emergency only", { priority: "emergency" }) %>
+  <div class="cs-segmented" role="group" aria-label="What to show">
+    <%= segment.("Everything", admin_incident_reports_path, @view == "all") %>
+    <%= segment.("Reports to HQ", admin_incident_reports_path(view: "reports"), @view == "reports") %>
+    <%= segment.("Event incident logs", admin_incident_reports_path(view: "logs"), @view == "logs") %>
   </div>
 
-  <% if @incident_reports.any? %>
-    <% IncidentReport.statuses.keys.each do |status| %>
-      <% reports = @reports_by_status[status] || [] %>
-      <% next if reports.empty? %>
-      <section class="cs-container">
-        <div class="cs-container-header cs-container-header-divided">
-          <h2 class="cs-h2"><%= status.humanize %> <span class="cs-counter">(<%= reports.size %>)</span></h2>
+  <% if show_reports %>
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <h2 class="cs-h2">Reports to HQ <span class="cs-counter">(<%= @incident_reports.size %>)</span></h2>
+        <div class="cs-segmented" role="group" aria-label="Filter by priority">
+          <%= segment.("All priorities", admin_incident_reports_path(view: params[:view]), params[:priority].blank?) %>
+          <%= segment.("Emergency only", admin_incident_reports_path(view: params[:view], priority: "emergency"), params[:priority] == "emergency") %>
         </div>
+      </div>
+      <% if @incident_reports.any? %>
+        <% IncidentReport.statuses.keys.each do |status| %>
+          <% reports = @reports_by_status[status] || [] %>
+          <% next if reports.empty? %>
+          <div class="cs-container-header cs-container-header-divided">
+            <h3 class="cs-h3"><%= status.humanize %> <span class="cs-counter">(<%= reports.size %>)</span></h3>
+          </div>
+          <div class="cs-table-wrap">
+            <table class="cs-table">
+              <thead>
+                <tr>
+                  <th scope="col">Filed</th>
+                  <th scope="col">Priority</th>
+                  <th scope="col">Summary</th>
+                  <th scope="col">Event</th>
+                  <th scope="col">Reporter</th>
+                  <th scope="col">Source</th>
+                  <th scope="col"><span class="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% reports.each do |report| %>
+                  <tr>
+                    <td class="whitespace-nowrap"><%= cs_absolute_time_tag(report.created_at) %></td>
+                    <td class="whitespace-nowrap"><%= incident_report_priority_badge(report.priority) %></td>
+                    <td class="max-w-xs">
+                      <span class="block truncate" title="<%= report.summary %>"><%= report.summary %></span>
+                      <span class="block cs-small cs-muted"><%= report.incident_type_label %></span>
+                    </td>
+                    <td class="whitespace-nowrap"><%= report.event_name || "—" %></td>
+                    <td class="whitespace-nowrap">
+                      <%= report.reporter_name %>
+                      <span class="block cs-small cs-muted"><%= report.role_label %></span>
+                    </td>
+                    <td class="whitespace-nowrap">
+                      <% if report.incident %>
+                        <%= link_to "Escalated from event log", admin_event_incident_path(report.incident.event, report.incident), class: "cs-link" %>
+                      <% else %>
+                        <span class="cs-muted">Public form</span>
+                      <% end %>
+                    </td>
+                    <td class="whitespace-nowrap text-right">
+                      <%= link_to "View", admin_incident_report_path(report), class: "cs-link" %>
+                    </td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% end %>
+      <% else %>
+        <div class="cs-container-body">
+          <div class="cs-empty">
+            <p class="cs-empty-title">No reports to HQ</p>
+            <p>No reports<%= " match this filter" if params[:priority].present? %>.</p>
+          </div>
+        </div>
+      <% end %>
+    </section>
+  <% end %>
+
+  <% if show_logs %>
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <h2 class="cs-h2">Event incident logs <span class="cs-counter">(<%= @incidents.size %>)</span></h2>
+      </div>
+      <%= form_with url: admin_incident_reports_path, method: :get, local: true, class: "cs-filter-bar", data: { controller: "auto-submit" } do %>
+        <%= hidden_field_tag :view, params[:view] %>
+        <%= select_tag :event_id, options_from_collection_for_select(@log_events, :id, :name, params[:event_id]), include_blank: "All events",
+              class: "cs-select w-full sm:max-w-xs", "aria-label": "Filter by event", data: { action: "change->auto-submit#submit" } %>
+        <label class="cs-option mt-0! cursor-pointer">
+          <%= check_box_tag :open, "1", params[:open] == "1", data: { action: "change->auto-submit#submit" } %>
+          <span class="cs-option-label">Open only</span>
+        </label>
+      <% end %>
+      <% if @incidents.any? %>
         <div class="cs-table-wrap">
           <table class="cs-table">
             <thead>
               <tr>
-                <th scope="col">Filed</th>
-                <th scope="col">Priority</th>
-                <th scope="col">Type</th>
+                <th scope="col">Incident time</th>
                 <th scope="col">Event</th>
-                <th scope="col">Reporter</th>
+                <th scope="col">Summary</th>
+                <th scope="col">Severity</th>
+                <th scope="col">Status</th>
+                <th scope="col">Reported by</th>
+                <th scope="col">HQ</th>
                 <th scope="col"><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
-              <% reports.each do |report| %>
+              <% @incidents.each do |incident| %>
                 <tr>
-                  <td class="whitespace-nowrap"><%= cs_absolute_time_tag(report.created_at) %></td>
-                  <td class="whitespace-nowrap"><%= incident_report_priority_badge(report.priority) %></td>
-                  <td class="whitespace-nowrap"><%= report.incident_type_label %></td>
-                  <td class="whitespace-nowrap"><%= report.event_name || "—" %></td>
-                  <td class="whitespace-nowrap">
-                    <%= report.reporter_name %>
-                    <span class="block cs-small cs-muted"><%= report.role_label %></span>
+                  <td class="whitespace-nowrap"><%= cs_absolute_time_tag(incident.occurred_at || incident.created_at) %></td>
+                  <td class="whitespace-nowrap"><%= incident.event.name %></td>
+                  <td class="max-w-xs">
+                    <span class="block truncate" title="<%= incident.summary %>"><%= incident.summary.presence || "No summary" %></span>
+                    <span class="block mt-0.5"><%= render_category_badge(incident.category) %></span>
                   </td>
-                  <td class="whitespace-nowrap text-right">
-                    <%= link_to "View", admin_incident_path(report), class: "cs-link" %>
+                  <td><%= render_severity_badge(incident.severity) %></td>
+                  <td><%= incident_status(incident.status) %></td>
+                  <td class="whitespace-nowrap"><%= incident.reported_by.display_name_or_fallback %></td>
+                  <td class="whitespace-nowrap">
+                    <% if incident.escalated? %>
+                      <%= link_to admin_incident_report_path(incident.hq_report), class: "cs-link" do %><%= incident_status(incident.hq_report.status) %><% end %>
+                    <% else %>
+                      <span class="cs-muted">—</span>
+                    <% end %>
+                  </td>
+                  <td class="text-right">
+                    <%= link_to "View", admin_event_incident_path(incident.event, incident), class: "cs-link" %>
                   </td>
                 </tr>
               <% end %>
             </tbody>
           </table>
         </div>
-      </section>
-    <% end %>
-  <% else %>
-    <section class="cs-container">
-      <div class="cs-container-body">
-        <div class="cs-empty">
-          <p class="cs-empty-title">No incident reports</p>
-          <p>No incident reports<%= " match this filter" if params[:priority].present? %>.</p>
+      <% else %>
+        <div class="cs-container-body">
+          <div class="cs-empty">
+            <p class="cs-empty-title">No event incidents</p>
+            <p>No incidents<%= " match this filter" if params[:event_id].present? || params[:open] == "1" %>.</p>
+          </div>
         </div>
-      </div>
+      <% end %>
     </section>
   <% end %>
 </div>

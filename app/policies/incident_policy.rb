@@ -19,6 +19,10 @@ class IncidentPolicy < ApplicationPolicy
     can_view_incident?
   end
 
+  def escalate?
+    can_view_incident?
+  end
+
   class Scope < ApplicationPolicy::Scope
     def resolve
       return scope.none unless user

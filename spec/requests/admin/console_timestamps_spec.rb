@@ -107,8 +107,8 @@ RSpec.describe "Admin console timestamps", type: :request do
     expect(expect_compliant(admin_series_api_tokens_path(series.slug))).not_to be_empty
     expect(expect_compliant(admin_event_slack_blasts_path(event))).not_to be_empty
     expect(expect_compliant(admin_event_slack_blast_path(event, blast))).not_to be_empty
-    expect(expect_compliant(admin_incidents_path)).not_to be_empty
-    expect(expect_compliant(admin_incident_path(report))).not_to be_empty
+    expect(expect_compliant(admin_incident_reports_path)).not_to be_empty
+    expect(expect_compliant(admin_incident_report_path(report))).not_to be_empty
     expect(expect_compliant(preview_admin_event_message_path(event, scheduled))).not_to be_empty
     expect_compliant(admin_settings_path)
     expect(expect_compliant(admin_series_index_path)).to be_empty

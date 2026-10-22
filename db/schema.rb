@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_203532) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_22_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -756,6 +756,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_203532) do
     t.text "details", null: false
     t.boolean "emergency_services_called"
     t.uuid "event_id"
+    t.uuid "incident_id"
     t.string "incident_type", null: false
     t.string "priority", null: false
     t.string "reporter_email", null: false
@@ -770,6 +771,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_203532) do
     t.uuid "user_id"
     t.index ["created_at"], name: "index_incident_reports_on_created_at"
     t.index ["event_id"], name: "index_incident_reports_on_event_id"
+    t.index ["incident_id"], name: "index_incident_reports_on_incident_id", unique: true
     t.index ["priority"], name: "index_incident_reports_on_priority"
     t.index ["status"], name: "index_incident_reports_on_status"
     t.index ["user_id"], name: "index_incident_reports_on_user_id"
@@ -1697,6 +1699,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_203532) do
   add_foreign_key "incident_report_comments", "incident_reports"
   add_foreign_key "incident_report_comments", "users"
   add_foreign_key "incident_reports", "events"
+  add_foreign_key "incident_reports", "incidents", on_delete: :nullify
   add_foreign_key "incident_reports", "users"
   add_foreign_key "incidents", "events"
   add_foreign_key "incidents", "participant_events"

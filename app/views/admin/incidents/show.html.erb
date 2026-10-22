@@ -4,13 +4,16 @@
   <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
     <h1 class="text-2xl font-bold">Incident Details</h1>
     <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-      <% if @incident.behavior? || @incident.safeguarding? || @incident.other? %>
-        <%= button_to "Send to Slack", send_to_slack_admin_event_incident_path(current_event, @incident), method: :post, class: "w-full sm:w-auto text-center bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 cursor-pointer", data: { turbo_confirm: "Send this conduct report to Slack?" } %>
-      <% end %>
       <%= link_to "Edit", edit_admin_event_incident_path(current_event, @incident), class: "w-full sm:w-auto text-center bg-[#d42f46] text-white px-4 py-2 rounded-md hover:bg-[#b82840]" %>
       <%= link_to "← Back to Incidents", admin_event_incidents_path(current_event), class: "w-full sm:w-auto text-center bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300" %>
     </div>
   </div>
+
+  <% if @incident.escalated? %>
+    <%= render "admin/incidents/hq_status", incident: @incident %>
+  <% else %>
+    <%= render "admin/incidents/escalate_form", incident: @incident %>
+  <% end %>
 
   <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
     <div class="px-6 py-4 border-b border-gray-200">
