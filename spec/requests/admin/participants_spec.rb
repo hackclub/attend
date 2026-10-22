@@ -43,6 +43,25 @@ RSpec.describe "Admin::Participants", type: :request do
     end
   end
 
+  describe "GET index filter form" do
+    before { sign_in global_admin }
+
+    it "submits filters on change and keeps them on the List/Table toggle links" do
+      get admin_event_participants_path(event.slug), params: { search: "ada", flag: "missing_medical" }
+
+      page = Nokogiri::HTML(response.body)
+      form = page.at_css("form[data-controller='auto-submit']")
+      expect(form["data-turbo-action"]).to eq("replace")
+      expect(form.at_css("select[name='flag']")["data-action"]).to eq("change->auto-submit#submit")
+      expect(form.at_css("noscript").inner_html).to include("Filter")
+
+      list_href = page.at_css("a[title='List view']")["href"]
+      table_href = page.at_css("a[title='Table view']")["href"]
+      expect(list_href).to eq(admin_event_participants_path(event.slug, search: "ada", flag: "missing_medical"))
+      expect(table_href).to eq(table_admin_event_participants_path(event.slug, search: "ada", flag: "missing_medical"))
+    end
+  end
+
   describe "participants over the age limit" do
     let!(:aged_out) do
       create(:participant_event, event: event, status: :invited, skip_age_check: true,

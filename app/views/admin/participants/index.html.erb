@@ -95,10 +95,11 @@
 
   <!-- Filters -->
   <div class="mb-4">
-    <form action="<%= admin_event_participants_path(current_event) %>" method="get" class="flex flex-wrap items-center gap-2">
+    <form action="<%= admin_event_participants_path(current_event) %>" method="get" class="flex flex-wrap items-center gap-2" data-controller="auto-submit" data-turbo-action="replace">
       <div class="flex-1 min-w-[200px] max-w-xs">
         <%= text_field_tag :search, params[:search],
             placeholder: "Search...",
+            data: { auto_submit_target: "search", action: "input->auto-submit#debouncedSubmit" },
             class: "w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750]" %>
       </div>
       <%= select_tag :status,
@@ -114,7 +115,8 @@
             ],
             params[:status]
           ),
-          class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
+          class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600",
+          data: { action: "change->auto-submit#submit" } %>
       <%= select_tag :flag,
           options_for_select([
             ["All Flags", ""],
@@ -125,21 +127,24 @@
             ["Anaphylaxis Risk", "anaphylaxis"],
             ["19+ During Event", "over_age_limit"]
           ], params[:flag]),
-          class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
+          class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600",
+          data: { action: "change->auto-submit#submit" } %>
       <%= select_tag :checked_in,
           options_for_select([
             ["All Check-In", ""],
             ["Checked In", "yes"],
             ["Not Checked In", "no"]
           ], params[:checked_in]),
-          class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
+          class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600",
+          data: { action: "change->auto-submit#submit" } %>
       <% if current_event.groups_enabled? && current_event.groups.any? %>
         <%= select_tag :group_id,
             options_for_select(
               [["All Groups", ""], ["No Group", "none"]] + current_event.groups.ordered.map { |g| [g.name, g.id] },
               params[:group_id]
             ),
-            class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
+            class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600",
+            data: { action: "change->auto-submit#submit" } %>
       <% end %>
       <% if @optional_documents.any? %>
         <%# Opt-in activities: who's doing each one, and who still owes a signature. %>
@@ -152,17 +157,23 @@
               },
               params[:optional_document]
             ),
-            class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
+            class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600",
+            data: { action: "change->auto-submit#submit" } %>
       <% end %>
-      <%= submit_tag "Filter", class: "text-sm font-medium bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 cursor-pointer" %>
+      <%# Filters apply on change; the button is only for browsers without JS. %>
+      <noscript>
+        <%= submit_tag "Filter", class: "text-sm font-medium bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 cursor-pointer" %>
+      </noscript>
       <% if params[:search].present? || params[:status].present? || params[:flag].present? || params[:checked_in].present? || params[:group_id].present? || params[:optional_document].present? %>
         <%= link_to "Clear", admin_event_participants_path(current_event), class: "text-sm text-gray-500 hover:text-gray-700" %>
       <% end %>
+      <%# Switching views keeps whatever filters are active. %>
+      <% view_params = request.query_parameters.slice("search", "status", "flag", "checked_in", "group_id", "optional_document") %>
       <div class="ml-auto flex items-center gap-1">
-        <%= link_to admin_event_participants_path(current_event), class: "p-1.5 rounded #{@show_pending_invitations || !request.path.include?('table') ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-600'}", title: "List view" do %>
+        <%= link_to admin_event_participants_path(current_event, view_params), class: "p-1.5 rounded #{@show_pending_invitations || !request.path.include?('table') ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-600'}", title: "List view" do %>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
         <% end %>
-        <%= link_to table_admin_event_participants_path(current_event), class: "p-1.5 rounded text-gray-400 hover:text-gray-600", title: "Table view" do %>
+        <%= link_to table_admin_event_participants_path(current_event, view_params), class: "p-1.5 rounded text-gray-400 hover:text-gray-600", title: "Table view" do %>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M3 12h18M3 18h18M9 4v16M15 4v16"/></svg>
         <% end %>
       </div>
