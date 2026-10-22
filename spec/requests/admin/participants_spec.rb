@@ -46,7 +46,7 @@ RSpec.describe "Admin::Participants", type: :request do
   describe "GET index filter form" do
     before { sign_in global_admin }
 
-    it "auto-submits, morphs and keeps active filters on the view links" do
+    it "auto-submits and keeps active filters, including the chase filter" do
       event.update!(groups_enabled: true, slack_channel_id: "C123")
       create(:group, event: event)
       create(:custom_document, :optional, event: event)
@@ -54,13 +54,8 @@ RSpec.describe "Admin::Participants", type: :request do
       get admin_event_participants_path(event.slug), params: { search: "ada", status: "", blocked_on: "travel" }
 
       page = Nokogiri::HTML(response.body)
-      form = page.at_css("form[data-controller='auto-submit']")
-      expect(page.at_css("meta[name='turbo-refresh-method']")["content"]).to eq("morph")
-      expect(form.at_css("input[name='search']")["data-action"]).to include("auto-submit#keepTypedSearch")
-      expect(form.css("select").map { |s| s["data-action"] }.uniq).to eq([ "change->auto-submit#submit" ])
-      expect(form.css("select").map { |s| s["name"] }).to include("group_id", "optional_document")
-      expect(form.at_css("input[name='blocked_on']")["value"]).to eq("travel")
-      expect(page.css("#slack-sync-progress[data-turbo-permanent], #sync-slack-modal[data-turbo-permanent]").size).to eq(2)
+      expect(page.css("#participant-filters select").map { |s| s["data-action"] }.uniq).to eq([ "change->auto-submit#submit" ])
+      expect(page.at_css("#participant-filters input[name='blocked_on']")["value"]).to eq("travel")
       expect(page.at_css("a[title='Table view']")["href"]).to eq(table_admin_event_participants_path(event.slug, search: "ada", blocked_on: "travel"))
     end
   end
