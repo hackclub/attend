@@ -60,6 +60,13 @@
       <% end %>
       <% if @participant_event.participant.slack_user_id.present? %>
         <%= link_to "View on Slack", "https://hackclub.enterprise.slack.com/team/#{@participant_event.participant.slack_user_id}", target: "_blank", rel: "noopener noreferrer", class: "block px-4 py-2 text-sm text-purple-700 hover:bg-gray-50" %>
+        <button type="button"
+                data-controller="clipboard"
+                data-clipboard-content-value="<%= @participant_event.participant.slack_user_id %>"
+                data-action="click->clipboard#copy"
+                class="w-full text-left px-4 py-2 text-sm text-purple-700 hover:bg-gray-50 cursor-pointer">
+          Copy Slack ID
+        </button>
       <% end %>
       <% if policy(@participant_event).withdraw? || policy(@participant_event).destroy? %>
         <div class="border-t border-gray-100 my-1"></div>
