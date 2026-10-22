@@ -48,10 +48,6 @@ RSpec.describe AirtableMailer do
       expect(mail.text_part.body.to_s).to include("Last successful sync was")
     end
 
-    it "says so when the integration never synced" do
-      expect(mail.text_part.body.to_s).to include("never synced successfully")
-    end
-
     it "logs the email against the event and the recipient" do
       expect { mail.deliver_now }.to change(EmailLog, :count).by(1)
 
@@ -79,14 +75,7 @@ RSpec.describe AirtableMailer do
         expect(body).to include("12 times")
         expect(body).to include("still retrying")
         expect(body).to include("/admin/horizons-polaris/integrations")
-      end
-    end
-
-    it "tells them Airtable is still showing the last good snapshot" do
-      event.update_columns(airtable_synced_at: 4.hours.ago)
-
-      [ mail.html_part, mail.text_part ].each do |part|
-        expect(part.body.to_s).to include("Last successful sync was")
+        expect(body).to include("never synced successfully")
       end
     end
 

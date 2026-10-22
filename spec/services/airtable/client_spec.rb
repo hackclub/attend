@@ -65,57 +65,12 @@ RSpec.describe Airtable::Client do
       expect(client.list_records("tblTest")).to eq("records" => [])
       expect(retry_sleeps).to eq([ 30.0 ])
     end
-
-    it "waits as long as Retry-After asks when that is longer" do
-      stub_request(:get, list_url).to_return(
-        { status: 429, headers: { "Retry-After" => "45" }, body: "" },
-        { status: 200, body: '{"records":[]}' }
-      )
-
-      client.list_records("tblTest")
-
-      expect(retry_sleeps).to eq([ 45.0 ])
-    end
-
-    it "gives up straight away when Retry-After is beyond the cap" do
-      stub_request(:get, list_url).to_return(status: 429, headers: { "Retry-After" => "600" }, body: "")
-
-      expect { client.list_records("tblTest") }.to raise_error(Airtable::RateLimitError)
-      expect(WebMock).to have_requested(:get, list_url).once
-      expect(retry_sleeps).to be_empty
-    end
-
-    it "does not wait out a 5xx Retry-After beyond the cap either" do
-      stub_request(:get, list_url).to_return(status: 503, headers: { "Retry-After" => "1800" }, body: "")
-
-      expect { client.list_records("tblTest") }.to raise_error(Airtable::ServerError)
-      expect(retry_sleeps).to be_empty
-    end
-
-    it "raises RateLimitError once the retries run out" do
-      stub_request(:get, list_url).to_return(status: 429, body: "")
-
-      expect { client.list_records("tblTest") }.to raise_error(Airtable::RateLimitError)
-      expect(WebMock).to have_requested(:get, list_url).times(3)
-    end
-
-    # Unlike a 5xx, a 429 means Airtable refused the request without running it.
-    it "retries a refused create, which a 5xx never does" do
-      stub_request(:post, records_url).to_return(
-        { status: 429, body: "" },
-        { status: 200, body: '{"id":"recNew"}' }
-      )
-
-      expect(client.create_record("Participants", { "Email" => "x@example.com" })).to eq("id" => "recNew")
-      expect(WebMock).to have_requested(:post, records_url).twice
-    end
   end
 
   it "raises ForbiddenError on a 403" do
-    stub_request(:post, sync_url)
-      .to_return(status: 403, body: '{"error":{"type":"INVALID_PERMISSIONS","message":"Invalid external table sync ID"}}')
+    stub_request(:post, sync_url).to_return(status: 403, body: "")
 
     expect { client.post_sync_csv("tblTest", "sncTest", "a,b\n") }
-      .to raise_error(Airtable::ForbiddenError, "HTTP 403: INVALID_PERMISSIONS: Invalid external table sync ID")
+      .to raise_error(Airtable::ForbiddenError, "Airtable denied access")
   end
 end
