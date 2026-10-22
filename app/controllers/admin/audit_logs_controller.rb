@@ -121,8 +121,9 @@ module Admin
     end
 
     # Incidents (across the user's events) whose visible_to_roles intersects
-    # the user's roles for that event — the same rule IncidentPolicy enforces,
-    # but computed for all events since audit logs span events.
+    # the user's roles for that event, or that the user reported — the same
+    # rule IncidentPolicy enforces, but computed for all events since audit
+    # logs span events.
     def visible_incident_ids
       @visible_incident_ids ||= begin
         roles_by_event = current_user.event_role_assignments
@@ -131,9 +132,10 @@ module Admin
           .transform_values { |pairs| pairs.map(&:last) }
 
         Incident.where(event_id: roles_by_event.keys)
-          .pluck(:id, :event_id, :visible_to_roles)
-          .filter_map do |id, event_id, visible_to_roles|
-            id if ((visible_to_roles || []) & roles_by_event[event_id]).any?
+          .pluck(:id, :event_id, :visible_to_roles, :reported_by_user_id)
+          .filter_map do |id, event_id, visible_to_roles, reported_by_user_id|
+            id if reported_by_user_id == current_user.id ||
+              ((visible_to_roles || []) & roles_by_event[event_id]).any?
           end
       end
     end

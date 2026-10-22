@@ -12,7 +12,7 @@ module Admin
     end
 
     def new
-      @incident = current_event.incidents.build
+      @incident = current_event.incidents.build(visible_to_roles: Incident::DEFAULT_VISIBLE_TO_ROLES)
       authorize @incident
     end
 

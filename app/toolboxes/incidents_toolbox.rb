@@ -48,7 +48,7 @@ class IncidentsToolbox < ApplicationToolbox
                     :participant_event_id).to_h
     )
     @incident.reported_by_user_id = current_user.id
-    @incident.visible_to_roles = params[:visible_to_roles].presence || %w[event_admin safeguarding_lead]
+    @incident.visible_to_roles = params[:visible_to_roles].presence || Incident::DEFAULT_VISIBLE_TO_ROLES
     authorize! @incident, :create?
     @incident.save!
     render json: serialize_incident(@incident, full: true)
@@ -74,7 +74,7 @@ class IncidentsToolbox < ApplicationToolbox
   def add_comment
     @incident = load_incident!
     authorize! @incident, :show?
-    @comment = @incident.incident_comments.create!(user: current_user, body: params[:body])
+    @comment = @incident.comments.create!(user: current_user, body: params[:body])
     render json: serialize_incident(@incident, full: true)
   end
 
@@ -107,10 +107,10 @@ class IncidentsToolbox < ApplicationToolbox
     base.merge(
       details: i.details,
       actions_taken: i.actions_taken,
-      reported_by: i.reported_by_user&.display_name_or_fallback,
+      reported_by: i.reported_by&.display_name_or_fallback,
       visible_to_roles: i.visible_to_roles,
       participant_event_id: i.participant_event_id,
-      comments: i.incident_comments.includes(:user).order(:created_at).map { |c|
+      comments: i.comments.includes(:user).order(:created_at).map { |c|
         { author: c.user&.display_name_or_fallback, body: c.body, at: c.created_at }
       }
     )

@@ -96,6 +96,19 @@ RSpec.describe "Admin::AuditLogs", type: :request do
       expect(response.body).not_to include(hidden.id.first(8))
     end
 
+    it "shows an event admin the audit rows for incidents they reported" do
+      own = Incident.create!(
+        event: event, reported_by: event_admin, category: "behavior", severity: "low",
+        summary: "Own summary", visible_to_roles: [ "safeguarding_lead" ]
+      )
+      log_for(own)
+      sign_in event_admin
+
+      get admin_audit_logs_path
+
+      expect(response.body).to include(own.id.first(8))
+    end
+
     it "does not let an event admin read another event's logs via event_id param" do
       other_event = create(:event)
       other_incident = Incident.create!(

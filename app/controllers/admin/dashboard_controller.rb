@@ -181,8 +181,8 @@ class Admin::DashboardController < Admin::BaseController
     @consent_stats = compute_consent_stats
 
     # Incidents
-    @open_incidents_count = current_event.incidents.open_incidents.count
-    @recent_incidents = current_event.incidents
+    @open_incidents_count = policy_scope(current_event.incidents).open_incidents.count
+    @recent_incidents = policy_scope(current_event.incidents)
       .includes(participant_event: :participant, reported_by: [])
       .order(created_at: :desc)
       .limit(5)

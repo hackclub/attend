@@ -24,6 +24,14 @@ class Incident < ApplicationRecord
   enum :severity, { low: "low", medium: "medium", high: "high", critical: "critical" }
   enum :status, { open: "open", in_review: "in_review", closed: "closed" }
 
+  # Pre-ticked on the new incident form, and used by the MCP toolbox when no
+  # roles are given.
+  DEFAULT_VISIBLE_TO_ROLES = %w[event_admin safeguarding_lead].freeze
+
+  # The form posts a hidden "" so that unticking every role still sends the
+  # param (and clears it); drop it before it's stored.
+  normalizes :visible_to_roles, with: ->(roles) { roles.compact_blank }
+
   validates :event_id, presence: true
   validates :reported_by_user_id, presence: true
   validates :category, presence: true
@@ -31,4 +39,7 @@ class Incident < ApplicationRecord
 
   scope :open_incidents, -> { where(status: %w[open in_review]) }
   scope :for_roles, ->(roles) { where("visible_to_roles && ARRAY[?]::varchar[]", roles) }
+  # What IncidentPolicy lets event staff see: incidents shared with one of their
+  # roles, plus the ones they reported themselves.
+  scope :visible_to_staff, ->(user, roles) { for_roles(roles).or(where(reported_by_user_id: user.id)) }
 end
