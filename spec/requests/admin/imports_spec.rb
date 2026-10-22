@@ -45,11 +45,17 @@ RSpec.describe "Admin CSV import", type: :request do
     expect(event.participants.pluck(:email)).to eq([ "ada@example.com" ])
   end
 
-  it "keeps the first value when two headers name the same field" do
-    upload("Email,Email Address,First Name,Last Name\nfirst@example.com,second@example.com,Pat,Example\n" \
-           ",only@example.com,Sam,Example\n")
+  it "prefers the template's header to an alias for the same field, falling back on a blank cell" do
+    upload("Email Address,Email,First Name,Last Name\nparent@example.com,kid@example.com,Pat,Example\n" \
+           "only@example.com,,Sam,Example\n")
 
-    expect(last_batch.rows_data.pluck("email")).to eq([ "first@example.com", "only@example.com" ])
+    expect(last_batch.rows_data.pluck("email")).to eq([ "kid@example.com", "only@example.com" ])
+  end
+
+  it "trims non-breaking spaces from values" do
+    upload("Email,First Name,Last Name\n\u00A0nbsp@example.com\u00A0,Nb,Sp\n")
+
+    expect(last_batch.rows_data.first["email"]).to eq("nbsp@example.com")
   end
 
   it "strips a byte order mark" do
@@ -58,10 +64,26 @@ RSpec.describe "Admin CSV import", type: :request do
     expect(last_batch.rows_data).to eq([ { "email" => "bom@example.com", "legal_first_name" => "Bo", "legal_last_name" => "Mark" } ])
   end
 
-  it "reads a Windows-1252 export with accented names" do
+  it "reads a Windows-1252 export with accented names, and asks for the names to be checked" do
     upload("Email,First Name,Last Name\njose@example.com,José,Müller\n".encode(Encoding::Windows_1252).b)
 
     expect(last_batch.rows_data.first).to include("legal_first_name" => "José", "legal_last_name" => "Müller")
+    expect(response).to redirect_to(preview_admin_event_import_path(event.slug, last_batch, read_as: "windows-1252"))
+
+    follow_redirect!
+    expect(response.body).to include("read as Windows-1252")
+  end
+
+  it "reads Excel's tab-separated UTF-16 \"Unicode Text\"" do
+    upload("\uFEFFEmail\tFirst Name\tLast Name\nzoe@example.com\tZoë\tExample\n".encode(Encoding::UTF_16LE).b)
+
+    expect(last_batch.rows_data.first).to include("email" => "zoe@example.com", "legal_first_name" => "Zoë")
+  end
+
+  it "reads semicolon-separated files and drops NUL bytes" do
+    upload("Email;First Name;Last Name\nsemi@example.com;Se\u0000mi;Colon\n")
+
+    expect(last_batch.rows_data.first).to include("email" => "semi@example.com", "legal_first_name" => "Semi")
   end
 
   describe "a file that can't be read" do
@@ -95,11 +117,11 @@ RSpec.describe "Admin CSV import", type: :request do
       let(:console) { console_variant }
 
       before do
-        returning = create(:participant, email: "returning@example.com")
+        create(:participant, email: "returning@example.com")
         create(:participant_event, participant: create(:participant, email: "registered@example.com"), event: event)
 
         upload("Email,Last Name\n" \
-               "#{returning.email},\n" \
+               "returning@example.com,\n" \
                "registered@example.com,Here\n" \
                "not-an-email,Nobody\n" \
                "new@example.com,Newcomer\n" \
@@ -108,13 +130,42 @@ RSpec.describe "Admin CSV import", type: :request do
       end
 
       it "fails them with the reason, and counts only the rows that will import" do
-        expect(response.body).to include("The file has no First Name column")
+        expect(response.body).to include("The file has no First Name column", "Won't be imported")
         expect(response.body).to include("Already registered", "Invalid email address", "Missing first name", "Same email as row 2")
         expect(response.body).to include(console_variant ? "cs-status-error" : "text-red-700")
+        expect(response.body).not_to include("read as Windows-1252")
 
         valid_rows = controller.instance_variable_get(:@valid_rows)
         expect(valid_rows.pluck(:email)).to eq([ "returning@example.com" ])
       end
     end
+  end
+
+  it "previews the rejections the job's other validations would make" do
+    create(:participant, email: "old@example.com", date_of_birth: 30.years.ago.to_date)
+    create(:ban, email: "banned@example.com")
+    create(:guardian, email: "known-parent@example.com")
+
+    upload("Email,First Name,Last Name,Birthday,Parent Email,Parent First Name,Parent Last Name,Emergency Contact First Name,Emergency Contact Phone\n" \
+           "banned@example.com,Ban,Ned,,,,,,\n" \
+           "adult@example.com,Ad,Ult,1/2/1990,,,,,\n" \
+           "old@example.com,,,,,,,,\n" \
+           "noparent@example.com,No,Parent,,mum@example.com,,,,\n" \
+           "badparent@example.com,Bad,Parent,,not-an-email,,,,\n" \
+           "badphone@example.com,Bad,Phone,,,,,Em,not a phone\n" \
+           "known@example.com,Known,Parent,,known-parent@example.com,,,Em,+14155550132\n" \
+           "self@example.com,Self,Parent,,SELF@example.com,,,,\n")
+    follow_redirect!
+
+    skipped = controller.instance_variable_get(:@skipped_rows).to_h { |row| [ row[:email], row[:reason] ] }
+    expect(skipped).to eq(
+      "banned@example.com" => "Banned from events",
+      "adult@example.com" => "19 or older during this event",
+      "old@example.com" => "19 or older during this event",
+      "noparent@example.com" => "Missing parent first name and parent last name",
+      "badparent@example.com" => "Invalid parent email",
+      "badphone@example.com" => "Invalid emergency contact phone"
+    )
+    expect(controller.instance_variable_get(:@valid_rows).pluck(:email)).to eq([ "known@example.com", "self@example.com" ])
   end
 end

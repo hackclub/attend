@@ -36,7 +36,7 @@ module Admin
         rows = parse_csv(csv_content)
       rescue CSV::MalformedCSVError => e
         return reject_csv_file("This file isn't a valid CSV: #{e.message}")
-      rescue EncodingError, ArgumentError
+      rescue EncodingError
         return reject_csv_file("This file couldn't be read. Save it from your spreadsheet as \"CSV UTF-8\" and upload it again.")
       end
 
@@ -55,7 +55,9 @@ module Admin
         send_invitations: send_invitations
       )
 
-      redirect_to preview_admin_event_import_path(current_event, @import_batch)
+      # Say how the file was read, so an admin checks the accented names
+      # before importing (Mac Roman and other code pages read as garbage).
+      redirect_to preview_admin_event_import_path(current_event, @import_batch, read_as: @read_as)
     end
 
     def preview
@@ -96,7 +98,7 @@ module Admin
         elsif importing_rows[email]
           # The job imports the first row and skips this one as registered.
           @skipped_rows << row_info.merge(reason: "Same email as row #{importing_rows[email]}")
-        elsif (failure = import_failure(row, email, existing_participant))
+        elsif (failure = rejection_reason(row, existing_participant))
           @skipped_rows << row_info.merge(reason: failure, failing: true)
         else
           importing_rows[email] = row_info[:row_number]
@@ -156,37 +158,46 @@ module Admin
     end
 
     def parse_csv(csv_content)
-      csv = CSV.parse(decode_csv(csv_content), headers: true)
+      content = decode_csv(csv_content).delete("\u0000")
+      # Excel in many European locales separates with semicolons; "Unicode
+      # Text" uses tabs. The header row tells which.
+      col_sep = [ ",", ";", "\t" ].max_by { |sep| content.each_line.first.to_s.count(sep) }
+      csv = CSV.parse(content, headers: true, col_sep: col_sep)
+
+      # Two headers can name one field. The template's own header beats an
+      # alias (a form's "Email Address" is often the parent who filled it in,
+      # its "Email" question the participant), then the leftmost column; a
+      # blank cell falls through to the next column.
+      columns = csv.headers.each_with_index.filter_map do |header, index|
+        key = CsvImportService.column_for(header)
+        [ key.to_s, index, CsvImportService.template_header?(header) ? 0 : 1 ] if key
+      end.sort_by { |_, index, rank| [ rank, index ] }
 
       csv.map do |row|
-        mapped = {}
-        row.each do |header, value|
-          key = CsvImportService.column_for(header)
-          # Two headers can name one field ("Email" and "Email Address"); the
-          # first with a value wins.
-          mapped[key.to_s] ||= value&.strip.presence if key
+        columns.each_with_object({}) do |(key, index, _), mapped|
+          mapped[key] ||= row[index]&.gsub(/\A[[:space:]]+|[[:space:]]+\z/, "").presence
         end
-        mapped
       end.reject { |row| row["email"].blank? }
     end
 
-    # Excel's "CSV UTF-8" starts with a byte order mark, and its plain "CSV"
-    # on Windows is Windows-1252, where accented names aren't valid UTF-8.
+    # Excel's "CSV UTF-8" starts with a byte order mark, its "Unicode Text" is
+    # UTF-16, and its plain "CSV" on Windows is Windows-1252, where accented
+    # names aren't valid UTF-8.
     def decode_csv(csv_content)
-      content = csv_content.b.delete_prefix("\xEF\xBB\xBF".b).force_encoding(Encoding::UTF_8)
+      bytes = csv_content.b
+      { "\xFF\xFE".b => Encoding::UTF_16LE, "\xFE\xFF".b => Encoding::UTF_16BE }.each do |bom, encoding|
+        return bytes.delete_prefix(bom).force_encoding(encoding).encode(Encoding::UTF_8) if bytes.start_with?(bom)
+      end
+
+      content = bytes.delete_prefix("\xEF\xBB\xBF".b).force_encoding(Encoding::UTF_8)
       return content if content.valid_encoding?
 
+      @read_as = "windows-1252"
       content.force_encoding(Encoding::Windows_1252).encode(Encoding::UTF_8)
     end
 
-    # Why the import job would fail this row, so the preview doesn't count it
-    # as imported. A participant already in Attend keeps the names on file.
-    def import_failure(row, email, existing_participant)
-      return "Invalid email address" unless email.match?(URI::MailTo::EMAIL_REGEXP)
-      return if existing_participant
-
-      missing = REQUIRED_COLUMNS.select { |key, _| row[key].blank? }.values
-      "Missing #{missing.to_sentence.downcase}" if missing.any?
+    def rejection_reason(row, existing_participant)
+      ProcessImportBatchJob.new.rejection_reason(row, current_event, existing_participant)
     end
   end
 end

@@ -78,8 +78,7 @@ class CsvImportService
     "Postal Code" => :postal_code,
     "Zip" => :postal_code,
     "Shirt Size" => :tshirt_size,
-    "T-Shirt" => :tshirt_size,
-    "Group" => :groups
+    "T-Shirt" => :tshirt_size
   }.freeze
 
   def self.normalize_header(header)
@@ -90,9 +89,15 @@ class CsvImportService
     .transform_keys { |header| normalize_header(header) }
     .freeze
 
+  TEMPLATE_HEADERS = COLUMN_MAPPING.keys.map { |header| normalize_header(header) }.to_set.freeze
+
   # The import field a CSV header fills, or nil for a column the import ignores.
   def self.column_for(header)
     HEADER_LOOKUP[normalize_header(header)]
+  end
+
+  def self.template_header?(header)
+    TEMPLATE_HEADERS.include?(normalize_header(header))
   end
 
   TSHIRT_SIZE_MAPPING = {

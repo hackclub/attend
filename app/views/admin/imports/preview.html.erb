@@ -18,9 +18,16 @@
     </div>
     <div class="bg-white rounded-lg border border-gray-200 p-4">
       <div class="text-3xl font-bold text-yellow-600"><%= @skipped_rows.count %></div>
-      <div class="text-sm text-gray-500">Will be skipped</div>
+      <div class="text-sm text-gray-500">Won't be imported</div>
     </div>
   </div>
+
+  <% if params[:read_as] == "windows-1252" %>
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+      <h3 class="font-semibold text-amber-800">Check the names below</h3>
+      <p class="text-sm text-amber-700 mt-1">This file wasn't saved as UTF-8, so it was read as Windows-1252. If accented names look wrong, save it from your spreadsheet as "CSV UTF-8" and upload it again.</p>
+    </div>
+  <% end %>
 
   <% if @missing_columns.any? %>
     <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
@@ -74,7 +81,7 @@
   <% if @skipped_rows.any? %>
     <div class="bg-white rounded-lg border border-gray-200 mb-6">
       <div class="px-4 py-3 border-b border-gray-200">
-        <h2 class="font-semibold text-yellow-700">Participants to Skip (<%= @skipped_rows.count %>)</h2>
+        <h2 class="font-semibold text-yellow-700">Participants Not Imported (<%= @skipped_rows.count %>)</h2>
       </div>
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-100">
