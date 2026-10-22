@@ -1,0 +1,48 @@
+# CodeQL advanced setup. Replaces the repository's CodeQL "default setup",
+# which never ran on pull requests from forks, so the required
+# "Analyze (...)" checks stayed pending there. Languages, build mode and
+# categories match what default setup used, so existing alerts carry over.
+# Default setup must be switched off when this lands: GitHub rejects
+# advanced-setup uploads while default setup is enabled.
+name: CodeQL
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '27 4 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    # Job names must stay "Analyze (<language>)": branch protection requires them.
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # for actions/checkout to fetch code
+      security-events: write # for github/codeql-action to upload results
+      actions: read # for github/codeql-action to read workflow run status
+      packages: read # for github/codeql-action to fetch CodeQL packs
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ actions, javascript-typescript, ruby ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
