@@ -47,6 +47,14 @@ RSpec.describe FoodSafetySummary do
     expect(summary(dietary: Dietary.new(cross_contamination_risk: true)).any_flags?).to be(true)
   end
 
+  it "reads a negative answer in either allergy field as no allergy" do
+    s = summary(medical: Medical.new(allergies: "None"), dietary: Dietary.new(life_threatening_allergies: " No "))
+
+    expect(s.allergies?).to be(false)
+    expect(s.life_threatening_food_allergies?).to be(false)
+    expect(s.any_flags?).to be(false)
+  end
+
   it "doesn't count a diet type as a flag" do
     expect(summary(dietary: Dietary.new(diet_type: "halal")).any_flags?).to be(false)
   end

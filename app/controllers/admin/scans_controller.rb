@@ -188,6 +188,7 @@ module Admin
           has_anaphylaxis_risk: food_safety.anaphylaxis_risk?,
           requires_refrigeration: participant_event.medical&.requires_refrigeration || false,
           dietary: food_safety.diet_type,
+          has_allergies: food_safety.allergies?,
           has_life_threatening_food_allergies: food_safety.life_threatening_food_allergies?,
           cross_contamination_risk: food_safety.cross_contamination_risk?,
           show_url: admin_event_participant_path(current_event, participant_event),

@@ -71,7 +71,7 @@ RSpec.describe "Admin::Scans", type: :request do
       }, as: :json
 
       expect(response.parsed_body["participant"]).to include(
-        "has_anaphylaxis_risk" => true, "dietary" => "vegan",
+        "has_anaphylaxis_risk" => true, "dietary" => "vegan", "has_allergies" => true,
         "has_life_threatening_food_allergies" => true, "cross_contamination_risk" => true
       )
       expect(response.body).not_to include("Peanuts", "Penicillin")
@@ -83,7 +83,7 @@ RSpec.describe "Admin::Scans", type: :request do
       }, as: :json
 
       expect(response.parsed_body["participant"]).to include(
-        "has_anaphylaxis_risk" => false, "dietary" => nil,
+        "has_anaphylaxis_risk" => false, "dietary" => nil, "has_allergies" => false,
         "has_life_threatening_food_allergies" => false, "cross_contamination_risk" => false
       )
     end

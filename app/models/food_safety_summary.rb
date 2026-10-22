@@ -1,7 +1,7 @@
 # Food risk is split across two records: the health form's Medical
 # (allergies, anaphylaxis risk) and the food form's Dietary (life-threatening
-# food allergies, cross-contamination, diet type). Admin surfaces that flag
-# food risk read both through here so none of them shows only half and says
+# food allergies, cross-contamination, diet type). The participant page and
+# the scanner read both through here so neither shows only half and says
 # "no flags" when there are some. Only booleans and the diet type: surfaces
 # that may show the free text read it from the records themselves.
 class FoodSafetySummary
@@ -11,7 +11,7 @@ class FoodSafetySummary
   end
 
   def anaphylaxis_risk?
-    @medical&.has_anaphylaxis_risk || false
+    @medical&.anaphylaxis_risk? || false
   end
 
   def allergies?

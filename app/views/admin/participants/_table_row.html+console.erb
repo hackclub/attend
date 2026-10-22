@@ -147,7 +147,7 @@
     <%= pe.dietary&.life_threatening_allergies.presence || "—" %>
   </td>
   <td class="whitespace-nowrap" data-column="cross_contamination">
-    <% if pe.food_safety_summary.cross_contamination_risk? %>
+    <% if pe.dietary&.cross_contamination_risk %>
       <%= cs_badge("Yes", "red") %>
     <% else %>
       <span class="cs-muted">No</span>

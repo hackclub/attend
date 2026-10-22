@@ -187,13 +187,14 @@
       <% end %>
 
       <% if policy(@medical || Medical.new(participant_event: @participant_event)).show? %>
-        <section class="bg-white rounded-lg border border-gray-200 p-6">
+        <section class="bg-white rounded-lg border border-gray-200 p-6" data-testid="medical-summary">
           <div class="flex justify-between items-center mb-4">
             <h2 class="text-lg font-semibold">Medical Summary</h2>
             <%= link_to "View Details", medical_admin_event_participant_path(current_event, @participant_event), class: "text-sm text-[#ec3750] hover:text-blue-800" %>
           </div>
-          <% if @medical || @dietary %>
-            <% food_safety = @participant_event.food_safety_summary %>
+          <% food_safety = @participant_event.food_safety_summary %>
+          <%# Dietary flags show without a Medical record, but only a Medical record can say there are none. %>
+          <% if @medical || food_safety.any_flags? %>
             <div class="flex flex-wrap gap-2">
               <% if food_safety.anaphylaxis_risk? %>
                 <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">⚠️ Anaphylaxis Risk</span>

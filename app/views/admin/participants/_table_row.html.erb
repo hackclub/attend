@@ -150,7 +150,7 @@
     <%= pe.dietary&.life_threatening_allergies.presence || "—" %>
   </td>
   <td class="px-2 py-1.5 whitespace-nowrap" data-column="cross_contamination">
-    <% if pe.food_safety_summary.cross_contamination_risk? %>
+    <% if pe.dietary&.cross_contamination_risk %>
       <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-red-100 text-red-700">Yes</span>
     <% else %>
       <span class="text-gray-400">No</span>

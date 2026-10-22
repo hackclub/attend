@@ -101,10 +101,10 @@ RSpec.describe Exports::FieldRegistry do
       columns = described_class::PRESETS["dietary"][:columns]
 
       expect(columns).to include("medical.allergies", "medical.allergy_severity", "medical.has_anaphylaxis_risk")
-      %w[event_admin ops limited safeguarding_lead].each do |role|
-        permitted = described_class.permitted_keys(role: role)
-        expect(columns.select { |key| key.start_with?("dietary.", "medical.") }.map { |key| permitted.include?(key) }.uniq.size).to eq(1),
-          "#{role} can export only part of the Dietary preset's health fields"
+      health = columns.grep(/\A(dietary|medical)\./)
+      described_class::TIER_ROLES.values.flatten.uniq.each do |role|
+        allowed = health & described_class.permitted_keys(role: role)
+        expect(allowed).to eq(health).or(be_empty), "#{role} can export only #{allowed} of #{health}"
       end
     end
   end

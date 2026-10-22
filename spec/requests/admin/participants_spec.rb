@@ -382,7 +382,7 @@ RSpec.describe "Admin::Participants", type: :request do
     let(:participant_event) { create(:participant_event, event: event) }
 
     def medical_summary
-      Nokogiri::HTML(response.body).xpath("//section[.//h2[contains(translate(., 'S', 's'), 'Medical summary')]]").text.squish
+      Nokogiri::HTML(response.body).at_css("[data-testid='medical-summary']").text.squish
     end
 
     it "flags dietary-only food allergies in the medical summary, in both admin UIs" do
@@ -414,19 +414,30 @@ RSpec.describe "Admin::Participants", type: :request do
       end
     end
 
-    it "still says there are no flags or no information, in both admin UIs" do
+    it "says there is no information until a medical record exists, in both admin UIs" do
+      participant_event.create_dietary!(diet_type: "vegan")
+
       [ false, true ].each do |console|
         global_admin.update!(admin_console_beta: console)
         sign_in global_admin
 
         get admin_event_participant_path(event, participant_event)
-        expect(medical_summary).to match(/no medical information provided/i)
 
-        participant_event.create_dietary!(diet_type: "vegan")
+        expect(medical_summary).to match(/no medical information provided/i)
+      end
+    end
+
+    it "says there are no flags when the records hold none, in both admin UIs" do
+      participant_event.create_medical!(allergies: "None")
+      participant_event.create_dietary!(diet_type: "vegan", life_threatening_allergies: "None")
+
+      [ false, true ].each do |console|
+        global_admin.update!(admin_console_beta: console)
+        sign_in global_admin
+
         get admin_event_participant_path(event, participant_event)
+
         expect(medical_summary).to match(/no special medical flags/i)
-        participant_event.dietary.destroy!
-        participant_event.reload
       end
     end
 
