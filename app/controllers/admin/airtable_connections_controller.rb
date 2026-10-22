@@ -111,7 +111,7 @@ class Admin::AirtableConnectionsController < Admin::BaseController
     ))
 
     # The connection replaces any pasted token, and whoever connected is who
-    # hears about it if the sync later pauses.
+    # hears about it if the sync later pauses or keeps failing.
     updates = { airtable_api_key: nil, airtable_config_updated_by_id: current_user.id }
     # A connected event syncs through the records API into a table of its
     # own; the old Sync API table is externally synced and can't be written.

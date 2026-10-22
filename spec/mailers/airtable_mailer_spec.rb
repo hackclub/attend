@@ -64,10 +64,10 @@ RSpec.describe AirtableMailer do
 
   describe "#sync_failing" do
     let(:recipient) { create(:user, email: "ops@hackclub.com", name: "Sam Rivers") }
-    let(:event) { create(:event, name: "Horizons Polaris", slug: "horizons-polaris", airtable_sync_failures: 12) }
+    let(:event) { create(:event, name: "Horizons Polaris", slug: "horizons-polaris") }
 
     subject(:mail) do
-      described_class.sync_failing(event: event, recipient: recipient, error_message: "HTTP 503: Service Unavailable")
+      described_class.sync_failing(event: event, recipient: recipient, error_message: "HTTP 503: Service Unavailable", failures: 12)
     end
 
     it "says the sync is failing, not paused, and how often" do

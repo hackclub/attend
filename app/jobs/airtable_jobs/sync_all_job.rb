@@ -62,23 +62,23 @@ module AirtableJobs
     def handle_transient_error(event, error)
       Rails.logger.warn("[AirtableSyncAll] Sync failed for event #{event.id}, retrying next run: #{error.message}")
       event.record_airtable_sync_failure!(error.message)
-      return unless event.airtable_sync_alert_due?
+      return unless event.airtable_sync_alert_due? && event.claim_airtable_sync_alert!
 
-      event.mark_airtable_sync_alerted!
-      recipient = notify_config_owner(event, error, mail: :sync_failing)
+      recipient = notify_config_owner(event, error, mail: :sync_failing, failures: event.airtable_sync_failures)
       report_to_sentry(event, error, recipient)
     end
 
     # A broken mailer must not take the rest of the run down with it — this
     # method is already running inside the loop's rescue.
-    def notify_config_owner(event, error, mail:)
+    def notify_config_owner(event, error, mail:, **details)
       recipient = event.airtable_config_last_saved_by
       return nil if recipient&.email.blank?
 
       AirtableMailer.public_send(mail,
         event: event,
         recipient: recipient,
-        error_message: error.message
+        error_message: error.message,
+        **details
       ).deliver_later
 
       recipient

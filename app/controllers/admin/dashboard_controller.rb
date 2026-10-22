@@ -54,9 +54,11 @@ class Admin::DashboardController < Admin::BaseController
     if @event.airtable_sync_configured?
       # "Sync Now" is a deliberate retry, so it also lifts a pause left by an
       # earlier failure — otherwise the scheduled job would skip this event and
-      # the button would look like it did nothing.
+      # the button would look like it did nothing. A sync that isn't paused is
+      # left alone, so pressing the button can't reset the failure streak that
+      # decides when someone is told it keeps failing.
       was_paused = @event.airtable_sync_paused?
-      @event.resume_airtable_sync!
+      @event.resume_airtable_sync! if was_paused
       AirtableJobs::SyncAllJob.perform_later(@event.id)
 
       notice = if was_paused
@@ -92,7 +94,7 @@ class Admin::DashboardController < Admin::BaseController
     if @event.update(integration_params)
       if airtable_settings_saved?
         # Whoever last touched the credentials is who we email if the sync
-        # later fails and pauses itself.
+        # later pauses itself or keeps failing.
         @event.update_column(:airtable_config_updated_by_id, current_user.id)
         @event.resume_airtable_sync!
       end

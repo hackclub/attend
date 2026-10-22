@@ -86,6 +86,15 @@ RSpec.describe "Admin::Integrations", type: :request do
           expect(response.body).to include("3 failed attempts in a row. Attend keeps retrying every 5 minutes.")
         end
 
+        it "blames a passing failure, not the settings, when a retrying sync goes stale" do
+          event.update_columns(airtable_synced_at: 2.hours.ago, airtable_sync_error: "HTTP 503", airtable_sync_failures: 20)
+
+          get admin_event_integrations_path(event)
+
+          expect(response.body).to include("Airtable is showing stale data while Attend retries.")
+          expect(response.body).not_to include("check that the sync endpoint above still exists")
+        end
+
         it "leaves the retry count off a paused sync" do
           event.update_columns(airtable_sync_failures: 3)
           event.pause_airtable_sync!("HTTP 403: INVALID_PERMISSIONS")
@@ -257,6 +266,14 @@ RSpec.describe "Admin::Integrations", type: :request do
 
       expect(event.reload.airtable_sync_paused?).to be(false)
       expect(flash[:notice]).to eq("Airtable sync resumed and triggered. It will complete shortly.")
+    end
+
+    it "keeps the failure streak of a sync that isn't paused" do
+      event.update_columns(airtable_sync_failures: 5, airtable_sync_failing_since: 30.minutes.ago)
+
+      post admin_event_trigger_airtable_sync_path(event)
+
+      expect(event.reload.airtable_sync_failures).to eq(5)
     end
 
     it "just triggers a sync when nothing is paused" do

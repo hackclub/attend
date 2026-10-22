@@ -123,7 +123,8 @@ module Airtable
                      exceptions: [ Faraday::RetriableResponse ],
                      retry_statuses: [ 429 ],
                      methods: %i[get post put patch delete]
-        conn.request :retry, max: 3, interval: 0.5, backoff_factor: 2,
+        # The same cap stops a 5xx Retry-After from holding the job up.
+        conn.request :retry, max: 3, interval: 0.5, backoff_factor: 2, max_interval: RATE_LIMIT_MAX_WAIT,
                      exceptions: [ Faraday::TimeoutError, Faraday::ConnectionFailed, Faraday::RetriableResponse ],
                      retry_statuses: [ 500, 502, 503, 504 ],
                      retry_if: RETRY_SYNC_POST

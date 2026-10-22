@@ -16,9 +16,10 @@ class AirtableMailer < ApplicationMailer
 
   # Sent once when a passing error (rate limit, Airtable outage, timeout) has
   # kept failing long enough to matter. The sync keeps retrying on its own,
-  # so this is a heads-up rather than a request to fix the settings.
-  def sync_failing(event:, recipient:, error_message:)
-    @failures = event.airtable_sync_failures
+  # so this is a heads-up rather than a request to fix the settings. The count
+  # is passed in because the mail is sent later, when it may have changed.
+  def sync_failing(event:, recipient:, error_message:, failures:)
+    @failures = failures
     prepare(event, recipient, error_message)
 
     mail(

@@ -2,9 +2,10 @@
 
 <p>
   The Airtable sync for <strong><%= @event.name %></strong> has failed
-  <strong><%= pluralize(@failures, "time") %> in a row</strong>. This usually means
-  Airtable is rate limiting the base or having an outage, so Attend is still retrying
-  every 5 minutes. You don't need to change anything unless it keeps failing.
+  <strong><%= pluralize(@failures, "time") %> in a row</strong>. Attend is still retrying
+  every 5 minutes, because errors like this are usually Airtable rate limiting the base
+  or having an outage, which clear up by themselves. If the error below looks like
+  something else, the settings may need fixing.
 </p>
 
 <p>You're getting this because you were the last person to save the Airtable settings for this event.</p>

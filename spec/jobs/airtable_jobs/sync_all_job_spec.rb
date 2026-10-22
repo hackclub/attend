@@ -182,7 +182,7 @@ RSpec.describe AirtableJobs::SyncAllJob do
     expect(Airtable::SyncService).not_to have_received(:new)
   end
 
-  describe "pausing after a failure" do
+  describe "pausing on a config error" do
     it "pauses the event's sync on the first failure" do
       broken = configured_event
       stub_sync(broken, raising: not_found)
@@ -190,16 +190,6 @@ RSpec.describe AirtableJobs::SyncAllJob do
       described_class.perform_now
 
       expect(broken.reload.airtable_sync_paused?).to be(true)
-    end
-
-    it "records a rate limit without pausing, so the next run retries" do
-      throttled = configured_event
-      stub_sync(throttled, raising: Airtable::RateLimitError.new)
-
-      described_class.perform_now
-
-      expect(throttled.reload.airtable_sync_paused?).to be(false)
-      expect(throttled.airtable_sync_error).to be_present
     end
 
     {
@@ -219,6 +209,7 @@ RSpec.describe AirtableJobs::SyncAllJob do
     end
 
     {
+      "a rate limit" => Airtable::RateLimitError.new,
       "a 5xx" => Airtable::ServerError.new,
       "a timeout" => Faraday::TimeoutError.new("execution expired"),
       "an unexpected error" => RuntimeError.new("boom")
@@ -377,7 +368,7 @@ RSpec.describe AirtableJobs::SyncAllJob do
 
       expect { described_class.perform_now }
         .to have_enqueued_mail(AirtableMailer, :sync_failing)
-        .with(event: flaky, recipient: owner, error_message: server_error.message)
+        .with(event: flaky, recipient: owner, error_message: server_error.message, failures: threshold)
 
       expect(flaky.reload.airtable_sync_alerted_at).to be_present
       expect(Sentry).to have_received(:capture_exception) do |_exception, **options|
@@ -398,24 +389,50 @@ RSpec.describe AirtableJobs::SyncAllJob do
       expect(Sentry).to have_received(:capture_exception).once
     end
 
-    it "alerts early when Airtable has been stale for too long" do
+    it "alerts early when the streak has lasted too long" do
       flaky = configured_event(
         airtable_config_updated_by: owner,
-        airtable_synced_at: (Event::AIRTABLE_SYNC_ALERT_AFTER_STALE + 5.minutes).ago
+        airtable_sync_failures: 2,
+        airtable_sync_failing_since: (Event::AIRTABLE_SYNC_ALERT_AFTER_FAILING_FOR + 5.minutes).ago
       )
       stub_sync(flaky, raising: server_error)
 
       expect { described_class.perform_now }.to have_enqueued_mail(AirtableMailer, :sync_failing)
     end
 
+    # The last good sync can be days old after a pause is lifted; that alone
+    # mustn't turn the first blip of a new streak into an email.
+    it "does not alert on the first failure after a long pause is lifted" do
+      resumed = configured_event(airtable_config_updated_by: owner, airtable_synced_at: 2.days.ago)
+      stub_sync(resumed, raising: server_error)
+
+      expect { described_class.perform_now }.not_to have_enqueued_mail(AirtableMailer, :sync_failing)
+      expect(resumed.reload.airtable_sync_failing_since).to be_present
+    end
+
+    it "leaves the alert to the run that claims it first" do
+      flaky = configured_event(airtable_config_updated_by: owner, airtable_sync_failures: threshold - 1)
+      stub_sync(flaky, raising: server_error)
+      # Another run alerted after this one loaded the event.
+      allow_any_instance_of(Event).to receive(:claim_airtable_sync_alert!).and_return(false)
+
+      expect { described_class.perform_now }.not_to have_enqueued_mail(AirtableMailer, :sync_failing)
+      expect(Sentry).not_to have_received(:capture_exception)
+    end
+
     it "starts a new streak after a successful sync" do
-      recovered = configured_event(airtable_sync_failures: threshold, airtable_sync_alerted_at: 1.hour.ago)
+      recovered = configured_event(
+        airtable_sync_failures: threshold,
+        airtable_sync_failing_since: 2.hours.ago,
+        airtable_sync_alerted_at: 1.hour.ago
+      )
       stub_sync(recovered)
 
       described_class.perform_now
 
       recovered.reload
       expect(recovered.airtable_sync_failures).to eq(0)
+      expect(recovered.airtable_sync_failing_since).to be_nil
       expect(recovered.airtable_sync_alerted_at).to be_nil
     end
   end

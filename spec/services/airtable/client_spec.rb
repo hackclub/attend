@@ -85,6 +85,13 @@ RSpec.describe Airtable::Client do
       expect(retry_sleeps).to be_empty
     end
 
+    it "does not wait out a 5xx Retry-After beyond the cap either" do
+      stub_request(:get, list_url).to_return(status: 503, headers: { "Retry-After" => "1800" }, body: "")
+
+      expect { client.list_records("tblTest") }.to raise_error(Airtable::ServerError)
+      expect(retry_sleeps).to be_empty
+    end
+
     it "raises RateLimitError once the retries run out" do
       stub_request(:get, list_url).to_return(status: 429, body: "")
 

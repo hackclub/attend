@@ -270,6 +270,8 @@ RSpec.describe Event, type: :model do
   end
 
   describe "airtable sync pausing" do
+    include ActiveSupport::Testing::TimeHelpers
+
     let(:event) do
       create(
         :event,
@@ -301,22 +303,29 @@ RSpec.describe Event, type: :model do
     end
 
     it "starts a fresh failure streak on resume" do
-      event.update_columns(airtable_sync_failures: 4, airtable_sync_alerted_at: 1.hour.ago)
+      event.update_columns(airtable_sync_failures: 4, airtable_sync_failing_since: 1.hour.ago, airtable_sync_alerted_at: 1.hour.ago)
 
       event.resume_airtable_sync!
 
       event.reload
       expect(event.airtable_sync_failures).to eq(0)
+      expect(event.airtable_sync_failing_since).to be_nil
       expect(event.airtable_sync_alerted_at).to be_nil
     end
 
-    it "counts transient failures without pausing" do
-      2.times { event.record_airtable_sync_failure!("HTTP 503") }
+    it "counts transient failures without pausing, from when the streak began" do
+      travel_to(1.hour.ago) { event.record_airtable_sync_failure!("HTTP 503") }
+      event.record_airtable_sync_failure!("HTTP 504")
 
-      event.reload
       expect(event.airtable_sync_failures).to eq(2)
-      expect(event.airtable_sync_error).to eq("HTTP 503")
+      expect(event.airtable_sync_failing_since).to be_within(1.minute).of(1.hour.ago)
+      expect(event.airtable_sync_error).to eq("HTTP 504")
       expect(event).not_to be_airtable_sync_paused
+    end
+
+    it "lets only one run claim the alert for a streak" do
+      expect(event.claim_airtable_sync_alert!).to be(true)
+      expect(event.claim_airtable_sync_alert!).to be(false)
     end
   end
 
@@ -330,15 +339,14 @@ RSpec.describe Event, type: :model do
       expect(event_with(airtable_sync_failures: Event::AIRTABLE_SYNC_ALERT_AFTER_FAILURES - 1)).not_to be_airtable_sync_alert_due
     end
 
-    it "is due once the last good sync is old enough, however few runs failed" do
-      expect(event_with(airtable_sync_failures: 1, airtable_synced_at: 4.hours.ago)).to be_airtable_sync_alert_due
-      expect(event_with(airtable_sync_failures: 1, airtable_synced_at: 2.hours.ago)).not_to be_airtable_sync_alert_due
+    it "is due once the streak has lasted long enough, however few runs failed" do
+      expect(event_with(airtable_sync_failures: 2, airtable_sync_failing_since: 4.hours.ago)).to be_airtable_sync_alert_due
+      expect(event_with(airtable_sync_failures: 2, airtable_sync_failing_since: 2.hours.ago)).not_to be_airtable_sync_alert_due
     end
 
-    # Brand-new settings that never synced rely on the failure count alone,
-    # so one rate limit on the first sync doesn't email anyone.
-    it "is not due on the first failures of a sync that never succeeded" do
-      expect(event_with(airtable_sync_failures: 1, airtable_synced_at: nil)).not_to be_airtable_sync_alert_due
+    it "ignores how old the last good sync is" do
+      expect(event_with(airtable_sync_failures: 1, airtable_sync_failing_since: 1.minute.ago, airtable_synced_at: 3.days.ago))
+        .not_to be_airtable_sync_alert_due
     end
 
     it "is not due again once the streak was reported" do

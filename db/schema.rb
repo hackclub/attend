@@ -473,6 +473,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_22_120000) do
     t.datetime "airtable_sync_alerted_at"
     t.text "airtable_sync_error"
     t.datetime "airtable_sync_error_at"
+    t.datetime "airtable_sync_failing_since"
     t.integer "airtable_sync_failures", default: 0, null: false
     t.datetime "airtable_sync_paused_at"
     t.string "airtable_sync_source_id"
