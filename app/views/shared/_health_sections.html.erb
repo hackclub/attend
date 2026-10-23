@@ -2,6 +2,7 @@
   <% guardian_visible = local_assigns.fetch(:guardian_visible, false) %>
   <% private_support_path = local_assigns[:private_support_path] %>
   <% private_support_email = local_assigns[:private_support_email] %>
+  <% hide_privacy_notes = local_assigns.fetch(:hide_privacy_notes, false) %>
   <% sections = [
     [ :medical, medical, "Medical needs" ],
     [ :dietary, dietary, "Food requirements" ],
@@ -22,6 +23,7 @@
           <% else %>
             <p class="portal-hint text-sm mt-1">Tell us what would help you. A diagnosis is never required to request support.</p>
           <% end %>
+          <% unless hide_privacy_notes %>
           <p class="portal-hint text-sm mt-3">
             These answers are used to plan safety, food service, and event support. They are visible to event staff with a relevant health, operations, or safeguarding role and are not shown to other attendees.
             <% if guardian_visible %>
@@ -30,6 +32,7 @@
               <% if local_assigns.fetch(:guardian_required, false) %>Your listed parent or guardian can also see and edit these answers in their portal.<% end %>
             <% end %>
           </p>
+          <% end %>
         </div>
         <span class="portal-meta text-xs text-right" data-health-sections-target="summary"><%= health_section_summary(record) %></span>
       </div>
@@ -37,7 +40,11 @@
       <fieldset class="mt-4">
         <legend class="portal-label">How would you like to answer?</legend>
         <div class="flex flex-col sm:flex-row gap-2 mt-2">
-          <% [ [ "nothing_to_add", "Nothing to add" ], [ "details", "Add details" ], [ "private", "Prefer to discuss privately" ] ].each do |value, text| %>
+          <% responses = [ [ "nothing_to_add", "Nothing to add" ], [ "details", "Add details" ], [ "private", "Prefer to discuss privately" ] ] %>
+          <%# Without the private request link there is no way to follow up, so
+              the option is dropped, unless it is the answer already saved. %>
+          <% responses.reject! { |value, _| value == "private" } if hide_privacy_notes && record&.effective_section_response != "private" %>
+          <% responses.each do |value, text| %>
             <label class="portal-check-row border rounded px-3 py-2">
               <input type="radio" name="<%= scope %>[section_response]" value="<%= value %>" class="portal-check" data-action="change->health-sections#responseChanged" <%= "checked" if record&.effective_section_response == value %>>
               <span class="text-sm"><%= text %></span>
@@ -45,6 +52,7 @@
           <% end %>
         </div>
       </fieldset>
+      <% unless hide_privacy_notes %>
       <p class="portal-hint text-sm mt-3">
         If you would rather explain something directly, you can
         <% if private_support_path %>
@@ -56,6 +64,7 @@
         <% end %>
         A private request is routed to the event staff audience you choose; it does not confirm an accommodation.
       </p>
+      <% end %>
 
       <div class="mt-4 <%= 'hidden' unless open %>" data-health-sections-target="details">
         <% if kind == :medical %>
