@@ -77,7 +77,9 @@ document.addEventListener('DOMContentLoaded', function() {
   initRoomReorder();
 });
 
-let draggedRoomId = null;
+// var, not let: Turbo re-runs this script on each visit to the page.
+
+var draggedRoomId = null;
 
 function initRoomReorder() {
   document.querySelectorAll('.room-card').forEach(card => {
