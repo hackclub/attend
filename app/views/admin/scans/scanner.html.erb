@@ -677,7 +677,15 @@ function showParticipantModal(data, scanContext, firstScan) {
   const phoneEl = document.getElementById('modal-phone');
   if (phoneEl) phoneEl.textContent = data.phone || '—';
   document.getElementById('modal-tshirt').textContent = data.tshirt_size?.toUpperCase() || '—';
-  document.getElementById('modal-dietary').textContent = data.dietary?.replace('_', ' ') || 'None specified';
+  // The diet type plus the food-allergy flags, so a recorded allergy never
+  // reads as "None specified".
+  const dietaryParts = [
+    data.dietary?.replace('_', ' '),
+    data.has_life_threatening_food_allergies && 'life-threatening food allergies',
+    data.cross_contamination_risk && 'cross-contamination risk',
+    data.has_allergies && 'other allergies on file'
+  ].filter(Boolean);
+  document.getElementById('modal-dietary').textContent = dietaryParts.join(' · ') || 'None specified';
   document.getElementById('modal-view-link').href = data.show_url;
 
   const alertsDiv = document.getElementById('modal-alerts');
@@ -685,6 +693,9 @@ function showParticipantModal(data, scanContext, firstScan) {
 
   if (data.has_anaphylaxis_risk) {
     alertsDiv.innerHTML += '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 px-4 py-3 mt-4"><strong>⚠️ Anaphylaxis Risk</strong></div>';
+  }
+  if (data.has_life_threatening_food_allergies) {
+    alertsDiv.innerHTML += '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 px-4 py-3 mt-4"><strong>⚠️ Life-Threatening Food Allergies</strong></div>';
   }
   if (data.requires_refrigeration) {
     alertsDiv.innerHTML += '<div class="bg-blue-100 border-l-4 border-[#ec3750] text-blue-700 px-4 py-3 mt-4"><strong>❄️ Needs Medication Refrigeration</strong></div>';

@@ -187,23 +187,31 @@
       <% end %>
 
       <% if policy(@medical || Medical.new(participant_event: @participant_event)).show? %>
-        <section class="bg-white rounded-lg border border-gray-200 p-6">
+        <section class="bg-white rounded-lg border border-gray-200 p-6" data-testid="medical-summary">
           <div class="flex justify-between items-center mb-4">
             <h2 class="text-lg font-semibold">Medical Summary</h2>
             <%= link_to "View Details", medical_admin_event_participant_path(current_event, @participant_event), class: "text-sm text-[#ec3750] hover:text-blue-800" %>
           </div>
-          <% if @medical %>
+          <% food_safety = @participant_event.food_safety_summary %>
+          <%# Dietary flags show without a Medical record, but only a Medical record can say there are none. %>
+          <% if @medical || food_safety.any_flags? %>
             <div class="flex flex-wrap gap-2">
-              <% if @medical.has_anaphylaxis_risk %>
+              <% if food_safety.anaphylaxis_risk? %>
                 <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">⚠️ Anaphylaxis Risk</span>
               <% end %>
-              <% if @medical.has_allergies? %>
+              <% if food_safety.life_threatening_food_allergies? %>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">Life-Threatening Food Allergies</span>
+              <% end %>
+              <% if food_safety.cross_contamination_risk? %>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">Cross-Contamination Risk</span>
+              <% end %>
+              <% if food_safety.allergies? %>
                 <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">Has Allergies</span>
               <% end %>
-              <% if @medical.needs_medication_storage? %>
+              <% if @medical&.needs_medication_storage? %>
                 <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">Needs Refrigeration</span>
               <% end %>
-              <% unless @medical.has_anaphylaxis_risk || @medical.has_allergies? || @medical.needs_medication_storage? %>
+              <% unless food_safety.any_flags? || @medical&.needs_medication_storage? %>
                 <span class="text-gray-500">No special medical flags</span>
               <% end %>
             </div>
