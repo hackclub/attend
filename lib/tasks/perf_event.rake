@@ -80,6 +80,11 @@ namespace :dev do
       registration.create_medical!(section_response: "nothing_to_add")
       registration.create_dietary!(section_response: "nothing_to_add")
       registration.create_accessibility!(section_response: "nothing_to_add")
+      if status.in?(%w[complete awaiting_guardian withdrawn])
+        registration.travels.create!(direction: "inbound", mode: "plane", arrival_time: event.starts_at - 3.hours)
+        registration.travels.create!(direction: "outbound", mode: "plane", departure_time: event.ends_at + 3.hours)
+        registration.create_accommodation!(check_in_date: event.starts_at.to_date, check_out_date: event.ends_at.to_date)
+      end
       if status.in?(%w[complete withdrawn])
         registration.consents.create!(consent_type: "waiver", status: "signed", signed_at: now - 20.days)
       end
