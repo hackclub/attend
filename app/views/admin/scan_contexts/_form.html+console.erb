@@ -16,7 +16,7 @@
           <div class="space-y-3">
             <% ScanContext::KIND_DESCRIPTIONS.each do |kind, description| %>
               <div class="cs-option">
-                <%= f.radio_button :kind, kind %>
+                <%= f.radio_button :kind, kind, **aria %>
                 <div>
                   <%= f.label :kind, kind.humanize, value: kind, class: "cs-option-label" %>
                   <p class="cs-option-description"><%= description %></p>

@@ -17,9 +17,11 @@ namespace :dev do
     if (existing = Event.find_by(slug: perf_slug))
       abort "#{perf_slug} already exists. Run with RESET=1 to rebuild it." unless ENV["RESET"] == "1"
       puts "Deleting #{perf_slug}..."
-      existing.update_columns(hotel_scan_context_id: nil)
       existing.destroy!
     end
+    # People outlive their registrations, so clear the ones a previous run made.
+    Guardian.where("email LIKE 'perf-guardian-%@example.com'").destroy_all
+    Participant.where("email LIKE 'perf-%@example.com'").destroy_all
 
     ActiveJob::Base.queue_adapter = :test
     random = Random.new(500)

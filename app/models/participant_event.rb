@@ -53,9 +53,9 @@ class ParticipantEvent < ApplicationRecord
   has_many :groups, through: :group_memberships
   # The latest scan that placed this participant somewhere, for their status.
   # DISTINCT ON keeps it to one row per registration, so lists preload it in
-  # a single query; only the columns the status reads are loaded.
+  # a single query. Preload it, never includes: eager loading drops the order.
   has_one :latest_placing_scan, -> {
-    placing.select("DISTINCT ON (scans.participant_event_id) scans.id, scans.participant_event_id, scans.scan_context_id, scans.scanned_at")
+    placing.select("DISTINCT ON (scans.participant_event_id) scans.*")
       .order("scans.participant_event_id", scanned_at: :desc, created_at: :desc)
   }, class_name: "Scan"
 

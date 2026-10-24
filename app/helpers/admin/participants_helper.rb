@@ -78,7 +78,7 @@ module Admin::ParticipantsHelper
   # their latest scan puts them (ParticipantStatusPresenter). The title says
   # what the word means and which scan it comes from.
   def render_display_status_badge(participant_event)
-    status = ParticipantStatusPresenter.new(participant_event)
+    status = ParticipantStatusPresenter.new(participant_event, now: (@participant_status_now ||= Time.current))
     time = status.scanned_at_label
 
     if console_ui?

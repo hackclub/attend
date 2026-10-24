@@ -22,12 +22,22 @@ RSpec.describe ParticipantStatusPresenter do
   end
 
   it "shows where the latest placing scan puts them, with its time" do
-    scan(event.scan_contexts.first.name, "venue", 3.hours.ago)
-    scan("Free time", "outing", 1.hour.ago)
-    scan("Lunch", "tracking_only", 10.minutes.ago)
+    now = Time.current.utc.change(hour: 15, min: 0)
+    scan(event.scan_contexts.first.name, "venue", now - 3.hours)
+    scan("Free time", "outing", now - 1.hour)
+    scan("Lunch", "tracking_only", now - 10.minutes)
 
-    expect(status).to have_attributes(label: "Out", tone: :wait, scanned_at_label: 1.hour.ago.utc.strftime("%H:%M"))
-    expect(status.explanation).to include("Free time")
+    expect(status(now: now)).to have_attributes(label: "Out", tone: :wait, scanned_at_label: "14:00")
+    expect(status(now: now + 1.day).scanned_at_label).to eq((now - 1.hour).strftime("%a 14:00"))
+    expect(status(now: now).explanation).to include("Free time")
+  end
+
+  it "falls back to the registration status if the point stops placing people mid-request" do
+    scan("Free time", "outing", 1.hour.ago)
+    loaded = registration.reload.tap(&:latest_placing_scan)
+    loaded.latest_placing_scan.scan_context.kind = "tracking_only"
+
+    expect(described_class.new(loaded)).to have_attributes(label: "Awaiting participant", scanned_at_label: nil)
   end
 
   it "says whether they attended once the event has ended" do

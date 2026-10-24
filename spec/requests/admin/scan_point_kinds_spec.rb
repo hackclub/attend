@@ -25,6 +25,8 @@ RSpec.describe "Scan point kinds in the admin", type: :request do
           .to have_attributes(kind: "supervised_outing", usage_note: "Scan as they board the bus.", checks_in: false)
         get admin_event_scan_contexts_path(event)
         expect(response.body).to include("Supervised outing", "Scan as they board the bus.")
+        get scanner_admin_event_scans_path(event)
+        expect(response.body).to include('data-role-info-target="panel"', "Scan as they board the bus.")
       end
 
       it "shows where a participant is in the status cell" do

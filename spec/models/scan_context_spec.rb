@@ -26,12 +26,21 @@ RSpec.describe ScanContext, type: :model do
       expect(both.reload).to have_attributes(checks_in: true, is_travel_pickup: true)
     end
 
+    it "counts a point saved without a kind by its flags" do
+      venue = event.scan_contexts.first
+      venue.update_columns(kind: nil)
+      scan = create(:participant_event, event: event).scans.create!(scan_context: venue, user: create(:user), scanned_at: Time.current)
+
+      expect(venue.reload.kind_label).to eq("Venue")
+      expect(Scan.placing).to include(scan)
+    end
+
     it "keeps the event's last venue point a venue" do
       venue = event.scan_contexts.first
       venue.kind = "outing"
 
       expect(venue).not_to be_valid
-      expect(venue.errors[:kind].first).to include("at least one Venue")
+      expect(venue.errors[:base].first).to include("at least one Venue")
     end
   end
 

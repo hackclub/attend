@@ -67,11 +67,15 @@ class ParticipantStatusPresenter
   end
 
   def resolve
-    return REGISTRATION.fetch(participant_event.display_status) if gone?
+    registration = REGISTRATION.fetch(participant_event.display_status)
+    return registration if gone?
     return (scan ? ATTENDED : NO_SHOW) if ended?
-    return WHEREABOUTS.fetch(scan.scan_context.kind) if scan
 
-    REGISTRATION.fetch(participant_event.display_status)
+    place = WHEREABOUTS[scan.scan_context.effective_kind] if scan
+    return place if place
+
+    @scan = nil # its point became tracking only mid-request, so it places nobody
+    registration
   end
 
   def ended?
