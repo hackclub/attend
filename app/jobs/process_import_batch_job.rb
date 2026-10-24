@@ -19,7 +19,48 @@ class ProcessImportBatchJob < ApplicationJob
     end
   end
 
+  # Why import_row would fail this row, or nil when it should import. The
+  # preview shows it before the import starts, so the rules live here, next to
+  # the validations they predict.
+  def rejection_reason(row, event, existing_participant)
+    row = row.with_indifferent_access
+    email = row[:email].to_s.downcase.strip
+    return "Invalid email address" unless email.match?(URI::MailTo::EMAIL_REGEXP)
+
+    # A participant already in Attend keeps the names on file.
+    unless existing_participant
+      missing = { legal_first_name: "first name", legal_last_name: "last name" }.select { |key, _| row[key].blank? }.values
+      return "Missing #{missing.to_sentence}" if missing.any?
+    end
+
+    return "Banned from events" if Ban.banned?(email, slack_ids: Ban.slack_ids_for(existing_participant))
+
+    date_of_birth = parse_date(row[:date_of_birth]) || existing_participant&.date_of_birth
+    if ParticipantEvent.new(event: event, participant: Participant.new(date_of_birth: date_of_birth)).too_old_for_event?
+      return "19 or older during this event"
+    end
+
+    guardian_rejection_reason(row) || emergency_contact_rejection_reason(row)
+  end
+
   private
+
+  def guardian_rejection_reason(row)
+    return if row[:parent_email].blank? || parent_email_matches_participant?(row)
+
+    parent_email = row[:parent_email].downcase.strip
+    return if Guardian.exists?([ "LOWER(email) = ?", parent_email ])
+    return "Invalid parent email" unless parent_email.match?(URI::MailTo::EMAIL_REGEXP)
+
+    missing = { parent_first_name: "parent first name", parent_last_name: "parent last name" }.select { |key, _| row[key].blank? }.values
+    "Missing #{missing.to_sentence}" if missing.any?
+  end
+
+  def emergency_contact_rejection_reason(row)
+    return unless row[:emergency_first_name].present? && row[:emergency_phone].present?
+
+    "Invalid emergency contact phone" unless PhoneNormalizer.normalize(row[:emergency_phone])
+  end
 
   def import_participants
     @batch.update!(status: :importing)
@@ -72,6 +113,7 @@ class ProcessImportBatchJob < ApplicationJob
       create_medical(participant_event, row)
       create_guardian_and_emergency_contact(participant_event, row, row_number)
       create_travel(participant_event, row)
+      apply_groups(participant_event, row, row_number)
     end
 
     { imported: true, participant: participant }
@@ -158,6 +200,35 @@ class ProcessImportBatchJob < ApplicationJob
       event: @event,
       status: :invited
     )
+  end
+
+  # The template's Groups column: names separated by commas or semicolons,
+  # matched to the event's groups by name or slug, creating any that are new.
+  # A name the event can't hold as a group (say, one whose slug would be empty
+  # or taken) is reported and skipped rather than failing the participant.
+  def apply_groups(participant_event, row, row_number)
+    return unless @event.groups_enabled?
+
+    names = row[:groups].to_s.split(/[;,]/).map { |name| name.gsub(/[[:space:]]+/, " ").strip }.reject(&:blank?)
+
+    names.each do |name|
+      group = find_or_build_group(name)
+      if group.new_record? && !group.save
+        add_error(row_number, row[:email], "Group #{name.inspect} not added: #{group.errors.full_messages.to_sentence}")
+        next
+      end
+      GroupMembership.find_or_create_by!(group: group, participant_event: participant_event)
+    end
+  end
+
+  def find_or_build_group(name)
+    existing = @event.groups.find_by("LOWER(name) = LOWER(?)", name) || @event.groups.find_by(slug: name.downcase)
+    return existing if existing
+
+    # Same position rule as Admin::GroupsController#create: new groups go last.
+    group = Group.new(event: @event, name: name, position: (@event.groups.maximum(:position) || -1) + 1)
+    group.validate # fills in the slug, which may match an existing group's
+    (group.slug.present? && @event.groups.find_by(slug: group.slug)) || group
   end
 
   def create_accommodation(participant_event, row)

@@ -52,4 +52,27 @@ RSpec.describe ProcessImportBatchJob do
     expect(import_batch.errors_data.map { |e| e["error"] })
       .to include(a_string_matching(/Parent email is the same as the participant's email/))
   end
+
+  describe "the Groups column" do
+    def import_with_groups(groups)
+      import_batch = ImportBatch.create!(
+        event: event, status: :pending, total_count: 1, send_invitations: false,
+        rows_data: [ { email: "grouped@example.com", legal_first_name: "Pat", legal_last_name: "Example", groups: groups } ]
+      )
+      described_class.perform_now(import_batch.id)
+      ParticipantEvent.find_by!(event: event, participant: Participant.find_by!(email: "grouped@example.com"))
+    end
+
+    it "matches existing groups by name or slug, adds new ones last, and skips a name that can't be a group" do
+      event.update!(groups_enabled: true)
+      red = event.groups.create!(name: "Red Team", position: 3)
+
+      participant_event = import_with_groups("red-team; Red\u00A0 team!, Green Team, !!!")
+
+      green = event.groups.find_by!(name: "Green Team")
+      expect(participant_event.groups).to contain_exactly(red, green)
+      expect(green.position).to eq(4)
+      expect(ImportBatch.last.errors_data.pluck("error")).to include(a_string_starting_with('Group "!!!" not added'))
+    end
+  end
 end
