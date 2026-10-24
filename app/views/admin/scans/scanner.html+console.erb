@@ -29,18 +29,24 @@
       </div>
 
       <% if @scan_contexts.size > 1 %>
-        <div class="flex w-full items-center gap-2 sm:w-auto">
+        <div class="flex w-full flex-wrap items-center gap-x-2 gap-y-1 sm:w-auto" data-controller="scan-context-note">
           <label for="scan-context" class="cs-kv-label whitespace-nowrap">Context</label>
-          <select id="scan-context" class="cs-select min-h-11 sm:min-h-8">
+          <select id="scan-context" data-scan-context-note-target="select" data-action="scan-context-note#show" class="cs-select min-h-11 sm:min-h-8">
             <% @scan_contexts.each do |context| %>
               <option value="<%= context.id %>" <%= "selected" if context == @default_scan_context %>>
                 <%= context.name %><%= " — Travel pickup" if context.is_travel_pickup? %><% if context.checks_in? %> ✓<% end %>
               </option>
             <% end %>
           </select>
+          <% @scan_contexts.select { |context| context.usage_note.present? }.each do |context| %>
+            <p class="hidden w-full cs-small cs-muted" data-scan-context-note-target="note" data-scan-context-id="<%= context.id %>"><%= context.usage_note %></p>
+          <% end %>
         </div>
       <% else %>
         <input type="hidden" id="scan-context" value="<%= @default_scan_context&.id %>">
+        <% if @default_scan_context&.usage_note.present? %>
+          <p class="cs-small cs-muted"><%= @default_scan_context.usage_note %></p>
+        <% end %>
       <% end %>
     </div>
 

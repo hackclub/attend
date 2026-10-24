@@ -38,18 +38,19 @@ namespace :dev do
     EventRoleAssignment.find_or_create_by!(event: event, user: admin, role: "event_admin")
 
     entrance = event.scan_contexts.first
-    entrance.update!(name: "Main entrance")
+    entrance.update!(name: "Main entrance", usage_note: "Scan everyone as they come in each morning.")
+    point = ->(name, kind, position, note = nil) { event.scan_contexts.create!(name: name, kind: kind, position: position, usage_note: note) }
     points = {
       entrance: entrance,
-      pickup: event.scan_contexts.create!(name: "Airport pickup", is_travel_pickup: true, checks_in: false, position: 1),
-      hotel: event.scan_contexts.create!(name: "Hotel", checks_in: false, is_travel_pickup: false, position: 2),
-      lunch: event.scan_contexts.create!(name: "Lunch", checks_in: false, is_travel_pickup: false, position: 3),
-      dinner: event.scan_contexts.create!(name: "Dinner", checks_in: false, is_travel_pickup: false, position: 4),
-      swag: event.scan_contexts.create!(name: "Swag pickup", checks_in: false, is_travel_pickup: false, position: 5),
-      workshop: event.scan_contexts.create!(name: "Workshop", checks_in: false, is_travel_pickup: false, position: 6),
-      bus_tour: event.scan_contexts.create!(name: "Bus tour", checks_in: false, is_travel_pickup: false, position: 7),
-      free_time: event.scan_contexts.create!(name: "Free time out", checks_in: false, is_travel_pickup: false, position: 8),
-      departure: event.scan_contexts.create!(name: "Departure", checks_in: false, is_travel_pickup: false, position: 9)
+      pickup: point.("Airport pickup", "pickup", 1, "Scan each participant as they get on the shuttle at arrivals."),
+      hotel: point.("Hotel", "lodging", 2, "Scan as people get back to the hotel at night."),
+      lunch: point.("Lunch", "tracking_only", 3),
+      dinner: point.("Dinner", "tracking_only", 4),
+      swag: point.("Swag pickup", "tracking_only", 5),
+      workshop: point.("Workshop", "tracking_only", 6),
+      bus_tour: point.("Bus tour", "supervised_outing", 7, "Scan everyone as they board the bus to the museum."),
+      free_time: point.("Free time out", "outing", 8, "Scan people heading out on their own in the afternoon."),
+      departure: point.("Departure", "departure", 9, "Scan on the last day as each person leaves.")
     }
     event.update_columns(hotel_scan_context_id: points[:hotel].id)
 
@@ -108,7 +109,7 @@ namespace :dev do
                 scanned_at: at, source: "qr", created_at: at, updated_at: at }
     }
     attending.each do |registration|
-      day0 = event.starts_at.beginning_of_day
+      day0 = event.starts_at.in_time_zone(event.event_time_zone).beginning_of_day
       add.(registration, points[:pickup], day0 - 2.hours + random.rand(0..300).minutes) if random.rand < 0.6
       4.times do |d|
         day = day0 + d.days
