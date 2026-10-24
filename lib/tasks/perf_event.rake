@@ -8,15 +8,15 @@
 #
 # Development only. Every name, email and phone number is made up.
 namespace :dev do
-  PERF_SLUG = "perf-500".freeze
+  perf_slug = "perf-500"
 
   desc "Create the 500-participant performance event (development only)"
   task perf_event: :environment do
     abort "dev:perf_event only runs in development" unless Rails.env.development?
 
-    if (existing = Event.find_by(slug: PERF_SLUG))
-      abort "#{PERF_SLUG} already exists. Run with RESET=1 to rebuild it." unless ENV["RESET"] == "1"
-      puts "Deleting #{PERF_SLUG}..."
+    if (existing = Event.find_by(slug: perf_slug))
+      abort "#{perf_slug} already exists. Run with RESET=1 to rebuild it." unless ENV["RESET"] == "1"
+      puts "Deleting #{perf_slug}..."
       existing.update_columns(hotel_scan_context_id: nil)
       existing.destroy!
     end
@@ -27,7 +27,7 @@ namespace :dev do
     now = Time.current
 
     event = Event.create!(
-      slug: PERF_SLUG,
+      slug: perf_slug,
       name: "Perf 500",
       support_email: "perf-support@events.hackclub.com",
       timezone: "Eastern Time (US & Canada)",
@@ -133,15 +133,15 @@ namespace :dev do
     rows.each_slice(2_000) { |slice| Scan.insert_all!(slice); print "." }
     puts
 
-    puts "Built #{PERF_SLUG}: #{registrations.size} registrations, #{rows.size} scans, #{points.size} scan points."
-    puts "Open /admin/#{PERF_SLUG} on this checkout's dev server."
+    puts "Built #{perf_slug}: #{registrations.size} registrations, #{rows.size} scans, #{points.size} scan points."
+    puts "Open /admin/#{perf_slug} on this checkout's dev server."
   end
 
   desc "Time the admin pages on the performance event (development only)"
   task perf_timings: :environment do
     abort "dev:perf_timings only runs in development" unless Rails.env.development?
 
-    event = Event.find_by!(slug: PERF_SLUG)
+    event = Event.find_by!(slug: perf_slug)
     admin = User.find_by!(email: "admin@hackclub.com")
     registration = event.participant_events.joins(:participant).order("participants.legal_last_name").first
     pages = {

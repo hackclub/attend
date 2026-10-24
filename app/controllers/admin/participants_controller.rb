@@ -123,10 +123,11 @@ module Admin
           event: [],
           guardian_participant_events: [ :guardian, :emergency_contacts ],
           scans: [ :scan_context, :user ],
-          latest_placing_scan: :scan_context,
           groups: []
         )
-        .preload(room: { participant_events: :participant })
+        # preload, never includes: a filter that forces eager_load would fold this
+        # DISTINCT ON association into the join and attach the wrong scan.
+        .preload(room: { participant_events: :participant }, latest_placing_scan: :scan_context)
 
       @sort_field = params[:sort] || "legal_last_name"
       @sort_direction = params[:direction] == "desc" ? "desc" : "asc"

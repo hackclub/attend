@@ -99,7 +99,7 @@ class ScanContext < ApplicationRecord
     return if destroyed_by_association || event.destroyed? || event.marked_for_destruction?
 
     if checks_in? && last_check_in_context_for_event?
-      errors.add(:base, "Cannot delete the last check-in context for this event")
+      errors.add(:base, "Cannot delete the last Venue scan point: the event needs one to check people in")
       throw :abort
     end
   end
