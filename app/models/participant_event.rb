@@ -82,6 +82,13 @@ class ParticipantEvent < ApplicationRecord
   validate :participant_not_too_old, on: :create, unless: :skip_age_check
   validate :participant_not_banned, on: :create
 
+  # Hooked on the status column rather than mark_complete_if_eligible!, so
+  # every route to complete (DocuSeal, guardian portal, admin status edits,
+  # CSV import) invites without each one remembering to. A participant change
+  # is a duplicate merge handing a complete registration to the Slack-linked row.
+  after_commit :invite_to_slack_channel, on: %i[create update],
+    if: -> { (saved_change_to_status? || saved_change_to_participant_id?) && complete? }
+
   # SQL mirror of !onboarding_complete? so list filters don't have to load
   # every row into Ruby. Keep in sync with #onboarding_complete?.
   scope :missing_onboarding_data, ->(accommodation_required:, travel_required: true) {
@@ -538,6 +545,12 @@ class ParticipantEvent < ApplicationRecord
 
   def participant_events_to_update
     [ self ]
+  end
+
+  def invite_to_slack_channel
+    return if event.slack_channel_id.blank?
+
+    InviteToEventSlackChannelJob.perform_later(id)
   end
 
   def participant_not_too_old

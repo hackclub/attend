@@ -278,4 +278,26 @@ RSpec.describe Participant, type: :model do
       expect(participant.reload.update(preferred_name: "Sam")).to be(true)
     end
   end
+
+  describe "Slack channel invite when the Slack ID changes" do
+    include ActiveJob::TestHelper
+
+    it "enqueues an invite for a complete registration in an event with a channel" do
+      participant = create(:participant)
+      pe = create(:participant_event, participant: participant, event: create(:event, slack_channel_id: "C123"), status: :complete)
+
+      expect { participant.update!(slack_user_id: "U1") }
+        .to have_enqueued_job(InviteToEventSlackChannelJob).with(pe.id)
+    end
+  end
+
+  describe "#slack_connect_participant_event" do
+    it "picks the upcoming registration over an older one" do
+      participant = create(:participant)
+      create(:participant_event, participant: participant, event: create(:event, starts_at: 3.months.ago, ends_at: 3.months.ago + 2.days))
+      upcoming = create(:participant_event, participant: participant, event: create(:event, starts_at: 1.month.from_now, ends_at: 1.month.from_now + 2.days))
+
+      expect(participant.slack_connect_participant_event).to eq(upcoming)
+    end
+  end
 end

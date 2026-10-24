@@ -105,6 +105,8 @@ class Participant < ApplicationRecord
   before_validation :normalize_public_profile_slug
   before_validation :generate_public_profile_slug, if: -> { public_profile_enabled? && public_profile_slug.blank? }
   after_update_commit :touch_participant_events
+  # Sign-in sync from Hack Club Auth, Slack OAuth and CSV import all land here.
+  after_update_commit :invite_to_slack_channels, if: -> { saved_change_to_slack_user_id? && slack_user_id.present? }
 
   # Onboarding writes this into the required name fields when OIDC claims
   # arrive without a name, so a row can carry it until the person registers.
@@ -232,6 +234,21 @@ class Participant < ApplicationRecord
       .order(starts_at: :desc)
   end
 
+  # The registration a "Connect Slack" link is signed for; the OAuth callback
+  # invites to that event's channel. Prefers the live or soonest upcoming event
+  # the participant is still going to, then the most recent one that ended.
+  # Withdrawn and rejected registrations count only when there's nothing else,
+  # so linking Slack still works for them.
+  def slack_connect_participant_event
+    registrations = participant_events.includes(:event).to_a
+    active = registrations.reject { |pe| pe.withdrawn? || pe.rejected? }
+    registrations = active if active.any?
+
+    ended, current = registrations.partition { |pe| pe.event.phase_at == :ended }
+    # Events with no start date yet sort after dated ones.
+    current.min_by { |pe| [ pe.event.starts_at ? 0 : 1, pe.event.starts_at.to_i ] } || ended.max_by { |pe| pe.event.ends_at }
+  end
+
   # Verified through Hack Club Auth identity verification.
   def hca_verified?
     user&.hca_verified? || false
@@ -279,6 +296,12 @@ class Participant < ApplicationRecord
 
   def touch_participant_events
     participant_events.touch_all
+  end
+
+  def invite_to_slack_channels
+    participant_events.complete.joins(:event).where.not(events: { slack_channel_id: [ nil, "" ] }).pluck(:id).each do |participant_event_id|
+      InviteToEventSlackChannelJob.perform_later(participant_event_id)
+    end
   end
 
   def email_differs_from_guardians
