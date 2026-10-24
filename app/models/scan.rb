@@ -20,6 +20,8 @@ class Scan < ApplicationRecord
   scope :for_travel_pickup, -> { joins(:scan_context).where(scan_contexts: { is_travel_pickup: true }) }
   scope :for_travel_pickup_or_check_in, -> { joins(:scan_context).where(scan_contexts: { is_travel_pickup: true }).or(joins(:scan_context).where(scan_contexts: { checks_in: true })) }
   scope :for_context, ->(context) { where(scan_context: context) }
+  # Scans that place a participant somewhere (every kind but tracking only).
+  scope :placing, -> { joins(:scan_context).where(scan_contexts: { kind: ScanContext::PLACING_KINDS }) }
 
   after_create_commit :broadcast_scan
 
