@@ -69,7 +69,7 @@ RSpec.describe "Admin::AirtableConnections", type: :request do
 
       expect {
         get admin_airtable_oauth_callback_path, params: { code: "fictional-code", state: state }
-      }.to have_enqueued_job(AirtableJobs::SyncAllJob)
+      }.to have_enqueued_job(AirtableJobs::SyncAllJob).with(event.id)
 
       event.reload
       connection = event.airtable_connection

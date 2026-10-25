@@ -111,7 +111,7 @@ class Admin::AirtableConnectionsController < Admin::BaseController
     ))
 
     # The connection replaces any pasted token, and whoever connected is who
-    # hears about it if the sync later pauses.
+    # hears about it if the sync later pauses or keeps failing.
     updates = { airtable_api_key: nil, airtable_config_updated_by_id: current_user.id }
     # A connected event syncs through the records API into a table of its
     # own; the old Sync API table is externally synced and can't be written.
@@ -123,7 +123,7 @@ class Admin::AirtableConnectionsController < Admin::BaseController
       @event.update_columns(config: @event.config.merge("airtable_base_id" => bases.first["id"]))
     end
     @event.resume_airtable_sync!
-    AirtableJobs::SyncAllJob.perform_later if @event.airtable_sync_configured?
+    AirtableJobs::SyncAllJob.perform_later(@event.id) if @event.airtable_sync_configured?
 
     connection
   end

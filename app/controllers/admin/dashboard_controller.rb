@@ -56,10 +56,12 @@ class Admin::DashboardController < Admin::BaseController
     if @event.airtable_sync_configured?
       # "Sync Now" is a deliberate retry, so it also lifts a pause left by an
       # earlier failure — otherwise the scheduled job would skip this event and
-      # the button would look like it did nothing.
+      # the button would look like it did nothing. A sync that isn't paused is
+      # left alone, so pressing the button can't reset the failure streak that
+      # decides when someone is told it keeps failing.
       was_paused = @event.airtable_sync_paused?
-      @event.resume_airtable_sync!
-      AirtableJobs::SyncAllJob.perform_later
+      @event.resume_airtable_sync! if was_paused
+      AirtableJobs::SyncAllJob.perform_later(@event.id)
 
       notice = if was_paused
         "Airtable sync resumed and triggered. It will complete shortly."
@@ -94,13 +96,13 @@ class Admin::DashboardController < Admin::BaseController
     if @event.update(integration_params)
       if airtable_settings_saved?
         # Whoever last touched the credentials is who we email if the sync
-        # later fails and pauses itself.
+        # later pauses itself or keeps failing.
         @event.update_column(:airtable_config_updated_by_id, current_user.id)
         @event.resume_airtable_sync!
       end
 
       if airtable_settings_saved? && @event.airtable_sync_configured?
-        AirtableJobs::SyncAllJob.perform_later
+        AirtableJobs::SyncAllJob.perform_later(@event.id)
         redirect_to admin_event_integrations_path(@event), notice: "Integration settings updated. Airtable sync started."
       else
         redirect_to admin_event_integrations_path(@event), notice: "Integration settings updated."
@@ -132,6 +134,7 @@ class Admin::DashboardController < Admin::BaseController
     @airtable_synced_at = current_event.airtable_synced_at
     @airtable_sync_error = current_event.airtable_sync_error
     @airtable_sync_error_at = current_event.airtable_sync_error_at
+    @airtable_sync_failures = current_event.airtable_sync_failures
     @airtable_sync_stale = current_event.airtable_sync_stale?
     @airtable_sync_paused = current_event.airtable_sync_paused?
     @airtable_sync_paused_at = current_event.airtable_sync_paused_at

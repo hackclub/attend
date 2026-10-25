@@ -505,7 +505,8 @@ class Event < ApplicationRecord
 
   # AirtableJobs::SyncAllJob runs every 5 minutes and only advances
   # airtable_synced_at on success, so anything older than this means the sync
-  # has been failing — the job rescues per event, so nothing else surfaces it.
+  # has been failing. The job rescues per event and only emails once a
+  # failure has lasted, so this is the first place a failing sync shows up.
   AIRTABLE_SYNC_STALE_AFTER = 30.minutes
 
   def airtable_sync_stale?
@@ -521,10 +522,10 @@ class Event < ApplicationRecord
     airtable_sync_paused_at.present?
   end
 
-  # One failure stops the schedule. Retrying broken credentials every 5 minutes
-  # never fixes them; it just buries the real signal under thousands of
-  # identical errors. A human re-saving the config (or hitting "Sync Now") is
-  # the only thing that resumes it.
+  # A configuration error stops the schedule. Retrying broken credentials
+  # every 5 minutes never fixes them; it just buries the real signal under
+  # thousands of identical errors. A human re-saving the config (or hitting
+  # "Sync Now") is the only thing that resumes it.
   def pause_airtable_sync!(error_message)
     update_columns(
       airtable_sync_paused_at: Time.current,
@@ -533,12 +534,60 @@ class Event < ApplicationRecord
     )
   end
 
+  # Rate limits, 5xx and timeouts clear up on their own, so the schedule keeps
+  # going and only the streak is recorded. One UPDATE adds to the count in SQL,
+  # so a manual "Sync Now" overlapping the scheduled run can't lose a failure.
+  def record_airtable_sync_failure!(error_message)
+    now = Time.current
+    scope = self.class.where(id: id)
+    scope.update_all([
+      "airtable_sync_failures = airtable_sync_failures + 1, " \
+      "airtable_sync_failing_since = COALESCE(airtable_sync_failing_since, ?), " \
+      "airtable_sync_error = ?, airtable_sync_error_at = ?",
+      now, error_message, now
+    ])
+
+    # Only the count is read back, not the whole row. It's nil when the event
+    # was deleted mid-run, and then there's nothing left to record.
+    failures = scope.pick(:airtable_sync_failures)
+    return if failures.nil?
+
+    self.airtable_sync_failures = failures
+    clear_attribute_changes([ :airtable_sync_failures ])
+  end
+
+  # Report a failing sync once per streak: after enough runs in a row fail, or
+  # once it has been failing for long enough (runs can be further apart than
+  # 5 minutes when Airtable keeps the job waiting), whichever comes first.
+  AIRTABLE_SYNC_ALERT_AFTER_FAILURES = 12
+  AIRTABLE_SYNC_ALERT_AFTER_FAILING_FOR = 3.hours
+
+  # True only for the run that records the alert, and only once the streak is
+  # due one, so two overlapping runs can't both send it.
+  def claim_airtable_sync_alert!
+    self.class
+      .where(id: id, airtable_sync_alerted_at: nil)
+      .where(
+        "airtable_sync_failures >= ? OR airtable_sync_failing_since < ?",
+        AIRTABLE_SYNC_ALERT_AFTER_FAILURES, AIRTABLE_SYNC_ALERT_AFTER_FAILING_FOR.ago
+      )
+      .update_all(airtable_sync_alerted_at: Time.current) == 1
+  end
+
+  AIRTABLE_SYNC_STREAK_RESET = {
+    airtable_sync_error: nil,
+    airtable_sync_error_at: nil,
+    airtable_sync_failures: 0,
+    airtable_sync_failing_since: nil,
+    airtable_sync_alerted_at: nil
+  }.freeze
+
+  def record_airtable_sync_success!
+    update_columns(airtable_synced_at: Time.current, **AIRTABLE_SYNC_STREAK_RESET)
+  end
+
   def resume_airtable_sync!
-    update_columns(
-      airtable_sync_paused_at: nil,
-      airtable_sync_error: nil,
-      airtable_sync_error_at: nil
-    )
+    update_columns(airtable_sync_paused_at: nil, **AIRTABLE_SYNC_STREAK_RESET)
   end
 
   # Whoever last saved the Airtable credentials — the only person who can
