@@ -116,10 +116,11 @@ export default class extends Controller {
           popupAnchor: [0, -size / 2 - 2]
         })
       })
-        .addTo(this.map)
-        .bindPopup(this.popupElement(pin))
 
-      marker.getElement()?.setAttribute("aria-label", this.pinLabel(pin))
+      // The map has no view yet, so Leaflet holds the marker back until
+      // fitToBounds sets one; its element only exists from "add" onwards.
+      marker.on("add", () => marker.getElement()?.setAttribute("aria-label", this.pinLabel(pin)))
+      marker.addTo(this.map).bindPopup(this.popupElement(pin))
       this.markers.push(marker)
       this.bounds.push([pin.lat, pin.lon])
     })

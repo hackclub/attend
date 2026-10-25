@@ -16,7 +16,7 @@
   <div class="landing" data-controller="landing-map" data-landing-map-pins-value="<%= @landing[:pins].to_json %>">
     <header class="landing-header">
       <div class="landing-header-inner">
-        <div class="flex min-w-0 items-center gap-2.5">
+        <div class="flex shrink-0 items-center gap-2.5">
           <img src="/icon-512.png" alt="" class="size-8 shrink-0">
           <span class="text-xl font-bold text-(--text-strong)">Attend</span>
           <span class="hidden whitespace-nowrap text-sm text-(--text-soft) sm:inline">by Hack Club</span>
@@ -24,8 +24,9 @@
         <%= button_to user_hack_club_omniauth_authorize_path,
               method: :post,
               data: { turbo: false },
+              form: { class: "min-w-0" },
               class: "landing-cta" do %>
-          <img src="https://assets.hackclub.com/icon-rounded.svg" alt="" width="20" height="20" class="size-5">
+          <img src="https://assets.hackclub.com/icon-rounded.svg" alt="" width="20" height="20" class="size-5 shrink-0">
           Continue with Hack Club
         <% end %>
       </div>
@@ -46,17 +47,31 @@
         <%# Doors for everyone who can't sign in. Never hidden at any width:
             guardians arrive from invite emails and incident reporters from an
             event, both overwhelmingly on phones. %>
-        <nav class="landing-doors" aria-label="Not Hack Club staff">
-          <span class="landing-doors-label">Not staff?</span>
-          <%= link_to guardian_portal_center_path, class: "landing-door" do %>
-            Parent or guardian <span aria-hidden="true">→</span>
-          <% end %>
-          <%= link_to incident_report_path, class: "landing-door" do %>
-            Report an incident <span aria-hidden="true">→</span>
-          <% end %>
-          <a href="mailto:attend@hackclub.com" class="landing-door">
-            Need help? <span aria-hidden="true">→</span>
-          </a>
+        <nav class="landing-actions" aria-labelledby="landing-actions-heading">
+          <h2 id="landing-actions-heading" class="landing-actions-label">Quick actions</h2>
+          <ul class="landing-actions-list">
+            <li>
+              <%= link_to guardian_portal_center_path, class: "landing-action" do %>
+                <span class="landing-action-title">Parent or guardian</span>
+                <span class="landing-action-hint">Forms and consent for your child</span>
+                <span class="landing-action-arrow" aria-hidden="true">→</span>
+              <% end %>
+            </li>
+            <li>
+              <%= link_to incident_report_path, class: "landing-action" do %>
+                <span class="landing-action-title">Report an incident</span>
+                <span class="landing-action-hint">Tell the safety team what happened</span>
+                <span class="landing-action-arrow" aria-hidden="true">→</span>
+              <% end %>
+            </li>
+            <li>
+              <a href="mailto:attend@hackclub.com" class="landing-action">
+                <span class="landing-action-title">Need help?</span>
+                <span class="landing-action-hint">Email attend@hackclub.com</span>
+                <span class="landing-action-arrow" aria-hidden="true">→</span>
+              </a>
+            </li>
+          </ul>
         </nav>
       </section>
 
@@ -97,9 +112,6 @@
             </li>
           <% end %>
         </ol>
-        <p class="landing-foot">
-          Counted live from Attend, <%= time_ago_in_words(@landing[:generated_at]) %> ago. Students are counted once each; events are counted once they have started.
-        </p>
       </section>
     </div>
 

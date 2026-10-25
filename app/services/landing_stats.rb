@@ -81,7 +81,6 @@ class LandingStats
     index_by_event = pins.each_with_index.to_h { |pin, i| [ pin.delete(:event_id), i ] }
 
     {
-      generated_at: @now,
       events: counted_event_ids.size,
       students: counted_registrations.distinct.count(:participant_id),
       countries: roll(index_by_event).size,
