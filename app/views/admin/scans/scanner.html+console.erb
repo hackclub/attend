@@ -290,6 +290,8 @@ function groupBadgeHtml(group) {
   // so repeat visits don't stack handlers over detached nodes.
   const pageListeners = new AbortController();
   const signal = pageListeners.signal;
+  // Shared with the NFC bridge below, which tears down on the same signal.
+  window.scannerPageSignal = signal;
 
   const scanUrl = '<%= admin_event_scans_path(current_event) %>';
   const searchUrl = '<%= search_admin_event_scans_path(current_event) %>';
@@ -1060,9 +1062,9 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
 
   // Disconnect when we navigate away, otherwise the next visit opens a second
   // connection and every tap is scanned twice.
-  document.addEventListener('turbo:before-render', function() {
+  window.scannerPageSignal.addEventListener('abort', function() {
     clearTimeout(autoConnect);
     if (nfcBridge) nfcBridge.close();
-  }, { once: true });
+  });
 })();
 </script>

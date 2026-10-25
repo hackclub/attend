@@ -18,7 +18,7 @@
   </header>
 
   <script nonce="<%= content_security_policy_nonce %>">
-    document.addEventListener("DOMContentLoaded", function() {
+    function initAccommodationGender() {
       const genderBaseRadios = document.querySelectorAll('input[name="accommodation[gender_base]"]');
       const isTransgenderCheckbox = document.getElementById("is_transgender_checkbox");
       const roommateSection = document.getElementById("preferred_roommate_genders_section");
@@ -69,7 +69,15 @@
       });
 
       toggleRoommateSection();
-    });
+    }
+
+    // On a Turbo visit DOMContentLoaded has long since fired, so only wait for
+    // it on a full page load.
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initAccommodationGender);
+    } else {
+      initAccommodationGender();
+    }
   </script>
 
   <%= form_with model: @accommodation, url: onboarding_step_path(step: @step, event_id: current_event.id), scope: :accommodation, method: :patch, local: true, data: { turbo: false, controller: "autosave", autosave_url_value: onboarding_step_path(step: @step, event_id: current_event.id), action: "input->autosave#input change->autosave#change" }, novalidate: true do |f| %>

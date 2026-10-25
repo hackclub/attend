@@ -8,9 +8,19 @@
 // Before each render, scripts that carry the new response's own nonce get the
 // document's nonce instead. A script injected into the markup can't know the
 // new response's nonce, so it stays blocked, the same as on a full page load.
+//
+// A back/forward visit renders a cached copy of the page instead, where the
+// browser has hidden every nonce attribute (""). The copy still holds the nonce
+// each script ran with, though, so scripts that ran under the document's nonce
+// get it back. Previews of a cached page are left alone: the real render that
+// follows runs their scripts.
 
 function cspNonce() {
   return document.querySelector('meta[name="csp-nonce"]')?.content
+}
+
+function isPreview() {
+  return document.documentElement.hasAttribute("data-turbo-preview")
 }
 
 export function startTurboScriptNonce() {
@@ -21,9 +31,13 @@ export function startTurboScriptNonce() {
   // onto every script it runs, injected ones included.
   document.addEventListener("turbo:before-render", (event) => {
     const newNonce = cspNonce()
+    const restoring = !isPreview()
 
     for (const script of event.detail.newBody.querySelectorAll("script[nonce]")) {
-      if (script.getAttribute("nonce") === newNonce) script.setAttribute("nonce", documentNonce)
+      const nonce = script.getAttribute("nonce")
+      const fromCache = nonce === "" && restoring && script.nonce === documentNonce
+
+      if (nonce === newNonce || fromCache) script.setAttribute("nonce", documentNonce)
     }
   })
 }
