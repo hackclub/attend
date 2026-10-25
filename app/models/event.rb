@@ -92,6 +92,7 @@ class Event < ApplicationRecord
 
   validate :acceptable_logo
   validate :acceptable_banner
+  validate :hotel_scan_context_belongs_to_event, if: :will_save_change_to_hotel_scan_context_id?
 
   belongs_to :event_series, optional: true
 
@@ -820,6 +821,16 @@ class Event < ApplicationRecord
   # Picking the hotel scan point makes its scans place people at lodging,
   # unless staff already gave it a kind that places them somewhere else.
   def mark_hotel_scan_context_as_lodging
-    hotel_scan_context.update!(kind: "lodging") if hotel_scan_context&.tracking_only?
+    return unless hotel_scan_context&.event_id == id
+
+    hotel_scan_context.update!(kind: "lodging") if hotel_scan_context.tracking_only?
+  end
+
+  # The hotel scan point is one of this event's own points; otherwise saving
+  # it would reach into another event's scan points.
+  def hotel_scan_context_belongs_to_event
+    return if hotel_scan_context.nil? || hotel_scan_context.event_id == id
+
+    errors.add(:hotel_scan_context, "must be one of this event's scan points")
   end
 end

@@ -69,6 +69,14 @@ RSpec.describe ScanContext, type: :model do
       event.update!(hotel_scan_context: pickup)
       expect(pickup.reload.kind).to eq("pickup")
     end
+
+    it "won't take another event's point as the hotel scan point" do
+      other_point = create(:event).scan_contexts.create!(name: "Their hotel")
+
+      expect(event.update(hotel_scan_context: other_point)).to be(false)
+      expect(event.errors[:hotel_scan_context]).to be_present
+      expect(other_point.reload.kind).to eq("tracking_only")
+    end
   end
 
   describe "travel pickup contexts" do
