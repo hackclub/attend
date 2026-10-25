@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { dropBlankFields } from "utils/drop_blank_fields"
 import { html } from "utils/html"
 
 // Cloudscape property filter for the admin console
@@ -52,12 +53,7 @@ export default class extends Controller {
       this.liveTimer = setTimeout(() => this.renderLive(), 0)
     } else {
       this.form = this.element.closest("form") || this.element.querySelector("form")
-      this.dropBlankFields = (event) => {
-        // Keep the URL to the filters that are applied: no "flag=&group_id=".
-        for (const [ name, value ] of Array.from(event.formData.entries())) {
-          if (value === "") event.formData.delete(name)
-        }
-      }
+      this.dropBlankFields = (event) => dropBlankFields(event.formData)
       this.form?.addEventListener("formdata", this.dropBlankFields)
       this.restoreFocus()
     }

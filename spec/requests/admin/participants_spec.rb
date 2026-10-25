@@ -54,9 +54,18 @@ RSpec.describe "Admin::Participants", type: :request do
       get admin_event_participants_path(event.slug), params: { search: "ada", status: "", blocked_on: "travel" }
 
       page = Nokogiri::HTML(response.body)
-      expect(page.css("#participant-filters select").map { |s| s["data-action"] }.uniq).to eq([ "change->auto-submit#submit" ])
-      expect(page.at_css("#participant-filters input[name='blocked_on']")["value"]).to eq("travel")
+      form = page.at_css("#participant-filters")
+      expect(form["data-action"]).to include("change->auto-submit#debouncedSubmit")
+      expect(form.css("select").size).to eq(5)
+      expect(form.at_css("input[name='blocked_on']")["value"]).to eq("travel")
       expect(page.at_css("a[title='Table view']")["href"]).to eq(table_admin_event_participants_path(event.slug, search: "ada", blocked_on: "travel"))
+
+      chip = form.at_css("[data-blocked-on-filter]")
+      expect(chip.text).to include("haven't given us both travel legs")
+      expect(chip.at_css("a[aria-label='Remove this filter']")["href"]).to eq(admin_event_participants_path(event.slug, search: "ada"))
+
+      expect(page.at_css("#slack-sync-progress-#{event.id}")).to be_present
+      expect(page.at_css("#sync-slack-modal-#{event.id}")).to be_present
     end
   end
 

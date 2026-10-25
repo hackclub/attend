@@ -1,9 +1,12 @@
 import { Controller } from "@hotwired/stimulus"
+import { dropBlankFields } from "utils/drop_blank_fields"
 
 // Submits the form as soon as a filter changes, so there's no Filter button
 // to press. Text input is debounced so each keystroke isn't a request.
 //   <form data-controller="auto-submit">
 //     <select data-action="change->auto-submit#submit">
+// or, for every control at once, debounced:
+//   <form data-controller="auto-submit" data-action="change->auto-submit#debouncedSubmit">
 //
 // The participant list morphs on these submits (turbo_refreshes_with :morph),
 // so the form, its controls and this controller stay in place: focus, caret
@@ -17,6 +20,7 @@ export default class extends Controller {
   // filtered by instead.
   connect() {
     this.element.reset()
+    this.submitted()
   }
 
   disconnect() {
@@ -45,15 +49,21 @@ export default class extends Controller {
 
   // Leave empty filters out of the URL.
   dropBlank({ formData }) {
-    for (const [name, value] of [...formData]) {
-      if (value === "") formData.delete(name)
-    }
+    dropBlankFields(formData)
+  }
+
+  // Remember what the results are (or are about to be) filtered by, however
+  // the form went out: a debounced change, Enter, or the no-JS button.
+  submitted() {
+    this.submittedQuery = this.query()
   }
 
   submit() {
     this.element.requestSubmit()
   }
 
+  // Selects go through here too: arrowing through a closed select fires
+  // change on every option in Windows browsers and Firefox.
   debouncedSubmit(event) {
     this.cancel()
     // Wait for IME and dead-key input to be committed before searching.
@@ -61,7 +71,9 @@ export default class extends Controller {
 
     this.debounceTimer = setTimeout(() => {
       this.debounceTimer = null
-      if (this.query() !== location.search) this.element.requestSubmit()
+      // Compare with the last submit, not the URL: the URL lags while results
+      // load and can list the same filters in another order.
+      if (this.query() !== this.submittedQuery) this.element.requestSubmit()
     }, this.delayValue)
   }
 

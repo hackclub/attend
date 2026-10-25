@@ -4,7 +4,7 @@
 
 <div<% if current_event.slack_channel_id.present? %> data-controller="sync-slack" data-sync-slack-preview-url-value="<%= sync_slack_channel_preview_admin_event_participants_path(current_event) %>" data-sync-slack-form-url-value="<%= sync_slack_channel_admin_event_participants_path(current_event) %>"<% end %>>
   <% if current_event.slack_channel_id.present? %>
-    <div id="slack-sync-progress" data-turbo-permanent data-controller="slack-sync-progress" data-slack-sync-progress-event-id-value="<%= current_event.id %>">
+    <div id="slack-sync-progress-<%= current_event.id %>" data-turbo-permanent data-controller="slack-sync-progress" data-slack-sync-progress-event-id-value="<%= current_event.id %>">
       <div data-slack-sync-progress-target="banner" class="hidden mb-4 rounded-md bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800">
         <span data-slack-sync-progress-target="message">Syncing Slack channel…</span>
       </div>
@@ -98,7 +98,7 @@
   <!-- Filters -->
   <div class="mb-4">
     <form action="<%= admin_event_participants_path(current_event) %>" method="get" class="flex flex-wrap items-center gap-2" id="participant-filters" data-controller="auto-submit" data-turbo-action="replace"
-          data-action="turbo:click@document->auto-submit#cancel turbo:submit-start@document->auto-submit#cancel popstate@window->auto-submit#cancel formdata->auto-submit#dropBlank">
+          data-action="change->auto-submit#debouncedSubmit turbo:submit-start->auto-submit#submitted turbo:click@document->auto-submit#cancel turbo:submit-start@document->auto-submit#cancel popstate@window->auto-submit#cancel formdata->auto-submit#dropBlank">
       <%# The series dashboard's chase links filter by blocking stage; keep it while other filters change. %>
       <%= hidden_field_tag :blocked_on, params[:blocked_on], id: nil if params[:blocked_on].present? %>
       <div class="flex-1 min-w-[200px] max-w-xs">
@@ -120,8 +120,7 @@
             ],
             params[:status]
           ),
-          class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600",
-          data: { action: "change->auto-submit#submit" } %>
+          class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
       <%= select_tag :flag,
           options_for_select([
             ["All Flags", ""],
@@ -132,24 +131,21 @@
             ["Anaphylaxis Risk", "anaphylaxis"],
             ["19+ During Event", "over_age_limit"]
           ], params[:flag]),
-          class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600",
-          data: { action: "change->auto-submit#submit" } %>
+          class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
       <%= select_tag :checked_in,
           options_for_select([
             ["All Check-In", ""],
             ["Checked In", "yes"],
             ["Not Checked In", "no"]
           ], params[:checked_in]),
-          class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600",
-          data: { action: "change->auto-submit#submit" } %>
+          class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
       <% if current_event.groups_enabled? && current_event.groups.any? %>
         <%= select_tag :group_id,
             options_for_select(
               [["All Groups", ""], ["No Group", "none"]] + current_event.groups.ordered.map { |g| [g.name, g.id] },
               params[:group_id]
             ),
-            class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600",
-            data: { action: "change->auto-submit#submit" } %>
+            class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
       <% end %>
       <% if @optional_documents.any? %>
         <%# Opt-in activities: who's doing each one, and who still owes a signature. %>
@@ -162,14 +158,23 @@
               },
               params[:optional_document]
             ),
-            class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600",
-            data: { action: "change->auto-submit#submit" } %>
+            class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
       <% end %>
       <%# Filters apply on change; the button is only for browsers without JS. %>
       <noscript>
         <%= submit_tag "Filter", class: "text-sm font-medium bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 cursor-pointer" %>
       </noscript>
       <% filter_params = request.query_parameters.slice("search", "status", "flag", "checked_in", "group_id", "optional_document", "blocked_on").compact_blank %>
+      <% if params[:blocked_on].present? %>
+        <%# The chase filter has no dropdown, so show it: it would otherwise narrow every search unseen. %>
+        <% blocking_stage = (SeriesDashboard::STAGES + [ SeriesDashboard::ARRIVAL_STAGE ]).find { |stage| stage.key.to_s == params[:blocked_on] } %>
+        <span class="inline-flex items-center gap-1 text-sm bg-gray-100 text-gray-700 rounded-md pl-3 pr-1.5 py-1.5" data-blocked-on-filter>
+          <%= blocking_stage ? "Only people who #{blocking_stage.chase}" : "Blocked on: #{params[:blocked_on].to_s.humanize}" %>
+          <%= link_to admin_event_participants_path(current_event, filter_params.except("blocked_on")), class: "p-0.5 rounded text-gray-500 hover:text-gray-700", "aria-label": "Remove this filter" do %>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          <% end %>
+        </span>
+      <% end %>
       <% if filter_params.any? %>
         <%= link_to "Clear", admin_event_participants_path(current_event), class: "text-sm text-gray-500 hover:text-gray-700" %>
       <% end %>
@@ -318,7 +323,7 @@
   </div>
 
   <% if current_event.slack_channel_id.present? %>
-    <div id="sync-slack-modal" data-turbo-permanent data-sync-slack-target="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-action="click->sync-slack#closeOnBackdrop">
+    <div id="sync-slack-modal-<%= current_event.id %>" data-turbo-permanent data-sync-slack-target="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-action="click->sync-slack#closeOnBackdrop">
       <div class="bg-white rounded-lg border border-gray-200 max-w-md w-full mx-4">
         <div class="p-6">
           <h3 class="text-base font-semibold mb-4">Sync Slack Channel</h3>
