@@ -1,6 +1,20 @@
 require "rails_helper"
 
 RSpec.describe ScanContext, type: :model do
+  describe "default order" do
+    let(:event) { create(:event) }
+
+    it "lists scheduled contexts by start time, then unscheduled ones, breaking ties by position" do
+      check_in = event.scan_contexts.find_by!(checks_in: true)
+      late = event.scan_contexts.create!(name: "Late", starts_at: 2.hours.from_now, position: 0)
+      early_second = event.scan_contexts.create!(name: "Early B", starts_at: 1.hour.from_now, position: 2)
+      early_first = event.scan_contexts.create!(name: "Early A", starts_at: early_second.starts_at, position: 1)
+      unscheduled = event.scan_contexts.create!(name: "Unscheduled", position: 1)
+
+      expect(event.scan_contexts.reload).to eq([ early_first, early_second, late, check_in, unscheduled ])
+    end
+  end
+
   describe "kinds" do
     let(:event) { create(:event) }
 

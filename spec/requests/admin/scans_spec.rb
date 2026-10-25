@@ -123,6 +123,26 @@ RSpec.describe "Admin::Scans", type: :request do
     expect(response.body).to include("NFC Scanner", 'id="nfc-write-panel"', 'id="modal-write-nfc-btn"')
   end
 
+  it "makes staff choose the scanner context when there are several, listed by start time" do
+    tomorrow = event.scan_contexts.create!(name: "Tomorrow", starts_at: 1.day.from_now, ends_at: 1.day.from_now + 1.hour, position: 1)
+    free_time = event.scan_contexts.create!(name: "Free time", starts_at: 1.hour.ago, ends_at: 1.hour.from_now, position: 2)
+
+    get scanner_admin_event_scans_path(event)
+
+    options = response.body[%r{<select id="scan-context".*?</select>}m].scan(/<option value="([^"]*)"( selected)?/)
+    expect(options.select { |_, selected| selected }).to eq([ [ "", " selected" ] ])
+    expect(options.map(&:first)).to eq([ "", free_time.id, tomorrow.id, scan_context.id ])
+    expect(response.body).to include('id="scan-context-required"')
+  end
+
+  it "uses the only scan context without asking in the old admin" do
+    admin.update!(admin_console_beta: false)
+
+    get scanner_admin_event_scans_path(event)
+
+    expect(response.body).to include(%(<input type="hidden" id="scan-context" value="#{scan_context.id}"))
+  end
+
   it "renders the NFC write flag as false when NFC badges were never set up" do
     event.update!(nfc_badges_enabled: nil)
 
