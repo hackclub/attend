@@ -415,6 +415,19 @@ class User < ApplicationRecord
       event_role_assignments.where(role: ADMIN_EVENT_ROLES).joins(:event).merge(Event.not_ended).exists?
   end
 
+  # Whether this user is registered for an event that hasn't ended yet, so the
+  # admin can offer a way across to their own participant dashboard. Reads the
+  # same `participant` row /dashboard does; withdrawn and rejected
+  # registrations don't count.
+  def participant_in_upcoming_events?
+    return false unless participant
+
+    participant.participant_events
+      .where.not(status: %w[withdrawn rejected])
+      .joins(:event).merge(Event.not_ended)
+      .exists?
+  end
+
   # Whether this user may see participants' identifying details: exact dates of
   # birth, home addresses, phone numbers, and the contact details of the people
   # around them (guardians and emergency contacts). A participant's own email
