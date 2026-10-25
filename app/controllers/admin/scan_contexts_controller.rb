@@ -4,7 +4,7 @@ module Admin
     before_action :set_scan_context, only: [ :edit, :update, :destroy ]
 
     def index
-      @scan_contexts = current_event.scan_contexts.by_schedule
+      @scan_contexts = current_event.scan_contexts
     end
 
     def new

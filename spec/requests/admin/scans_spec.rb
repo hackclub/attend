@@ -81,15 +81,15 @@ RSpec.describe "Admin::Scans", type: :request do
   end
 
   it "makes staff choose the scanner context when there are several, listed by start time" do
-    event.scan_contexts.create!(name: "Tomorrow", starts_at: 1.day.from_now, ends_at: 1.day.from_now + 1.hour, position: 1)
-    event.scan_contexts.create!(name: "Free time", starts_at: 1.hour.ago, ends_at: 1.hour.from_now, position: 2)
+    tomorrow = event.scan_contexts.create!(name: "Tomorrow", starts_at: 1.day.from_now, ends_at: 1.day.from_now + 1.hour, position: 1)
+    free_time = event.scan_contexts.create!(name: "Free time", starts_at: 1.hour.ago, ends_at: 1.hour.from_now, position: 2)
 
     get scanner_admin_event_scans_path(event)
 
-    options = response.body.scan(/<option value="([^"]*)"( selected)?/)
+    options = response.body[%r{<select id="scan-context".*?</select>}m].scan(/<option value="([^"]*)"( selected)?/)
     expect(options.select { |_, selected| selected }).to eq([ [ "", " selected" ] ])
+    expect(options.map(&:first)).to eq([ "", free_time.id, tomorrow.id, scan_context.id ])
     expect(response.body).to include('id="scan-context-required"')
-    expect(response.body.index("Free time")).to be < response.body.index("Tomorrow")
   end
 
   it "uses the only scan context without asking in the old admin" do

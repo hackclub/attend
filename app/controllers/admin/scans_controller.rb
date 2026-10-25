@@ -48,7 +48,7 @@ module Admin
         .recent
         .limit(50)
 
-      @scan_contexts = current_event.scan_contexts.by_schedule.to_a
+      @scan_contexts = current_event.scan_contexts.to_a
     end
 
     def search

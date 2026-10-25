@@ -42,7 +42,7 @@
             </select>
           </div>
         <% else %>
-          <input type="hidden" id="scan-context" value="<%= @scan_contexts.first.id %>">
+          <input type="hidden" id="scan-context" value="<%= @scan_contexts.first&.id %>">
         <% end %>
       </div>
       
@@ -316,6 +316,7 @@ function groupBadgeHtml(group, fallbackColor) {
       contextSelect.removeAttribute('aria-describedby');
       document.getElementById('scan-context-required')?.classList.add('hidden');
       lastScannedCode = null;
+      startScannerOnce();
     });
   }
 
@@ -376,19 +377,31 @@ function groupBadgeHtml(group, fallbackColor) {
     return scannedValue;
   }
 
-  async function processScan(scannedValue) {
-    if (scanCooldown) return;
-    if (scannedValue === lastScannedCode) return;
+  // The one gate for every scan path. Returns whether the scan was sent, so
+  // manual entry and search only clear what staff typed once it has.
+  function processScan(scannedValue) {
+    if (scanCooldown) return false;
+    if (scannedValue === lastScannedCode) return false;
     
     const participantId = parseQrCode(scannedValue);
     const scanContextId = requireContextId();
     if (!scanContextId) {
+      // Report a code held up to the camera once rather than every frame, but
+      // forget it after the usual cooldown so showing it again gets feedback.
       lastScannedCode = scannedValue;
-      return;
+      setTimeout(() => {
+        if (lastScannedCode === scannedValue) lastScannedCode = null;
+      }, 2000);
+      return false;
     }
     
     scanCooldown = true;
     lastScannedCode = scannedValue;
+    sendScan(participantId, scanContextId);
+    return true;
+  }
+
+  async function sendScan(participantId, scanContextId) {
     updateStatus('Processing...', 'scanning');
 
     try {
@@ -582,8 +595,7 @@ function groupBadgeHtml(group, fallbackColor) {
     e.preventDefault();
     const input = document.getElementById('manual-participant-id');
     const participantId = input.value.trim();
-    if (participantId && requireContextId()) {
-      processScan(participantId);
+    if (participantId && processScan(participantId)) {
       input.value = '';
     }
   });
@@ -637,9 +649,7 @@ function groupBadgeHtml(group, fallbackColor) {
   // Handle search result click
   searchResults.addEventListener('click', function(e) {
     const result = e.target.closest('.search-result');
-    if (result && requireContextId()) {
-      const participantId = result.dataset.participantId;
-      processScan(participantId);
+    if (result && processScan(result.dataset.participantId)) {
       searchInput.value = '';
       searchResults.classList.add('hidden');
     }
@@ -659,8 +669,21 @@ function groupBadgeHtml(group, fallbackColor) {
 
   // Initialize scanner. The zxing tag lives in <head>, and on a Turbo visit
   // Turbo appends it without waiting for it to load, so poll for the global
-  // rather than betting on a fixed delay.
-  waitForZXing().then(initScanner);
+  // rather than betting on a fixed delay. With several contexts the camera
+  // waits until staff pick one (see the change handler): every scan is
+  // refused until then and the overlay hides the video anyway.
+  let scannerStarted = false;
+  function startScannerOnce() {
+    if (scannerStarted) return;
+    scannerStarted = true;
+    waitForZXing().then(initScanner);
+  }
+
+  if (contextSelect) {
+    updateStatus('Choose a context');
+  } else {
+    startScannerOnce();
+  }
 
   // Hand the camera back as soon as we navigate away, otherwise iOS keeps the
   // capture (and its indicator) alive behind the next page.

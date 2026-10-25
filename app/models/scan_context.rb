@@ -11,13 +11,10 @@ class ScanContext < ApplicationRecord
   validates :is_travel_pickup, inclusion: { in: [ true, false ] }
   validate :ends_at_after_starts_at
 
-  default_scope { order(:position, :created_at) }
-
-  # Admin list and scanner selector order: scheduled contexts by start time,
-  # unscheduled ones after, then by manual position.
-  scope :by_schedule, -> {
-    reorder(arel_table[:starts_at].asc.nulls_last, :position, :created_at)
-  }
+  # Every context list (scanner, admin list, filters) uses one order:
+  # scheduled contexts by start time, unscheduled ones after, then by manual
+  # position.
+  default_scope { order(arel_table[:starts_at].asc.nulls_last, :position, :created_at) }
 
   validate :cannot_disable_last_check_in_context, if: :will_unset_checks_in?
   before_destroy :ensure_not_last_check_in_context
