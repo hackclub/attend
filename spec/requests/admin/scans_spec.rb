@@ -2,6 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Admin::Scans", type: :request do
   include Devise::Test::IntegrationHelpers
+  include ActiveSupport::Testing::TimeHelpers
 
   let(:admin) { create(:user, global_role: "global_admin") }
   let(:event) { create(:event, nfc_badges_enabled: false) }
@@ -45,6 +46,22 @@ RSpec.describe "Admin::Scans", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(participation.scans.last.source).to eq("nfc")
+    end
+
+    # The scanner banner stays up after the scan, so it spells out the
+    # resulting status, who scanned and when rather than a bare tick.
+    it "returns the resulting status and when the scan was recorded" do
+      freeze_time do
+        post admin_event_scans_path(event), params: {
+          participant_id: participant_event.id, scan_context_id: scan_context.id
+        }, as: :json
+
+        expect(response.parsed_body).to include(
+          "scanned_by" => admin.display_name_or_fallback,
+          "scanned_at" => Time.current.iso8601
+        )
+        expect(response.parsed_body.dig("participant", "display_status")).to eq(participant_event.display_status)
+      end
     end
 
     it "rejects a revoked passport" do
