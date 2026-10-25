@@ -1,0 +1,15 @@
+<%# The event has no arrival window, so attendees' dashboards can't tell them
+    when to turn up. Sits at the top of every admin page for the event until
+    someone sets one; there's nothing to dismiss because the gap is real. %>
+<div class="cs-alert cs-alert-warning mb-5" role="alert" data-testid="arrival-window-banner">
+  <%= cs_status_icon(:warning) %>
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+    <div>
+      <p class="cs-alert-title">No arrival window set</p>
+      <p>Attendees of <%= event.name %> can't see when to arrive until you set one.</p>
+    </div>
+    <% if policy(event).update? %>
+      <%= link_to "Set arrival window", edit_admin_event_path(event, anchor: "arrival-window"), class: "cs-btn self-start sm:self-auto whitespace-nowrap" %>
+    <% end %>
+  </div>
+</div>

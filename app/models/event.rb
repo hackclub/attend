@@ -322,6 +322,13 @@ class Event < ApplicationRecord
     public_send(attr)&.in_time_zone(event_time_zone)&.strftime("%Y-%m-%dT%H:%M")
   end
 
+  # Neither end of the arrival window is set, so attendees' dashboards fall
+  # back to "contact the team" copy. Staff get nagged about it on every admin
+  # page for the event until it's filled in or the event is over.
+  def arrival_window_missing?
+    arrival_opens_at.nil? && arrival_closes_at.nil? && !completed?
+  end
+
   # One-line "when to arrive" summary for the participant dashboard, in the
   # event's timezone. Nil when neither end of the arrival window is published,
   # so callers can fall back to "contact the team" copy.
