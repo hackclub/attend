@@ -74,13 +74,14 @@ module Admin
       # A header the file lacks leaves its key out of every row.
       @missing_columns = REQUIRED_COLUMNS.reject { |key, _| @rows.any? { |row| row.key?(key) } }.values
       importing_rows = {}
+      lookups = preview_lookups(@rows)
 
       @rows.each_with_index do |row, index|
         email = row[:email]&.downcase&.strip
         next if email.blank?
 
-        existing_participant = Participant.find_by("LOWER(email) = ?", email)
-        existing_pe = existing_participant&.participant_events&.find_by(event: current_event)
+        existing_participant = lookups[:participants][email]
+        existing_pe = existing_participant && lookups[:registered].include?(existing_participant.id)
 
         row_info = {
           row_number: index + 2,
@@ -98,7 +99,7 @@ module Admin
         elsif importing_rows[email]
           # The job imports the first row and skips this one as registered.
           @skipped_rows << row_info.merge(reason: "Same email as row #{importing_rows[email]}")
-        elsif (failure = rejection_reason(row, existing_participant))
+        elsif (failure = rejection_reason(row, existing_participant, lookups))
           @skipped_rows << row_info.merge(reason: failure, failing: true)
         else
           importing_rows[email] = row_info[:row_number]
@@ -160,24 +161,46 @@ module Admin
     def parse_csv(csv_content)
       content = decode_csv(csv_content).delete("\u0000")
       # Excel in many European locales separates with semicolons; "Unicode
-      # Text" uses tabs. The header row tells which.
-      col_sep = [ ",", ";", "\t" ].max_by { |sep| content.each_line.first.to_s.count(sep) }
+      # Text" uses tabs. The first rows tell which.
+      col_sep = [ ",", ";", "\t" ].max_by { |sep| separator_fit(content, sep) }
       csv = CSV.parse(content, headers: true, col_sep: col_sep)
 
       # Two headers can name one field. The template's own header beats an
       # alias (a form's "Email Address" is often the parent who filled it in,
       # its "Email" question the participant), then the leftmost column; a
-      # blank cell falls through to the next column.
+      # blank cell falls through to the next column of the same standing.
       columns = csv.headers.each_with_index.filter_map do |header, index|
         key = CsvImportService.column_for(header)
         [ key.to_s, index, CsvImportService.template_header?(header) ? 0 : 1 ] if key
       end.sort_by { |_, index, rank| [ rank, index ] }
+
+      # An alias never stands in for a template header the file also has, not
+      # even for a blank cell: a row that left the participant's own "Email"
+      # empty must not be imported under the parent's "Email Address".
+      best_rank = columns.each_with_object({}) { |(key, _, rank), ranks| ranks[key] ||= rank }
+      columns = columns.select { |(key, _, rank)| rank == best_rank[key] }
 
       csv.map do |row|
         columns.each_with_object({}) do |(key, index, _), mapped|
           mapped[key] ||= row[index]&.gsub(/\A[[:space:]]+|[[:space:]]+\z/, "").presence
         end
       end.reject { |row| row["email"].blank? }
+    end
+
+    # Rows sampled to pick the separator.
+    SNIFF_ROWS = 5
+
+    # How well a separator fits the file: the narrowest row it produces, then
+    # the header row's width. Counting separator characters instead reads a
+    # semicolon file whose header text contains a comma as comma-separated,
+    # and chokes on a comma inside a quoted header.
+    def separator_fit(content, col_sep)
+      rows = CSV.new(content, col_sep: col_sep).first(SNIFF_ROWS)
+      return [ 0, 0 ] if rows.empty?
+
+      [ rows.map(&:length).min, rows.first.length ]
+    rescue CSV::MalformedCSVError
+      [ 0, 0 ]
     end
 
     # Excel's "CSV UTF-8" starts with a byte order mark, its "Unicode Text" is
@@ -196,8 +219,34 @@ module Admin
       content.force_encoding(Encoding::Windows_1252).encode(Encoding::UTF_8)
     end
 
-    def rejection_reason(row, existing_participant)
-      ProcessImportBatchJob.new.rejection_reason(row, current_event, existing_participant)
+    # Everything the preview will ask the database about, in five queries for
+    # the whole file. The loop runs over every row inside the request, so a
+    # participant, registration, ban and guardian lookup per row doesn't scale
+    # to the thousand-row sheets organizers upload.
+    def preview_lookups(rows)
+      emails = rows.filter_map { |row| row[:email]&.downcase&.strip.presence }.uniq
+      parent_emails = rows.filter_map { |row| row[:parent_email]&.downcase&.strip.presence }.uniq
+      participants = emails.any? ? Participant.where("LOWER(email) IN (?)", emails).includes(:user).to_a : []
+      slack_ids = participants.flat_map { |participant| Ban.slack_ids_for(participant) }
+
+      {
+        participants: participants.index_by { |participant| participant.email.downcase },
+        registered: participants.any? ? ParticipantEvent.where(event: current_event, participant: participants).pluck(:participant_id).to_set : Set.new,
+        banned_emails: Ban.banned_emails(emails),
+        banned_slack_ids: Ban.banned_slack_ids(slack_ids),
+        guardian_emails: parent_emails.any? ? Guardian.where("LOWER(email) IN (?)", parent_emails).pluck(Arel.sql("LOWER(email)")).to_set : Set.new
+      }
+    end
+
+    def rejection_reason(row, existing_participant, lookups)
+      banned = lookups[:banned_emails].include?(row[:email].to_s.downcase.strip) ||
+        Ban.slack_ids_for(existing_participant).compact_blank.any? { |id| lookups[:banned_slack_ids].include?(id.strip.upcase) }
+
+      ProcessImportBatchJob.new.rejection_reason(
+        row, current_event, existing_participant,
+        banned: banned,
+        known_guardian: lookups[:guardian_emails].include?(row[:parent_email].to_s.downcase.strip)
+      )
     end
   end
 end

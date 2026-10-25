@@ -21,8 +21,10 @@ class ProcessImportBatchJob < ApplicationJob
 
   # Why import_row would fail this row, or nil when it should import. The
   # preview shows it before the import starts, so the rules live here, next to
-  # the validations they predict.
-  def rejection_reason(row, event, existing_participant)
+  # the validations they predict. The two answers that take a query - whether
+  # the address is banned, whether the parent is already a guardian - are
+  # passed in, because the preview loads them for a whole file at once.
+  def rejection_reason(row, event, existing_participant, banned:, known_guardian:)
     row = row.with_indifferent_access
     email = row[:email].to_s.downcase.strip
     return "Invalid email address" unless email.match?(URI::MailTo::EMAIL_REGEXP)
@@ -33,23 +35,23 @@ class ProcessImportBatchJob < ApplicationJob
       return "Missing #{missing.to_sentence}" if missing.any?
     end
 
-    return "Banned from events" if Ban.banned?(email, slack_ids: Ban.slack_ids_for(existing_participant))
+    return "Banned from events" if banned
 
     date_of_birth = parse_date(row[:date_of_birth]) || existing_participant&.date_of_birth
     if ParticipantEvent.new(event: event, participant: Participant.new(date_of_birth: date_of_birth)).too_old_for_event?
       return "19 or older during this event"
     end
 
-    guardian_rejection_reason(row) || emergency_contact_rejection_reason(row)
+    guardian_rejection_reason(row, known_guardian) || emergency_contact_rejection_reason(row)
   end
 
   private
 
-  def guardian_rejection_reason(row)
+  def guardian_rejection_reason(row, known_guardian)
     return if row[:parent_email].blank? || parent_email_matches_participant?(row)
+    return if known_guardian
 
     parent_email = row[:parent_email].downcase.strip
-    return if Guardian.exists?([ "LOWER(email) = ?", parent_email ])
     return "Invalid parent email" unless parent_email.match?(URI::MailTo::EMAIL_REGEXP)
 
     missing = { parent_first_name: "parent first name", parent_last_name: "parent last name" }.select { |key, _| row[key].blank? }.values

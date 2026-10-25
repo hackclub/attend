@@ -1,5 +1,9 @@
 import { Controller } from "@hotwired/stimulus"
 
+// Excel saves "Unicode Text" and tab-delimited exports as .txt, and the import
+// reads those too, so the dropzone can't be .csv-only.
+const ACCEPTED_EXTENSIONS = ['.csv', '.txt']
+
 export default class extends Controller {
   static targets = ["input", "content", "selected", "fileName", "submit", "zone"]
 
@@ -24,10 +28,15 @@ export default class extends Controller {
     this.zoneTarget.classList.remove('border-blue-500', 'bg-blue-50')
     
     const files = e.dataTransfer.files
-    if (files.length > 0 && files[0].name.toLowerCase().endsWith('.csv')) {
+    if (files.length > 0 && this.isAccepted(files[0].name)) {
       this.inputTarget.files = files
       this.showFileSelected(files[0].name)
     }
+  }
+
+  isAccepted(name) {
+    const lowered = name.toLowerCase()
+    return ACCEPTED_EXTENSIONS.some((extension) => lowered.endsWith(extension))
   }
 
   fileSelected(e) {
