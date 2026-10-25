@@ -115,7 +115,7 @@ RSpec.describe AirtableJobs::SyncAllJob do
     broken = configured_event
     healthy = configured_event
     allow(Airtable::SyncService).to receive(:new).with(broken)
-      .and_raise(ArgumentError, "Airtable API key is required")
+      .and_raise(Airtable::ConfigurationError, "Airtable API key is required")
     healthy_service = stub_sync(healthy)
 
     expect { described_class.perform_now }.not_to raise_error
@@ -126,9 +126,24 @@ RSpec.describe AirtableJobs::SyncAllJob do
     expect(broken.airtable_sync_error_at).to be_present
 
     expect(Sentry).to have_received(:capture_exception) do |exception, **options|
-      expect(exception).to be_a(ArgumentError)
+      expect(exception).to be_a(Airtable::ConfigurationError)
       expect(options[:tags]).to include(airtable_status: nil)
-      expect(options[:fingerprint]).to eq([ "airtable-sync-all", "ArgumentError", broken.id ])
+      expect(options[:fingerprint]).to eq([ "airtable-sync-all", "Airtable::ConfigurationError", broken.id ])
+    end
+  end
+
+  describe "an unexpected error" do
+    it "reports it straight away without pausing, once per streak" do
+      buggy = configured_event
+      stub_sync(buggy, raising: ArgumentError.new("wrong number of arguments"))
+
+      described_class.perform_now
+      described_class.perform_now
+
+      buggy.reload
+      expect(buggy.airtable_sync_paused?).to be(false)
+      expect(buggy.airtable_sync_failures).to eq(2)
+      expect(Sentry).to have_received(:capture_exception).once
     end
   end
 
@@ -203,6 +218,15 @@ RSpec.describe AirtableJobs::SyncAllJob do
       expect(flaky.airtable_sync_paused?).to be(false)
       expect(flaky.airtable_sync_failures).to eq(2)
       expect(service).to have_received(:sync_via_api).twice
+    end
+
+    it "pauses when the workspace's monthly API allowance is used up" do
+      broken = configured_event
+      stub_sync(broken, raising: Airtable::QuotaExceededError.new)
+
+      described_class.perform_now
+
+      expect(broken.reload.airtable_sync_paused?).to be(true)
     end
 
     it "does not touch a healthy event's pause state" do
@@ -331,6 +355,17 @@ RSpec.describe AirtableJobs::SyncAllJob do
         expect(options[:tags]).to include(airtable_sync_paused: false)
         expect(options[:contexts][:airtable_sync]).to include(consecutive_failures: threshold)
       end
+    end
+
+    it "doesn't count a manual Sync Now towards the streak" do
+      flaky = configured_event(airtable_config_updated_by: owner, airtable_sync_failures: threshold - 1)
+      stub_sync(flaky, raising: server_error)
+
+      expect { described_class.perform_now(flaky.id) }.not_to have_enqueued_mail(AirtableMailer, :sync_failing)
+
+      flaky.reload
+      expect(flaky.airtable_sync_failures).to eq(threshold - 1)
+      expect(flaky.airtable_sync_error).to eq(server_error.message)
     end
   end
 

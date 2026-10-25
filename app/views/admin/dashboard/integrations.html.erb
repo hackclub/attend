@@ -295,8 +295,8 @@
                     <p class="text-sm text-red-600">
                       <% unless @airtable_synced_at %>If you just saved these settings, a sync is already running — refresh in a minute. Otherwise, <% end %>
                       <% if @airtable_sync_failures.positive? %>
-                        Airtable is showing stale data while Attend retries. Failures like the one below are
-                        usually a rate limit or an Airtable outage and clear up by themselves.
+                        Airtable is showing stale data while Attend retries. A rate limit or an Airtable outage clears
+                        up by itself; anything else has been reported to the Attend team.
                       <% elsif @airtable_connection %>
                         Airtable is showing stale data — check that the connected account can still see the base above.
                       <% else %>

@@ -3,15 +3,23 @@ module AirtableJobs
     queue_as :default
 
     # Errors only a human can fix: the token, the base or the sync endpoint is
-    # wrong, or (ArgumentError) a key or base id is missing before any request
-    # is made. Everything else (rate limits, 5xx, timeouts, a dropped
-    # connection) is treated as passing and retried on the next run.
+    # wrong, a key or base id is missing before any request is made, or the
+    # workspace has used up its monthly API calls.
     CONFIG_ERRORS = [
       Airtable::AuthenticationError,
       Airtable::ForbiddenError,
       Airtable::NotFoundError,
       Airtable::ValidationError,
-      ArgumentError
+      Airtable::QuotaExceededError,
+      Airtable::ConfigurationError
+    ].freeze
+
+    # Errors that clear up by themselves, so the next run retries them.
+    TRANSIENT_ERRORS = [
+      Airtable::RateLimitError,
+      Airtable::ServerError,
+      Faraday::TimeoutError,
+      Faraday::ConnectionFailed
     ].freeze
 
     # With an event_id, syncs just that event ("Sync Now", saving the
@@ -27,8 +35,10 @@ module AirtableJobs
         sync_event(event)
       rescue *CONFIG_ERRORS => e
         handle_config_error(event, e)
+      rescue *TRANSIENT_ERRORS => e
+        handle_transient_error(event, e, scheduled: event_id.nil?)
       rescue StandardError => e
-        handle_transient_error(event, e)
+        handle_unexpected_error(event, e, scheduled: event_id.nil?)
       end
     end
 
@@ -57,15 +67,41 @@ module AirtableJobs
     end
 
     # A passing error keeps the schedule running. It is only worth a person's
-    # attention once it has lasted (Event#airtable_sync_alert_due?), and then
+    # attention once it has lasted (Event#claim_airtable_sync_alert!), and then
     # only once until the sync next succeeds.
-    def handle_transient_error(event, error)
+    def handle_transient_error(event, error, scheduled:)
       Rails.logger.warn("[AirtableSyncAll] Sync failed for event #{event.id}, retrying next run: #{error.message}")
+      return record_manual_failure(event, error) unless scheduled
+
       event.record_airtable_sync_failure!(error.message)
-      return unless event.airtable_sync_alert_due? && event.claim_airtable_sync_alert!
+      return unless event.claim_airtable_sync_alert!
 
       recipient = notify_config_owner(event, error, mail: :sync_failing, failures: event.airtable_sync_failures)
       report_to_sentry(event, error, recipient)
+    end
+
+    # Anything else is most likely a bug in Attend, or an Airtable response we
+    # don't know how to handle. Retrying won't fix it and the config owner
+    # can't either, so it goes to Sentry at the start of the streak rather than
+    # an hour later in an email blaming rate limits. It doesn't pause, so one
+    # bug can't stop every event's sync.
+    def handle_unexpected_error(event, error, scheduled:)
+      Rails.logger.error("[AirtableSyncAll] Unexpected error for event #{event.id}: #{error.class}: #{error.message}")
+      if scheduled
+        event.record_airtable_sync_failure!(error.message)
+        return unless event.airtable_sync_failures == 1
+      else
+        record_manual_failure(event, error)
+      end
+
+      report_to_sentry(event, error, nil)
+    end
+
+    # A manual run ("Sync Now", saving the settings) shows its error but isn't
+    # one of the scheduled runs the streak counts, so pressing the button
+    # during an outage can't set off the alert early.
+    def record_manual_failure(event, error)
+      event.update_columns(airtable_sync_error: error.message, airtable_sync_error_at: Time.current)
     end
 
     # A broken mailer must not take the rest of the run down with it — this

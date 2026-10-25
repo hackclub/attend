@@ -19,8 +19,8 @@ module Airtable
       @api_key = api_key || ENV["AIRTABLE_API_KEY"] || Rails.application.credentials.dig(:airtable, :api_key)
       @base_id = base_id || ENV["AIRTABLE_BASE_ID"] || Rails.application.credentials.dig(:airtable, :base_id)
 
-      raise ArgumentError, "Airtable API key is required" if @api_key.blank?
-      raise ArgumentError, "Airtable base ID is required" if @base_id.blank?
+      raise ConfigurationError, "Airtable API key is required" if @api_key.blank?
+      raise ConfigurationError, "Airtable base ID is required" if @base_id.blank?
     end
 
     def list_records(table_name, options = {})
@@ -109,22 +109,15 @@ module Airtable
       (env.method == :post && env.url.path.include?("/sync/")) || env.method == :patch
     }
 
-    # Airtable answers a burst over 5 requests a second with a 429 and keeps
-    # refusing that base for 30 seconds, so a quick backoff would only burn the
-    # retries. Wait out the penalty, or longer if Retry-After asks for it; a
-    # Retry-After beyond the cap raises instead of holding the job up. A 429
-    # means the request was refused, not run, so any method is safe to replay.
-    RATE_LIMIT_WAIT = 30
-    RATE_LIMIT_MAX_WAIT = 60
+    # A 429 isn't retried here: Airtable refuses the base for 30 seconds, and
+    # waiting that out would hold one of the few job threads. It raises
+    # RateLimitError so the caller can come back later instead. The cap stops
+    # a 5xx Retry-After from holding the job up for the same reason.
+    MAX_RETRY_WAIT = 60
 
     def connection
       @connection ||= Faraday.new(url: BASE_URL) do |conn|
-        conn.request :retry, max: 2, interval: RATE_LIMIT_WAIT, max_interval: RATE_LIMIT_MAX_WAIT,
-                     exceptions: [ Faraday::RetriableResponse ],
-                     retry_statuses: [ 429 ],
-                     methods: %i[get post put patch delete]
-        # The same cap stops a 5xx Retry-After from holding the job up.
-        conn.request :retry, max: 3, interval: 0.5, backoff_factor: 2, max_interval: RATE_LIMIT_MAX_WAIT,
+        conn.request :retry, max: 3, interval: 0.5, backoff_factor: 2, max_interval: MAX_RETRY_WAIT,
                      exceptions: [ Faraday::TimeoutError, Faraday::ConnectionFailed, Faraday::RetriableResponse ],
                      retry_statuses: [ 500, 502, 503, 504 ],
                      retry_if: RETRY_SYNC_POST
@@ -171,6 +164,9 @@ module Airtable
       when 422
         raise ValidationError.new(parse_error_message(response), response: response)
       when 429
+        if response.body.to_s.include?("PUBLIC_API_BILLING_LIMIT_EXCEEDED")
+          raise QuotaExceededError.new(parse_error_message(response), response: response)
+        end
         raise RateLimitError.new(response: response)
       when 500..599
         raise ServerError.new(parse_error_message(response), response: response)

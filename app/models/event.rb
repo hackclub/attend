@@ -539,13 +539,21 @@ class Event < ApplicationRecord
   # so a manual "Sync Now" overlapping the scheduled run can't lose a failure.
   def record_airtable_sync_failure!(error_message)
     now = Time.current
-    self.class.where(id: id).update_all([
+    scope = self.class.where(id: id)
+    scope.update_all([
       "airtable_sync_failures = airtable_sync_failures + 1, " \
       "airtable_sync_failing_since = COALESCE(airtable_sync_failing_since, ?), " \
       "airtable_sync_error = ?, airtable_sync_error_at = ?",
       now, error_message, now
     ])
-    reload
+
+    # Only the count is read back, not the whole row. It's nil when the event
+    # was deleted mid-run, and then there's nothing left to record.
+    failures = scope.pick(:airtable_sync_failures)
+    return if failures.nil?
+
+    self.airtable_sync_failures = failures
+    clear_attribute_changes([ :airtable_sync_failures ])
   end
 
   # Report a failing sync once per streak: after enough runs in a row fail, or
@@ -554,17 +562,16 @@ class Event < ApplicationRecord
   AIRTABLE_SYNC_ALERT_AFTER_FAILURES = 12
   AIRTABLE_SYNC_ALERT_AFTER_FAILING_FOR = 3.hours
 
-  def airtable_sync_alert_due?
-    return false if airtable_sync_alerted_at.present?
-
-    airtable_sync_failures >= AIRTABLE_SYNC_ALERT_AFTER_FAILURES ||
-      (airtable_sync_failing_since.present? && airtable_sync_failing_since < AIRTABLE_SYNC_ALERT_AFTER_FAILING_FOR.ago)
-  end
-
-  # True only for the run that records the alert, so two overlapping runs
-  # can't both send it.
+  # True only for the run that records the alert, and only once the streak is
+  # due one, so two overlapping runs can't both send it.
   def claim_airtable_sync_alert!
-    self.class.where(id: id, airtable_sync_alerted_at: nil).update_all(airtable_sync_alerted_at: Time.current) == 1
+    self.class
+      .where(id: id, airtable_sync_alerted_at: nil)
+      .where(
+        "airtable_sync_failures >= ? OR airtable_sync_failing_since < ?",
+        AIRTABLE_SYNC_ALERT_AFTER_FAILURES, AIRTABLE_SYNC_ALERT_AFTER_FAILING_FOR.ago
+      )
+      .update_all(airtable_sync_alerted_at: Time.current) == 1
   end
 
   AIRTABLE_SYNC_STREAK_RESET = {
