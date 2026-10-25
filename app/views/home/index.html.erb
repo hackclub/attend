@@ -78,14 +78,22 @@
         <ol class="landing-roll">
           <% @landing[:roll].each do |row| %>
             <li>
-              <button type="button"
-                      class="landing-country"
-                      aria-pressed="false"
-                      data-pins="<%= row[:pins].join(",") %>"
-                      data-action="mouseenter->landing-map#preview mouseleave->landing-map#unpreview focus->landing-map#preview blur->landing-map#unpreview click->landing-map#toggle">
-                <span class="landing-country-name"><%= row[:name] %></span>
-                <span class="landing-country-count"><%= number_with_delimiter(row[:students]) %></span>
-              </button>
+              <% if row[:pins].any? %>
+                <button type="button"
+                        class="landing-country"
+                        aria-pressed="false"
+                        data-pins="<%= row[:pins].join(",") %>"
+                        data-action="mouseenter->landing-map#preview mouseleave->landing-map#unpreview focus->landing-map#preview blur->landing-map#unpreview click->landing-map#toggle">
+                  <span class="landing-country-name"><%= row[:name] %></span>
+                  <span class="landing-country-count"><%= number_with_delimiter(row[:students]) %></span>
+                </button>
+              <% else %>
+                <%# Too few students to point at their events (see LandingStats). %>
+                <div class="landing-country landing-country--static">
+                  <span class="landing-country-name"><%= row[:name] %></span>
+                  <span class="landing-country-count"><%= number_with_delimiter(row[:students]) %></span>
+                </div>
+              <% end %>
             </li>
           <% end %>
         </ol>

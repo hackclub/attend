@@ -11,7 +11,7 @@ RSpec.describe LandingStats do
 
   it "counts started events with standing registrations, distinct students, and folded countries" do
     happened = create(:event, name: "Mock Winter", starts_at: now - 30.days, ends_at: now - 27.days,
-                      location_latitude: 48.2, location_longitude: 16.4)
+                      location_latitude: 48.2345, location_longitude: 16.4123)
     second = create(:event, name: "Mock Spring", starts_at: now - 10.days, ends_at: now - 8.days,
                      location_latitude: 1.3, location_longitude: 103.8)
     empty = create(:event, name: "Mock Nobody Came", starts_at: now - 5.days, ends_at: now - 4.days)
@@ -19,31 +19,40 @@ RSpec.describe LandingStats do
            location_latitude: 51.5, location_longitude: -0.1)
     create(:event, :draft, name: "Mock Unannounced", starts_at: now + 40.days, ends_at: now + 41.days,
            location_latitude: 40.7, location_longitude: -74.0)
+    unlisted = create(:event, :draft, name: "Mock Unlisted", starts_at: now - 3.days, ends_at: now - 2.days,
+                      location_latitude: 35.6, location_longitude: 139.7)
 
     returning = register(happened, country: "United States")
     create(:participant_event, participant: returning, event: second, status: :complete)
     register(happened, country: "US")
+    register(happened, country: "USA")
     register(second, country: "IN")
     register(second, country: "India")
+    register(second, country: "Narnia")
     register(second, country: "Morocco", status: :withdrawn)
     register(second, country: "Peru", status: :rejected)
     register(empty, country: "Ireland", status: :withdrawn)
+    register(unlisted, country: "Japan")
 
     stats = described_class.new(now: now).to_h
 
-    expect(stats.slice(:events, :students, :countries)).to eq(events: 2, students: 4, countries: 2)
+    # The Narnia student counts; the made-up residence is just never published.
+    expect(stats.slice(:events, :students, :countries)).to eq(events: 3, students: 7, countries: 3)
 
+    # The unlisted event counts toward the headline but never reaches the map.
     expect(stats[:pins].map { |p| [ p[:name], p[:state], p[:students] ] }).to eq([
-      [ "Mock Winter", "past", 2 ],
-      [ "Mock Spring", "past", 3 ],
+      [ "Mock Winter", "past", 3 ],
+      [ "Mock Spring", "past", 4 ],
       [ "Mock Someday", "upcoming", 0 ]
     ])
     expect(stats[:pins].first.keys).to contain_exactly(:name, :location, :dates, :lat, :lon, :students, :state)
+    expect(stats[:pins].first.slice(:lat, :lon)).to eq(lat: 48.23, lon: 16.41)
 
-    # Ties on headcount sort by name so the roll is stable between refreshes.
+    # Countries below the pin threshold keep their row but not their events.
     expect(stats[:roll]).to eq([
-      { name: "India", students: 2, pins: [ 1 ] },
-      { name: "United States", students: 2, pins: [ 0, 1 ] }
+      { name: "United States", students: 3, pins: [ 0, 1 ] },
+      { name: "India", students: 2, pins: [] },
+      { name: "Japan", students: 1, pins: [] }
     ])
   end
 
@@ -67,6 +76,7 @@ RSpec.describe LandingStats do
     it "folds codes and spellings into one name and leaves the rest as typed" do
       expect(described_class.normalize_country(" GB ")).to eq("United Kingdom")
       expect(described_class.normalize_country("United State")).to eq("United States")
+      expect(described_class.normalize_country("HK")).to eq("Hong Kong")
       expect(described_class.normalize_country("日本")).to eq("Japan")
       expect(described_class.normalize_country("Nicaragua")).to eq("Nicaragua")
     end

@@ -8,13 +8,16 @@
 #
 # What counts, and why:
 # - An event counts once it has started and at least one registration on it is
-#   still standing. Draft flags are ignored for past events (organisers forget
-#   to tick "setup complete" on events that plainly happened), but a draft that
-#   hasn't started yet is not announced on a public map.
+#   still standing. Draft flags are ignored for the headline (organisers forget
+#   to tick "setup complete" on events that plainly happened), but only events
+#   that finished setup are placed on the map: a draft was never announced, so
+#   its venue is not public either.
 # - A student is a distinct participant with a standing registration on a
 #   counted event. Withdrawn and rejected registrations were never supported.
 # - A country is a participant's country of residence, with the handful of ISO
-#   codes and spellings people typed folded into one name.
+#   codes and spellings people typed folded into one name. Only names the
+#   product offers are published: residence was free text for a long time, and
+#   a value nobody else typed could point at one person.
 class LandingStats
   CACHE_KEY = "landing_stats/v1".freeze
   TTL = 1.hour
@@ -37,9 +40,28 @@ class LandingStats
     "CA" => "Canada",
     "DE" => "Germany",
     "FR" => "France",
+    "HK" => "Hong Kong",
     "România" => "Romania",
     "日本" => "Japan"
   }.freeze
+
+  # The picker's list, plus territories people actually live in that it leaves
+  # out. Anything else is left off the roll rather than published as typed.
+  KNOWN_COUNTRIES = (ApplicationHelper::COUNTRIES.without("---") + [
+    "Hong Kong", "Macau", "Puerto Rico", "Guam", "Bermuda", "Cayman Islands", "Anguilla",
+    "Gibraltar", "Greenland", "Faroe Islands", "Isle of Man", "Jersey", "Guernsey",
+    "Aruba", "Curaçao", "Réunion", "French Polynesia", "New Caledonia",
+    "British Virgin Islands", "U.S. Virgin Islands", "Turks and Caicos Islands", "Montserrat"
+  ]).to_set.freeze
+
+  # A country with one or two students still gets its row, but not the link to
+  # which events they went: "the student from X was in city Y that weekend" is
+  # a detail about a person, not a statistic.
+  MIN_STUDENTS_FOR_PINS = 3
+
+  # Map pins are rounded to about a kilometre. The map never zooms past the
+  # country level, so nothing is lost, and the exact venue stays off the page.
+  COORDINATE_DECIMALS = 2
 
   def self.fetch
     Rails.cache.fetch(CACHE_KEY, expires_in: TTL) { new.to_h }
@@ -98,17 +120,19 @@ class LandingStats
         events[self.class.normalize_country(raw)] << pin if pin
       end
 
-      students.map { |name, n| { name: name, students: n, pins: events[name].sort } }
+      students.select { |name, _| KNOWN_COUNTRIES.include?(name) }
+        .map { |name, n| { name: name, students: n, pins: n >= MIN_STUDENTS_FOR_PINS ? events[name].sort : [] } }
         .sort_by { |row| [ -row[:students], row[:name] ] }
     end
   end
 
   def build_pins
     counted = Event.where(id: counted_event_ids)
-    announced = Event.where.not(setup_completed_at: nil).where("starts_at > ?", @now)
+    announced = Event.where("starts_at > ?", @now)
     headcounts = counted_registrations.group(:event_id).distinct.count(:participant_id)
 
     counted.or(announced)
+      .where.not(setup_completed_at: nil)
       .where.not(location_latitude: nil).where.not(location_longitude: nil)
       .order(:starts_at)
       .map do |event|
@@ -117,8 +141,8 @@ class LandingStats
           name: event.name,
           location: [ event.location_city, event.location_country ].compact_blank.join(", "),
           dates: ApplicationController.helpers.event_date_range(event.starts_at, event.ends_at),
-          lat: event.location_latitude.to_f.round(4),
-          lon: event.location_longitude.to_f.round(4),
+          lat: event.location_latitude.to_f.round(COORDINATE_DECIMALS),
+          lon: event.location_longitude.to_f.round(COORDINATE_DECIMALS),
           students: headcounts.fetch(event.id, 0),
           state: state_for(event)
         }

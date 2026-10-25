@@ -1212,6 +1212,14 @@
     outline: 2px solid var(--accent);
     outline-offset: 1px;
   }
+  .landing-country--static,
+  .landing-country--static:hover {
+    cursor: default;
+    background-color: transparent;
+  }
+  .landing-country--static:hover .landing-country-name {
+    color: inherit;
+  }
 
   .landing-foot {
     margin-top: 1.5rem;
