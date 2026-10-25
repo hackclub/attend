@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-12T00:00:00Z",
+  "generatedAt": "2026-10-24T00:00:00Z",
   "title": "Design System: Attend",
   "extensions": {
     "colorMeta": {
@@ -877,7 +877,7 @@
       },
       {
         "name": "The No Literal Hex Rule",
-        "body": "Every colour resolves through a semantic custom property or a Tailwind token remapped in themes.css. A raw hex in a template is a theme bug: it renders correctly in light and wrong in the other seven. New work uses var(--accent), not #ec3750.",
+        "body": "Every colour resolves through a semantic custom property or a Tailwind token remapped in themes.css. A raw hex in a template is a theme bug: it renders correctly in light and wrong in the other seven. New work uses var(--accent), not #ec3750. The one exception is a pin drawn onto OpenStreetMap tiles: the tiles stay light under every theme, so map markers (series map, public profile map, landing map) pin their fill and white ring as literal hex; everything the app paints around the map still resolves through tokens.",
         "section": "colors"
       },
       {
