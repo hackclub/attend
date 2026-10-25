@@ -7,22 +7,21 @@
 # per request.
 #
 # What counts, and why:
-# - An event counts once it has started and at least one registration on it is
-#   still standing. Draft flags are ignored for the headline (organisers forget
+# - An event counts once it has started and at least one person on it has been
+#   scanned in at a check-in point. Draft flags are ignored for the headline (organisers forget
 #   to tick "setup complete" on events that plainly happened), but only events
 #   that finished setup are placed on the map: a draft was never announced, so
 #   its venue is not public either.
-# - A student is a distinct participant with a standing registration on a
-#   counted event. Withdrawn and rejected registrations were never supported.
+# - A student is a distinct participant who was scanned in at a check-in point
+#   on a counted event. A registration nobody scanned is someone who signed up,
+#   not someone who turned up, so it stays out of every number on the page.
 # - A country is a participant's country of residence, with the handful of ISO
 #   codes and spellings people typed folded into one name. Only names the
 #   product offers are published: residence was free text for a long time, and
 #   a value nobody else typed could point at one person.
 class LandingStats
-  CACHE_KEY = "landing_stats/v1".freeze
+  CACHE_KEY = "landing_stats/v2".freeze
   TTL = 1.hour
-
-  EXCLUDED_STATUSES = %w[withdrawn rejected].freeze
 
   # Residence is free text on the participant. These are the variants that
   # have actually shown up; anything else is counted under the name as typed.
@@ -94,7 +93,7 @@ class LandingStats
   def counted_registrations
     ParticipantEvent.joins(:event)
       .where(events: { starts_at: ..@now })
-      .where.not(status: EXCLUDED_STATUSES)
+      .where(id: Scan.for_check_in.select(:participant_event_id))
   end
 
   def counted_event_ids
