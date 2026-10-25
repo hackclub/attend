@@ -101,7 +101,7 @@ RSpec.describe "Admin::AuditLogs", type: :request do
         event: event, reported_by: event_admin, category: "behavior", severity: "s3",
         summary: "Own summary", visible_to_roles: [ "safeguarding_lead" ]
       )
-      log_for(own)
+      AuditLog.log!(action: "create", record: own, actor: event_admin, event: event)
       sign_in event_admin
 
       get admin_audit_logs_path
@@ -132,6 +132,97 @@ RSpec.describe "Admin::AuditLogs", type: :request do
       get admin_audit_logs_path
 
       expect(response.body).to include(hidden.id.first(8))
+    end
+  end
+
+  # IncidentPolicy#view_casework?: a reporter who holds none of the incident's
+  # roles gets a receipt for what they filed, not the casework that followed.
+  # The audit log is a second view onto that casework, so it draws the same line.
+  describe "an incident reported by someone outside its roles" do
+    let(:handler) do
+      User.create!(email: "handler-audit@example.com", name: "Handler").tap do |user|
+        EventRoleAssignment.create!(user: user, event: event, role: "safeguarding_lead")
+      end
+    end
+    let(:incident) do
+      PaperTrail.request(whodunnit: event_admin.id) do
+        Incident.create!(
+          event: event, reported_by: event_admin, category: "behavior", severity: "s3",
+          summary: "Own summary", visible_to_roles: [ "safeguarding_lead" ]
+        )
+      end
+    end
+    let!(:create_log) { AuditLog.log!(action: "create", record: incident, actor: event_admin, event: event) }
+    let!(:update_log) do
+      PaperTrail.request(whodunnit: handler.id) { incident.update!(status: "in_review") }
+      AuditLog.log!(action: "update", record: incident, actor: handler, event: event,
+        changed_fields: { "status" => [ "open", "in_review" ] })
+    end
+    let!(:comment_log) do
+      comment = IncidentComment.create!(incident: incident, user: handler, body: "Contacted the guardian")
+      AuditLog.log!(action: "create", record: comment, actor: handler, event: event)
+    end
+
+    it "lists the reporter's own create row and none of the casework" do
+      sign_in event_admin
+
+      get admin_audit_logs_path
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(admin_audit_log_path(create_log))
+      expect(response.body).not_to include(admin_audit_log_path(update_log))
+      expect(response.body).not_to include(admin_audit_log_path(comment_log))
+    end
+
+    it "opens the create row without the incident's version history" do
+      sign_in event_admin
+
+      get admin_audit_log_path(create_log)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("Full record history")
+    end
+
+    it "won't open a comment row by id" do
+      sign_in event_admin
+
+      get admin_audit_log_path(comment_log)
+
+      expect(response).to redirect_to(admin_audit_logs_path)
+    end
+
+    it "won't open a handler's update row by id" do
+      sign_in event_admin
+
+      get admin_audit_log_path(update_log)
+
+      expect(response).to redirect_to(admin_audit_logs_path)
+    end
+
+    context "for staff the incident is shared with" do
+      before { EventRoleAssignment.create!(user: handler, event: event, role: "event_admin") }
+
+      it "lists every row" do
+        sign_in handler
+
+        get admin_audit_logs_path
+
+        expect(response.body).to include(admin_audit_log_path(create_log))
+        expect(response.body).to include(admin_audit_log_path(update_log))
+        expect(response.body).to include(admin_audit_log_path(comment_log))
+      end
+
+      it "opens every row, with the version history" do
+        sign_in handler
+
+        [ create_log, update_log, comment_log ].each do |log|
+          get admin_audit_log_path(log)
+          expect(response).to have_http_status(:ok)
+        end
+
+        get admin_audit_log_path(create_log)
+        expect(response.body).to include("Full record history")
+      end
     end
   end
 
