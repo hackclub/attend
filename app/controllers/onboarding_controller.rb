@@ -1215,6 +1215,11 @@ class OnboardingController < ApplicationController
   def health_record_params(record, attributes)
     values = attributes.to_h.symbolize_keys
     clear = ActiveModel::Type::Boolean.new.cast(values.delete(:clear_details))
+    # A series that hides the privacy notes offers no private follow-up, so a
+    # new "private" answer is ignored; one already saved is kept.
+    if values[:section_response] == "private" && current_event.hide_privacy_notes? && !record.section_response_private?
+      values.delete(:section_response)
+    end
     if values[:section_response] == "nothing_to_add" && clear
       record.class.health_section_detail_fields.each do |field|
         values[field] = record.class.health_section_boolean_fields.include?(field) ? false : nil

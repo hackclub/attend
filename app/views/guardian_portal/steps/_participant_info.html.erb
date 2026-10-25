@@ -379,9 +379,9 @@
 
     <section>
       <h2 class="portal-heading text-lg mb-3">Health and support</h2>
-      <p class="portal-hint text-sm mb-4">The participant can choose nothing to add, add details, or discuss a section privately. Existing details remain visible when you return. As the listed guardian, you can see and edit these answers. Relevant event staff can also access them according to their role.</p>
+      <p class="portal-hint text-sm mb-4">The participant can choose nothing to add<%= @event.hide_privacy_notes? ? " or add details" : ", add details, or discuss a section privately" %>. Existing details remain visible when you return. As the listed guardian, you can see and edit these answers. Relevant event staff can also access them according to their role.</p>
       <%= render "shared/health_sections", medical: @medical, dietary: @dietary, accessibility: @accessibility,
-        guardian_visible: true, private_support_email: @event.effective_support_email %>
+        guardian_visible: true, hide_privacy_notes: @event.hide_privacy_notes?, private_support_email: @event.effective_support_email %>
     </section>
 
     <div class="flex flex-col sm:flex-row gap-3">

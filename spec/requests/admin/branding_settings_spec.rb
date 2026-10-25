@@ -23,7 +23,7 @@ RSpec.describe "Admin branding and account linking settings", type: :request do
     {
       brand: brand_params,
       registration_note: "Bring a laptop!", address_note: "For posting prizes.", tshirt_note: "Unisex sizing.",
-      hide_rooming_note: "1", github_linking: "required", itch_linking: "optional",
+      hide_privacy_notes: "1", github_linking: "required", itch_linking: "optional",
       github_help_url: "https://example.com/github-howto", itch_help_url: ""
     }
   end
@@ -47,7 +47,7 @@ RSpec.describe "Admin branding and account linking settings", type: :request do
         expect(response).to have_http_status(:ok)
         names = form_names
         BrandTheme::FIELDS.each { |field| expect(names).to include("event_series[brand][#{field}]") }
-        %w[registration_note address_note tshirt_note hide_rooming_note github_linking itch_linking github_help_url itch_help_url].each do |field|
+        %w[registration_note address_note tshirt_note hide_privacy_notes github_linking itch_linking github_help_url itch_help_url].each do |field|
           expect(names).to include("event_series[#{field}]")
         end
         expect(names).not_to include("event_series[haven_onboarding]")
@@ -63,7 +63,7 @@ RSpec.describe "Admin branding and account linking settings", type: :request do
         expect(series.registration_note).to eq("Bring a laptop!")
         expect(series.address_note).to eq("For posting prizes.")
         expect(series.tshirt_note).to eq("Unisex sizing.")
-        expect(event.reload.hide_rooming_note?).to be(true)
+        expect(event.reload.hide_privacy_notes?).to be(true)
         expect(event.reload.account_linking_mode("github")).to eq("required")
         expect(event.account_help_url("github")).to eq("https://example.com/github-howto")
       end
