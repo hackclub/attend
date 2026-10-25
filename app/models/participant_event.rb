@@ -82,6 +82,13 @@ class ParticipantEvent < ApplicationRecord
   validate :participant_not_too_old, on: :create, unless: :skip_age_check
   validate :participant_not_banned, on: :create
 
+  # Hooked on the status column rather than mark_complete_if_eligible!, so
+  # every route to complete (DocuSeal, guardian portal, admin status edits,
+  # CSV import) invites without each one remembering to. A participant change
+  # is a duplicate merge handing a complete registration to the Slack-linked row.
+  after_commit :invite_to_slack_channel, on: %i[create update],
+    if: -> { (saved_change_to_status? || saved_change_to_participant_id?) && complete? }
+
   # SQL mirror of !onboarding_complete? so list filters don't have to load
   # every row into Ruby. Keep in sync with #onboarding_complete?.
   scope :missing_onboarding_data, ->(accommodation_required:, travel_required: true) {
@@ -314,6 +321,9 @@ class ParticipantEvent < ApplicationRecord
   # webhook and the guardian portal so neither path can complete a participant
   # the other would still consider blocked.
   def eligible_for_completion?
+    # A withdrawn or rejected registration is closed: a still-open DocuSeal
+    # link finishing later must not flip it back to complete.
+    return false if withdrawn? || rejected?
     # Signing can now happen before the participant submits their registration
     # (documents step) — never complete someone who hasn't hit submit yet.
     return false unless code_of_conduct_accepted_at.present?
@@ -332,9 +342,19 @@ class ParticipantEvent < ApplicationRecord
     return false if complete?
     return false unless eligible_for_completion?
 
-    update!(status: :complete, onboarding_completed_at: onboarding_completed_at || Time.current)
-    ParticipantMailer.registration_confirmed(participant_event: self).deliver_later
-    true
+    # Concurrent webhooks (or a webhook racing a guardian's commit hook) can
+    # both get this far. Re-check under a row lock so only one of them
+    # completes the registration and sends the confirmation email.
+    completed_now = with_lock do
+      reset_document_memoisation!
+      next false if complete? || !eligible_for_completion?
+
+      update!(status: :complete, onboarding_completed_at: onboarding_completed_at || Time.current)
+      true
+    end
+
+    ParticipantMailer.registration_confirmed(participant_event: self).deliver_later if completed_now
+    completed_now
   end
 
   # Computed display status for the UI. Maps the DB status + actual progress
@@ -396,6 +416,10 @@ class ParticipantEvent < ApplicationRecord
     blocking = steps.find { |s| !s[:done] }
 
     { steps: steps, blocking_step: blocking&.dig(:name) }
+  end
+
+  def food_safety_summary
+    FoodSafetySummary.new(medical: medical, dietary: dietary)
   end
 
   def checked_in?
@@ -538,6 +562,12 @@ class ParticipantEvent < ApplicationRecord
 
   def participant_events_to_update
     [ self ]
+  end
+
+  def invite_to_slack_channel
+    return if event.slack_channel_id.blank?
+
+    InviteToEventSlackChannelJob.perform_later(id)
   end
 
   def participant_not_too_old

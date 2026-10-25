@@ -301,6 +301,35 @@ RSpec.describe Event, type: :model do
     end
   end
 
+  describe "#claim_airtable_sync_alert!" do
+    it "is not claimed before the streak is due" do
+      event = create(:event, airtable_sync_failures: 2, airtable_sync_failing_since: 10.minutes.ago)
+
+      expect(event.claim_airtable_sync_alert!).to be(false)
+    end
+
+    it "is claimed once the streak has lasted long enough" do
+      event = create(:event, airtable_sync_failures: 2, airtable_sync_failing_since: 4.hours.ago)
+
+      expect(event.claim_airtable_sync_alert!).to be(true)
+    end
+
+    it "is not claimed again once the streak was reported" do
+      event = create(:event, airtable_sync_failures: 50, airtable_sync_alerted_at: 1.hour.ago)
+
+      expect(event.claim_airtable_sync_alert!).to be(false)
+    end
+  end
+
+  describe "#record_airtable_sync_failure!" do
+    it "does nothing when the event was deleted mid-run" do
+      # An in-memory event whose row is gone, as when it's deleted mid-run.
+      event = build(:event, id: SecureRandom.uuid)
+
+      expect { event.record_airtable_sync_failure!("HTTP 503") }.not_to raise_error
+    end
+  end
+
   describe "#airtable_config_last_saved_by" do
     let(:event) { create(:event) }
 
@@ -408,7 +437,7 @@ RSpec.describe Event, type: :model do
     # notes, so anything still pointing at a participant event at that moment
     # used to blow up with a foreign key violation.
     it "tears down records that point at its participant events" do
-      incident = Incident.create!(event: event, reported_by: reporter, category: :other, severity: :low)
+      incident = Incident.create!(event: event, reported_by: reporter, category: :other, severity: :s3)
       incident.incident_participants.create!(participant_event: participant_event)
       Note.create!(event: event, participant_event: participant_event, author: reporter, body: "note")
       RoommatePreference.create!(participant_event: other_participant_event, preferred_participant_event: participant_event)

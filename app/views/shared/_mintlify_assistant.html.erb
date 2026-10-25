@@ -15,16 +15,21 @@
     next release rather than protect us from anything. %>
 <script type="module" src="https://widget.mintlify.com/v1/embed.js"></script>
 <script type="module" nonce="<%= content_security_policy_nonce %>">
-  await window.MintlifyAssistant.init({
-    id: "mint_widget_27e4366e-41a4-4085-b53d-34c17b726968",
-    supportEmail: "attend@hackclub.com",
-    appearance: {
-      variant: "widget",
-      theme: "system",
-      accent: "#ec3750",
-      radius: "12px",
-      side: "bottom",
-      align: "end"
-    }
-  });
+  // Turbo re-runs this on every visit, but the widget only needs starting once
+  // per page load.
+  if (!window.mintlifyAssistantStarted) {
+    window.mintlifyAssistantStarted = true;
+    await window.MintlifyAssistant.init({
+      id: "mint_widget_27e4366e-41a4-4085-b53d-34c17b726968",
+      supportEmail: "attend@hackclub.com",
+      appearance: {
+        variant: "widget",
+        theme: "system",
+        accent: "#ec3750",
+        radius: "12px",
+        side: "bottom",
+        align: "end"
+      }
+    });
+  }
 </script>

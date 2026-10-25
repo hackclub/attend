@@ -1,4 +1,4 @@
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Ban list", nil ]) %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Conduct bans", nil ]) %>
 <%# The filters carried onto pagination links. Built by hand rather than with
     params.permit: these are query-string filters, not model attributes. %>
 <% pagination_params = { search: params[:search].presence, status: @status }.compact %>
@@ -7,7 +7,7 @@
 <div class="cs-stack">
   <div class="cs-header">
     <div class="cs-header-text">
-      <h1 class="cs-h1">Ban list <span class="cs-counter">(<%= @total_count %>)</span></h1>
+      <h1 class="cs-h1">Conduct bans <span class="cs-counter">(<%= @total_count %>)</span></h1>
       <p class="cs-description">Emails on this list are blocked from being added to any event.</p>
     </div>
     <div class="cs-actions">

@@ -179,7 +179,7 @@ module Airtable
         pe.check_in_time&.iso8601,
         pe.onboarding_complete?,
         pe.waiver_signed?,
-        pe.slack_user_id,
+        participant.slack_user_id,
         pe.nfc_badge_assigned?,
         travel_in&.mode,
         travel_in&.departure_city,

@@ -78,6 +78,15 @@ RSpec.describe "Admin::Integrations", type: :request do
           expect(form["action"]).to eq(admin_event_trigger_airtable_sync_path(event))
         end
 
+        it "says the sync is retrying, not that the settings are wrong, when it goes stale" do
+          event.update_columns(airtable_synced_at: 2.hours.ago, airtable_sync_error: "HTTP 503", airtable_sync_failures: 3)
+
+          get admin_event_integrations_path(event)
+
+          expect(response.body).to include("Airtable is showing stale data while Attend retries.")
+          expect(response.body).to include("3 failed attempts in a row. Attend keeps retrying every 5 minutes.")
+        end
+
         it "lists the event's active API tokens" do
           EventApiToken.generate_for(event, user: admin, name: "fictional-widget-sync")
 
@@ -115,7 +124,7 @@ RSpec.describe "Admin::Integrations", type: :request do
         patch admin_event_integrations_path(event), params: {
           event: { airtable_api_key: "key-rotated" }
         }
-      }.to have_enqueued_job(AirtableJobs::SyncAllJob)
+      }.to have_enqueued_job(AirtableJobs::SyncAllJob).with(event.id)
 
       expect(flash[:notice]).to eq("Integration settings updated. Airtable sync started.")
     end
@@ -236,7 +245,7 @@ RSpec.describe "Admin::Integrations", type: :request do
 
       expect {
         post admin_event_trigger_airtable_sync_path(event)
-      }.to have_enqueued_job(AirtableJobs::SyncAllJob)
+      }.to have_enqueued_job(AirtableJobs::SyncAllJob).with(event.id)
 
       expect(event.reload.airtable_sync_paused?).to be(false)
       expect(flash[:notice]).to eq("Airtable sync resumed and triggered. It will complete shortly.")
@@ -245,7 +254,7 @@ RSpec.describe "Admin::Integrations", type: :request do
     it "just triggers a sync when nothing is paused" do
       expect {
         post admin_event_trigger_airtable_sync_path(event)
-      }.to have_enqueued_job(AirtableJobs::SyncAllJob)
+      }.to have_enqueued_job(AirtableJobs::SyncAllJob).with(event.id)
 
       expect(flash[:notice]).to eq("Airtable sync triggered. It will complete shortly.")
     end

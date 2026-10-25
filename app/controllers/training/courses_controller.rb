@@ -3,6 +3,8 @@ module Training
     before_action :set_course, except: :index
 
     def index
+      return render("training/disclosures/under_review") unless current_user.eligible_to_work_events?
+
       @courses = training_access.courses(visible_courses).ordered.includes(:badge, :lessons)
       @enrollments = current_user.training_enrollments.index_by(&:training_course_id)
       @awards = current_user.training_badge_awards.includes(:course, badge: { image_attachment: :blob }).newest_first
@@ -16,7 +18,11 @@ module Training
 
     def enroll
       enrollment = current_user.training_enrollments.find_or_create_by!(course: @course)
-      redirect_to training_course_lesson_path(@course, enrollment.next_lesson || @course.lessons.first)
+      if enrollment.disclosure_needed?
+        redirect_to new_training_course_disclosure_path(@course)
+      else
+        redirect_to training_course_lesson_path(@course, enrollment.next_lesson || @course.lessons.first)
+      end
     rescue ActiveRecord::RecordNotUnique
       retry
     end
@@ -28,8 +34,8 @@ module Training
       end
 
       @enrollment.restart!
-      redirect_to training_course_lesson_path(@course, @course.lessons.first),
-        notice: "Course restarted. Your badge stays valid until it expires."
+      next_step = @enrollment.disclosure_needed? ? new_training_course_disclosure_path(@course) : training_course_lesson_path(@course, @course.lessons.first)
+      redirect_to next_step, notice: "Course restarted. Your badge stays valid until it expires."
     end
 
     private

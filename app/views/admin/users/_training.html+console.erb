@@ -7,7 +7,15 @@
     </div>
     <div class="cs-actions"><%= link_to "Training admin", admin_training_path, class: "cs-btn" %></div>
   </div>
-  <% if awards.empty? && enrollments.empty? %>
+  <% if (disclosure = local_assigns[:disclosure]) %>
+    <div class="cs-container-body border-b border-(--cs-border-divider-secondary)">
+      <p class="flex flex-wrap items-center gap-2">
+        Safety review: <%= render "admin/training/disclosure_status", disclosure: disclosure %>
+        <%= link_to "Open declaration", admin_training_disclosure_path(disclosure), class: "cs-link" %>
+      </p>
+    </div>
+  <% end %>
+  <% if awards.empty? && enrollments.empty? && local_assigns[:disclosure].nil? %>
     <div class="cs-empty"><p class="cs-empty-title">No training badges</p></div>
   <% else %>
     <div class="cs-table-wrap">

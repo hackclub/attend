@@ -66,6 +66,17 @@
         ]
       },
       {
+        "tab": "Organizers",
+        "groups": [
+          {
+            "group": "Safety",
+            "pages": [
+              "organizers/reporting-incidents"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "API reference",
         "groups": [
           {

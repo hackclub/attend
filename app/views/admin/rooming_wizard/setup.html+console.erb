@@ -147,6 +147,11 @@
     <% end %>
 
     <script nonce="<%= content_security_policy_nonce %>">
+      // Listeners bound to document are torn down when we navigate away, so
+      // repeat visits don't stack them.
+      var pageListeners = new AbortController();
+      document.addEventListener('turbo:before-render', () => pageListeners.abort(), { signal: pageListeners.signal });
+
       function addConfigRow() {
         const tbody = document.getElementById('room-configurations-body');
         const row = document.createElement('tr');
@@ -184,7 +189,7 @@
 
         const removeButton = event.target.closest('[data-remove-config-row]');
         if (removeButton) removeConfigRow(removeButton);
-      });
+      }, { signal: pageListeners.signal });
 
       // A sibling group needs at least two participants. The cs-form-validation
       // controller shows this inline: it's checked on submit (capture phase, so
@@ -198,13 +203,13 @@
 
       document.addEventListener('submit', (event) => {
         if (event.target.querySelector('[data-sibling-participant]')) syncSiblingValidity(true);
-      }, true);
+      }, { capture: true, signal: pageListeners.signal });
 
       document.addEventListener('change', (event) => {
         if (!event.target.matches('[data-sibling-participant]')) return;
         const inError = document.querySelector('[data-sibling-participant][aria-invalid="true"]');
         syncSiblingValidity(Boolean(inError));
-      }, true);
+      }, { capture: true, signal: pageListeners.signal });
 
       function updateRemoveButtons() {
         const rows = document.querySelectorAll('#room-configurations-body .configuration-row');

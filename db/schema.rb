@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_24_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -470,8 +470,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
   create_table "events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.text "airtable_api_key"
     t.uuid "airtable_config_updated_by_id"
+    t.datetime "airtable_sync_alerted_at"
     t.text "airtable_sync_error"
     t.datetime "airtable_sync_error_at"
+    t.datetime "airtable_sync_failing_since"
+    t.integer "airtable_sync_failures", default: 0, null: false
     t.datetime "airtable_sync_paused_at"
     t.string "airtable_sync_source_id"
     t.string "airtable_sync_table_id"
@@ -756,6 +759,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
     t.text "details", null: false
     t.boolean "emergency_services_called"
     t.uuid "event_id"
+    t.uuid "incident_id"
     t.string "incident_type", null: false
     t.string "priority", null: false
     t.string "reporter_email", null: false
@@ -770,6 +774,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
     t.uuid "user_id"
     t.index ["created_at"], name: "index_incident_reports_on_created_at"
     t.index ["event_id"], name: "index_incident_reports_on_event_id"
+    t.index ["incident_id"], name: "index_incident_reports_on_incident_id", unique: true
     t.index ["priority"], name: "index_incident_reports_on_priority"
     t.index ["status"], name: "index_incident_reports_on_status"
     t.index ["user_id"], name: "index_incident_reports_on_user_id"
@@ -852,6 +857,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
   end
 
   create_table "message_deliveries", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.boolean "catch_up", default: false, null: false
     t.string "channel", null: false
     t.datetime "created_at", null: false
     t.datetime "delivered_at"
@@ -1444,6 +1450,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
   create_table "training_courses", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "access", default: "invite_only", null: false
     t.datetime "created_at", null: false
+    t.text "disclosure_question"
+    t.boolean "disclosure_required", default: false, null: false
     t.integer "estimated_minutes"
     t.integer "pass_mark", default: 80, null: false
     t.integer "position", default: 0, null: false
@@ -1456,6 +1464,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
     t.datetime "updated_at", null: false
     t.index ["slug"], name: "index_training_courses_on_slug", unique: true
     t.index ["training_badge_id"], name: "index_training_courses_on_training_badge_id"
+  end
+
+  create_table "training_disclosures", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "answer", null: false
+    t.datetime "answered_at", null: false
+    t.datetime "created_at", null: false
+    t.text "question", null: false
+    t.text "review_note"
+    t.string "review_status", null: false
+    t.datetime "reviewed_at"
+    t.uuid "reviewed_by_id"
+    t.uuid "training_course_id"
+    t.uuid "training_enrollment_id"
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["review_status"], name: "index_training_disclosures_on_review_status"
+    t.index ["reviewed_by_id"], name: "index_training_disclosures_on_reviewed_by_id"
+    t.index ["training_course_id"], name: "index_training_disclosures_on_training_course_id"
+    t.index ["training_enrollment_id"], name: "index_training_disclosures_on_training_enrollment_id"
+    t.index ["user_id"], name: "index_training_disclosures_on_user_id"
   end
 
   create_table "training_enrollments", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1696,6 +1724,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
   add_foreign_key "incident_report_comments", "incident_reports"
   add_foreign_key "incident_report_comments", "users"
   add_foreign_key "incident_reports", "events"
+  add_foreign_key "incident_reports", "incidents", on_delete: :nullify
   add_foreign_key "incident_reports", "users"
   add_foreign_key "incidents", "events"
   add_foreign_key "incidents", "participant_events"
@@ -1777,6 +1806,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
   add_foreign_key "training_course_invitations", "users", column: "invited_by_id", on_delete: :nullify
   add_foreign_key "training_course_invitations", "users", on_delete: :cascade
   add_foreign_key "training_courses", "training_badges"
+  add_foreign_key "training_disclosures", "training_courses", on_delete: :nullify
+  add_foreign_key "training_disclosures", "training_enrollments", on_delete: :nullify
+  add_foreign_key "training_disclosures", "users", column: "reviewed_by_id", on_delete: :nullify
+  add_foreign_key "training_disclosures", "users", on_delete: :cascade
   add_foreign_key "training_enrollments", "training_courses", on_delete: :cascade
   add_foreign_key "training_enrollments", "users", on_delete: :cascade
   add_foreign_key "training_lesson_completions", "training_enrollments", on_delete: :cascade

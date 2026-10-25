@@ -283,9 +283,7 @@
               <%= link_to admin_event_incident_path(@event, incident), class: "block p-4 hover:bg-gray-50 transition-colors" do %>
                 <div class="flex items-start justify-between">
                   <div class="flex items-start gap-3">
-                    <span class="px-2 py-0.5 text-xs font-medium rounded <%= severity_badge_class(incident.severity) %>">
-                      <%= incident.severity.upcase %>
-                    </span>
+                    <%= incident_level_badge(incident.severity) %>
                     <div>
                       <p class="text-sm font-medium text-gray-900"><%= incident.category.titleize %></p>
                       <p class="text-sm text-gray-500 mt-0.5">

@@ -19,8 +19,8 @@ module Airtable
       @api_key = api_key || ENV["AIRTABLE_API_KEY"] || Rails.application.credentials.dig(:airtable, :api_key)
       @base_id = base_id || ENV["AIRTABLE_BASE_ID"] || Rails.application.credentials.dig(:airtable, :base_id)
 
-      raise ArgumentError, "Airtable API key is required" if @api_key.blank?
-      raise ArgumentError, "Airtable base ID is required" if @base_id.blank?
+      raise ConfigurationError, "Airtable API key is required" if @api_key.blank?
+      raise ConfigurationError, "Airtable base ID is required" if @base_id.blank?
     end
 
     def list_records(table_name, options = {})
@@ -109,9 +109,15 @@ module Airtable
       (env.method == :post && env.url.path.include?("/sync/")) || env.method == :patch
     }
 
+    # A 429 isn't retried here: Airtable refuses the base for 30 seconds, and
+    # waiting that out would hold one of the few job threads. It raises
+    # RateLimitError so the caller can come back later instead. The cap stops
+    # a 5xx Retry-After from holding the job up for the same reason.
+    MAX_RETRY_WAIT = 60
+
     def connection
       @connection ||= Faraday.new(url: BASE_URL) do |conn|
-        conn.request :retry, max: 3, interval: 0.5, backoff_factor: 2,
+        conn.request :retry, max: 3, interval: 0.5, backoff_factor: 2, max_interval: MAX_RETRY_WAIT,
                      exceptions: [ Faraday::TimeoutError, Faraday::ConnectionFailed, Faraday::RetriableResponse ],
                      retry_statuses: [ 500, 502, 503, 504 ],
                      retry_if: RETRY_SYNC_POST
@@ -151,11 +157,16 @@ module Airtable
         JSON.parse(response.body)
       when 401
         raise AuthenticationError.new(parse_error_message(response), response: response)
+      when 403
+        raise ForbiddenError.new(parse_error_message(response), response: response)
       when 404
         raise NotFoundError.new(parse_error_message(response), response: response)
       when 422
         raise ValidationError.new(parse_error_message(response), response: response)
       when 429
+        if response.body.to_s.include?("PUBLIC_API_BILLING_LIMIT_EXCEEDED")
+          raise QuotaExceededError.new(parse_error_message(response), response: response)
+        end
         raise RateLimitError.new(response: response)
       when 500..599
         raise ServerError.new(parse_error_message(response), response: response)

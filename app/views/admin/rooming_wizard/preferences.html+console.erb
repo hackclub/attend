@@ -171,6 +171,11 @@
 </div>
 
 <script nonce="<%= content_security_policy_nonce %>">
+// Listeners bound to document are torn down when we navigate away, so repeat
+// visits don't stack them.
+var pageListeners = new AbortController();
+document.addEventListener('turbo:before-render', () => pageListeners.abort(), { signal: pageListeners.signal });
+
 function openLinkModal(peId, kind) {
   document.getElementById('link-pe-id').value = peId;
   document.getElementById('link-kind').value = kind;
@@ -214,7 +219,7 @@ document.addEventListener('submit', async function(e) {
     const html = await response.text();
     Turbo.renderStreamMessage(html);
   }
-});
+}, { signal: pageListeners.signal });
 
 document.querySelectorAll('[data-close-link-modal]').forEach((el) => {
   el.addEventListener('click', closeLinkModal);

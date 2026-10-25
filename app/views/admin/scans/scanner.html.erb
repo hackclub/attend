@@ -290,6 +290,8 @@ function groupBadgeHtml(group, fallbackColor) {
   // so repeat visits don't stack handlers over detached nodes.
   const pageListeners = new AbortController();
   const signal = pageListeners.signal;
+  // Shared with the NFC bridge below, which tears down on the same signal.
+  window.scannerPageSignal = signal;
 
   const scanUrl = '<%= admin_event_scans_path(current_event) %>';
   const searchUrl = '<%= search_admin_event_scans_path(current_event) %>';
@@ -697,7 +699,8 @@ function groupBadgeHtml(group, fallbackColor) {
   window.getCurrentContextId = getCurrentContextId;
 })();
 
-let currentModalParticipant = null;
+// var, not let: Turbo re-runs this script on each visit to the page.
+var currentModalParticipant = null;
 
 function showParticipantModal(data, scanContext, firstScan) {
   const modal = document.getElementById('participant-modal');
@@ -734,7 +737,15 @@ function showParticipantModal(data, scanContext, firstScan) {
   const phoneEl = document.getElementById('modal-phone');
   if (phoneEl) phoneEl.textContent = data.phone || '—';
   document.getElementById('modal-tshirt').textContent = data.tshirt_size?.toUpperCase() || '—';
-  document.getElementById('modal-dietary').textContent = data.dietary?.replace('_', ' ') || 'None specified';
+  // The diet type plus the food-allergy flags, so a recorded allergy never
+  // reads as "None specified".
+  const dietaryParts = [
+    data.dietary?.replace('_', ' '),
+    data.has_life_threatening_food_allergies && 'life-threatening food allergies',
+    data.cross_contamination_risk && 'cross-contamination risk',
+    data.has_allergies && 'allergies on health form'
+  ].filter(Boolean);
+  document.getElementById('modal-dietary').textContent = dietaryParts.join(' · ') || 'None specified';
   document.getElementById('modal-view-link').href = data.show_url;
 
   const alertsDiv = document.getElementById('modal-alerts');
@@ -742,6 +753,14 @@ function showParticipantModal(data, scanContext, firstScan) {
 
   if (data.has_anaphylaxis_risk) {
     alertsDiv.innerHTML += '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 px-4 py-3 mt-4"><strong>⚠️ Anaphylaxis Risk</strong></div>';
+  }
+  if (data.has_life_threatening_food_allergies) {
+    alertsDiv.innerHTML += '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 px-4 py-3 mt-4"><strong>⚠️ Life-Threatening Food Allergies</strong></div>';
+  }
+  // Health-form allergies can be food allergies too (older records often put
+  // them there), so they get an alert rather than only the muted Dietary line.
+  if (data.has_allergies) {
+    alertsDiv.innerHTML += '<div class="bg-orange-100 border-l-4 border-orange-500 text-orange-800 px-4 py-3 mt-4"><strong>⚠️ Allergies on Health Form — Check Medical Details</strong></div>';
   }
   if (data.requires_refrigeration) {
     alertsDiv.innerHTML += '<div class="bg-blue-100 border-l-4 border-[#ec3750] text-blue-700 px-4 py-3 mt-4"><strong>❄️ Needs Medication Refrigeration</strong></div>';
@@ -865,7 +884,7 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
 
 // NFC Bridge Integration
 (function() {
-  const nfcWriteOnCheckin = <%= current_event.nfc_badges_enabled? && current_event.nfc_badge_write_on_checkin_enabled? %>;
+  const nfcWriteOnCheckin = <%= !!(current_event.nfc_badges_enabled? && current_event.nfc_badge_write_on_checkin_enabled?) %>;
   const eventId = '<%= current_event.id %>';
   const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
   
@@ -1110,6 +1129,13 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
   };
   
   // Auto-connect on page load
-  setTimeout(connectNfcBridge, 1000);
+  const autoConnect = setTimeout(connectNfcBridge, 1000);
+
+  // Disconnect when we navigate away, otherwise the next visit opens a second
+  // connection and every tap is scanned twice.
+  window.scannerPageSignal.addEventListener('abort', function() {
+    clearTimeout(autoConnect);
+    if (nfcBridge) nfcBridge.close();
+  });
 })();
 </script>

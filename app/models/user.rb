@@ -74,6 +74,7 @@ class User < ApplicationRecord
   has_many :training_enrollments, dependent: :destroy
   has_many :training_badge_awards, dependent: :destroy
   has_many :training_course_invitations, dependent: :destroy
+  has_many :training_disclosures, dependent: :destroy
   has_many :event_volunteers, dependent: :destroy
   # API tokens name their creator, and each kind survives that person
   # differently. Event and series keys belong to the event or series and keep
@@ -414,6 +415,12 @@ class User < ApplicationRecord
 
     assignments = event ? event_role_assignments.where(event: event) : event_role_assignments
     assignments.where.not(role: EventRoleAssignment::PII_RESTRICTED_ROLES).exists?
+  end
+
+  # False while a "yes" criminal-record declaration is awaiting the Hack Club
+  # Safety Team's review, or was upheld (see TrainingDisclosure).
+  def eligible_to_work_events?
+    !training_disclosures.blocking.exists?
   end
 
   def safeguarding_lead_for?(event)

@@ -18,6 +18,11 @@ class SlackService
   # channel is in, so it can't be invited until someone adds it there.
   class NotInWorkspace < Error; end
 
+  # The call never reached Slack, or came back unreadable: a timeout, a reset
+  # connection, a proxy error page. Nothing to fix by hand, so callers that
+  # can retry should, rather than treating it like a refusal from Slack.
+  class TransportError < Error; end
+
   def initialize(bot_token: nil)
     @bot_token = bot_token || Rails.application.credentials.dig(:slack, :bot_token)
   end
@@ -203,7 +208,7 @@ class SlackService
 
     parsed
   rescue Faraday::Error, JSON::ParserError => e
-    raise Error, "Slack API error: #{e.message}"
+    raise TransportError, "Slack API error: #{e.message}"
   end
 
   def retry_after(response)
