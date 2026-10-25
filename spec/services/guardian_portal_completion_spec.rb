@@ -6,7 +6,7 @@ RSpec.describe GuardianPortalCompletion do
     create(:participant_event, participant: create(:participant, date_of_birth: 15.years.ago), event: event,
       status: :awaiting_guardian, code_of_conduct_accepted_at: Time.current)
   end
-  let(:gpe) { create(:guardian_participant_event, participant_event: participant_event, status: :in_progress) }
+  let(:gpe) { create(:guardian_participant_event, :details_reviewed, participant_event: participant_event, status: :in_progress) }
 
   describe "#complete!" do
     before do
@@ -23,6 +23,15 @@ RSpec.describe GuardianPortalCompletion do
 
       expect(described_class.new(stale_copy).complete!).to be(false)
       expect(gpe.reload.completed_at).to be_within(1.second).of(1.hour.ago)
+    end
+
+    # Completion locks the guardian out of the portal, so it waits for every
+    # section the overview shows, not just the waivers.
+    it "waits until the guardian has reviewed the participant's information" do
+      gpe.update!(participant_info_reviewed_at: nil)
+
+      expect(described_class.new(gpe).complete!).to be(false)
+      expect(gpe.reload).not_to be_completed
     end
 
     it "sends guardian-only documents that don't have a submission yet" do

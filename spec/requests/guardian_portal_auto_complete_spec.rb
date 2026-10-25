@@ -13,8 +13,8 @@ RSpec.describe "Guardian portal automatic completion", type: :request do
       status: :awaiting_guardian, code_of_conduct_accepted_at: Time.current)
   end
   let!(:gpe) do
-    create(:guardian_participant_event, participant_event: participant_event, status: :in_progress,
-      accepted_at: Time.current, relationship: "Parent").tap do |g|
+    create(:guardian_participant_event, :details_reviewed, participant_event: participant_event, status: :in_progress,
+      accepted_at: Time.current).tap do |g|
       g.guardian.update!(legal_first_name: "Pat", legal_last_name: "Guardian", phone: "+14155550150")
       g.emergency_contacts.create!(name: "Pat Guardian", phone: "+14155550150", relationship: "Parent")
     end

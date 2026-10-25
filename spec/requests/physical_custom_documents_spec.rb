@@ -440,7 +440,7 @@ RSpec.describe "Physical custom documents", type: :request do
   describe "guardian portal completion gating" do
     let(:participant_event) { create(:participant_event, event: event) }
     let(:gpe) do
-      create(:guardian_participant_event, participant_event: participant_event).tap do |g|
+      create(:guardian_participant_event, :details_reviewed, participant_event: participant_event).tap do |g|
         g.guardian.update!(legal_first_name: "Pat", legal_last_name: "Guardian", phone: "+14155550150")
         g.emergency_contacts.create!(name: "Pat Guardian", phone: "+14155550150", relationship: "Parent")
       end

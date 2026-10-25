@@ -45,17 +45,35 @@ class GuardianPortalCompletion
       true
     end
 
-    trigger_documents if completed_now
+    trigger_documents_reporting_failures if completed_now
     completed_now
   end
 
+  # The overview's four sections. Automatic completion locks the guardian out
+  # of the portal, so it must wait for the same sections the overview ticks,
+  # not just the fields the old button checked.
   def steps_complete?
+    participant_info_complete? &&
+      details_complete? &&
+      guardian_participant_event.emergency_contacts.any? &&
+      consents_complete?
+  end
+
+  def participant_info_complete?
+    guardian_participant_event.participant_info_reviewed_at.present?
+  end
+
+  def details_complete?
     guardian.legal_first_name.present? &&
       guardian.legal_last_name.present? &&
       guardian.email.present? &&
       guardian.phone.present? &&
-      guardian_participant_event.emergency_contacts.any? &&
-      consents_complete?
+      guardian_participant_event.relationship.present? &&
+      guardian.address_line_1.present? &&
+      guardian.city.present? &&
+      guardian.state.present? &&
+      guardian.postal_code.present? &&
+      guardian.country.present?
   end
 
   def consents_complete?
@@ -119,13 +137,18 @@ class GuardianPortalCompletion
   def pending_consent_types
     pending = []
 
+    # One query (never the cached association, which may predate a signature
+    # made earlier in this request) instead of a find_by per document.
+    consents = participant_event.consents.where(consent_type: %w[waiver freedom_waiver custom_document]).to_a
+    custom_document_consents = consents.select(&:custom_document?).index_by(&:custom_document_id)
+
     # Check waiver (requires guardian signature)
-    waiver_consent = participant_event.consents.find_by(consent_type: "waiver")
+    waiver_consent = consents.find(&:waiver?)
     pending << "waiver" unless waiver_consent&.guardian_signed?
 
     # Check freedom waiver (requires full signature since parent-only) - only if enabled
     if event.freedom_waivers_enabled?
-      freedom_consent = participant_event.consents.find_by(consent_type: "freedom_waiver")
+      freedom_consent = consents.find(&:freedom_waiver?)
       pending << "freedom_waiver" unless freedom_consent&.signed?
     end
 
@@ -134,7 +157,7 @@ class GuardianPortalCompletion
     # participant uploads awaiting their review. (Dual-signer documents the
     # participant hasn't uploaded yet don't block — there's nothing to review.)
     participant_event.applicable_custom_documents.select(&:physical?).select(&:guardian_signs?).each do |doc|
-      consent = participant_event.consents.find_by(consent_type: "custom_document", custom_document: doc)
+      consent = custom_document_consents[doc.id]
       next if consent&.signed?
 
       if doc.signed_by_guardian? || consent&.physical_uploaded?
@@ -166,6 +189,17 @@ class GuardianPortalCompletion
   def trigger_documents
     ensure_waiver_exists_and_triggered
     ensure_guardian_custom_documents_triggered
+  end
+
+  # The link is already committed as completed, so a failure here can't be
+  # retried by calling #complete! again. Report it rather than failing the
+  # caller (a webhook would 422 and skip the waiver notification); the
+  # guardian's signing pages, reachable from the confirmed page, create any
+  # missing submission on open.
+  def trigger_documents_reporting_failures
+    trigger_documents
+  rescue StandardError => e
+    Rails.error.report(e, handled: true, context: { guardian_participant_event_id: guardian_participant_event.id })
   end
 
   def guardian

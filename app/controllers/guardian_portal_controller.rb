@@ -55,7 +55,7 @@ class GuardianPortalController < ApplicationController
     @step_index = STEPS.index(@step)
 
     if save_step_data
-      if complete_guardian_if_ready
+      if guardian_completion.complete!
         redirect_to guardian_portal_confirmed_path(token: @token), notice: COMPLETED_NOTICE
       elsif params[:advance] && next_step
         redirect_to guardian_portal_step_path(token: @token, step: next_step), notice: "Progress saved."
@@ -78,6 +78,11 @@ class GuardianPortalController < ApplicationController
     # automatic completion can't drift apart. Already-completed links are a
     # no-op (no second confirmation email).
     guardian_completion.complete!
+
+    if @participant_event.rejected?
+      redirect_to guardian_portal_path(token: @token), alert: "This registration is no longer active, so there's nothing left to submit."
+      return
+    end
 
     unless @guardian_participant_event.completed?
       redirect_to guardian_portal_path(token: @token), alert: "Please complete all required steps before submitting."
@@ -110,7 +115,7 @@ class GuardianPortalController < ApplicationController
   end
 
   def waiver_complete
-    redirect_after_signing("Thank you for signing the waiver!")
+    redirect_after_signing(@participant_event.consents.waiver.first, "Thank you for signing the waiver!")
   end
 
   def freedom_waiver
@@ -130,7 +135,7 @@ class GuardianPortalController < ApplicationController
   end
 
   def freedom_waiver_complete
-    redirect_after_signing("Thank you for completing the Freedom Waiver!")
+    redirect_after_signing(@participant_event.consents.freedom_waiver.first, "Thank you for completing the Freedom Waiver!")
   end
 
   def custom_document
@@ -205,7 +210,7 @@ class GuardianPortalController < ApplicationController
     end
 
     consent.verify_physical_upload!(@guardian_participant_event)
-    complete_guardian_if_ready
+    guardian_completion.complete!
     redirect_to after_guardian_document_path, notice: "Thank you for confirming #{@custom_document.name}!"
   end
 
@@ -239,7 +244,7 @@ class GuardianPortalController < ApplicationController
     end
 
     consent.mark_physical_uploaded_by_guardian!(@guardian_participant_event)
-    complete_guardian_if_ready
+    guardian_completion.complete!
     redirect_to after_guardian_document_path, notice: "\"#{@custom_document.name}\" uploaded — thank you!"
   end
 
@@ -273,22 +278,24 @@ class GuardianPortalController < ApplicationController
 
   private
 
+  # Finishes the guardian's part as soon as nothing is left for them to do, so
+  # guardians who sign everything but never press "Submit and finish" don't
+  # leave the participant "Awaiting Parent". complete! returns true when this
+  # request completed the link.
   def guardian_completion
     @guardian_completion ||= GuardianPortalCompletion.new(@guardian_participant_event)
   end
 
-  # Finishes the guardian's part as soon as nothing is left for them to do, so
-  # guardians who sign everything but never press "Submit and finish" don't
-  # leave the participant "Awaiting Parent". Returns true when this request
-  # completed the link.
-  def complete_guardian_if_ready
-    guardian_completion.complete!
-  end
+  delegate :waivers_paused?, :participant_info_complete?, :details_complete?, :consents_complete?,
+    :ensure_waiver_exists_and_triggered, to: :guardian_completion, private: true
 
   # DocuSeal sends guardians back here after they sign. Signing was often the
-  # last thing left, so finish their part before sending them on.
-  def redirect_after_signing(thanks)
-    notice = complete_guardian_if_ready ? "#{thanks} Your portion is complete." : thanks
+  # last thing left, so finish their part before sending them on. The webhook
+  # usually lands after this redirect, so pull the signature from the API
+  # first (as OnboardingController#waiver_complete does).
+  def redirect_after_signing(consent, thanks)
+    consent.sync_from_docuseal! if consent && !consent.signed?
+    notice = guardian_completion.complete! ? "#{thanks} Your portion is complete." : thanks
     redirect_to after_guardian_document_path, notice: notice
   end
 
@@ -301,10 +308,6 @@ class GuardianPortalController < ApplicationController
     else
       guardian_portal_step_path(token: @token, step: "consents")
     end
-  end
-
-  def waivers_paused?
-    guardian_completion.waivers_paused?
   end
 
   def load_guardian_context
@@ -446,23 +449,6 @@ class GuardianPortalController < ApplicationController
     )
   end
 
-  def details_complete?
-    @guardian.legal_first_name.present? &&
-      @guardian.legal_last_name.present? &&
-      @guardian.email.present? &&
-      @guardian.phone.present? &&
-      @guardian_participant_event.relationship.present? &&
-      @guardian.address_line_1.present? &&
-      @guardian.city.present? &&
-      @guardian.state.present? &&
-      @guardian.postal_code.present? &&
-      @guardian.country.present?
-  end
-
-  def consents_complete?
-    guardian_completion.consents_complete?
-  end
-
   def completed_steps
     completed = []
     completed << "participant_info" if participant_info_complete?
@@ -483,10 +469,6 @@ class GuardianPortalController < ApplicationController
       consent = @participant_event.consents.find_by(consent_type: "custom_document", custom_document: doc)
       !consent&.signed? && !consent&.physical_uploaded?
     end
-  end
-
-  def participant_info_complete?
-    @guardian_participant_event.participant_info_reviewed_at.present?
   end
 
   # Data the wizard's position indicator needs on every step render.
@@ -663,10 +645,6 @@ class GuardianPortalController < ApplicationController
   def next_step
     current_index = STEPS.index(@step)
     STEPS[current_index + 1] if current_index && current_index < STEPS.length - 1
-  end
-
-  def ensure_waiver_exists_and_triggered
-    guardian_completion.ensure_waiver_exists_and_triggered
   end
 
   def next_priority(contacts)
