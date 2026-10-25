@@ -26,6 +26,7 @@
           <span class="w-2 h-2 rounded-full bg-current" id="status-dot"></span>
           <span id="status-text">Initializing...</span>
         </div>
+        <button type="button" id="restart-camera-btn" class="hidden cs-btn cs-btn-link min-h-11 sm:min-h-8">Restart camera</button>
       </div>
 
       <div class="flex w-full flex-wrap items-center gap-x-2 gap-y-1 sm:w-auto" data-controller="role-info">
@@ -306,7 +307,13 @@ function groupBadgeHtml(group) {
   const scanUrl = '<%= admin_event_scans_path(current_event) %>';
   const searchUrl = '<%= search_admin_event_scans_path(current_event) %>';
   const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-  let scanner = null;
+  // The one camera stream we own, and the decode loop reading from it. Each
+  // (re)start bumps the generation so a loop left over from the last stream
+  // notices and exits instead of running alongside the new one.
+  let cameraStream = null;
+  let decodeTimer = null;
+  let decodeGeneration = 0;
+  let cameraStatus = ['Initializing...', 'loading'];
   let lastScannedCode = null;
   let scanCooldown = false;
   let searchTimeout = null;
@@ -353,20 +360,32 @@ function groupBadgeHtml(group) {
     if (state === 'scanning') dot.classList.add('animate-pulse');
   }
 
+  // Camera state outlives a scan's "Processing..." flash, so remember it and
+  // put it back afterwards rather than claiming the camera is ready.
+  function updateCameraStatus(message, state) {
+    cameraStatus = [message, state];
+    if (!scanCooldown) updateStatus(message, state);
+  }
+
   function offerManualStart() {
     document.getElementById('start-camera-btn').classList.remove('hidden');
   }
 
   function stopScanner() {
-    if (scanner) scanner.reset();
-    scanner = null;
+    decodeGeneration++;
+    clearTimeout(decodeTimer);
+    if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
+    cameraStream = null;
+    const video = document.getElementById('qr-video');
+    if (video) video.srcObject = null;
   }
+
 
   function waitForZXing(timeoutMs = 8000) {
     return new Promise((resolve) => {
       const deadline = performance.now() + timeoutMs;
       (function poll() {
-        if (typeof ZXing !== 'undefined' && ZXing.BrowserQRCodeReader) return resolve();
+        if (typeof ZXing !== 'undefined' && ZXing.QRCodeReader) return resolve();
         if (performance.now() > deadline) return resolve();
         setTimeout(poll, 50);
       })();
@@ -487,121 +506,196 @@ function groupBadgeHtml(group) {
     setTimeout(() => {
       scanCooldown = false;
       lastScannedCode = null;
-      updateStatus('Ready to scan', 'ready');
+      updateStatus(...cameraStatus);
     }, 2000);
   }
 
-  async function initScanner() {
-    stopScanner(); // re-entrant: also reached from the tap-to-start button
-    if (typeof ZXing === 'undefined' || !ZXing.BrowserQRCodeReader) {
-      updateStatus('Scanner library not loaded', 'error');
+  // Maps a getUserMedia rejection to something staff can act on.
+  function describeCameraError(err) {
+    switch (err.name) {
+      case 'NotAllowedError':
+      case 'PermissionDeniedError':
+        return 'Camera blocked - check browser settings';
+      case 'NotFoundError':
+      case 'DevicesNotFoundError':
+        return 'No camera found on device';
+      case 'NotReadableError':
+      case 'TrackStartError':
+        return 'Camera in use by another app';
+      default:
+        return 'Camera error: ' + err.name + ' - ' + err.message;
+    }
+  }
+
+  // Opens the camera exactly once and keeps that stream for decoding. We used
+  // to open a probe stream, stop it, and have ZXing reopen the camera by id,
+  // which iOS Safari answers with black frames or NotReadableError right after
+  // a first permission grant.
+  async function openCamera(deviceId) {
+    const attempts = [{ facingMode: 'environment' }, true];
+    if (deviceId) attempts.unshift({ deviceId: { exact: deviceId } });
+    for (let i = 0; ; i++) {
+      try {
+        return await navigator.mediaDevices.getUserMedia({ video: attempts[i] });
+      } catch (err) {
+        // Only a camera that doesn't match is worth another try; a refusal or
+        // a busy camera fails the same way again.
+        if (err.name !== 'OverconstrainedError' || i === attempts.length - 1) throw err;
+      }
+    }
+  }
+
+  // Device labels are only readable once we hold a stream, so this runs after
+  // the camera is open.
+  async function populateCameraPicker(activeId) {
+    let cameras = [];
+    try {
+      cameras = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    } catch (err) {
+      console.warn('Could not list cameras:', err);
+    }
+    const select = document.getElementById('camera-select');
+    select.innerHTML = cameras
+      .map((c, i) => html`<option value="${c.deviceId}">${c.label || `Camera ${i + 1}`}</option>`)
+      .join('');
+    if (activeId) select.value = activeId;
+    // Only show the picker when there's an actual choice to make
+    document.getElementById('camera-select-wrapper').classList.toggle('hidden', cameras.length < 2);
+  }
+
+  async function initScanner(deviceId = localStorage.getItem('scannerCameraId')) {
+    stopScanner(); // re-entrant: restart, camera switch and tap-to-start all land here
+    const generation = decodeGeneration;
+    document.getElementById('start-camera-btn').classList.add('hidden');
+    document.getElementById('restart-camera-btn').classList.remove('hidden');
+
+    if (typeof ZXing === 'undefined' || !ZXing.QRCodeReader) {
+      updateCameraStatus('Scanner library not loaded', 'error');
       return;
     }
 
     // Check for secure context (HTTPS or localhost)
     if (!window.isSecureContext) {
-      updateStatus('Camera requires HTTPS or localhost', 'error');
+      updateCameraStatus('Camera requires HTTPS or localhost', 'error');
       console.error('Camera access requires a secure context (HTTPS or localhost). Current URL:', window.location.href);
       return;
     }
 
     // Check if mediaDevices API is available
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      updateStatus('Camera API not available', 'error');
+      updateCameraStatus('Camera API not available', 'error');
       return;
     }
 
-    // Request camera permission (also unlocks device labels for selection below)
+    updateCameraStatus('Requesting camera access...', 'loading');
+    let stream;
     try {
-      console.log('Requesting camera access...');
-      updateStatus('Requesting camera access...', 'ready');
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      console.log('Camera access granted, got stream:', stream);
-      stream.getTracks().forEach(track => track.stop());
+      stream = await openCamera(deviceId);
     } catch (err) {
       console.error('Camera permission error:', err.name, err.message, err);
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        updateStatus('Camera blocked - check browser settings', 'error');
-        offerManualStart();
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        updateStatus('No camera found on device', 'error');
-      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-        updateStatus('Camera in use by another app', 'error');
-      } else if (err.name === 'OverconstrainedError') {
-        // Try again without facing mode constraint
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          stream.getTracks().forEach(track => track.stop());
-        } catch (retryErr) {
-          updateStatus('Camera access failed: ' + retryErr.message, 'error');
-          offerManualStart();
-          return;
-        }
-      } else {
-        updateStatus('Camera error: ' + err.name + ' - ' + err.message, 'error');
-        offerManualStart();
-      }
+      if (generation !== decodeGeneration) return;
+      updateCameraStatus(describeCameraError(err), 'error');
+      offerManualStart();
       return;
     }
 
-    scanner = new ZXing.BrowserQRCodeReader();
+    // Restarted or navigated away while the permission prompt was up.
+    if (generation !== decodeGeneration) {
+      stream.getTracks().forEach(track => track.stop());
+      return;
+    }
+    cameraStream = stream;
 
+    const track = stream.getVideoTracks()[0];
+    // iOS ends the track when another app takes the camera.
+    track.addEventListener('ended', () => {
+      if (generation !== decodeGeneration) return;
+      stopScanner();
+      updateCameraStatus('Camera stopped', 'error');
+      offerManualStart();
+    });
+    populateCameraPicker(track.getSettings().deviceId);
+
+    const video = document.getElementById('qr-video');
+    video.srcObject = stream;
+    updateCameraStatus('Starting camera...', 'loading');
     try {
-      const cameras = await scanner.listVideoInputDevices();
-      if (!cameras || !cameras.length) {
-        updateStatus('No cameras found', 'error');
+      await video.play();
+    } catch (err) {
+      if (generation !== decodeGeneration) return;
+      // Playback that isn't tied to a tap can be refused, e.g. in the installed PWA.
+      console.error('Camera playback error:', err);
+      updateCameraStatus('Tap to start camera', 'error');
+      offerManualStart();
+      return;
+    }
+    decodeFrames(generation);
+  }
+
+  function markCameraReady() {
+    if (cameraStatus[1] === 'ready') return;
+    updateCameraStatus('Ready to scan', 'ready');
+    document.getElementById('start-camera-btn').classList.add('hidden');
+  }
+
+  // Our own loop rather than ZXing's decodeFromVideoDevice. Its loop sizes the
+  // capture canvas once, from the first frame, and stops for good on any error
+  // other than "no code in this frame". Right after a camera grant iOS can
+  // report a 0x0 frame, reading it throws, and the page sat on "Ready to scan"
+  // with nothing decoding until staff reloaded.
+  function decodeFrames(generation) {
+    const reader = new ZXing.QRCodeReader();
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const video = document.getElementById('qr-video');
+    const startedAt = performance.now();
+    let failures = 0;
+
+    (function tick() {
+      if (generation !== decodeGeneration) return;
+      // Schedule first, so nothing below can end the loop.
+      decodeTimer = setTimeout(tick, 100);
+
+      if (video.readyState < video.HAVE_CURRENT_DATA || !video.videoWidth || !video.videoHeight) {
+        if (performance.now() - startedAt > 8000 && cameraStatus[1] !== 'error') {
+          updateCameraStatus('Camera not showing a picture', 'error');
+          offerManualStart();
+        }
         return;
       }
 
-      // Populate the camera picker
-      const select = document.getElementById('camera-select');
-      select.innerHTML = cameras
-        .map((c, i) => html`<option value="${c.deviceId}">${c.label || `Camera ${i + 1}`}</option>`)
-        .join('');
-
-      // Pick a sensible default: remembered choice, else a back/rear camera, else last device
-      const savedId = localStorage.getItem('scannerCameraId');
-      const savedValid = savedId && cameras.some(c => c.deviceId === savedId);
-      const backCamera = cameras.find(c => /back|rear|environment/i.test(c.label));
-      const defaultId = savedValid ? savedId : (backCamera || cameras[cameras.length - 1]).deviceId;
-      select.value = defaultId;
-
-      // Only show the picker when there's an actual choice to make
-      if (cameras.length > 1) {
-        document.getElementById('camera-select-wrapper').classList.remove('hidden');
+      // The stream can change resolution or orientation mid-session.
+      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
       }
 
-      select.addEventListener('change', () => {
-        localStorage.setItem('scannerCameraId', select.value);
-        startCamera(select.value);
-      });
-
-      await startCamera(defaultId);
-    } catch (err) {
-      console.error('Camera start error:', err);
-      updateStatus('Camera access denied', 'error');
-      offerManualStart();
-    }
-  }
-
-  async function startCamera(deviceId) {
-    if (!scanner) return;
-    updateStatus('Starting camera...', 'loading');
-    document.getElementById('start-camera-btn').classList.add('hidden');
-    scanner.reset(); // stop any in-progress stream before switching
-    try {
-      await scanner.decodeFromVideoDevice(deviceId, 'qr-video', (result, err) => {
-        if (result) {
-          processScan(result.getText());
+      let text = null;
+      try {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // `true` inverts every other frame, so light-on-dark codes read too.
+        const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas, true);
+        text = reader.decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source))).getText();
+      } catch (err) {
+        // Every frame without a readable code lands here; that's normal.
+        const expected = err instanceof ZXing.NotFoundException ||
+          err instanceof ZXing.ChecksumException ||
+          err instanceof ZXing.FormatException;
+        if (!expected) {
+          failures++;
+          console.warn('QR decode error:', err);
+          if (failures === 10) {
+            updateCameraStatus('Scanner error - restart the camera', 'error');
+            offerManualStart();
+          }
+          return;
         }
-        // err is a NotFoundException on every frame without a QR code - ignore it
-      });
-      updateStatus('Ready to scan', 'ready');
-    } catch (err) {
-      console.error('Camera start error:', err);
-      updateStatus('Could not start camera', 'error');
-      offerManualStart();
-    }
+      }
+
+      failures = 0;
+      markCameraReady();
+      if (text) processScan(text);
+    })();
   }
 
   // Manual form submission
@@ -674,10 +768,19 @@ function groupBadgeHtml(group) {
     }
   }, { signal });
 
-  document.getElementById('start-camera-btn').addEventListener('click', function() {
-    this.classList.add('hidden');
-    initScanner();
+  // Both restart on whichever camera is picked, and count as the tap iOS
+  // wants before it hands over the camera.
+  function restartCamera() {
+    initScanner(document.getElementById('camera-select').value || undefined);
+  }
+  document.getElementById('start-camera-btn').addEventListener('click', restartCamera);
+  document.getElementById('restart-camera-btn').addEventListener('click', restartCamera);
+
+  document.getElementById('camera-select').addEventListener('change', function() {
+    localStorage.setItem('scannerCameraId', this.value);
+    initScanner(this.value);
   });
+
 
   // Initialize scanner. The zxing tag lives in <head>, and on a Turbo visit
   // Turbo appends it without waiting for it to load, so poll for the global
