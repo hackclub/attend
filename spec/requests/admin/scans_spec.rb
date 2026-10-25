@@ -122,4 +122,12 @@ RSpec.describe "Admin::Scans", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("NFC Scanner", 'id="nfc-write-panel"', 'id="modal-write-nfc-btn"')
   end
+
+  it "renders the NFC write flag as false when NFC badges were never set up" do
+    event.update!(nfc_badges_enabled: nil)
+
+    get scanner_admin_event_scans_path(event)
+
+    expect(response.body).to include("const nfcWriteOnCheckin = false;")
+  end
 end

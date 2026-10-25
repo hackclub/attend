@@ -111,6 +111,10 @@ jobs:
       - name: Run tests
         run: bundle exec rspec
 
+      # Plain node:test files with no dependencies, so the runner's Node is enough.
+      - name: Run JavaScript tests
+        run: node --test spec/javascript/*.mjs
+
       - name: Upload failure screenshots
         uses: actions/upload-artifact@v7
         if: failure()
