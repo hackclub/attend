@@ -816,3 +816,420 @@
   display: block;
   width: 100%;
 }
+
+/* ------------------------------------------------------------------------
+ * Landing page: the signed-out front door.
+ *
+ * One sentence of live numbers, a roll-call of countries, and a map. The map
+ * sits on OpenStreetMap tiles, which are light under every app theme, so the
+ * pins use fixed hex like the series map does; everything the app paints
+ * around it resolves through theme tokens.
+ * ---------------------------------------------------------------------- */
+@layer components {
+  .landing {
+    background-color: var(--bg-app);
+    color: var(--text);
+  }
+
+  .landing-header {
+    background-color: var(--bg-elev);
+    border-bottom: 1px solid var(--border-card);
+  }
+
+  .landing-header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    height: 4rem;
+    margin: 0 auto;
+    max-width: 80rem;
+    padding: 0 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .landing-header-inner {
+      padding: 0 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .landing-header-inner {
+      padding: 0 2.5rem;
+    }
+  }
+
+  /* The one primary action on the page, and the only thing besides the three
+   * numbers allowed to be red. Deepened red under white text (DESIGN.md). */
+  .landing-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    white-space: nowrap;
+    min-height: 2.75rem;
+    padding: 0.625rem 1.125rem;
+    border-radius: 6px;
+    background-color: var(--accent-fill, var(--accent-strong));
+    color: var(--accent-on);
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 150ms ease;
+  }
+
+  .landing-cta:hover {
+    background-color: var(--accent-fill-hover, var(--accent-deep));
+  }
+
+  .landing-cta:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  @media (max-width: 400px) {
+    .landing-cta {
+      padding-inline: 0.875rem;
+    }
+  }
+
+  .landing-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.75rem;
+    margin: 0 auto;
+    max-width: 80rem;
+    padding: 2.5rem 1rem 3.5rem;
+  }
+
+  @media (min-width: 640px) {
+    .landing-grid {
+      padding-inline: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .landing-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(24rem, 50%);
+      grid-template-areas:
+        "copy map"
+        "roll map";
+      column-gap: 3rem;
+      row-gap: 2.5rem;
+      align-items: start;
+      padding: 3.5rem 2.5rem 5rem;
+    }
+
+    .landing-copy { grid-area: copy; }
+    .landing-map-column { grid-area: map; position: sticky; top: 1.5rem; }
+    .landing-roll-section { grid-area: roll; }
+  }
+
+  .landing-sentence {
+    font-size: clamp(2rem, 1.1rem + 3.4vw, 3.75rem);
+    line-height: 1.04;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--text-strong);
+    text-wrap: balance;
+    max-width: 18ch;
+  }
+
+  .landing-num {
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .landing-doors {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 1.5rem;
+    row-gap: 0.25rem;
+    margin-top: 1.5rem;
+  }
+
+  .landing-doors-label {
+    color: var(--text-soft);
+    font-size: 0.875rem;
+  }
+
+  .landing-door {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-height: 2.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-strong);
+    border-radius: 6px;
+    transition: color 150ms ease;
+  }
+
+  /* Phones keep the 44px tap height; beside the map the row has to stay one
+   * line, so the targets shrink to the text and the row gap. */
+  @media (min-width: 1024px) {
+    .landing-door { min-height: 2rem; }
+  }
+
+  .landing-door:hover {
+    color: var(--accent);
+  }
+
+  .landing-door:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* --- map -------------------------------------------------------------- */
+
+  .landing-map-frame {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border-card);
+    border-radius: 8px;
+    background-color: var(--bg-elev);
+  }
+
+  .landing-map {
+    height: 14rem;
+    z-index: 0;
+    background-color: var(--bg-elev-2);
+    transition: filter 150ms ease;
+  }
+
+  @media (min-width: 640px) {
+    .landing-map { height: 18rem; }
+  }
+
+  /* Roughly the aspect of the inhabited world in Mercator, so the fit spends
+   * the frame on continents rather than polar ocean. */
+  @media (min-width: 1024px) {
+    .landing-map { height: 26rem; }
+  }
+
+  .landing-map .leaflet-control-attribution {
+    font-size: 0.625rem;
+  }
+
+  .landing-map .leaflet-popup-content-wrapper,
+  .landing-map .leaflet-popup-tip {
+    background-color: var(--bg-elev);
+    color: var(--text);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .landing-map .leaflet-popup-content {
+    margin: 0.625rem 0.75rem;
+    font-size: 0.75rem;
+    line-height: 1.45;
+  }
+
+  .landing-map-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 1.5rem;
+    text-align: center;
+  }
+
+  .landing-map-message p {
+    max-width: 18rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--text-soft);
+  }
+
+  .landing-legend {
+    position: absolute;
+    left: 0.75rem;
+    bottom: 0.75rem;
+    z-index: 1;
+    display: flex;
+    gap: 0.875rem;
+    padding: 0.375rem 0.625rem;
+    border: 1px solid var(--border-card);
+    border-radius: 6px;
+    background-color: var(--bg-elev);
+    color: var(--text-strong);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    pointer-events: none;
+  }
+
+  .landing-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  /* Pins. Solid red for events that happened, a hollow ghost for what is
+   * announced and not yet run: absence drawn as deliberately as presence. */
+  .landing-pin {
+    display: block;
+    width: 15px;
+    height: 15px;
+    border-radius: 999px;
+    background-color: #ec3750;
+    border: 2px solid #ffffff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    transition: opacity 150ms ease, transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
+    transform-origin: center;
+  }
+
+  .landing-pin--upcoming {
+    width: 10px;
+    height: 10px;
+    background-color: #f9fafc;
+    border: 1.5px solid #5a6473;
+    box-shadow: none;
+  }
+
+  .landing-pin--static {
+    width: 10px;
+    height: 10px;
+    border-width: 1.5px;
+    box-shadow: none;
+  }
+
+  .landing-map.is-dimmed .landing-pin {
+    opacity: 0.22;
+  }
+
+  .landing-map.is-dimmed .landing-pin.is-lit {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+
+  /* The one authored moment: past events arrive in date order, so first paint
+   * replays the history. Delays are set per pin by the controller. */
+  @media (prefers-reduced-motion: no-preference) {
+    .landing-map .landing-pin--past,
+    .landing-map .landing-pin--live {
+      animation: landing-pin-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .landing-map .landing-pin--live {
+      animation: landing-pin-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both,
+        landing-pin-pulse 1.6s cubic-bezier(0.16, 1, 0.3, 1) 0.6s 1;
+    }
+  }
+
+  @keyframes landing-pin-in {
+    from {
+      transform: scale(0);
+      opacity: 0;
+    }
+  }
+
+  @keyframes landing-pin-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(236, 55, 80, 0.55); }
+    100% { box-shadow: 0 0 0 14px rgba(236, 55, 80, 0); }
+  }
+
+  /* --- country roll ----------------------------------------------------- */
+
+  .landing-roll-section {
+    border-top: 1px solid var(--border-card);
+    padding-top: 1.25rem;
+  }
+
+  .landing-roll-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.75rem;
+    row-gap: 0.125rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-strong);
+    margin-bottom: 0.75rem;
+  }
+
+  .landing-roll-hint {
+    font-weight: 500;
+    color: var(--text-soft);
+  }
+
+  .landing-roll {
+    column-count: 2;
+    column-gap: 1.5rem;
+    column-rule: 1px solid var(--border-soft);
+  }
+
+  @media (min-width: 640px) {
+    .landing-roll { column-count: 3; column-gap: 2rem; }
+  }
+
+  /* Three columns is where "United Arab Emirates" still fits on one line
+   * beside the half-width map; the roll grows downward instead. */
+  @media (min-width: 1024px) {
+    .landing-roll { column-count: 3; }
+  }
+
+  .landing-roll li {
+    break-inside: avoid;
+  }
+
+  .landing-country {
+    display: flex;
+    width: 100%;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.4375rem 0.25rem;
+    border-bottom: 1px solid var(--border-soft);
+    border-radius: 4px;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    text-align: left;
+    cursor: pointer;
+    transition: color 150ms ease, background-color 150ms ease;
+  }
+
+  .landing-country-name {
+    font-weight: 600;
+    color: var(--text-strong);
+  }
+
+  .landing-country-count {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-soft);
+  }
+
+  .landing-country:hover,
+  .landing-country[aria-pressed="true"] {
+    background-color: var(--accent-soft);
+  }
+
+  .landing-country:hover .landing-country-name,
+  .landing-country[aria-pressed="true"] .landing-country-name,
+  .landing-country[aria-pressed="true"] .landing-country-count {
+    color: var(--accent);
+  }
+
+  .landing-country:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .landing-foot {
+    margin-top: 1.5rem;
+    font-size: 0.75rem;
+    color: var(--text-soft);
+  }
+
+  .landing-dev {
+    margin: 0 auto 3rem;
+    max-width: 28rem;
+    padding: 1.25rem;
+    border: 1px solid var(--border-card);
+    border-radius: 8px;
+    background-color: var(--bg-elev);
+  }
+
+  .landing ::selection {
+    background-color: var(--accent-soft);
+    color: var(--text-strong);
+  }
+}
