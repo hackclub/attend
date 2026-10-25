@@ -19,7 +19,9 @@ class Note < ApplicationRecord
   validates :body, presence: true
   validate :event_or_ticket_present
 
-  scope :for_roles, ->(roles) { where("visible_to_roles && ARRAY[?]::varchar[]", roles) }
+  # A note with no visible_to_roles (the admin forms never set any) is visible
+  # to every event role.
+  scope :for_roles, ->(roles) { where("COALESCE(cardinality(visible_to_roles), 0) = 0 OR visible_to_roles && ARRAY[?]::varchar[]", roles) }
   scope :restricted, -> { where(sensitivity: :restricted) }
   scope :general, -> { where(sensitivity: :normal) }
 

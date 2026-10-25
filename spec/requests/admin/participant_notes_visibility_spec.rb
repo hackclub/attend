@@ -24,6 +24,7 @@ RSpec.describe "Participant notes visibility", type: :request do
     user = User.create!(email: "#{role}-notes-spec@example.com", name: role.titleize, admin_console_beta: console)
     EventRoleAssignment.create!(user: user, event: event, role: role)
     sign_in user
+    user
   end
 
   [ false, true ].each do |console|
@@ -52,6 +53,25 @@ RSpec.describe "Participant notes visibility", type: :request do
     expect(response.body).to include("Safeguarding note body", "Lead-only note body")
   end
 
+  it "shows a note added through the admin form, which has no visible_to_roles, to every event role" do
+    Note.create!(event: event, participant_event: participant_event, author: author,
+      note_type: "ops", body: "Form-created note body")
+    sign_in_with_role("event_admin")
+
+    get notes_admin_event_participant_path(event.slug, participant_event)
+
+    expect(response.body).to include("Form-created note body")
+  end
+
+  it "hides the Delete button on notes the user can't delete" do
+    sign_in_with_role("ops")
+
+    get notes_admin_event_participant_path(event.slug, participant_event)
+
+    expect(response.body).to include("Shared ops note body")
+    expect(response.body).not_to include("Are you sure you want to delete this note?")
+  end
+
   it "keeps out-of-scope note bodies off the history tab" do
     sign_in_with_role("limited")
 
@@ -70,6 +90,16 @@ RSpec.describe "Participant notes visibility", type: :request do
       delete admin_event_participant_note_path(event.slug, participant_event, hidden_note)
 
       expect(Note.exists?(hidden_note.id)).to be(true)
+    end
+
+    it "lets an author delete their own note outside their role's scope" do
+      user = sign_in_with_role("ops")
+      own_note = Note.create!(event: event, participant_event: participant_event, author: user,
+        note_type: "safeguarding", visible_to_roles: %w[safeguarding_lead], body: "Own safeguarding note body")
+
+      delete admin_event_participant_note_path(event.slug, participant_event, own_note)
+
+      expect(Note.exists?(own_note.id)).to be(false)
     end
 
     it "lets a safeguarding lead delete a safeguarding note" do

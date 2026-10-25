@@ -157,7 +157,6 @@ module Admin
       @safeguarding_info = @participant_event.safeguarding_info
       @consents = @participant_event.consents
       @guardian_participant_events = @participant_event.guardian_participant_events.includes(:guardian)
-      @notes = policy_scope(@participant_event.notes).includes(:author).order(created_at: :desc)
       @scans = @participant_event.scans.includes(:user, :scan_context).recent.limit(3)
       @emergency_contacts = emergency_contacts_for_profile
     end
@@ -505,7 +504,6 @@ module Admin
 
     def notes
       authorize @participant_event, :view_notes?
-      @notes = policy_scope(@participant_event.notes).includes(:author).order(created_at: :desc)
     end
 
     def history
