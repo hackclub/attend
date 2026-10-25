@@ -33,6 +33,19 @@ RSpec.describe "Admin CSV import", type: :request do
     expect(event.participants.pluck(:email)).to eq([ "ada@example.com" ])
   end
 
+  it "lets an alias fill a column the template header doesn't, but never stand in for it" do
+    upload("Email Address,Email,Surname,Family Name,First Name\n" \
+           "parent@example.com,,,Hopper,Grace\n" \
+           "mum@example.com,kid@example.com,,Lovelace,Ada\n")
+
+    # The first row left the participant's own "Email" blank, so it has no
+    # address and is dropped rather than imported under the parent's.
+    expect(last_batch.rows_data.pluck("email")).to eq([ "kid@example.com" ])
+    # "Surname" and "Family Name" are both aliases, so a blank one does fall
+    # through to the other.
+    expect(last_batch.rows_data.first).to include("legal_last_name" => "Lovelace")
+  end
+
   it "reads Windows-1252 and UTF-16 exports" do
     upload("Email,First Name,Last Name\njose@example.com,José,Müller\n".encode(Encoding::Windows_1252).b)
     expect(last_batch.rows_data.first).to include("legal_first_name" => "José")
@@ -40,6 +53,17 @@ RSpec.describe "Admin CSV import", type: :request do
 
     upload("﻿Email\tFirst Name\tLast Name\nzoe@example.com\tZoë\tExample\n".encode(Encoding::UTF_16LE).b)
     expect(last_batch.rows_data.first).to include("email" => "zoe@example.com", "legal_first_name" => "Zoë")
+  end
+
+  it "picks the separator by how the rows parse, not by counting header characters" do
+    # Narrow semicolon exports whose header text holds a comma: the character
+    # counts tie, and going by them read the whole line as one comma column.
+    upload("E-mail;Vorname, Nachname\nlena@example.com;Lena Novak\n")
+    expect(last_batch.rows_data.pluck("email")).to eq([ "lena@example.com" ])
+
+    # The same file with the comma quoted wasn't parsable as commas at all.
+    upload(%Q(Email;"Nachname, Vorname"\njan@example.com;"Novak, Jan"\n))
+    expect(last_batch.rows_data.pluck("email")).to eq([ "jan@example.com" ])
   end
 
   it "explains a file it can't read instead of failing" do
