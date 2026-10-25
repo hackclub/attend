@@ -21,6 +21,10 @@ RSpec.describe "Admin::Incidents", type: :request do
       details: "Two attendees shoved each other.", visible_to_roles: [ "event_admin" ] }
   end
   let(:escalation_params) { { reporter_phone: "+14155550177", emergency_services_called: "0" } }
+  let(:participant_event) { create(:participant_event, event: event) }
+  let(:medical_params) do
+    incident_params.merge(category: "medical", participant_event_ids: [ participant_event.id ], helping_staff_ids: [ ops.id ])
+  end
 
   before do
     sign_in event_admin
@@ -52,7 +56,7 @@ RSpec.describe "Admin::Incidents", type: :request do
 
     it "keeps medical escalations off the Firehouse channel" do
       expect {
-        post admin_event_incidents_path(event), params: { incident: incident_params.merge(category: "medical"), escalate: "1", escalation: escalation_params }
+        post admin_event_incidents_path(event), params: { incident: medical_params, escalate: "1", escalation: escalation_params }
       }.to have_enqueued_job(SendIncidentReportToSlackJob).and not_have_enqueued_job(SendIncidentToSlackJob)
     end
 
@@ -68,6 +72,34 @@ RSpec.describe "Admin::Incidents", type: :request do
     it "strips the form's blank role placeholder" do
       post admin_event_incidents_path(event), params: { incident: incident_params.merge(visible_to_roles: [ "", "ops" ]) }
       expect(Incident.last.visible_to_roles).to eq([ "ops" ])
+    end
+
+    it "records dispensed medication on a medical incident" do
+      expect {
+        post admin_event_incidents_path(event), params: {
+          incident: medical_params.merge(
+            medication_dispensed: "1",
+            medications_attributes: { "0" => { name: "Paracetamol", dose: "2 x 500mg", notes: "After lunch" } }
+          )
+        }
+      }.to change(IncidentMedication, :count).by(1)
+
+      incident = Incident.last
+      expect(response).to redirect_to(admin_event_incident_path(event, incident))
+      expect(incident.medication_dispensed).to be(true)
+
+      get admin_event_incident_path(event, incident)
+      expect(response.body).to include("Paracetamol", "2 x 500mg", "After lunch")
+    end
+
+    it "rejects a medical incident without a participant or staff member" do
+      expect {
+        post admin_event_incidents_path(event), params: { incident: incident_params.merge(category: "medical") }
+      }.not_to change(Incident, :count)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.body).to include("Medical incidents must be linked to at least one participant")
+      expect(response.body).to include("Medical incidents must be linked to at least one staff member")
     end
   end
 
@@ -109,6 +141,14 @@ RSpec.describe "Admin::Incidents", type: :request do
     it "pre-ticks the default roles" do
       get new_admin_event_incident_path(event)
       expect(response.body).to include('value="event_admin" checked', 'value="safeguarding_lead" checked')
+    end
+
+    it "renders the medication fields" do
+      get new_admin_event_incident_path(event)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("incident[medication_dispensed]")
+      expect(response.body).to include("incident[medications_attributes][NEW_RECORD][name]")
     end
   end
 end

@@ -1,0 +1,15 @@
+<div data-nested-form-target="item" class="rounded-(--cs-radius-item) border border-(--cs-border-input) p-3 <%= "hidden" if mf.object.marked_for_destruction? %>">
+  <div class="cs-field-grid">
+    <%= cs_form_field mf, :name, label: "Medication", constraint: "For example: Paracetamol" %>
+    <%= cs_form_field mf, :dose, label: "Quantity / dose", constraint: "For example: 2 x 500mg tablets" %>
+  </div>
+  <%= cs_form_field mf, :notes, label: "Notes", optional: true, description: "Time given, who administered it, any follow-up." do |aria| %>
+    <%= mf.text_area :notes, rows: 2, class: "cs-input", **aria %>
+  <% end %>
+  <div class="flex justify-end">
+    <% if mf.object.persisted? %>
+      <%= mf.hidden_field :_destroy, data: { nested_form_target: "destroyField" } %>
+    <% end %>
+    <button type="button" data-action="nested-form#remove" class="cs-btn cs-btn-link">Remove</button>
+  </div>
+</div>

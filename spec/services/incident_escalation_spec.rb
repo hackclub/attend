@@ -12,7 +12,7 @@ RSpec.describe IncidentEscalation do
   let(:incident) do
     create(:incident, event: event, reported_by: organizer, category: "medical", severity: "s1",
       summary: "Allergic reaction at lunch", details: "Participant used an epipen.", actions_taken: "First aider on scene.",
-      location: "Dining hall")
+      location: "Dining hall", participant_events: [ create(:participant_event, event: event) ], helping_staff: [ organizer ])
   end
 
   def escalation(**opts)

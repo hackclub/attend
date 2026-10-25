@@ -27,6 +27,9 @@ class Incident < ApplicationRecord
   # What a fresh incident is visible to before the organizer adjusts it.
   DEFAULT_VISIBLE_TO_ROLES = %w[event_admin safeguarding_lead].freeze
 
+  has_many :medications, class_name: "IncidentMedication", dependent: :destroy
+  accepts_nested_attributes_for :medications, allow_destroy: true, reject_if: :all_blank
+
   enum :category, { safeguarding: "safeguarding", medical: "medical", behavior: "behavior", other: "other" }
   enum :severity, IncidentLevel::ENUM
   enum :status, { open: "open", in_review: "in_review", closed: "closed" }
@@ -35,7 +38,12 @@ class Incident < ApplicationRecord
   validates :reported_by_user_id, presence: true
   validates :category, presence: true
   validates :severity, presence: true
+  validate :medical_incident_links, if: :medical?
   before_validation { self.visible_to_roles = Array(visible_to_roles).reject(&:blank?) }
+
+  # Medication rows only mean something on a medical incident marked as
+  # dispensed; the form keeps hidden rows around, so drop them here.
+  before_validation :discard_medications, unless: -> { medical? && medication_dispensed? }
 
   scope :open_incidents, -> { where(status: %w[open in_review]) }
   scope :for_roles, ->(roles) { where("visible_to_roles && ARRAY[?]::varchar[]", roles) }
@@ -54,5 +62,22 @@ class Incident < ApplicationRecord
 
   def escalated?
     hq_report.present?
+  end
+
+  private
+
+  def medical_incident_links
+    if participant_events.empty? && participant_event_id.blank?
+      errors.add(:base, "Medical incidents must be linked to at least one participant")
+    end
+    errors.add(:base, "Medical incidents must be linked to at least one staff member") if helping_staff.empty?
+    if medication_dispensed? && medications.reject(&:marked_for_destruction?).empty?
+      errors.add(:base, "Add the medication that was dispensed")
+    end
+  end
+
+  def discard_medications
+    self.medication_dispensed = false
+    medications.each(&:mark_for_destruction)
   end
 end
