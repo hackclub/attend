@@ -35,6 +35,44 @@ RSpec.describe "Landing after sign-in", type: :request do
     expect(response).to redirect_to(training_path)
   end
 
+  describe "someone who is both staff and a participant" do
+    let(:past_event) { create(:event, starts_at: 3.weeks.ago, ends_at: 2.weeks.ago) }
+    let(:user) { create(:user).tap { |u| create(:participant, user: u) } }
+
+    it "sends them to their dashboard once every event they staffed has ended" do
+      create(:event_role_assignment, event: past_event, user: user, role: "event_admin")
+      sign_in user
+
+      get root_path
+      expect(response).to redirect_to(dashboard_path)
+    end
+
+    it "still sends them to the admin while an event they staff hasn't ended" do
+      create(:event_role_assignment, event: past_event, user: user, role: "event_admin")
+      create(:event_role_assignment, event: event, user: user, role: "ops")
+      sign_in user
+
+      get root_path
+      expect(response).to redirect_to(admin_root_path)
+    end
+
+    it "still sends a series organizer to the admin" do
+      SeriesRoleAssignment.create!(user: user, event_series: create(:event_series), role: "organizer")
+      sign_in user
+
+      get root_path
+      expect(response).to redirect_to(admin_root_path)
+    end
+  end
+
+  it "keeps sending staff of past events to the admin when they aren't a participant" do
+    staff = create(:event_role_assignment, event: create(:event, starts_at: 3.weeks.ago, ends_at: 2.weeks.ago), role: "event_admin").user
+    sign_in staff
+
+    get root_path
+    expect(response).to redirect_to(admin_root_path)
+  end
+
   it "leaves someone with nothing to do on the home page" do
     sign_in create(:user)
 

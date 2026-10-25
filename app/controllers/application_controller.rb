@@ -55,12 +55,13 @@ class ApplicationController < ActionController::Base
 
   # Where a signed-in person starts out: the admin for anyone who can use it
   # (User#admin? — global admins, event staff, series owners and organizers),
+  # unless they're also a participant and every event they staff has ended;
   # their dashboard if they're a participant, and the training page for
   # people working events who can't use the admin (read-only staff,
   # volunteers) or who've been invited to a course. nil means the home page.
   # Shared by the home page and the sign-in callback so they can't disagree.
   def landing_path_for(user)
-    if user.admin?
+    if user.admin? && (user.participant.blank? || user.admin_for_current_events?)
       admin_root_path
     elsif user.participant.present?
       dashboard_path
