@@ -126,7 +126,7 @@ RSpec.describe "Admin console form validation", type: :request do
   describe "scan context" do
     it "shows the name and time-order errors inline" do
       post admin_event_scan_contexts_path(event), params: {
-        scan_context: { name: "", checks_in: "1", starts_at: "2026-07-12T10:00", ends_at: "2026-07-12T09:00" }
+        scan_context: { name: "", kind: "venue", starts_at: "2026-07-12T10:00", ends_at: "2026-07-12T09:00" }
       }
 
       expect(response).to have_http_status(:unprocessable_entity)

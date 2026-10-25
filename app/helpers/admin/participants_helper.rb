@@ -1,21 +1,14 @@
 module Admin::ParticipantsHelper
-  # Tailwind pill classes for each display status (original admin UI).
-  DISPLAY_STATUS_STYLES = {
-    "Complete" => "bg-green-50 text-green-700",
-    "Awaiting Participant" => "bg-blue-50 text-blue-700",
-    "Awaiting Parent" => "bg-amber-50 text-amber-700",
-    "Withdrawn" => "bg-red-50 text-red-700",
-    "Rejected" => "bg-red-50 text-red-700"
+  # Colours for ParticipantStatusPresenter tones: green done, amber waiting,
+  # blue with staff right now, grey nothing to act on.
+  STATUS_TONE_STYLES = {
+    done: "bg-green-50 text-green-700",
+    wait: "bg-amber-50 text-amber-700",
+    live: "bg-blue-50 text-blue-700",
+    idle: "bg-gray-100 text-gray-700"
   }.freeze
 
-  # Cloudscape status indicator type for each participant display status.
-  DISPLAY_STATUS_TYPES = {
-    "Complete" => :success,
-    "Awaiting Participant" => :in_progress,
-    "Awaiting Parent" => :pending,
-    "Withdrawn" => :stopped,
-    "Rejected" => :error
-  }.freeze
+  STATUS_TONE_TYPES = { done: :success, wait: :pending, live: :in_progress, idle: :stopped }.freeze
 
   BLOCKING_STEP_LABELS = {
     "profile" => "Needs profile",
@@ -81,12 +74,24 @@ module Admin::ParticipantsHelper
     doc ? doc.name : group_by.titleize
   end
 
+  # The status cell: registration status until a scan places them, then where
+  # their latest scan puts them (ParticipantStatusPresenter). The title says
+  # what the word means and which scan it comes from.
   def render_display_status_badge(participant_event)
-    ds = participant_event.display_status
-    return cs_status(DISPLAY_STATUS_TYPES.fetch(ds, :info), ds) if console_ui?
+    status = ParticipantStatusPresenter.new(participant_event, now: (@participant_status_now ||= Time.current))
+    time = status.scanned_at_label
 
-    css_class = DISPLAY_STATUS_STYLES[ds] || "bg-gray-100 text-gray-800"
-    content_tag(:span, ds, class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium #{css_class}")
+    if console_ui?
+      badge = cs_status(STATUS_TONE_TYPES.fetch(status.tone), status.label)
+      time_tag = time && content_tag(:span, time, class: "cs-small cs-muted")
+    else
+      badge = content_tag(:span, status.label,
+        class: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium #{STATUS_TONE_STYLES.fetch(status.tone)}")
+      time_tag = time && content_tag(:span, time, class: "text-xs text-gray-500")
+    end
+
+    content_tag(:span, safe_join([ badge, time_tag ].compact, " "),
+      class: "inline-flex flex-wrap items-center gap-x-1.5", title: status.explanation)
   end
 
   def render_blocking_step_badge(participant_event)

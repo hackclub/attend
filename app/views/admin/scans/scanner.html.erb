@@ -29,20 +29,23 @@
           </div>
         </div>
         
-        <% if @scan_contexts.size > 1 %>
-          <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1" data-controller="role-info">
+          <% if @scan_contexts.size > 1 %>
             <label for="scan-context" class="text-xs sm:text-sm text-gray-500 whitespace-nowrap">Context:</label>
-            <select id="scan-context" class="border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]">
+            <select id="scan-context" data-role-info-target="select" data-action="role-info#update" class="border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]">
               <% @scan_contexts.each do |context| %>
                 <option value="<%= context.id %>" <%= "selected" if context == @default_scan_context %>>
-                  <%= context.name %><%= " — Travel pickup" if context.is_travel_pickup? %><% if context.checks_in? %> ✓<% end %>
+                  <%= context.name %> — <%= context.kind_label %>
                 </option>
               <% end %>
             </select>
-          </div>
-        <% else %>
-          <input type="hidden" id="scan-context" value="<%= @default_scan_context&.id %>">
-        <% end %>
+          <% else %>
+            <input type="hidden" id="scan-context" value="<%= @default_scan_context&.id %>" data-role-info-target="select">
+          <% end %>
+          <% @scan_contexts.select { |context| context.usage_note.present? }.each do |context| %>
+            <p class="hidden w-full text-xs text-gray-500" data-role-info-target="panel" data-role="<%= context.id %>"><%= context.usage_note %></p>
+          <% end %>
+        </div>
       </div>
       
       <div class="flex items-center gap-2 mb-3 hidden" id="camera-select-wrapper">

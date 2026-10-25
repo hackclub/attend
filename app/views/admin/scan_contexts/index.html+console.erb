@@ -20,8 +20,7 @@
         <thead>
           <tr>
             <th scope="col">Name</th>
-            <th scope="col">Checks in</th>
-            <th scope="col">Travel pickup</th>
+            <th scope="col">Kind</th>
             <th scope="col">Schedule</th>
             <th scope="col">Scans</th>
             <th scope="col"><span class="sr-only">Actions</span></th>
@@ -30,17 +29,13 @@
         <tbody>
           <% @scan_contexts.each do |context| %>
             <tr>
-              <td class="whitespace-nowrap font-bold"><%= context.name %></td>
-              <td class="whitespace-nowrap">
-                <%= context.checks_in? ? cs_status(:success, "Yes") : cs_status(:stopped, "No") %>
-              </td>
-              <td class="whitespace-nowrap">
-                <% if context.is_travel_pickup? %>
-                  <%= cs_badge("Travel pickup", "blue") %>
-                <% else %>
-                  <span class="cs-muted">—</span>
+              <td>
+                <span class="whitespace-nowrap font-bold"><%= context.name %></span>
+                <% if context.usage_note.present? %>
+                  <div class="cs-small cs-muted"><%= context.usage_note %></div>
                 <% end %>
               </td>
+              <td class="whitespace-nowrap"><%= cs_badge(context.kind_label) %></td>
               <td class="whitespace-nowrap">
                 <% if context.starts_at? || context.ends_at? %>
                   <%= [ cs_absolute_time(context.starts_at), cs_absolute_time(context.ends_at) ].compact.join(" – ") %>

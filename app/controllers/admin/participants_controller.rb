@@ -26,7 +26,9 @@ module Admin
         # preload (not includes): the string order on participants.legal_last_name
         # would otherwise flip every association into one giant eager-load LEFT JOIN.
         @participant_events = policy_scope(current_event.participant_events)
-          .preload(:participant, :event, :travel_inbound, :travel_outbound, :accommodation, :medical, :safeguarding_info, :dietary, :accessibility, :consents, :emergency_contacts, :groups, guardian_participant_events: :emergency_contacts)
+          .preload(:participant, :event, :travel_inbound, :travel_outbound, :accommodation, :medical, :safeguarding_info, :dietary, :accessibility, :consents, :emergency_contacts, :groups, guardian_participant_events: :emergency_contacts, latest_placing_scan: :scan_context)
+        # Once the event has ended the status cell asks whether each row ever checked in.
+        @participant_events = @participant_events.preload(scans: :scan_context) if current_event.phase_at == :ended
 
         if params[:search].present?
           search_term = "%#{ActiveRecord::Base.sanitize_sql_like(params[:search])}%"
