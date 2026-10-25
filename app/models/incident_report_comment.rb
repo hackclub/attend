@@ -37,7 +37,13 @@ class IncidentReportComment < ApplicationRecord
     end
   end
 
+  # A status change must not depend on the whole report still passing
+  # validation: reports filed before today's phone/email rules can be invalid
+  # as stored, and `update!` raising inside this callback makes `save` return
+  # false with no error on the comment (a blank 422 for the admin). Only the
+  # status is changing, so skip validations and keep timestamps/versions.
   def update_incident_report_status
-    incident_report.update!(status: new_status)
+    incident_report.status = new_status
+    incident_report.save!(validate: false)
   end
 end

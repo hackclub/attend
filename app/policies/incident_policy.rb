@@ -11,11 +11,17 @@ class IncidentPolicy < ApplicationPolicy
     has_any_role?
   end
 
+  # Reporters can read and comment on what they filed, but changing it (and
+  # who it's shared with) is for the roles it's shared with.
   def update?
+    can_view_incident?(include_reporter: false)
+  end
+
+  def comment?
     can_view_incident?
   end
 
-  def send_to_slack?
+  def escalate?
     can_view_incident?
   end
 
@@ -56,7 +62,7 @@ class IncidentPolicy < ApplicationPolicy
     user.event_role_assignments.exists?(event: event)
   end
 
-  def can_view_incident?
+  def can_view_incident?(include_reporter: true)
     return true if user.global_admin?
 
     event = Current.event
@@ -67,6 +73,6 @@ class IncidentPolicy < ApplicationPolicy
 
     # Reporters keep access to what they filed, whichever roles it's shared
     # with, for as long as they're still staff on the event.
-    record.reported_by_user_id == user.id || (record.visible_to_roles & user_roles).any?
+    include_reporter ? record.visible_to_staff?(user, user_roles) : record.shared_with_roles?(user_roles)
   end
 end

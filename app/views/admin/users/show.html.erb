@@ -197,7 +197,7 @@
     <% end %>
   </div>
 
-  <%= render "admin/users/training", user: @user, awards: @training_awards, enrollments: @training_enrollments %>
+  <%= render "admin/users/training", user: @user, awards: @training_awards, enrollments: @training_enrollments, disclosure: @training_disclosure %>
 
   <% if @event_role_assignments.any? %>
     <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">

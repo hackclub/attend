@@ -161,6 +161,7 @@ Rails.application.routes.draw do
         post :enroll
         post :restart
       end
+      resource :disclosure, only: [ :new, :create ]
       resources :lessons, only: :show do
         member do
           post :complete
@@ -295,7 +296,7 @@ Rails.application.routes.draw do
       end
       resources :incidents do
         member do
-          post :send_to_slack
+          post :escalate
         end
         resources :comments, only: [ :create ], controller: "incident_comments"
       end
@@ -333,6 +334,7 @@ Rails.application.routes.draw do
           post :cancel
           post :retry_failed
           post :retry_delivery
+          post :send_to_new_recipients
         end
       end
       resources :scans, only: [ :index, :create, :update ] do
@@ -426,6 +428,7 @@ Rails.application.routes.draw do
           end
         end
       end
+      resources :disclosures, controller: "training_disclosures", only: [ :index, :show, :update ]
       resources :badges, controller: "training_badges", except: :index do
         resources :awards, controller: "training_badge_awards", only: [ :new, :create ] do
           patch :revoke, on: :member
@@ -466,15 +469,18 @@ Rails.application.routes.draw do
       post :sync_org_support_slack_channel
     end
 
-    # Global incident reports (public form submissions)
-    get "incidents", to: "incident_reports#index", as: :incidents
+    # HQ incident inbox: public-form reports, organizer escalations and every
+    # event's incident log in one place. Helpers are named after the model
+    # (admin_incident_report_*) so they can't be confused with the
+    # event-scoped admin_event_incident_* helpers above.
+    get "incidents", to: "incident_reports#index", as: :incident_reports
 
     # Global incident-report notification settings
-    get "incidents/settings", to: "incident_settings#show", as: :incident_settings
+    get "incidents/settings", to: "incident_settings#show", as: :incident_report_settings
     patch "incidents/settings", to: "incident_settings#update"
 
-    get "incidents/:id", to: "incident_reports#show", as: :incident
-    post "incidents/:incident_id/comments", to: "incident_report_comments#create", as: :incident_comments
+    get "incidents/:id", to: "incident_reports#show", as: :incident_report
+    post "incidents/:incident_id/comments", to: "incident_report_comments#create", as: :incident_report_comments
 
     # Airtable redirects only to a registered URI, so the OAuth callback can't
     # carry the event slug (see Admin::AirtableConnectionsController).

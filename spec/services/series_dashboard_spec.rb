@@ -111,7 +111,7 @@ RSpec.describe SeriesDashboard do
     before do
       Incident.create!(
         event: event, reported_by: global_admin, category: "safeguarding",
-        severity: "low", status: "open", visible_to_roles: [ "safeguarding_lead" ]
+        severity: "s3", status: "open", visible_to_roles: [ "safeguarding_lead" ]
       )
     end
 
@@ -141,7 +141,7 @@ RSpec.describe SeriesDashboard do
       EventRoleAssignment.create!(user: ops, event: event, role: "ops")
       Incident.create!(
         event: event, reported_by: ops, category: "behavior",
-        severity: "low", status: "open", visible_to_roles: [ "safeguarding_lead" ]
+        severity: "s3", status: "open", visible_to_roles: [ "safeguarding_lead" ]
       )
 
       expect(dashboard_for(event, user: ops).open_incidents[event.id]).to eq(1)

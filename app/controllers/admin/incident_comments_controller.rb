@@ -6,7 +6,7 @@ module Admin
     def create
       @comment = @incident.comments.build(comment_params)
       @comment.user = current_user
-      authorize @incident, :update?
+      authorize @incident, :comment?
 
       if @comment.save
         SendIncidentCommentToSlackJob.perform_later(@comment.id) if @incident.slack_message_ts.present?

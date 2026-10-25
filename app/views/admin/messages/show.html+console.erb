@@ -45,6 +45,13 @@
             class: "cs-btn" %>
       <% end %>
 
+      <% if @new_recipient_count > 0 %>
+        <%= button_to "Send to #{pluralize(@new_recipient_count, "new recipient")}", send_to_new_recipients_admin_event_message_path(current_event, @message),
+            method: :post,
+            form: { data: { turbo_confirm: "Send this message to #{pluralize(@new_recipient_count, "new recipient")}? They match this audience now but haven't received it." } },
+            class: "cs-btn" %>
+      <% end %>
+
       <% if @message.draft? || @message.scheduled? %>
         <%= link_to "Edit", edit_admin_event_message_path(current_event, @message), class: "cs-btn" %>
 
@@ -129,6 +136,9 @@
                           <div class="cs-small cs-muted">Attendee</div>
                         <% elsif first_delivery.guardian.present? %>
                           <div class="cs-small cs-muted">Guardian</div>
+                        <% end %>
+                        <% if first_delivery.catch_up? %>
+                          <div class="mt-1"><%= cs_badge("Sent later") %></div>
                         <% end %>
                       </td>
                     <% end %>

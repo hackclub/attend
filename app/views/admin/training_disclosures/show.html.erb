@@ -1,0 +1,27 @@
+<div class="max-w-3xl space-y-6">
+  <%= link_to "← Safety reviews", admin_training_disclosures_path, class: "text-sm text-gray-500 hover:text-[#ec3750]" %>
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900"><%= @disclosure.user.display_name_or_fallback %></h1>
+    <p class="text-sm text-gray-500"><%= @disclosure.user.email %> · viewing this declaration is recorded in the audit log</p>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-3 text-sm">
+    <p><span class="text-gray-500">Question, as they saw it:</span> <%= @disclosure.question %></p>
+    <p><span class="text-gray-500">Answer:</span> <strong><%= @disclosure.answered_yes? ? "Yes" : "No" %></strong></p>
+    <p><span class="text-gray-500">Status:</span> <%= render "admin/training/disclosure_status", disclosure: @disclosure %></p>
+    <p><span class="text-gray-500">Declared:</span> <%= l(@disclosure.answered_at, format: :long) %> before <%= @disclosure.course&.title || "a deleted course" %></p>
+    <% if @disclosure.reviewed_at %>
+      <p><span class="text-gray-500">Review:</span> <%= @disclosure.review_status.titleize %> by <%= @disclosure.reviewed_by&.display_name_or_fallback || "an admin" %></p>
+      <p class="whitespace-pre-line"><%= @disclosure.review_note %></p>
+    <% end %>
+  </div>
+  <% if @disclosure.answered_yes? %>
+    <%= form_with url: admin_training_disclosure_path(@disclosure), method: :patch, class: "bg-white border border-gray-200 rounded-lg p-6 space-y-4" do %>
+      <label class="block text-sm font-medium text-gray-700" for="note">Note (why — encrypted, global admins only)</label>
+      <%= text_area_tag :note, nil, rows: 4, required: true, class: "w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %>
+      <div class="flex justify-end gap-2">
+        <%= button_tag "Uphold — keep ineligible", name: "outcome", value: "upheld", class: "px-4 py-2 border border-gray-300 rounded-md text-sm" %>
+        <%= button_tag "Clear", name: "outcome", value: "cleared", class: "px-4 py-2 bg-[#d42f46] text-white rounded-md text-sm", data: { turbo_confirm: "Clear this person to train and work at Hack Club events?" } %>
+      </div>
+    <% end %>
+  <% end %>
+</div>

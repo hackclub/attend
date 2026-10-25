@@ -2,6 +2,7 @@ module Training
   class LessonsController < BaseController
     before_action :set_course
     before_action :require_enrollment
+    before_action :require_disclosure
     before_action :set_lesson
     before_action :require_unlocked
     before_action :require_video_watched, only: [ :complete, :quiz ]
@@ -82,6 +83,12 @@ module Training
       return if @enrollment
 
       redirect_to training_course_path(@course), alert: "Start the course to open its lessons."
+    end
+
+    def require_disclosure
+      return unless @enrollment.disclosure_needed?
+
+      redirect_to new_training_course_disclosure_path(@course)
     end
 
     def set_lesson

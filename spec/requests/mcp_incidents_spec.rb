@@ -29,16 +29,15 @@ RSpec.describe "MCP incident tools", type: :request do
     JSON.parse(body.dig("result", "content").map { |part| part["text"] }.join)
   end
 
-  it "creates, shows, updates and comments on an incident" do
+  it "creates, shows and comments on an incident" do
     created = call_tool("incidents_create",
-      "event_slug" => event.slug, "category" => "behavior", "severity" => "low", "summary" => "Lost badge")
+      "event_slug" => event.slug, "category" => "behavior", "severity" => "s3", "summary" => "Lost badge")
     expect(created["visible_to_roles"]).to eq(Incident::DEFAULT_VISIBLE_TO_ROLES)
     expect(created["reported_by"]).to eq(user.display_name_or_fallback)
 
-    # Not shared with Limited, but the reporter can still work it.
+    # Not shared with Limited, but the reporter can still read and comment on it.
     id = created.fetch("id")
     expect(call_tool("incidents_show", "incident_id" => id)["summary"]).to eq("Lost badge")
-    expect(call_tool("incidents_update", "incident_id" => id, "status" => "in_review")["status"]).to eq("in_review")
 
     commented = call_tool("incidents_add_comment", "incident_id" => id, "body" => "Found it")
     expect(commented["comments"].map { |c| c["body"] }).to eq([ "Found it" ])

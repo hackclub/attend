@@ -33,7 +33,7 @@ class IncidentsToolbox < ApplicationToolbox
     param :event_id, :string, "Event ID", optional: true
     param :event_slug, :string, "Event slug", optional: true
     param :category, :string, "Category", enum: %w[safeguarding medical behavior other]
-    param :severity, :string, "Severity", enum: %w[low medium high critical]
+    param :severity, :string, "Level (S0 high priority … S3 follow-up)", enum: IncidentLevel::KEYS
     param :summary, :string, "Short summary"
     param :details, :string, "Full details", optional: true
     param :location, :string, "Where it happened", optional: true
@@ -58,7 +58,7 @@ class IncidentsToolbox < ApplicationToolbox
     param :incident_id, :string, "Incident ID"
     param :status, :string, "New status", enum: %w[open in_review closed], optional: true
     param :actions_taken, :string, "Actions taken", optional: true
-    param :severity, :string, "Severity", enum: %w[low medium high critical], optional: true
+    param :severity, :string, "Level (S0 high priority … S3 follow-up)", enum: IncidentLevel::KEYS, optional: true
   end
   def update
     @incident = load_incident!
@@ -73,7 +73,7 @@ class IncidentsToolbox < ApplicationToolbox
   end
   def add_comment
     @incident = load_incident!
-    authorize! @incident, :show?
+    authorize! @incident, :comment?
     @comment = @incident.comments.create!(user: current_user, body: params[:body])
     render json: serialize_incident(@incident, full: true)
   end

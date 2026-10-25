@@ -7,17 +7,20 @@
       <h1 class="cs-h1">Incident details</h1>
       <div class="cs-description flex flex-wrap items-center gap-2 mt-1">
         <%= render_category_badge(@incident.category) %>
-        <%= render_severity_badge(@incident.severity) %>
+        <%= incident_level_badge(@incident.severity, full: true) %>
         <%= incident_status(@incident.status) %>
       </div>
     </div>
     <div class="cs-actions">
-      <% if @incident.behavior? || @incident.safeguarding? || @incident.other? %>
-        <%= button_to "Send to Slack", send_to_slack_admin_event_incident_path(current_event, @incident), method: :post, class: "cs-btn", data: { turbo_confirm: "Send this conduct report to Slack?" } %>
-      <% end %>
-      <%= link_to "Edit", edit_admin_event_incident_path(current_event, @incident), class: "cs-btn cs-btn-primary" %>
+      <%= link_to "Edit", edit_admin_event_incident_path(current_event, @incident), class: "cs-btn cs-btn-primary" if policy(@incident).edit? %>
     </div>
   </div>
+
+  <% if @incident.escalated? %>
+    <%= render "admin/incidents/hq_status", incident: @incident %>
+  <% else %>
+    <%= render "admin/incidents/escalate_form", incident: @incident %>
+  <% end %>
 
   <section class="cs-container">
     <div class="cs-container-header">

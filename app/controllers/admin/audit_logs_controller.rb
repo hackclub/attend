@@ -131,12 +131,10 @@ module Admin
           .group_by(&:first)
           .transform_values { |pairs| pairs.map(&:last) }
 
-        Incident.where(event_id: roles_by_event.keys)
-          .pluck(:id, :event_id, :visible_to_roles, :reported_by_user_id)
-          .filter_map do |id, event_id, visible_to_roles, reported_by_user_id|
-            id if reported_by_user_id == current_user.id ||
-              ((visible_to_roles || []) & roles_by_event[event_id]).any?
-          end
+        roles_by_event
+          .map { |event_id, roles| Incident.where(event_id: event_id).visible_to_staff(current_user, roles) }
+          .reduce(:or)
+          &.pluck(:id) || []
       end
     end
 

@@ -8,10 +8,24 @@
     </div>
     <div class="cs-actions">
       <%= link_to "Learner view", training_path, class: "cs-btn cs-btn-full" %>
+      <%= link_to "Safety reviews", admin_training_disclosures_path, class: "cs-btn cs-btn-full" %>
       <%= link_to "New badge", new_admin_training_badge_path, class: "cs-btn cs-btn-full" %>
       <%= link_to "New course", new_admin_training_course_path, class: "cs-btn cs-btn-primary cs-btn-full" %>
     </div>
   </div>
+
+  <% if @pending_disclosures.positive? %>
+    <div class="cs-alert cs-alert-error">
+      <%= cs_status_icon(:error) %>
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+        <div>
+          <p class="cs-alert-title"><%= pluralize(@pending_disclosures, "declaration") %> awaiting the <%= TrainingDisclosure::SAFETY_TEAM_NAME %></p>
+          <p>They can't train or work events until reviewed.</p>
+        </div>
+        <%= link_to "Review", admin_training_disclosures_path, class: "cs-btn self-start sm:self-auto whitespace-nowrap" %>
+      </div>
+    </div>
+  <% end %>
 
   <section class="cs-container">
     <div class="cs-container-header cs-container-header-divided">

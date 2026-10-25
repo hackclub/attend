@@ -1,0 +1,47 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Training", admin_training_path ], [ "Safety reviews", nil ]) %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Safety reviews <span class="cs-counter">(<%= @disclosures.size %>)</span></h1>
+      <p class="cs-description">People who answered yes to a course declaration. They can't train or work events until the <%= TrainingDisclosure::SAFETY_TEAM_NAME %> clears them.</p>
+    </div>
+    <div class="cs-actions">
+      <% Admin::TrainingDisclosuresController::FILTERS.each do |filter| %>
+        <%= link_to filter.titleize, admin_training_disclosures_path(status: filter), class: "cs-btn #{"cs-btn-primary" if filter == @filter}", "aria-current": (filter == @filter ? "true" : nil) %>
+      <% end %>
+    </div>
+  </div>
+
+  <section class="cs-container">
+    <% if @disclosures.empty? %>
+      <div class="cs-empty"><p class="cs-empty-title"><%= @filter == "pending" ? "Nothing awaiting review" : "No declarations" %></p></div>
+    <% else %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Person</th>
+              <th scope="col">Course</th>
+              <th scope="col">Declared</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @disclosures.each do |disclosure| %>
+              <tr>
+                <td>
+                  <%= link_to disclosure.user.display_name_or_fallback, admin_training_disclosure_path(disclosure), class: "cs-link" %>
+                  <div class="cs-small cs-secondary"><%= disclosure.user.email %></div>
+                </td>
+                <td><%= disclosure.course&.title || tag.span("Deleted course", class: "cs-muted") %></td>
+                <td class="whitespace-nowrap"><%= cs_relative_time(disclosure.answered_at) %></td>
+                <td class="whitespace-nowrap"><%= render "admin/training/disclosure_status", disclosure: disclosure %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </section>
+</div>

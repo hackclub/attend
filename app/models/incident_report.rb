@@ -8,6 +8,8 @@ class IncidentReport < ApplicationRecord
 
   belongs_to :event, optional: true
   belongs_to :user, optional: true
+  # Set when an organizer escalated an event incident log entry to HQ.
+  belongs_to :incident, optional: true
 
   # An event is "recent" (and so eligible for emergency priority + calls) if it
   # is upcoming, running, or ended within the last month. Custom events (not on
@@ -36,13 +38,12 @@ class IncidentReport < ApplicationRecord
     "other" => "Other"
   }.freeze
 
-  PRIORITIES = {
-    "emergency" => "Emergency – Need resolution ASAP",
-    "elevated" => "Elevated – Need resolution in 2-3 hours",
-    "standard" => "Standard – 24-hour response is OK"
-  }.freeze
+  # Priority uses the platform-wide IncidentLevel scale (S0–S3).
+  PRIORITIES = IncidentLevel::LABELS
 
   enum :status, { open: "open", in_review: "in_review", resolved: "resolved" }
+
+  scope :escalated, -> { where.not(incident_id: nil) }
 
   normalizes_phone_number :reporter_phone
 
@@ -65,6 +66,20 @@ class IncidentReport < ApplicationRecord
     event&.name || custom_event_name
   end
 
+  def escalated?
+    incident_id.present?
+  end
+
+  # Everything that should happen once a new report is on file: the HQ email,
+  # the Slack post, the reporter's confirmation text and, for emergencies,
+  # the phone calls. Shared by the public form and organizer escalation.
+  def dispatch_notifications!
+    IncidentReportMailer.new_report(self).deliver_later
+    SendIncidentReportToSlackJob.perform_later(id)
+    SendIncidentReportConfirmationSmsJob.perform_later(id)
+    InitiateEmergencyIncidentCallsJob.perform_later(id) if emergency?
+  end
+
   def emergency_allowed?
     return false if event.blank? # custom / historical events
     return true if event.ends_at.blank?
@@ -77,7 +92,11 @@ class IncidentReport < ApplicationRecord
   end
 
   def emergency?
-    priority == "emergency"
+    priority == IncidentLevel::EMERGENCY
+  end
+
+  def priority_code
+    IncidentLevel.code(priority)
   end
 
   # Records that the given caller acknowledged the emergency call. Idempotent
@@ -117,11 +136,11 @@ class IncidentReport < ApplicationRecord
   private
 
   def force_emergency_priority_if_services_called
-    self.priority = "emergency" if emergency_services_called? && emergency_allowed?
+    self.priority = IncidentLevel::EMERGENCY if emergency_services_called? && emergency_allowed?
   end
 
   def downgrade_emergency_for_old_events
-    self.priority = "elevated" if priority == "emergency" && !emergency_allowed?
+    self.priority = IncidentLevel::EMERGENCY_FALLBACK if priority == IncidentLevel::EMERGENCY && !emergency_allowed?
   end
 
   def event_or_custom_event_present
