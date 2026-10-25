@@ -1,0 +1,10 @@
+<% report = incident.hq_report %>
+<% colors = { "open" => "bg-blue-100 text-blue-800", "in_review" => "bg-amber-100 text-amber-800", "resolved" => "bg-green-100 text-green-800" } %>
+<div class="bg-gray-50 border border-gray-200 rounded-lg px-6 py-4 mb-6 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm">
+  <span class="font-medium text-gray-900">Escalated to Hack Club HQ</span>
+  <span class="px-2 py-0.5 rounded-full text-xs font-medium <%= colors[report.status] %>">HQ status: <%= report.status.humanize %></span>
+  <span class="text-gray-500">on <%= report.created_at.strftime("%b %-d, %Y at %H:%M") %></span>
+  <% if current_user.global_admin? %>
+    <%= link_to "Open HQ report →", admin_incident_report_path(report), class: "text-[#ec3750] hover:text-[#d42f46] font-medium sm:ml-auto" %>
+  <% end %>
+</div>

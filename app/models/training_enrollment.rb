@@ -8,6 +8,7 @@ class TrainingEnrollment < ApplicationRecord
   has_many :lesson_completions, class_name: "TrainingLessonCompletion", dependent: :destroy
   has_many :quiz_attempts, class_name: "TrainingQuizAttempt", dependent: :destroy
   has_many :video_views, class_name: "TrainingVideoView", dependent: :destroy
+  has_many :disclosures, class_name: "TrainingDisclosure", dependent: :nullify
 
   validates :training_course_id, uniqueness: { scope: :user_id }
 
@@ -33,6 +34,16 @@ class TrainingEnrollment < ApplicationRecord
     lessons = course.lessons.to_a
     index = lessons.index(lesson)
     index.nil? || index.zero? || lesson_completed?(lessons[index - 1])
+  end
+
+  # The declaration for this attempt at the course. Asked again on a restart,
+  # so it's re-confirmed whenever the badge is earned or renewed.
+  def current_disclosure
+    disclosures.where(answered_at: started_at..).order(:answered_at).last
+  end
+
+  def disclosure_needed?
+    course.disclosure_required? && current_disclosure.nil?
   end
 
   def video_view_for(lesson)
@@ -100,6 +111,8 @@ class TrainingEnrollment < ApplicationRecord
   # published one awards anything.
   def award_badge!
     return if course.badge.nil? || !course.published?
+    # Someone the Safety Team hasn't cleared can't earn a badge.
+    return unless user.eligible_to_work_events?
 
     TrainingBadgeAward.create!(
       user: user,

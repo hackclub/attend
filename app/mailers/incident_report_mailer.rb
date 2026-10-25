@@ -21,7 +21,7 @@ class IncidentReportMailer < ApplicationMailer
     mail(
       to: notify_email,
       reply_to: incident_report.reporter_email,
-      subject: "[#{incident_report.priority.humanize}] Incident Report – #{@event_name}"
+      subject: "[#{incident_report.priority_code}] Incident Report – #{@event_name}"
     )
   end
 

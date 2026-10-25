@@ -96,7 +96,7 @@
               </p>
             </div>
             <div class="p-4 bg-white">
-              <div class="prose prose-sm max-w-none">
+              <div class="text-sm leading-relaxed [&_p]:my-4 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_ul]:my-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_blockquote]:my-4 [&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-4 [&_a]:text-[#ec3750] [&_a]:underline">
                 <%= sanitize @message.body_as_html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
               </div>
             </div>

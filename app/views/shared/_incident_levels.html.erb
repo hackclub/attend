@@ -1,0 +1,19 @@
+<%# The S0–S3 triage levels, from IncidentLevel, for forms and help text. %>
+<% pills = { "red" => "bg-red-50 text-red-700", "amber" => "bg-amber-50 text-amber-800", "green" => "bg-green-50 text-green-800", "blue" => "bg-blue-50 text-blue-800" } %>
+<dl class="divide-y divide-gray-200 text-sm">
+  <% IncidentLevel::LEVELS.each do |level| %>
+    <div class="py-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 items-start">
+      <dt class="flex flex-col items-center justify-center w-14 py-1 rounded-md font-bold <%= pills[level.color] %>">
+        <span class="text-base"><%= level.code %></span>
+      </dt>
+      <dd>
+        <span class="font-medium text-gray-900"><%= level.name %></span>
+        <span class="text-gray-500"> · <%= level.target %></span>
+        <p class="text-gray-600 mt-0.5"><%= level.examples.join(" · ") %></p>
+      </dd>
+    </div>
+  <% end %>
+</dl>
+<p class="mt-2 text-sm">
+  <%= link_to "Full triage chart and what HQ does at each level →", incident_levels_docs_path, target: "_blank", rel: "noopener", class: "text-[#ec3750] hover:text-[#d42f46] font-medium" %>
+</p>

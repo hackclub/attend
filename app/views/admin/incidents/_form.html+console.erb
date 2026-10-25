@@ -2,7 +2,7 @@
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
 <% end %>
 
-<%= form_with model: [:admin, current_event, incident], local: true, class: "cs-stack", html: { novalidate: true }, data: { controller: "cs-form-validation firehouse-confirm", action: "submit->firehouse-confirm#confirm" } do |f| %>
+<%= form_with model: [:admin, current_event, incident], local: true, class: "cs-stack", html: { novalidate: true }, data: { controller: "cs-form-validation incident-escalation", action: "submit->incident-escalation#confirm" } do |f| %>
   <section class="cs-container">
     <div class="cs-container-header">
       <h2 class="cs-h2">Incident details</h2>
@@ -13,8 +13,8 @@
           <%= f.select :category, Incident.categories.keys.map { |c| [c.humanize, c] }, { prompt: "Select category" }, class: "cs-select", required: true, **aria %>
         <% end %>
 
-        <%= cs_form_field f, :severity, label: "Severity", messages: { blank: "Severity is required.", inclusion: "Select a valid severity." } do |aria| %>
-          <%= f.select :severity, Incident.severities.keys.map { |s| [s.humanize, s] }, { prompt: "Select severity" }, class: "cs-select", required: true, **aria %>
+        <%= cs_form_field f, :severity, label: "Level", description: "S0 is the most urgent. The chart below has examples.", messages: { blank: "Level is required.", inclusion: "Select a valid level." } do |aria| %>
+          <%= f.select :severity, IncidentLevel.select_options, { prompt: "Select level" }, class: "cs-select", required: true, **aria %>
         <% end %>
 
         <%= cs_form_field f, :status, label: "Status" do |aria| %>
@@ -27,6 +27,10 @@
 
         <%= cs_form_field f, :location, label: "Location", optional: true, constraint: "For example: Main Hall, Room 204" %>
       </div>
+      <details class="mt-4">
+        <summary class="cs-link cursor-pointer">Which level? The triage chart</summary>
+        <div class="mt-2"><%= render "shared/incident_levels" %></div>
+      </details>
     </div>
   </section>
 
@@ -169,17 +173,28 @@
         <%= hidden_field_tag "incident[visible_to_roles][]", "" %>
       </fieldset>
 
-      <% unless incident.persisted? %>
-        <label class="cs-option mt-4 cursor-pointer">
-          <%= check_box_tag "sync_to_slack", "1", false %>
-          <span>
-            <span class="cs-option-label block">Sync to HQ Firehouse</span>
-            <span class="cs-option-description block">Posts the incident to the HQ Slack channel for visibility.</span>
-          </span>
-        </label>
-      <% end %>
     </div>
   </section>
+
+  <% unless incident.persisted? %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Hack Club HQ</h2>
+      </div>
+      <div class="cs-container-body">
+        <label class="cs-option cursor-pointer">
+          <%= check_box_tag "escalate", "1", params[:escalate] == "1", data: { incident_escalation_target: "checkbox", action: "change->incident-escalation#toggle" } %>
+          <span>
+            <span class="cs-option-label block">Escalate to Hack Club HQ</span>
+            <span class="cs-option-description block">Files a confidential report with HQ's safeguarding team. They're notified by email and Slack, and an S0 rings their phones. Conduct incidents also post to the HQ Firehouse channel.</span>
+          </span>
+        </label>
+        <div class="mt-4 hidden" data-incident-escalation-target="fields">
+          <%= render "admin/incidents/escalation_fields", phone: params.dig(:escalation, :reporter_phone).presence || current_user.oidc_claims&.dig("phone_number") %>
+        </div>
+      </div>
+    </section>
+  <% end %>
 
   <%= cs_form_errors f %>
 

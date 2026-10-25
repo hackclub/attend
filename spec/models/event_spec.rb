@@ -418,7 +418,7 @@ RSpec.describe Event, type: :model do
     # notes, so anything still pointing at a participant event at that moment
     # used to blow up with a foreign key violation.
     it "tears down records that point at its participant events" do
-      incident = Incident.create!(event: event, reported_by: reporter, category: :other, severity: :low)
+      incident = Incident.create!(event: event, reported_by: reporter, category: :other, severity: :s3)
       incident.incident_participants.create!(participant_event: participant_event)
       Note.create!(event: event, participant_event: participant_event, author: reporter, body: "note")
       RoommatePreference.create!(participant_event: other_participant_event, preferred_participant_event: participant_event)

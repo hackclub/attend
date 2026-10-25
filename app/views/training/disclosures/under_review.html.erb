@@ -1,0 +1,19 @@
+<% content_for :title, "Training – Attend" %>
+
+<div class="w-full max-w-xl mx-auto">
+  <div class="portal-card p-6 sm:p-8 text-center">
+    <span class="portal-medallion portal-medallion-neutral mx-auto mb-4">
+      <svg class="size-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/>
+      </svg>
+    </span>
+    <h1 class="portal-title text-2xl mb-2">Thanks for telling us</h1>
+    <p class="portal-body mb-4 mx-auto max-w-prose">
+      The <%= TrainingDisclosure::SAFETY_TEAM_NAME %> will be in touch before you can work at an event.
+    </p>
+    <p class="portal-hint text-sm mb-6">
+      If you have questions in the meantime, email <%= mail_to TrainingDisclosure::SAFETY_TEAM_EMAIL, class: "portal-link" %>.
+    </p>
+    <%= link_to "Back to training", training_path, class: "portal-btn portal-btn-secondary w-full sm:w-auto" %>
+  </div>
+</div>

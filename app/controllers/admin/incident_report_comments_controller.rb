@@ -1,9 +1,9 @@
 module Admin
   class IncidentReportCommentsController < BaseController
-    before_action :require_global_admin
     before_action :set_incident_report
 
     def create
+      authorize @incident_report, :comment?
       @comment = @incident_report.comments.build(comment_params)
       @comment.user = current_user
 
@@ -17,14 +17,14 @@ module Admin
           SendIncidentReportUpdateSmsJob.perform_later(@comment.id)
         end
 
-        redirect_to admin_incident_path(@incident_report), notice: notice_message
+        redirect_to admin_incident_report_path(@incident_report), notice: notice_message
       elsif request.variant.include?(:console)
         # The console re-renders the report with the comment's errors under
         # its fields; the original UI keeps its redirect.
         @incident_report.comments.reset
         render "admin/incident_reports/show", status: :unprocessable_entity
       else
-        redirect_to admin_incident_path(@incident_report), alert: "Failed to add comment."
+        redirect_to admin_incident_report_path(@incident_report), alert: "Failed to add comment."
       end
     end
 
@@ -44,12 +44,6 @@ module Admin
 
     def comment_params
       params.require(:incident_report_comment).permit(:body, :new_status, attachments: [])
-    end
-
-    def require_global_admin
-      unless current_user&.global_admin?
-        redirect_to admin_root_path, alert: "You must be a global admin to comment on incident reports."
-      end
     end
   end
 end

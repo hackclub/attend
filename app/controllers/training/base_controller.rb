@@ -26,6 +26,13 @@ module Training
         return
       end
 
+      # A "yes" declaration the Hack Club Safety Team hasn't cleared stops all
+      # training, with a neutral message rather than the word "ineligible".
+      unless current_user.eligible_to_work_events?
+        render "training/disclosures/under_review", status: :forbidden
+        return
+      end
+
       @enrollment = current_user.training_enrollments.find_by(course: @course)
     end
   end

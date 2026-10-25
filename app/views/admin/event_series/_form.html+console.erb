@@ -136,6 +136,13 @@
           <%= f.text_field :tshirt_note, class: "cs-input", placeholder: "Unisex, US sizing.", **aria %>
         <% end %>
       </div>
+      <div class="cs-option">
+        <%= f.check_box :hide_rooming_note, { checked: @series.hide_rooming_note? } %>
+        <div>
+          <%= f.label :hide_rooming_note, "Hide the rooming privacy note", class: "cs-option-label" %>
+          <p class="cs-option-description">Leaves out the "Who sees this?" note and the private request link on the accommodation step.</p>
+        </div>
+      </div>
     </div>
   </section>
 

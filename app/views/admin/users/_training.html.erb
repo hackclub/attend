@@ -4,7 +4,10 @@
     <h2 class="text-lg font-medium text-gray-900">Training (<%= awards.size %>)</h2>
     <%= link_to "Training admin", admin_training_path, class: "text-sm text-[#ec3750] hover:underline" %>
   </div>
-  <% if awards.empty? && enrollments.empty? %>
+  <% if (disclosure = local_assigns[:disclosure]) %>
+    <p class="px-6 py-3 border-b border-gray-100 text-sm">Safety review: <%= render "admin/training/disclosure_status", disclosure: disclosure %> <%= link_to "Open declaration", admin_training_disclosure_path(disclosure), class: "text-[#ec3750] hover:underline ml-2" %></p>
+  <% end %>
+  <% if awards.empty? && enrollments.empty? && local_assigns[:disclosure].nil? %>
     <p class="px-6 py-6 text-sm text-gray-500">No training badges.</p>
   <% else %>
     <ul class="divide-y divide-gray-100">
