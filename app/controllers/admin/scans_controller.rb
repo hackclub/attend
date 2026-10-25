@@ -166,6 +166,7 @@ module Admin
         scan_id: scan.id,
         first_scan_in_context: first_scan_in_context,
         scanned_by: current_user.display_name_or_fallback,
+        scanned_at: scan.scanned_at.iso8601,
         scan_context: {
           id: scan_context.id,
           name: scan_context.name,
@@ -184,6 +185,7 @@ module Admin
           pronouns: participant.pronouns,
           tshirt_size: participant.tshirt_size,
           status: participant_event.status,
+          display_status: participant_event.display_status,
           has_anaphylaxis_risk: food_safety.anaphylaxis_risk?,
           requires_refrigeration: participant_event.medical&.requires_refrigeration || false,
           dietary: food_safety.diet_type,
