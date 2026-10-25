@@ -38,7 +38,8 @@ class IncidentsToolbox < ApplicationToolbox
     param :details, :string, "Full details", optional: true
     param :location, :string, "Where it happened", optional: true
     param :occurred_at, :string, "When it happened (ISO8601)", optional: true
-    param :participant_event_id, :string, "Related registration, if any", optional: true
+    param :participant_event_id, :string, "Related registration, if any (required for medical)", optional: true
+    param :helping_staff_ids, [ :string ], "User IDs of staff who helped (at least one required for medical)", optional: true
     param :visible_to_roles, [ :string ], "Roles that may see this (defaults to event_admin + safeguarding_lead)", optional: true
   end
   def create
@@ -47,6 +48,7 @@ class IncidentsToolbox < ApplicationToolbox
       params.permit(:category, :severity, :summary, :details, :location, :occurred_at,
                     :participant_event_id).to_h
     )
+    @incident.helping_staff_ids = params[:helping_staff_ids] if params[:helping_staff_ids].present?
     @incident.reported_by_user_id = current_user.id
     @incident.visible_to_roles = params[:visible_to_roles].presence || %w[event_admin safeguarding_lead]
     authorize! @incident, :create?

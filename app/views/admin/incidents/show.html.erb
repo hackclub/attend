@@ -94,6 +94,36 @@
         </div>
       </div>
 
+      <% if @incident.medical? %>
+        <div>
+          <h3 class="text-sm font-medium text-gray-500">Medication Dispensed</h3>
+          <% if @incident.medication_dispensed? %>
+            <div class="mt-1 overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead>
+                  <tr class="text-left text-gray-500 border-b border-gray-200">
+                    <th class="py-2 pr-4 font-medium">Medication</th>
+                    <th class="py-2 pr-4 font-medium">Quantity / Dose</th>
+                    <th class="py-2 font-medium">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% @incident.medications.each do |medication| %>
+                    <tr class="border-b border-gray-100 last:border-0 align-top">
+                      <td class="py-2 pr-4 text-gray-900"><%= medication.name %></td>
+                      <td class="py-2 pr-4 text-gray-900"><%= medication.dose %></td>
+                      <td class="py-2 text-gray-900 whitespace-pre-wrap"><%= medication.notes %></td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            </div>
+          <% else %>
+            <p class="mt-1 text-sm text-gray-400">None</p>
+          <% end %>
+        </div>
+      <% end %>
+
       <div>
         <h3 class="text-sm font-medium text-gray-500">Visible To</h3>
         <div class="mt-1 flex flex-wrap gap-2">

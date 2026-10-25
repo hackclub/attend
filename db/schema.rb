@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_25_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -645,6 +645,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_160000) do
     t.index ["user_id"], name: "index_incident_helping_staff_on_user_id"
   end
 
+  create_table "incident_medications", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "dose", null: false
+    t.uuid "incident_id", null: false
+    t.text "name", null: false
+    t.text "notes"
+    t.datetime "updated_at", null: false
+    t.index ["incident_id"], name: "index_incident_medications_on_incident_id"
+  end
+
   create_table "incident_participants", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.uuid "incident_id", null: false
@@ -705,6 +715,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_160000) do
     t.text "details"
     t.uuid "event_id", null: false
     t.string "location"
+    t.boolean "medication_dispensed", default: false, null: false
     t.datetime "occurred_at"
     t.uuid "participant_event_id"
     t.uuid "reported_by_user_id", null: false
@@ -1408,6 +1419,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_160000) do
   add_foreign_key "incident_comments", "users"
   add_foreign_key "incident_helping_staff", "incidents"
   add_foreign_key "incident_helping_staff", "users"
+  add_foreign_key "incident_medications", "incidents"
   add_foreign_key "incident_participants", "incidents"
   add_foreign_key "incident_participants", "participant_events"
   add_foreign_key "incident_report_comments", "incident_reports"
