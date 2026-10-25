@@ -160,6 +160,19 @@ RSpec.describe "Admin::Scans", type: :request do
     expect(response.body).to include(%(<input type="hidden" id="scan-context" value="#{scan_context.id}"))
   end
 
+  # Both admins carry their own copy of the scanner script, so pin each one
+  # to the persistent banner and the queue for scans arriving mid-scan.
+  { "the console" => true, "the old admin" => false }.each do |ui, console|
+    it "keeps scan results up and queues scans made mid-scan in #{ui}" do
+      admin.update!(admin_console_beta: console)
+
+      get scanner_admin_event_scans_path(event)
+
+      expect(response.body).to include('id="scan-queue-note"', "pendingScans.push", "data-scan-result-dismiss", "function submitScan")
+      expect(response.body).not_to include("resultHideTimeout")
+    end
+  end
+
   it "renders the NFC write flag as false when NFC badges were never set up" do
     event.update!(nfc_badges_enabled: nil)
 
