@@ -34,6 +34,38 @@ RSpec.describe "health section responses" do
     expect(medical.errors[:section_response]).to include("cannot be Nothing to add while details are present")
   end
 
+  describe "a saved nothing to add with details added later" do
+    {
+      medical: [ { has_anaphylaxis_risk: true }, { requires_refrigeration: true }, { allergies: "peanuts" } ],
+      dietary: [ { diet_type: "vegan" }, { cross_contamination_risk: true }, { notes: "no pork" } ],
+      accessibility: [ { uses_wheelchair: true }, { has_adhd: true }, { mobility_needs: "uses a cane" } ]
+    }.each do |section, changes|
+      changes.each do |change|
+        it "switches #{section} to details when #{change.keys.first} is set" do
+          record = participant_event.public_send(:"create_#{section}!", section_response: :nothing_to_add)
+          record.update!(change)
+
+          expect(record.reload).to have_attributes(section_response: "details", **change)
+        end
+      end
+    end
+
+    it "still rejects nothing to add when it is submitted alongside details" do
+      medical = participant_event.create_medical!(section_response: :nothing_to_add)
+      medical.assign_attributes(section_response: "nothing_to_add", has_anaphylaxis_risk: true)
+
+      expect(medical).not_to be_valid
+      expect(medical.reload.section_response).to eq("nothing_to_add")
+    end
+
+    it "leaves a private answer alone" do
+      medical = participant_event.create_medical!(section_response: :private)
+      medical.update!(has_anaphylaxis_risk: true)
+
+      expect(medical.reload.section_response).to eq("private")
+    end
+  end
+
   it "allows private with retained disclosures and leaves sibling flags intact" do
     medical = participant_event.create_medical!(medical_conditions: "asthma", has_anaphylaxis_risk: true)
     medical.update!(section_response: :private)
