@@ -96,14 +96,14 @@
   </td>
   <td class="cs-secondary whitespace-nowrap" data-column="arrival">
     <% if pe.travel_inbound&.last_arrival_time %>
-      <div><%= cs_absolute_time_tag(pe.travel_inbound.last_arrival_time) %></div>
+      <div><%= cs_absolute_time_tag(pe.travel_inbound.local_last_arrival_time, zone: pe.travel_inbound.local_last_arrival_time.time_zone) %></div>
     <% else %>
       <span class="cs-muted">—</span>
     <% end %>
   </td>
   <td class="cs-secondary whitespace-nowrap" data-column="departure">
     <% if pe.travel_outbound&.first_departure_time %>
-      <div><%= cs_absolute_time_tag(pe.travel_outbound.first_departure_time) %></div>
+      <div><%= cs_absolute_time_tag(pe.travel_outbound.local_first_departure_time, zone: pe.travel_outbound.local_first_departure_time.time_zone) %></div>
     <% else %>
       <span class="cs-muted">—</span>
     <% end %>

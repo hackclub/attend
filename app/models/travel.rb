@@ -39,7 +39,7 @@ class Travel < ApplicationRecord
   def arrival_display
     if plane? && travel_legs.any?
       last_leg = travel_legs.last
-      [ last_leg.arrival_time&.strftime("%b %d, %Y %H:%M"), last_leg.arrival_airport ].compact.join(" - ")
+      [ last_leg.local_arrival_time&.strftime("%b %d, %Y %H:%M %Z"), last_leg.arrival_airport ].compact.join(" - ")
     else
       [ arrival_time&.strftime("%b %d, %Y %H:%M"), arrival_city ].compact.join(" - ")
     end
@@ -59,6 +59,16 @@ class Travel < ApplicationRecord
     else
       arrival_time
     end
+  end
+
+  # first_departure_time / last_arrival_time for display: flight legs come back
+  # in the zone they were entered in rather than UTC.
+  def local_first_departure_time
+    plane? && travel_legs.any? ? travel_legs.first.local_departure_time : departure_time
+  end
+
+  def local_last_arrival_time
+    plane? && travel_legs.any? ? travel_legs.last.local_arrival_time : arrival_time
   end
 
   def calendar_time

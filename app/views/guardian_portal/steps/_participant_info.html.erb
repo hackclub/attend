@@ -148,13 +148,13 @@
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label for="travel_inbound_leg_<%= index %>_departure_time" class="portal-label">Departure Time <span class="portal-meta font-normal">(local airport time)</span></label>
-                      <input type="datetime-local" name="travel_inbound[travel_legs_attributes][<%= index %>][departure_time]" id="travel_inbound_leg_<%= index %>_departure_time" value="<%= flight_local_input_value(leg.departure_time, leg.departure_airport) %>" class="portal-input">
-                      <select name="travel_inbound[travel_legs_attributes][<%= index %>][departure_time_zone]" aria-label="Departure time zone for flight <%= index + 1 %>" class="portal-select mt-1 text-sm"><%= travel_leg_time_zone_options %></select>
+                      <input type="datetime-local" name="travel_inbound[travel_legs_attributes][<%= index %>][departure_time]" id="travel_inbound_leg_<%= index %>_departure_time" value="<%= flight_local_input_value(leg, :departure) %>" class="portal-input">
+                      <select name="travel_inbound[travel_legs_attributes][<%= index %>][departure_time_zone]" aria-label="Departure time zone for flight <%= index + 1 %>" class="portal-select mt-1 text-sm"><%= travel_leg_time_zone_options(leg.time_zone_pick(:departure)) %></select>
                     </div>
                     <div>
                       <label for="travel_inbound_leg_<%= index %>_arrival_time" class="portal-label">Arrival Time <span class="portal-meta font-normal">(local airport time)</span></label>
-                      <input type="datetime-local" name="travel_inbound[travel_legs_attributes][<%= index %>][arrival_time]" id="travel_inbound_leg_<%= index %>_arrival_time" value="<%= flight_local_input_value(leg.arrival_time, leg.arrival_airport) %>" class="portal-input">
-                      <select name="travel_inbound[travel_legs_attributes][<%= index %>][arrival_time_zone]" aria-label="Arrival time zone for flight <%= index + 1 %>" class="portal-select mt-1 text-sm"><%= travel_leg_time_zone_options %></select>
+                      <input type="datetime-local" name="travel_inbound[travel_legs_attributes][<%= index %>][arrival_time]" id="travel_inbound_leg_<%= index %>_arrival_time" value="<%= flight_local_input_value(leg, :arrival) %>" class="portal-input">
+                      <select name="travel_inbound[travel_legs_attributes][<%= index %>][arrival_time_zone]" aria-label="Arrival time zone for flight <%= index + 1 %>" class="portal-select mt-1 text-sm"><%= travel_leg_time_zone_options(leg.time_zone_pick(:arrival)) %></select>
                     </div>
                   </div>
                 </div>
@@ -279,13 +279,13 @@
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label for="travel_outbound_leg_<%= index %>_departure_time" class="portal-label">Departure Time <span class="portal-meta font-normal">(local airport time)</span></label>
-                      <input type="datetime-local" name="travel_outbound[travel_legs_attributes][<%= index %>][departure_time]" id="travel_outbound_leg_<%= index %>_departure_time" value="<%= flight_local_input_value(leg.departure_time, leg.departure_airport) %>" class="portal-input">
-                      <select name="travel_outbound[travel_legs_attributes][<%= index %>][departure_time_zone]" aria-label="Departure time zone for flight <%= index + 1 %>" class="portal-select mt-1 text-sm"><%= travel_leg_time_zone_options %></select>
+                      <input type="datetime-local" name="travel_outbound[travel_legs_attributes][<%= index %>][departure_time]" id="travel_outbound_leg_<%= index %>_departure_time" value="<%= flight_local_input_value(leg, :departure) %>" class="portal-input">
+                      <select name="travel_outbound[travel_legs_attributes][<%= index %>][departure_time_zone]" aria-label="Departure time zone for flight <%= index + 1 %>" class="portal-select mt-1 text-sm"><%= travel_leg_time_zone_options(leg.time_zone_pick(:departure)) %></select>
                     </div>
                     <div>
                       <label for="travel_outbound_leg_<%= index %>_arrival_time" class="portal-label">Arrival Time <span class="portal-meta font-normal">(local airport time)</span></label>
-                      <input type="datetime-local" name="travel_outbound[travel_legs_attributes][<%= index %>][arrival_time]" id="travel_outbound_leg_<%= index %>_arrival_time" value="<%= flight_local_input_value(leg.arrival_time, leg.arrival_airport) %>" class="portal-input">
-                      <select name="travel_outbound[travel_legs_attributes][<%= index %>][arrival_time_zone]" aria-label="Arrival time zone for flight <%= index + 1 %>" class="portal-select mt-1 text-sm"><%= travel_leg_time_zone_options %></select>
+                      <input type="datetime-local" name="travel_outbound[travel_legs_attributes][<%= index %>][arrival_time]" id="travel_outbound_leg_<%= index %>_arrival_time" value="<%= flight_local_input_value(leg, :arrival) %>" class="portal-input">
+                      <select name="travel_outbound[travel_legs_attributes][<%= index %>][arrival_time_zone]" aria-label="Arrival time zone for flight <%= index + 1 %>" class="portal-select mt-1 text-sm"><%= travel_leg_time_zone_options(leg.time_zone_pick(:arrival)) %></select>
                     </div>
                   </div>
                 </div>

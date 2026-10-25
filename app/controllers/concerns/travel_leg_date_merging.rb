@@ -10,12 +10,18 @@ module TravelLegDateMerging
   #
   # We interpret each wall-clock time in its zone and store true UTC, so a leg
   # that departs in one zone and arrives in another (overnight/long-haul) keeps
-  # both endpoints correct. The `*_time_zone` params are stripped here since
-  # they aren't columns on TravelLeg.
+  # both endpoints correct. The zone used is saved alongside the time so it can
+  # be shown and edited in that zone later.
+  #
+  # When there's no pick and the airport's zone isn't known, the zone is left
+  # blank and TravelLeg's validation asks for one (see `entered_as_local_time`).
+  # Guessing UTC here silently shifted times by hours. The time is still read
+  # as UTC so the form can show back what was typed.
   def normalize_leg_times!(travel_params)
     return unless travel_params[:travel_legs_attributes].present?
 
     travel_params[:travel_legs_attributes].each do |_index, leg_attrs|
+      leg_attrs[:entered_as_local_time] = true
       apply_leg_zone!(leg_attrs, :departure_time, :departure_time_zone, leg_attrs[:departure_airport])
       apply_leg_zone!(leg_attrs, :arrival_time, :arrival_time_zone, leg_attrs[:arrival_airport])
     end
@@ -28,9 +34,9 @@ module TravelLegDateMerging
 
     zone = ActiveSupport::TimeZone[picked.to_s] if picked.present?
     zone ||= airport_time_zone(airport_code)
-    zone ||= Time.zone
+    leg_attrs[zone_key] = zone&.name
 
-    parsed = (zone.parse(raw.to_s) rescue nil)
+    parsed = ((zone || ActiveSupport::TimeZone["UTC"]).parse(raw.to_s) rescue nil)
     leg_attrs[time_key] = parsed.utc.iso8601 if parsed
   end
 

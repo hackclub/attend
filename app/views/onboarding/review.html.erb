@@ -107,11 +107,11 @@
                 </div>
                 <div>
                   <dt class="portal-hint">Departure</dt>
-                  <dd class="portal-body"><%= leg.departure_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                  <dd class="portal-body"><%= flight_local_time(leg, :departure) || "—" %></dd>
                 </div>
                 <div>
                   <dt class="portal-hint">Arrival</dt>
-                  <dd class="portal-body"><%= leg.arrival_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                  <dd class="portal-body"><%= flight_local_time(leg, :arrival) || "—" %></dd>
                 </div>
               <% end %>
               <% if @travel_inbound.is_unaccompanied_minor %>
@@ -183,11 +183,11 @@
                 </div>
                 <div>
                   <dt class="portal-hint">Departure</dt>
-                  <dd class="portal-body"><%= leg.departure_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                  <dd class="portal-body"><%= flight_local_time(leg, :departure) || "—" %></dd>
                 </div>
                 <div>
                   <dt class="portal-hint">Arrival</dt>
-                  <dd class="portal-body"><%= leg.arrival_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                  <dd class="portal-body"><%= flight_local_time(leg, :arrival) || "—" %></dd>
                 </div>
               <% end %>
               <% if @travel_outbound.is_unaccompanied_minor %>

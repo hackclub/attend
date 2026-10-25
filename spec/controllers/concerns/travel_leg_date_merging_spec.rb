@@ -30,18 +30,21 @@ RSpec.describe TravelLegDateMerging do
     expect(result(params)[:arrival_time]).to eq("2026-07-16T10:00:00Z")
   end
 
-  it "strips the *_time_zone params (they aren't columns)" do
+  it "keeps the zone each time was read in, so it can be shown in that zone later" do
     params = leg(
+      departure_airport: "VIE",
+      arrival_airport: "VIE",
       departure_time: "2026-07-15T12:00",
       arrival_time: "2026-07-15T14:00",
       departure_time_zone: "Europe/Vienna",
-      arrival_time_zone: "Europe/Vienna"
+      arrival_time_zone: "London"
     )
 
     host.normalize(params)
 
-    expect(result(params)).not_to have_key(:departure_time_zone)
-    expect(result(params)).not_to have_key(:arrival_time_zone)
+    expect(result(params)[:departure_time_zone]).to eq("Europe/Vienna")
+    expect(result(params)[:arrival_time_zone]).to eq("London")
+    expect(result(params)[:entered_as_local_time]).to be(true)
   end
 
   it "falls back to the airport's timezone when no zone is picked" do
@@ -63,13 +66,26 @@ RSpec.describe TravelLegDateMerging do
     expect(result(params)[:arrival_time]).to eq("2026-07-16T10:00:00Z")
   end
 
-  it "falls back to the app timezone when neither a pick nor an airport zone is available" do
+  it "stores the airport's zone when no zone is picked" do
+    allow(FlightTrackingService).to receive(:airport_timezone).with("JFK").and_return("America/New_York")
+
+    params = leg(departure_airport: "JFK", departure_time: "2026-06-05T21:00", departure_time_zone: "")
+
+    host.normalize(params)
+
+    expect(result(params)[:departure_time]).to eq("2026-06-06T01:00:00Z")
+    expect(result(params)[:departure_time_zone]).to eq("America/New_York")
+  end
+
+  it "leaves the zone blank instead of guessing UTC when neither a pick nor an airport zone is available" do
     allow(FlightTrackingService).to receive(:airport_timezone).and_return(nil)
 
-    params = leg(departure_time: "2026-07-15T12:00", departure_time_zone: "")
+    params = leg(departure_airport: "ZZZ", departure_time: "2026-07-15T12:00", departure_time_zone: "")
 
-    Time.use_zone("UTC") { host.normalize(params) }
+    host.normalize(params)
 
+    expect(result(params)[:departure_time_zone]).to be_nil
+    # Read as UTC only so the form can show back what was typed.
     expect(result(params)[:departure_time]).to eq("2026-07-15T12:00:00Z")
   end
 

@@ -263,7 +263,7 @@ class TicketPdfService
       travel.travel_legs.each do |leg|
         flight_info = leg.flight_code.to_s
         route = "#{leg.departure_airport} → #{leg.arrival_airport}"
-        time = leg.departure_time&.strftime("%b %d, %Y at %H:%M")
+        time = leg.local_departure_time&.strftime("%b %d, %Y at %H:%M %Z")
         parts << [ flight_info, route, time ].compact.join("  ")
       end
     else

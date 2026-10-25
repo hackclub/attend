@@ -75,24 +75,24 @@
       <label class="portal-label">Departure Time <span class="portal-required" aria-hidden="true">*</span> <span class="portal-meta font-normal">(local airport time)</span></label>
       <input type="datetime-local"
              name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][departure_time]"
-             value="<%= flight_local_input_value(leg.departure_time, leg.departure_airport, default_date: default_date) %>"
+             value="<%= flight_local_input_value(leg, :departure, default_date: default_date) %>"
              required
              class="portal-input">
       <select name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][departure_time_zone]"
               class="portal-select mt-1 text-sm">
-        <%= travel_leg_time_zone_options %>
+        <%= travel_leg_time_zone_options(leg.time_zone_pick(:departure)) %>
       </select>
     </div>
     <div>
       <label class="portal-label">Arrival Time <span class="portal-required" aria-hidden="true">*</span> <span class="portal-meta font-normal">(local airport time)</span></label>
       <input type="datetime-local"
              name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][arrival_time]"
-             value="<%= flight_local_input_value(leg.arrival_time, leg.arrival_airport, default_date: default_date) %>"
+             value="<%= flight_local_input_value(leg, :arrival, default_date: default_date) %>"
              required
              class="portal-input">
       <select name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][arrival_time_zone]"
               class="portal-select mt-1 text-sm">
-        <%= travel_leg_time_zone_options %>
+        <%= travel_leg_time_zone_options(leg.time_zone_pick(:arrival)) %>
       </select>
     </div>
   </div>
