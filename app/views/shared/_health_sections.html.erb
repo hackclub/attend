@@ -2,6 +2,8 @@
   <% guardian_visible = local_assigns.fetch(:guardian_visible, false) %>
   <% private_support_path = local_assigns[:private_support_path] %>
   <% private_support_email = local_assigns[:private_support_email] %>
+  <% hide_privacy_notes = local_assigns.fetch(:hide_privacy_notes, false) %>
+  <% guardian_required = local_assigns.fetch(:guardian_required, false) %>
   <% sections = [
     [ :medical, medical, "Medical needs" ],
     [ :dietary, dietary, "Food requirements" ],
@@ -11,6 +13,9 @@
     <% scope = kind.to_s %>
     <% open = health_section_details_open?(record) %>
     <% has_details = record&.health_section_has_details? %>
+    <%# Without the private request link there is no way to follow up, so a
+        hidden-notes series only offers it when it is the answer already saved. %>
+    <% offer_private = !hide_privacy_notes || record&.effective_section_response == "private" %>
     <section class="portal-card p-5 sm:p-6" data-health-sections-target="section" data-section="<%= scope %>" data-has-details="<%= has_details %>">
       <div class="flex items-start justify-between gap-4">
         <div>
@@ -22,14 +27,18 @@
           <% else %>
             <p class="portal-hint text-sm mt-1">Tell us what would help you. A diagnosis is never required to request support.</p>
           <% end %>
+          <% if !hide_privacy_notes || guardian_visible || guardian_required %>
           <p class="portal-hint text-sm mt-3">
-            These answers are used to plan safety, food service, and event support. They are visible to event staff with a relevant health, operations, or safeguarding role and are not shown to other attendees.
+            <% unless hide_privacy_notes %>
+              These answers are used to plan safety, food service, and event support. They are visible to event staff with a relevant health, operations, or safeguarding role and are not shown to other attendees.
+            <% end %>
             <% if guardian_visible %>
               You can see and edit these answers here because you are the listed parent or guardian.
             <% else %>
-              <% if local_assigns.fetch(:guardian_required, false) %>Your listed parent or guardian can also see and edit these answers in their portal.<% end %>
+              <% if guardian_required %>Your listed parent or guardian can also see and edit these answers in their portal.<% end %>
             <% end %>
           </p>
+          <% end %>
         </div>
         <span class="portal-meta text-xs text-right" data-health-sections-target="summary"><%= health_section_summary(record) %></span>
       </div>
@@ -37,7 +46,9 @@
       <fieldset class="mt-4">
         <legend class="portal-label">How would you like to answer?</legend>
         <div class="flex flex-col sm:flex-row gap-2 mt-2">
-          <% [ [ "nothing_to_add", "Nothing to add" ], [ "details", "Add details" ], [ "private", "Prefer to discuss privately" ] ].each do |value, text| %>
+          <% responses = [ [ "nothing_to_add", "Nothing to add" ], [ "details", "Add details" ], [ "private", "Prefer to discuss privately" ] ] %>
+          <% responses.reject! { |value, _| value == "private" } unless offer_private %>
+          <% responses.each do |value, text| %>
             <label class="portal-check-row border rounded px-3 py-2">
               <input type="radio" name="<%= scope %>[section_response]" value="<%= value %>" class="portal-check" data-action="change->health-sections#responseChanged" <%= "checked" if record&.effective_section_response == value %>>
               <span class="text-sm"><%= text %></span>
@@ -45,6 +56,7 @@
           <% end %>
         </div>
       </fieldset>
+      <% if offer_private %>
       <p class="portal-hint text-sm mt-3">
         If you would rather explain something directly, you can
         <% if private_support_path %>
@@ -56,6 +68,7 @@
         <% end %>
         A private request is routed to the event staff audience you choose; it does not confirm an accommodation.
       </p>
+      <% end %>
 
       <div class="mt-4 <%= 'hidden' unless open %>" data-health-sections-target="details">
         <% if kind == :medical %>
