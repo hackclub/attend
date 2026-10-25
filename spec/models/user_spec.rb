@@ -113,6 +113,44 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#verified_slack_id" do
+    it "keeps a plain, upcased copy of the Hack Club Auth Slack ID in step with the claims" do
+      user = create(:user, oidc_claims: { "slack_id" => " u123abc " })
+      expect(user.reload.verified_slack_id).to eq("U123ABC")
+
+      user.update!(oidc_claims: { "slack_id" => "U1,U2" })
+      expect(user.reload.verified_slack_id).to be_nil
+    end
+
+    it "ignores the profile override" do
+      user = create(:user, slack_user_id: "U999XYZ")
+      expect(user.verified_slack_id).to be_nil
+    end
+
+    it "heals a stale copy on the next save even though the claims are unchanged" do
+      user = create(:user, oidc_claims: { "slack_id" => "U0FAKE111" })
+      # A write that skipped the callback (old code mid-deploy, a missed backfill)
+      user.update_column(:verified_slack_id, nil)
+
+      user.update!(name: "Testy McTestface")
+      expect(user.reload.verified_slack_id).to eq("U0FAKE111")
+
+      user.update_column(:verified_slack_id, "U0WRONG99")
+      user.save!
+      expect(user.reload.verified_slack_id).to eq("U0FAKE111")
+    end
+
+    it "does not write the column when the copy already matches" do
+      user = create(:user, oidc_claims: { "slack_id" => "U0FAKE111" })
+      user.reload
+
+      user.name = "Testy McTestface"
+      expect(user).to receive(:verified_slack_id=).never
+      user.save!
+      expect(user.saved_changes).not_to have_key("verified_slack_id")
+    end
+  end
+
   describe "#sync_email_to_participant" do
     let(:user) { create(:user, email: "new@example.com") }
     let!(:participant) { create(:participant, user: user, email: "old@example.com") }
@@ -186,6 +224,16 @@ RSpec.describe User, type: :model do
         "slack_id" => "U07BLJ1MBEE"
       )
       expect(user.oidc_claims["address"]).to include("locality" => "Shelburne")
+    end
+
+    it "repairs a stale verified_slack_id on sign-in when the claims haven't changed" do
+      user = User.from_omniauth(auth_hash("identity" => identity))
+      expect(user.verified_slack_id).to eq("U07BLJ1MBEE")
+      user.update_column(:verified_slack_id, nil)
+
+      User.from_omniauth(auth_hash("identity" => identity))
+
+      expect(user.reload.verified_slack_id).to eq("U07BLJ1MBEE")
     end
 
     it "prefers the identity record's names when HCA returns both" do
@@ -406,6 +454,75 @@ RSpec.describe User, type: :model do
 
     it "fails closed for a user with no roles at all" do
       expect(user.can_view_participant_pii?(event)).to be(false)
+    end
+  end
+
+  # Deleting a user used to raise ActiveRecord::InvalidForeignKey the moment
+  # they had ever issued an API token. Each kind now survives its creator
+  # differently, and the FK carries the matching ON DELETE so a raw SQL delete
+  # behaves the same way as user.destroy.
+  describe "destroying a user who issued API tokens" do
+    let(:user) { create(:user, email: "departing@hackclub.com", global_role: "global_admin") }
+    let(:event) { create(:event) }
+    let(:series) { create(:event_series) }
+
+    it "leaves an event API key working, with its creator nulled" do
+      token = EventApiToken.generate_for(event, user: user, name: "integration")
+      secret = token.token
+
+      user.destroy!
+
+      expect(token.reload.user_id).to be_nil
+      expect(token.name).to eq("departing@integration")
+      expect(EventApiToken.find_by_token(secret)).to eq(token)
+    end
+
+    it "leaves a series API key working, with its creator nulled" do
+      token = SeriesApiToken.generate_for(series, user: user, name: "integration")
+      secret = token.token
+
+      user.destroy!
+
+      expect(token.reload.user_id).to be_nil
+      expect(SeriesApiToken.find_by_token(secret)).to eq(token)
+    end
+
+    # A global key's authority *is* its owner's global-admin standing, which
+    # Api::V1::BaseController re-checks per request — so once they're gone the
+    # key could never authenticate again, and its row cannot even be saved
+    # (GlobalApiToken validates the owner is a global admin).
+    it "takes the owner's global API tokens with them" do
+      token = GlobalApiToken.generate_for(user, name: "superadmin")
+      secret = token.token
+
+      user.destroy!
+
+      expect(GlobalApiToken).not_to exist(token.id)
+      expect(GlobalApiToken.find_by_token(secret)).to be_nil
+    end
+
+    it "destroys a user holding all three kinds at once" do
+      EventApiToken.generate_for(event, user: user, name: "e")
+      SeriesApiToken.generate_for(series, user: user, name: "s")
+      GlobalApiToken.generate_for(user, name: "g")
+
+      expect { user.destroy! }.not_to raise_error
+      expect(User).not_to exist(user.id)
+    end
+
+    # The FK is the backstop for anything that bypasses Active Record.
+    it "applies the same rules to a raw SQL delete" do
+      event_token = EventApiToken.generate_for(event, user: user, name: "e")
+      series_token = SeriesApiToken.generate_for(series, user: user, name: "s")
+      global_token = GlobalApiToken.generate_for(user, name: "g")
+
+      User.connection.execute(
+        User.sanitize_sql_array([ "DELETE FROM users WHERE id = ?", user.id ])
+      )
+
+      expect(event_token.reload.user_id).to be_nil
+      expect(series_token.reload.user_id).to be_nil
+      expect(GlobalApiToken).not_to exist(global_token.id)
     end
   end
 

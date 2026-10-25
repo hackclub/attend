@@ -1,22 +1,6 @@
 module Admin::DashboardHelper
-  def severity_badge_class(severity)
-    case severity
-    when "critical"
-      "bg-red-600 text-white"
-    when "high"
-      "bg-red-100 text-red-800"
-    when "medium"
-      "bg-amber-100 text-amber-800"
-    when "low"
-      "bg-green-100 text-green-800"
-    else
-      "bg-gray-100 text-gray-800"
-    end
-  end
-
-  # The single phase pill an event row shows, as [label, badge classes].
-  # An event with no dates used to fall through to "Active", which read as
-  # "happening now" on a row that was really an unscheduled draft.
+  # The single phase pill an event row shows, as [label, badge classes], for
+  # the original (non-console) admin templates.
   def event_phase_badge(event)
     if event.completed?
       [ "Past", "bg-gray-100 text-gray-500" ]
@@ -29,12 +13,35 @@ module Admin::DashboardHelper
     end
   end
 
+  # The single phase an event row shows, as [label, status indicator type].
+  # An event with no dates used to fall through to "Active", which read as
+  # "happening now" on a row that was really an unscheduled draft.
+  def event_phase(event)
+    if event.completed?
+      [ "Past", :stopped ]
+    elsif event.starts_at.nil?
+      [ "Draft", :pending ]
+    elsif event.starts_at > Time.current
+      [ "Upcoming", :info ]
+    else
+      [ "Active", :success ]
+    end
+  end
+
+  # Cloudscape status indicator for an event's phase.
+  def event_phase_status(event)
+    label, type = event_phase(event)
+    cs_status(type, label)
+  end
+
   # "Aug 13, 2026" · "Aug 13–15, 2026" · "Aug 30 – Sep 2, 2026" ·
   # "Dec 30, 2026 – Jan 2, 2027". The previous inline format always printed
-  # both ends, so a one-day event read "Aug 13 - Aug 13, 2026".
-  def event_date_range(starts_at, ends_at)
-    start_date = starts_at&.to_date
-    end_date = ends_at&.to_date
+  # both ends, so a one-day event read "Aug 13 - Aug 13, 2026". Pass the
+  # event's zone: times are stored in UTC, so an evening start west of UTC
+  # would otherwise land on the next day.
+  def event_date_range(starts_at, ends_at, zone: nil)
+    start_date = zone && starts_at ? starts_at.in_time_zone(zone).to_date : starts_at&.to_date
+    end_date = zone && ends_at ? ends_at.in_time_zone(zone).to_date : ends_at&.to_date
 
     return "Dates not set" if start_date.nil? && end_date.nil?
     return "Ends #{end_date.strftime('%b %-d, %Y')}" if start_date.nil?

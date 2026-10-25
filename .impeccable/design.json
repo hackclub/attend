@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-22T15:33:38Z",
+  "generatedAt": "2026-10-24T00:00:00Z",
   "title": "Design System: Attend",
   "extensions": {
     "colorMeta": {
@@ -9,113 +9,732 @@
         "displayName": "Hack Club Red",
         "canonical": "#ec3750",
         "note": "Contrast vs white is 4.02:1 — below WCAG AA for normal text, and below the 18.66px-bold threshold for the large-text exemption. Never carries white text; see The Deepened Red Rule.",
-        "tonalRamp": ["#2e0a10", "#5c1420", "#8a1e30", "#b82840", "#ec3750", "#f2707f", "#f8a8b1", "#fde9ec"]
+        "tonalRamp": [
+          "#2e0a10",
+          "#5c1420",
+          "#8a1e30",
+          "#b82840",
+          "#ec3750",
+          "#f2707f",
+          "#f8a8b1",
+          "#fde9ec"
+        ]
       },
       "accent-strong": {
         "role": "primary",
         "displayName": "Deepened Red",
         "canonical": "#d42f46",
         "note": "4.89:1 on white — the resting fill of every red surface that carries white text.",
-        "tonalRamp": ["#2a0910", "#54121f", "#7e1b2f", "#a8243e", "#d42f46", "#e26a7b", "#eda5b0", "#f9e0e4"]
+        "tonalRamp": [
+          "#2a0910",
+          "#54121f",
+          "#7e1b2f",
+          "#a8243e",
+          "#d42f46",
+          "#e26a7b",
+          "#eda5b0",
+          "#f9e0e4"
+        ]
       },
       "accent-deep": {
         "role": "primary",
         "displayName": "Pressed Red",
         "canonical": "#b82840",
         "note": "Hover and pressed state under Deepened Red.",
-        "tonalRamp": ["#240811", "#491021", "#6d1832", "#922042", "#b82840", "#cd6377", "#e19fab", "#f6dce1"]
+        "tonalRamp": [
+          "#240811",
+          "#491021",
+          "#6d1832",
+          "#922042",
+          "#b82840",
+          "#cd6377",
+          "#e19fab",
+          "#f6dce1"
+        ]
       },
       "bg-app": {
         "role": "neutral",
         "displayName": "Paper",
         "canonical": "#f9fafc",
-        "tonalRamp": ["#191b1f", "#31353d", "#4a4f5c", "#62697a", "#7b8399", "#a3a9b8", "#cbcfd8", "#f9fafc"]
+        "tonalRamp": [
+          "#191b1f",
+          "#31353d",
+          "#4a4f5c",
+          "#62697a",
+          "#7b8399",
+          "#a3a9b8",
+          "#cbcfd8",
+          "#f9fafc"
+        ]
       },
       "bg-elev": {
         "role": "neutral",
         "displayName": "Card White",
         "canonical": "#ffffff",
-        "tonalRamp": ["#1a1a1a", "#333333", "#4d4d4d", "#666666", "#808080", "#aaaaaa", "#d5d5d5", "#ffffff"]
+        "tonalRamp": [
+          "#1a1a1a",
+          "#333333",
+          "#4d4d4d",
+          "#666666",
+          "#808080",
+          "#aaaaaa",
+          "#d5d5d5",
+          "#ffffff"
+        ]
       },
       "bg-sunken": {
         "role": "neutral",
         "displayName": "Sunken Grey",
         "canonical": "#e6e6ea",
-        "tonalRamp": ["#171718", "#2e2e31", "#454549", "#5c5c62", "#73737a", "#9a9aa1", "#c0c0c6", "#e6e6ea"]
+        "tonalRamp": [
+          "#171718",
+          "#2e2e31",
+          "#454549",
+          "#5c5c62",
+          "#73737a",
+          "#9a9aa1",
+          "#c0c0c6",
+          "#e6e6ea"
+        ]
       },
       "text-strong": {
         "role": "neutral",
         "displayName": "Ink",
         "canonical": "#1f2d3d",
-        "tonalRamp": ["#0a0f14", "#141d28", "#1f2d3d", "#33485f", "#4c6883", "#7f97ac", "#b3c2d0", "#e6ebf0"]
+        "tonalRamp": [
+          "#0a0f14",
+          "#141d28",
+          "#1f2d3d",
+          "#33485f",
+          "#4c6883",
+          "#7f97ac",
+          "#b3c2d0",
+          "#e6ebf0"
+        ]
       },
       "text": {
         "role": "neutral",
         "displayName": "Slate",
         "canonical": "#3c4858",
-        "tonalRamp": ["#0c0f12", "#181e24", "#252d36", "#313b48", "#3c4858", "#6c7c92", "#a3aebc", "#dae0e7"]
+        "tonalRamp": [
+          "#0c0f12",
+          "#181e24",
+          "#252d36",
+          "#313b48",
+          "#3c4858",
+          "#6c7c92",
+          "#a3aebc",
+          "#dae0e7"
+        ]
       },
       "text-muted": {
         "role": "neutral",
         "displayName": "Muted Steel",
         "canonical": "#8492a6",
-        "tonalRamp": ["#1a1e24", "#343b47", "#4e586b", "#68758e", "#8492a6", "#a6b1c0", "#c8d0da", "#eaeef3"]
+        "tonalRamp": [
+          "#1a1e24",
+          "#343b47",
+          "#4e586b",
+          "#68758e",
+          "#8492a6",
+          "#a6b1c0",
+          "#c8d0da",
+          "#eaeef3"
+        ]
       },
       "border": {
         "role": "neutral",
         "displayName": "Hairline",
         "canonical": "#e5e7eb",
-        "tonalRamp": ["#171718", "#2e2f31", "#454749", "#5c5f62", "#74777b", "#9b9ea3", "#c0c3c7", "#e5e7eb"]
+        "tonalRamp": [
+          "#171718",
+          "#2e2f31",
+          "#454749",
+          "#5c5f62",
+          "#74777b",
+          "#9b9ea3",
+          "#c0c3c7",
+          "#e5e7eb"
+        ]
       },
       "success": {
         "role": "tertiary",
         "displayName": "Mint",
         "canonical": "#33d6a6",
-        "tonalRamp": ["#0a2b21", "#125542", "#1b8063", "#24aa84", "#33d6a6", "#68e2bd", "#9dedd4", "#e6faf3"]
+        "tonalRamp": [
+          "#0a2b21",
+          "#125542",
+          "#1b8063",
+          "#24aa84",
+          "#33d6a6",
+          "#68e2bd",
+          "#9dedd4",
+          "#e6faf3"
+        ]
       },
       "warning": {
         "role": "tertiary",
         "displayName": "Amber",
         "canonical": "#ff8c37",
-        "tonalRamp": ["#33190a", "#663214", "#994b1e", "#cc6428", "#ff8c37", "#ffab6d", "#ffc9a3", "#ffeede"]
+        "tonalRamp": [
+          "#33190a",
+          "#663214",
+          "#994b1e",
+          "#cc6428",
+          "#ff8c37",
+          "#ffab6d",
+          "#ffc9a3",
+          "#ffeede"
+        ]
       },
       "info": {
         "role": "tertiary",
         "displayName": "Sky",
         "canonical": "#338eda",
-        "tonalRamp": ["#0a1c2c", "#143857", "#1e5583", "#2871ae", "#338eda", "#6cade5", "#a5ccef", "#e4f0fa"]
+        "tonalRamp": [
+          "#0a1c2c",
+          "#143857",
+          "#1e5583",
+          "#2871ae",
+          "#338eda",
+          "#6cade5",
+          "#a5ccef",
+          "#e4f0fa"
+        ]
       },
       "text-link": {
         "role": "tertiary",
         "displayName": "Link Blue",
         "canonical": "#2563eb",
-        "tonalRamp": ["#07142f", "#0f285e", "#163c8d", "#1e50bc", "#2563eb", "#5d8bf1", "#95b3f6", "#e0e9fd"]
+        "tonalRamp": [
+          "#07142f",
+          "#0f285e",
+          "#163c8d",
+          "#1e50bc",
+          "#2563eb",
+          "#5d8bf1",
+          "#95b3f6",
+          "#e0e9fd"
+        ]
       }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "Page titles on marketing-adjacent surfaces — home, public profiles, docs. Rare." },
-      "headline": { "displayName": "Headline", "purpose": "The title of a screen or major panel. The normal top of a page inside the app." },
-      "title": { "displayName": "Title", "purpose": "Card and section headings. Also the minimum size for white text on a red fill." },
-      "body": { "displayName": "Body", "purpose": "The workhorse at 14px/500 — form labels, table cells, button text, nav items." },
-      "label": { "displayName": "Label", "purpose": "Status badges, helper text, metadata, timestamps." },
-      "eyebrow": { "displayName": "Eyebrow", "purpose": "Uppercase sidebar section headers only." }
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page titles on marketing-adjacent surfaces — home, public profiles, docs. Rare."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "The title of a screen or major panel. The normal top of a page inside the app."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card and section headings. Also the minimum size for white text on a red fill."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "The workhorse at 14px/500 — form labels, table cells, button text, nav items."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Status badges, helper text, metadata, timestamps."
+      },
+      "eyebrow": {
+        "displayName": "Eyebrow",
+        "purpose": "Uppercase sidebar section headers only."
+      }
     },
     "shadows": [
-      { "name": "hairline-lift", "value": "0 1px 2px rgba(0, 0, 0, 0.06)", "purpose": "Sticky headers and the app bar, where a border alone disappears against a scrolling surface." },
-      { "name": "overlay", "value": "0 8px 24px rgba(15, 23, 42, 0.10)", "purpose": "Dropdowns, command palette, modals, mobile drawers — things that genuinely float." },
-      { "name": "card-lift", "value": "0 4px 8px rgba(0, 0, 0, 0.125)", "purpose": "The legacy Hack Club card and pill button only; part of the brand component, not the layout system." },
-      { "name": "card-elevated", "value": "0 1px 2px rgba(0, 0, 0, 0.0625), 0 8px 12px rgba(0, 0, 0, 0.125)", "purpose": "Hover state of the Hack Club interactive card and pill button." },
-      { "name": "overlay-dark", "value": "0 12px 32px rgba(0, 0, 0, 0.6)", "purpose": "The overlay role under dark themes; light-theme opacity vanishes on #0f1115." }
+      {
+        "name": "hairline-lift",
+        "value": "0 1px 2px rgba(0, 0, 0, 0.06)",
+        "purpose": "Sticky headers and the app bar, where a border alone disappears against a scrolling surface."
+      },
+      {
+        "name": "overlay",
+        "value": "0 8px 24px rgba(15, 23, 42, 0.10)",
+        "purpose": "Dropdowns, command palette, modals, mobile drawers — things that genuinely float."
+      },
+      {
+        "name": "card-lift",
+        "value": "0 4px 8px rgba(0, 0, 0, 0.125)",
+        "purpose": "The legacy Hack Club card and pill button only; part of the brand component, not the layout system."
+      },
+      {
+        "name": "card-elevated",
+        "value": "0 1px 2px rgba(0, 0, 0, 0.0625), 0 8px 12px rgba(0, 0, 0, 0.125)",
+        "purpose": "Hover state of the Hack Club interactive card and pill button."
+      },
+      {
+        "name": "overlay-dark",
+        "value": "0 12px 32px rgba(0, 0, 0, 0.6)",
+        "purpose": "The overlay role under dark themes; light-theme opacity vanishes on #0f1115."
+      }
     ],
     "motion": [
-      { "name": "state-transition", "value": "150ms ease", "purpose": "The default. transition-colors on buttons, nav items, inputs, icon buttons." },
-      { "name": "brand-lift", "value": "125ms ease-in-out", "purpose": "The Hack Club pill button and interactive card scale(1.0625) lift. The only scaling motion in the system." }
+      {
+        "name": "state-transition",
+        "value": "150ms ease",
+        "purpose": "The default. transition-colors on buttons, nav items, inputs, icon buttons."
+      },
+      {
+        "name": "brand-lift",
+        "value": "125ms ease-in-out",
+        "purpose": "The Hack Club pill button and interactive card scale(1.0625) lift. The only scaling motion in the system."
+      }
     ],
     "breakpoints": [
-      { "name": "sm", "value": "640px", "purpose": "The dominant breakpoint — where full-width mobile actions shrink to auto width." },
-      { "name": "md", "value": "768px", "purpose": "Participant header expands from hamburger to inline nav." },
-      { "name": "lg", "value": "1024px", "purpose": "Admin sidebar becomes a persistent 256px column instead of an overlay drawer." }
-    ]
+      {
+        "name": "sm",
+        "value": "640px",
+        "purpose": "The dominant breakpoint — where full-width mobile actions shrink to auto width."
+      },
+      {
+        "name": "md",
+        "value": "768px",
+        "purpose": "Participant header expands from hamburger to inline nav."
+      },
+      {
+        "name": "lg",
+        "value": "1024px",
+        "purpose": "Support desk sidebar becomes a persistent 256px column. (Admin console breakpoints live in extensions.console.)"
+      }
+    ],
+    "console": {
+      "scope": "The staff admin console under /admin only: pages rendered by layouts/admin.html.erb (html.cs-console). Tokens are --cs-* custom properties in app/assets/stylesheets/console.css. Values are [light, dark].",
+      "tokens": {
+        "colors": {
+          "cs-accent": {
+            "role": "primary",
+            "displayName": "Console Red",
+            "light": "#c8283f",
+            "dark": "#ff7a8a",
+            "note": "Hack Club red replacing Cloudscape's interactive blue. 5.48:1 on white; 6.79:1 on #161d26.",
+            "tonalRamp": [
+              "#2a080d",
+              "#53101a",
+              "#7d1827",
+              "#a72034",
+              "#c8283f",
+              "#d9677a",
+              "#e9a5b0",
+              "#faeaed"
+            ]
+          },
+          "cs-accent-hover": {
+            "role": "primary",
+            "displayName": "Console Red Hover",
+            "light": "#8f1426",
+            "dark": "#ffb3bc"
+          },
+          "cs-accent-active": {
+            "role": "primary",
+            "displayName": "Console Red Pressed",
+            "light": "#7a0f20",
+            "dark": "#ff7a8a"
+          },
+          "cs-accent-on": {
+            "role": "primary",
+            "displayName": "Label on Red",
+            "light": "#ffffff",
+            "dark": "#0f141a"
+          },
+          "cs-bg-selected": {
+            "role": "primary",
+            "displayName": "Selection Wash",
+            "light": "#fff5f6",
+            "dark": "#2a0d14"
+          },
+          "cs-bg-pressed": {
+            "role": "primary",
+            "displayName": "Pressed Wash",
+            "light": "#ffe5e9",
+            "dark": "#3d121c"
+          },
+          "cs-bg-container": {
+            "role": "neutral",
+            "displayName": "Container",
+            "light": "#ffffff",
+            "dark": "#161d26"
+          },
+          "cs-bg-shaded": {
+            "role": "neutral",
+            "displayName": "Shaded / Hover",
+            "light": "#f6f6f9",
+            "dark": "#1b232d"
+          },
+          "cs-bg-input": {
+            "role": "neutral",
+            "displayName": "Input",
+            "light": "#ffffff",
+            "dark": "#0f141a"
+          },
+          "cs-bg-input-disabled": {
+            "role": "neutral",
+            "displayName": "Input Disabled",
+            "light": "#ebebf0",
+            "dark": "#1b232d"
+          },
+          "cs-text-heading": {
+            "role": "neutral",
+            "displayName": "Heading Ink",
+            "light": "#0f141a",
+            "dark": "#ebebf0"
+          },
+          "cs-text-body": {
+            "role": "neutral",
+            "displayName": "Body Ink",
+            "light": "#0f141a",
+            "dark": "#dedee3"
+          },
+          "cs-text-secondary": {
+            "role": "neutral",
+            "displayName": "Secondary Ink",
+            "light": "#424650",
+            "dark": "#c6c6cd"
+          },
+          "cs-text-muted": {
+            "role": "neutral",
+            "displayName": "Muted Ink",
+            "light": "#656871",
+            "dark": "#a4a4ad"
+          },
+          "cs-text-disabled": {
+            "role": "neutral",
+            "displayName": "Disabled",
+            "light": "#8c8c94",
+            "dark": "#8c8c94"
+          },
+          "cs-border-divider": {
+            "role": "neutral",
+            "displayName": "Divider",
+            "light": "#c6c6cd",
+            "dark": "#424650"
+          },
+          "cs-border-divider-secondary": {
+            "role": "neutral",
+            "displayName": "Row Rule",
+            "light": "#ebebf0",
+            "dark": "#232b37"
+          },
+          "cs-border-container": {
+            "role": "neutral",
+            "displayName": "Container Border",
+            "light": "#c6c6cd",
+            "dark": "#424650"
+          },
+          "cs-border-input": {
+            "role": "neutral",
+            "displayName": "Input Border",
+            "light": "#8c8c94",
+            "dark": "#656871"
+          },
+          "cs-topnav-bg": {
+            "role": "neutral",
+            "displayName": "Top Navigation",
+            "light": "#0f141a",
+            "dark": "#0a0e12"
+          },
+          "cs-success": {
+            "role": "tertiary",
+            "displayName": "Success",
+            "light": "#00802f",
+            "dark": "#2bb534"
+          },
+          "cs-error": {
+            "role": "tertiary",
+            "displayName": "Error",
+            "light": "#db0000",
+            "dark": "#ff7a7a"
+          },
+          "cs-warning": {
+            "role": "tertiary",
+            "displayName": "Warning Text",
+            "light": "#855900",
+            "dark": "#fbd332"
+          },
+          "cs-warning-fill": {
+            "role": "tertiary",
+            "displayName": "Warning Fill",
+            "light": "#ffe347",
+            "dark": "#fbd332"
+          },
+          "cs-info": {
+            "role": "tertiary",
+            "displayName": "Info",
+            "light": "#006ce0",
+            "dark": "#42b4ff"
+          },
+          "cs-inactive": {
+            "role": "tertiary",
+            "displayName": "Inactive",
+            "light": "#656871",
+            "dark": "#a4a4ad"
+          }
+        },
+        "severity": {
+          "critical": [
+            "#870303",
+            "#d63f38"
+          ],
+          "high": [
+            "#ce3311",
+            "#fe6e73"
+          ],
+          "medium": "#f89256",
+          "low": "#f2cd54",
+          "neutral": "#656871"
+        },
+        "typography": {
+          "fontFamily": "\"Open Sans\", \"Helvetica Neue\", Roboto, Arial, sans-serif",
+          "fontFamilyMono": "Monaco, Menlo, Consolas, \"Courier Prime\", Courier, monospace",
+          "page-title": {
+            "fontSize": "24px",
+            "lineHeight": "30px",
+            "fontWeight": 700
+          },
+          "modal-title": {
+            "fontSize": "20px",
+            "lineHeight": "24px",
+            "fontWeight": 700
+          },
+          "container-title": {
+            "fontSize": "18px",
+            "lineHeight": "22px",
+            "fontWeight": 700
+          },
+          "sub-heading": {
+            "fontSize": "16px",
+            "lineHeight": "20px",
+            "fontWeight": 700
+          },
+          "body": {
+            "fontSize": "14px",
+            "lineHeight": "20px",
+            "fontWeight": 400
+          },
+          "label": {
+            "fontSize": "14px",
+            "lineHeight": "20px",
+            "fontWeight": 700
+          },
+          "small": {
+            "fontSize": "12px",
+            "lineHeight": "16px",
+            "fontWeight": 400
+          },
+          "counter-value": {
+            "fontSize": "32px",
+            "lineHeight": "40px",
+            "fontWeight": 300,
+            "letterSpacing": "-0.01em"
+          }
+        },
+        "rounded": {
+          "container": "16px",
+          "button": "20px",
+          "flash": "12px",
+          "input": "8px",
+          "item": "8px",
+          "badge": "4px",
+          "full": "9999px"
+        },
+        "spacing": {
+          "topnav-height": "52px",
+          "sidenav-width": "280px",
+          "sidenav-collapsed": "48px",
+          "stack-gap": "20px",
+          "content-max": "1680px",
+          "gutter-phone": "16px",
+          "gutter-sm": "24px",
+          "gutter-lg": "40px",
+          "control-min": "32px",
+          "control-min-phone": "40px"
+        }
+      },
+      "shadows": [
+        {
+          "name": "dropdown",
+          "value": "0 4px 20px 1px rgba(0, 7, 22, 0.10)",
+          "purpose": "Menus, calendar, popovers."
+        },
+        {
+          "name": "modal",
+          "value": "0 4px 20px 1px rgba(0, 7, 22, 0.18)",
+          "purpose": "Modals, command palette, mobile drawer."
+        },
+        {
+          "name": "sticky",
+          "value": "0 4px 8px 1px rgba(0, 7, 22, 0.10)",
+          "purpose": "A container pinned under the top bar."
+        },
+        {
+          "name": "dark-mode",
+          "value": "same geometry at rgba(0, 4, 12, 1)",
+          "purpose": "All three roles in dark mode."
+        }
+      ],
+      "motion": [
+        {
+          "name": "control-state",
+          "value": "90ms linear",
+          "purpose": "Colour and border changes on buttons, tiles, cards, the top-nav search."
+        },
+        {
+          "name": "disclosure",
+          "value": "135ms ease-out",
+          "purpose": "Caret rotation on side-nav groups and expandable sections."
+        },
+        {
+          "name": "toggle",
+          "value": "120ms ease-out",
+          "purpose": "Toggle track and knob."
+        },
+        {
+          "name": "spinner",
+          "value": "0.7s linear infinite (2.4s under prefers-reduced-motion)",
+          "purpose": "Loading spinner."
+        }
+      ],
+      "breakpoints": [
+        {
+          "name": "phone",
+          "value": "max-width 639px",
+          "purpose": "Touch targets grow to 40px; actions full width; event switcher moves into the drawer."
+        },
+        {
+          "name": "sm",
+          "value": "640px",
+          "purpose": "Top-nav search field appears; content gutter 24px."
+        },
+        {
+          "name": "md",
+          "value": "768px",
+          "purpose": "Column, key-value and field grids go multi-column; counter grids leave two-up."
+        },
+        {
+          "name": "lg",
+          "value": "1024px",
+          "purpose": "Persistent 280px side nav (collapsible to a 48px rail); content gutter 40px; wizard step list appears."
+        }
+      ],
+      "narrative": {
+        "northStar": "The Cloud Console",
+        "overview": "Staff spend whole event cycles in `/admin`, so it borrows the tool they already know how to read: AWS's Cloudscape design system (cloudscape.design, visual refresh), built in ERB, Tailwind and Stimulus rather than imported. The look is a cloud console's: a dark top bar, a white side navigation, breadcrumbs, a flashbar, and content laid out as bordered containers, dense tables and key-value panels. Values come from Cloudscape's published design tokens with one deliberate swap: Hack Club red replaces Cloudscape's interactive blue, deepened so every label clears AA.\n\nThe console is a translation, not a remix. Where Cloudscape has a component, the console uses its shape, spacing and states; where Attend needs one Cloudscape lacks, it is assembled from existing kit parts. Its single Hack Club gesture beyond the red is the 3px accent rail on the active side-nav link.",
+        "keyCharacteristics": [
+          "Dark top navigation in both modes, white (or dark-mode slate) side navigation, bordered 16px containers",
+          "Hack Club red as the interactive colour (`--cs-accent`), Cloudscape's own status colours for state",
+          "Open Sans at 14/20, bold (700) for labels, headings and buttons",
+          "Two modes only: the app's nine themes collapse to light or dark inside the console",
+          "Status as icon + word; badges as 4px-radius chips",
+          "One content width for every page, capped at 1680px"
+        ],
+        "rules": [
+          {
+            "name": "The Red-For-Blue Rule",
+            "body": "Every place Cloudscape uses its interactive blue, the console uses `--cs-accent`, and nowhere else. Red never marks an error state in the console; errors use `--cs-error`, a different red from a different ramp.",
+            "section": "colors"
+          },
+          {
+            "name": "The Two Modes Rule",
+            "body": "The console has Cloudscape's light and dark modes, not the app's nine themes. `admin_console_theme` maps `light` and `catppuccin-latte` to light and every other theme to dark, and the theme controller applies the same mapping client-side. New console styling is written against `--cs-*` tokens and checked in both modes, never per-theme.",
+            "section": "colors"
+          },
+          {
+            "name": "The Tailwind Remap Rule",
+            "body": "In light mode the console remaps Tailwind's gray, slate, blue, green, red, amber and yellow scales onto Cloudscape's ramps, so legacy utility classes land on console colours. New console markup does not rely on that remap: it uses kit classes, or a token utility such as `text-(--cs-text-muted)` when one is truly needed. Light-mode gray-400 is lifted to #71717a so legacy meta text stays AA.",
+            "section": "colors"
+          },
+          {
+            "name": "The Sentence Case Rule",
+            "body": "Headings, buttons, labels and tabs are sentence case (\"Add staff member\"). Table headers are never uppercase; the legacy adapter strips `uppercase tracking-wider` from old markup.",
+            "section": "typography"
+          },
+          {
+            "name": "The Counter Rule",
+            "body": "A count beside a title is a muted, regular-weight `(12)` after the title, never a badge.",
+            "section": "typography"
+          },
+          {
+            "name": "The One Page Width Rule",
+            "body": "Every console page shares one content area, left-aligned against the side nav and capped at 1680px. Any top-level `max-w-*` wrapper a view brings is released to that cap and stripped of its own horizontal gutter and top padding; the content area's padding is the only page gutter. A page that needs a narrower measure constrains its inner content (the wizard caps at 960px), not its outer wrapper.",
+            "section": "layout"
+          },
+          {
+            "name": "The Two-Up Counters Rule",
+            "body": "Key-value grids of counters (`cs-kv-3` holding counter values, and every `cs-kv-4`/`cs-kv-5`) go two-up below 768px instead of collapsing to one long column. Five-up is 3-up at tablet width and 5-up from 1024px.",
+            "section": "layout"
+          },
+          {
+            "name": "The Thumb Rule",
+            "body": "Cloudscape's 32px controls are a desktop density. Below 640px buttons, link and inline-icon buttons, inputs and selects grow to a 40px minimum, nav links, menu items, tabs and segments gain 10px vertical padding, calendar days grow, and inputs move to 16px text so iOS doesn't zoom.",
+            "section": "layout"
+          },
+          {
+            "name": "The Full-Width Action Rule",
+            "body": "On phones a form's actions go full width (`cs-btn-full`, and the wizard's action row stacks in reverse so the primary sits on top); from 640px they size to content, right-aligned in the wizard.",
+            "section": "layout"
+          },
+          {
+            "name": "The Visual Refresh Radii Rule",
+            "body": "16 containers, 20 buttons, 12 alerts, 8 fields and menus, 4 badges. The Clipboard's 6/8/full scale does not apply inside the console.",
+            "section": "shapes"
+          },
+          {
+            "name": "The Components Layer Rule",
+            "body": "Every `cs-*` kit component is declared inside Tailwind's `@layer components` (order pinned as `theme, base, components, utilities`), so it beats preflight and loses to utilities: `hidden`, `sm:block` and friends work on kit elements, which Stimulus controllers rely on. Only rules that must beat utilities on purpose stay unlayered: the tokens, the legacy-pattern adapter, field focus, the one page width, links in prose, and the console's dark-mode overrides (which need `:root.cs-console`'s extra specificity to beat `themes.css`).",
+            "section": "components"
+          },
+          {
+            "name": "The Shell Boundary Rule",
+            "body": "The admin layout carries a tracked `<meta name=\"attend-shell\" content=\"console\" data-turbo-track=\"reload\">`. Turbo swaps `<body>` but not `<html>`'s class and `data-theme`, so any visit that crosses between the console and another layout does a full page load. Don't remove the meta or add it to another layout.",
+            "section": "components"
+          },
+          {
+            "name": "The Confirm-Don't-Colour Rule",
+            "body": "A destructive action on a console page is a normal button (or a link-style button), never primary and never a red fill, and it carries `turbo_confirm`. The confirmation modal is where the action becomes primary: its confirm button is the one primary in the dialog and is labelled with the action, not \"OK\".",
+            "section": "components"
+          },
+          {
+            "name": "The Underlined Prose Link Rule",
+            "body": "Links inside running text are underlined: any non-button link inside a paragraph, alert, description, field hint, setting description or empty state is underlined automatically. A link in running text outside a paragraph (a key-value line, a table cell) takes `cs-link-inline`. Standalone links (`cs-link`), breadcrumbs, nav and link-style buttons stay un-underlined until hover. In dark mode the accent sits at 1.86:1 against body text, so colour alone cannot mark a link.",
+            "section": "components"
+          },
+          {
+            "name": "The Admin-Only Marker Rule",
+            "body": "Inside the console, the project's dashed orange outline (`border-2 border-dashed border-orange-400`) marks an admin-only control or panel on a page other roles can also see. It is never used to wrap a page, or a section of a page, that only global admins can reach; there it marks nothing.",
+            "section": "components"
+          },
+          {
+            "name": "The Button-Not-Input Rule",
+            "body": "Console forms submit with `f.button` / `button_tag`, never `f.submit`: `themes.css` paints `<input>` backgrounds under dark themes, which breaks the button styling.",
+            "section": "components"
+          }
+        ],
+        "dos": [
+          "Do build console pages from the kit: page header, containers, key-value pairs, tables, `cs_status`, `cs_badge`, `cs_breadcrumbs`.",
+          "Do write console colour as `--cs-*` tokens and check both modes.",
+          "Do show state as a status indicator (icon + word); keep badges for labels and counts.",
+          "Do keep one primary button per view region.",
+          "Do put destructive actions on normal buttons with `turbo_confirm` and let the confirmation modal carry the primary.",
+          "Do underline links in running text; use `cs-link-inline` outside paragraphs.",
+          "Do let every page use the one content width; constrain inner content, not the page wrapper.",
+          "Do use `f.button` / `button_tag` for form submits.",
+          "Do use sentence case for headings, buttons, labels and tabs."
+        ],
+        "donts": [
+          "Don't use red for errors, or Cloudscape blue for actions; accent is interaction, status colours are state.",
+          "Don't add per-theme console styling; the console has two modes.",
+          "Don't add new Tailwind colour utilities (`bg-gray-50`, `text-blue-800`, `bg-[#…]`) to console markup; the light-mode remap is for legacy pages.",
+          "Don't declare a kit component outside `@layer components`, or it will override `hidden`.",
+          "Don't add a top-level `max-w-*` page wrapper expecting it to narrow the page.",
+          "Don't make a destructive action primary or red-filled on the page.",
+          "Don't use uppercase table headers or full-round status pills in new console markup.",
+          "Don't wrap global-admin-only pages or sections in the dashed orange admin marker.",
+          "Don't use Open Sans, `cs-*` classes or console tokens on a Clipboard surface."
+        ]
+      }
+    }
   },
   "components": [
     {
@@ -175,28 +794,68 @@
       "css": ".ds-badge { display: inline-flex; align-items: center; padding: 2px 10px; font-size: 0.75rem; font-weight: 600; line-height: 1.4; border-radius: 99999px; } .ds-badge-complete { background: #dcfce7; color: #166534; } .ds-badge-awaiting-participant { background: #dbeafe; color: #1e40af; } .ds-badge-awaiting-parent { background: #fef3c7; color: #92400e; } .ds-badge-withdrawn { background: #fee2e2; color: #991b1b; }"
     },
     {
-      "name": "Sidebar Nav Item",
+      "name": "Console Normal Button",
+      "kind": "button",
+      "refersTo": "console:cs-btn",
+      "description": "Admin console only. Cloudscape's normal button in Hack Club red: outlined, bold, 20px radius. Also the destructive-action trigger.",
+      "html": "<button class=\"ds-cs-btn\">Export CSV</button>",
+      "css": ".ds-cs-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 4px 20px; border: 2px solid var(--cs-accent, #c8283f); border-radius: 20px; background: var(--cs-bg-container, #fff); color: var(--cs-accent, #c8283f); font-family: \"Open Sans\", \"Helvetica Neue\", Roboto, Arial, sans-serif; font-size: 14px; line-height: 20px; font-weight: 700; letter-spacing: 0.005em; cursor: pointer; transition: background-color 90ms linear, border-color 90ms linear, color 90ms linear; } .ds-cs-btn:hover { background: var(--cs-bg-selected, #fff5f6); border-color: var(--cs-accent-hover, #8f1426); color: var(--cs-accent-hover, #8f1426); } .ds-cs-btn:active { background: var(--cs-bg-pressed, #ffe5e9); } .ds-cs-btn:focus-visible { outline: 2px solid var(--cs-focus, #c8283f); outline-offset: 2px; }"
+    },
+    {
+      "name": "Console Primary Button",
+      "kind": "button",
+      "refersTo": "console:cs-btn-primary",
+      "description": "Admin console only. One per view region; never a destructive action on the page.",
+      "html": "<button class=\"ds-cs-btn-primary\">Create event</button>",
+      "css": ".ds-cs-btn-primary { display: inline-flex; align-items: center; justify-content: center; min-height: 32px; padding: 4px 20px; border: 2px solid var(--cs-accent, #c8283f); border-radius: 20px; background: var(--cs-accent, #c8283f); color: var(--cs-accent-on, #fff); font-family: \"Open Sans\", \"Helvetica Neue\", Roboto, Arial, sans-serif; font-size: 14px; line-height: 20px; font-weight: 700; cursor: pointer; transition: background-color 90ms linear, border-color 90ms linear; } .ds-cs-btn-primary:hover { background: var(--cs-accent-hover, #8f1426); border-color: var(--cs-accent-hover, #8f1426); } .ds-cs-btn-primary:active { background: var(--cs-accent-active, #7a0f20); border-color: var(--cs-accent-active, #7a0f20); } .ds-cs-btn-primary:focus-visible { outline: 2px solid var(--cs-focus, #c8283f); outline-offset: 2px; }"
+    },
+    {
+      "name": "Console Input",
+      "kind": "input",
+      "refersTo": "console:cs-input",
+      "description": "Admin console only. Cloudscape field: bold label, 32px input, 8px radius, accent border plus 1px ring on focus.",
+      "html": "<label class=\"ds-cs-label\">Event name<input class=\"ds-cs-input\" type=\"text\" placeholder=\"Enter a name\"></label>",
+      "css": ".ds-cs-label { display: block; font-family: \"Open Sans\", Arial, sans-serif; font-size: 14px; line-height: 20px; font-weight: 700; color: var(--cs-text-label, #0f141a); } .ds-cs-input { display: block; width: 100%; margin-top: 4px; min-height: 32px; padding: 4px 12px; border: 1px solid var(--cs-border-input, #8c8c94); border-radius: 8px; background: var(--cs-bg-input, #fff); color: var(--cs-text-body, #0f141a); font-family: inherit; font-size: 14px; font-weight: 400; line-height: 22px; } .ds-cs-input::placeholder { color: var(--cs-text-muted, #656871); font-style: italic; } .ds-cs-input:focus { outline: none; border-color: var(--cs-focus, #c8283f); box-shadow: 0 0 0 1px var(--cs-focus, #c8283f); }"
+    },
+    {
+      "name": "Console Container",
+      "kind": "card",
+      "refersTo": "console:cs-container",
+      "description": "Admin console only. 16px bordered container with header, key-value body; flat, no shadow.",
+      "html": "<section class=\"ds-cs-container\"><div class=\"ds-cs-container-header\"><h2>Overview <span>(3)</span></h2></div><dl class=\"ds-cs-kv\"><div><dt>Registered</dt><dd>128</dd></div><div><dt>Complete</dt><dd>97</dd></div><div><dt>Checked in</dt><dd>0</dd></div></dl></section>",
+      "css": ".ds-cs-container { background: var(--cs-bg-container, #fff); border: 1px solid var(--cs-border-container, #c6c6cd); border-radius: 16px; color: var(--cs-text-body, #0f141a); font-family: \"Open Sans\", Arial, sans-serif; } .ds-cs-container-header { padding: 12px 20px; } .ds-cs-container-header h2 { margin: 0; font-size: 18px; line-height: 22px; font-weight: 700; color: var(--cs-text-heading, #0f141a); } .ds-cs-container-header span { font-weight: 400; color: var(--cs-text-muted, #656871); } .ds-cs-kv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 32px; margin: 0; padding: 4px 20px 20px; } .ds-cs-kv > div + div { padding-left: 20px; border-left: 1px solid var(--cs-border-divider-secondary, #ebebf0); } .ds-cs-kv dt { font-size: 14px; line-height: 20px; font-weight: 700; } .ds-cs-kv dd { margin: 4px 0 0; font-size: 32px; line-height: 40px; font-weight: 300; letter-spacing: -0.01em; color: var(--cs-text-heading, #0f141a); font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Console Status Indicator",
+      "kind": "chip",
+      "refersTo": "console:cs_status",
+      "description": "Admin console only. Icon plus word in the status colour; the word carries the meaning.",
+      "html": "<span class=\"ds-cs-status ds-cs-success\"><svg viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"8\" cy=\"8\" r=\"7\"/><path d=\"M4.5 8.2l2.3 2.3 4.7-4.9\"/></svg><span>Complete</span></span> <span class=\"ds-cs-status ds-cs-pending\"><svg viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"8\" cy=\"8\" r=\"7\"/><path d=\"M8 4.5V8l2.5 1.8\"/></svg><span>Awaiting guardian</span></span> <span class=\"ds-cs-status ds-cs-error\"><svg viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"8\" cy=\"8\" r=\"7\"/><path d=\"M5.5 5.5l5 5m0-5l-5 5\"/></svg><span>Withdrawn</span></span>",
+      "css": ".ds-cs-status { display: inline-flex; align-items: center; gap: 6px; font-family: \"Open Sans\", Arial, sans-serif; font-size: 14px; line-height: 20px; white-space: nowrap; } .ds-cs-status svg { width: 16px; height: 16px; flex-shrink: 0; } .ds-cs-success { color: var(--cs-success, #00802f); } .ds-cs-pending { color: var(--cs-inactive, #656871); } .ds-cs-error { color: var(--cs-error, #db0000); }"
+    },
+    {
+      "name": "Console Badge",
+      "kind": "chip",
+      "refersTo": "console:cs_badge",
+      "description": "Admin console only. 4px-radius label chips; prefer a status indicator for lifecycle state.",
+      "html": "<span class=\"ds-cs-badge\">Staff</span> <span class=\"ds-cs-badge ds-cs-badge-green\">Paid</span> <span class=\"ds-cs-badge ds-cs-badge-yellow\">Minor</span> <span class=\"ds-cs-badge ds-cs-sev-high\">High</span>",
+      "css": ".ds-cs-badge { display: inline-flex; align-items: center; padding: 0 8px; border-radius: 4px; background: var(--cs-badge-grey, #424650); color: var(--cs-badge-on, #f9f9fa); font-family: \"Open Sans\", Arial, sans-serif; font-size: 12px; line-height: 20px; font-weight: 400; white-space: nowrap; } .ds-cs-badge-green { background: var(--cs-badge-green, #00802f); } .ds-cs-badge-yellow { background: var(--cs-warning-fill, #ffe347); color: #0f141a; } .ds-cs-sev-high { background: #ce3311; color: #f9f9fa; }"
+    },
+    {
+      "name": "Console Side Navigation",
       "kind": "nav",
-      "refersTo": "nav-item",
-      "description": "The admin sidebar row at 13px/500 with a muted 20px icon; active state deepens to the sunken grey.",
-      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item\" href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3\"/></svg>Overview</a><a class=\"ds-nav-item ds-nav-item-active\" href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z\"/></svg>Participants</a></nav>",
-      "css": ".ds-nav { display: flex; flex-direction: column; gap: 2px; width: 256px; padding: 8px; background: var(--bg-elev-2, #f7f7f9); } .ds-nav-item { display: flex; align-items: center; padding: 6px 10px; font-size: 0.8125rem; font-weight: 500; line-height: 1.4; border-radius: 6px; color: var(--text, #3c4858); text-decoration: none; transition: background-color 150ms ease, color 150ms ease; } .ds-nav-item svg { width: 20px; height: 20px; margin-right: 10px; flex-shrink: 0; color: var(--text-muted, #6b7280); } .ds-nav-item:hover { background: rgba(0,0,0,0.04); color: var(--text-strong, #1f2d3d); } .ds-nav-item-active { background: var(--bg-sunken, #e6e6ea); color: var(--text-strong, #1f2d3d); font-weight: 600; } .ds-nav-item-active svg { color: var(--text-strong, #1f2d3d); }"
+      "refersTo": "console:cs-sidenav",
+      "description": "Admin console only. White side nav; the active link is accent and bold with a 3px accent rail, the console's one Hack Club gesture.",
+      "html": "<nav class=\"ds-cs-sidenav\"><a class=\"ds-cs-sidenav-header\" href=\"#\">Summer Hackathon</a><p class=\"ds-cs-sidenav-title\">Participants</p><a class=\"ds-cs-sidenav-link\" href=\"#\">Overview</a><a class=\"ds-cs-sidenav-link\" href=\"#\" aria-current=\"page\">All participants</a><a class=\"ds-cs-sidenav-link\" href=\"#\">Rooming<span class=\"ds-cs-count\">3</span></a></nav>",
+      "css": ".ds-cs-sidenav { width: 280px; padding: 20px 0; background: var(--cs-bg-container, #fff); border-right: 1px solid var(--cs-border-divider, #c6c6cd); font-family: \"Open Sans\", Arial, sans-serif; } .ds-cs-sidenav-header { display: block; margin: 0 24px 12px 28px; padding-bottom: 14px; border-bottom: 1px solid var(--cs-border-divider-secondary, #ebebf0); font-size: 18px; line-height: 22px; font-weight: 700; color: var(--cs-text-heading, #0f141a); text-decoration: none; } .ds-cs-sidenav-title { margin: 8px 24px 4px 28px; font-size: 14px; line-height: 20px; font-weight: 700; color: var(--cs-text-heading, #0f141a); } .ds-cs-sidenav-link { position: relative; display: flex; align-items: center; padding: 4px 24px 4px 28px; font-size: 14px; line-height: 20px; color: var(--cs-text-secondary, #424650); text-decoration: none; } .ds-cs-sidenav-link:hover { color: var(--cs-accent, #c8283f); } .ds-cs-sidenav-link:focus-visible { outline: 2px solid var(--cs-focus, #c8283f); outline-offset: -2px; } .ds-cs-sidenav-link[aria-current=\"page\"] { font-weight: 700; color: var(--cs-accent, #c8283f); } .ds-cs-sidenav-link[aria-current=\"page\"]::before { content: \"\"; position: absolute; left: 12px; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--cs-accent, #c8283f); } .ds-cs-count { margin-left: auto; padding: 0 6px; border-radius: 4px; background: #db0000; color: #f9f9fa; font-size: 12px; line-height: 18px; font-weight: 700; }"
     },
     {
-      "name": "Search Trigger",
-      "kind": "custom",
-      "refersTo": "input-field",
-      "description": "A faux input in the admin header that opens the command palette. Looks like a field, behaves like a button.",
-      "html": "<button class=\"ds-search-trigger\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z\"/></svg>Search participants, events…<kbd>⌘K</kbd></button>",
-      "css": ".ds-search-trigger { display: flex; align-items: center; gap: 8px; min-width: 240px; padding: 6px 12px; font-size: 0.875rem; color: var(--text-faint, #9ca3af); background: var(--bg-elev-2, #f9fafb); border: 1px solid var(--border, #e5e7eb); border-radius: 8px; cursor: pointer; transition: border-color 150ms ease, box-shadow 150ms ease; } .ds-search-trigger svg { width: 16px; height: 16px; flex-shrink: 0; } .ds-search-trigger:hover { border-color: var(--border-strong, #d1d5db); box-shadow: 0 1px 2px rgba(0,0,0,0.05); } .ds-search-trigger kbd { margin-left: auto; padding: 2px 6px; font-size: 0.6875rem; font-weight: 500; color: var(--text-faint, #9ca3af); background: var(--border, #e5e7eb); border-radius: 4px; }"
-    },
-    {
-      "name": "Sidebar Selector Pill",
-      "kind": "custom",
-      "refersTo": "nav-item",
-      "description": "The user and event selectors at the top of the admin sidebar. Full-round because it carries identity, not action.",
-      "html": "<button class=\"ds-sidebar-pill\"><span class=\"ds-sidebar-pill-avatar\">LW</span><span class=\"ds-sidebar-pill-label\">Summit 2026</span><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M19 9l-7 7-7-7\"/></svg></button>",
-      "css": ".ds-sidebar-pill { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 10px 6px 6px; background: var(--bg-elev, #fff); border: 1px solid var(--border, #e5e7eb); border-radius: 9999px; cursor: pointer; text-align: left; transition: border-color 150ms ease, box-shadow 150ms ease; } .ds-sidebar-pill:hover { border-color: var(--border-strong, #d1d5db); box-shadow: 0 1px 2px rgba(0,0,0,0.04); } .ds-sidebar-pill-avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 9999px; background: var(--accent, #ec3750); color: #fff; font-size: 0.6875rem; font-weight: 700; flex-shrink: 0; } .ds-sidebar-pill-label { font-size: 0.8125rem; font-weight: 500; color: var(--text-strong, #1f2d3d); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ds-sidebar-pill svg { width: 14px; height: 14px; margin-left: auto; flex-shrink: 0; color: var(--text-muted, #8492a6); }"
+      "name": "Console Top Navigation",
+      "kind": "nav",
+      "refersTo": "console:cs-topnav",
+      "description": "Admin console only. Dark in both modes: identity, command-palette search, event switcher, user menu.",
+      "html": "<header class=\"ds-cs-topnav\"><span class=\"ds-cs-topnav-title\">Attend</span><button class=\"ds-cs-topnav-search\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z\"/></svg><span>Search participants, events, pages</span><kbd>⌘K</kbd></button><span class=\"ds-cs-spacer\"></span><button class=\"ds-cs-topnav-utility\"><span class=\"ds-cs-muted\">Event</span>Summer Hackathon</button></header>",
+      "css": ".ds-cs-topnav { display: flex; align-items: center; gap: 16px; height: 52px; padding: 0 20px; background: var(--cs-topnav-bg, #0f141a); border-bottom: 1px solid var(--cs-topnav-border, #232b37); color: var(--cs-topnav-text, #dedee3); font-family: \"Open Sans\", Arial, sans-serif; } .ds-cs-topnav-title { font-size: 16px; line-height: 20px; font-weight: 700; color: #f9f9fa; } .ds-cs-topnav-search { display: inline-flex; align-items: center; gap: 8px; flex: 1 1 auto; max-width: 560px; height: 32px; padding: 0 8px 0 12px; background: var(--cs-topnav-field, #161d26); border: 1px solid var(--cs-topnav-field-border, #656871); border-radius: 8px; color: var(--cs-topnav-muted, #a4a4ad); font: inherit; font-size: 14px; cursor: pointer; transition: border-color 90ms linear; } .ds-cs-topnav-search:hover { border-color: #dedee3; color: #dedee3; } .ds-cs-topnav-search svg { width: 16px; height: 16px; } .ds-cs-topnav-search span { flex: 1; text-align: left; } .ds-cs-topnav-search kbd { padding: 0 6px; border: 1px solid #656871; border-radius: 4px; font-size: 12px; } .ds-cs-spacer { flex: 1; } .ds-cs-topnav-utility { display: inline-flex; gap: 8px; align-items: center; height: 36px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: #dedee3; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; } .ds-cs-topnav-utility:hover { background: var(--cs-topnav-hover, #1b232d); color: #f9f9fa; } .ds-cs-muted { font-weight: 400; color: #a4a4ad; }"
     }
   ],
   "narrative": {
@@ -207,7 +866,7 @@
       "One loud colour (Hack Club red) held to actions, alerts, and active state",
       "Dense administrative type scale: 14px body, 12px labels, weight over size for hierarchy",
       "Every colour semantic and themed; eight themes on one palette contract",
-      "Mobile-first single column that widens into a 256px-sidebar shell on lg",
+      "Mobile-first single column for participants and guardians; the support desk widens into a 256px-sidebar shell on lg (the admin console has its own shell; see Admin Console)",
       "Motion is confined to transition-colors at ~150ms, plus a small lift on genuinely interactive cards"
     ],
     "rules": [
@@ -218,7 +877,7 @@
       },
       {
         "name": "The No Literal Hex Rule",
-        "body": "Every colour resolves through a semantic custom property or a Tailwind token remapped in themes.css. A raw hex in a template is a theme bug: it renders correctly in light and wrong in the other seven. New work uses var(--accent), not #ec3750.",
+        "body": "Every colour resolves through a semantic custom property or a Tailwind token remapped in themes.css. A raw hex in a template is a theme bug: it renders correctly in light and wrong in the other seven. New work uses var(--accent), not #ec3750. The one exception is a pin drawn onto OpenStreetMap tiles: the tiles stay light under every theme, so map markers (series map, public profile map, landing map) pin their fill and white ring as literal hex; everything the app paints around the map still resolves through tokens.",
         "section": "colors"
       },
       {
@@ -271,12 +930,13 @@
       "Don't add new bg-blue-600 buttons or ring-blue-500 focus rings. The blue running through the onboarding wizard and guardian portal (35 blue fills, 277 blue rings) is drift from a Tailwind default, not a decision. Red is the accent everywhere; converge on it when touching those files.",
       "Don't let Hack Club red occupy area. It fills buttons, badges, and 1px borders. Large red panels, red page headers, and red backgrounds behind body copy are out — use accent-soft if a red-tinted region is genuinely needed.",
       "Don't ship gradients, hero imagery, or marketing motion inside the app shell. Attend is a tool someone uses to do a job, not a consumer event app.",
-      "Don't introduce a webfont. The system stack is a deliberate performance choice for guardians on slow connections and old phones.",
+      "Don't introduce a webfont on a Clipboard surface. The system stack is a deliberate performance choice for guardians on slow connections and old phones. (The console's Open Sans is staff-only and loads only under /admin.)",
       "Don't add a third container radius. 6px controls, 8px containers, full for state and identity.",
       "Don't use rounded-full on a plain action button. A pill in Attend means state or identity; the Hack Club brand pill is the one sanctioned exception.",
       "Don't trust text-white to be white. Outside the default theme it resolves to a surface colour; a new filled surface needs its foreground declared in themes.css per The Theme Foreground Rule, or its label disappears.",
       "Don't suppress the focus ring. focus:outline-none is only acceptable when a focus:ring-2 replaces it in the same class list.",
       "Don't use text-faint for anything a user has to read. It is for placeholders and disabled states only."
-    ]
+    ],
+    "scope": "Clipboard world: participant, guardian, onboarding, public-profile, docs and support surfaces. The /admin console is documented in extensions.console."
   }
 }

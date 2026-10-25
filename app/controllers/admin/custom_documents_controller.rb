@@ -54,7 +54,8 @@ module Admin
         redirect_to admin_event_integrations_path(@event),
                     notice: "\"#{@custom_document.name}\" updated.#{" Sync its fields again to reconfigure pre-fill." if template_id_changed && @custom_document.electronic?}"
       else
-        flash.now[:alert] = "Couldn't update document: #{@custom_document.errors.full_messages.to_sentence}"
+        # The console shows these errors under their fields instead.
+        flash.now[:alert] = "Couldn't update document: #{@custom_document.errors.full_messages.to_sentence}" unless request.variant.include?(:console)
         render :edit, status: :unprocessable_entity
       end
     rescue ArgumentError => e
@@ -84,7 +85,7 @@ module Admin
 
     def set_event
       @event = Event.find_by!(slug: params[:slug])
-      authorize @event, :update?
+      authorize @event, :manage_integrations?
       set_current_event(@event)
     end
 

@@ -1,0 +1,97 @@
+<%# The chase list. Rows only exist when there is something to chase, so an
+    all-clear series collapses to one line instead of a wall of zeroes — the
+    page is meant to open with work, not with reassurance. %>
+<% invite_rows = event_rows.select { |row| row[:pending_invitations].positive? } %>
+<% incident_rows = event_rows.select { |row| row[:open_incidents].to_i.positive? } %>
+<% nothing_to_chase = chase_rows.empty? && invite_rows.empty? && incident_rows.empty? %>
+<%# SeriesDashboard#open_incidents returns nil, not zero, for an event whose
+    incidents this viewer has no role to see. Counting those as zero would hand
+    an organizer a chase list that is quietly short, so the gap is stated. %>
+<% hidden_incident_events = event_rows.count { |row| row[:open_incidents].nil? } %>
+<%# Each group is the same shape: a count, what it means, and one row per
+    event linking to the list that clears it. %>
+<% groups = chase_rows.map do |row|
+     { count: row[:stalled], label: "#{"participant".pluralize(row[:stalled])} #{row[:stage].chase}",
+       entries: row[:by_event].map { |entry| [ entry[:event], entry[:count], series_chase_path(entry[:event], row[:stage]) ] } }
+   end %>
+<% if invite_rows.any? %>
+  <% invite_total = invite_rows.sum { |row| row[:pending_invitations] } %>
+  <% groups << { count: invite_total, kind: :invites,
+                 entries: invite_rows.sort_by { |row| -row[:pending_invitations] }.map { |row| [ row[:event], row[:pending_invitations], admin_event_participants_path(row[:event].slug, status: "pending_invitations") ] } } %>
+<% end %>
+<%# Incidents are counted per event under IncidentPolicy's own rules, so an
+    event the viewer cannot see incidents on contributes nothing here
+    rather than a misleading zero. %>
+<% if incident_rows.any? %>
+  <% incident_total = incident_rows.sum { |row| row[:open_incidents] } %>
+  <% groups << { count: incident_total, kind: :incidents,
+                 entries: incident_rows.sort_by { |row| -row[:open_incidents] }.map { |row| [ row[:event], row[:open_incidents], admin_event_incidents_path(row[:event].slug) ] } } %>
+<% end %>
+
+<section class="cs-container">
+  <%# The heaviest heading on the page: this list is what the page is for. %>
+  <div class="cs-container-header<%= " cs-container-header-divided" unless nothing_to_chase %>">
+    <h2 class="cs-h2">Needs chasing</h2>
+  </div>
+
+  <% if nothing_to_chase %>
+    <div class="cs-container-body">
+      <span class="cs-status cs-status-success">
+        <%= cs_status_icon(:success) %>
+        <span>Nothing needs chasing across <%= pluralize(totals[:events], "event") %>.<% if totals[:active].positive? %> Every participant is cleared.<% end %></span>
+      </span>
+    </div>
+  <% else %>
+    <div class="cs-container-body">
+      <% groups.each_with_index do |group, index| %>
+        <details class="cs-expandable<%= " mt-3 pt-3 border-t border-(--cs-border-divider-secondary)" unless index.zero? %>">
+          <summary>
+            <span class="tabular-nums"><%= group[:count] %></span>
+            <span class="font-normal min-w-0">
+              <% case group[:kind] %>
+              <% when :invites %>
+                <%= "invitation".pluralize(group[:count]) %> haven't been accepted yet
+              <% when :incidents %>
+                open <%= "incident".pluralize(group[:count]) %> need a decision
+              <% else %>
+                <%= group[:label] %>
+              <% end %>
+            </span>
+            <span class="ml-auto pl-3 cs-small cs-secondary font-normal whitespace-nowrap hidden sm:inline"><%= pluralize(group[:entries].length, "event") %></span>
+          </summary>
+          <div class="cs-expandable-content">
+            <div class="cs-table-wrap">
+              <table class="cs-table cs-table-compact">
+                <thead>
+                  <tr>
+                    <th scope="col">Event</th>
+                    <th scope="col" class="text-right"><%= group[:kind] == :incidents ? "Open" : "Count" %></th>
+                    <th scope="col"><span class="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% group[:entries].each do |event, count, path| %>
+                    <tr>
+                      <td><%= event.name %></td>
+                      <td class="text-right tabular-nums"><%= count %></td>
+                      <td class="text-right"><%= link_to "Open list", path, class: "cs-link" %></td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </details>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if hidden_incident_events.positive? %>
+    <div class="cs-container-footer">
+      <span class="cs-status cs-status-info">
+        <%= cs_status_icon(:info) %>
+        <span>Incidents on <%= pluralize(hidden_incident_events, "event") %> aren't visible to you, so none of them are counted above.</span>
+      </span>
+    </div>
+  <% end %>
+</section>

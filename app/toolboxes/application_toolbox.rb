@@ -61,6 +61,16 @@ class ApplicationToolbox < Toolchest::Toolbox
 
   def anonymized? = mcp_connection&.anonymize? || false
 
+  # Whether this account may see participants' exact dates of birth, addresses,
+  # and phone numbers. Participants here aren't scoped to one event, so a
+  # PII-restricted role on one event doesn't hide anything for someone who is
+  # ops elsewhere.
+  def view_pii?
+    return @view_pii if defined?(@view_pii)
+
+    @view_pii = current_user&.can_view_participant_pii? || false
+  end
+
   # nil means "no connection-level restriction" — every event the user can reach.
   def permitted_event_ids
     return @permitted_event_ids if defined?(@permitted_event_ids)
@@ -259,10 +269,6 @@ class ApplicationToolbox < Toolchest::Toolbox
   end
 
   def redact_encrypted_audit_fields(record, changed_fields)
-    encrypted = record.class.try(:encrypted_attributes)
-    return changed_fields if encrypted.blank?
-
-    names = encrypted.map(&:to_s)
-    changed_fields.to_h { |field, change| [ field, names.include?(field.to_s) ? "[REDACTED]" : change ] }
+    AuditLog.redact_encrypted_fields(record, changed_fields)
   end
 end

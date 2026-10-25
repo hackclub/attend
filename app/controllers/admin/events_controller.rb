@@ -25,12 +25,17 @@ module Admin
       authorize @event
     end
 
+    # Where a save from the setup wizard's Basics step goes back to. It rides
+    # on the form as a hidden field, so a later plain edit isn't affected and
+    # a slug change on the same save still lands in setup.
+    SETUP_RETURNS = %w[setup review].freeze
+
     def update
       @event = Event.find_by!(slug: params[:slug])
       authorize @event
 
       if @event.update(event_params)
-        redirect_to admin_event_dashboard_path(@event), notice: "Event was successfully updated."
+        redirect_to after_update_path, notice: params[:return_to].in?(SETUP_RETURNS) ? "Basics saved." : "Event was successfully updated."
       else
         render :edit, status: :unprocessable_entity
       end
@@ -87,6 +92,14 @@ module Admin
       redirect_to admin_event_integrations_path(@event), notice: "API key generated successfully."
     end
 
+    def clear_waiver_dates_warning
+      @event = Event.find_by!(slug: params[:slug])
+      authorize @event
+
+      @event.clear_waiver_dates_stale!
+      redirect_back fallback_location: admin_event_dashboard_path(@event), notice: "Waiver date warning cleared."
+    end
+
     def destroy
       @event = Event.find_by!(slug: params[:slug])
       authorize @event
@@ -102,6 +115,14 @@ module Admin
     end
 
     private
+
+    def after_update_path
+      case params[:return_to]
+      when "setup" then admin_event_setup_schedule_path(@event)
+      when "review" then admin_event_setup_review_path(@event)
+      else admin_event_dashboard_path(@event)
+      end
+    end
 
     # Series members created this event themselves — give them an explicit
     # event_admin role so per-event tooling (setup wizard team step, staff
@@ -126,6 +147,8 @@ module Admin
         :ends_at,
         :registration_open_at,
         :registration_close_at,
+        :arrival_opens_at,
+        :arrival_closes_at,
         :location_city,
         :location_country,
         :location_address,
@@ -141,10 +164,15 @@ module Admin
         :accommodation_enabled,
         :roommate_preferences_enabled,
         :guardian_invites_locked,
+        :onboarding_invites_held,
         :hotel_scan_context_id,
         :nfc_badges_enabled,
         :nfc_badge_write_on_checkin_enabled,
-        :groups_enabled
+        :groups_enabled,
+        :github_linking,
+        :itch_linking,
+        :github_help_url,
+        :itch_help_url
       )
       unless action_name == "create" || current_user.global_admin?
         permitted = permitted.except(:event_series_id)

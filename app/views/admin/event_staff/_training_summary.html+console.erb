@@ -1,0 +1,28 @@
+<%# How many people on this event's roster are missing required training.
+    Locals: summary (TrainingStatus#summary) %>
+<% if summary[:ineligible].to_i.positive? %>
+  <div class="cs-alert cs-alert-error">
+    <%= cs_status_icon(:error) %>
+    <div>
+      <p class="cs-alert-title"><%= pluralize(summary[:ineligible], "person is", plural: "people are") %> not eligible to work this event</p>
+      <p>They're marked "Ineligible" below. Contact the <%= TrainingDisclosure::SAFETY_TEAM_NAME %> at <%= mail_to TrainingDisclosure::SAFETY_TEAM_EMAIL, class: "cs-link" %> before they work it.</p>
+    </div>
+  </div>
+<% end %>
+<% if summary[:untrained].positive? %>
+  <div class="cs-alert cs-alert-error">
+    <%= cs_status_icon(:error) %>
+    <div>
+      <p class="cs-alert-title"><%= summary[:untrained] %> of <%= summary[:required] %> people need to complete their training</p>
+      <p>They're marked "Not trained" below. Send them to <%= link_to training_url, training_url, class: "cs-link" %> to do it.</p>
+    </div>
+  </div>
+<% elsif summary[:required].positive? %>
+  <div class="cs-alert cs-alert-success">
+    <%= cs_status_icon(:success) %>
+    <div>
+      <p class="cs-alert-title">Everyone who needs training has done it</p>
+      <% if summary[:expiring].positive? %><p><%= pluralize(summary[:expiring], "person") %> should renew soon.</p><% end %>
+    </div>
+  </div>
+<% end %>

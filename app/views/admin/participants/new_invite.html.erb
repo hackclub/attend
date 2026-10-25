@@ -43,15 +43,23 @@
           </div>
         <% end %>
 
-        <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
-          <p class="text-sm text-blue-800">
-            <strong>What happens next:</strong> The participant will receive an email with a link to sign in with Hack Club Auth and complete the onboarding process for this event.
-          </p>
-        </div>
+        <% if current_event.onboarding_invites_held? %>
+          <div class="bg-amber-50 border border-amber-200 rounded-md p-4">
+            <p class="text-sm text-amber-800">
+              <strong>Onboarding invitations are held for this event.</strong> The participant will be added to the pending invitations list without an email. Their invitation goes out when this event's held invitations are sent, from the participants page or the series page.
+            </p>
+          </div>
+        <% else %>
+          <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+            <p class="text-sm text-blue-800">
+              <strong>What happens next:</strong> The participant will receive an email with a link to sign in with Hack Club Auth and complete the onboarding process for this event.
+            </p>
+          </div>
+        <% end %>
 
         <div class="flex flex-col sm:flex-row justify-end gap-3">
           <%= link_to "Cancel", admin_event_participants_path(current_event), class: "w-full sm:w-auto text-center px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors" %>
-          <%= f.submit "Send Invitation", class: "w-full sm:w-auto px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] transition-colors cursor-pointer" %>
+          <%= f.submit current_event.onboarding_invites_held? ? "Add Participant" : "Send Invitation", class: "w-full sm:w-auto px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] transition-colors cursor-pointer" %>
         </div>
       <% end %>
     </div>

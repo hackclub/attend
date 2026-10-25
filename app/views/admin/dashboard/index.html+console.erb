@@ -1,0 +1,78 @@
+<% content_for :title, "Events – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Events", nil ]) %>
+
+<div class="cs-header">
+  <div class="cs-header-text">
+    <h1 class="cs-h1">Events <span class="cs-counter">(<%= @events.size %>)</span></h1>
+  </div>
+  <% if policy(Event).create? || policy(EventSeries).create? %>
+    <div class="cs-actions">
+      <div class="relative" data-controller="dropdown">
+        <button type="button" class="cs-btn cs-btn-primary" data-action="dropdown#toggle" aria-haspopup="true" aria-expanded="false">
+          Create
+          <svg class="cs-btn-caret" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </button>
+        <div class="hidden cs-menu cs-menu-right" data-dropdown-target="menu">
+          <% if policy(Event).create? %>
+            <%= link_to admin_new_event_path, class: "cs-menu-item" do %>
+              <span class="cs-menu-item-label">New event</span>
+            <% end %>
+          <% end %>
+          <% if policy(EventSeries).create? %>
+            <%= link_to new_admin_series_path, class: "cs-menu-item" do %>
+              <span class="cs-menu-item-label">New series</span>
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<div class="cs-stack">
+  <% if @current_events.any? %>
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <h2 class="cs-h2">Current events <span class="cs-counter">(<%= @current_events.count %>)</span></h2>
+      </div>
+      <%= render "event_list", events: @current_events %>
+    </section>
+  <% elsif @completed_events.any? %>
+    <%# Every event this admin can see has already run. Without this the page
+        was just a heading and a one-line disclosure link. %>
+    <section class="cs-container">
+      <div class="cs-empty">
+        <p class="cs-empty-title">Nothing running right now</p>
+        <p>Every event you have access to has wrapped up. Past events are listed below.</p>
+        <% if policy(Event).create? %>
+          <div class="cs-actions">
+            <%= link_to "Create event", admin_new_event_path, class: "cs-btn" %>
+          </div>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
+  <% if @completed_events.any? %>
+    <details class="cs-expandable cs-expandable-container" <%= "open" if @current_events.empty? %>>
+      <summary>Completed events <span class="cs-counter">(<%= @completed_events.count %>)</span></summary>
+      <div class="cs-expandable-content">
+        <%= render "event_list", events: @completed_events %>
+      </div>
+    </details>
+  <% end %>
+
+  <% if @events.empty? %>
+    <section class="cs-container">
+      <div class="cs-empty">
+        <p class="cs-empty-title">No events yet</p>
+        <p>An event holds its own participants, staff, travel, and check-in — start one and the rest of the admin fills in around it.</p>
+        <% if policy(Event).create? %>
+          <div class="cs-actions">
+            <%= link_to "Create event", admin_new_event_path, class: "cs-btn" %>
+          </div>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+</div>

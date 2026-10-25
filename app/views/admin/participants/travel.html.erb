@@ -70,6 +70,12 @@
 
       <%= fields_for :travel_inbound, @travel_inbound do |f| %>
         <div class="space-y-4">
+          <div>
+            <%= f.label :arrangement_status, "Arrangement status", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.select :arrangement_status, Travel.arrangement_statuses.keys.map { |status| [status.titleize, status] },
+                { include_blank: "Select status..." }, class: "w-full rounded-md border border-gray-300 px-3 py-2",
+                data: { action: "change->travel-form#updateFields", travel_form_target: "inboundStatus" } %>
+          </div>
           <!-- Mode -->
           <div>
             <%= f.label :mode, "Travel Mode", class: "block text-sm font-medium text-gray-700 mb-1" %>
@@ -101,7 +107,7 @@
               <h3 class="text-sm font-medium text-gray-700 mb-3">Flight Legs</h3>
               <div data-travel-form-target="inboundLegs" class="space-y-4">
                 <% @travel_inbound.travel_legs.order(:position).each_with_index do |leg, index| %>
-                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "inbound", show_remove: leg.persisted?, default_date: current_event.starts_at&.strftime('%Y-%m-%d'), refresh_url: refresh_flight_leg_admin_event_participant_path(current_event, @participant_event, leg_id: leg.id) %>
+                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "inbound", show_remove: leg.persisted?, default_date: current_event.local_starts_at&.strftime('%Y-%m-%d'), refresh_url: refresh_flight_leg_admin_event_participant_path(current_event, @participant_event, leg_id: leg.id) %>
                 <% end %>
               </div>
               <button type="button" data-action="click->travel-form#addLeg" data-direction="inbound" class="mt-4 inline-flex items-center gap-1 text-sm text-[#ec3750] hover:text-blue-800">
@@ -190,6 +196,12 @@
 
       <%= fields_for :travel_outbound, @travel_outbound do |f| %>
         <div class="space-y-4">
+          <div>
+            <%= f.label :arrangement_status, "Arrangement status", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <%= f.select :arrangement_status, Travel.arrangement_statuses.keys.map { |status| [status.titleize, status] },
+                { include_blank: "Select status..." }, class: "w-full rounded-md border border-gray-300 px-3 py-2",
+                data: { action: "change->travel-form#updateFields", travel_form_target: "outboundStatus" } %>
+          </div>
           <!-- Mode -->
           <div>
             <%= f.label :mode, "Travel Mode", class: "block text-sm font-medium text-gray-700 mb-1" %>
@@ -211,7 +223,7 @@
               <h3 class="text-sm font-medium text-gray-700 mb-3">Flight Legs</h3>
               <div data-travel-form-target="outboundLegs" class="space-y-4">
                 <% @travel_outbound.travel_legs.order(:position).each_with_index do |leg, index| %>
-                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "outbound", show_remove: leg.persisted?, default_date: current_event.ends_at&.strftime('%Y-%m-%d'), refresh_url: refresh_flight_leg_admin_event_participant_path(current_event, @participant_event, leg_id: leg.id) %>
+                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "outbound", show_remove: leg.persisted?, default_date: current_event.local_ends_at&.strftime('%Y-%m-%d'), refresh_url: refresh_flight_leg_admin_event_participant_path(current_event, @participant_event, leg_id: leg.id) %>
                 <% end %>
               </div>
               <button type="button" data-action="click->travel-form#addLeg" data-direction="outbound" class="mt-4 inline-flex items-center gap-1 text-sm text-[#ec3750] hover:text-blue-800">

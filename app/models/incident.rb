@@ -20,11 +20,18 @@ class Incident < ApplicationRecord
 
   has_many :comments, class_name: "IncidentComment", dependent: :destroy
 
+  # The confidential report HQ sees when an organizer escalates this incident.
+  # HQ's thread stays on the report; the incident only shows its status.
+  has_one :hq_report, class_name: "IncidentReport", dependent: :nullify
+
+  # What a fresh incident is visible to before the organizer adjusts it.
+  DEFAULT_VISIBLE_TO_ROLES = %w[event_admin safeguarding_lead].freeze
+
   has_many :medications, class_name: "IncidentMedication", dependent: :destroy
   accepts_nested_attributes_for :medications, allow_destroy: true, reject_if: :all_blank
 
   enum :category, { safeguarding: "safeguarding", medical: "medical", behavior: "behavior", other: "other" }
-  enum :severity, { low: "low", medium: "medium", high: "high", critical: "critical" }
+  enum :severity, IncidentLevel::ENUM
   enum :status, { open: "open", in_review: "in_review", closed: "closed" }
 
   validates :event_id, presence: true
@@ -32,6 +39,7 @@ class Incident < ApplicationRecord
   validates :category, presence: true
   validates :severity, presence: true
   validate :medical_incident_links, if: :medical?
+  before_validation { self.visible_to_roles = Array(visible_to_roles).reject(&:blank?) }
 
   # Medication rows only mean something on a medical incident marked as
   # dispensed; the form keeps hidden rows around, so drop them here.
@@ -39,6 +47,22 @@ class Incident < ApplicationRecord
 
   scope :open_incidents, -> { where(status: %w[open in_review]) }
   scope :for_roles, ->(roles) { where("visible_to_roles && ARRAY[?]::varchar[]", roles) }
+  # What event staff holding `roles` can see: incidents shared with one of
+  # those roles, plus the ones `user` reported. visible_to_staff? is the same
+  # rule for a loaded record; keep the two in step.
+  scope :visible_to_staff, ->(user, roles) { for_roles(roles).or(where(reported_by_user_id: user.id)) }
+
+  def visible_to_staff?(user, roles)
+    reported_by_user_id == user.id || shared_with_roles?(roles)
+  end
+
+  def shared_with_roles?(roles)
+    (visible_to_roles & roles).any?
+  end
+
+  def escalated?
+    hq_report.present?
+  end
 
   private
 

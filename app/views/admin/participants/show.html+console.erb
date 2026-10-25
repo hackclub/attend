@@ -1,0 +1,492 @@
+<% content_for :title, "#{@participant.display_name} – #{current_event.name} – Attend" %>
+
+<div>
+  <%= render "header" %>
+
+  <% if @participant_event.too_old_for_event? %>
+    <div class="cs-alert cs-alert-warning mb-5" data-testid="over-age-limit">
+      <%= cs_status_icon(:warning) %>
+      <div>
+        <p class="cs-alert-title">19 or older during this event</p>
+        <p>Their date of birth ages them out by <%= current_event.local_end_date.strftime("%B %-d, %Y") %>, so onboarding won't let them past their profile. If it's a typo, correct it here or approve their change request; otherwise withdraw them.</p>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <div class="lg:col-span-2 cs-stack">
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">Personal information</h2>
+        </div>
+        <div class="cs-container-body">
+          <dl class="cs-kv cs-kv-2">
+            <div>
+              <dt class="cs-kv-label">Email</dt>
+              <dd class="cs-kv-value"><%= @participant.email %></dd>
+            </div>
+            <% if can_view_participant_pii? %>
+              <div>
+                <dt class="cs-kv-label">Phone</dt>
+                <dd class="cs-kv-value"><%= @participant.phone || "—" %></dd>
+              </div>
+            <% end %>
+            <% if can_view_participant_pii? %>
+              <div>
+                <dt class="cs-kv-label">Date of birth</dt>
+                <dd class="cs-kv-value"><%= cs_absolute_time_tag(@participant.date_of_birth, date_only: true) %></dd>
+              </div>
+            <% end %>
+            <div>
+              <dt class="cs-kv-label">Pronouns</dt>
+              <dd class="cs-kv-value"><%= @participant.pronouns.presence || "—" %></dd>
+            </div>
+            <div>
+              <dt class="cs-kv-label">T-shirt size</dt>
+              <dd class="cs-kv-value"><%= @participant.tshirt_size.presence&.upcase || "—" %></dd>
+            </div>
+            <% if can_view_participant_pii? %>
+              <div>
+                <dt class="cs-kv-label">Address</dt>
+                <dd class="cs-kv-value"><%= [@participant.address_line_1, @participant.address_line_2, @participant.city, @participant.state, @participant.postal_code, @participant.country_of_residence].compact.reject(&:blank?).join(", ").presence || "—" %></dd>
+              </div>
+            <% end %>
+          </dl>
+        </div>
+      </section>
+
+      <% if current_event.travel_enabled? %>
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">Travel</h2>
+          <div class="cs-actions">
+            <%= button_to "Send update reminder",
+                send_travel_update_reminder_admin_event_participant_path(current_event, @participant_event),
+                method: :post,
+                class: "cs-btn",
+                form: { data: { turbo_confirm: "Send a travel update reminder email to #{@participant.email}?" } } %>
+            <%= link_to "Edit", travel_admin_event_participant_path(current_event, @participant_event), class: "cs-btn" %>
+          </div>
+        </div>
+        <div class="cs-container-body">
+          <% if @travel_inbound || @travel_outbound %>
+            <div class="cs-columns cs-columns-2">
+              <div>
+                <h3 class="cs-h3 mb-3">Inbound</h3>
+                <% if @travel_inbound %>
+                  <dl class="cs-kv">
+                    <div><dt class="cs-kv-label">Mode</dt><dd class="cs-kv-value"><%= @travel_inbound.mode&.titleize %></dd></div>
+                    <% if @travel_inbound.plane? && @travel_inbound.travel_legs.any? %>
+                      <% first_leg = @travel_inbound.travel_legs.first %>
+                      <% last_leg = @travel_inbound.travel_legs.last %>
+                      <div><dt class="cs-kv-label">From</dt><dd class="cs-kv-value"><%= first_leg.departure_airport %></dd></div>
+                      <div><dt class="cs-kv-label">Arrival</dt><dd class="cs-kv-value"><%= safe_join([ cs_absolute_time_tag(last_leg.local_arrival_time, zone: last_leg.local_arrival_time&.time_zone), last_leg.arrival_airport.presence ].compact, " - ") %></dd></div>
+                      <div><dt class="cs-kv-label">Flight</dt><dd class="cs-kv-value"><%= first_leg.flight_code %></dd></div>
+                    <% elsif @travel_inbound.car? %>
+                      <div><dt class="cs-kv-label">From</dt><dd class="cs-kv-value">
+                        <% if can_view_participant_pii? %><%= @travel_inbound.origin_address %>
+                        <% else %><span class="italic cs-muted" title="Pickup addresses are hidden for your role">Address hidden</span><% end %>
+                      </dd></div>
+                      <div><dt class="cs-kv-label">Arrival</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_inbound.expected_arrival_time) %></dd></div>
+                    <% elsif @travel_inbound.train? %>
+                      <div><dt class="cs-kv-label">From</dt><dd class="cs-kv-value"><%= @travel_inbound.train_departure_station %></dd></div>
+                      <div><dt class="cs-kv-label">Arrival</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_inbound.arrival_time) %> - <%= @travel_inbound.train_arrival_station %></dd></div>
+                    <% elsif @travel_inbound.bus? %>
+                      <div><dt class="cs-kv-label">From</dt><dd class="cs-kv-value"><%= @travel_inbound.bus_departure_location %></dd></div>
+                      <div><dt class="cs-kv-label">Arrival</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_inbound.arrival_time) %> - <%= @travel_inbound.bus_arrival_location %></dd></div>
+                    <% else %>
+                      <div><dt class="cs-kv-label">Details</dt><dd class="cs-kv-value"><%= @travel_inbound.other_details %></dd></div>
+                    <% end %>
+                  </dl>
+                <% else %>
+                  <p class="cs-muted">Not provided</p>
+                <% end %>
+              </div>
+              <div>
+                <h3 class="cs-h3 mb-3">Outbound</h3>
+                <% if @travel_outbound %>
+                  <dl class="cs-kv">
+                    <div><dt class="cs-kv-label">Mode</dt><dd class="cs-kv-value"><%= @travel_outbound.mode&.titleize %></dd></div>
+                    <% if @travel_outbound.plane? && @travel_outbound.travel_legs.any? %>
+                      <% first_leg = @travel_outbound.travel_legs.first %>
+                      <% last_leg = @travel_outbound.travel_legs.last %>
+                      <div><dt class="cs-kv-label">To</dt><dd class="cs-kv-value"><%= last_leg.arrival_airport %></dd></div>
+                      <div><dt class="cs-kv-label">Departure</dt><dd class="cs-kv-value"><%= safe_join([ cs_absolute_time_tag(first_leg.local_departure_time, zone: first_leg.local_departure_time&.time_zone), first_leg.departure_airport.presence ].compact, " - ") %></dd></div>
+                      <div><dt class="cs-kv-label">Flight</dt><dd class="cs-kv-value"><%= first_leg.flight_code %></dd></div>
+                    <% elsif @travel_outbound.car? %>
+                      <div><dt class="cs-kv-label">To</dt><dd class="cs-kv-value">
+                        <% if can_view_participant_pii? %><%= @travel_outbound.origin_address %>
+                        <% else %><span class="italic cs-muted" title="Pickup addresses are hidden for your role">Address hidden</span><% end %>
+                      </dd></div>
+                      <div><dt class="cs-kv-label">Departure</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_outbound.departure_time) %></dd></div>
+                    <% elsif @travel_outbound.train? %>
+                      <div><dt class="cs-kv-label">To</dt><dd class="cs-kv-value"><%= @travel_outbound.train_arrival_station %></dd></div>
+                      <div><dt class="cs-kv-label">Departure</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_outbound.departure_time) %> - <%= @travel_outbound.train_departure_station %></dd></div>
+                    <% elsif @travel_outbound.bus? %>
+                      <div><dt class="cs-kv-label">To</dt><dd class="cs-kv-value"><%= @travel_outbound.bus_arrival_location %></dd></div>
+                      <div><dt class="cs-kv-label">Departure</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_outbound.departure_time) %> - <%= @travel_outbound.bus_departure_location %></dd></div>
+                    <% else %>
+                      <div><dt class="cs-kv-label">Details</dt><dd class="cs-kv-value"><%= @travel_outbound.other_details %></dd></div>
+                    <% end %>
+                  </dl>
+                <% else %>
+                  <p class="cs-muted">Not provided</p>
+                <% end %>
+              </div>
+            </div>
+          <% else %>
+            <p class="cs-muted">No travel information provided.</p>
+          <% end %>
+        </div>
+      </section>
+      <% end %>
+
+      <% if current_event.accommodation_enabled? %>
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">Accommodation</h2>
+          <div class="cs-actions">
+            <%= link_to "Edit", accommodation_admin_event_participant_path(current_event, @participant_event), class: "cs-btn" %>
+          </div>
+        </div>
+        <div class="cs-container-body">
+          <% if @accommodation %>
+            <dl class="cs-kv cs-kv-2">
+              <div>
+                <dt class="cs-kv-label">Check-in</dt>
+                <dd class="cs-kv-value"><%= cs_absolute_time_tag(@accommodation.check_in_date, date_only: true) %></dd>
+              </div>
+              <div>
+                <dt class="cs-kv-label">Check-out</dt>
+                <dd class="cs-kv-value"><%= cs_absolute_time_tag(@accommodation.check_out_date, date_only: true) %></dd>
+              </div>
+              <div>
+                <dt class="cs-kv-label">Gender identity</dt>
+                <dd class="cs-kv-value"><%= @accommodation.gender_identity&.titleize || "—" %></dd>
+              </div>
+              <div>
+                <dt class="cs-kv-label">Preferred roommate genders</dt>
+                <dd class="cs-kv-value"><%= @accommodation.preferred_roommate_genders&.map(&:titleize)&.join(", ").presence || "—" %></dd>
+              </div>
+              <div>
+                <dt class="cs-kv-label">Assigned room</dt>
+                <dd class="cs-kv-value"><%= @accommodation.assigned_room || "Not assigned" %></dd>
+              </div>
+              <% if @accommodation.roommate_preferences.present? %>
+                <div class="md:col-span-2">
+                  <dt class="cs-kv-label">Roommate preferences</dt>
+                  <dd class="cs-kv-value"><%= @accommodation.roommate_preferences %></dd>
+                </div>
+              <% end %>
+              <% if @accommodation.roommate_exclusions.present? %>
+                <div class="md:col-span-2">
+                  <dt class="cs-kv-label">Do not room with</dt>
+                  <dd class="cs-kv-value"><%= cs_status(:warning, @accommodation.roommate_exclusions) %></dd>
+                </div>
+              <% end %>
+            </dl>
+          <% else %>
+            <p class="cs-muted">No accommodation information provided.</p>
+          <% end %>
+        </div>
+      </section>
+      <% end %>
+
+      <% if policy(@medical || Medical.new(participant_event: @participant_event)).show? %>
+        <section class="cs-container" data-testid="medical-summary">
+          <div class="cs-container-header">
+            <h2 class="cs-h2">Medical summary</h2>
+            <div class="cs-actions">
+              <%= link_to "View details", medical_admin_event_participant_path(current_event, @participant_event), class: "cs-btn" %>
+            </div>
+          </div>
+          <div class="cs-container-body">
+            <% food_safety = @participant_event.food_safety_summary %>
+            <%# Dietary flags show without a Medical record, but only a Medical record can say there are none. %>
+            <% if @medical || food_safety.any_flags? %>
+              <div class="flex flex-wrap gap-2">
+                <% if food_safety.anaphylaxis_risk? %>
+                  <%= cs_status(:error, "Anaphylaxis risk") %>
+                <% end %>
+                <% if food_safety.life_threatening_food_allergies? %>
+                  <%= cs_status(:error, "Life-threatening food allergies") %>
+                <% end %>
+                <% if food_safety.cross_contamination_risk? %>
+                  <%= cs_badge("Cross-contamination risk", "red") %>
+                <% end %>
+                <% if food_safety.allergies? %>
+                  <%= cs_badge("Has allergies", "red") %>
+                <% end %>
+                <% if @medical&.needs_medication_storage? %>
+                  <%= cs_badge("Needs refrigeration", "blue") %>
+                <% end %>
+                <% unless food_safety.any_flags? || @medical&.needs_medication_storage? %>
+                  <span class="cs-muted">No special medical flags</span>
+                <% end %>
+              </div>
+            <% else %>
+              <p class="cs-muted">No medical information provided.</p>
+            <% end %>
+          </div>
+        </section>
+      <% end %>
+
+      <% if current_event.groups_enabled? && current_event.groups.any? %>
+        <section class="cs-container">
+          <div class="cs-container-header">
+            <h2 class="cs-h2">Groups</h2>
+          </div>
+          <%= form_with url: groups_admin_event_participant_path(current_event, @participant_event), method: :patch, local: true do %>
+            <div class="cs-container-body">
+              <% current_member_ids = @participant_event.groups.pluck(:id) %>
+              <% current_event.groups.ordered.each do |g| %>
+                <div class="cs-option">
+                  <%= check_box_tag "group_ids[]", g.id, current_member_ids.include?(g.id), id: "group_ids_#{g.id}" %>
+                  <div>
+                    <label class="cs-option-label" for="group_ids_<%= g.id %>">
+                      <span class="cs-badge"
+                            style="background-color: <%= g.normalized_color || '#e5e7eb' %>; color: <%= g.color.present? ? 'white' : '#1f2d3d' %>;">
+                        <%= g.name %>
+                      </span>
+                    </label>
+                    <% if g.description.present? %>
+                      <p class="cs-option-description"><%= g.description %></p>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+              <%# always submit at least an empty array %>
+              <input type="hidden" name="group_ids[]" value="">
+            </div>
+            <div class="cs-container-footer flex flex-wrap justify-end gap-2">
+              <%= link_to "Manage groups", admin_event_groups_path(current_event), class: "cs-btn cs-btn-link" %>
+              <button type="submit" class="cs-btn cs-btn-primary">Save groups</button>
+            </div>
+          <% end %>
+        </section>
+      <% end %>
+    </div>
+
+    <div class="cs-stack">
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">Guardians</h2>
+        </div>
+        <div class="cs-container-body">
+          <% if @guardian_participant_events.any? %>
+            <ul class="divide-y divide-(--cs-border-divider-secondary)">
+              <% @guardian_participant_events.each do |gpe| %>
+                <li class="py-3 first:pt-0 last:pb-0">
+                  <div class="flex justify-between items-start gap-3">
+                    <div class="min-w-0">
+                      <div class="font-bold"><%= gpe.guardian.full_name %></div>
+                      <div class="cs-secondary flex flex-wrap items-center gap-2">
+                        <% if can_view_participant_pii? %>
+                          <%= gpe.guardian.email %>
+                        <% else %>
+                          <%= contact_hidden_placeholder("Contact details hidden") %>
+                        <% end %>
+                        <% if gpe.guardian.email_undeliverable? %>
+                          <span title="This address hard-bounced and is suppressed — emails to it will not be delivered. Correct the email to clear this."><%= cs_status(:error, "Email bouncing") %></span>
+                        <% end %>
+                      </div>
+                      <% if can_view_participant_pii? %>
+                        <div class="cs-secondary"><%= gpe.guardian.phone %></div>
+                      <% end %>
+                    </div>
+                    <div class="text-right shrink-0">
+                      <% if gpe.completed? %>
+                        <%= cs_status(:success, "Completed") %>
+                      <% elsif current_event.guardian_invites_locked? %>
+                        <%= cs_status(:stopped, "Invites locked") %>
+                      <% elsif gpe.invite_token_sent_at.present? %>
+                        <%= cs_status(:in_progress, "Invite sent") %>
+                        <div class="cs-small cs-muted mt-1">Sent <%= cs_relative_time(gpe.invite_token_sent_at, inline: true) %></div>
+                      <% else %>
+                        <%= cs_status(:pending, "Pending") %>
+                      <% end %>
+                    <% if can_view_participant_pii? %>
+                      <div>
+                        <%= link_to "Edit",
+                            edit_admin_event_participant_guardian_path(current_event, @participant_event, gpe),
+                            class: "cs-link" %>
+                      </div>
+                    <% end %>
+                    </div>
+                  </div>
+                  <div class="mt-2 flex flex-wrap items-center gap-1 -ml-3">
+                    <% unless gpe.completed? || current_event.guardian_invites_locked? %>
+                      <%= button_to "Resend invite",
+                          resend_guardian_invite_admin_event_participant_path(current_event, @participant_event, guardian_participant_event_id: gpe.id),
+                          method: :post,
+                          class: "cs-btn cs-btn-link" %>
+                      <button type="button"
+                              data-controller="clipboard"
+                              data-clipboard-content-value="<%= gpe.invite_url %>"
+                              data-action="click->clipboard#copy"
+                              class="cs-btn cs-btn-link">
+                        Copy portal link
+                      </button>
+                    <% end %>
+                  </div>
+                </li>
+              <% end %>
+            </ul>
+          <% else %>
+            <p class="cs-muted">No guardians linked.</p>
+          <% end %>
+
+          <% if can_view_participant_pii? %>
+          <div class="mt-4 border-2 border-dashed border-orange-400 rounded-lg p-4">
+            <h3 class="cs-h3 mb-3">Link guardian (admin)</h3>
+            <%= form_with url: link_guardian_admin_event_participant_path(current_event, @participant_event), method: :post, local: true, html: { novalidate: true }, data: { controller: "phone-input cs-form-validation" } do |f| %>
+              <div class="cs-field-grid mb-4">
+                <%= cs_field id: "guardian_first_name", label: "First name" do |aria| %>
+                  <%= f.text_field :guardian_first_name, id: "guardian_first_name", class: "cs-input", required: true, autocomplete: "off", **aria %>
+                <% end %>
+                <%= cs_field id: "guardian_last_name", label: "Last name" do |aria| %>
+                  <%= f.text_field :guardian_last_name, id: "guardian_last_name", class: "cs-input", required: true, autocomplete: "off", **aria %>
+                <% end %>
+              </div>
+              <%= cs_field id: "guardian_email", label: "Email",
+                    constraint: "Must be different from the participant's email address." do |aria| %>
+                <%= f.email_field :guardian_email, id: "guardian_email", class: "cs-input", required: true, autocomplete: "off", **aria %>
+              <% end %>
+              <%= cs_field id: "guardian_phone", label: "Phone", optional: true,
+                    constraint: "Include the country code, for example +1 415 555 0132." do |aria| %>
+                <%= f.telephone_field :guardian_phone, id: "guardian_phone", class: "cs-input", **aria %>
+              <% end %>
+              <%= cs_field id: "guardian_relationship", label: "Relationship" do |aria| %>
+                <%= f.select :guardian_relationship, ["Parent", "Legal Guardian", "Other"], { prompt: "Select a relationship" }, id: "guardian_relationship", class: "cs-select", required: true, **aria %>
+              <% end %>
+              <div class="mt-4">
+                <%= f.button "Link guardian", class: "cs-btn" %>
+              </div>
+            <% end %>
+          </div>
+          <% end %>
+        </div>
+      </section>
+
+      <%# Roles that can't see contact details still get an emergency contact's
+          first name and phone number, so they can call someone during an
+          incident. Roles with safeguarding access see the full record here,
+          the same one the safeguarding tab shows. %>
+      <% if @emergency_contacts %>
+        <section class="cs-container">
+          <div class="cs-container-header">
+            <h2 class="cs-h2">Emergency contacts</h2>
+          </div>
+          <div class="cs-container-body">
+            <% if @emergency_contacts.any? %>
+              <ul class="divide-y divide-(--cs-border-divider-secondary)">
+                <% @emergency_contacts.each do |contact| %>
+                  <li class="py-3 first:pt-0 last:pb-0">
+                    <div class="font-bold">
+                      <%= can_view_participant_pii? ? contact.name : contact.first_name %>
+                    </div>
+                    <div class="cs-secondary"><%= contact.phone %></div>
+                    <% if can_view_participant_pii? %>
+                      <% if contact.email.present? %>
+                        <div class="cs-secondary"><%= contact.email %></div>
+                      <% end %>
+                      <% if contact.relationship.present? %>
+                        <div class="cs-muted"><%= contact.relationship %></div>
+                      <% end %>
+                    <% end %>
+                  </li>
+                <% end %>
+              </ul>
+            <% else %>
+              <p class="cs-muted">No emergency contacts recorded.</p>
+            <% end %>
+          </div>
+        </section>
+      <% end %>
+
+      <% if @participant_event.complete? || @participant_event.participant.slack_user_id.present? %>
+        <section class="cs-container">
+          <div class="cs-container-header">
+            <h2 class="cs-h2">Slack integration</h2>
+          </div>
+          <div class="cs-container-body">
+            <% if @participant_event.participant.slack_user_id.present? %>
+              <div class="flex items-center gap-2 <%= "mb-3" if @participant_event.complete? %>">
+                <%= cs_status(:success, "Connected") %>
+                <%= link_to "slack://user?team=T0266FRGM&id=#{@participant_event.participant.slack_user_id}", class: "cs-link" do %><code class="cs-small"><%= @participant_event.participant.slack_user_id %></code><% end %>
+                <button type="button"
+                        data-controller="clipboard"
+                        data-clipboard-content-value="<%= @participant_event.participant.slack_user_id %>"
+                        data-action="click->clipboard#copy"
+                        class="cs-btn cs-btn-link">
+                  Copy
+                </button>
+              </div>
+              <% if @participant_event.complete? %>
+                <% if current_event.slack_channel_id.present? %>
+                  <%= button_to "Invite to channel",
+                      invite_to_slack_channel_admin_event_participant_path(current_event, @participant_event),
+                      method: :post,
+                      class: "cs-btn" %>
+                <% else %>
+                  <p class="cs-muted">No Slack channel configured for this event.</p>
+                <% end %>
+              <% end %>
+            <% else %>
+              <p class="cs-secondary mb-3">Participant has not linked their Slack account via Hack Club Auth.</p>
+              <%= link_to "Generate OAuth invite link",
+                  slack_invite_link_admin_event_participant_path(current_event, @participant_event),
+                  class: "cs-btn" %>
+            <% end %>
+          </div>
+        </section>
+      <% end %>
+
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">Onboarding progress</h2>
+        </div>
+        <div class="cs-container-body">
+          <% onboarding_steps = [] %>
+          <% if current_event.travel_enabled? %>
+            <% onboarding_steps << [ "Inbound travel", @travel_inbound ] << [ "Outbound travel", @travel_outbound ] %>
+          <% end %>
+          <% onboarding_steps << [ "Accommodation", @accommodation ] if current_event.accommodation_enabled? %>
+          <% onboarding_steps << [ "Medical", @medical ] << [ "Dietary", @dietary ] << [ "Accessibility", @accessibility ] << [ "Consents", @consents.signed.any? ] %>
+          <ul class="space-y-2">
+            <% onboarding_steps.each do |label, done| %>
+              <li><%= cs_status(done ? :success : :stopped, label) %></li>
+            <% end %>
+          </ul>
+        </div>
+      </section>
+
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">Scan history</h2>
+          <div class="cs-actions">
+            <%= link_to "View all", history_admin_event_scans_path(current_event, participant_event_id: @participant_event.id),
+                class: "cs-btn cs-btn-link" %>
+          </div>
+        </div>
+        <div class="cs-container-body">
+          <% if @scans.any? %>
+            <ul class="divide-y divide-(--cs-border-divider-secondary)">
+              <% @scans.each do |scan| %>
+                <li class="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                  <div>
+                    <div class="font-bold"><%= scan.user.display_name_or_fallback %></div>
+                    <div class="cs-small cs-muted"><%= scan.scan_context.name %> · <%= cs_absolute_time_tag(scan.scanned_at) %></div>
+                  </div>
+                  <span class="cs-small cs-muted shrink-0"><%= cs_relative_time(scan.scanned_at) %></span>
+                </li>
+              <% end %>
+            </ul>
+          <% else %>
+            <p class="cs-muted">No scans recorded yet.</p>
+          <% end %>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>

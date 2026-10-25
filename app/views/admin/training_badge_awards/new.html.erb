@@ -1,0 +1,20 @@
+<div class="max-w-3xl space-y-6">
+  <%= link_to "← #{@badge.name}", admin_training_badge_path(@badge), class: "text-sm text-gray-500 hover:text-[#ec3750]" %>
+  <h1 class="text-2xl font-bold text-gray-900">Award <%= @badge.name %></h1>
+  <p class="text-sm text-gray-500">For someone who has done equivalent training elsewhere.</p>
+  <%= form_with model: @award, url: admin_training_badge_awards_path(@badge), scope: :training_badge_award, class: "space-y-6" do |f| %>
+    <%= render "admin/training/errors", record: @award %>
+    <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+      <div><%= label_tag :email, "Email address", class: "block text-sm font-medium text-gray-700" %><%= email_field_tag :email, params[:email], class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+      <div><%= f.label :note, "Where was the training done?", class: "block text-sm font-medium text-gray-700" %><%= f.text_area :note, rows: 2, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div><%= f.label :awarded_at, "Training completed", class: "block text-sm font-medium text-gray-700" %><%= f.date_field :awarded_at, value: @award.awarded_at&.to_date, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+        <div><%= f.label :expires_at, "Expires (optional)", class: "block text-sm font-medium text-gray-700" %><%= f.date_field :expires_at, value: @award.expires_at&.to_date, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2">
+      <%= link_to "Cancel", admin_training_badge_path(@badge), class: "px-4 py-2 text-sm text-gray-600" %>
+      <%= f.button "Award Badge", class: "px-4 py-2 bg-[#d42f46] text-white rounded-md text-sm hover:bg-[#b82840]" %>
+    </div>
+  <% end %>
+</div>

@@ -2,6 +2,7 @@ module Api
   module V1
     class ParticipantsController < BaseController
       include Pundit::Authorization
+      include Api::V1::ApiAuditing
 
       # Roles without participant API access (read_only, limited) would
       # otherwise surface Pundit's exception as a 500 to the mobile app.
@@ -9,9 +10,11 @@ module Api
         render json: { error: "Forbidden" }, status: :forbidden
       end
 
+      requires_scope "support:read", only: :lookup
+
       before_action :restrict_api_key_actions
       before_action :set_event
-      before_action :set_participant_event, only: [ :show ]
+      before_action :set_participant_event, only: [ :show, :update, :destroy ]
 
       def index
         sync_cutoff = Time.current
@@ -71,10 +74,21 @@ module Api
       end
 
       def create
+        # API keys are event-scoped credentials issued by an event admin, so
+        # they may invite. A signed-in person needs the event admin role;
+        # api_participants? alone (checked in set_event) lets ops, limited, and
+        # safeguarding leads read the roster, not add to it.
+        authorize @event, :invite_participants? unless api_key_request?
+
         email = params[:email]&.strip&.downcase
         first_name = params[:first_name]&.strip
         last_name = params[:last_name]&.strip
         name = [ first_name, last_name ].compact.join(" ").presence
+
+        details, details_error = invitee_details
+        if details_error
+          return render json: { success: false, error: details_error }, status: :unprocessable_entity
+        end
 
         if email.blank?
           return render json: { success: false, error: "Email is required" }, status: :unprocessable_entity
@@ -90,25 +104,45 @@ module Api
 
         existing_invitation = @event.invitations.find_by(email: email)
         if existing_invitation
-          return render json: { success: false, error: "An invitation has already been sent to this email" }, status: :conflict
+          error = existing_invitation.held? ? "This email has already been added; its invitation is held" : "An invitation has already been sent to this email"
+          return render json: { success: false, error: error }, status: :conflict
         end
 
-        existing_participant = @event.participants.find_by(email: email)
-        if existing_participant
+        # LOWER() to match how register_invitee finds people: an attendee who
+        # self-registered in another case is still already registered.
+        if @event.participants.where("LOWER(participants.email) = ?", email).exists?
           return render json: { success: false, error: "This email is already registered for this event" }, status: :conflict
         end
 
         begin
-          ParticipantMailer.invitation(
-            email: email,
-            name: name,
-            event: @event
-          ).deliver_later
+          invitation = nil
+          participant_event = nil
+
+          # One unit: an invitation nobody is on the roster for, or a roster
+          # entry nobody was invited to, are both worse than neither.
+          ActiveRecord::Base.transaction do
+            invitation = Invitation.issue!(event: @event, email: email, name: name, send: false)
+            participant_event = register_invitee(email: email, first_name: first_name, last_name: last_name, details: details)
+          end
+
+          # Only once both rows are committed. The mail job is enqueued
+          # immediately rather than on commit, and the mailer find-or-creates
+          # the invitation, so sending from inside the transaction would
+          # resurrect and email an invitation the rollback had just undone.
+          # Honours the event's hold: while onboarding invitations are held,
+          # the invitation is recorded and goes out when they're released.
+          invitation.deliver_later
+
+          held = @event.onboarding_invites_held?
 
           render json: {
             success: true,
-            message: "Invitation sent to #{email}",
-            event: @event.name
+            held: held,
+            message: held ? "Invitation held for #{email}" : "Invitation sent to #{email}",
+            event: @event.name,
+            participant_id: participant_event.participant_id,
+            participant_event_id: participant_event.id,
+            status: participant_event.status
           }, status: :created
         rescue ActiveRecord::RecordInvalid => e
           render json: { success: false, error: e.record.errors.full_messages.join(", ") }, status: :unprocessable_entity
@@ -117,22 +151,120 @@ module Api
 
       # Read-only participation check. Unlike `create`, this never sends an
       # invitation or mutates anything, so it is safe to call on every sign-in.
+      # Takes `email` or `slack_id`, never both: the response echoes the key it
+      # matched on, and echoing one that wasn't checked would read as a match.
+      # `participant_event_id` is the id the admin participant page and #show
+      # are keyed on.
+      #
+      # Email works for every caller that can reach the event. Slack ID is for
+      # the support bot only (see #slack_lookup_allowed?).
       def lookup
         email = params[:email].to_s.strip.downcase
+        slack_id = params[:slack_id].to_s.strip.upcase
 
-        if email.blank?
-          return render json: { error: "Email is required" }, status: :unprocessable_entity
+        if email.blank? && slack_id.blank?
+          return render json: { error: "Email or slack_id is required" }, status: :unprocessable_entity
         end
 
-        participant = @event.participants.find_by(email: email)
-        participant_event = participant && @event.participant_events.find_by(participant_id: participant.id)
+        if email.present? && slack_id.present?
+          return render json: { error: "Send email or slack_id, not both" }, status: :unprocessable_entity
+        end
+
+        if slack_id.present? && !slack_lookup_allowed?
+          return render json: {
+            error: "Looking up by slack_id needs a global API token with the support:read scope"
+          }, status: :forbidden
+        end
+
+        participant_event = if email.present?
+          participant = @event.participants.find_by(email: email)
+          participant && @event.participant_events.find_by(participant_id: participant.id)
+        else
+          matches = participant_events_for_slack_id(slack_id).limit(2).to_a
+          if matches.size > 1
+            return render json: { error: "More than one registration matches that Slack ID" }, status: :conflict
+          end
+          matches.first
+        end
 
         render json: {
-          email: email,
+          email: email.presence,
+          slack_id: slack_id.presence,
           registered: participant_event.present?,
-          participant_id: participant&.id,
+          participant_id: participant_event&.participant_id,
+          participant_event_id: participant_event&.id,
+          admin_url: participant_event && AttendUrls.registration_url(participant_event),
           status: participant_event&.status
         }
+      end
+
+      # Edits the person (name, contact details, sizing) and, with `status`,
+      # where their registration stands. Sending status=withdrawn is the
+      # withdraw button; status=in_progress is the reinstate button, after
+      # which #display_status recomputes the real state from their progress.
+      def update
+        authorize @participant_event, :update? unless api_key_request?
+
+        status = params[:status].presence
+        if status && !ParticipantEvent.statuses.key?(status.to_s)
+          return render_error("#{status} is not a valid status. Valid statuses: #{ParticipantEvent.statuses.keys.join(', ')}")
+        end
+
+        participant = @participant_event.participant
+        attributes = participant_update_params
+
+        if attributes.empty? && status.nil?
+          return render_error("Nothing to update. Send a `participant` object and/or a `status`.")
+        end
+
+        if attributes[:country_of_residence].present?
+          country = CountryCodes.normalize(attributes[:country_of_residence])
+          return render_error(unknown_country_error(attributes[:country_of_residence])) unless country
+
+          attributes[:country_of_residence] = country
+        end
+
+        # Backfills send fill_blanks so they only add what's missing and
+        # never overwrite something the participant entered themselves.
+        fill_blanks = ActiveModel::Type::Boolean.new.cast(params[:fill_blanks])
+        if fill_blanks
+          sent_fields = attributes.keys
+          attributes = participant.blank_attributes_only(attributes)
+          skipped_fields = sent_fields - attributes.keys
+        end
+
+        ActiveRecord::Base.transaction do
+          participant.update!(attributes) if attributes.any?
+          @participant_event.update!(status: status) if status
+        end
+
+        audit_api_change!(:record_update, participant) if attributes.any?
+        audit_api_change!(status_audit_action(status), @participant_event, metadata: { status: status }) if status
+
+        response = { participant: participant_json(@participant_event.reload) }
+        response[:skipped_fields] = skipped_fields if fill_blanks
+        render json: response
+      rescue ActiveRecord::RecordInvalid => e
+        render_error(e.record.errors.full_messages.to_sentence)
+      end
+
+      # Removes this person's registration for this event — their profile,
+      # travel, consents and scans for it — and nothing else. The Participant
+      # row survives, along with their registrations for other events, so
+      # someone deleted from one event is not deleted from Attend.
+      def destroy
+        authorize @participant_event, :destroy? unless api_key_request?
+
+        name = @participant_event.participant.display_name
+        revoked = nil
+        ActiveRecord::Base.transaction do
+          revoked = @participant_event.revoke_invitations!.size
+          @participant_event.destroy!
+        end
+        audit_api_change!(:record_destroy, @participant_event, changed_fields: {},
+          metadata: { participant_name: name, invitations_revoked: revoked })
+
+        head :no_content
       end
 
       # Minimal roster for external integrations: just enough to build an
@@ -162,27 +294,154 @@ module Api
 
       private
 
-      # An event API key may only send invitations and read minimal
-      # identity/registration data (lookup, roster) — never the full
-      # participant payload from index/show, which includes sensitive
-      # medical/safeguarding/travel PII.
-      API_KEY_ALLOWED_ACTIONS = %w[create lookup roster].freeze
+      # Puts the invitee on the roster immediately, in the same `invited` state
+      # a CSV import leaves them in, so staff can see them and the "Incomplete
+      # Onboarding" message audience can reach them before they ever sign in.
+      # Onboarding links the person to their account by email and moves them to
+      # `in_progress` the moment they open the wizard.
+      #
+      # `invited` specifically, never `in_progress`: ParticipantEvent#onboarding_held?
+      # keys off that status, and it is what keeps the wizard shut for someone
+      # whose invitation is still held by the event.
+      def register_invitee(email:, first_name:, last_name:, details: {})
+        # LOWER() rather than an exact match: participant emails are not
+        # normalized on write, so an existing person may be stored in another
+        # case. Missing them here would fork the same human into two records.
+        # Oldest first: duplicate rows for one address exist in production,
+        # and without an order the pick would vary between invitations.
+        participant = Participant.where("LOWER(participants.email) = ?", email).order(:created_at).first
+
+        if participant
+          # Someone Attend already knows (from another event): only fill in
+          # what's missing, never overwrite what they entered themselves.
+          # Skip the save when there's nothing to fill in: an older record
+          # may not pass today's validations, and that shouldn't fail an
+          # invite that changes nothing.
+          known = { legal_first_name: first_name.presence, legal_last_name: last_name.presence, **details }.compact
+          fills = participant.blank_attributes_only(known)
+          if fills.any?
+            participant.update!(fills)
+            # Another event's records may rely on these (age checks use the
+            # birthday), so log it the way `update` does.
+            audit_api_change!(:record_update, participant)
+          end
+        else
+          participant = Participant.create!(
+            email: email,
+            # Legal names are validated on every save, but an invitation may
+            # only carry an address. "Unknown" is the placeholder the
+            # onboarding OIDC backfill looks for, so the real name lands on
+            # first sign-in.
+            legal_first_name: first_name.presence || "Unknown",
+            legal_last_name: last_name.presence || "Unknown",
+            **details
+          )
+        end
+
+        # The birthday is kept even if it ages them out; onboarding holds them
+        # until staff sort it out (see ParticipantEvent#skip_age_check).
+        ParticipantEvent.create_with(status: :invited, skip_age_check: true)
+                        .find_or_create_by!(participant: participant, event: @event)
+      end
+
+      # Optional details an integration can send with an invitation, so the
+      # participant's record (and the Hack Club Auth signup form they're sent
+      # to, see HackClubAuthPrefill) starts filled in. Returns
+      # [attributes, error].
+      def invitee_details
+        details = {}
+        details[:preferred_name] = params[:preferred_name].to_s.strip if params[:preferred_name].present?
+        details[:date_of_birth] = Date.iso8601(params[:date_of_birth].to_s) if params[:date_of_birth].present?
+        details[:phone] = params[:phone].to_s.strip if params[:phone].present?
+
+        if params[:country].present?
+          country = CountryCodes.normalize(params[:country])
+          return [ nil, unknown_country_error(params[:country]) ] unless country
+
+          details[:country_of_residence] = country
+        end
+
+        [ details, nil ]
+      rescue Date::Error
+        [ nil, "date_of_birth must be a date in YYYY-MM-DD format" ]
+      end
+
+      def unknown_country_error(value)
+        "#{value.to_s.inspect} isn't a country Attend knows. Send an ISO 3166-1 alpha-2 code (e.g. US) or the country's English name."
+      end
+
+      # An API key may send invitations, read minimal identity/registration
+      # data (lookup, roster), and manage a registration (update, destroy) —
+      # never the full participant payload from index/show, which includes
+      # sensitive medical/safeguarding/travel PII. Applies to event and series
+      # keys alike: a series key is broader in reach, not in what it may read.
+      #
+      # update is on this list even though it *writes* fields a key can't read
+      # back: an integration that owns the source of truth for someone's name
+      # or phone number should be able to correct Attend, and the response is
+      # redacted for keys exactly as index/show would be (see include_pii?).
+      API_KEY_ALLOWED_ACTIONS = %w[create lookup roster update destroy].freeze
 
       def restrict_api_key_actions
-        return unless current_event_from_api_key
+        return unless api_key_request?
         return if API_KEY_ALLOWED_ACTIONS.include?(action_name)
 
         render json: { error: "API key is not authorized for this action" }, status: :forbidden
+      end
+
+      # Mirrors Admin::ParticipantsController#participant_params, minus the
+      # headshot (a file upload has no place in a JSON API). Only the keys
+      # actually sent are written, so a one-field PATCH stays a one-field PATCH.
+      #
+      # Date of birth and phone are writable by every caller that gets this
+      # far, including PII-restricted roles and API keys, which cannot read
+      # them back — an integration correcting a record it owns doesn't need to
+      # see what was there before.
+      PARTICIPANT_WRITABLE_FIELDS = %i[
+        legal_first_name legal_last_name preferred_name email
+        date_of_birth phone pronouns tshirt_size country_of_residence
+      ].freeze
+
+      # Resolving a Slack ID to a registration is a support-bot capability, not
+      # part of what an event or series key (or a signed-in person on the
+      # mobile app) is for. Matches how Api::V1::UsersController gates its
+      # Slack lookup: a global token that permits support:read, which includes
+      # an unrestricted one.
+      def slack_lookup_allowed?
+        current_token.is_a?(GlobalApiToken) && current_token.permits?("support:read")
+      end
+
+      # Only the Slack ID Hack Club Auth verified for the participant's account
+      # counts. The participant and registration columns are typed by people,
+      # and anyone can type someone else's ID there, so a registration nobody
+      # has signed in to can't be found this way.
+      def participant_events_for_slack_id(slack_id)
+        @event.participant_events.joins(participant: :user).where(users: { verified_slack_id: slack_id })
+      end
+
+      def participant_update_params
+        return {} if params[:participant].blank?
+
+        params.require(:participant).permit(*PARTICIPANT_WRITABLE_FIELDS).to_h.symbolize_keys
+      end
+
+      # The web has dedicated withdraw/unwithdraw buttons that audit under
+      # their own action names; a status change through the API is the same
+      # event and should read the same way in the audit log.
+      def status_audit_action(status)
+        case status.to_s
+        when "withdrawn" then :withdraw
+        when "in_progress" then :unwithdraw
+        else :record_update
+        end
       end
 
       def set_event
         @event = Event.find_by(id: params[:event_id]) || Event.find_by!(slug: params[:event_id])
         Current.event = @event
 
-        if current_event_from_api_key
-          unless current_event_from_api_key.id == @event.id
-            render json: { error: "API key is not valid for this event" }, status: :forbidden
-          end
+        if api_key_request?
+          require_api_key_event_scope!(@event)
         else
           authorize @event, :api_participants?
         end
@@ -219,8 +478,10 @@ module Api
           display_name: participant.display_name,
           full_name: participant.full_name,
           email: participant.email,
+          # The phone is omitted, not nulled, for PII-restricted roles — same
+          # contract as date_of_birth and address in #personal_json.
+          **(include_pii? ? { phone: participant.phone } : {}),
           slack_user_id: participant.slack_user_id,
-          phone: participant.phone,
           pronouns: participant.pronouns,
           headshot_url: headshot_url_for(participant),
           status: pe.status,
@@ -427,14 +688,13 @@ module Api
           id: gpe.id,
           guardian_id: g&.id,
           name: g&.full_name,
-          email: g&.email,
-          phone: gpe.phone_override.presence || g&.phone,
+          **(include_pii? ? { email: g&.email, phone: gpe.phone_override.presence || g&.phone } : {}),
           relationship: gpe.relationship,
           is_primary: gpe.is_primary_guardian,
           status: gpe.status,
           accepted_at: gpe.accepted_at&.iso8601,
           completed_at: gpe.completed_at&.iso8601,
-          invited_via_email: gpe.invited_via_email,
+          **(include_pii? ? { invited_via_email: gpe.invited_via_email } : {}),
           invite_token_sent_at: gpe.invite_token_sent_at&.iso8601,
           media_permission: gpe.media_permission,
           photo_permission: gpe.photo_permission,
@@ -445,7 +705,12 @@ module Api
         }
       end
 
+      # An emergency contact's phone number is the one number a PII-restricted
+      # role keeps — you can't run an incident without being able to call
+      # someone — but they get the first name only, and no email address.
       def emergency_contact_json(ec)
+        return { id: ec.id, name: ec.first_name, phone: ec.phone, priority: ec.priority } unless include_pii?
+
         {
           id: ec.id,
           name: ec.name,
@@ -524,14 +789,21 @@ module Api
         }
       end
 
-      # Whether this caller gets exact dates of birth and addresses. Memoized
-      # for the same reason as can_view_sensitive_data? below. A nil
-      # current_user means an event API key, which never reaches the actions
-      # that serve these fields (see API_KEY_ALLOWED_ACTIONS).
+      # Whether this caller gets exact dates of birth, addresses, phone numbers,
+      # and the people around a participant (guardian and emergency contact
+      # details). A participant's own email address is not gated. Memoized
+      # for the same reason as can_view_sensitive_data? below. An API key
+      # never gets any of it: it may write these fields through #update, but
+      # what comes back is the same redacted shape a PII-restricted role sees.
       def include_pii?
         return @include_pii if defined?(@include_pii)
 
-        @include_pii = current_user.nil? || current_user.can_view_participant_pii?(@event)
+        @include_pii =
+          if api_key_request?
+            false
+          else
+            current_user.nil? || current_user.can_view_participant_pii?(@event)
+          end
       end
 
       # Memoized per request: participant_json calls this once per participant,
@@ -551,6 +823,8 @@ module Api
       def emergency_contacts_json(pe)
         pe.guardian_participant_events.flat_map do |gpe|
           gpe.emergency_contacts.sort_by { |ec| ec.priority || Float::INFINITY }.map do |ec|
+            next { name: ec.first_name, phone: ec.phone, priority: ec.priority } unless include_pii?
+
             {
               name: ec.name,
               phone: ec.phone,

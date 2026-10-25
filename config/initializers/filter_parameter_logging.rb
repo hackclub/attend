@@ -1,6 +1,7 @@
 Rails.application.config.filter_parameters += [
   # Authentication & security
   :passw, :email, :secret, :token, :_key, :crypt, :salt, :certificate, :otp, :ssn,
+  /\Acode\z/, # OAuth authorization codes (ConnectedAccountsController)
 
   # Identity fields
   :name, :first_name, :last_name, :legal_first_name, :legal_last_name, :preferred_name,
@@ -33,6 +34,7 @@ Rails.application.config.filter_parameters += [
   # Safeguarding
   :high_support_notes, :high_support_flag, :freedom_waiver_granted, :can_leave_unaccompanied,
   :summary, :details, :actions_taken, :body,
+  :staff_response, :requester_note, :requested_changes,
 
   # Legal
   :code_of_conduct_signature,

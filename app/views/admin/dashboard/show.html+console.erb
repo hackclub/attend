@@ -1,0 +1,370 @@
+<% content_for :title, "Dashboard – #{@event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs(event: @event) %>
+
+<% phase_status_types = { active: :success, starting: :success, upcoming: :info, planning: :pending, draft: :pending, ended: :stopped } %>
+<% awaiting_count = (@display_status_counts["Awaiting Participant"] || 0) + (@display_status_counts["Awaiting Parent"] || 0) %>
+
+<div class="cs-header">
+  <div class="cs-header-text">
+    <h1 class="cs-h1"><%= @event.name %></h1>
+  </div>
+  <div class="cs-actions">
+    <% if policy(@event).manage_integrations? %>
+      <%= link_to "Integrations", admin_event_integrations_path(@event.slug), class: "cs-btn" %>
+    <% end %>
+    <%= link_to "Settings", edit_admin_event_path(@event), class: "cs-btn" %>
+  </div>
+</div>
+
+<div class="cs-stack">
+  <% unless @event.setup_complete? %>
+    <div class="cs-alert cs-alert-warning">
+      <%= cs_status_icon(:warning) %>
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+        <div>
+          <p class="cs-alert-title">Setup isn't finished yet</p>
+          <p>Pick up where you left off to configure dates, modules, and waivers.</p>
+        </div>
+        <%= link_to "Resume setup", admin_event_setup_path(@event), class: "cs-btn self-start sm:self-auto whitespace-nowrap" %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Event status %>
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Event status</h2>
+    </div>
+    <div class="cs-container-body">
+      <dl class="cs-kv cs-kv-3 cs-kv-divided">
+        <div>
+          <dt class="cs-kv-label">Status</dt>
+          <dd class="cs-kv-value"><%= cs_status(phase_status_types.fetch(@event_status[:phase], :info), @event_status[:label]) %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Dates</dt>
+          <dd class="cs-kv-value">
+            <% if @event.starts_at && @event.ends_at %>
+              <%= cs_event_date_range(@event) %>
+            <% else %>
+              <span class="cs-muted">Not set</span>
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Staff</dt>
+          <dd class="cs-kv-value">
+            <%= @staff_count %> staff assigned ·
+            <%= link_to "Manage staff", admin_event_staff_index_path(@event), class: "cs-link cs-link-inline" %>
+          </dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <%# Overview counters %>
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Overview</h2>
+    </div>
+    <div class="cs-container-body">
+      <dl class="cs-kv cs-kv-4 cs-kv-divided">
+        <div>
+          <dt class="cs-kv-label">Total participants</dt>
+          <dd><%= link_to @total_participants, admin_event_participants_path(@event), class: "cs-kv-value-lg block" %></dd>
+          <dd class="cs-kv-value cs-small cs-secondary">
+            <%= @display_status_counts["Complete"] || 0 %> complete · <%= awaiting_count %> in progress
+          </dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">High support</dt>
+          <dd class="cs-kv-value-lg"><%= @high_support_participants.count %></dd>
+          <dd class="cs-kv-value cs-small">
+            <% if @high_support_participants.any? %>
+              <%= cs_status(:warning, "Participants flagged for support") %>
+            <% else %>
+              <span class="cs-secondary">Participants flagged for support</span>
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Pending consents</dt>
+          <dd class="cs-kv-value-lg"><%= @consent_stats[:pending] %></dd>
+          <dd class="cs-kv-value cs-small cs-secondary">
+            <%= @consent_stats[:signed] %> signed · <%= @consent_stats[:waivers_pending] %> waivers pending
+          </dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Open incidents</dt>
+          <dd><%= link_to @open_incidents_count, admin_event_incidents_path(@event), class: "cs-kv-value-lg block" %></dd>
+          <dd class="cs-kv-value cs-small cs-secondary">Click to view all incidents</dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <div class="lg:col-span-2 cs-stack">
+      <%# Onboarding progress %>
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">Onboarding progress</h2>
+          <% if policy(@event).invite_participants? %>
+            <div class="cs-actions">
+              <%= link_to "Invite participants", new_invite_admin_event_participants_path(@event), class: "cs-btn" %>
+            </div>
+          <% end %>
+        </div>
+        <div class="cs-container-body">
+          <% display_status_types = { "Awaiting Participant" => :pending, "Awaiting Parent" => :pending, "Complete" => :success, "Withdrawn" => :stopped } %>
+          <dl class="cs-kv cs-kv-4 cs-kv-divided">
+            <% display_status_types.each do |ds, type| %>
+              <div>
+                <dt class="cs-kv-label"><%= cs_status(type, ds) %></dt>
+                <dd class="cs-kv-value-lg"><%= @display_status_counts[ds] || 0 %></dd>
+              </div>
+            <% end %>
+          </dl>
+        </div>
+      </section>
+
+      <%# Travel overview %>
+      <% if @event.travel_enabled? %>
+        <section class="cs-container">
+          <div class="cs-container-header">
+            <h2 class="cs-h2">Travel overview</h2>
+            <div class="cs-actions">
+              <%= link_to "Travel calendar", admin_event_travel_path(@event), class: "cs-btn" %>
+            </div>
+          </div>
+          <div class="cs-container-body">
+            <div class="cs-columns cs-columns-2">
+              <div>
+                <h3 class="cs-h3 mb-3">Arrivals (inbound)</h3>
+                <dl class="cs-kv cs-kv-2">
+                  <div>
+                    <dt class="cs-kv-label">Submitted</dt>
+                    <dd class="cs-kv-value"><%= @travel_stats[:inbound_complete] %></dd>
+                  </div>
+                  <div>
+                    <dt class="cs-kv-label">Missing</dt>
+                    <dd class="cs-kv-value">
+                      <%= @travel_stats[:missing_inbound] > 0 ? cs_status(:error, @travel_stats[:missing_inbound].to_s) : @travel_stats[:missing_inbound] %>
+                    </dd>
+                  </div>
+                </dl>
+                <% if @travel_stats[:arriving_today] > 0 %>
+                  <p class="mt-3"><%= cs_status(:info, "#{@travel_stats[:arriving_today]} arriving today") %></p>
+                <% end %>
+              </div>
+              <div>
+                <h3 class="cs-h3 mb-3">Departures (outbound)</h3>
+                <dl class="cs-kv cs-kv-2">
+                  <div>
+                    <dt class="cs-kv-label">Submitted</dt>
+                    <dd class="cs-kv-value"><%= @travel_stats[:outbound_complete] %></dd>
+                  </div>
+                  <div>
+                    <dt class="cs-kv-label">Missing</dt>
+                    <dd class="cs-kv-value">
+                      <%= @travel_stats[:missing_outbound] > 0 ? cs_status(:error, @travel_stats[:missing_outbound].to_s) : @travel_stats[:missing_outbound] %>
+                    </dd>
+                  </div>
+                </dl>
+                <% if @travel_stats[:departing_today] > 0 %>
+                  <p class="mt-3"><%= cs_status(:info, "#{@travel_stats[:departing_today]} departing today") %></p>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        </section>
+      <% end %>
+
+      <%# Recent incidents %>
+      <section class="cs-container">
+        <div class="cs-container-header cs-container-header-divided">
+          <h2 class="cs-h2">Recent incidents</h2>
+          <div class="cs-actions">
+            <%= link_to "View all", admin_event_incidents_path(@event), class: "cs-btn cs-btn-link" %>
+            <%= link_to "Report new", new_admin_event_incident_path(@event), class: "cs-btn" %>
+          </div>
+        </div>
+        <% if @recent_incidents.any? %>
+          <div class="cs-table-wrap">
+            <table class="cs-table cs-table-compact">
+              <thead>
+                <tr>
+                  <th scope="col">Level</th>
+                  <th scope="col">Category</th>
+                  <th scope="col">Participant</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Reported</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @recent_incidents.each do |incident| %>
+                  <tr>
+                    <td><%= incident_level_badge(incident.severity) %></td>
+                    <td><%= link_to incident.category.titleize, admin_event_incident_path(@event, incident), class: "cs-link cs-link-strong" %></td>
+                    <td>
+                      <% if incident.participant_event %>
+                        <%= incident.participant_event.participant.display_name %>
+                      <% else %>
+                        <span class="cs-secondary">General incident</span>
+                      <% end %>
+                    </td>
+                    <td class="whitespace-nowrap"><%= incident_status(incident.status) %></td>
+                    <td class="whitespace-nowrap cs-secondary"><%= cs_relative_time(incident.created_at) %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% else %>
+          <div class="cs-empty">
+            <p class="cs-empty-title">No incidents reported</p>
+          </div>
+        <% end %>
+      </section>
+    </div>
+
+    <div class="cs-stack">
+      <%# High support participants %>
+      <% if @high_support_participants.any? %>
+        <section class="cs-container">
+          <div class="cs-container-header cs-container-header-divided">
+            <h2 class="cs-h2">High support participants <span class="cs-counter">(<%= @high_support_participants.count %>)</span></h2>
+          </div>
+          <div class="cs-table-wrap max-h-64 overflow-y-auto">
+            <table class="cs-table cs-table-compact">
+              <thead>
+                <tr><th scope="col">Participant</th><th scope="col">Status</th></tr>
+              </thead>
+              <tbody>
+                <% @high_support_participants.first(10).each do |pe| %>
+                  <tr>
+                    <td><%= link_to pe.participant.display_name, safeguarding_admin_event_participant_path(@event, pe), class: "cs-link" %></td>
+                    <td class="cs-secondary"><%= pe.status.titleize %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+          <% if @high_support_participants.count > 10 %>
+            <div class="cs-container-footer">+ <%= @high_support_participants.count - 10 %> more</div>
+          <% end %>
+        </section>
+      <% end %>
+
+      <%# Recent activity %>
+      <section class="cs-container">
+        <div class="cs-container-header cs-container-header-divided">
+          <h2 class="cs-h2">Recent activity</h2>
+          <div class="cs-actions">
+            <%= link_to "View all", admin_audit_logs_path(event_id: @event.id), class: "cs-btn cs-btn-link" %>
+          </div>
+        </div>
+        <% if @recent_activity.any? %>
+          <div class="cs-table-wrap max-h-96 overflow-y-auto">
+            <table class="cs-table cs-table-compact">
+              <thead>
+                <tr><th scope="col"><span class="sr-only">Actor</span></th><th scope="col">Action</th><th scope="col">Logged</th></tr>
+              </thead>
+              <tbody>
+                <% @recent_activity.each do |log| %>
+                  <tr>
+                    <td class="w-0">
+                      <% if log.actor&.avatar_displayable? %>
+                        <%= image_tag log.actor.avatar.variant(resize_to_fill: [ 32, 32 ]), class: "cs-avatar", alt: "" %>
+                      <% else %>
+                        <span class="cs-avatar" aria-hidden="true"><%= log.actor&.initials || "SY" %></span>
+                      <% end %>
+                    </td>
+                    <td>
+                      <%= link_to admin_audit_log_path(log), class: "cs-link" do %>
+                        <span class="font-bold"><%= log.action&.titleize || "Unknown" %></span>
+                        <%= log.record_type %>
+                      <% end %>
+                    </td>
+                    <td class="whitespace-nowrap cs-secondary"><%= cs_relative_time(log.created_at) %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% else %>
+          <div class="cs-empty">
+            <p class="cs-empty-title">No recent activity</p>
+          </div>
+        <% end %>
+      </section>
+
+      <%# Admin tools %>
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">Admin tools</h2>
+        </div>
+        <div class="cs-container-body">
+          <div class="flex flex-col items-start gap-2">
+            <% if policy(@event).invite_participants? %>
+              <%= link_to "Import participants", new_admin_event_import_path(@event), class: "cs-btn cs-btn-full" %>
+            <% end %>
+            <%= link_to "Export data", admin_event_exports_path(@event), class: "cs-btn cs-btn-full" %>
+            <%= link_to "Manage staff", admin_event_staff_index_path(@event), class: "cs-btn cs-btn-full" %>
+            <% if policy(@event).manage_integrations? %>
+              <%= link_to "Integrations & API", admin_event_integrations_path(@event.slug), class: "cs-btn cs-btn-full" %>
+            <% end %>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <%# Event staff %>
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided">
+      <h2 class="cs-h2">Event staff <span class="cs-counter">(<%= @staff_count %>)</span></h2>
+      <div class="cs-actions">
+        <%= link_to "Manage staff", admin_event_staff_index_path(@event), class: "cs-btn" %>
+      </div>
+    </div>
+    <% if @event_role_assignments.any? %>
+      <% role_badge_colors = { "event_admin" => "blue", "safeguarding_lead" => "red", "ops" => "green" } %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">User</th>
+              <th scope="col">Role</th>
+              <th scope="col">Added</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @event_role_assignments.limit(5).each do |assignment| %>
+              <tr>
+                <td class="whitespace-nowrap">
+                  <div class="font-bold"><%= assignment.user.display_name_or_fallback %></div>
+                  <div class="cs-small cs-secondary"><%= assignment.user.email %></div>
+                </td>
+                <td class="whitespace-nowrap"><%= cs_badge(assignment.role.titleize, role_badge_colors[assignment.role]) %></td>
+                <td class="whitespace-nowrap cs-secondary"><%= cs_relative_time(assignment.created_at) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+      <% if @event_role_assignments.count > 5 %>
+        <div class="cs-container-footer">
+          <%= link_to "View all #{@event_role_assignments.count} staff members", admin_event_staff_index_path(@event), class: "cs-link" %>
+        </div>
+      <% end %>
+    <% else %>
+      <div class="cs-empty">
+        <p class="cs-empty-title">No staff members assigned yet</p>
+        <div class="cs-actions">
+          <%= link_to "Add staff member", new_admin_event_staff_path(@event), class: "cs-btn" %>
+        </div>
+      </div>
+    <% end %>
+  </section>
+</div>

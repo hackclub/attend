@@ -1,0 +1,325 @@
+<%= form_with model: [:admin, event], class: "cs-stack", multipart: true, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+  <% if params[:return_to].in?(Admin::EventsController::SETUP_RETURNS) %>
+    <%= hidden_field_tag :return_to, params[:return_to] %>
+  <% end %>
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Basic information</h2>
+    </div>
+    <div class="cs-container-body">
+      <div class="cs-field-grid">
+        <%= render "admin/events/console_identity_fields", f: f, event: event %>
+        <% if current_user.global_admin? && EventSeries.any? %>
+          <%= cs_form_field f, :event_series_id, label: "Series", optional: true, error_keys: [ :event_series ],
+                constraint: "Series members can manage this event and it inherits the series' branding." do |aria| %>
+            <%= f.collection_select :event_series_id, EventSeries.order(:name), :id, :name, { include_blank: "No series (standalone event)" }, class: "cs-select", **aria %>
+          <% end %>
+        <% elsif event.event_series %>
+          <div>
+            <span class="cs-field-label block">Series</span>
+            <p class="mt-1 flex items-center gap-2">
+              <%= render "admin/events/avatar", event: event.event_series, size: 20, rounded: "rounded-md" %>
+              Part of <strong><%= event.event_series.name %></strong>
+            </p>
+          </div>
+        <% end %>
+      </div>
+
+      <%= cs_form_field f, :logo, label: "Logo", optional: true, class: "mt-4",
+            constraint: "JPEG, PNG, GIF, WebP or SVG, up to 5 MB. Shown in the sidebar and event picker.#{" Uploads as soon as you choose a file." if event.persisted?}" do |aria| %>
+        <div class="mt-1 flex items-center gap-4"
+             data-controller="instant-upload"
+             data-instant-upload-field-value="logo"
+             data-instant-upload-url-value="<%= event.persisted? ? attach_image_admin_event_path(event) : "" %>">
+          <%= render "admin/events/image_preview", event: event, field: "logo" %>
+          <div class="flex flex-col gap-1 min-w-0">
+            <%= f.file_field :logo, accept: "image/jpeg,image/png,image/gif,image/webp,image/svg+xml", data: { instant_upload_target: "input", action: "change->instant-upload#upload" }, class: "cs-file", **aria %>
+            <span data-instant-upload-target="status" class="cs-small" aria-live="polite"></span>
+          </div>
+        </div>
+      <% end %>
+
+      <%= cs_form_field f, :banner, label: "Ticket banner", optional: true, class: "mt-4",
+            description: "Shown as the hero image on Google Wallet tickets (full image, roughly 5:4) and cropped to a wide center strip on Apple Wallet tickets. Avoid text in the image and keep the important content centered.",
+            constraint: "PNG or JPEG, 1032×812 px recommended, up to 5 MB.#{" Uploads as soon as you choose a file." if event.persisted?}" do |aria| %>
+        <div class="mt-1 flex items-center gap-4"
+             data-controller="instant-upload"
+             data-instant-upload-field-value="banner"
+             data-instant-upload-url-value="<%= event.persisted? ? attach_image_admin_event_path(event) : "" %>">
+          <%= render "admin/events/image_preview", event: event, field: "banner" %>
+          <div class="flex flex-col gap-1 min-w-0">
+            <%= f.file_field :banner, accept: "image/jpeg,image/png", data: { instant_upload_target: "input", action: "change->instant-upload#upload" }, class: "cs-file", **aria %>
+            <span data-instant-upload-target="status" class="cs-small" aria-live="polite"></span>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Location and time</h2>
+    </div>
+    <div class="cs-container-body">
+      <div class="cs-field-grid">
+        <%= cs_form_field f, :location_city, label: "City", optional: true %>
+        <%= cs_form_field f, :location_country, label: "Country", optional: true %>
+        <%= cs_form_field f, :timezone, label: "Time zone" do |aria| %>
+          <%= f.time_zone_select :timezone, nil, {}, class: "cs-select", **aria %>
+        <% end %>
+      </div>
+    </div>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2">Venue details</h2>
+        <p class="cs-container-description">Venue information for Google Wallet passes. The pass shows it only when both the venue name and address are set.</p>
+      </div>
+    </div>
+    <div class="cs-container-body">
+      <div class="cs-field-grid">
+        <%= cs_form_field f, :venue_name, label: "Venue name", optional: true, constraint: "For example: Reaktor" %>
+        <%= cs_form_field f, :location_address, label: "Venue address", optional: true, id: "venue-address-input",
+              constraint: "Start typing to search Google Places." do |aria| %>
+          <%= f.text_field :location_address, id: "venue-address-input", class: "cs-input", autocomplete: "off", **aria %>
+        <% end %>
+      </div>
+      <%= f.hidden_field :location_latitude, id: "venue-latitude" %>
+      <%= f.hidden_field :location_longitude, id: "venue-longitude" %>
+    </div>
+  </section>
+
+  <script nonce="<%= content_security_policy_nonce %>">
+    (function() {
+      var script = document.createElement('script');
+      script.src = 'https://maps.googleapis.com/maps/api/js?key=<%= Rails.application.credentials.dig(:google, :key) %>&libraries=places&callback=initPlacesAutocomplete';
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+
+    function initPlacesAutocomplete() {
+      var input = document.getElementById('venue-address-input');
+      if (!input) return;
+
+      var autocomplete = new google.maps.places.Autocomplete(input, {
+        types: ['establishment', 'geocode']
+      });
+
+      autocomplete.addListener('place_changed', function() {
+        var place = autocomplete.getPlace();
+        if (place.geometry) {
+          document.getElementById('venue-latitude').value = place.geometry.location.lat();
+          document.getElementById('venue-longitude').value = place.geometry.location.lng();
+        }
+        if (place.formatted_address) {
+          input.value = place.formatted_address;
+        }
+      });
+    }
+  </script>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Event dates</h2>
+    </div>
+    <div class="cs-container-body">
+      <div class="cs-field-grid">
+        <%= cs_form_field f, :starts_at, label: "Starts at", optional: true do |aria| %>
+          <%= f.datetime_local_field :starts_at, value: f.object.schedule_time_field_value(:starts_at), class: "cs-input", **aria %>
+        <% end %>
+        <%= cs_form_field f, :ends_at, label: "Ends at", optional: true do |aria| %>
+          <%= f.datetime_local_field :ends_at, value: f.object.schedule_time_field_value(:ends_at), class: "cs-input", **aria %>
+        <% end %>
+      </div>
+    </div>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Registration period</h2>
+    </div>
+    <div class="cs-container-body">
+      <div class="cs-field-grid">
+        <%= cs_form_field f, :registration_open_at, label: "Registration opens at", optional: true do |aria| %>
+          <%= f.datetime_local_field :registration_open_at, value: f.object.schedule_time_field_value(:registration_open_at), class: "cs-input", **aria %>
+        <% end %>
+        <%= cs_form_field f, :registration_close_at, label: "Registration closes at", optional: true do |aria| %>
+          <%= f.datetime_local_field :registration_close_at, value: f.object.schedule_time_field_value(:registration_close_at), class: "cs-input", **aria %>
+        <% end %>
+      </div>
+    </div>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2">Arrival window</h2>
+        <p class="cs-container-description">Shown to attendees as "when to arrive" on their dashboard.</p>
+      </div>
+    </div>
+    <div class="cs-container-body">
+      <div class="cs-field-grid">
+        <%= cs_form_field f, :arrival_opens_at, label: "Arrival opens at", optional: true do |aria| %>
+          <%= f.datetime_local_field :arrival_opens_at, value: f.object.schedule_time_field_value(:arrival_opens_at), class: "cs-input", **aria %>
+        <% end %>
+        <%= cs_form_field f, :arrival_closes_at, label: "Arrival closes at", optional: true do |aria| %>
+          <%= f.datetime_local_field :arrival_closes_at, value: f.object.schedule_time_field_value(:arrival_closes_at), class: "cs-input", **aria %>
+        <% end %>
+      </div>
+    </div>
+  </section>
+
+  <% if event.persisted? && event.scan_contexts.any? %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Rooming</h2>
+      </div>
+      <div class="cs-container-body">
+        <%= cs_form_field f, :hotel_scan_context_id, label: "Hotel scan context", optional: true, error_keys: [ :hotel_scan_context ],
+              constraint: "The scan context used for hotel check-in. Participants with this scan show as green on the rooming finalize page." do |aria| %>
+          <%= f.select :hotel_scan_context_id,
+              event.scan_contexts.map { |c| [c.name, c.id] },
+              { include_blank: "None", selected: event.hotel_scan_context_id },
+              class: "cs-select", **aria %>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Event options</h2>
+    </div>
+    <div class="cs-container-body">
+      <div class="cs-option">
+        <%= f.check_box :freedom_waivers_enabled %>
+        <div>
+          <%= f.label :freedom_waivers_enabled, "Enable freedom waivers", class: "cs-option-label" %>
+          <p class="cs-option-description">Allow guardians to grant additional freedom permissions for minor participants</p>
+        </div>
+      </div>
+      <div class="cs-option">
+        <%= f.check_box :travel_enabled, { checked: f.object.travel_enabled? } %>
+        <div>
+          <%= f.label :travel_enabled, "Enable travel", class: "cs-option-label" %>
+          <p class="cs-option-description">Collect travel information from participants. Disabling hides the travel onboarding step, travel dashboards, and Travel Calendar</p>
+        </div>
+      </div>
+      <div class="cs-option">
+        <%= f.check_box :visa_options_enabled %>
+        <div class="w-full">
+          <%= f.label :visa_options_enabled, "Enable visa options", class: "cs-option-label" %>
+          <p class="cs-option-description">Show visa requirement fields in travel information for international participants</p>
+          <%= cs_form_field f, :visa_application_url, label: "Visa letter application URL", optional: true, class: "mt-3",
+                constraint: "The Envoy application form participants are pointed to when they need a visa letter. For example: https://visas.hackclub.com/…" do |aria| %>
+            <%= f.url_field :visa_application_url, class: "cs-input", data: { cs_example: "https://visas.hackclub.com/…" }, **aria %>
+          <% end %>
+        </div>
+      </div>
+      <div class="cs-option">
+        <%= f.check_box :accommodation_enabled %>
+        <div>
+          <%= f.label :accommodation_enabled, "Enable accommodation", class: "cs-option-label" %>
+          <p class="cs-option-description">Show accommodation/housing preferences in onboarding for events with overnight stays</p>
+        </div>
+      </div>
+      <div class="cs-option">
+        <%= f.check_box :roommate_preferences_enabled %>
+        <div>
+          <%= f.label :roommate_preferences_enabled, "Enable roommate preferences", class: "cs-option-label" %>
+          <p class="cs-option-description">Show roommate preference fields on the accommodation onboarding step</p>
+        </div>
+      </div>
+      <div class="cs-option">
+        <%= f.check_box :guardian_invites_locked %>
+        <div>
+          <%= f.label :guardian_invites_locked, "Lock guardian invites", class: "cs-option-label" %>
+          <p class="cs-option-description">Hold off sending guardian invitations while waiver details are being finalised</p>
+        </div>
+      </div>
+      <div class="cs-option">
+        <%= f.check_box :onboarding_invites_held %>
+        <div>
+          <%= f.label :onboarding_invites_held, "Hold onboarding invitations", class: "cs-option-label" %>
+          <p class="cs-option-description">Add and import participants without emailing them. Unticking this sends every held invitation, as does the button on the participants page or the series page.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Account linking</h2>
+      <p class="cs-container-description">Ask registrants to connect a GitHub or itch.io account in an extra onboarding step.<% if f.object.event_series %> Leave on "Same as series" to follow <%= f.object.event_series.name %>.<% end %></p>
+    </div>
+    <div class="cs-container-body">
+      <div class="cs-field-grid">
+        <% EventSeries::ACCOUNT_LINKING_PROVIDERS.each do |provider| %>
+          <% provider_name = AccountLinking.provider_name(provider) %>
+          <div class="cs-stack">
+            <%= cs_form_field f, :"#{provider}_linking", label: "#{provider_name} account", warning: account_linking_credentials_warning(provider) do |aria| %>
+              <%= f.select :"#{provider}_linking", event_account_linking_options(f.object, provider), {}, class: "cs-select", **aria %>
+            <% end %>
+            <%= cs_form_field f, :"#{provider}_help_url", label: "#{provider_name} how-to link", optional: true,
+                  constraint: "Shown to people who don't have an account yet.#{" Blank uses the series' link." if f.object.event_series}" do |aria| %>
+              <%= f.url_field :"#{provider}_help_url", class: "cs-input", placeholder: f.object.event_series&.account_help_url(provider) || "https://", **aria %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2">NFC badges</h2>
+        <p class="cs-container-description">Enable NFC badge support for events with physical PCB badges or NFC wristbands.</p>
+      </div>
+    </div>
+    <div class="cs-container-body">
+      <div class="cs-option">
+        <%= f.check_box :nfc_badges_enabled %>
+        <div>
+          <%= f.label :nfc_badges_enabled, "Enable NFC badges", class: "cs-option-label" %>
+          <p class="cs-option-description">Allow participants to be checked in by scanning NFC badges</p>
+        </div>
+      </div>
+      <div class="cs-option">
+        <%= f.check_box :nfc_badge_write_on_checkin_enabled %>
+        <div>
+          <%= f.label :nfc_badge_write_on_checkin_enabled, "Prompt NFC write on initial check-in", class: "cs-option-label" %>
+          <p class="cs-option-description">After a participant scans their QR code, offer to write their ID to an NFC badge</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2">Groups</h2>
+        <p class="cs-container-description">Tag participants with named groups (for example, "Hardware" or "General Attendance") to distinguish cohorts within the same event.</p>
+      </div>
+    </div>
+    <div class="cs-container-body">
+      <div class="cs-option">
+        <%= f.check_box :groups_enabled %>
+        <div>
+          <%= f.label :groups_enabled, "Enable groups", class: "cs-option-label" %>
+          <p class="cs-option-description">Show group chips on tickets, scans, the participant table, messaging, rooming, and the Travel Calendar.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <%= cs_form_errors f %>
+
+  <div class="flex flex-col-reverse sm:flex-row justify-end gap-2">
+    <%= link_to "Cancel", (event.persisted? ? admin_event_dashboard_path(event.slug) : admin_root_path), class: "cs-btn cs-btn-link cs-btn-full justify-center" %>
+    <%= f.button class: "cs-btn cs-btn-primary cs-btn-full justify-center" %>
+  </div>
+<% end %>

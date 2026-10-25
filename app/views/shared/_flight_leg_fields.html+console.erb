@@ -1,0 +1,91 @@
+<%# locals: (leg:, index:, direction:, show_remove: false, default_date: nil, refresh_url: nil) %>
+<%# Console variant of the flight leg fields, rendered only in the admin
+    console. Onboarding and the participant dashboard keep the original
+    partial. Same field names, ids and Stimulus hooks; Cloudscape labels and
+    the data-cs-field wrappers the validation controller reads. Matches the
+    add-a-leg <template> in admin/participants/travel.html+console.erb. %>
+<% admin_tool do %>
+  <details class="cs-expandable">
+    <summary>Raw leg data</summary>
+    <div class="cs-expandable-content">
+      <pre class="cs-copy-value overflow-auto whitespace-pre-wrap"><code><%= leg.to_json %></code></pre>
+    </div>
+  </details>
+<% end %>
+<div class="border border-(--cs-border-container) rounded-(--cs-radius-container) p-4 relative"
+     data-travel-form-target="legTemplate"
+     data-autosave-skip>
+  <% if show_remove %>
+    <button type="button" data-action="click->travel-form#removeLeg" class="cs-modal-close absolute top-2 right-2" aria-label="Remove leg">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+  <% end %>
+  <div class="cs-h3 mb-3">Leg <%= index + 1 %></div>
+  <input type="hidden" name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][id]" value="<%= leg.id %>">
+  <input type="hidden" name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][position]" value="<%= index %>">
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+    <div data-cs-field data-cs-label="Flight code">
+      <label class="cs-field-label" for="<%= "#{direction}_leg_#{index}_flight_code" %>">Flight code</label>
+      <input type="text"
+             id="<%= "#{direction}_leg_#{index}_flight_code" %>"
+             name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][flight_code]"
+             value="<%= leg.flight_code %>"
+             placeholder="LH1234"
+             required
+             class="cs-input">
+    </div>
+    <div data-cs-field data-cs-label="Confirmation code">
+      <label class="cs-field-label" for="<%= "#{direction}_leg_#{index}_confirmation_code" %>">Confirmation code<span class="cs-field-optional"> - optional</span></label>
+      <input type="text"
+             id="<%= "#{direction}_leg_#{index}_confirmation_code" %>"
+             name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][confirmation_code]"
+             value="<%= leg.confirmation_code %>"
+             placeholder="Booking reference"
+             class="cs-input">
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+    <% [ [ "departure_airport", "Departure airport", "LHR" ], [ "arrival_airport", "Arrival airport", "VIE" ] ].each do |field, label, example| %>
+      <div data-controller="airport-autocomplete" class="relative" data-cs-field data-cs-label="<%= label %>">
+        <label class="cs-field-label" for="<%= "#{direction}_leg_#{index}_#{field}" %>"><%= label %></label>
+        <input type="text"
+               id="<%= "#{direction}_leg_#{index}_#{field}" %>"
+               name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][<%= field %>]"
+               value="<%= leg.public_send(field) %>"
+               placeholder="<%= example %>"
+               required
+               autocomplete="off"
+               data-airport-autocomplete-target="input"
+               data-action="input->airport-autocomplete#search keydown->airport-autocomplete#onKeydown blur->airport-autocomplete#onBlur"
+               class="cs-input">
+        <div data-airport-autocomplete-target="dropdown" class="hidden cs-menu cs-menu-scroll left-0 w-full">
+          <div data-airport-autocomplete-target="results"></div>
+        </div>
+        <p class="cs-field-hint">3-letter IATA or 4-letter ICAO code.</p>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <% [ [ "departure", "Departure time" ], [ "arrival", "Arrival time" ] ].each do |kind, label| %>
+      <div data-cs-field data-cs-label="<%= label %>">
+        <label class="cs-field-label" for="<%= "#{direction}_leg_#{index}_#{kind}_time" %>"><%= label %></label>
+        <input type="datetime-local"
+               id="<%= "#{direction}_leg_#{index}_#{kind}_time" %>"
+               name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][<%= kind %>_time]"
+               value="<%= flight_local_input_value(leg, kind, default_date: default_date) %>"
+               required
+               class="cs-input">
+        <select name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][<%= kind %>_time_zone]"
+                class="cs-select mt-1"
+                aria-label="<%= label %> zone"
+                data-cs-validate="false">
+          <%= travel_leg_time_zone_options(leg.time_zone_pick(kind)) %>
+        </select>
+        <p class="cs-field-hint">Local time at the <%= kind %> airport.</p>
+      </div>
+    <% end %>
+  </div>
+</div>

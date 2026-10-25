@@ -1,0 +1,13 @@
+<% content_for :title, "New Series – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs(cs_gated_crumb("Event series", admin_series_index_path, policy(EventSeries).index?), [ "Create series", nil ]) %>
+
+<div class="cs-stack max-w-3xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Create an event series</h1>
+      <p class="cs-description">A series groups related events under shared branding and a shared team who can create and manage events within it.</p>
+    </div>
+  </div>
+
+  <%= render "form" %>
+</div>

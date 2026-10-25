@@ -1,0 +1,138 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Training", admin_training_path ], [ @course.title, nil ]) %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1"><%= @course.title %></h1>
+      <% if @course.summary.present? %><p class="cs-description"><%= @course.summary %></p><% end %>
+    </div>
+    <div class="cs-actions">
+      <%= link_to "Preview", training_course_path(@course), class: "cs-btn cs-btn-full" unless @course.archived? %>
+      <%= link_to "Edit", edit_admin_training_course_path(@course), class: "cs-btn cs-btn-full" %>
+      <% if @course.draft? || @course.archived? %>
+        <%= button_to "Publish", admin_training_course_path(@course), method: :patch, params: { training_course: { status: "published" } }, class: "cs-btn cs-btn-primary cs-btn-full",
+              data: { turbo_confirm: (@course.access_open? ? "Publish this course? Everyone signed in to Attend will be able to take it." : "Publish this course? Invited people, and staff whose role needs its badge, will be able to take it.") } %>
+      <% else %>
+        <%= button_to "Unpublish", admin_training_course_path(@course), method: :patch, params: { training_course: { status: "draft" } }, class: "cs-btn cs-btn-full" %>
+      <% end %>
+    </div>
+  </div>
+
+  <section class="cs-container">
+    <div class="cs-container-header"><h2 class="cs-h2">Course details</h2></div>
+    <div class="cs-container-body">
+      <dl class="cs-kv cs-kv-3">
+        <div><dt class="cs-kv-label">Status</dt><dd class="cs-kv-value"><%= render "admin/training/course_status", course: @course %></dd></div>
+        <div><dt class="cs-kv-label">Awards</dt><dd class="cs-kv-value"><%= @course.badge ? link_to(@course.badge.name, admin_training_badge_path(@course.badge), class: "cs-link") : "No badge" %></dd></div>
+        <div><dt class="cs-kv-label">Who can take it</dt><dd class="cs-kv-value"><%= @course.access_open? ? "Anyone signed in" : "Invite-only" %></dd></div>
+        <div><dt class="cs-kv-label">Pass mark</dt><dd class="cs-kv-value"><%= @course.pass_mark %>%</dd></div>
+        <div><dt class="cs-kv-label">Correct answers shown</dt><dd class="cs-kv-value"><%= @course.reveal_answers_every_attempt? ? "After every attempt" : "Once passed" %></dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided">
+      <h2 class="cs-h2">Lessons <span class="cs-counter">(<%= @lessons.size %>)</span></h2>
+      <div class="cs-actions"><%= link_to "Add lesson", new_admin_training_course_lesson_path(@course), class: "cs-btn" %></div>
+    </div>
+    <% if @lessons.empty? %>
+      <div class="cs-empty">
+        <p class="cs-empty-title">No lessons yet</p>
+        <p>A lesson is a reading, a video, or both, with an optional quiz at the end.</p>
+      </div>
+    <% else %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Lesson</th>
+              <th scope="col">Video</th>
+              <th scope="col">Quiz</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @lessons.each_with_index do |lesson, index| %>
+              <tr>
+                <td class="cs-secondary"><%= index + 1 %></td>
+                <td><%= link_to lesson.title, edit_admin_training_course_lesson_path(@course, lesson), class: "cs-link" %></td>
+                <td class="whitespace-nowrap">
+                  <% if lesson.video? %>
+                    <%= lesson.video_source.to_s.titleize %><span class="cs-secondary"><%= lesson.require_full_watch? ? " · must watch" : " · optional" %></span>
+                    <% if lesson.watch_required? && lesson.known_video_duration.nil? %>
+                      <div title="Learners can't finish it until its length is known. Re-save the lesson to look it up again, play it once in the course preview, or enter it on the lesson."><%= cs_status(:warning, "Length unknown") %></div>
+                    <% end %>
+                  <% else %>
+                    <span class="cs-muted">—</span>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap">
+                  <% if lesson.quiz? %>
+                    <%= pluralize(lesson.questions.size, "question") %>
+                    <% unless lesson.questions.all?(&:answerable?) %><%= cs_status(:warning, "Missing answers") %><% end %>
+                  <% else %>
+                    <span class="cs-muted">—</span>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap text-right">
+                  <%= render "admin/training/move_buttons", path: move_admin_training_course_lesson_path(@course, lesson), label: lesson.title, first: index.zero?, last: index == @lessons.size - 1 %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </section>
+
+  <%= render "admin/training_courses/invitations", course: @course, invitations: @invitations %>
+
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided">
+      <h2 class="cs-h2">Learners <span class="cs-counter">(<%= @enrollments.size %>)</span></h2>
+    </div>
+    <% if @enrollments.empty? %>
+      <div class="cs-empty"><p class="cs-empty-title">Nobody has started this course yet</p></div>
+    <% else %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Learner</th>
+              <th scope="col">Progress</th>
+              <th scope="col">Started</th>
+              <th scope="col">Completed</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @enrollments.each do |enrollment| %>
+              <tr>
+                <td>
+                  <%= link_to enrollment.user.display_name_or_fallback, admin_user_path(enrollment.user), class: "cs-link" %>
+                  <div class="cs-small cs-secondary"><%= enrollment.user.email %></div>
+                </td>
+                <td class="whitespace-nowrap"><%= @completed_counts.fetch(enrollment.id, 0) %> of <%= @lessons.size %> lessons</td>
+                <td class="whitespace-nowrap"><%= cs_relative_time(enrollment.started_at) %></td>
+                <td class="whitespace-nowrap"><%= enrollment.completed_at ? cs_relative_time(enrollment.completed_at) : tag.span("—", class: "cs-muted") %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </section>
+
+  <% if @course.draft? || @course.published? %>
+    <div class="flex justify-end gap-2">
+      <% if @course.published? %>
+        <%= button_to "Archive course", admin_training_course_path(@course), method: :patch, params: { training_course: { status: "archived" } }, class: "cs-btn",
+              data: { turbo_confirm: "Archive this course? Learners will no longer see it. Badges it awarded stay valid." } %>
+      <% elsif @enrollments.empty? %>
+        <%= button_to "Delete course", admin_training_course_path(@course), method: :delete, class: "cs-btn",
+              data: { turbo_confirm: "Delete this course and all its lessons?" } %>
+      <% end %>
+    </div>
+  <% end %>
+</div>

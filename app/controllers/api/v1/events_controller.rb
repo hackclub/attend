@@ -12,6 +12,9 @@ module Api
       # capability flags rather than off this string.
       ROLE_PRECEDENCE = %w[event_admin safeguarding_lead ops limited read_only].freeze
 
+      # Mirrors EventPolicy#api_participants?: everyone but read-only staff.
+      PARTICIPANT_API_ROLES = %w[event_admin ops limited safeguarding_lead].freeze
+
       def index
         events = if current_user.global_admin?
           Event.all
@@ -41,7 +44,12 @@ module Api
           # The caller's standing on this event, so a client can adapt its UI up
           # front instead of discovering restrictions through error responses.
           role: role_for(event),
-          can_view_participant_pii: can_view_participant_pii?(event)
+          can_view_participant_pii: can_view_participant_pii?(event),
+          can_view_participants: can_view_participants?(event),
+          can_view_sensitive_data: can_view_sensitive_data?(event),
+          # Whether the event runs travel at all, so a client can hide travel
+          # screens for events that never collect it.
+          travel_enabled: event.travel_enabled?
         }
       end
 
@@ -60,6 +68,24 @@ module Api
         return true if series_member?(event)
 
         roles_for(event).any? { |role| EventRoleAssignment::PII_RESTRICTED_ROLES.exclude?(role) }
+      end
+
+      # Mirrors EventPolicy#api_participants? against the preloaded roles.
+      # Without it the participant endpoints answer 403.
+      def can_view_participants?(event)
+        return true if current_user.global_admin?
+        return true if series_member?(event)
+
+        roles_for(event).intersect?(PARTICIPANT_API_ROLES)
+      end
+
+      # Mirrors ParticipantsController#can_view_sensitive_data?: the medical,
+      # dietary, safeguarding and guardian contact fields. Series membership
+      # does not grant it there, so it doesn't here either.
+      def can_view_sensitive_data?(event)
+        return true if current_user.global_admin?
+
+        roles_for(event).include?("safeguarding_lead")
       end
 
       def series_member?(event)

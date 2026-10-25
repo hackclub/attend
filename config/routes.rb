@@ -1,4 +1,17 @@
 Rails.application.routes.draw do
+  # badge.hackclub.com is a redirect host and nothing else. It answers the QR
+  # codes printed on event badges (/t/:slack_id) and bounces everything else to
+  # Attend, where the links are managed — so this block has to come before the
+  # engines and the rest of the app, or the badge host would serve them too.
+  #
+  # Deliberately host-scoped: /t/:slack_id is an open redirect by design, and it
+  # has no business being reachable on attend.hackclub.com, where people sign in.
+  constraints(->(request) { BadgeRedirect.badge_host?(request.host) }) do
+    get "up", to: "rails/health#show"
+    get "t/:slack_id", to: "badge_redirects#show", constraints: { slack_id: /[A-Za-z0-9._-]+/ }
+    match "(*path)", to: "badge_redirects#elsewhere", via: :all, format: false
+  end
+
   toolchest_oauth
   mount Toolchest::Engine => "/mcp"
   mount ActionCable.server => "/cable"
@@ -21,14 +34,26 @@ Rails.application.routes.draw do
 
   root "home#index"
 
-  # Admin-only API reference (Scalar). The OpenAPI document is served through
-  # the controller so it stays behind the same admin gate as the page itself.
-  get "docs", to: "docs#index"
-  get "docs/openapi.json", to: "docs#openapi", as: :docs_openapi
+  # Admin-only API reference. /docs is reverse-proxied onto the Mintlify-hosted
+  # docs (see Mintlify::Proxy), so the whole prefix belongs to the proxy —
+  # `format: false` keeps Rails from splitting /docs/_next/chunk.js into a path
+  # plus a :js format. The OpenAPI document therefore sits at the root, still
+  # served through the controller so it stays behind the same admin gate.
+  get "docs", to: "docs#show"
+  get "docs/*path", to: "docs#show", format: false
+  get "openapi.json", to: "docs#openapi", as: :openapi
+
+  # Mintlify's domain-ownership check, which it fetches on the apex rather than
+  # under the base path. Unauthenticated on purpose (see DocsController).
+  get ".well-known/vercel/*path", to: "docs#vercel_verification", format: false
 
   # Opt-in public participant profiles (attend.hackclub.com/p/:slug)
   get "p/:slug/markers", to: "public_profiles#markers", as: :public_profile_markers, constraints: { slug: /[A-Za-z0-9-]+/ }, defaults: { format: :json }
   get "p/:slug", to: "public_profiles#show", as: :public_profile, constraints: { slug: /[A-Za-z0-9-]+/ }
+
+  # Public verification of a training badge its holder chose to share
+  # (attend.hackclub.com/verify/:token). Unauthenticated by design.
+  get "verify/:token", to: "badge_verifications#show", as: :badge_verification, constraints: { token: /[A-Za-z0-9_-]{20,64}/ }
 
   # Public incident reporting (attend.hackclub.com/incident)
   get "incident", to: "incident_reports#new", as: :incident_report
@@ -86,6 +111,7 @@ Rails.application.routes.draw do
   get "dashboard/profile", to: "dashboard#profile", as: :dashboard_profile
   patch "dashboard/public_profile", to: "dashboard#update_public_profile", as: :dashboard_public_profile
   patch "dashboard/staff_profile", to: "dashboard#update_staff_profile", as: :dashboard_staff_profile
+  patch "dashboard/badge_redirect", to: "dashboard#update_badge_redirect", as: :dashboard_badge_redirect
   delete "dashboard/staff_profile/avatar", to: "dashboard#destroy_staff_avatar", as: :dashboard_staff_profile_avatar
   delete "dashboard/mcp_connections/:id", to: "dashboard#revoke_mcp_connection", as: :dashboard_mcp_connection
   patch "dashboard/mcp_connections/:id", to: "dashboard#update_mcp_connection", as: :update_dashboard_mcp_connection
@@ -102,9 +128,48 @@ Rails.application.routes.draw do
   post "dashboard/events/:id/resend_guardian_invite", to: "dashboard#resend_guardian_invite", as: :dashboard_resend_guardian_invite
   get "dashboard/events/:id/travel/edit", to: "dashboard#edit_travel", as: :dashboard_event_travel_edit
   patch "dashboard/events/:id/travel", to: "dashboard#update_travel", as: :dashboard_event_travel
+  get "dashboard/events/:participant_event_id/corrections/:section/edit", to: "registration_corrections#edit", as: :edit_dashboard_event_correction
+  patch "dashboard/events/:participant_event_id/corrections/:section", to: "registration_corrections#update", as: :dashboard_event_correction
+  post "dashboard/events/:participant_event_id/change_requests", to: "registration_change_requests#create", as: :dashboard_event_registration_change_requests
+  get "dashboard/events/:participant_event_id/change_requests/:id", to: "registration_change_requests#show", as: :dashboard_event_registration_change_request
 
   scope "/dashboard" do
     resources :messages, only: [ :index, :show ], controller: "dashboard/messages", as: :dashboard_messages
+  end
+
+  scope "/connected_accounts", controller: :connected_accounts, constraints: { provider: /github|itch/ } do
+    post ":provider", action: :create, as: :connect_account
+    get ":provider/callback", action: :callback, as: :connected_account_callback
+    delete ":provider", action: :destroy, as: :disconnect_account
+  end
+
+  # Staff training: courses that award badges, which event roles can be
+  # required to hold (see TrainingBadge). Open to anyone signed in, so
+  # volunteers with no admin access can take it too. Awards are routed ahead
+  # of courses because a course lives at /training/:slug.
+  get "training", to: "training/courses#index", as: :training
+  namespace :training do
+    resources :awards, only: :show, path: "badges" do
+      member do
+        post :share
+        delete :share, action: :unshare
+        post :linkedin
+      end
+    end
+    resources :courses, only: :show, param: :slug, path: "" do
+      member do
+        post :enroll
+        post :restart
+      end
+      resource :disclosure, only: [ :new, :create ]
+      resources :lessons, only: :show do
+        member do
+          post :complete
+          post :quiz
+          post :video_progress
+        end
+      end
+    end
   end
 
   scope "/onboarding" do
@@ -117,6 +182,9 @@ Rails.application.routes.draw do
     delete "/optional_documents/:custom_document_id", to: "onboarding#withdraw_optional_document", as: :onboarding_withdraw_optional_document
     post "/documents/:consent_id/physical_upload", to: "onboarding#physical_document_upload", as: :onboarding_physical_document_upload
     delete "/documents/:consent_id/physical_uploads/:upload_id", to: "onboarding#remove_physical_upload", as: :onboarding_remove_physical_upload
+    get "/welcome", to: "onboarding#welcome", as: :onboarding_welcome
+    post "/welcome", to: "onboarding#start", as: :onboarding_start
+    get "/done", to: "onboarding#done", as: :onboarding_done
     get "/:step", to: "onboarding#show", as: :onboarding_step
     patch "/:step", to: "onboarding#update"
     post "/complete", to: "onboarding#complete", as: :complete_onboarding
@@ -159,6 +227,9 @@ Rails.application.routes.draw do
 
     get "search", to: "search#index"
 
+    # Opt-in switch between the original admin and the console redesign.
+    patch "console_beta", to: "console_beta#update", as: :console_beta
+
     # The staff profile form now lives on the participant-facing settings page.
     get "profile/edit", to: redirect("/dashboard/profile#staff-settings")
 
@@ -171,13 +242,16 @@ Rails.application.routes.draw do
         post :select
         post :regenerate_api_key
         patch :attach_image
+        patch :clear_waiver_dates_warning
       end
+      resource :waiver_regeneration, only: [ :new, :create ]
       resources :participants, only: [ :index, :show, :edit, :update, :destroy ] do
         collection do
           get :table
           get :new_invite
           post :send_invite
           delete :revoke_invite
+          post :send_held_invitations
           get :sync_slack_channel_preview
           post :sync_slack_channel
         end
@@ -222,7 +296,7 @@ Rails.application.routes.draw do
       end
       resources :incidents do
         member do
-          post :send_to_slack
+          post :escalate
         end
         resources :comments, only: [ :create ], controller: "incident_comments"
       end
@@ -239,7 +313,14 @@ Rails.application.routes.draw do
             delete :cancel
           end
         end
-      resources :staff, only: [ :index, :new, :create, :destroy ], controller: "event_staff"
+      resources :staff, only: [ :index, :new, :create, :update, :destroy ], controller: "event_staff"
+      resources :volunteers, only: [ :create, :destroy ], controller: "event_volunteers"
+      resources :registration_change_requests, only: [ :index, :show ] do
+        member do
+          patch :approve
+          patch :request_follow_up
+        end
+      end
       resources :slack_blasts, only: [ :index, :show, :new, :create ] do
         member do
           post :retry_failed
@@ -253,6 +334,7 @@ Rails.application.routes.draw do
           post :cancel
           post :retry_failed
           post :retry_delivery
+          post :send_to_new_recipients
         end
       end
       resources :scans, only: [ :index, :create, :update ] do
@@ -310,13 +392,47 @@ Rails.application.routes.draw do
     end
 
     resources :series, controller: "event_series", param: :slug, except: [ :destroy ] do
+      member do
+        post :send_held_invitations
+      end
+      resource :integrations, only: [ :show ], controller: "series_integrations" do
+        # Vote events are per event, so this one names which of the series'
+        # events it is for.
+        post "vote_event/:event_id", action: :create_vote_event, as: :create_vote_event
+      end
       resources :members, only: [ :index, :new, :create, :destroy ], controller: "series_members"
+      resources :api_tokens, only: [ :index, :create, :destroy ], controller: "series_api_tokens" do
+        member do
+          post :rotate
+        end
+      end
     end
 
     resources :users, only: [ :index, :show, :new, :create, :edit, :update ] do
       resource :impersonation, only: [ :create ]
       resources :passports, only: [ :create, :destroy ] do
         post :confirm, on: :member
+      end
+    end
+
+    # Authoring for staff training; the learner side is /training.
+    get "training", to: "training_courses#index", as: :training
+    scope "training", as: "training" do
+      resources :courses, controller: "training_courses", param: :slug, except: :index do
+        patch :move, on: :member
+        resources :invitations, controller: "training_course_invitations", only: [ :create, :destroy ]
+        resources :lessons, controller: "training_lessons", except: [ :index, :show ] do
+          patch :move, on: :member
+          resources :questions, controller: "training_questions", except: [ :index, :show ] do
+            patch :move, on: :member
+          end
+        end
+      end
+      resources :disclosures, controller: "training_disclosures", only: [ :index, :show, :update ]
+      resources :badges, controller: "training_badges", except: :index do
+        resources :awards, controller: "training_badge_awards", only: [ :new, :create ] do
+          patch :revoke, on: :member
+        end
       end
     end
 
@@ -347,23 +463,36 @@ Rails.application.routes.draw do
       post :toggle_waiver_sending
       post :toggle_support_sms
       post :update_support_sms_numbers
+      post :update_admin_help_slack_channel
+      post :sync_admin_help_slack_channel
+      post :update_org_support_slack_channel
+      post :sync_org_support_slack_channel
     end
 
-    # Global incident reports (public form submissions)
-    get "incidents", to: "incident_reports#index", as: :incidents
+    # HQ incident inbox: public-form reports, organizer escalations and every
+    # event's incident log in one place. Helpers are named after the model
+    # (admin_incident_report_*) so they can't be confused with the
+    # event-scoped admin_event_incident_* helpers above.
+    get "incidents", to: "incident_reports#index", as: :incident_reports
 
     # Global incident-report notification settings
-    get "incidents/settings", to: "incident_settings#show", as: :incident_settings
+    get "incidents/settings", to: "incident_settings#show", as: :incident_report_settings
     patch "incidents/settings", to: "incident_settings#update"
 
-    get "incidents/:id", to: "incident_reports#show", as: :incident
-    post "incidents/:incident_id/comments", to: "incident_report_comments#create", as: :incident_comments
+    get "incidents/:id", to: "incident_reports#show", as: :incident_report
+    post "incidents/:incident_id/comments", to: "incident_report_comments#create", as: :incident_report_comments
+
+    # Airtable redirects only to a registered URI, so the OAuth callback can't
+    # carry the event slug (see Admin::AirtableConnectionsController).
+    get "airtable/oauth/callback", to: "airtable_connections#callback", as: :airtable_oauth_callback
 
     # Slug-based routes must come last to avoid matching other routes
     get ":slug", to: "dashboard#show", as: :event_dashboard, constraints: { slug: /[a-z0-9-]+/ }
     get ":slug/integrations", to: "dashboard#integrations", as: :event_integrations, constraints: { slug: /[a-z0-9-]+/ }
     patch ":slug/integrations", to: "dashboard#update_integrations", constraints: { slug: /[a-z0-9-]+/ }
     post ":slug/integrations/airtable_sync", to: "dashboard#trigger_airtable_sync", as: :event_trigger_airtable_sync, constraints: { slug: /[a-z0-9-]+/ }
+    post ":slug/integrations/airtable/connection", to: "airtable_connections#create", as: :event_airtable_connection, constraints: { slug: /[a-z0-9-]+/ }
+    delete ":slug/integrations/airtable/connection", to: "airtable_connections#destroy", constraints: { slug: /[a-z0-9-]+/ }
     post ":slug/integrations/vote_event", to: "dashboard#create_vote_event", as: :event_create_vote_event, constraints: { slug: /[a-z0-9-]+/ }
     post ":slug/integrations/api_tokens", to: "event_api_tokens#create", as: :event_api_tokens, constraints: { slug: /[a-z0-9-]+/ }
     post ":slug/integrations/api_tokens/:id/rotate", to: "event_api_tokens#rotate", as: :rotate_event_api_token, constraints: { slug: /[a-z0-9-]+/ }
@@ -432,13 +561,41 @@ Rails.application.routes.draw do
       end
 
       resources :events, only: [ :index ]
+
+      # Global-admin only: who someone is and which events they run, by Slack ID.
+      get "users/lookup", to: "users#lookup"
+
       resources :push_tokens, only: [ :create, :destroy ], param: :token
+
+      # Global-admin only: adds emails to the app-wide ban list.
+      resources :bans, only: [ :create ]
+
+      # Series API: one key per event series. `:series_id` accepts the series
+      # id, its slug, or the literal `current` (the series the calling key
+      # belongs to). Event creation lives here and nowhere else — it needs a
+      # series, and only a series key names one.
+      resources :series, only: [ :index, :show ], controller: "series", param: :id do
+        resources :events, only: [ :index, :show, :create, :update ],
+                  controller: "series/events", param: :id
+      end
 
       get "travel/search_airports", to: "travel#search_airports"
       post "travel/validate_flight", to: "travel#validate_flight"
 
       resources :events, only: [] do
-        resources :participants, only: [ :index, :show, :create ], controller: "participants" do
+        # The tail of the setup wizard for events created through the API:
+        # waiver configuration and the flip out of draft. The earlier steps
+        # (basics, schedule, modules) are the Series API's event create/update.
+        resource :setup, only: [ :show ], controller: "event_setup" do
+          put :waivers
+          post :complete
+        end
+
+        # Event staff and their roles. `:id` is the assignment id from #index,
+        # never an email address — those don't belong in a URL.
+        resources :staff, only: [ :index, :create, :update, :destroy ], controller: "event_staff"
+
+        resources :participants, only: [ :index, :show, :create, :update, :destroy ], controller: "participants" do
           collection do
             get :search
             get :lookup

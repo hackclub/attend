@@ -1,11 +1,15 @@
 <p>Dear <%= @first_name %>,</p>
 
-<p>Great news! <%= @child_first_name %> has completed their portion of the waiver for <%= @event_name %>. Now we just need your signature to finalize everything.</p>
+<p>Great news! <%= @child_first_name %> has completed their portion of the waiver for <%= @event_name %>. Now we need your signature on this waiver.</p>
 
 <p style="margin: 24px 0;">
   <%= mail_button "Sign the Waiver", @waiver_link %>
 </p>
 
-<p>Once you've signed, <%= @child_first_name %>'s registration will be complete.</p>
+<% if @waiver_is_final_task %>
+  <p>Once you've signed, we'll process the completed waiver and confirm <%= @child_first_name %>'s registration.</p>
+<% else %>
+  <p>After you sign, any remaining steps will stay visible on <%= @child_first_name %>'s dashboard.</p>
+<% end %>
 
 <p>If you have any questions, don't hesitate to email us at <%= mail_to @support_email %>, or just hit reply to this email!</p>

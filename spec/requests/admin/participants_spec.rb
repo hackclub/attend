@@ -4,7 +4,7 @@ RSpec.describe "Admin::Participants", type: :request do
   include Devise::Test::IntegrationHelpers
 
   let(:event) { create(:event, accommodation_enabled: false) }
-  let(:global_admin) { User.create!(email: "ga-participants@example.com", name: "Global Admin", global_role: "global_admin") }
+  let(:global_admin) { User.create!(email: "ga-participants@example.com", name: "Global Admin", global_role: "global_admin", admin_console_beta: false) }
 
   def complete_onboarding!(pe)
     pe.travels.create!(direction: "inbound", mode: "car")
@@ -43,6 +43,69 @@ RSpec.describe "Admin::Participants", type: :request do
     end
   end
 
+  describe "GET index filter form" do
+    before { sign_in global_admin }
+
+    it "auto-submits and keeps active filters, including the chase filter" do
+      event.update!(groups_enabled: true, slack_channel_id: "C123")
+      create(:group, event: event)
+      create(:custom_document, :optional, event: event)
+
+      get admin_event_participants_path(event.slug), params: { search: "ada", status: "", blocked_on: "travel" }
+
+      page = Nokogiri::HTML(response.body)
+      form = page.at_css("#participant-filters")
+      expect(form["data-action"]).to include("change->auto-submit#debouncedSubmit")
+      expect(form.css("select").size).to eq(5)
+      expect(form.at_css("input[name='blocked_on']")["value"]).to eq("travel")
+      expect(page.at_css("a[title='Table view']")["href"]).to eq(table_admin_event_participants_path(event.slug, search: "ada", blocked_on: "travel"))
+
+      chip = form.at_css("[data-blocked-on-filter]")
+      expect(chip.text).to include("haven't given us both travel legs")
+      expect(chip.at_css("a[aria-label='Remove this filter']")["href"]).to eq(admin_event_participants_path(event.slug, search: "ada"))
+
+      expect(page.at_css("#slack-sync-progress-#{event.id}")).to be_present
+      expect(page.at_css("#sync-slack-modal-#{event.id}")).to be_present
+    end
+  end
+
+  describe "participants over the age limit" do
+    let!(:aged_out) do
+      create(:participant_event, event: event, status: :invited, skip_age_check: true,
+        participant: create(:participant, legal_first_name: "Aged", legal_last_name: "Out", date_of_birth: event.ends_at.to_date - 25.years))
+    end
+    let!(:eligible) do
+      create(:participant_event, event: event,
+        participant: create(:participant, legal_first_name: "Still", legal_last_name: "Eligible"))
+    end
+
+    it "lists only them under flag=over_age_limit, in both admin UIs" do
+      [ false, true ].each do |console|
+        global_admin.update!(admin_console_beta: console)
+        sign_in global_admin
+
+        get admin_event_participants_path(event.slug), params: { flag: "over_age_limit" }
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include(aged_out.participant.full_name)
+        expect(response.body).not_to include(eligible.participant.full_name)
+      end
+    end
+
+    it "warns on their participant page, in both admin UIs" do
+      [ false, true ].each do |console|
+        global_admin.update!(admin_console_beta: console)
+        sign_in global_admin
+
+        get admin_event_participant_path(event.slug, aged_out)
+        expect(Nokogiri::HTML(response.body).at_css("[data-testid='over-age-limit']")).to be_present
+
+        get admin_event_participant_path(event.slug, eligible)
+        expect(Nokogiri::HTML(response.body).at_css("[data-testid='over-age-limit']")).to be_nil
+      end
+    end
+  end
+
   describe "accommodation when disabled for the event" do
     let(:participant_event) { create(:participant_event, event: event) }
 
@@ -70,6 +133,53 @@ RSpec.describe "Admin::Participants", type: :request do
 
       get accommodation_admin_event_participant_path(event, participant_event)
       expect(response).to have_http_status(:ok)
+    end
+  end
+
+  describe "Slack ID copy controls on the participant page" do
+    let(:participant_event) do
+      create(:participant_event, event: event, participant: create(:participant, slack_user_id: "U0SLACKID1"))
+    end
+
+    before { sign_in global_admin }
+
+    shared_examples "Slack ID copy controls" do
+      it "renders copy controls with the Slack ID, even before onboarding is complete" do
+        get admin_event_participant_path(event, participant_event)
+
+        expect(response).to have_http_status(:ok)
+        page = Nokogiri::HTML(response.body)
+        copy_buttons = page.css('button[data-controller="clipboard"][data-clipboard-content-value="U0SLACKID1"]')
+        expect(copy_buttons.map { |b| b.text.strip }).to contain_exactly("Copy Slack ID", "Copy")
+        expect(response.body).not_to include(invite_to_slack_channel_admin_event_participant_path(event, participant_event))
+      end
+
+      it "keeps Invite to Channel for complete registrations" do
+        event.update!(slack_channel_id: "C123")
+        participant_event.update!(status: :complete)
+
+        get admin_event_participant_path(event, participant_event)
+
+        expect(response.body).to include("Copy Slack ID")
+        expect(response.body).to include(invite_to_slack_channel_admin_event_participant_path(event, participant_event))
+      end
+
+      it "does not render the copy controls or the Slack card without a Slack ID before completion" do
+        participant_event.participant.update!(slack_user_id: nil)
+
+        get admin_event_participant_path(event, participant_event)
+
+        expect(response.body).not_to include("Copy Slack ID")
+        expect(response.body).not_to match(/Slack integration/i)
+      end
+    end
+
+    include_examples "Slack ID copy controls"
+
+    context "with the admin console beta" do
+      before { global_admin.update!(admin_console_beta: true) }
+
+      include_examples "Slack ID copy controls"
     end
   end
 
@@ -308,6 +418,93 @@ RSpec.describe "Admin::Participants", type: :request do
       expect {
         post resend_invitation_admin_event_participant_path(event, pe)
       }.to change { AuditLog.where(action: "resend_invitation").count }.by(1)
+    end
+  end
+  describe "DELETE destroy" do
+    it "revokes the invitation so the removal cannot be undone by the old link" do
+      participant = create(:participant, email: "removed@example.com")
+      create(:invitation, event: event, email: "removed@example.com", sent_at: Time.current)
+      participant_event = create(:participant_event, participant: participant, event: event)
+
+      sign_in global_admin
+
+      expect {
+        delete admin_event_participant_path(event, participant_event)
+      }.to change(Invitation, :count).by(-1)
+
+      expect(ParticipantEvent.exists?(participant_event.id)).to be(false)
+      expect(Invitation.where(event: event).for_email("removed@example.com")).to be_empty
+    end
+
+    it "keeps the invitation when the registration is only withdrawn" do
+      participant = create(:participant, email: "staying@example.com")
+      create(:invitation, event: event, email: "staying@example.com", sent_at: Time.current)
+      participant_event = create(:participant_event, participant: participant, event: event)
+
+      sign_in global_admin
+
+      expect {
+        post withdraw_admin_event_participant_path(event, participant_event)
+      }.not_to change(Invitation, :count)
+
+      expect(participant_event.reload).to be_withdrawn
+    end
+  end
+
+  describe "food-allergy information" do
+    let(:participant_event) { create(:participant_event, event: event) }
+
+    def medical_summary
+      Nokogiri::HTML(response.body).at_css("[data-testid='medical-summary']").text.squish
+    end
+
+    it "flags allergies from both health records in the medical summary, in both admin UIs" do
+      participant_event.create_medical!(allergies: "Penicillin", has_anaphylaxis_risk: true, requires_refrigeration: true)
+      participant_event.create_dietary!(life_threatening_allergies: "Peanuts", cross_contamination_risk: true)
+
+      [ false, true ].each do |console|
+        global_admin.update!(admin_console_beta: console)
+        sign_in global_admin
+
+        get admin_event_participant_path(event, participant_event)
+
+        expect(medical_summary).to match(/anaphylaxis risk/i).and match(/life-threatening food allergies/i)
+          .and match(/cross-contamination risk/i).and match(/has allergies/i).and match(/needs refrigeration/i)
+        expect(medical_summary).not_to match(/no special medical flags|Peanuts|Penicillin/i)
+      end
+    end
+
+    it "reads \"None\" in the allergy fields as no allergy" do
+      participant_event.create_medical!(allergies: "None")
+      participant_event.create_dietary!(life_threatening_allergies: "None")
+
+      [ false, true ].each do |console|
+        global_admin.update!(admin_console_beta: console)
+        sign_in global_admin
+
+        get admin_event_participant_path(event, participant_event)
+
+        expect(medical_summary).to match(/no special medical flags/i)
+      end
+    end
+
+    it "shows dietary food allergies and cross-contamination in the table, in both admin UIs" do
+      participant_event.create_dietary!(life_threatening_allergies: "Peanuts", cross_contamination_risk: true)
+      create(:participant_event, event: event).create_dietary!(life_threatening_allergies: "None")
+      create(:participant_event, event: event)
+
+      [ false, true ].each do |console|
+        global_admin.update!(admin_console_beta: console)
+        sign_in global_admin
+
+        get table_admin_event_participants_path(event)
+
+        doc = Nokogiri::HTML(response.body)
+        expect(doc.css("th[data-column='food_allergies'], th[data-column='cross_contamination']").size).to eq(2)
+        expect(doc.css("td[data-column='food_allergies']").map { |td| td.text.strip }).to contain_exactly("Peanuts", "—", "—")
+        expect(doc.css("td[data-column='cross_contamination']").map { |td| td.text.strip }).to contain_exactly("Yes", "No", "—")
+        expect(doc.css("tr[data-group-id] td").map { |td| td["colspan"].to_i }.uniq).to eq([ doc.css("thead th").size ])
+      end
     end
   end
 end

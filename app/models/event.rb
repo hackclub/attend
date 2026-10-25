@@ -4,7 +4,8 @@ class Event < ApplicationRecord
   include DecodableImageAttachment
   include TravelCalendarCacheInvalidatable
 
-  has_paper_trail
+  # The Airtable token is encrypted; a version would store it in plaintext.
+  has_paper_trail skip: %i[airtable_api_key]
 
   self.implicit_order_column = "created_at"
 
@@ -16,27 +17,64 @@ class Event < ApplicationRecord
     :accommodation_enabled,
     :roommate_preferences_enabled,
     :guardian_invites_locked,
+    :onboarding_invites_held,
     :nfc_badges_enabled,
     :nfc_badge_write_on_checkin_enabled,
     :groups_enabled,
-    :airtable_api_key,
     :airtable_base_id,
     :vote_event_id,
     :vote_event_slug,
     :vote_event_admin_url,
     :vote_event_gallery_url,
-    :vote_event_linked_at
+    :vote_event_linked_at,
+    :github_linking,
+    :itch_linking,
+    :github_help_url,
+    :itch_help_url
 
   after_initialize :set_default_config, if: :new_record?
 
-  # Airtable ids/keys are copy-pasted; stray whitespace yields baffling
-  # 403/404s from the API. The api key and base id live in the config store,
-  # which `normalizes` doesn't cover, so their writers strip too.
-  normalizes :airtable_sync_source_id, :airtable_sync_table_id, with: ->(v) { v.strip.presence }
+  # A personal access token, from before organisers could connect Airtable
+  # with OAuth (AirtableConnection). Still honoured when there's no connection.
+  encrypts :airtable_api_key
 
-  def airtable_api_key=(value)
-    super(value.is_a?(String) ? value.strip.presence : value)
+  # Airtable ids/keys are copy-pasted; stray whitespace yields baffling
+  # 403/404s from the API. The base id lives in the config store, which
+  # `normalizes` doesn't cover, so its writer strips too.
+  normalizes :airtable_api_key, :airtable_sync_source_id, :airtable_sync_table_id, with: ->(v) { v.strip.presence }
+
+  # The URL Airtable shows when you set up a Sync API source:
+  # https://api.airtable.com/v0/{baseId}/{tableIdOrName}/sync/{apiEndpointSyncId}
+  AIRTABLE_SYNC_ENDPOINT = %r{\Ahttps://api\.airtable\.com/v0/(?<base>app\w+)/(?<table>[^/?#]+)/sync/(?<sync>[^/?#]+)/?\z}
+
+  attr_reader :airtable_sync_endpoint_url_error
+
+  # One pasted URL instead of three ids to dig out of it by hand.
+  def airtable_sync_endpoint_url
+    return airtable_sync_endpoint_url_error if airtable_sync_endpoint_url_error
+    return if airtable_base_id.blank? || airtable_sync_table_id.blank? || airtable_sync_source_id.blank?
+
+    "https://api.airtable.com/v0/#{airtable_base_id}/#{airtable_sync_table_id}/sync/#{airtable_sync_source_id}"
   end
+
+  def airtable_sync_endpoint_url=(value)
+    value = value.to_s.strip
+    @airtable_sync_endpoint_url_error = nil
+    if value.blank?
+      self.airtable_base_id = self.airtable_sync_table_id = self.airtable_sync_source_id = nil
+    elsif (match = AIRTABLE_SYNC_ENDPOINT.match(value))
+      self.airtable_base_id = match[:base]
+      self.airtable_sync_table_id = CGI.unescape(match[:table])
+      self.airtable_sync_source_id = CGI.unescape(match[:sync])
+    else
+      @airtable_sync_endpoint_url_error = value
+    end
+  end
+
+  validate :airtable_sync_endpoint_url_parses
+
+  # Attend's table lives in one base; a new base means a new table.
+  before_save :forget_airtable_table, if: -> { airtable_connection.present? && airtable_base_id_changed? }
 
   def airtable_base_id=(value)
     super(value.is_a?(String) ? value.strip.presence : value)
@@ -54,6 +92,7 @@ class Event < ApplicationRecord
 
   validate :acceptable_logo
   validate :acceptable_banner
+  validate :hotel_scan_context_belongs_to_event, if: :will_save_change_to_hotel_scan_context_id?
 
   belongs_to :event_series, optional: true
 
@@ -61,6 +100,7 @@ class Event < ApplicationRecord
   has_many :participants, through: :participant_events
   has_many :event_role_assignments, dependent: :destroy
   has_many :staff_users, through: :event_role_assignments, source: :user
+  has_many :event_volunteers, dependent: :destroy
   has_many :incidents, dependent: :destroy
   has_many :notes, dependent: :destroy
   has_many :audit_logs, dependent: :delete_all
@@ -78,6 +118,7 @@ class Event < ApplicationRecord
   has_many :incident_reports, dependent: :nullify
   has_many :tickets, dependent: :nullify
   has_one :rooming_plan, dependent: :destroy
+  has_one :airtable_connection, dependent: :destroy
   belongs_to :hotel_scan_context, class_name: "ScanContext", optional: true
   belongs_to :airtable_config_updated_by, class_name: "User", optional: true
 
@@ -96,11 +137,17 @@ class Event < ApplicationRecord
 
   validates :name, presence: true
 
+  # Blank linking modes mean "same as the series".
+  validates :github_linking, :itch_linking, inclusion: { in: EventSeries::ACCOUNT_LINKING_MODES }, allow_blank: true
+  validates :github_help_url, :itch_help_url, format: { with: %r{\Ahttps://\S+\z}, message: "must start with https://" }, allow_blank: true
+
   # Support email is the from/reply-to on every participant- and guardian-facing
   # email, so it has to be an address we actually control. Required from setup
   # onwards; older events created before this rule keep passing validation until
   # someone edits the field (hence allow_blank on the format check).
-  SUPPORT_EMAIL_DOMAINS = %w[hackclub.com events.hackclub.com].freeze
+  SUPPORT_EMAIL_DOMAINS = %w[hackclub.com events.hackclub.com haven.hackclub.com].freeze
+  SUPPORT_EMAIL_DOMAINS_SENTENCE = SUPPORT_EMAIL_DOMAINS.map { |d| "@#{d}" }
+    .to_sentence(two_words_connector: " or ", last_word_connector: ", or ").freeze
   SUPPORT_EMAIL_FORMAT = /\A[^@\s]+@(?:#{SUPPORT_EMAIL_DOMAINS.map { |d| Regexp.escape(d) }.join("|")})\z/i
 
   normalizes :support_email, with: ->(v) { v.strip.downcase.presence }
@@ -110,7 +157,7 @@ class Event < ApplicationRecord
   validates :support_email,
             format: {
               with: SUPPORT_EMAIL_FORMAT,
-              message: "must be a #{SUPPORT_EMAIL_DOMAINS.map { |d| "@#{d}" }.join(" or ")} address"
+              message: "must be a #{SUPPORT_EMAIL_DOMAINS_SENTENCE} address"
             },
             allow_blank: true
 
@@ -128,7 +175,8 @@ class Event < ApplicationRecord
   # string here and re-parse it in the event's timezone once validation runs
   # (by which point a timezone submitted in the same form has been assigned).
   NAIVE_DATETIME_PATTERN = /\A\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?\z/
-  SCHEDULE_TIME_ATTRIBUTES = %i[starts_at ends_at registration_open_at registration_close_at].freeze
+  SCHEDULE_TIME_ATTRIBUTES = %i[starts_at ends_at registration_open_at registration_close_at
+                                arrival_opens_at arrival_closes_at].freeze
 
   SCHEDULE_TIME_ATTRIBUTES.each do |attr|
     define_method(:"#{attr}=") do |value|
@@ -138,8 +186,11 @@ class Event < ApplicationRecord
       super(value)
     end
   end
+  before_update :flag_waiver_dates_stale, if: :local_event_dates_changed?
   after_save :geocode_location, if: :should_geocode?
   after_save :send_pending_guardian_invites, if: :guardian_invites_just_unlocked?
+  after_save :send_held_onboarding_invites, if: :onboarding_invites_just_released?
+  after_save :mark_hotel_scan_context_as_lodging, if: :saved_change_to_hotel_scan_context_id?
 
   attr_accessor :api_key
 
@@ -184,6 +235,40 @@ class Event < ApplicationRecord
   # Events whose staff may still work the shared support inbox: anytime before
   # the event through 7 days after it ends.
   scope :within_support_window, -> { where(ends_at: 7.days.ago..) }
+  scope :not_ended, -> { where(ends_at: nil).or(where(ends_at: Time.current..)) }
+
+  # The events that put `user` in the admin help Slack channel: an
+  # ADMIN_HELP_CHANNEL_ROLES role on the event itself, or any role on its
+  # series, for events that haven't ended. Undated drafts count, since setting
+  # an event up is when people most need help. A global admin's blanket access
+  # doesn't count here, or every event would be listed.
+  #
+  # `user` is a User, a user id, or the users.id Arel column:
+  # User.admin_help_channel_members passes the column to correlate this into an
+  # EXISTS, so the channel and the support lookup share one rule.
+  scope :admin_help_events_for, ->(user) {
+    user = user.id if user.is_a?(User)
+    via_event = EventRoleAssignment.where(role: User::ADMIN_HELP_CHANNEL_ROLES)
+      .where(EventRoleAssignment.arel_table[:user_id].eq(user)).select(:event_id)
+    via_series = SeriesRoleAssignment.where(SeriesRoleAssignment.arel_table[:user_id].eq(user)).select(:event_series_id)
+
+    not_ended.where(id: via_event).or(not_ended.where(event_series_id: via_series))
+  }
+
+  # The events that put `user` in the org support Slack channel: any role on
+  # the event or its series, from before the event until ORG_SUPPORT_GRACE
+  # after it ends. Undated drafts count. Takes the same `user` forms as
+  # admin_help_events_for.
+  ORG_SUPPORT_GRACE = 7.days
+
+  scope :org_support_events_for, ->(user) {
+    user = user.id if user.is_a?(User)
+    via_event = EventRoleAssignment.where(EventRoleAssignment.arel_table[:user_id].eq(user)).select(:event_id)
+    via_series = SeriesRoleAssignment.where(SeriesRoleAssignment.arel_table[:user_id].eq(user)).select(:event_series_id)
+    window = where(ends_at: nil).or(where(ends_at: ORG_SUPPORT_GRACE.ago..))
+
+    window.where(id: via_event).or(window.where(event_series_id: via_series))
+  }
 
   def setup_complete?
     setup_completed_at.present?
@@ -196,7 +281,7 @@ class Event < ApplicationRecord
   end
 
   def completed?
-    ends_at.present? && ends_at.to_date < Date.current
+    ends_at.present? && local_end_date < local_today
   end
 
   def registration_open?
@@ -207,6 +292,17 @@ class Event < ApplicationRecord
 
   def event_time_zone
     ActiveSupport::TimeZone[timezone.to_s.presence || "UTC"] || Time.zone
+  end
+
+  # The dashboard uses the event's local clock for phase labels. A multi-day
+  # event remains live until its configured end timestamp, even when its start
+  # date is yesterday.
+  def phase_at(time = Time.current)
+    local_time = time.in_time_zone(event_time_zone)
+    return :upcoming if starts_at.blank? || local_time < starts_at.in_time_zone(event_time_zone)
+    return :ended if ends_at.present? && local_time >= ends_at.in_time_zone(event_time_zone)
+
+    :live
   end
 
   # IANA identifier (e.g. "America/Los_Angeles") for API clients — `timezone`
@@ -226,12 +322,55 @@ class Event < ApplicationRecord
     public_send(attr)&.in_time_zone(event_time_zone)&.strftime("%Y-%m-%dT%H:%M")
   end
 
+  # One-line "when to arrive" summary for the participant dashboard, in the
+  # event's timezone. Nil when neither end of the arrival window is published,
+  # so callers can fall back to "contact the team" copy.
+  def formatted_arrival_window
+    tz = event_time_zone
+    opens = arrival_opens_at&.in_time_zone(tz)
+    closes = arrival_closes_at&.in_time_zone(tz)
+    return nil if opens.nil? && closes.nil?
+
+    if opens && closes
+      if opens.to_date == closes.to_date
+        "Arrive between #{opens.strftime('%-I:%M %p')} and #{closes.strftime('%-I:%M %p %Z')} on #{opens.strftime('%A, %B %-d')}."
+      else
+        "Arrive between #{opens.strftime('%A, %B %-d at %-I:%M %p')} and #{closes.strftime('%A, %B %-d at %-I:%M %p %Z')}."
+      end
+    elsif opens
+      "Arrive from #{opens.strftime('%A, %B %-d at %-I:%M %p %Z')}."
+    else
+      "Arrive by #{closes.strftime('%A, %B %-d at %-I:%M %p %Z')}."
+    end
+  end
+
+  # Start and end on the event's own clock. Times are stored in UTC, so an
+  # evening start west of UTC reads as the next day unless converted first.
+  def local_starts_at
+    starts_at&.in_time_zone(event_time_zone)
+  end
+
+  def local_ends_at
+    ends_at&.in_time_zone(event_time_zone)
+  end
+
+  def local_start_date
+    local_starts_at&.to_date
+  end
+
+  def local_end_date
+    local_ends_at&.to_date
+  end
+
+  def local_today
+    Time.current.in_time_zone(event_time_zone).to_date
+  end
+
   def formatted_date_range
     return nil if starts_at.nil? || ends_at.nil?
 
-    tz = event_time_zone
-    start_date = starts_at.in_time_zone(tz).to_date
-    end_date = ends_at.in_time_zone(tz).to_date
+    start_date = local_start_date
+    end_date = local_end_date
 
     if start_date == end_date
       start_date.strftime("%B %-d, %Y")
@@ -242,6 +381,26 @@ class Event < ApplicationRecord
     else
       "#{start_date.strftime('%B %-d, %Y')} - #{end_date.strftime('%B %-d, %Y')}"
     end
+  end
+
+  # DocuSeal waiver templates have the event dates printed on them when they're
+  # cloned (Docuseal::DefaultTemplateSetup), and each sent waiver snapshots its
+  # template. Moving the event's dates after waivers have gone out leaves those
+  # waivers showing the old dates until the Attend team fixes them by hand.
+  def waiver_dates_stale?
+    waiver_dates_stale_since.present?
+  end
+
+  def waivers_issued?
+    Consent.joins(:participant_event)
+      .where(participant_events: { event_id: id })
+      .where(consent_type: %w[waiver freedom_waiver])
+      .where.not(docuseal_envelope_id: nil)
+      .exists?
+  end
+
+  def clear_waiver_dates_stale!
+    update!(waiver_dates_stale_since: nil)
   end
 
   def freedom_waivers_enabled?
@@ -267,6 +426,29 @@ class Event < ApplicationRecord
     ActiveModel::Type::Boolean.new.cast(guardian_invites_locked)
   end
 
+  # While held, adding a participant (admin form, API, CSV import) records
+  # their onboarding invitation without emailing it, so organizers can build
+  # the list and remove people before anyone hears about the event. Series HQ
+  # releases them all at once.
+  def onboarding_invites_held?
+    ActiveModel::Type::Boolean.new.cast(onboarding_invites_held)
+  end
+
+  def held_invitations_count
+    invitations.held.count
+  end
+
+  # Emails every invitation recorded while onboarding invitations were held,
+  # and stops holding new ones. Also the way to send invitations a CSV import
+  # added silently on an event that never held — the job just finds fewer.
+  def release_onboarding_invites!
+    if onboarding_invites_held?
+      update!(onboarding_invites_held: false) # after_save enqueues the job
+    else
+      SendHeldOnboardingInvitesJob.perform_later(id)
+    end
+  end
+
   def roommate_preferences_enabled?
     ActiveModel::Type::Boolean.new.cast(roommate_preferences_enabled)
   end
@@ -283,11 +465,20 @@ class Event < ApplicationRecord
     ActiveModel::Type::Boolean.new.cast(groups_enabled)
   end
 
+  # A connected event only needs a base: Attend creates its own table there
+  # (Airtable::RecordsSync). A pasted token drives the Sync API, which needs
+  # the synced table and its sync source too.
   def airtable_sync_configured?
+    return airtable_base_id.present? if airtable_connection.present?
+
     airtable_api_key.present? &&
       airtable_base_id.present? &&
       airtable_sync_source_id.present? &&
       airtable_sync_table_id.present?
+  end
+
+  def airtable_sync_via_records?
+    airtable_connection.present?
   end
 
   # The SQL counterpart of #airtable_sync_configured?, for the scheduled sync.
@@ -299,10 +490,15 @@ class Event < ApplicationRecord
   # integrations form was ever saved blank). Those events then reach
   # Airtable::Client, which raises on the blank key, once per event per run.
   scope :with_airtable_sync_configured, -> {
-    where("NULLIF(BTRIM(events.airtable_sync_source_id), '') IS NOT NULL")
-      .where("NULLIF(BTRIM(events.airtable_sync_table_id), '') IS NOT NULL")
-      .where("NULLIF(BTRIM(events.config ->> 'airtable_api_key'), '') IS NOT NULL")
-      .where("NULLIF(BTRIM(events.config ->> 'airtable_base_id'), '') IS NOT NULL")
+    where("NULLIF(BTRIM(events.config ->> 'airtable_base_id'), '') IS NOT NULL")
+      .where(<<~SQL.squish)
+        EXISTS (SELECT 1 FROM airtable_connections WHERE airtable_connections.event_id = events.id)
+        OR (
+          events.airtable_api_key IS NOT NULL
+          AND NULLIF(BTRIM(events.airtable_sync_source_id), '') IS NOT NULL
+          AND NULLIF(BTRIM(events.airtable_sync_table_id), '') IS NOT NULL
+        )
+      SQL
   }
 
   scope :with_airtable_sync_active, -> {
@@ -311,7 +507,8 @@ class Event < ApplicationRecord
 
   # AirtableJobs::SyncAllJob runs every 5 minutes and only advances
   # airtable_synced_at on success, so anything older than this means the sync
-  # has been failing — the job rescues per event, so nothing else surfaces it.
+  # has been failing. The job rescues per event and only emails once a
+  # failure has lasted, so this is the first place a failing sync shows up.
   AIRTABLE_SYNC_STALE_AFTER = 30.minutes
 
   def airtable_sync_stale?
@@ -327,10 +524,10 @@ class Event < ApplicationRecord
     airtable_sync_paused_at.present?
   end
 
-  # One failure stops the schedule. Retrying broken credentials every 5 minutes
-  # never fixes them; it just buries the real signal under thousands of
-  # identical errors. A human re-saving the config (or hitting "Sync Now") is
-  # the only thing that resumes it.
+  # A configuration error stops the schedule. Retrying broken credentials
+  # every 5 minutes never fixes them; it just buries the real signal under
+  # thousands of identical errors. A human re-saving the config (or hitting
+  # "Sync Now") is the only thing that resumes it.
   def pause_airtable_sync!(error_message)
     update_columns(
       airtable_sync_paused_at: Time.current,
@@ -339,12 +536,60 @@ class Event < ApplicationRecord
     )
   end
 
+  # Rate limits, 5xx and timeouts clear up on their own, so the schedule keeps
+  # going and only the streak is recorded. One UPDATE adds to the count in SQL,
+  # so a manual "Sync Now" overlapping the scheduled run can't lose a failure.
+  def record_airtable_sync_failure!(error_message)
+    now = Time.current
+    scope = self.class.where(id: id)
+    scope.update_all([
+      "airtable_sync_failures = airtable_sync_failures + 1, " \
+      "airtable_sync_failing_since = COALESCE(airtable_sync_failing_since, ?), " \
+      "airtable_sync_error = ?, airtable_sync_error_at = ?",
+      now, error_message, now
+    ])
+
+    # Only the count is read back, not the whole row. It's nil when the event
+    # was deleted mid-run, and then there's nothing left to record.
+    failures = scope.pick(:airtable_sync_failures)
+    return if failures.nil?
+
+    self.airtable_sync_failures = failures
+    clear_attribute_changes([ :airtable_sync_failures ])
+  end
+
+  # Report a failing sync once per streak: after enough runs in a row fail, or
+  # once it has been failing for long enough (runs can be further apart than
+  # 5 minutes when Airtable keeps the job waiting), whichever comes first.
+  AIRTABLE_SYNC_ALERT_AFTER_FAILURES = 12
+  AIRTABLE_SYNC_ALERT_AFTER_FAILING_FOR = 3.hours
+
+  # True only for the run that records the alert, and only once the streak is
+  # due one, so two overlapping runs can't both send it.
+  def claim_airtable_sync_alert!
+    self.class
+      .where(id: id, airtable_sync_alerted_at: nil)
+      .where(
+        "airtable_sync_failures >= ? OR airtable_sync_failing_since < ?",
+        AIRTABLE_SYNC_ALERT_AFTER_FAILURES, AIRTABLE_SYNC_ALERT_AFTER_FAILING_FOR.ago
+      )
+      .update_all(airtable_sync_alerted_at: Time.current) == 1
+  end
+
+  AIRTABLE_SYNC_STREAK_RESET = {
+    airtable_sync_error: nil,
+    airtable_sync_error_at: nil,
+    airtable_sync_failures: 0,
+    airtable_sync_failing_since: nil,
+    airtable_sync_alerted_at: nil
+  }.freeze
+
+  def record_airtable_sync_success!
+    update_columns(airtable_synced_at: Time.current, **AIRTABLE_SYNC_STREAK_RESET)
+  end
+
   def resume_airtable_sync!
-    update_columns(
-      airtable_sync_paused_at: nil,
-      airtable_sync_error: nil,
-      airtable_sync_error_at: nil
-    )
+    update_columns(airtable_sync_paused_at: nil, **AIRTABLE_SYNC_STREAK_RESET)
   end
 
   # Whoever last saved the Airtable credentials — the only person who can
@@ -394,6 +639,54 @@ class Event < ApplicationRecord
     series_banner if series_banner&.attached?
   end
 
+  # Onboarding branding and registration notes come from the series, so
+  # every event in it looks and reads the same.
+  def brand_theme
+    theme = event_series&.brand_theme
+    theme if theme&.active?
+  end
+
+  def registration_note
+    event_series&.registration_note.presence
+  end
+
+  def address_note
+    event_series&.address_note.presence
+  end
+
+  def tshirt_note
+    event_series&.tshirt_note.presence
+  end
+
+  def hide_privacy_notes?
+    event_series&.hide_privacy_notes? || false
+  end
+
+  # Account linking is set on the event, falling back to its series; an
+  # event outside a series can still ask for accounts.
+  def account_linking_mode(provider)
+    own = config&.[]("#{provider}_linking")
+    return own if EventSeries::ACCOUNT_LINKING_MODES.include?(own)
+
+    event_series&.account_linking_mode(provider) || "off"
+  end
+
+  def account_help_url(provider)
+    config&.[]("#{provider}_help_url").presence || event_series&.account_help_url(provider)
+  end
+
+  def linked_account_providers
+    EventSeries::ACCOUNT_LINKING_PROVIDERS.reject { |provider| account_linking_mode(provider) == "off" }
+  end
+
+  def required_account_providers
+    linked_account_providers.select { |provider| account_linking_mode(provider) == "required" }
+  end
+
+  def account_linking_step?
+    linked_account_providers.any?
+  end
+
   # Outbound-mail contact: the event's own support email, else its series'
   # contact email, else the global default.
   def effective_support_email
@@ -423,6 +716,17 @@ class Event < ApplicationRecord
 
   def assign_default_docuseal_host
     self.docuseal_host = Docuseal::HostConfig.default_host
+  end
+
+  def forget_airtable_table
+    self.airtable_sync_table_id = nil
+  end
+
+  def airtable_sync_endpoint_url_parses
+    return if airtable_sync_endpoint_url_error.nil?
+
+    errors.add(:airtable_sync_endpoint_url,
+      "doesn't look like an Airtable sync endpoint. It should look like https://api.airtable.com/v0/appXXXX/tblXXXX/sync/XXXX")
   end
 
   def acceptable_logo
@@ -476,6 +780,26 @@ class Event < ApplicationRecord
     self.roommate_preferences_enabled = true if roommate_preferences_enabled.nil?
   end
 
+  # Compares the calendar days in the event's timezone, since that's what the
+  # waivers print — moving the start time within the same day changes nothing.
+  # Setting dates for the first time isn't a change.
+  def local_event_dates_changed?
+    return false unless will_save_change_to_starts_at? || will_save_change_to_ends_at? || will_save_change_to_timezone?
+    return false if starts_at_in_database.nil? || ends_at_in_database.nil?
+
+    old_tz = ActiveSupport::TimeZone[timezone_in_database.to_s.presence || "UTC"] || Time.zone
+    old_dates = [ starts_at_in_database, ends_at_in_database ].map { |t| t.in_time_zone(old_tz).to_date }
+    new_dates = [ starts_at, ends_at ].map { |t| t&.in_time_zone(event_time_zone)&.to_date }
+    old_dates != new_dates
+  end
+
+  def flag_waiver_dates_stale
+    return if waiver_dates_stale?
+    return unless waivers_issued?
+
+    self.waiver_dates_stale_since = Time.current
+  end
+
   def should_geocode?
     return false if location_latitude.present? && !location_address_changed?
 
@@ -514,6 +838,19 @@ class Event < ApplicationRecord
     was_locked && now_unlocked
   end
 
+  def onboarding_invites_just_released?
+    return false unless saved_change_to_config?
+
+    old_config = config_before_last_save || {}
+    was_held = ActiveModel::Type::Boolean.new.cast(old_config["onboarding_invites_held"])
+
+    was_held && !onboarding_invites_held?
+  end
+
+  def send_held_onboarding_invites
+    SendHeldOnboardingInvitesJob.perform_later(id)
+  end
+
   def send_pending_guardian_invites
     SendPendingGuardianInvitesJob.perform_later(id)
     # Custom documents added while locked deferred reopening completed
@@ -528,5 +865,21 @@ class Event < ApplicationRecord
       is_travel_pickup: false,
       position: 0
     )
+  end
+
+  # Picking the hotel scan point makes its scans place people at lodging,
+  # unless staff already gave it a kind that places them somewhere else.
+  def mark_hotel_scan_context_as_lodging
+    return unless hotel_scan_context&.event_id == id
+
+    hotel_scan_context.update!(kind: "lodging") if hotel_scan_context.tracking_only?
+  end
+
+  # The hotel scan point is one of this event's own points; otherwise saving
+  # it would reach into another event's scan points.
+  def hotel_scan_context_belongs_to_event
+    return if hotel_scan_context.nil? || hotel_scan_context.event_id == id
+
+    errors.add(:hotel_scan_context, "must be one of this event's scan points")
   end
 end

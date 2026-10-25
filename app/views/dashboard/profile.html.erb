@@ -38,6 +38,12 @@
           Public profile
         </a>
       <% end %>
+      <a href="#badge-link" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
+        <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm1.294 6.336a6.721 6.721 0 01-3.17.789 6.721 6.721 0 01-3.168-.789 3.376 3.376 0 016.338 0z"/>
+        </svg>
+        Badge link
+      </a>
       <% if @passports.any? %>
         <a href="#passport" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
           <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -55,7 +61,7 @@
           Staff settings
         </a>
       <% end %>
-      <% if @show_mcp_connections %>
+      <% if @show_connections %>
         <a href="#connections" class="flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) hover:text-(--text-strong) transition-colors">
           <svg class="size-4 text-(--text-muted)" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5"/>
@@ -282,7 +288,7 @@
                       <span class="text-sm text-(--text)">
                         <%= participant_event.event.name %>
                         <% if participant_event.event.starts_at.present? %>
-                          <span class="text-(--text-faint)">· <%= participant_event.event.starts_at.strftime("%b %Y") %></span>
+                          <span class="text-(--text-faint)">· <%= participant_event.event.local_starts_at.strftime("%b %Y") %></span>
                         <% end %>
                       </span>
                     </label>
@@ -302,7 +308,7 @@
                       <span class="text-sm text-(--text)">
                         <%= event.name %>
                         <% if event.starts_at.present? %>
-                          <span class="text-(--text-faint)">· <%= event.starts_at.strftime("%b %Y") %></span>
+                          <span class="text-(--text-faint)">· <%= event.local_starts_at.strftime("%b %Y") %></span>
                         <% end %>
                       </span>
                     </label>
@@ -321,6 +327,64 @@
         </div>
       </section>
       <% end %>
+
+      <!-- Badge link -->
+      <section id="badge-link" class="scroll-mt-8">
+        <h2 class="border-b border-(--border-soft) pb-3 text-xl font-semibold text-(--text-strong)">Badge link</h2>
+        <p class="mt-3 text-sm text-(--text-muted)">
+          Where the QR code on your Hack Club event badge sends whoever scans it. Point it at your site, your GitHub, whatever you want people to see — you can change it any time, including mid-event.
+        </p>
+
+        <div class="mt-4 overflow-hidden rounded-2xl border border-(--border-card) bg-(--bg-elev)">
+          <% if @badge_redirect %>
+            <div class="border-b border-(--border-soft) px-6 py-4">
+              <div class="text-sm font-medium text-(--text-muted)">Your badge link</div>
+              <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                <code class="rounded-md bg-(--bg-elev-2) px-2.5 py-1 font-mono text-sm text-(--text-strong) break-all"><%= @badge_redirect.public_url %></code>
+                <button type="button"
+                        class="rounded-md px-2 py-1 text-xs font-medium text-(--text-link) hover:bg-(--bg-elev-2) transition-colors cursor-pointer"
+                        data-controller="clipboard"
+                        data-clipboard-content-value="<%= @badge_redirect.public_url %>"
+                        data-action="click->clipboard#copy">Copy</button>
+              </div>
+              <p class="mt-1.5 text-xs text-(--text-faint)">This never changes — it's printed on your badge.</p>
+            </div>
+
+            <%= form_with model: @badge_redirect, url: dashboard_badge_redirect_path, method: :patch, scope: :badge_redirect, class: "px-6 py-5 space-y-4" do |f| %>
+              <div>
+                <%= f.label :url, "Sends people to", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
+                <%= f.url_field :url, placeholder: "https://example.com", autocomplete: "off",
+                      class: "w-full rounded-lg border border-(--border-card) bg-(--bg-app) px-3 py-2 text-sm text-(--text-strong) focus:outline-none focus:ring-2 focus:ring-[#ec3750]/40" %>
+                <p class="mt-1 text-xs text-(--text-faint)">Leave it blank to turn the link off — scans will land on a "nothing here yet" page instead.</p>
+              </div>
+
+              <div class="flex items-center justify-between gap-4 border-t border-(--border-soft) pt-4">
+                <p class="text-xs text-(--text-faint)">
+                  <% if @badge_redirect.url.present? %>
+                    Live now.
+                  <% else %>
+                    Not set — nothing to scan yet.
+                  <% end %>
+                </p>
+                <%# f.button (not f.submit): themes.css themes every `input` element in dark
+                    modes with an unlayered rule that beats Tailwind's utility layer. %>
+                <%= f.button "Save badge link", class: "inline-flex items-center px-4 py-2 bg-[#d42f46] hover:bg-[#b82840] text-[#ffffff] text-sm font-semibold rounded-lg transition-colors cursor-pointer" %>
+              </div>
+            <% end %>
+          <% else %>
+            <div class="px-6 py-5">
+              <p class="text-sm text-(--text)">
+                Badge links are keyed to your Slack account, and Attend doesn't have a Slack ID for you yet.
+                <% if @participant %>
+                  Connect Slack under <a href="#account" class="font-medium text-(--text-link) hover:underline">Account</a> and this section will fill in.
+                <% else %>
+                  Sign in again once your <a href="https://auth.hackclub.com" target="_blank" rel="noopener noreferrer" class="font-medium text-(--text-link) hover:underline">Hack Club Auth</a> account is linked to Slack, and this section will fill in.
+                <% end %>
+              </p>
+            </div>
+          <% end %>
+        </div>
+      </section>
 
       <% if current_user.admin? %>
         <!-- Staff settings (User record: shown on comments, audit logs, incident calls) -->
@@ -398,11 +462,58 @@
       <% end %>
 
       <!-- Connections -->
-      <% if @show_mcp_connections %>
+      <% if @show_connections %>
       <section id="connections" class="scroll-mt-8">
         <h2 class="border-b border-(--border-soft) pb-3 text-xl font-semibold text-(--text-strong)">Connections</h2>
+
+        <% if @participant %>
+          <% connections_return = dashboard_profile_path(anchor: "connections") %>
+          <h3 class="mt-5 text-base font-semibold text-(--text-strong)">GitHub and itch.io</h3>
+          <p class="mt-1 text-sm text-(--text-muted)">
+            Link the accounts you build and ship projects with. Events can ask for them when you register, and
+            accounts linked here are already connected when you get to that step. Disconnecting removes the link
+            and Attend's access.
+          </p>
+          <div class="mt-4 overflow-hidden rounded-2xl border border-(--border-card) bg-(--bg-elev)">
+            <ul class="divide-y divide-(--border-soft)">
+              <% EventSeries::ACCOUNT_LINKING_PROVIDERS.each do |provider| %>
+                <% name = AccountLinking.provider_name(provider) %>
+                <% account = @connected_accounts[provider] %>
+                <li id="connection-<%= provider %>" class="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div class="min-w-0">
+                    <p class="text-sm font-semibold text-(--text-strong)"><%= name %></p>
+                    <p class="mt-0.5 text-xs text-(--text-muted)">
+                      <% if account %>
+                        Connected as <%= link_to account.username, account.profile_url, class: "font-medium text-(--text-link) hover:underline", target: "_blank", rel: "noopener" %>
+                        on <%= account.connected_at.strftime("%b %-d, %Y") %>
+                      <% elsif AccountLinking.available?(provider) %>
+                        Not connected
+                      <% else %>
+                        <%= name %> linking isn't available right now.
+                      <% end %>
+                    </p>
+                  </div>
+                  <% if account %>
+                    <%= button_to "Disconnect", disconnect_account_path(provider: provider, return_to: connections_return),
+                          method: :delete,
+                          form: { data: { turbo: false, turbo_confirm: "Disconnect #{name}? Events that ask for it will ask again." } },
+                          aria: { label: "Disconnect #{name}" },
+                          class: "w-full sm:w-auto cursor-pointer rounded-lg border border-(--border-card) px-4 py-2 text-sm font-medium text-(--text) hover:bg-(--bg-elev-2) transition-colors" %>
+                  <% elsif AccountLinking.available?(provider) %>
+                    <%= button_to "Connect #{name}", connect_account_path(provider: provider, return_to: connections_return),
+                          form: { data: { turbo: false } },
+                          class: "w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 bg-[#d42f46] hover:bg-[#b82840] text-[#ffffff] text-sm font-semibold rounded-lg transition-colors cursor-pointer" %>
+                  <% end %>
+                </li>
+              <% end %>
+            </ul>
+          </div>
+        <% end %>
+
+        <% if @show_mcp_connections %>
+        <h3 class="<%= @participant ? "mt-8" : "mt-5" %> text-base font-semibold text-(--text-strong)">Apps connected through MCP</h3>
         <% if current_user.admin? %>
-          <p class="mt-3 text-sm text-(--text-muted)">
+          <p class="mt-1 text-sm text-(--text-muted)">
             Apps connected to your Attend account through
             <a href="https://attend.hackclub.com/mcp" class="font-medium text-(--text-link) hover:underline">MCP</a>.
             They act as you, limited to the scopes you approved. Disconnecting one signs it out immediately.
@@ -413,7 +524,7 @@
             back through the approval screen.
           </p>
         <% else %>
-          <p class="mt-3 text-sm text-(--text-muted)">
+          <p class="mt-1 text-sm text-(--text-muted)">
             MCP is only available to Attend staff, so these apps can no longer reach your
             account. Disconnect them to clear them out.
           </p>
@@ -497,7 +608,7 @@
                                             class: "size-3.5 accent-(--brand)" %>
                                       <span><%= event.name %></span>
                                       <% if event.starts_at %>
-                                        <span class="ml-auto text-[11px] text-(--text-muted)"><%= event.starts_at.strftime("%b %Y") %></span>
+                                        <span class="ml-auto text-[11px] text-(--text-muted)"><%= event.local_starts_at.strftime("%b %Y") %></span>
                                       <% end %>
                                     </label>
                                   <% end %>
@@ -524,6 +635,7 @@
           <div class="mt-4 rounded-2xl border border-dashed border-(--border-card) bg-(--bg-elev) px-6 py-8 text-center text-sm text-(--text-muted)">
             Nothing is connected to your account.
           </div>
+        <% end %>
         <% end %>
       </section>
       <% end %>

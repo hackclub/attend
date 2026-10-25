@@ -25,13 +25,12 @@
     <meta name="current-event-id" content="<%= current_event&.id %>">
     <meta name="current-event-slug" content="<%= current_event&.slug %>">
     <meta name="global-admin" content="<%= current_user&.global_admin? %>">
+    <meta name="can-manage-integrations" content="<%= current_event.present? && policy(current_event).manage_integrations? %>">
 
     <link rel="icon" href="/icon-32.png?v=3" type="image/png" sizes="32x32">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3">
 
-    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
-    <%= stylesheet_link_tag "hackclub", "data-turbo-track": "reload" %>
-    <%= stylesheet_link_tag "themes", "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "application", "console", "tailwind", "hackclub", "themes", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
   </head>
 
@@ -88,6 +87,8 @@
                 </div>
               </div>
 
+              <%= render "layouts/admin_console_beta_button", extra_class: "mx-3 mb-2" %>
+
               <nav class="px-3 pt-2">
                 <%= render "layouts/admin_sidebar_nav", close_action: nil %>
               </nav>
@@ -114,6 +115,8 @@
                 </svg>
               </button>
             </div>
+
+            <%= render "layouts/admin_console_beta_button", compact: true %>
           </div>
         </header>
 
@@ -125,8 +128,9 @@
         <% end %>
 
         <!-- Flash messages -->
+        <%# A fresh id each render makes a morph insert (and reveal) a new notice instead of rewriting the old one in place; scroll-mt clears the sticky mobile header. %>
         <% if flash[:notice] %>
-          <div class="border-b border-[#33d6a6]/30 border-l-4 border-l-[#33d6a6] bg-white" data-controller="flash" data-flash-target="container">
+          <div id="flash-<%= SecureRandom.hex(4) %>" class="scroll-mt-14 lg:scroll-mt-0 border-b border-[#33d6a6]/30 border-l-4 border-l-[#33d6a6] bg-white" data-controller="flash" data-flash-target="container" data-flash-reveal-value="true">
             <div class="px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
               <p class="text-sm text-[#1f2d3d]"><%= flash[:notice] %></p>
               <button type="button" class="text-[#8492a6] hover:text-[#3c4858]" data-action="flash#dismiss">
@@ -139,7 +143,7 @@
         <% end %>
 
         <% if flash[:alert] %>
-          <div class="border-b border-[#ec3750]/30 border-l-4 border-l-[#ec3750] bg-white" data-controller="flash" data-flash-target="container">
+          <div id="flash-<%= SecureRandom.hex(4) %>" class="scroll-mt-14 lg:scroll-mt-0 border-b border-[#ec3750]/30 border-l-4 border-l-[#ec3750] bg-white" data-controller="flash" data-flash-target="container" data-flash-reveal-value="true">
             <div class="px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
               <p class="text-sm text-[#1f2d3d]"><%= flash[:alert] %></p>
               <button type="button" class="text-[#8492a6] hover:text-[#3c4858]" data-action="flash#dismiss">
@@ -149,6 +153,14 @@
               </button>
             </div>
           </div>
+        <% end %>
+
+        <% if current_event&.waiver_dates_stale? %>
+          <%= render "layouts/waiver_dates_banner", event: current_event %>
+        <% end %>
+
+        <% if current_event %>
+          <%= render "layouts/training_banner", event: current_event %>
         <% end %>
 
         <!-- Main content -->
@@ -211,5 +223,6 @@
       </div>
     </div>
     <%= render "shared/staging_frame" %>
+    <%= render "shared/mintlify_assistant" %>
   </body>
 </html>

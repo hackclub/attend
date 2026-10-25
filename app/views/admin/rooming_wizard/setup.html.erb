@@ -121,6 +121,11 @@
   </div>
 
   <script nonce="<%= content_security_policy_nonce %>">
+    // Listeners bound to document are torn down when we navigate away, so
+    // repeat visits don't stack them.
+    var pageListeners = new AbortController();
+    document.addEventListener('turbo:before-render', () => pageListeners.abort(), { signal: pageListeners.signal });
+
     function addConfigRow() {
       const tbody = document.getElementById('room-configurations-body');
       const row = document.createElement('tr');
@@ -156,7 +161,7 @@
 
       const removeButton = event.target.closest('[data-remove-config-row]');
       if (removeButton) removeConfigRow(removeButton);
-    });
+    }, { signal: pageListeners.signal });
 
     function updateRemoveButtons() {
       const rows = document.querySelectorAll('#room-configurations-body .configuration-row');

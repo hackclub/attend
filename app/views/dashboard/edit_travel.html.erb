@@ -40,8 +40,17 @@
 
         <div class="space-y-4">
           <div>
+            <label for="travel_inbound_arrangement_status" class="block text-sm font-medium text-gray-700 mb-1">Arrival plan status <span class="text-red-500">*</span></label>
+            <select name="travel_inbound[arrangement_status]" id="travel_inbound_arrangement_status" data-action="change->travel-form#updateFields" data-travel-form-target="inboundStatus" class="w-full border border-gray-300 rounded-md px-3 py-2" required>
+              <option value="">Choose a status</option>
+              <option value="not_arranged" <%= "selected" if @travel_inbound&.not_arranged? %>>I haven't arranged this yet</option>
+              <option value="provisional" <%= "selected" if @travel_inbound&.provisional? %>>Provisional, not booked</option>
+              <option value="confirmed" <%= "selected" if @travel_inbound&.confirmed? %>>Confirmed</option>
+            </select>
+          </div>
+          <div>
             <label for="travel_inbound_mode" class="block text-sm font-medium text-gray-700 mb-1">How are you travelling? <span class="text-red-500">*</span></label>
-            <select name="travel_inbound[mode]" id="travel_inbound_mode" data-action="change->travel-form#updateFields" data-travel-form-target="inboundMode" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+            <select name="travel_inbound[mode]" id="travel_inbound_mode" data-action="change->travel-form#updateFields" data-travel-form-target="inboundMode" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">Select travel mode</option>
               <option value="plane" <%= "selected" if @travel_inbound&.plane? %>>Flight</option>
               <option value="train" <%= "selected" if @travel_inbound&.train? %>>Train</option>
@@ -144,8 +153,17 @@
 
         <div class="space-y-4">
           <div>
+            <label for="travel_outbound_arrangement_status" class="block text-sm font-medium text-gray-700 mb-1">Departure plan status <span class="text-red-500">*</span></label>
+            <select name="travel_outbound[arrangement_status]" id="travel_outbound_arrangement_status" data-action="change->travel-form#updateFields" data-travel-form-target="outboundStatus" class="w-full border border-gray-300 rounded-md px-3 py-2" required>
+              <option value="">Choose a status</option>
+              <option value="not_arranged" <%= "selected" if @travel_outbound&.not_arranged? %>>I haven't arranged this yet</option>
+              <option value="provisional" <%= "selected" if @travel_outbound&.provisional? %>>Provisional, not booked</option>
+              <option value="confirmed" <%= "selected" if @travel_outbound&.confirmed? %>>Confirmed</option>
+            </select>
+          </div>
+          <div>
             <label for="travel_outbound_mode" class="block text-sm font-medium text-gray-700 mb-1">How are you leaving? <span class="text-red-500">*</span></label>
-            <select name="travel_outbound[mode]" id="travel_outbound_mode" data-action="change->travel-form#updateFields" data-travel-form-target="outboundMode" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+            <select name="travel_outbound[mode]" id="travel_outbound_mode" data-action="change->travel-form#updateFields" data-travel-form-target="outboundMode" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">Select travel mode</option>
               <option value="plane" <%= "selected" if @travel_outbound&.plane? %>>Flight</option>
               <option value="train" <%= "selected" if @travel_outbound&.train? %>>Train</option>

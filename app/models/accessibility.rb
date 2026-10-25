@@ -1,5 +1,6 @@
 class Accessibility < ApplicationRecord
   include ClearsNegativeResponses
+  include HealthSectionResponse
 
   has_paper_trail
 
@@ -32,5 +33,13 @@ class Accessibility < ApplicationRecord
   def needs_accommodation?
     has_mobility_needs? || has_sensory_needs? || has_communication_needs? ||
       religious_practices.present? || other_needs.present?
+  end
+
+  def health_section_has_details?
+    [ mobility_needs, sensory_needs, communication_needs, religious_practices,
+      other_needs, neurodivergent_notes, distance_limitations, unavailable_times ].any?(&:present?) ||
+      %i[has_adhd has_autism has_dyslexia light_sensitivity needs_captioning needs_large_print
+         needs_sign_language noise_sensitivity prayer_space_required requires_private_space
+         step_free_required strobe_sensitivity uses_wheelchair].any? { |field| public_send(field) }
   end
 end

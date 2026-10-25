@@ -1,15 +1,22 @@
 Hi <%= @first_name %>!
 
-We're super excited to invite you to complete your onboarding materials for Hack Club's <%= @event_name %>. We can't wait to welcome you to <%= @location %> for an amazing hackathon.
+You've been invited to register for Hack Club's <%= @event_name %>. Complete your information and required signatures to confirm your attendance.
 
-Complete your onboarding using Attend: <%= @onboarding_url %>
+<% if @event_dates.present? %>Dates: <%= @event_dates %>
+<% end %><% if @location.present? %>Location: <%= @location %>
+<% end %><% if @registration_deadline.present? %>Complete your registration by <%= @registration_deadline %>.
+<% end %>
+Complete your registration in Attend: <%= @onboarding_url %>
 
-What does this include?
-- You'll be asked to sign in with Hack Club Account - if you don't have one, it'll run you through the process automatically.
-- You'll add information like your name, birthday, and your contact info as well as your medical information.
-- You'll let us know how you're getting to <%= @location %> - plane, bus, car etc.
-- You'll let us know your parent/guardian's email & contact details in case of emergency.
+What to have ready:
+- Your contact details and date of birth.
+- A clear photo of your face for event identification.
+- Any health, dietary, accessibility, or support information the event team should know.
+<% if @travel_required %>- Your travel details, including bookings you already know.
+<% end %><% if @accommodation_required %>- Your accommodation requirements.
+<% end %><% if @guardian_requirement == :minor %>- Your guardian contact details. After you submit, your guardian will receive a separate invitation to provide their details and required signatures.
+<% elsif @guardian_requirement == :unknown_age %>- If you'll be under 18 when <%= @event_name %> starts, your guardian contact details. After you submit, your guardian will receive a separate invitation to provide their details and required signatures.
+<% end %>
+You can save your progress, leave Attend, and sign back in later to resume your registration.
 
-If you have any questions about this process, don't hesitate to email us at <%= @support_email %>, or just hit reply to this email!
-
-We can't wait to see you at <%= @event_name %>!
+Use the Hack Club Account connected to the email address that received this invitation. If you use a different account or the link expires, email <%= @support_email %> or reply to this email for help.

@@ -3,7 +3,9 @@ class ThemesController < ApplicationController
 
   def update
     theme = params[:theme].to_s
-    theme = "light" unless ApplicationHelper::THEMES.key?(theme)
+    # "system" is the admin console's follow-the-OS mode. It isn't one of the
+    # app themes, so pages outside the console render it as light.
+    theme = "light" unless ApplicationHelper::THEMES.key?(theme) || theme == ConsoleHelper::SYSTEM_THEME
 
     cookies.permanent[:attend_theme] = { value: theme, same_site: :lax }
 

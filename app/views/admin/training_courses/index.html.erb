@@ -1,0 +1,59 @@
+<div class="space-y-6">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Training</h1>
+      <p class="text-sm text-gray-500">Courses award badges; badges can be required for event roles.</p>
+    </div>
+    <div class="flex gap-2">
+      <%= link_to "Learner view", training_path, class: "px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50" %>
+      <%= link_to "New Badge", new_admin_training_badge_path, class: "px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50" %>
+      <%= link_to "New Course", new_admin_training_course_path, class: "px-4 py-2 bg-[#d42f46] text-white rounded-md text-sm hover:bg-[#b82840]" %>
+    </div>
+  </div>
+
+  <% if @pending_disclosures.positive? %>
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-800 flex justify-between items-center gap-4">
+      <span><strong><%= pluralize(@pending_disclosures, "declaration") %></strong> awaiting the <%= TrainingDisclosure::SAFETY_TEAM_NAME %>.</span>
+      <%= link_to "Review", admin_training_disclosures_path, class: "underline" %>
+    </div>
+  <% end %>
+  <div class="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-100">
+      <thead class="bg-gray-50">
+        <tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Course</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Awards</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lessons</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Learners</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><span class="sr-only">Order</span></th></tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100 text-sm">
+        <% if @courses.empty? %><tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">No courses yet.</td></tr><% end %>
+        <% @courses.each_with_index do |course, index| %>
+          <tr>
+            <td class="px-6 py-4"><%= link_to course.title, admin_training_course_path(course), class: "font-medium text-gray-900 hover:text-[#ec3750]" %></td>
+            <td class="px-6 py-4"><%= render "admin/training/course_status", course: course %><div class="text-xs text-gray-500 mt-1"><%= course.access_open? ? "Open to anyone" : "Invite-only" %></div></td>
+            <td class="px-6 py-4 text-gray-600"><%= course.badge&.name || "—" %></td>
+            <td class="px-6 py-4 text-gray-600"><%= course.lessons.size %> · <%= pluralize(course.question_count, "question") %></td>
+            <td class="px-6 py-4 text-gray-600"><%= @completion_counts.fetch(course.id, 0) %> completed of <%= @enrollment_counts.fetch(course.id, 0) %></td>
+            <td class="px-6 py-4 text-right"><%= render "admin/training/move_buttons", path: move_admin_training_course_path(course), label: course.title, first: index.zero?, last: index == @courses.size - 1 %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-100">
+      <thead class="bg-gray-50">
+        <tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Badge</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Required for</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Validity</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current holders</th></tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100 text-sm">
+        <% if @badges.empty? %><tr><td colspan="4" class="px-6 py-8 text-center text-gray-500">No badges yet.</td></tr><% end %>
+        <% @badges.each do |badge| %>
+          <tr>
+            <td class="px-6 py-4"><%= link_to badge.name, admin_training_badge_path(badge), class: "font-medium text-gray-900 hover:text-[#ec3750]" %></td>
+            <td class="px-6 py-4"><%= render "admin/training/required_roles", badge: badge %></td>
+            <td class="px-6 py-4 text-gray-600"><%= training_validity(badge) %></td>
+            <td class="px-6 py-4 text-gray-600"><%= @holder_counts.fetch(badge.id, 0) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>

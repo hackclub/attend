@@ -1,5 +1,6 @@
 class Medical < ApplicationRecord
   include ClearsNegativeResponses
+  include HealthSectionResponse
 
   has_paper_trail
 
@@ -19,13 +20,8 @@ class Medical < ApplicationRecord
 
   before_save :set_last_updated_by
 
-  NEGATIVE_RESPONSES = %w[none no n/a na nil null nothing nope - 0].freeze
-
   def has_allergies?
-    return false if allergies.blank?
-
-    normalized = allergies.strip.downcase
-    !NEGATIVE_RESPONSES.include?(normalized)
+    ClearsNegativeResponses.meaningful_response?(allergies)
   end
 
   def anaphylaxis_risk?
@@ -34,6 +30,12 @@ class Medical < ApplicationRecord
 
   def needs_medication_storage?
     requires_refrigeration
+  end
+
+  def health_section_has_details?
+    [ allergies, allergy_severity, medical_conditions, medications,
+      emergency_action_plan, additional_notes ].any?(&:present?) ||
+      has_anaphylaxis_risk? || requires_refrigeration?
   end
 
   private

@@ -14,6 +14,7 @@ RSpec.describe "Onboarding unaccompanied minor verification", type: :request do
 
   def plane_travel_params(um: false)
     {
+      arrangement_status: "confirmed",
       mode: "plane",
       is_unaccompanied_minor: um ? "1" : "0",
       travel_legs_attributes: {

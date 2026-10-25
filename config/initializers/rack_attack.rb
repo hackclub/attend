@@ -2,13 +2,27 @@
 return unless ActiveRecord::Base.connection.table_exists?("solid_cache_entries") rescue false
 
 class Rack::Attack
+  # Health probes hit /up every few seconds from the same node IPs. Counting
+  # them means a cache-DB read + locked increment per probe, so a slow cache
+  # DB turned into slow (and eventually failing) liveness checks.
+  safelist("health-check") { |req| req.path == "/up" }
+
   throttle("req/ip", limit: 300, period: 5.minutes) do |req|
     # The Slack events webhook is exempt: it's HMAC-authenticated (Slack
     # signing secret), Slack retries throttled deliveries (amplifying load),
     # and counting it costs a cache read + write on every request.
     next if req.path == "/api/v1/slack/events" && req.post?
 
-    req.ip unless req.path.start_with?("/assets")
+    # /docs is a proxy onto a Next.js site: one page view pulls a dozen-odd
+    # chunks, none of them under /assets, so reading the docs would burn this
+    # budget and lock the reader out of the app itself. It gets its own,
+    # looser bucket below rather than no limit at all — it's public, and every
+    # request through it costs us a call to Mintlify.
+    req.ip unless req.path.start_with?("/assets", "/docs")
+  end
+
+  throttle("docs/ip", limit: 600, period: 5.minutes) do |req|
+    req.ip if req.path.start_with?("/docs")
   end
 
   throttle("logins/ip", limit: 5, period: 20.seconds) do |req|
@@ -27,6 +41,11 @@ class Rack::Attack
     if req.path.start_with?("/guardian/invite") && req.get?
       req.ip
     end
+  end
+
+  # Each connect starts an OAuth round trip to GitHub or itch.io.
+  throttle("connected_accounts/ip", limit: 20, period: 1.minute) do |req|
+    req.ip if req.path.start_with?("/connected_accounts")
   end
 
   throttle("api/participants", limit: 60, period: 1.minute) do |req|

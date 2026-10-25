@@ -7,7 +7,7 @@ RSpec.describe "Custom documents", type: :request do
   let(:event) { create(:event) }
 
   describe "admin management" do
-    let(:admin) { User.create!(email: "admin-docs@example.com", name: "Admin", global_role: "global_admin") }
+    let(:admin) { User.create!(email: "admin-docs@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
 
     before { sign_in admin }
 
@@ -154,6 +154,19 @@ RSpec.describe "Custom documents", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Hotel Waiver Field Mappings")
+    end
+
+    context "with the admin console beta" do
+      before { admin.update!(admin_console_beta: true) }
+
+      it "renders the sentence-case mappings heading via its mapping key" do
+        doc = create(:custom_document, event: event, name: "Hotel Waiver")
+
+        get admin_event_docuseal_template_mappings_path(event, doc.mapping_key)
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("Hotel Waiver field mappings")
+      end
     end
 
     it "saves mappings for a custom document under its mapping key" do

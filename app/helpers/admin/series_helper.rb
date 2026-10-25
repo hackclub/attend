@@ -40,7 +40,7 @@ module Admin::SeriesHelper
         lon: coordinates[:lon],
         name: event.name,
         location: [ event.location_city, event.location_country ].compact_blank.join(", "),
-        dates: event_date_range(event.starts_at, event.ends_at),
+        dates: event_date_range(event.starts_at, event.ends_at, zone: event.event_time_zone),
         url: admin_event_dashboard_path(event.slug),
         active: row[:active],
         blocked: blocked,
@@ -53,6 +53,19 @@ module Admin::SeriesHelper
         radius: (Math.sqrt(row[:active]) * 3.6).clamp(10, 34).round
       }
     end
+  end
+
+  # vote.hackclub.com decides its own admin and gallery URLs and we store
+  # whatever it sends, so they are external input by the time a view renders
+  # them: anything but http(s) — a `javascript:` URL above all — must never
+  # reach an href. Returns nil when there is nothing safe to link to, so the
+  # caller can drop the link entirely.
+  def external_http_url(url)
+    return nil if url.blank?
+
+    URI.parse(url).is_a?(URI::HTTP) ? url : nil
+  rescue URI::InvalidURIError
+    nil
   end
 
   # The participant list for one event, filtered to the people stuck at a stage.

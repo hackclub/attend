@@ -109,17 +109,17 @@ class SchoolExcuseLetterService
   def format_date_range
     return "TBD" unless @event.starts_at.present?
 
-    start_date = @event.starts_at.strftime("%B %-d")
+    start_date = @event.local_starts_at.strftime("%B %-d")
 
     if @event.ends_at.present?
-      end_date = if @event.starts_at.year == @event.ends_at.year &&
-                    @event.starts_at.month == @event.ends_at.month
-        "the #{@event.ends_at.strftime('%-d')}"
+      end_date = if @event.local_starts_at.year == @event.local_ends_at.year &&
+                    @event.local_starts_at.month == @event.local_ends_at.month
+        "the #{@event.local_ends_at.strftime('%-d')}"
       else
-        @event.ends_at.strftime("%B %-d")
+        @event.local_ends_at.strftime("%B %-d")
       end
 
-      "#{start_date} to #{end_date} of #{(@event.ends_at || @event.starts_at).strftime('%Y')}"
+      "#{start_date} to #{end_date} of #{(@event.local_ends_at || @event.local_starts_at).strftime('%Y')}"
     else
       start_date
     end

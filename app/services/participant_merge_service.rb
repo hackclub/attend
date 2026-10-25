@@ -21,10 +21,6 @@ class ParticipantMergeService
     engagement_notes slack_user_id
   ].freeze
 
-  # Placeholder onboarding writes for required name fields when OIDC claims
-  # are missing — treated the same as blank.
-  PLACEHOLDER = "Unknown"
-
   # When both rows registered for the same event, the more-progressed
   # registration is kept and the other destroyed. Ties keep the primary's.
   STATUS_PRIORITY = {
@@ -73,6 +69,7 @@ class ParticipantMergeService
     actions = []
     merge_participant_events(actions, execute:)
     merge_sibling_memberships(actions, execute:)
+    merge_connected_accounts(actions, execute:)
     merge_profile_fields(actions, execute:)
     merge_headshot(actions, execute:)
     merge_user_link(actions, execute:)
@@ -110,6 +107,15 @@ class ParticipantMergeService
     end
   end
 
+  def merge_connected_accounts(actions, execute:)
+    duplicate.connected_accounts.to_a.each do |account|
+      next if primary.connected_accounts.exists?(provider: account.provider)
+
+      actions << "Transfer connected #{account.provider_name} account (#{account.username})"
+      account.update!(participant: primary) if execute
+    end
+  end
+
   def merge_profile_fields(actions, execute:)
     PROFILE_FIELDS.each do |field|
       next unless missing?(primary.public_send(field)) && !missing?(duplicate.public_send(field))
@@ -140,6 +146,6 @@ class ParticipantMergeService
   end
 
   def missing?(value)
-    value.blank? || value == PLACEHOLDER
+    Participant.name_placeholder?(value)
   end
 end

@@ -1,0 +1,19 @@
+Hi <%= @first_name %>,
+
+<% if @added_by %>
+<%= @added_by.name.presence || @added_by.email %> added you as a volunteer at <%= @event.name %>.
+<% else %>
+You've been added as a volunteer at <%= @event.name %>.
+<% end %>
+<% if @badges.any? %>
+
+Everyone working at a Hack Club event needs to complete our safeguarding training first. Before the event, please earn <%= @badges.map(&:name).to_sentence %> on Attend -- sign in with your Hack Club account using this email address (<%= @user.email %>):
+
+<%= @training_url %>
+<% end %>
+
+<% if @added_by %>
+Questions? Just reply to this email and it'll go to <%= @added_by.email %>.
+<% else %>
+Questions? Just reply to this email.
+<% end %>

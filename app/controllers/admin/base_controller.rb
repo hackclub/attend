@@ -1,6 +1,7 @@
 module Admin
   class BaseController < ApplicationController
     before_action :authenticate_user!
+    before_action :set_admin_ui_variant
     before_action :authorize_admin_access
     before_action :set_current_event_from_session
     before_action :switch_event_if_needed
@@ -9,7 +10,8 @@ module Admin
 
     layout "admin"
 
-    helper_method :current_event, :available_events, :can_view_participant_pii?
+    helper_method :current_event, :available_events, :can_view_participant_pii?,
+      :registration_change_request_pending_count
 
     # Views that render an exact date of birth or a home address gate on this;
     # PII-restricted roles (Limited) get age and no address instead.
@@ -29,7 +31,21 @@ module Admin
         .order(starts_at: :desc)
     end
 
+    def registration_change_request_pending_count
+      return 0 unless current_event
+
+      @registration_change_request_pending_count ||= policy_scope(RegistrationChangeRequest).pending.count
+    end
+
     private
+
+    # Staff get the console redesign unless they've switched back to the
+    # original admin (Admin::ConsoleBetaController): every *.html+console.erb template, layout included,
+    # wins over its *.html.erb original. Set before any action runs so
+    # renders, Turbo Stream responses and render_to_string all see it.
+    def set_admin_ui_variant
+      request.variant = :console if current_user&.admin_console_beta?
+    end
 
     def authorize_admin_access
       unless current_user&.admin?
@@ -73,7 +89,7 @@ module Admin
 
     def require_event_selected
       unless current_event
-        redirect_to admin_events_path, alert: "Please select an event first."
+        redirect_to admin_root_path, alert: "Please select an event first."
       end
     end
 
@@ -91,7 +107,7 @@ module Admin
       Current.event = nil
       @current_event = nil
 
-      redirect_to admin_events_path,
+      redirect_to admin_root_path,
         alert: "You no longer have access to that event."
     end
 
@@ -112,8 +128,13 @@ module Admin
 
       changed_record = find_changed_record
       record = changed_record || @record || @event || @participant_event
-      # Skip audit logging for actions without a record (e.g., impersonation)
-      return if record.nil?
+      # Skip audit logging for actions without a record (e.g., impersonation),
+      # and for records that were never persisted — a create that failed
+      # validation re-renders the form with an id-less object, which AuditLog
+      # rejects. In development that rejection re-raises (see below) and
+      # replaces the 422 form (errors and all) with an exception page that
+      # Turbo full-reloads, so the admin just sees the form silently reset.
+      return if record.nil? || record.id.blank?
 
       changed_fields = if changed_record
         changed_record.previous_changes.except("updated_at", "created_at")
@@ -178,18 +199,8 @@ module Admin
       candidates.max_by { |_, _, change_count, _| change_count }[1]
     end
 
-    # Values of `encrypts`-declared attributes are plaintext in
-    # previous_changes; keep them out of the audit_logs jsonb so encrypted-at-
-    # rest content (incident narratives, medical notes, etc.) never lands
-    # there readable.
     def redact_encrypted_audit_fields(record, changed_fields)
-      encrypted = record.class.try(:encrypted_attributes)
-      return changed_fields if encrypted.blank?
-
-      encrypted_names = encrypted.map(&:to_s)
-      changed_fields.to_h do |field, change|
-        [ field, encrypted_names.include?(field.to_s) ? "[REDACTED]" : change ]
-      end
+      AuditLog.redact_encrypted_fields(record, changed_fields)
     end
   end
 end

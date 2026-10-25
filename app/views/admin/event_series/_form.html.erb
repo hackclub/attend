@@ -3,8 +3,11 @@
     <div class="bg-red-50 border border-red-200 rounded-lg p-4">
       <h3 class="text-red-800 font-medium"><%= pluralize(@series.errors.count, "error") %> prohibited this series from being saved:</h3>
       <ul class="mt-2 list-disc list-inside text-sm text-red-700">
-        <% @series.errors.full_messages.each do |message| %>
+        <% @series.errors.reject { |error| error.attribute == :brand }.map(&:full_message).each do |message| %>
           <li><%= message %></li>
+        <% end %>
+        <% if @series.errors.include?(:brand) %>
+          <li>The registration branding colours don't meet contrast minimums (details below)</li>
         <% end %>
       </ul>
     </div>
@@ -52,6 +55,132 @@
         <p class="mt-1 text-sm text-gray-500">PNG or JPEG. Max 5MB. Inherited by events in this series too.</p>
       </div>
     </div>
+  </div>
+
+  <% brand = @series.brand_theme %>
+  <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+    <div>
+      <h2 class="text-base font-semibold text-gray-900">Registration branding</h2>
+      <p class="mt-1 text-sm text-gray-500">How registration looks for every event in this series. Fonts and images come from files in the repo: add images under <code>app/assets/images/brands/</code> and fonts to <code>BrandTheme::FONTS</code>, then pick them here. Colours only apply to the light theme, and every text, button and outline colour has to pass WCAG contrast before it saves.</p>
+    </div>
+
+    <% brand_base_errors = @series.errors[:brand] %>
+    <% if brand_base_errors.any? %>
+      <ul class="text-sm text-red-700 list-disc list-inside" role="alert">
+        <% brand_base_errors.each do |message| %><li><%= message %></li><% end %>
+      </ul>
+    <% end %>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <% BrandHelper::BRAND_COLOR_FIELDS.each do |field, (label, hint)| %>
+        <div>
+          <%= label_tag "event_series_brand_#{field}", label, class: "block text-sm font-medium text-gray-700" %>
+          <div class="mt-1 flex items-center gap-2">
+            <span class="size-9 shrink-0 rounded-md border border-gray-300" style="background-color: <%= brand.public_send(field).to_s.match?(BrandTheme::HEX) ? brand.public_send(field) : "transparent" %>" aria-hidden="true"></span>
+            <%= text_field_tag "event_series[brand][#{field}]", brand.public_send(field), id: "event_series_brand_#{field}", placeholder: "#rrggbb", class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", aria: { describedby: "event_series_brand_#{field}_hint" } %>
+          </div>
+          <p id="event_series_brand_<%= field %>_hint" class="mt-1 text-sm text-gray-500"><%= hint %></p>
+          <% brand_field_errors(@series, field).each do |message| %><p class="mt-1 text-sm text-red-700"><%= message %></p><% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <%= label_tag "event_series_brand_body_font", "Body font", class: "block text-sm font-medium text-gray-700" %>
+        <%= select_tag "event_series[brand][body_font]", brand_font_options_for_select(brand.body_font), id: "event_series_brand_body_font", class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+      </div>
+      <div>
+        <%= label_tag "event_series_brand_heading_font", "Heading font", class: "block text-sm font-medium text-gray-700" %>
+        <%= select_tag "event_series[brand][heading_font]", brand_font_options_for_select(brand.heading_font), id: "event_series_brand_heading_font", class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+      </div>
+      <div>
+        <%= label_tag "event_series_brand_nav_style", "Step navigation", class: "block text-sm font-medium text-gray-700" %>
+        <%= select_tag "event_series[brand][nav_style]", brand_nav_options_for_select(brand.nav_style), id: "event_series_brand_nav_style", class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <% BrandHelper::BRAND_IMAGE_FIELDS.each do |field, (label, hint)| %>
+        <div>
+          <%= label_tag "event_series_brand_#{field}", label, class: "block text-sm font-medium text-gray-700" %>
+          <%= select_tag "event_series[brand][#{field}]", brand_image_options_for_select(brand.public_send(field)), id: "event_series_brand_#{field}", class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", aria: { describedby: "event_series_brand_#{field}_hint" } %>
+          <p id="event_series_brand_<%= field %>_hint" class="mt-1 text-sm text-gray-500"><%= hint %></p>
+          <% brand_field_errors(@series, field).each do |message| %><p class="mt-1 text-sm text-red-700"><%= message %></p><% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <details <%= "open" if brand.tokens.present? || @series.errors.include?(:brand_tokens) %>>
+      <summary class="cursor-pointer text-sm font-medium text-gray-700">Exact token values (advanced)</summary>
+      <div class="mt-2">
+        <%= label_tag "event_series_brand_tokens", "Token overrides", class: "block text-sm font-medium text-gray-700" %>
+        <%= text_area_tag "event_series[brand][tokens]", brand.tokens_text, id: "event_series_brand_tokens", rows: 6, class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2 font-mono text-sm", placeholder: "text-muted: #8a6440", aria: { describedby: "event_series_brand_tokens_hint" } %>
+        <p id="event_series_brand_tokens_hint" class="mt-1 text-sm text-gray-500">One <code>token: #hex</code> per line, to pin a shade instead of having it worked out. Tokens: <%= BrandTheme::TOKENS.join(", ") %>.</p>
+        <% brand_field_errors(@series, "tokens").each do |message| %><p class="mt-1 text-sm text-red-700"><%= message %></p><% end %>
+      </div>
+    </details>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+    <div>
+      <h2 class="text-base font-semibold text-gray-900">Registration notes</h2>
+      <p class="mt-1 text-sm text-gray-500">Optional text shown to registrants at every event in this series.</p>
+    </div>
+    <div>
+      <%= f.label :registration_note, "Next steps note", class: "block text-sm font-medium text-gray-700" %>
+      <%= f.text_area :registration_note, rows: 2, class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "Bring a laptop! You'll need one to build your project." %>
+      <p class="mt-1 text-sm text-gray-500">On the welcome, review and "you're registered" screens.</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <%= f.label :address_note, "Why we ask for an address", class: "block text-sm font-medium text-gray-700" %>
+        <%= f.text_field :address_note, class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+        <p class="mt-1 text-sm text-gray-500">Above the address fields.</p>
+      </div>
+      <div>
+        <%= f.label :tshirt_note, "T-shirt hint", class: "block text-sm font-medium text-gray-700" %>
+        <%= f.text_field :tshirt_note, class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "Unisex, US sizing." %>
+        <p class="mt-1 text-sm text-gray-500">Under the t-shirt size question.</p>
+      </div>
+    </div>
+    <div class="flex items-start">
+      <div class="flex items-center h-5">
+        <%= f.check_box :hide_privacy_notes, { checked: @series.hide_privacy_notes?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" } %>
+      </div>
+      <div class="ml-3">
+        <%= f.label :hide_privacy_notes, "Hide the privacy notes", class: "text-sm font-medium text-gray-700" %>
+        <p class="text-sm text-gray-500">Leaves out the notes on who can see rooming and health answers, and the private request links, on the accommodation and health steps. Health sections also stop offering to discuss privately.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+    <h2 class="text-base font-semibold text-gray-900">Account linking</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <% EventSeries::ACCOUNT_LINKING_PROVIDERS.each do |provider| %>
+        <% provider_name = AccountLinking.provider_name(provider) %>
+        <div class="space-y-3">
+          <div>
+            <%= f.label :"#{provider}_linking", "#{provider_name} account", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.select :"#{provider}_linking",
+                  [ [ "Don't ask", "off" ], [ "Optional", "optional" ], [ "Required", "required" ] ],
+                  { selected: @series.account_linking_mode(provider) },
+                  class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+            <% unless AccountLinking.available?(provider) %>
+              <p class="mt-1 text-sm text-[#c2410c]"><%= provider_name %> OAuth credentials aren't configured, so participants can't connect yet and "Required" won't block anyone.</p>
+            <% end %>
+          </div>
+          <div>
+            <%= f.label :"#{provider}_help_url", "#{provider_name} how-to link", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.url_field :"#{provider}_help_url", class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "https://" %>
+            <p class="mt-1 text-sm text-gray-500">Shown to people who don't have an account yet.</p>
+            <% @series.errors.full_messages_for(:"#{provider}_help_url").each do |message| %><p class="mt-1 text-sm text-red-700"><%= message %></p><% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+    <p class="text-sm text-gray-500">Adds an accounts step to onboarding before documents. Events can override this in their own settings. Changing it while people are mid-registration can shift where they are in the steps.</p>
   </div>
 
   <div class="flex flex-col sm:flex-row justify-between gap-3">

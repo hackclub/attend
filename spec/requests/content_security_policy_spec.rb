@@ -79,9 +79,19 @@ RSpec.describe "Content Security Policy", type: :request do
     end
   end
 
-  # The app layout renders three inline scripts of its own (theme, importmap,
-  # module preloads), so that is the floor for any page using it.
-  LAYOUT_INLINE_SCRIPTS = 3
+  # The app layout renders four inline scripts of its own (theme, importmap,
+  # module preloads, and the Mintlify assistant's init block), so that is the
+  # floor for any page using it.
+  LAYOUT_INLINE_SCRIPTS = 4
+
+  # The admin console beta (users.admin_console_beta) adds one more: the
+  # pre-paint script that restores a collapsed side navigation before the page
+  # draws. The admin specs below run against both layouts.
+  ADMIN_UIS = { "original admin" => false, "admin console beta" => true }.freeze
+
+  def admin_layout_inline_scripts
+    admin.admin_console_beta? ? LAYOUT_INLINE_SCRIPTS + 1 : LAYOUT_INLINE_SCRIPTS
+  end
 
   describe "public pages" do
     it "the sign-in page is clean" do
@@ -98,90 +108,135 @@ RSpec.describe "Content Security Policy", type: :request do
       form_action = response.headers["Content-Security-Policy"][/form-action[^;]*/]
       expect(form_action).to include("https://auth.hackclub.com")
     end
-  end
 
-  describe "admin pages" do
-    let(:event) { create(:event) }
-    let(:admin) do
-      User.create!(email: "csp-admin@example.com", name: "CSP Admin", global_role: "global_admin")
+    # "Add to LinkedIn" on a training badge posts to Attend, which 302s to
+    # LinkedIn's add-to-profile form.
+    it "allows LinkedIn in form-action" do
+      get root_path
+
+      form_action = response.headers["Content-Security-Policy"][/form-action[^;]*/]
+      expect(form_action).to include("https://www.linkedin.com")
     end
 
-    before { sign_in admin }
+    # Same for the integrations page's Connect Airtable button, which posts to
+    # Attend and is 302'd to Airtable's consent screen.
+    it "allows Airtable's OAuth host in form-action" do
+      get root_path
 
-    it "the QR scanner is clean" do
-      ScanContext.create!(event: event, name: "Main Door", checks_in: true, is_travel_pickup: false)
-
-      expect_csp_clean(scanner_admin_event_scans_path(event), inline_scripts: LAYOUT_INLINE_SCRIPTS + 1)
+      expect(response.headers["Content-Security-Policy"][/form-action[^;]*/]).to include("https://airtable.com")
     end
 
-    it "the scan history is clean" do
-      expect_csp_clean(history_admin_event_scans_path(event), inline_scripts: LAYOUT_INLINE_SCRIPTS + 1)
-    end
+    # Address fields (the event venue, profile and travel addresses) load the
+    # Google Maps JS API, which pulls modules from both hosts and fetches
+    # predictions from maps.googleapis.com. Blocked, the field just shows no
+    # suggestions.
+    it "allows Google Maps for address autocomplete" do
+      get root_path
 
-    it "the event form is clean" do
-      expect_csp_clean(edit_admin_event_path(event), inline_scripts: LAYOUT_INLINE_SCRIPTS + 1)
-    end
-
-    it "the event setup schedule step is clean" do
-      expect_csp_clean(admin_event_setup_schedule_path(event.slug), inline_scripts: LAYOUT_INLINE_SCRIPTS + 1)
-    end
-
-    it "the participants table is clean" do
-      expect_csp_clean(admin_event_participants_path(event), inline_scripts: LAYOUT_INLINE_SCRIPTS)
-    end
-
-    it "the dashboard is clean" do
-      expect_csp_clean(admin_event_dashboard_path(event), inline_scripts: LAYOUT_INLINE_SCRIPTS)
-    end
-
-    # /docs uses its own bare layout rather than the app one, hence the count.
-    it "the API docs page is clean" do
-      expect_csp_clean(docs_path, inline_scripts: 1)
+      header = response.headers["Content-Security-Policy"]
+      expect(header[/script-src[^;]*/]).to include("https://maps.googleapis.com", "https://maps.gstatic.com")
+      expect(header[/connect-src[^;]*/]).to include("https://maps.googleapis.com")
     end
   end
 
-  # The rooming wizard carried most of the inline handlers, and its partials
-  # (_room_card, _preference_links) render one script block per room and per
-  # participant, so the counts here also pin that the delegated listeners
-  # aren't being installed once per copy.
-  describe "the rooming wizard" do
-    let(:event) { create(:event) }
-    let(:admin) do
-      User.create!(email: "csp-rooming@example.com", name: "CSP Rooming", global_role: "global_admin")
-    end
-
-    before { sign_in admin }
-
-    it "the setup step is clean" do
-      expect_csp_clean(setup_admin_event_rooming_wizard_path(event.slug), inline_scripts: LAYOUT_INLINE_SCRIPTS + 1)
-    end
-
-    it "the preferences step is clean, with one script per participant partial" do
-      # The page joins accommodations, so a participant without one is skipped.
-      create_list(:participant_event, 2, event: event).each do |pe|
-        Accommodation.create!(participant_event: pe)
+  ADMIN_UIS.each do |ui, console|
+    describe "admin pages in the #{ui}" do
+      let(:event) { create(:event) }
+      let(:admin) do
+        User.create!(email: "csp-admin@example.com", name: "CSP Admin", global_role: "global_admin", admin_console_beta: console)
       end
 
-      expect_csp_clean(
-        preferences_admin_event_rooming_wizard_path(event.slug),
-        inline_scripts: LAYOUT_INLINE_SCRIPTS + 1 + 2
-      )
+      before { sign_in admin }
+
+      it "the QR scanner is clean" do
+        ScanContext.create!(event: event, name: "Main Door", checks_in: true, is_travel_pickup: false)
+
+        expect_csp_clean(scanner_admin_event_scans_path(event), inline_scripts: admin_layout_inline_scripts + 1)
+      end
+
+      it "the scan history is clean" do
+        expect_csp_clean(history_admin_event_scans_path(event), inline_scripts: admin_layout_inline_scripts + 1)
+      end
+
+      it "the event form is clean" do
+        expect_csp_clean(edit_admin_event_path(event), inline_scripts: admin_layout_inline_scripts + 1)
+      end
+
+      it "the event setup schedule step is clean" do
+        expect_csp_clean(admin_event_setup_schedule_path(event.slug), inline_scripts: admin_layout_inline_scripts + 1)
+      end
+
+      it "the participants table is clean" do
+        expect_csp_clean(admin_event_participants_path(event), inline_scripts: admin_layout_inline_scripts)
+      end
+
+      it "the dashboard is clean" do
+        expect_csp_clean(admin_event_dashboard_path(event), inline_scripts: admin_layout_inline_scripts)
+      end
+
+      # /docs uses its own bare layout rather than the app one, hence the count.
+      # It is also the Scalar fallback: once MINTLIFY_DOCS_HOST is set the
+      # response is Mintlify's HTML under Mintlify's own policy, and this stops
+      # being ours to check.
+      it "the API docs page is clean" do
+        expect_csp_clean(docs_path, inline_scripts: 1)
+      end
+
+      # The assistant widget loads from Mintlify and talks to their API. Losing
+      # any of these origins breaks it with nothing in the server logs.
+      it "allows the Mintlify assistant's origins" do
+        get root_path
+
+        header = response.headers["Content-Security-Policy"]
+        expect(header[/script-src[^;]*/]).to include("https://widget.mintlify.com")
+        expect(header[/connect-src[^;]*/]).to include("https://api.mintlify.com", "https://ph.mintlify.com")
+        expect(header[/frame-src[^;]*/]).to include("hcaptcha.com")
+      end
     end
 
-    it "the assignments step is clean, with one script per room partial" do
-      RoomingPlan.create!(event: event)
-      2.times { |i| Room.create!(event: event, name: "Room #{i}", capacity: 2) }
+    # The rooming wizard carried most of the inline handlers, and its partials
+    # (_room_card, _preference_links) render one script block per room and per
+    # participant, so the counts here also pin that the delegated listeners
+    # aren't being installed once per copy.
+    describe "the rooming wizard in the #{ui}" do
+      let(:event) { create(:event) }
+      let(:admin) do
+        User.create!(email: "csp-rooming@example.com", name: "CSP Rooming", global_role: "global_admin", admin_console_beta: console)
+      end
 
-      expect_csp_clean(
-        assignments_admin_event_rooming_wizard_path(event.slug),
-        inline_scripts: LAYOUT_INLINE_SCRIPTS + 1 + 2
-      )
-    end
+      before { sign_in admin }
 
-    it "the finalize step is clean" do
-      RoomingPlan.create!(event: event)
+      it "the setup step is clean" do
+        expect_csp_clean(setup_admin_event_rooming_wizard_path(event.slug), inline_scripts: admin_layout_inline_scripts + 1)
+      end
 
-      expect_csp_clean(finalize_admin_event_rooming_wizard_path(event.slug), inline_scripts: LAYOUT_INLINE_SCRIPTS + 1)
+      it "the preferences step is clean, with one script per participant partial" do
+        # The page joins accommodations, so a participant without one is skipped.
+        create_list(:participant_event, 2, event: event).each do |pe|
+          Accommodation.create!(participant_event: pe)
+        end
+
+        expect_csp_clean(
+          preferences_admin_event_rooming_wizard_path(event.slug),
+          inline_scripts: admin_layout_inline_scripts + 1 + 2
+        )
+      end
+
+      it "the assignments step is clean, with one script per room partial" do
+        RoomingPlan.create!(event: event)
+        2.times { |i| Room.create!(event: event, name: "Room #{i}", capacity: 2) }
+
+        expect_csp_clean(
+          assignments_admin_event_rooming_wizard_path(event.slug),
+          inline_scripts: admin_layout_inline_scripts + 1 + 2
+        )
+      end
+
+      it "the finalize step is clean" do
+        RoomingPlan.create!(event: event)
+
+        expect_csp_clean(finalize_admin_event_rooming_wizard_path(event.slug), inline_scripts: admin_layout_inline_scripts + 1)
+      end
     end
   end
 end

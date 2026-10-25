@@ -11,6 +11,13 @@ module ApplicationHelper
     "solarized-dark"         => "Solarized Dark"
   }.freeze
 
+  # Store links for the Attend mobile (scanner) app, shared by the
+  # participant dashboard badges and the admin console's side nav.
+  MOBILE_APP_URLS = {
+    ios: "https://testflight.apple.com/join/faP6dmwQ",
+    android: "https://play.google.com/store/apps/details?id=com.hackclub.attend"
+  }.freeze
+
   # Mirrors --bg-app in themes.css; <meta name="theme-color"> can't read CSS
   # variables, so the browser-chrome color has to be rendered server-side.
   THEME_COLORS = {
@@ -335,14 +342,19 @@ def admin_tool(class_name = "", element = "div", **options, &block)
     end
   end
 
+  # Flight leg times are stored in true UTC. Render one in the zone it was
+  # entered in (see TravelLeg#local_departure_time), with the zone's
+  # abbreviation, so attendees and organizers see the time on the ticket.
+  # `endpoint` is :departure or :arrival.
+  def flight_local_time(leg, endpoint, format: "%b %d, %Y %H:%M %Z")
+    leg.public_send(:"local_#{endpoint}_time")&.strftime(format)
+  end
+
   # Wall-clock value (YYYY-MM-DDThh:mm) for a stored-UTC leg time, rendered in
-  # the airport's local zone so a `datetime-local` input shows the booked time.
-  def flight_local_input_value(time, airport_code, default_date: nil)
-    if time.blank?
-      return default_date.present? ? "#{default_date}T00:00" : nil
-    end
-    tz = FlightTrackingService.airport_timezone(airport_code)
-    (tz ? time.in_time_zone(tz) : time).strftime("%Y-%m-%dT%H:%M")
+  # the zone it was entered in so a `datetime-local` input shows the booked time.
+  # `endpoint` is :departure or :arrival.
+  def flight_local_input_value(leg, endpoint, default_date: nil)
+    leg.public_send(:"local_#{endpoint}_time")&.strftime("%Y-%m-%dT%H:%M")
   end
 
   def attend_deep_link(participant_id)
@@ -370,7 +382,7 @@ def admin_tool(class_name = "", element = "div", **options, &block)
   def slack_oauth_url_for_user(user)
     return nil unless user&.participant.present?
 
-    participant_event = user.participant.participant_events.first
+    participant_event = user.participant.slack_connect_participant_event
     return nil unless participant_event.present?
 
     SlackService.new.authorization_url(

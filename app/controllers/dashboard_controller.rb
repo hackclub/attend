@@ -1,4 +1,5 @@
 class DashboardController < ApplicationController
+  include RestrictsBannedUsers
   include TravelLegDateMerging
   include PhysicalDocumentUploads
   include OptionalDocumentEnrolment
@@ -6,7 +7,8 @@ class DashboardController < ApplicationController
   # MCP connections are managed from the profile page, so they follow the same
   # rule as the rest of it: admins without a participant record still get in.
   PROFILE_ACTIONS = %w[profile update_staff_profile destroy_staff_avatar
-                       revoke_mcp_connection update_mcp_connection].freeze
+                       revoke_mcp_connection update_mcp_connection
+                       update_badge_redirect].freeze
 
   before_action :authenticate_user!
   before_action :require_participant, except: PROFILE_ACTIONS
@@ -21,12 +23,15 @@ class DashboardController < ApplicationController
     @participant_events = @participant.participant_events.includes(
       :consents, :travel_inbound, :travel_outbound, :accommodation,
       :medical, :dietary, :accessibility, :emergency_contacts,
-      guardian_participant_events: :emergency_contacts,
+      guardian_participant_events: [ :emergency_contacts, :guardian ],
       event: [ :custom_documents, { logo_attachment: :blob, event_series: { logo_attachment: :blob } } ]
     )
     @pending_invitations = @participant.pending_invitations.includes(
       event: [ { logo_attachment: :blob, event_series: { logo_attachment: :blob } } ]
     )
+    @completion_presenters = @participant_events.index_with do |participant_event|
+      RegistrationCompletionPresenter.new(participant_event, viewer: :participant)
+    end
   end
 
   def profile
@@ -49,6 +54,19 @@ class DashboardController < ApplicationController
     # needs a way to clear the (now dead) connection out.
     @mcp_connections = mcp_connections
     @show_mcp_connections = current_user.admin? || @mcp_connections.any?
+    # Linked GitHub and itch.io accounts belong to the participant, so anyone
+    # with a participant record gets the section to connect them.
+    @connected_accounts = @participant ? @participant.connected_accounts.index_by(&:provider) : {}
+    @show_connections = @participant.present? || @show_mcp_connections
+
+    # Badge links are keyed by Slack ID (that's what the printed QR encodes),
+    # so someone whose account has no Slack ID gets the section as a prompt to
+    # connect Slack rather than a form that could never resolve.
+    @badge_slack_id = current_user.slack_id
+    if @badge_slack_id.present?
+      @badge_redirect = BadgeRedirect.for_slack_id(@badge_slack_id) ||
+        BadgeRedirect.new(slack_id: @badge_slack_id)
+    end
   end
 
   def update_staff_profile
@@ -57,6 +75,30 @@ class DashboardController < ApplicationController
     else
       redirect_to dashboard_profile_path(anchor: "staff-settings"),
         alert: current_user.errors.full_messages.to_sentence
+    end
+  end
+
+  # The redirect behind the QR code on this user's event badge. Managed here so
+  # nobody has to sign in to badge.hackclub.com, which now only serves the
+  # redirects themselves.
+  def update_badge_redirect
+    slack_id = current_user.slack_id
+
+    if slack_id.blank?
+      return redirect_to dashboard_profile_path(anchor: "badge-link"),
+        alert: "Connect your Slack account before setting a badge link."
+    end
+
+    badge_redirect = BadgeRedirect.for_slack_id(slack_id) || BadgeRedirect.new(slack_id: slack_id)
+    badge_redirect.user = current_user
+    badge_redirect.url = params.dig(:badge_redirect, :url)
+
+    if badge_redirect.save
+      redirect_to dashboard_profile_path(anchor: "badge-link"),
+        notice: badge_redirect.url.present? ? "Badge link updated." : "Badge link cleared."
+    else
+      redirect_to dashboard_profile_path(anchor: "badge-link"),
+        alert: badge_redirect.errors.full_messages.to_sentence
     end
   end
 
@@ -136,6 +178,7 @@ class DashboardController < ApplicationController
       .find(params[:id])
     authorize @participant_event
     @event = @participant_event.event
+    @completion = RegistrationCompletionPresenter.new(@participant_event, viewer: :participant)
     @scans = @participant_event.scans.includes(:user).recent.limit(20)
     @messages = @participant_event.message_deliveries
       .includes(message: :sent_by_user)
@@ -147,19 +190,13 @@ class DashboardController < ApplicationController
     @optional_documents = @participant_event.relevant_optional_custom_documents
     # Documents live in the wizard while the participant is still filling it
     # in for the first time, and on the dashboard once they've submitted.
-    # Adding an optional document reopens a completed participant, so
-    # "in_progress" on its own no longer means "still in the wizard".
-    @show_documents_section = @custom_documents.any? && !@participant_event.invited? &&
-      (!@participant_event.in_progress? || @participant_event.onboarding_completed_at.present?)
+    @show_documents_section = @custom_documents.any? && !@participant_event.in_onboarding?
     @custom_document_consents = @participant_event.consents
       .select(&:custom_document_id)
       .index_by(&:custom_document_id)
-
-    waiver_consent = @participant_event.consents.find { |c| c.consent_type == "waiver" }
-    if waiver_consent&.guardian_signed? && !waiver_consent&.participant_signed?
-      set_current_event(@event)
-      redirect_to onboarding_waiver_path, alert: "Please sign your waiver to complete your registration."
-    end
+    @registration_change_requests = policy_scope(RegistrationChangeRequest)
+      .where(participant_event: @participant_event)
+      .pending_first
   end
 
   def sign_document
@@ -394,16 +431,24 @@ class DashboardController < ApplicationController
     @travel_outbound = @participant_event.travel_outbound || @participant_event.build_travel_outbound
 
     Travel.transaction do
-      inbound_saved = @travel_inbound.update(travel_params(:inbound))
-      outbound_saved = @travel_outbound.update(travel_params(:outbound))
+      @travel_inbound.assign_attributes(travel_params(:inbound))
+      @travel_outbound.assign_attributes(travel_params(:outbound))
+      inbound_saved = @travel_inbound.valid?
+      outbound_saved = @travel_outbound.valid?
 
       if inbound_saved && outbound_saved
+        @travel_inbound.save!
+        @travel_outbound.save!
         redirect_to dashboard_event_path(@participant_event), notice: "Travel information updated successfully."
       else
+        raise ActiveRecord::Rollback
+      end
+    end
+
+    unless performed?
         @travel_inbound.travel_legs.build(position: 0) if @travel_inbound.plane? && @travel_inbound.travel_legs.reject(&:marked_for_destruction?).empty?
         @travel_outbound.travel_legs.build(position: 0) if @travel_outbound.plane? && @travel_outbound.travel_legs.reject(&:marked_for_destruction?).empty?
         render :edit_travel, status: :unprocessable_entity
-      end
     end
   end
 
@@ -513,7 +558,7 @@ class DashboardController < ApplicationController
     return { direction: direction } unless params[key].present?
 
     permitted = params.require(key).permit(
-      :mode, :carrier, :flight_number, :departure_city, :departure_time,
+      :arrangement_status, :mode, :carrier, :flight_number, :departure_city, :departure_time,
       :arrival_city, :arrival_time, :arrival_location, :booking_reference,
       :visa_status, :visa_notes, :notes,
       :train_departure_station, :train_arrival_station,

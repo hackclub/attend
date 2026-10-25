@@ -4,6 +4,7 @@
   <header class="mb-8">
     <h1 class="portal-title text-2xl">Review Your Information</h1>
     <p class="portal-body mt-2">Please review your information below before submitting. Click any section to make changes.</p>
+    <%= render "onboarding/registration_note", event: current_event, class: "mt-4" %>
   </header>
 
   <div class="space-y-6">
@@ -88,6 +89,10 @@
           <h3 class="portal-heading text-sm mb-2">Arrival (Getting to <%= current_event.location_city || "the event" %>)</h3>
           <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <div>
+              <dt class="portal-hint">Plan status</dt>
+              <dd class="portal-body"><%= @travel_inbound&.arrangement_status&.titleize || "Unknown" %></dd>
+            </div>
+            <div>
               <dt class="portal-hint">Mode</dt>
               <dd class="portal-body"><%= @travel_inbound&.mode&.titleize || "—" %></dd>
             </div>
@@ -102,11 +107,11 @@
                 </div>
                 <div>
                   <dt class="portal-hint">Departure</dt>
-                  <dd class="portal-body"><%= leg.departure_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                  <dd class="portal-body"><%= flight_local_time(leg, :departure) || "—" %></dd>
                 </div>
                 <div>
                   <dt class="portal-hint">Arrival</dt>
-                  <dd class="portal-body"><%= leg.arrival_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                  <dd class="portal-body"><%= flight_local_time(leg, :arrival) || "—" %></dd>
                 </div>
               <% end %>
               <% if @travel_inbound.is_unaccompanied_minor %>
@@ -160,6 +165,10 @@
           <h3 class="portal-heading text-sm mb-2">Departure (Leaving <%= current_event.location_city || "the event" %>)</h3>
           <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <div>
+              <dt class="portal-hint">Plan status</dt>
+              <dd class="portal-body"><%= @travel_outbound&.arrangement_status&.titleize || "Unknown" %></dd>
+            </div>
+            <div>
               <dt class="portal-hint">Mode</dt>
               <dd class="portal-body"><%= @travel_outbound&.mode&.titleize || "—" %></dd>
             </div>
@@ -174,11 +183,11 @@
                 </div>
                 <div>
                   <dt class="portal-hint">Departure</dt>
-                  <dd class="portal-body"><%= leg.departure_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                  <dd class="portal-body"><%= flight_local_time(leg, :departure) || "—" %></dd>
                 </div>
                 <div>
                   <dt class="portal-hint">Arrival</dt>
-                  <dd class="portal-body"><%= leg.arrival_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                  <dd class="portal-body"><%= flight_local_time(leg, :arrival) || "—" %></dd>
                 </div>
               <% end %>
               <% if @travel_outbound.is_unaccompanied_minor %>
@@ -253,57 +262,14 @@
 
     <section class="portal-card p-5 sm:p-6">
       <div class="flex justify-between items-center mb-4">
-        <h2 class="portal-heading text-lg">Health & Dietary</h2>
+        <h2 class="portal-heading text-lg">Health and support</h2>
         <%= link_to "Edit", onboarding_step_path(step: "health", event_id: current_event.id), class: "portal-btn portal-btn-quiet text-sm" %>
       </div>
-      <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
-        <div>
-          <dt class="portal-hint">Allergies</dt>
-          <dd class="portal-body"><%= @medical&.allergies.presence || "None" %></dd>
-        </div>
-        <div>
-          <dt class="portal-hint">Medical Conditions</dt>
-          <dd class="portal-body"><%= @medical&.medical_conditions.presence || "None" %></dd>
-        </div>
-        <div>
-          <dt class="portal-hint">Diet Type</dt>
-          <dd class="portal-body"><%= @dietary&.diet_type&.titleize || "No specific diet" %></dd>
-        </div>
-        <div>
-          <dt class="portal-hint">Food Intolerances</dt>
-          <dd class="portal-body"><%= @dietary&.intolerances.presence || "None" %></dd>
-        </div>
-        <div>
-          <dt class="portal-hint">Anaphylaxis Risk</dt>
-          <dd class="portal-body"><%= @medical&.has_anaphylaxis_risk ? "Yes" : "No" %></dd>
-        </div>
-        <div>
-          <dt class="portal-hint">Refrigeration Needed</dt>
-          <dd class="portal-body"><%= @medical&.requires_refrigeration ? "Yes" : "No" %></dd>
-        </div>
-        <div class="md:col-span-2">
-          <dt class="portal-hint">Learning & Cognitive Needs</dt>
-          <dd class="portal-body">
-            <% needs = [] %>
-            <% needs << "ADHD" if @accessibility&.has_adhd %>
-            <% needs << "Dyslexia" if @accessibility&.has_dyslexia %>
-            <% needs << "Autism" if @accessibility&.has_autism %>
-            <%= needs.any? ? needs.join(", ") : "None specified" %>
-          </dd>
-        </div>
-        <div class="md:col-span-2">
-          <dt class="portal-hint">Accessibility Needs</dt>
-          <dd class="portal-body">
-            <% accessibility = [] %>
-            <% accessibility << "Wheelchair accessible" if @accessibility&.uses_wheelchair %>
-            <% accessibility << "Step-free access" if @accessibility&.step_free_required %>
-            <% accessibility << "Captioning" if @accessibility&.needs_captioning %>
-            <% accessibility << "Large print" if @accessibility&.needs_large_print %>
-            <% accessibility << "Sign language interpreter" if @accessibility&.needs_sign_language %>
-            <%= accessibility.any? ? accessibility.join(", ") : "None" %>
-          </dd>
-        </div>
-      </dl>
+      <div class="space-y-3 text-sm">
+        <p><strong>Medical needs:</strong> <%= health_section_summary(@medical) %></p>
+        <p><strong>Food requirements:</strong> <%= health_section_summary(@dietary) %></p>
+        <p><strong>Accessibility or support:</strong> <%= health_section_summary(@accessibility) %></p>
+      </div>
     </section>
 
     <% if @guardians&.any? %>
@@ -361,6 +327,23 @@
             </div>
           </dl>
         <% end %>
+      </section>
+    <% end %>
+
+    <% if @account_modes.present? %>
+      <section class="portal-card p-5 sm:p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="portal-heading text-lg">Accounts</h2>
+          <%= link_to "Edit", onboarding_step_path(step: "accounts", event_id: current_event.id), class: "portal-btn portal-btn-quiet text-sm" %>
+        </div>
+        <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+          <% @account_modes.each_key do |provider| %>
+            <div>
+              <dt class="portal-hint"><%= AccountLinking.provider_name(provider) %></dt>
+              <dd class="portal-body"><%= @connected_accounts[provider]&.username || "Not connected" %></dd>
+            </div>
+          <% end %>
+        </dl>
       </section>
     <% end %>
   </div>
@@ -478,19 +461,30 @@
           </div>
         </div>
 
-        <a href="https://hackclub.com/safety" target="_blank"
-           class="portal-note portal-note-info mt-4">
+        <a href="https://hackclub.com/safety" target="_blank" rel="noopener"
+           class="portal-note portal-note-info mt-4 group cursor-pointer hover:border-blue-400 transition-colors">
           <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
           <span>
-            <span class="block portal-heading text-sm">Need help or want to read the policies?</span>
+            <span class="block portal-heading text-sm underline decoration-1 underline-offset-4 group-hover:text-blue-700">Need help or want to read the policies? <span aria-hidden="true">↗</span></span>
             <span class="block portal-body text-sm">Visit our safety hub for the full Code of Conduct, Safeguarding Policy, and how to report a concern.</span>
           </span>
         </a>
       </section>
 
       <!-- Terms acceptance -->
+      <% if @participant_event.requires_guardian? %>
+        <div class="portal-note portal-note-warn p-4 mb-6 block">
+          <h2 class="portal-heading text-base mb-2">Your parent or guardian still has to finish</h2>
+          <% guardian = @guardians&.first %>
+          <p class="portal-body text-sm">Submitting your part does not finish registration. We will send <%= guardian&.guardian&.full_name.presence || "your parent or guardian" %> an invitation at <strong><%= guardian&.guardian&.email.presence || "the email you provided" %></strong> to complete their information and sign the required documents. Your entry ticket becomes available only after every required attendee, guardian, and staff processing task is complete.</p>
+          <label class="portal-check-row mt-3">
+            <input type="checkbox" name="guardian_requirement_acknowledged" value="1" class="portal-check mt-0.5" required>
+            <span class="text-sm">I understand that my parent or guardian must complete their forms and sign before my registration is confirmed and my entry ticket is available.</span>
+          </label>
+        </div>
+      <% end %>
       <div class="portal-panel p-4 mb-6">
         <%= f.label :terms_accepted, class: "portal-check-row" do %>
           <%= f.check_box :terms_accepted, class: "portal-check mt-0.5", required: true %>

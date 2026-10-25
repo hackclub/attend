@@ -8,9 +8,11 @@ class GuardianPortalController < ApplicationController
   before_action :redirect_if_withdrawn, except: [ :withdrawn ]
   before_action :redirect_if_expired, except: [ :expired, :withdrawn ]
   before_action :redirect_if_completed, only: [ :show, :step, :update, :update_step ]
+  before_action :redirect_unless_completed, only: [ :confirmed ]
   before_action :mark_accepted_if_needed, only: [ :update, :update_step, :complete ]
 
   STEPS = %w[participant_info details emergency consents].freeze
+  COMPLETED_NOTICE = "Thank you! Your portion is complete.".freeze
 
   def show
     @steps = STEPS
@@ -53,7 +55,9 @@ class GuardianPortalController < ApplicationController
     @step_index = STEPS.index(@step)
 
     if save_step_data
-      if params[:advance] && next_step
+      if guardian_completion.complete!
+        redirect_to guardian_portal_confirmed_path(token: @token), notice: COMPLETED_NOTICE
+      elsif params[:advance] && next_step
         redirect_to guardian_portal_step_path(token: @token, step: next_step), notice: "Progress saved."
       else
         redirect_to guardian_portal_path(token: @token), notice: "Progress saved."
@@ -70,21 +74,28 @@ class GuardianPortalController < ApplicationController
   end
 
   def complete
-    unless all_guardian_steps_complete?
+    # Same path the DocuSeal webhooks and portal saves use, so the button and
+    # automatic completion can't drift apart. Already-completed links are a
+    # no-op (no second confirmation email).
+    guardian_completion.complete!
+
+    if @participant_event.rejected?
+      redirect_to guardian_portal_path(token: @token), alert: "This registration is no longer active, so there's nothing left to submit."
+      return
+    end
+
+    unless @guardian_participant_event.completed?
       redirect_to guardian_portal_path(token: @token), alert: "Please complete all required steps before submitting."
       return
     end
 
-    # Completing the guardian fires GuardianParticipantEvent's after_update_commit
-    # hook, which is what marks the participant complete once every guardian is
-    # done — doing it here read a stale copy of this very row.
-    @guardian_participant_event.update!(status: :completed, completed_at: Time.current)
-    trigger_docuseal_if_needed
-
-    redirect_to guardian_portal_confirmed_path(token: @token), notice: "Thank you! Your portion is complete."
+    redirect_to guardian_portal_confirmed_path(token: @token), notice: COMPLETED_NOTICE
   end
 
   def confirmed
+    @completion = RegistrationCompletionPresenter.new(@participant_event, viewer: :guardian,
+      guardian_participant_event: @guardian_participant_event)
+    @documents_paused = waivers_paused?
   end
 
   def waiver
@@ -104,7 +115,7 @@ class GuardianPortalController < ApplicationController
   end
 
   def waiver_complete
-    redirect_to guardian_portal_step_path(token: @token, step: :consents), notice: "Thank you for signing the waiver!"
+    redirect_after_signing(@participant_event.consents.waiver.first, "Thank you for signing the waiver!")
   end
 
   def freedom_waiver
@@ -124,7 +135,7 @@ class GuardianPortalController < ApplicationController
   end
 
   def freedom_waiver_complete
-    redirect_to guardian_portal_step_path(token: @token, step: :consents), notice: "Thank you for completing the Freedom Waiver!"
+    redirect_after_signing(@participant_event.consents.freedom_waiver.first, "Thank you for completing the Freedom Waiver!")
   end
 
   def custom_document
@@ -199,6 +210,7 @@ class GuardianPortalController < ApplicationController
     end
 
     consent.verify_physical_upload!(@guardian_participant_event)
+    guardian_completion.complete!
     redirect_to after_guardian_document_path, notice: "Thank you for confirming #{@custom_document.name}!"
   end
 
@@ -232,6 +244,7 @@ class GuardianPortalController < ApplicationController
     end
 
     consent.mark_physical_uploaded_by_guardian!(@guardian_participant_event)
+    guardian_completion.complete!
     redirect_to after_guardian_document_path, notice: "\"#{@custom_document.name}\" uploaded — thank you!"
   end
 
@@ -265,18 +278,36 @@ class GuardianPortalController < ApplicationController
 
   private
 
-  # After acting on a physical document, guardians mid-portal go back to the
-  # consents step; guardians who already completed go to the confirmed page.
+  # Finishes the guardian's part as soon as nothing is left for them to do, so
+  # guardians who sign everything but never press "Submit and finish" don't
+  # leave the participant "Awaiting Parent". complete! returns true when this
+  # request completed the link.
+  def guardian_completion
+    @guardian_completion ||= GuardianPortalCompletion.new(@guardian_participant_event)
+  end
+
+  delegate :waivers_paused?, :participant_info_complete?, :details_complete?, :consents_complete?,
+    :ensure_waiver_exists_and_triggered, to: :guardian_completion, private: true
+
+  # DocuSeal sends guardians back here after they sign. Signing was often the
+  # last thing left, so finish their part before sending them on. The webhook
+  # usually lands after this redirect, so pull the signature from the API
+  # first (as OnboardingController#waiver_complete does).
+  def redirect_after_signing(consent, thanks)
+    consent.sync_from_docuseal! if consent && !consent.signed?
+    notice = guardian_completion.complete! ? "#{thanks} Your portion is complete." : thanks
+    redirect_to after_guardian_document_path, notice: notice
+  end
+
+  # After signing or acting on a physical document, guardians mid-portal go
+  # back to the consents step; guardians who already completed go to the
+  # confirmed page.
   def after_guardian_document_path
     if @guardian_participant_event.completed?
       guardian_portal_confirmed_path(token: @token)
     else
       guardian_portal_step_path(token: @token, step: "consents")
     end
-  end
-
-  def waivers_paused?
-    Setting.waiver_sending_paused? || @event.guardian_invites_locked?
   end
 
   def load_guardian_context
@@ -300,6 +331,8 @@ class GuardianPortalController < ApplicationController
     @participant_event = @guardian_participant_event.participant_event
     @participant = @participant_event.participant
     @event = @participant_event.event
+    @completion = RegistrationCompletionPresenter.new(@participant_event, viewer: :guardian,
+      guardian_participant_event: @guardian_participant_event)
   end
 
   def mark_accepted_if_needed
@@ -326,6 +359,17 @@ class GuardianPortalController < ApplicationController
     redirect_to guardian_portal_confirmed_path(token: @token)
   end
 
+  # The confirmed page tells guardians their information "is submitted", so a
+  # guardian who hasn't finished goes to the overview, which shows what's left
+  # (and the "Submit and finish" button). Keep any flash from the redirect
+  # that brought them here.
+  def redirect_unless_completed
+    return if @guardian_participant_event.completed?
+
+    flash.keep
+    redirect_to guardian_portal_path(token: @token)
+  end
+
   def step_params(step_name)
     case step_name
     when "participant_info"
@@ -336,15 +380,21 @@ class GuardianPortalController < ApplicationController
           :city, :state, :postal_code, :country_of_residence, :tshirt_size
         ),
         medical: params.fetch(:medical, {}).permit(
-          :allergies, :medical_conditions, :medications, :has_anaphylaxis_risk, :requires_refrigeration
+          :allergies, :medical_conditions, :medications, :allergy_severity, :emergency_action_plan, :additional_notes,
+          :has_anaphylaxis_risk, :requires_refrigeration, :section_response, :clear_details
         ),
         dietary: params.fetch(:dietary, {}).permit(
-          :diet_type, :intolerances, :life_threatening_allergies
+          :diet_type, :intolerances, :life_threatening_allergies, :notes, :cross_contamination_risk,
+          :section_response, :clear_details
         ),
         accessibility: params.fetch(:accessibility, {}).permit(
           :has_adhd, :has_dyslexia, :has_autism, :neurodivergent_notes,
           :uses_wheelchair, :step_free_required, :needs_large_print,
-          :needs_captioning, :needs_sign_language, :other_needs
+          :needs_captioning, :needs_sign_language, :other_needs, :mobility_needs,
+          :sensory_needs, :communication_needs, :religious_practices,
+          :distance_limitations, :unavailable_times, :light_sensitivity,
+          :noise_sensitivity, :prayer_space_required, :requires_private_space,
+          :strobe_sensitivity, :section_response, :clear_details
         ),
         travel_inbound: params.fetch(:travel_inbound, {}).permit(
           :mode, :is_unaccompanied_minor,
@@ -399,61 +449,6 @@ class GuardianPortalController < ApplicationController
     )
   end
 
-  def all_guardian_steps_complete?
-    @guardian.legal_first_name.present? &&
-      @guardian.legal_last_name.present? &&
-      @guardian.email.present? &&
-      @guardian.phone.present? &&
-      @guardian_participant_event.emergency_contacts.any? &&
-      consents_complete?
-  end
-
-  def details_complete?
-    @guardian.legal_first_name.present? &&
-      @guardian.legal_last_name.present? &&
-      @guardian.email.present? &&
-      @guardian.phone.present? &&
-      @guardian_participant_event.relationship.present? &&
-      @guardian.address_line_1.present? &&
-      @guardian.city.present? &&
-      @guardian.state.present? &&
-      @guardian.postal_code.present? &&
-      @guardian.country.present?
-  end
-
-  def consents_complete?
-    pending_consent_types.empty?
-  end
-
-  def pending_consent_types
-    pending = []
-
-    # Check waiver (requires guardian signature)
-    waiver_consent = @participant_event.consents.find_by(consent_type: "waiver")
-    pending << "waiver" unless waiver_consent&.guardian_signed?
-
-    # Check freedom waiver (requires full signature since parent-only) - only if enabled
-    if @event.freedom_waivers_enabled?
-      freedom_consent = @participant_event.consents.find_by(consent_type: "freedom_waiver")
-      pending << "freedom_waiver" unless freedom_consent&.signed?
-    end
-
-    # Physical custom documents the guardian can act on right now block
-    # completion: guardian-only ones they must sign & upload themselves, and
-    # participant uploads awaiting their review. (Dual-signer documents the
-    # participant hasn't uploaded yet don't block — there's nothing to review.)
-    @participant_event.applicable_custom_documents.select(&:physical?).select(&:guardian_signs?).each do |doc|
-      consent = @participant_event.consents.find_by(consent_type: "custom_document", custom_document: doc)
-      next if consent&.signed?
-
-      if doc.signed_by_guardian? || consent&.physical_uploaded?
-        pending << "custom_document_#{doc.id}"
-      end
-    end
-
-    pending
-  end
-
   def completed_steps
     completed = []
     completed << "participant_info" if participant_info_complete?
@@ -464,7 +459,7 @@ class GuardianPortalController < ApplicationController
   end
 
   # Dual-signer physical documents the participant hasn't uploaded yet. These
-  # don't block the guardian's submission (see pending_consent_types), but the
+  # don't block the guardian's submission (see GuardianPortalCompletion#pending_consent_types), but the
   # guardian will be asked to confirm them later — the overview must say so
   # instead of claiming everything is done.
   def docs_awaiting_participant_upload
@@ -474,10 +469,6 @@ class GuardianPortalController < ApplicationController
       consent = @participant_event.consents.find_by(consent_type: "custom_document", custom_document: doc)
       !consent&.signed? && !consent&.physical_uploaded?
     end
-  end
-
-  def participant_info_complete?
-    @guardian_participant_event.participant_info_reviewed_at.present?
   end
 
   # Data the wizard's position indicator needs on every step render.
@@ -554,18 +545,32 @@ class GuardianPortalController < ApplicationController
   def save_participant_info_data
     all_params = step_params("participant_info")
 
-    participant_saved = @participant.update(all_params[:participant])
-
     medical = @participant_event.medical || @participant_event.build_medical
-    medical_saved = medical.update(all_params[:medical])
-
     dietary = @participant_event.dietary || @participant_event.build_dietary
-    dietary_params = all_params[:dietary]
-    dietary_params[:diet_type] = nil if dietary_params[:diet_type].blank?
-    dietary_saved = dietary.update(dietary_params)
-
     accessibility = @participant_event.accessibility || @participant_event.build_accessibility
-    accessibility_saved = accessibility.update(all_params[:accessibility])
+    health_records = [
+      [ medical, guardian_health_record_params(medical, all_params[:medical]), "Medical information" ],
+      [ dietary, guardian_health_record_params(dietary, all_params[:dietary]), "Dietary information" ],
+      [ accessibility, guardian_health_record_params(accessibility, all_params[:accessibility]), "Accessibility information" ]
+    ]
+    health_records.each { |record, attributes, _label| record.assign_attributes(attributes) }
+    health_valid = health_records.all? { |record, _attributes, _label| record.valid? }
+    unless health_valid
+      health_records.each do |record, _attributes, label|
+        record.errors.full_messages.each { |error| @participant.errors.add(:base, "#{label}: #{error}") }
+      end
+      return false
+    end
+    ActiveRecord::Base.transaction { health_records.each { |record, _attributes, _label| record.save! } }
+
+    # A birthday that ages the participant out is locked for guardians too;
+    # it only moves through a staff-reviewed change request (see
+    # OnboardingController#assign_profile_attributes).
+    birthday_locked = @participant_event.too_old_for_event?
+    @participant.assign_attributes(all_params[:participant])
+    @participant.restore_attributes([ :date_of_birth ]) if birthday_locked
+    participant_saved = @participant.save
+    medical_saved = dietary_saved = accessibility_saved = true
 
     # Save travel data
     inbound_saved = outbound_saved = true
@@ -608,6 +613,23 @@ class GuardianPortalController < ApplicationController
     participant_saved && medical_saved && dietary_saved && accessibility_saved && inbound_saved && outbound_saved
   end
 
+  def guardian_health_record_params(record, attributes)
+    values = attributes.to_h.symbolize_keys
+    clear = ActiveModel::Type::Boolean.new.cast(values.delete(:clear_details))
+    # A series that hides the privacy notes offers no private follow-up, so a
+    # new "private" answer is ignored; one already saved is kept.
+    if values[:section_response] == "private" && @event.hide_privacy_notes? && !record.section_response_private?
+      values.delete(:section_response)
+    end
+    if values[:section_response] == "nothing_to_add" && clear
+      record.class.health_section_detail_fields.each do |field|
+        values[field] = record.class.health_section_boolean_fields.include?(field) ? false : nil
+      end
+    end
+    values[:diet_type] = nil if record.is_a?(Dietary) && values[:diet_type].blank?
+    values
+  end
+
   def um_declared_in?(travel_params)
     travel_params[:mode] == "plane" &&
       ActiveRecord::Type::Boolean.new.cast(travel_params[:is_unaccompanied_minor])
@@ -628,68 +650,6 @@ class GuardianPortalController < ApplicationController
   def next_step
     current_index = STEPS.index(@step)
     STEPS[current_index + 1] if current_index && current_index < STEPS.length - 1
-  end
-
-  def trigger_docuseal_if_needed
-    ensure_waiver_exists_and_triggered
-    ensure_guardian_custom_documents_triggered
-  end
-
-  # Guardian-only custom documents are the guardian's to sign — create their
-  # submissions as soon as the portal is completed (DocuSeal emails the link)
-  # instead of waiting for anyone to open a signing page.
-  def ensure_guardian_custom_documents_triggered
-    @participant_event.applicable_custom_documents.select(&:signed_by_guardian?).each do |doc|
-      consent = @participant_event.consents.find_or_create_by!(consent_type: :custom_document, custom_document: doc) do |c|
-        c.guardian_participant_event = @guardian_participant_event
-      end
-
-      # Physical documents are signed on paper — nothing to send.
-      next if doc.physical?
-
-      if consent.docuseal_envelope_id.blank? && !consent.signed? && !consent.failed?
-        DocusealJobs::CreateCustomDocumentJob.perform_later(consent.id)
-      end
-    end
-  end
-
-  def ensure_waiver_exists_and_triggered
-    # While guardian invites are locked (or waiver sending is globally paused),
-    # don't create consents or DocuSeal submissions — participant_events without
-    # waiver consents are what SendPendingGuardianInvitesJob backfills on unlock.
-    return if waivers_paused?
-
-    # Create and trigger the main waiver
-    waiver = @participant_event.consents.find_or_create_by!(consent_type: :waiver) do |c|
-      c.status = :pending
-      c.guardian_participant_event = @guardian_participant_event
-    end
-
-    unless waiver.signed? || waiver.sent?
-      DocusealJobs::CreateMinorWaiverJob.perform_later(waiver.id)
-    end
-
-    if waiver.failed?
-      waiver.update!(status: :pending, failure_reason: nil)
-      DocusealJobs::CreateMinorWaiverJob.perform_later(waiver.id)
-    end
-
-    # Create and trigger the freedom waiver (only if enabled for this event)
-    return unless @event.freedom_waivers_enabled?
-
-    freedom_waiver = @participant_event.consents.find_or_create_by!(consent_type: :freedom_waiver) do |c|
-      c.status = :pending
-      c.guardian_participant_event = @guardian_participant_event
-    end
-
-    unless freedom_waiver.signed? || freedom_waiver.sent?
-      DocusealJobs::CreateFreedomWaiverJob.perform_later(freedom_waiver.id)
-    end
-
-    if freedom_waiver.failed?
-      freedom_waiver.update!(status: :pending, failure_reason: nil)
-      DocusealJobs::CreateFreedomWaiverJob.perform_later(freedom_waiver.id)
-    end
   end
 
   def next_priority(contacts)

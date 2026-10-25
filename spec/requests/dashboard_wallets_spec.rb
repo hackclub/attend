@@ -4,8 +4,14 @@ RSpec.describe "Dashboard wallet passes", type: :request do
   include Devise::Test::IntegrationHelpers
 
   let(:user) { create(:user) }
-  let(:participant) { create(:participant, user: user) }
-  let(:participant_event) { create(:participant_event, participant: participant, status: :complete) }
+  let(:participant) { create(:participant, user: user, date_of_birth: 18.years.ago - 1.day) }
+  let(:participant_event) do
+    participant.update!(date_of_birth: 18.years.ago - 1.day)
+    create(:participant_event, participant: participant, status: :complete,
+      code_of_conduct_accepted_at: Time.current).tap do |registration|
+      create(:consent, :signed, participant_event: registration)
+    end
+  end
 
   before { sign_in user }
 

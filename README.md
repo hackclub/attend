@@ -62,10 +62,18 @@ The app will be available at `https://localhost:3000`.
 
 ### Test Users (Development)
 
-After running seeds, these accounts are available:
+After running seeds, these accounts are available. There are no passwords: sign in from the home page with the development-only email sign-in (`POST /dev_sign_in`).
 
-| Email | Password | Role |
-|-------|----------|------|
+| Email | Role |
+|-------|------|
+| admin@hackclub.com | Global Admin |
+| eventadmin@hackclub.com | Event Admin |
+| ops@hackclub.com | Ops Staff |
+| limited@hackclub.com | Limited Staff |
+| safeguarding@hackclub.com | Safeguarding Lead |
+| participant@example.com | Participant |
+
+-------|----------|------|
 | admin@hackclub.com | password123 | Global Admin |
 | eventadmin@hackclub.com | password123 | Event Admin |
 | ops@hackclub.com | password123 | Ops Staff |
@@ -172,7 +180,7 @@ Event
 │   ├── Dietary
 │   ├── Accessibility (encrypted)
 │   ├── SafeguardingInfo (encrypted)
-│   └── Consent (Docuseal tracking)
+│   └── Consent (DocuSeal tracking)
 ├── Incident (encrypted)
 ├── Note (encrypted)
 ├── Scan (check-in records)
@@ -183,7 +191,7 @@ Event
 
 | Service | Purpose |
 |---------|---------|
-| **Docuseal** | Embedded consent forms with webhook status updates |
+| **DocuSeal** | Embedded consent forms with webhook status updates |
 
 ---
 

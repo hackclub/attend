@@ -19,6 +19,49 @@ RSpec.describe ParticipantEvent, type: :model do
     end
   end
 
+  describe "age limit" do
+    let(:event) { create(:event, starts_at: Time.zone.local(2027, 2, 20, 9), ends_at: Time.zone.local(2027, 2, 28, 17)) }
+
+    def registration(date_of_birth)
+      build(:participant_event, event: event, participant: create(:participant, date_of_birth: date_of_birth))
+    end
+
+    it "is too old when the participant turns 19 by the last day of the event" do
+      expect(registration(Date.new(2008, 2, 28))).to be_too_old_for_event
+      expect(registration(Date.new(2008, 3, 1))).not_to be_too_old_for_event
+    end
+
+    it "isn't too old without a birthday" do
+      expect(registration(nil)).not_to be_too_old_for_event
+    end
+
+    it "refuses to create a registration for someone too old" do
+      pe = registration(Date.new(2000, 1, 1))
+
+      expect(pe).not_to be_valid
+      expect(pe.errors[:base]).to include("You will be 19 or older during this event. Please contact event staff for assistance.")
+    end
+
+    it "creates it anyway when asked to skip the check" do
+      pe = registration(Date.new(2000, 1, 1))
+      pe.skip_age_check = true
+
+      expect(pe).to be_valid
+    end
+  end
+
+  describe "#in_onboarding?" do
+    it "is true until the wizard is first submitted" do
+      expect(build(:participant_event, status: :invited)).to be_in_onboarding
+      expect(build(:participant_event, status: :in_progress, onboarding_completed_at: nil)).to be_in_onboarding
+    end
+
+    it "is false once submitted, even if an optional document reopened them" do
+      expect(build(:participant_event, status: :in_progress, onboarding_completed_at: 1.day.ago)).not_to be_in_onboarding
+      expect(build(:participant_event, status: :complete, onboarding_completed_at: 1.day.ago)).not_to be_in_onboarding
+    end
+  end
+
   describe ".missing_onboarding_data" do
     def build_pe(event, travel_in: false, travel_out: false, medical: false, dietary: false,
                  accessibility: false, safeguarding: false, consent: false, accommodation: false)
@@ -193,6 +236,45 @@ RSpec.describe ParticipantEvent, type: :model do
     end
   end
 
+  describe "#find_or_create_consent!" do
+    let(:pe) { create(:participant_event) }
+
+    it "returns the existing consent of that type" do
+      existing = create(:consent, :freedom_waiver, participant_event: pe)
+
+      expect(pe.find_or_create_consent!(:freedom_waiver)).to eq(existing)
+    end
+
+    it "creates the consent with the block's attributes when none exists" do
+      consent = pe.find_or_create_consent!(:freedom_waiver) { |c| c.status = :pending }
+
+      expect(consent).to be_persisted
+      expect(consent).to be_freedom_waiver
+    end
+
+    it "picks up the other request's row when it loses the insert race" do
+      existing = create(:consent, :freedom_waiver, participant_event: pe)
+      # Simulate the race: our find missed, so we go straight to the insert.
+      allow(pe.consents).to receive(:find_or_create_by!) do |attrs|
+        Consent.create!(participant_event: pe, **attrs)
+      end
+
+      expect(pe.find_or_create_consent!(:freedom_waiver)).to eq(existing)
+      expect(pe.consents.freedom_waiver.count).to eq(1)
+    end
+
+    it "is backed by a unique index that still allows several custom documents" do
+      create(:consent, :freedom_waiver, participant_event: pe)
+
+      expect { Consent.new(participant_event: pe, consent_type: :freedom_waiver).save!(validate: false) }
+        .to raise_error(ActiveRecord::RecordNotUnique)
+      expect {
+        create(:consent, :custom_document, participant_event: pe)
+        create(:consent, :custom_document, participant_event: pe)
+      }.to change(Consent, :count).by(2)
+    end
+  end
+
   describe "#mark_complete_if_eligible!" do
     let(:event) { create(:event) }
 
@@ -208,9 +290,25 @@ RSpec.describe ParticipantEvent, type: :model do
       expect(pe.reload).not_to be_complete
 
       create(:consent, :signed, participant_event: pe)
-      expect(pe.reload.mark_complete_if_eligible!).to be true
+      expect {
+        expect(pe.reload.mark_complete_if_eligible!).to be true
+      }.to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
       expect(pe.reload).to be_complete
       expect(pe.onboarding_completed_at).to be_present
+      expect {
+        pe.reload.mark_complete_if_eligible!
+      }.not_to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
+    end
+
+    it "never completes a withdrawn or rejected registration" do
+      pe = adult_pe
+      create(:consent, :signed, participant_event: pe)
+
+      pe.withdrawn!
+      expect(pe.mark_complete_if_eligible!).to be false
+      pe.rejected!
+      expect(pe.mark_complete_if_eligible!).to be false
+      expect(pe.reload).to be_rejected
     end
 
     it "refuses to complete before the registration is submitted" do
@@ -399,6 +497,72 @@ RSpec.describe ParticipantEvent, type: :model do
       end
 
       expect(queries).to eq(0)
+    end
+  end
+  describe "#revoke_invitations!" do
+    let(:event) { create(:event) }
+
+    it "destroys the event's invitation for that email, closing the re-entry route" do
+      participant = create(:participant, email: "leaving@example.com")
+      invitation = create(:invitation, event: event, email: "leaving@example.com", sent_at: Time.current)
+      pe = create(:participant_event, participant: participant, event: event)
+
+      expect { pe.revoke_invitations! }.to change(Invitation, :count).by(-1)
+      expect(Invitation.exists?(invitation.id)).to be(false)
+    end
+
+    it "matches the invitation across email casing" do
+      participant = create(:participant, email: "Mixed@Example.com")
+      create(:invitation, event: event, email: "mixed@example.com", sent_at: Time.current)
+      pe = create(:participant_event, participant: participant, event: event)
+
+      expect { pe.revoke_invitations! }.to change(Invitation, :count).by(-1)
+    end
+
+    it "leaves the same person's invitation to another event alone" do
+      participant = create(:participant, email: "two@example.com")
+      other_event = create(:event)
+      keep = create(:invitation, event: other_event, email: "two@example.com", sent_at: Time.current)
+      create(:invitation, event: event, email: "two@example.com", sent_at: Time.current)
+      pe = create(:participant_event, participant: participant, event: event)
+
+      pe.revoke_invitations!
+
+      expect(Invitation.exists?(keep.id)).to be(true)
+    end
+
+    it "leaves other people's invitations to this event alone" do
+      participant = create(:participant, email: "mine@example.com")
+      keep = create(:invitation, event: event, email: "someone-else@example.com", sent_at: Time.current)
+      create(:invitation, event: event, email: "mine@example.com", sent_at: Time.current)
+      pe = create(:participant_event, participant: participant, event: event)
+
+      pe.revoke_invitations!
+
+      expect(Invitation.exists?(keep.id)).to be(true)
+    end
+
+    it "is not fired by a merge, which destroys a registration without uninviting anyone" do
+      primary = create(:participant, email: "primary@example.com")
+      duplicate = create(:participant, email: "duplicate@example.com")
+      create(:invitation, event: event, email: "primary@example.com", sent_at: Time.current)
+      create(:participant_event, participant: primary, event: event, status: :invited)
+      create(:participant_event, participant: duplicate, event: event, status: :complete)
+
+      expect {
+        ParticipantMergeService.new(primary: primary, duplicate: duplicate).merge!
+      }.not_to change(Invitation, :count)
+    end
+  end
+
+  describe "Slack channel invite on completion" do
+    include ActiveJob::TestHelper
+
+    it "enqueues an invite when a registration in an event with a channel becomes complete" do
+      pe = create(:participant_event, event: create(:event, slack_channel_id: "C123"))
+
+      expect { pe.update!(status: :complete) }
+        .to have_enqueued_job(InviteToEventSlackChannelJob).with(pe.id)
     end
   end
 end

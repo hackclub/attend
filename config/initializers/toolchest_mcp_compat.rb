@@ -6,10 +6,81 @@
 require "toolchest"
 
 module ToolchestMcpCompat
-  # mcp 0.23 passes a `cancellation:` keyword down to `MCP::Server#call_tool` and
-  # `#complete`. toolchest's singleton overrides of both predate it and accept only
-  # `session:`/`related_request_id:`, so every tools/call would raise ArgumentError.
-  # Re-wrap them to pass on just the keywords the override actually declares.
+  # Toolchest 0.3 installs handlers against mcp 0.11's contracts. Current mcp
+  # versions expect list handlers to return the named result object, and dispatch
+  # several APIs through dedicated server methods instead of the handler table.
+  # Normalize both surfaces here so legacy and modern clients receive the current
+  # protocol shapes while Toolchest still owns routing and authorization.
+  def self.install_current_api!(server, router)
+    handlers = server.instance_variable_get(:@handlers)
+    handlers[MCP::Methods::TOOLS_LIST] = ->(_params) { { tools: router.tools_for_handler } }
+    handlers[MCP::Methods::RESOURCES_LIST] = ->(_params) { { resources: router.resources_for_handler } }
+    handlers[MCP::Methods::RESOURCES_TEMPLATES_LIST] = ->(_params) do
+      { resourceTemplates: router.resource_templates_for_handler }
+    end
+    handlers[MCP::Methods::PROMPTS_LIST] = ->(_params) { { prompts: router.prompts_for_handler } }
+
+    install_prompt_handler!(server, router)
+    install_resource_handler!(server, router)
+    relax_handler_signatures!(server)
+
+    # Toolchest advertises list-change and logging features that it does not
+    # implement on this stateless endpoint. Keep completions, which Toolchest
+    # implements for enum-backed toolbox parameters, while advertising only the
+    # APIs we actually serve.
+    server.capabilities = { tools: {}, completions: {} }
+    server.capabilities[:prompts] = {} if router.prompts_list.any?
+    server.capabilities[:resources] = {} if router.toolbox_classes.any? { |toolbox| toolbox.resources.any? }
+  end
+
+  def self.install_prompt_handler!(server, router)
+    server.define_singleton_method(:get_prompt) do |params, **_kwargs|
+      name = params[:name] || params["name"]
+      prompt = router.prompts_list.find { |candidate| candidate[:name] == name }
+      unless prompt
+        raise MCP::Server::RequestHandlerError.new(
+          "Prompt not found: #{name}",
+          params,
+          error_type: :prompt_not_found,
+          error_code: MCP::JsonRpcHandler::ErrorCode::INVALID_PARAMS
+        )
+      end
+
+      arguments = params[:arguments] || params["arguments"] || {}
+      unless arguments.is_a?(Hash)
+        raise MCP::Server::RequestHandlerError.new("Invalid prompt arguments", params, error_type: :invalid_params)
+      end
+
+      missing = prompt[:arguments].filter_map do |argument_name, options|
+        argument_name.to_s if options[:required] && !arguments.key?(argument_name.to_s) && !arguments.key?(argument_name.to_sym)
+      end
+      unless missing.empty?
+        raise MCP::Server::RequestHandlerError.new(
+          "Missing required prompt arguments: #{missing.join(", ")}",
+          params,
+          error_type: :invalid_params
+        )
+      end
+
+      router.prompts_get(name, arguments)
+    end
+  end
+
+  def self.install_resource_handler!(server, router)
+    server.define_singleton_method(:read_resource_contents) do |params, **_kwargs|
+      uri = params[:uri] || params["uri"]
+      resource = router.toolbox_classes.flat_map(&:resources).find do |candidate|
+        candidate[:template] ? uri&.match?(Regexp.new("^#{candidate[:uri].gsub(/\{[^}]+\}/, "[^/]+")}$")) : candidate[:uri] == uri
+      end
+
+      raise MCP::Server::ResourceNotFoundError.new(uri, params) unless resource
+
+      router.resources_read(uri)
+    end
+  end
+
+  # Current mcp versions pass request context keywords to the Toolchest
+  # overrides. Forward only the keywords each old override declares.
   def self.relax_handler_signatures!(server)
     [ :call_tool, :complete ].each do |name|
       next unless server.singleton_class.method_defined?(name) ||
@@ -67,7 +138,8 @@ module ToolchestStatelessTransport
     super
 
     server = instance_variable_get(:@server)
-    ToolchestMcpCompat.relax_handler_signatures!(server)
+    router = Toolchest.router(mount_key)
+    ToolchestMcpCompat.install_current_api!(server, router)
 
     # `super` already built a stateful transport, which in mcp >= 0.23 spawns a
     # session-reaper thread. Shut it down rather than leaking the thread.
@@ -76,6 +148,10 @@ module ToolchestStatelessTransport
     transport = MCP::Server::Transports::StreamableHTTPTransport.new(
       server,
       stateless: true,
+      # Attend is multi-process and multi-pod, with no shared notification bus.
+      # Do not advertise or open an in-process subscriptions/listen stream that
+      # would miss notifications emitted by the other workers.
+      serve_subscriptions_listen: false,
       # Same-origin and header-less (i.e. every non-browser) clients are always
       # accepted; a browser-based client such as the MCP Inspector sends its own
       # Origin and needs listing here, hence the escape hatch.

@@ -14,7 +14,7 @@
         same-origin rather than from a CDN. %>
     <script nonce="<%= content_security_policy_nonce %>"
       id="api-reference"
-      data-url="<%= docs_openapi_path(format: :json) %>"
+      data-url="<%= openapi_path %>"
       data-configuration='<%= { theme: "default", layout: "modern" }.to_json %>'></script>
 
     <%= javascript_include_tag "scalar.standalone", defer: true %>

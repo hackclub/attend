@@ -1,0 +1,110 @@
+<% content_for :title, "#{@series.name} Integrations – Attend" %>
+
+<div class="max-w-5xl mx-auto space-y-6">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div class="flex items-center gap-3 min-w-0">
+      <%= render "admin/events/avatar", event: @series, size: 32, rounded: "rounded-lg" %>
+      <h1 class="text-2xl font-bold text-gray-900 truncate"><%= @series.name %> Integrations</h1>
+    </div>
+    <%= link_to "API Keys", admin_series_api_tokens_path(@series), class: "w-full sm:w-auto text-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors" %>
+  </div>
+
+  <p class="text-sm text-gray-600">
+    Where this series' events get their projects judged. A gallery is per event, so a series
+    running satellites gets one each — create them here rather than event by event.
+  </p>
+
+  <div class="bg-white border border-gray-200 rounded-lg">
+    <div class="p-4 border-b border-gray-100 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+        <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+      </div>
+      <div class="min-w-0">
+        <h2 class="font-semibold text-gray-900">vote.hackclub.com</h2>
+        <p class="text-sm text-gray-500">A peer-voting gallery for one event at a time</p>
+      </div>
+    </div>
+
+    <div class="p-4 space-y-4">
+      <p class="text-sm text-gray-600">
+        Creates a <strong>DRAFT</strong> vote event from an Attend event's name, slug, logo and banner,
+        with its event admins as admins over there — you finish setting it up on vote.hackclub.com.
+        An event that already exists for the same slug is linked rather than duplicated.
+      </p>
+
+      <% unless @vote_client.configured? %>
+        <div class="bg-amber-50 border border-amber-200 rounded px-3 py-2 text-sm text-amber-800">
+          ⚠️ No vote.hackclub.com API key is configured on this server, so nothing can be created.
+          Set <code class="font-mono">VOTE_API_KEY</code> (or the <code class="font-mono">vote.api_key</code> credential) first.
+        </div>
+      <% end %>
+    </div>
+
+    <% if @events.any? %>
+      <div class="border-t border-gray-100">
+        <table class="min-w-full divide-y divide-gray-100">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gallery</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-100">
+            <% @events.each do |event| %>
+              <% artwork_ready = event.logo.attached? && event.banner.attached? %>
+              <%# vote.hackclub.com sends these; only an http(s) one gets linked. %>
+              <% gallery_url = external_http_url(event.vote_event_gallery_url) %>
+              <% admin_url = external_http_url(event.vote_event_admin_url) %>
+              <tr>
+                <td class="px-6 py-4">
+                  <div class="text-sm font-medium text-gray-900"><%= event.name %></div>
+                  <div class="text-sm text-gray-500 font-mono"><%= event.slug %></div>
+                </td>
+                <td class="px-6 py-4 text-sm">
+                  <% if event.vote_event_linked? %>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">Linked</span>
+                      <% if gallery_url %>
+                        <%= link_to "View gallery", gallery_url, target: "_blank", rel: "noopener",
+                              class: "text-[#ec3750] hover:underline font-medium" %>
+                      <% end %>
+                    </div>
+                  <% elsif artwork_ready %>
+                    <span class="text-gray-400">Not created yet</span>
+                  <% else %>
+                    <%# Same bar as the event's own page: vote.hackclub.com fetches both
+                        images itself, so it cannot be created without them. %>
+                    <span class="text-amber-700">Needs a logo and a banner first</span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 text-right text-sm font-medium">
+                  <div class="flex items-center justify-end gap-4">
+                    <% if event.vote_event_linked? %>
+                      <% if admin_url %>
+                        <%= link_to "Manage", admin_url, target: "_blank", rel: "noopener",
+                              class: "text-[#ec3750] hover:text-[#d42f46]" %>
+                      <% end %>
+                    <% else %>
+                      <%= button_to "Create gallery",
+                            create_vote_event_admin_series_integrations_path(@series, event_id: event.slug),
+                            method: :post,
+                            disabled: !artwork_ready || !@vote_client.configured?,
+                            data: { turbo_confirm: "Create a DRAFT vote.hackclub.com event for \"#{event.name}\"?" },
+                            class: "text-[#ec3750] hover:text-[#d42f46] disabled:text-gray-400 disabled:cursor-not-allowed" %>
+                    <% end %>
+                    <%= link_to "Event page", admin_event_integrations_path(event), class: "text-gray-500 hover:text-gray-700" %>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="border-t border-gray-100 px-6 py-8 text-center">
+        <p class="text-gray-500">This series has no events yet.</p>
+      </div>
+    <% end %>
+  </div>
+</div>

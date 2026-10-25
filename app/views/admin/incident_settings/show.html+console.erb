@@ -1,0 +1,104 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Settings", admin_settings_path ], [ "Incident report settings", nil ]) %>
+
+<div class="cs-stack max-w-4xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Incident report settings</h1>
+      <p class="cs-description">
+        Configure where public incident reports (filed at
+        <code class="font-mono">/incident</code>) are delivered.
+        These settings are global and only editable by global admins.
+      </p>
+    </div>
+  </div>
+
+  <%= form_with url: admin_incident_report_settings_path, method: :patch, class: "cs-stack", html: { novalidate: true }, data: { controller: "cs-form-validation" } do %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Incident responders</h2>
+          <p class="cs-container-description">
+            Select the global admins who respond to incident reports. Each new report is
+            emailed and direct-messaged to everyone selected, and <strong>Emergency</strong>
+            reports also phone anyone with a number on their profile. Contact details come
+            from each person's <%= link_to "Attend profile", dashboard_profile_path(anchor: "staff-settings"), class: "cs-link" %>.
+          </p>
+        </div>
+      </div>
+      <% if @selectable_users.any? %>
+        <div class="cs-table-wrap">
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th scope="col"><span class="sr-only">Responder</span></th>
+                <th scope="col">Name</th>
+                <th scope="col">Channels</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @selectable_users.each do |user| %>
+                <tr>
+                  <td class="w-8">
+                    <%= check_box_tag "responder_user_ids[]", user.id, @selected_user_ids.include?(user.id),
+                          class: "size-4 accent-(--cs-accent)", "aria-label": "Responder: #{user.display_name_or_fallback}" %>
+                  </td>
+                  <td>
+                    <span class="block"><%= user.display_name_or_fallback %></span>
+                    <span class="block cs-small cs-muted"><%= user.email %></span>
+                  </td>
+                  <td>
+                    <span class="flex flex-wrap items-center gap-1.5">
+                      <%= cs_badge("email", user.email.present? ? "green" : nil) %>
+                      <%= cs_badge("Slack", user.slack_id.present? ? "green" : nil) %>
+                      <%= cs_badge("phone", user.phone.present? ? "green" : nil) %>
+                    </span>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+        <div class="cs-container-footer">
+          A greyed-out badge means that detail is missing from the user's profile, so that
+          channel is skipped for them. Phone numbers usually need to be added manually.
+        </div>
+      <% else %>
+        <div class="cs-container-body">
+          <div class="cs-empty">
+            <p class="cs-empty-title">No global admins found.</p>
+          </div>
+        </div>
+      <% end %>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Delivery</h2>
+      </div>
+      <div class="cs-container-body">
+        <%= cs_field id: "incident_reports_slack_channel_id", label: "Slack channel ID", optional: true,
+              description: "A summary of each report is posted to this Slack channel. Leave blank to use the default.",
+              constraint: safe_join([ "Use the channel ID, not its name. For example: C0123ABCD. Currently posting to: ", content_tag(:strong, @effective_channel_id) ]) do |aria| %>
+          <input type="text" id="incident_reports_slack_channel_id" name="incident_reports_slack_channel_id"
+            value="<%= @slack_channel_id %>"
+            class="cs-input"
+            pattern="[A-Z0-9]+"
+            data-cs-pattern-message="Enter a valid Slack channel ID. For example: C0123ABCD"
+            <%= tag.attributes(aria) %>>
+        <% end %>
+
+        <%= cs_field id: "incident_reports_custom_events", label: "Custom events", optional: true,
+              description: "Past events that never ran on Attend. They appear in the incident form's event list so people can report on them. Reports filed against a custom event can't use Emergency priority (no calls are placed).",
+              constraint: "One event name per line. For example: Assemble 2023" do |aria| %>
+          <textarea id="incident_reports_custom_events" name="incident_reports_custom_events" rows="3"
+            class="cs-input"
+            <%= tag.attributes(aria) %>><%= @custom_events %></textarea>
+        <% end %>
+      </div>
+    </section>
+
+    <div class="flex justify-end">
+      <%= button_tag "Save settings", class: "cs-btn cs-btn-primary cs-btn-full" %>
+    </div>
+  <% end %>
+</div>

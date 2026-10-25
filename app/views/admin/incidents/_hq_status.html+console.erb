@@ -1,0 +1,11 @@
+<% report = incident.hq_report %>
+<div class="cs-alert">
+  <%= cs_status_icon(:info) %>
+  <p class="flex flex-wrap items-center gap-x-3 gap-y-1">
+    <span><strong>Escalated to Hack Club HQ</strong> <%= cs_absolute_time_tag(report.created_at) %>.</span>
+    <span>HQ status: <%= incident_status(report.status) %></span>
+    <% if current_user.global_admin? %>
+      <%= link_to "Open HQ report", admin_incident_report_path(report), class: "cs-link" %>
+    <% end %>
+  </p>
+</div>

@@ -1,0 +1,160 @@
+<%# Cloudscape "details page with tabs": breadcrumbs, the participant's name
+    with their status, global actions, a summary that stays the same on every
+    tab, then the tabs. Each tab is its own route, so deep links and the
+    medical/safeguarding policy gates keep working; a tab the viewer can't
+    open is left out rather than disabled. Pages that edit something the
+    Details tab shows (accommodation, Slack invite link, merge) sit under
+    the Details tab. %>
+<% header_action = action_name.delete_prefix("update_") %>
+<% participant_tab_labels = {
+     "travel" => "Travel",
+     "accommodation" => "Accommodation",
+     "medical" => "Medical",
+     "safeguarding" => "Safeguarding",
+     "consents" => "Consents",
+     "notes" => "Notes",
+     "history" => "History",
+     "merge" => "Merge duplicate",
+     "slack_invite_link" => "Slack invite"
+   } %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs(
+     [ "Participants", admin_event_participants_path(current_event) ],
+     *(participant_tab_labels.key?(header_action) ?
+       [ [ participant_name(@participant), admin_event_participant_path(current_event, @participant_event) ], [ participant_tab_labels[header_action], nil ] ] :
+       [ [ participant_name(@participant), nil ] ])
+   ) %>
+
+<%# Tab forms build unsaved travel/medical/etc. records on @participant_event,
+    which would read as "provided" to onboarding_progress. The header and
+    summary use the saved record so they say the same thing on every tab. %>
+<% summary_pe = @participant_event %>
+<% if %i[travel_inbound travel_outbound accommodation medical dietary accessibility safeguarding_info].any? { |a| summary_pe.association(a).target&.new_record? } %>
+  <% summary_pe = current_event.participant_events.find(@participant_event.id) %>
+<% end %>
+
+<% participant_policy = policy(@participant_event) %>
+<% can_resend_invitation = participant_policy.update? && @participant_event.invitation_resendable? %>
+<% can_merge = participant_policy.merge_duplicate? %>
+<% slack_user_id = @participant_event.participant.slack_user_id.presence %>
+<% can_withdraw = participant_policy.withdraw? %>
+<% can_destroy = participant_policy.destroy? %>
+
+<div class="cs-header">
+  <div class="cs-header-text">
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <% if @participant.headshot.attached? && @participant.headshot.blob.persisted? %>
+        <%= image_tag @participant.headshot, alt: "", class: "w-10 h-10 rounded-full object-cover border border-(--cs-border-divider) shrink-0" %>
+      <% else %>
+        <span class="w-10 h-10 shrink-0 rounded-full flex items-center justify-center bg-(--cs-bg-shaded) text-(--cs-text-muted) font-bold" aria-hidden="true"><%= @participant.initials %></span>
+      <% end %>
+      <h1 class="cs-h1"><%= participant_name(@participant) %></h1>
+      <%= render_display_status_badge(summary_pe) %>
+    </div>
+    <% if @participant.preferred_name.present? %>
+      <p class="cs-description">Legal name: <%= participant_name(@participant, legal: true) %></p>
+    <% end %>
+    <p class="cs-description flex flex-wrap items-center gap-2">
+      <%= @participant.email %>
+      <% if @participant.email_undeliverable? %>
+        <span title="This address hard-bounced and is suppressed. Emails to it will not be delivered. Correct the email to clear this."><%= cs_status(:error, "Email bouncing") %></span>
+      <% end %>
+    </p>
+  </div>
+  <div class="cs-actions">
+    <%= link_to "Edit", edit_admin_event_participant_path(current_event, @participant_event), class: "cs-btn" %>
+    <% if can_resend_invitation || can_merge || slack_user_id || can_withdraw || can_destroy %>
+      <div class="relative" data-controller="dropdown">
+        <button type="button" data-action="dropdown#toggle" class="cs-btn" aria-haspopup="true">
+          Actions
+          <svg class="cs-btn-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
+        </button>
+        <div class="hidden cs-menu cs-menu-right top-full" data-dropdown-target="menu" data-participant-actions>
+          <% if can_resend_invitation %>
+            <% invitation_held = current_event.invitations.held.for_email(@participant.email).exists? %>
+            <%= button_to resend_invitation_admin_event_participant_path(current_event, @participant_event),
+                method: :post,
+                data: { turbo_confirm: invitation_held ? "#{@participant.email} hasn't been sent their onboarding invitation yet#{current_event.onboarding_invites_held? ? ' (this event is holding them)' : ''}. Send it now?" : "Resend the onboarding invitation to #{@participant.email}?" },
+                class: "cs-menu-item" do %>
+              <span class="cs-menu-item-label"><%= invitation_held ? "Send invitation" : "Resend invitation" %></span>
+            <% end %>
+          <% end %>
+          <% if can_merge %>
+            <%= link_to merge_admin_event_participant_path(current_event, @participant_event), class: "cs-menu-item" do %>
+              <span class="cs-menu-item-label">Merge duplicate</span>
+            <% end %>
+          <% end %>
+          <% if slack_user_id %>
+            <%= link_to "https://hackclub.enterprise.slack.com/team/#{slack_user_id}", target: "_blank", rel: "noopener noreferrer", class: "cs-menu-item" do %>
+              <span class="cs-menu-item-label">View on Slack</span>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 2h5v5M14 2L7 9M12 9v5H2V4h5"/></svg>
+            <% end %>
+            <%# Plain text, not a cs-menu-item-label span: the clipboard controller swaps the button's text for "Copied!" %>
+            <button type="button"
+                    data-controller="clipboard"
+                    data-clipboard-content-value="<%= slack_user_id %>"
+                    data-action="click->clipboard#copy"
+                    class="cs-menu-item">Copy Slack ID</button>
+          <% end %>
+          <% if (can_withdraw || can_destroy) && (can_resend_invitation || can_merge || slack_user_id) %>
+            <div class="cs-menu-divider"></div>
+          <% end %>
+          <% if can_withdraw && !@participant_event.withdrawn? %>
+            <%= button_to withdraw_admin_event_participant_path(current_event, @participant_event),
+                method: :post,
+                data: { turbo_confirm: "Are you sure you want to mark #{@participant.display_name} as withdrawn?" },
+                class: "cs-menu-item" do %>
+              <span class="cs-menu-item-label">Withdraw</span>
+            <% end %>
+          <% end %>
+          <% if can_withdraw && @participant_event.withdrawn? %>
+            <%= button_to unwithdraw_admin_event_participant_path(current_event, @participant_event),
+                method: :post,
+                data: { turbo_confirm: "Are you sure you want to reinstate #{@participant.display_name}?" },
+                class: "cs-menu-item" do %>
+              <span class="cs-menu-item-label">Reinstate</span>
+            <% end %>
+          <% end %>
+          <% if can_destroy %>
+            <%= button_to admin_event_participant_path(current_event, @participant_event),
+                method: :delete,
+                data: { turbo_confirm: "Are you sure you want to remove #{@participant.display_name} from this event? This action cannot be undone." },
+                class: "cs-menu-item" do %>
+              <span class="cs-menu-item-label">Remove from event</span>
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%= render "admin/participants/summary", summary_pe: summary_pe %>
+
+<% current_tab = case header_action
+   when "travel", "medical", "safeguarding", "consents", "notes", "history" then header_action
+   else "details"
+   end %>
+<nav class="cs-tabs mb-5" aria-label="Participant record">
+  <%= link_to "Details", admin_event_participant_path(current_event, @participant_event),
+      class: "cs-tab", "aria-current": cs_current(current_tab == "details") %>
+  <% if current_event.travel_enabled? %>
+    <%= link_to "Travel", travel_admin_event_participant_path(current_event, @participant_event),
+        class: "cs-tab", "aria-current": cs_current(current_tab == "travel") %>
+  <% end %>
+  <% if policy(@participant_event.medical || Medical.new(participant_event: @participant_event)).show? %>
+    <%= link_to "Medical", medical_admin_event_participant_path(current_event, @participant_event),
+        class: "cs-tab", "aria-current": cs_current(current_tab == "medical") %>
+  <% end %>
+  <% if policy(@safeguarding_info || SafeguardingInfo.new(participant_event: @participant_event)).show? %>
+    <%= link_to "Safeguarding", safeguarding_admin_event_participant_path(current_event, @participant_event),
+        class: "cs-tab", "aria-current": cs_current(current_tab == "safeguarding") %>
+  <% end %>
+  <%= link_to "Consents", consents_admin_event_participant_path(current_event, @participant_event),
+      class: "cs-tab", "aria-current": cs_current(current_tab == "consents") %>
+  <%= link_to notes_admin_event_participant_path(current_event, @participant_event),
+      class: "cs-tab", "aria-current": cs_current(current_tab == "notes") do %>
+    Notes <span class="cs-counter">(<%= @notes.count %>)</span>
+  <% end %>
+  <%= link_to "History", history_admin_event_participant_path(current_event, @participant_event),
+      class: "cs-tab", "aria-current": cs_current(current_tab == "history") %>
+</nav>

@@ -1,0 +1,335 @@
+<% content_for :title, "Travel – #{@participant_event.participant.display_name} – #{current_event.name} – Attend" %>
+
+<div>
+  <%= render "header" %>
+
+  <% if @participant_event.unaccompanied_minor_declared? || !@participant_event.um_none? || @participant_event.um_proof.attached? %>
+    <section class="cs-container mb-5">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Unaccompanied minor verification</h2>
+          <p class="cs-container-description">
+            UM means the airline's formal (paid) unaccompanied minor chaperone service, not just an under-18 travelling alone.
+            Only approved participants show the UM badge in the Travel Calendar and admin views.
+          </p>
+        </div>
+        <% badge = {
+          "none" => ["Not reviewed", :stopped],
+          "pending" => ["Pending review", :pending],
+          "approved" => ["Verified UM", :success],
+          "rejected" => ["Rejected", :error]
+        }[@participant_event.um_status] %>
+        <div class="cs-actions">
+          <%= cs_status(badge[1], badge[0]) %>
+          <% unless @participant_event.um_rejected? %>
+            <%= button_to "Reject UM status", reject_um_admin_event_participant_path(current_event, @participant_event), method: :post, class: "cs-btn" %>
+          <% end %>
+          <% unless @participant_event.um_approved? %>
+            <%= button_to "Approve UM status", approve_um_admin_event_participant_path(current_event, @participant_event), method: :post, class: "cs-btn cs-btn-primary" %>
+          <% end %>
+        </div>
+      </div>
+
+      <div class="cs-container-body">
+        <dl class="cs-kv cs-kv-2">
+          <div>
+            <dt class="cs-kv-label">Declared on</dt>
+            <dd class="cs-kv-value">
+              <%= [("inbound flight" if @participant_event.travel_inbound&.plane? && @participant_event.travel_inbound.is_unaccompanied_minor?),
+                   ("outbound flight" if @participant_event.travel_outbound&.plane? && @participant_event.travel_outbound.is_unaccompanied_minor?)].compact.join(" and ").presence || "—" %>
+            </dd>
+          </div>
+          <div>
+            <dt class="cs-kv-label">Proof of UM booking</dt>
+            <dd class="cs-kv-value">
+              <% if @participant_event.um_proof.attached? %>
+                <%= link_to @participant_event.um_proof.filename, um_proof_admin_event_participant_path(current_event, @participant_event), target: "_blank", rel: "noopener", class: "cs-link" %>
+              <% else %>
+                Not uploaded
+              <% end %>
+            </dd>
+          </div>
+          <div>
+            <dt class="cs-kv-label">Guardian double-confirmed</dt>
+            <dd class="cs-kv-value"><%= cs_relative_time(@participant_event.um_guardian_confirmed_at) || "Not yet" %></dd>
+          </div>
+          <% if @participant_event.um_verified_at.present? %>
+            <div>
+              <dt class="cs-kv-label">Reviewed</dt>
+              <dd class="cs-kv-value"><%= cs_relative_time(@participant_event.um_verified_at) %><%= " by #{@participant_event.um_verified_by.name || @participant_event.um_verified_by.email}" if @participant_event.um_verified_by %></dd>
+            </div>
+          <% end %>
+        </dl>
+      </div>
+    </section>
+  <% end %>
+
+  <%= form_with url: travel_admin_event_participant_path(current_event, @participant_event), method: :patch, local: true, class: "cs-stack", html: { novalidate: true }, data: { controller: "travel-form cs-form-validation" } do |form| %>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Inbound travel (arriving at event)</h2>
+      </div>
+      <div class="cs-container-body">
+
+      <%= fields_for :travel_inbound, @travel_inbound do |f| %>
+        <div class="space-y-4">
+          <%= cs_form_field f, :arrangement_status, label: "Arrangement status", optional: true do |aria| %>
+            <%= f.select :arrangement_status, Travel.arrangement_statuses.keys.map { |status| [status.titleize, status] },
+                  { include_blank: "Select status" }, class: "cs-select", id: f.field_id(:arrangement_status), **aria,
+                  data: { action: "change->travel-form#updateFields", travel_form_target: "inboundStatus" } %>
+          <% end %>
+          <!-- Mode -->
+          <%= cs_form_field f, :mode, label: "Travel mode", constraint: "Required once the arrangement is provisional or confirmed." do |aria| %>
+            <%= f.select :mode, Travel.modes.keys.map { |m| [m.titleize, m] },
+                  { include_blank: "Select mode" },
+                  class: "cs-select", id: f.field_id(:mode), **aria,
+                  data: { action: "change->travel-form#updateFields", travel_form_target: "inboundMode" } %>
+          <% end %>
+
+          <% if current_event.visa_options_enabled? %>
+          <!-- Visa Status -->
+          <%= cs_form_field f, :visa_status, label: "Visa status", optional: true do |aria| %>
+            <%= f.select :visa_status, Travel.visa_statuses.keys.map { |s| [s.titleize.gsub("_", " "), s] },
+                  { include_blank: "Select status" },
+                  class: "cs-select", id: f.field_id(:visa_status), **aria %>
+          <% end %>
+          <% end %>
+
+          <!-- Unaccompanied Minor -->
+          <div class="cs-option">
+            <%= f.check_box :is_unaccompanied_minor %>
+            <div><%= f.label :is_unaccompanied_minor, "Travelling as unaccompanied minor", class: "cs-option-label" %></div>
+          </div>
+
+          <!-- Flight Legs (for plane mode) -->
+          <% if @travel_inbound.plane? || @travel_inbound.mode.nil? %>
+            <div class="border-t border-(--cs-border-divider-secondary) pt-4 mt-4" id="inbound-flight-legs">
+              <h3 class="cs-h3 mb-3">Flight legs</h3>
+              <div data-travel-form-target="inboundLegs" class="space-y-4">
+                <% @travel_inbound.travel_legs.order(:position).each_with_index do |leg, index| %>
+                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "inbound", show_remove: leg.persisted?, default_date: current_event.local_starts_at&.strftime('%Y-%m-%d'), refresh_url: refresh_flight_leg_admin_event_participant_path(current_event, @participant_event, leg_id: leg.id) %>
+                <% end %>
+              </div>
+              <button type="button" data-action="click->travel-form#addLeg" data-direction="inbound" class="cs-btn mt-4">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Add flight leg
+              </button>
+            </div>
+          <% end %>
+
+          <!-- Train fields -->
+          <% if @travel_inbound.train? %>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
+              <%= cs_form_field f, :train_departure_station, label: "Departure station" %>
+              <%= cs_form_field f, :train_arrival_station, label: "Arrival station" %>
+              <%= cs_form_field f, :arrival_time, label: "Arrival time", as: :datetime_local_field %>
+            </div>
+          <% end %>
+
+          <!-- Bus fields -->
+          <% if @travel_inbound.bus? %>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
+              <%= cs_form_field f, :bus_departure_location, label: "Departure location" %>
+              <%= cs_form_field f, :bus_arrival_location, label: "Arrival location" %>
+              <%= cs_form_field f, :departure_time, label: "Departure time", as: :datetime_local_field %>
+              <%= cs_form_field f, :arrival_time, label: "Arrival time", as: :datetime_local_field %>
+            </div>
+          <% end %>
+
+          <!-- Car fields -->
+          <% if @travel_inbound.car? %>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
+              <% if can_view_participant_pii? %>
+                <%= cs_form_field f, :origin_address, label: "Travelling from", data: { controller: "address-autocomplete" } do |aria| %>
+                  <%= f.text_field :origin_address, class: "cs-input", id: f.field_id(:origin_address), data: { address_autocomplete_target: "input" }, **aria %>
+                <% end %>
+              <% end %>
+              <%= cs_form_field f, :expected_arrival_time, label: "Expected arrival time", as: :datetime_local_field %>
+            </div>
+          <% end %>
+
+          <!-- Other fields -->
+          <% if @travel_inbound.other? %>
+            <%= cs_form_field f, :other_details, label: "Travel details", as: :text_area, input: { rows: 3 }, class: "border-t border-(--cs-border-divider-secondary) pt-4 mt-4" %>
+          <% end %>
+
+          <!-- Notes -->
+          <%= cs_form_field f, :notes, label: "Notes", optional: true, as: :text_area, input: { rows: 2, placeholder: "Any additional notes" }, class: "border-t border-(--cs-border-divider-secondary) pt-4 mt-4" %>
+        </div>
+      <% end %>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Outbound travel (leaving event)</h2>
+      </div>
+      <div class="cs-container-body">
+
+      <%= fields_for :travel_outbound, @travel_outbound do |f| %>
+        <div class="space-y-4">
+          <%= cs_form_field f, :arrangement_status, label: "Arrangement status", optional: true do |aria| %>
+            <%= f.select :arrangement_status, Travel.arrangement_statuses.keys.map { |status| [status.titleize, status] },
+                  { include_blank: "Select status" }, class: "cs-select", id: f.field_id(:arrangement_status), **aria,
+                  data: { action: "change->travel-form#updateFields", travel_form_target: "outboundStatus" } %>
+          <% end %>
+          <!-- Mode -->
+          <%= cs_form_field f, :mode, label: "Travel mode", constraint: "Required once the arrangement is provisional or confirmed." do |aria| %>
+            <%= f.select :mode, Travel.modes.keys.map { |m| [m.titleize, m] },
+                  { include_blank: "Select mode" },
+                  class: "cs-select", id: f.field_id(:mode), **aria,
+                  data: { action: "change->travel-form#updateFields", travel_form_target: "outboundMode" } %>
+          <% end %>
+
+          <!-- Unaccompanied Minor -->
+          <div class="cs-option">
+            <%= f.check_box :is_unaccompanied_minor %>
+            <div><%= f.label :is_unaccompanied_minor, "Travelling as unaccompanied minor", class: "cs-option-label" %></div>
+          </div>
+
+          <!-- Flight Legs (for plane mode) -->
+          <% if @travel_outbound.plane? || @travel_outbound.mode.nil? %>
+            <div class="border-t border-(--cs-border-divider-secondary) pt-4 mt-4" id="outbound-flight-legs">
+              <h3 class="cs-h3 mb-3">Flight legs</h3>
+              <div data-travel-form-target="outboundLegs" class="space-y-4">
+                <% @travel_outbound.travel_legs.order(:position).each_with_index do |leg, index| %>
+                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "outbound", show_remove: leg.persisted?, default_date: current_event.local_ends_at&.strftime('%Y-%m-%d'), refresh_url: refresh_flight_leg_admin_event_participant_path(current_event, @participant_event, leg_id: leg.id) %>
+                <% end %>
+              </div>
+              <button type="button" data-action="click->travel-form#addLeg" data-direction="outbound" class="cs-btn mt-4">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Add flight leg
+              </button>
+            </div>
+          <% end %>
+
+          <!-- Train fields -->
+          <% if @travel_outbound.train? %>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
+              <%= cs_form_field f, :train_departure_station, label: "Departure station" %>
+              <%= cs_form_field f, :train_arrival_station, label: "Arrival station" %>
+              <%= cs_form_field f, :departure_time, label: "Departure time", as: :datetime_local_field %>
+            </div>
+          <% end %>
+
+          <!-- Bus fields -->
+          <% if @travel_outbound.bus? %>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
+              <%= cs_form_field f, :bus_departure_location, label: "Departure location" %>
+              <%= cs_form_field f, :bus_arrival_location, label: "Arrival location" %>
+              <%= cs_form_field f, :departure_time, label: "Departure time", as: :datetime_local_field %>
+              <%= cs_form_field f, :arrival_time, label: "Arrival time", as: :datetime_local_field %>
+            </div>
+          <% end %>
+
+          <!-- Car fields -->
+          <% if @travel_outbound.car? %>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
+              <% if can_view_participant_pii? %>
+                <%= cs_form_field f, :origin_address, label: "Travelling to", data: { controller: "address-autocomplete" } do |aria| %>
+                  <%= f.text_field :origin_address, class: "cs-input", id: f.field_id(:origin_address), data: { address_autocomplete_target: "input" }, **aria %>
+                <% end %>
+              <% end %>
+              <%= cs_form_field f, :departure_time, label: "Departure time", as: :datetime_local_field %>
+            </div>
+          <% end %>
+
+          <!-- Other fields -->
+          <% if @travel_outbound.other? %>
+            <%= cs_form_field f, :other_details, label: "Travel details", as: :text_area, input: { rows: 3 }, class: "border-t border-(--cs-border-divider-secondary) pt-4 mt-4" %>
+          <% end %>
+
+          <!-- Notes -->
+          <%= cs_form_field f, :notes, label: "Notes", optional: true, as: :text_area, input: { rows: 2, placeholder: "Any additional notes" }, class: "border-t border-(--cs-border-divider-secondary) pt-4 mt-4" %>
+        </div>
+      <% end %>
+      </div>
+    </section>
+
+    <%= cs_form_errors @travel_inbound, title: "Inbound travel couldn't be saved.", labels: { "travel_legs.flight_code": "Flight code", "travel_legs.departure_airport": "Departure airport", "travel_legs.arrival_airport": "Arrival airport", "travel_legs.departure_time": "Departure time", "travel_legs.arrival_time": "Arrival time", travel_legs: "Flight legs" } %>
+    <%= cs_form_errors @travel_outbound, title: "Outbound travel couldn't be saved.", labels: { "travel_legs.flight_code": "Flight code", "travel_legs.departure_airport": "Departure airport", "travel_legs.arrival_airport": "Arrival airport", "travel_legs.departure_time": "Departure time", "travel_legs.arrival_time": "Arrival time", travel_legs: "Flight legs" } %>
+
+    <!-- Submit -->
+    <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+      <%= link_to "Cancel", admin_event_participant_path(current_event, @participant_event), class: "cs-btn cs-btn-link cs-btn-full" %>
+      <%= form.button "Save travel information", class: "cs-btn cs-btn-primary cs-btn-full" %>
+    </div>
+  <% end %>
+</div>
+
+<!-- Template for adding new flight legs dynamically -->
+<template id="leg-template">
+  <div class="border border-(--cs-border-container) rounded-(--cs-radius-container) p-4 relative"
+       data-travel-form-target="legTemplate"
+       data-autosave-skip>
+    <button type="button" data-action="click->travel-form#removeLeg" class="cs-modal-close absolute top-2 right-2" aria-label="Remove leg">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+    <div class="cs-h3 mb-3 leg-number">Leg 1</div>
+    <input type="hidden" class="leg-position" name="" value="">
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div data-cs-field data-cs-label="Flight code">
+        <label class="cs-field-label">Flight code</label>
+        <input type="text"
+               class="leg-flight-code cs-input"
+               name=""
+               placeholder="LH1234"
+               required>
+      </div>
+      <div data-cs-field data-cs-label="Confirmation code">
+        <label class="cs-field-label">Confirmation code<span class="cs-field-optional"> - optional</span></label>
+        <input type="text" class="leg-confirmation-code cs-input" name="" placeholder="Booking reference">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div data-controller="airport-autocomplete" class="relative" data-cs-field data-cs-label="Departure airport">
+        <label class="cs-field-label">Departure airport</label>
+        <input type="text"
+               class="leg-departure-airport cs-input"
+               name=""
+               placeholder="LHR"
+               required
+               autocomplete="off"
+               data-airport-autocomplete-target="input"
+               data-action="input->airport-autocomplete#search keydown->airport-autocomplete#onKeydown blur->airport-autocomplete#onBlur">
+        <div data-airport-autocomplete-target="dropdown" class="hidden cs-menu cs-menu-scroll left-0 w-full">
+          <div data-airport-autocomplete-target="results"></div>
+        </div>
+        <p class="cs-field-hint">3-letter IATA or 4-letter ICAO code.</p>
+      </div>
+      <div data-controller="airport-autocomplete" class="relative" data-cs-field data-cs-label="Arrival airport">
+        <label class="cs-field-label">Arrival airport</label>
+        <input type="text"
+               class="leg-arrival-airport cs-input"
+               name=""
+               placeholder="VIE"
+               required
+               autocomplete="off"
+               data-airport-autocomplete-target="input"
+               data-action="input->airport-autocomplete#search keydown->airport-autocomplete#onKeydown blur->airport-autocomplete#onBlur">
+        <div data-airport-autocomplete-target="dropdown" class="hidden cs-menu cs-menu-scroll left-0 w-full">
+          <div data-airport-autocomplete-target="results"></div>
+        </div>
+        <p class="cs-field-hint">3-letter IATA or 4-letter ICAO code.</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div data-cs-field data-cs-label="Departure time">
+        <label class="cs-field-label">Departure time</label>
+        <input type="datetime-local" class="leg-departure-time cs-input" name="" required>
+        <select class="leg-departure-tz mt-1 cs-select" name="" aria-label="Departure time zone" data-cs-validate="false"><%= travel_leg_time_zone_options %></select>
+        <p class="cs-field-hint">Local time at the departure airport.</p>
+      </div>
+      <div data-cs-field data-cs-label="Arrival time">
+        <label class="cs-field-label">Arrival time</label>
+        <input type="datetime-local" class="leg-arrival-time cs-input" name="" required>
+        <select class="leg-arrival-tz mt-1 cs-select" name="" aria-label="Arrival time zone" data-cs-validate="false"><%= travel_leg_time_zone_options %></select>
+        <p class="cs-field-hint">Local time at the arrival airport.</p>
+      </div>
+    </div>
+  </div>
+</template>

@@ -1,8 +1,10 @@
 <% content_for :title, "Participants – #{current_event.name} – Attend" %>
+<%# Filtering morphs the page rather than replacing it, so the filter controls keep focus and typing. %>
+<% turbo_refreshes_with method: :morph, scroll: :preserve %>
 
 <div<% if current_event.slack_channel_id.present? %> data-controller="sync-slack" data-sync-slack-preview-url-value="<%= sync_slack_channel_preview_admin_event_participants_path(current_event) %>" data-sync-slack-form-url-value="<%= sync_slack_channel_admin_event_participants_path(current_event) %>"<% end %>>
   <% if current_event.slack_channel_id.present? %>
-    <div data-controller="slack-sync-progress" data-slack-sync-progress-event-id-value="<%= current_event.id %>">
+    <div id="slack-sync-progress-<%= current_event.id %>" data-turbo-permanent data-controller="slack-sync-progress" data-slack-sync-progress-event-id-value="<%= current_event.id %>">
       <div data-slack-sync-progress-target="banner" class="hidden mb-4 rounded-md bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800">
         <span data-slack-sync-progress-target="message">Syncing Slack channel…</span>
       </div>
@@ -21,20 +23,56 @@
           Sync Slack
         </button>
       <% end %>
-      <%= link_to new_admin_event_import_path(current_event), class: "text-sm font-medium text-gray-700 bg-white border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5" do %>
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-        </svg>
-        Import
-      <% end %>
-      <%= link_to new_invite_admin_event_participants_path(current_event), class: "text-sm font-medium text-white bg-[#d42f46] px-3 py-1.5 rounded-md hover:bg-[#b82840] transition-colors inline-flex items-center gap-1.5" do %>
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-        </svg>
-        Add participant
+      <% if policy(current_event).invite_participants? %>
+        <%= link_to new_admin_event_import_path(current_event), class: "text-sm font-medium text-gray-700 bg-white border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 transition-colors inline-flex items-center gap-1.5" do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+          </svg>
+          Import
+        <% end %>
+        <%= link_to new_invite_admin_event_participants_path(current_event), class: "text-sm font-medium text-white bg-[#d42f46] px-3 py-1.5 rounded-md hover:bg-[#b82840] transition-colors inline-flex items-center gap-1.5" do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          Add participant
+        <% end %>
       <% end %>
     </div>
   </div>
+
+  <% held_count = current_event.held_invitations_count %>
+  <% if current_event.onboarding_invites_held? || held_count.positive? %>
+    <%# Holding is the event's state, not the tab's, so this sits above both
+        tabs: the All tab shows imported participants whose email hasn't gone
+        out, and nothing in their row says so. %>
+    <div class="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3" data-testid="held-invitations-banner">
+      <div class="flex-1 min-w-0 text-sm text-amber-800">
+        <% if current_event.onboarding_invites_held? %>
+          <p class="font-semibold">Onboarding invitations are held for this event.</p>
+          <p class="mt-0.5">
+            Participants you add or import are recorded without an email.
+            <% if held_count.positive? %>
+              <%= pluralize(held_count, "invitation") %> <%= held_count == 1 ? "is" : "are" %> waiting to be sent.
+            <% else %>
+              Nothing is waiting to be sent yet.
+            <% end %>
+          </p>
+        <% else %>
+          <p class="font-semibold"><%= pluralize(held_count, "invitation") %> <%= held_count == 1 ? "hasn't" : "haven't" %> been sent.</p>
+          <p class="mt-0.5">These participants were added without an email.</p>
+        <% end %>
+      </div>
+      <% if policy(current_event).invite_participants? %>
+        <%= button_to send_held_invitations_admin_event_participants_path(current_event),
+            method: :post,
+            data: { turbo_confirm: held_count.positive? ? "Email #{pluralize(held_count, 'held invitation')} now? New participants will be emailed as they're added from here on." : "Stop holding onboarding invitations? New participants will be emailed as they're added." },
+            class: "shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-white bg-[#d42f46] px-3 py-1.5 rounded-md hover:bg-[#b82840] transition-colors cursor-pointer" do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          <%= held_count.positive? ? "Send #{pluralize(held_count, 'held invitation')}" : "Stop holding invitations" %>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
 
   <!-- Tabs -->
   <div class="mb-5 border-b border-gray-200">
@@ -59,10 +97,14 @@
 
   <!-- Filters -->
   <div class="mb-4">
-    <form action="<%= admin_event_participants_path(current_event) %>" method="get" class="flex flex-wrap items-center gap-2">
+    <form action="<%= admin_event_participants_path(current_event) %>" method="get" class="flex flex-wrap items-center gap-2" id="participant-filters" data-controller="auto-submit" data-turbo-action="replace"
+          data-action="change->auto-submit#debouncedSubmit turbo:submit-start->auto-submit#submitted turbo:click@document->auto-submit#cancel turbo:submit-start@document->auto-submit#cancel popstate@window->auto-submit#cancel formdata->auto-submit#dropBlank">
+      <%# The series dashboard's chase links filter by blocking stage; keep it while other filters change. %>
+      <%= hidden_field_tag :blocked_on, params[:blocked_on], id: nil if params[:blocked_on].present? %>
       <div class="flex-1 min-w-[200px] max-w-xs">
         <%= text_field_tag :search, params[:search],
             placeholder: "Search...",
+            data: { auto_submit_target: "search", action: "input->auto-submit#debouncedSubmit compositionend->auto-submit#debouncedSubmit turbo:before-morph-element->auto-submit#keepTypedSearch" },
             class: "w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750]" %>
       </div>
       <%= select_tag :status,
@@ -86,7 +128,8 @@
             *(current_event.travel_enabled? ? [["Missing Travel", "missing_travel"]] : []),
             ["Missing Medical", "missing_medical"],
             ["High Support", "high_support"],
-            ["Anaphylaxis Risk", "anaphylaxis"]
+            ["Anaphylaxis Risk", "anaphylaxis"],
+            ["19+ During Event", "over_age_limit"]
           ], params[:flag]),
           class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
       <%= select_tag :checked_in,
@@ -117,15 +160,30 @@
             ),
             class: "text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#ec3750] focus:border-[#ec3750] text-gray-600" %>
       <% end %>
-      <%= submit_tag "Filter", class: "text-sm font-medium bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 cursor-pointer" %>
-      <% if params[:search].present? || params[:status].present? || params[:flag].present? || params[:checked_in].present? || params[:group_id].present? || params[:optional_document].present? %>
+      <%# Filters apply on change; the button is only for browsers without JS. %>
+      <noscript>
+        <%= submit_tag "Filter", class: "text-sm font-medium bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-200 cursor-pointer" %>
+      </noscript>
+      <% filter_params = request.query_parameters.slice("search", "status", "flag", "checked_in", "group_id", "optional_document", "blocked_on").compact_blank %>
+      <% if params[:blocked_on].present? %>
+        <%# The chase filter has no dropdown, so show it: it would otherwise narrow every search unseen. %>
+        <% blocking_stage = (SeriesDashboard::STAGES + [ SeriesDashboard::ARRIVAL_STAGE ]).find { |stage| stage.key.to_s == params[:blocked_on] } %>
+        <span class="inline-flex items-center gap-1 text-sm bg-gray-100 text-gray-700 rounded-md pl-3 pr-1.5 py-1.5" data-blocked-on-filter>
+          <%= blocking_stage ? "Only people who #{blocking_stage.chase}" : "Blocked on: #{params[:blocked_on].to_s.humanize}" %>
+          <%= link_to admin_event_participants_path(current_event, filter_params.except("blocked_on")), class: "p-0.5 rounded text-gray-500 hover:text-gray-700", "aria-label": "Remove this filter" do %>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          <% end %>
+        </span>
+      <% end %>
+      <% if filter_params.any? %>
         <%= link_to "Clear", admin_event_participants_path(current_event), class: "text-sm text-gray-500 hover:text-gray-700" %>
       <% end %>
+      <%# Switching views keeps whatever filters are active. %>
       <div class="ml-auto flex items-center gap-1">
-        <%= link_to admin_event_participants_path(current_event), class: "p-1.5 rounded #{@show_pending_invitations || !request.path.include?('table') ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-600'}", title: "List view" do %>
+        <%= link_to admin_event_participants_path(current_event, filter_params), class: "p-1.5 rounded #{@show_pending_invitations || !request.path.include?('table') ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-600'}", title: "List view" do %>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
         <% end %>
-        <%= link_to table_admin_event_participants_path(current_event), class: "p-1.5 rounded text-gray-400 hover:text-gray-600", title: "Table view" do %>
+        <%= link_to table_admin_event_participants_path(current_event, filter_params), class: "p-1.5 rounded text-gray-400 hover:text-gray-600", title: "Table view" do %>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M3 12h18M3 18h18M9 4v16M15 4v16"/></svg>
         <% end %>
       </div>
@@ -150,13 +208,24 @@
             <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
               <td class="px-4 py-3 text-sm font-medium text-gray-900"><%= invitation.email %></td>
               <td class="px-4 py-3">
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">Pending</span>
+                <% if invitation.held? %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-600" title="Recorded but not emailed yet">Held</span>
+                <% else %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700">Pending</span>
+                <% end %>
               </td>
-              <td class="px-4 py-3 text-sm text-gray-500"><%= time_ago_in_words(invitation.created_at) %> ago</td>
-              <td class="px-4 py-3 text-sm text-gray-500"><%= time_ago_in_words(invitation.expires_at) %></td>
+              <% if invitation.held? %>
+                <td class="px-4 py-3 text-sm text-gray-500">Not sent <span class="text-gray-400">· added <%= time_ago_in_words(invitation.created_at) %> ago</span></td>
+                <td class="px-4 py-3 text-sm text-gray-400" title="The link is valid for 30 days from when it is sent">—</td>
+              <% else %>
+                <td class="px-4 py-3 text-sm text-gray-500"><%= time_ago_in_words(invitation.sent_at) %> ago</td>
+                <td class="px-4 py-3 text-sm text-gray-500"><%= time_ago_in_words(invitation.expires_at) %></td>
+              <% end %>
               <td class="px-4 py-3 text-right text-sm space-x-3">
-                <%= button_to "Resend", send_invite_admin_event_participants_path(current_event, invite: { email: invitation.email }), method: :post, class: "text-[#ec3750] hover:text-[#d42f46] text-sm font-medium" %>
-                <%= button_to "Revoke", revoke_invite_admin_event_participants_path(current_event, id: invitation.id), method: :delete, data: { confirm: "Are you sure you want to revoke the invitation for #{invitation.email}?" }, class: "text-gray-500 hover:text-red-600 text-sm" %>
+                <% if policy(current_event).invite_participants? %>
+                  <%= button_to invitation.held? ? "Send now" : "Resend", send_invite_admin_event_participants_path(current_event, invite: { email: invitation.email, send_now: "1" }), method: :post, class: "text-[#ec3750] hover:text-[#d42f46] text-sm font-medium" %>
+                  <%= button_to "Revoke", revoke_invite_admin_event_participants_path(current_event, id: invitation.id), method: :delete, form: { data: { turbo_confirm: "Are you sure you want to revoke the invitation for #{invitation.email}?" } }, class: "text-gray-500 hover:text-red-600 text-sm" %>
+                <% end %>
               </td>
             </tr>
           <% end %>
@@ -186,7 +255,7 @@
           <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
             <td class="px-4 py-3">
               <div>
-                <%= link_to pe.participant.display_name, admin_event_participant_path(current_event, pe), class: "text-sm font-medium text-gray-900 hover:text-[#ec3750]" %>
+                <%= link_to participant_name(pe.participant), admin_event_participant_path(current_event, pe), class: "text-sm font-medium text-gray-900 hover:text-[#ec3750]" %>
                 <div class="text-xs text-gray-500 truncate max-w-[200px]" title="<%= pe.participant.email %>"><%= pe.participant.email %></div>
                 <% if current_event.groups_enabled? && pe.groups.any? %>
                   <div class="flex flex-wrap gap-1 mt-1">
@@ -254,7 +323,7 @@
   </div>
 
   <% if current_event.slack_channel_id.present? %>
-    <div data-sync-slack-target="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-action="click->sync-slack#closeOnBackdrop">
+    <div id="sync-slack-modal-<%= current_event.id %>" data-turbo-permanent data-sync-slack-target="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-action="click->sync-slack#closeOnBackdrop">
       <div class="bg-white rounded-lg border border-gray-200 max-w-md w-full mx-4">
         <div class="p-6">
           <h3 class="text-base font-semibold mb-4">Sync Slack Channel</h3>

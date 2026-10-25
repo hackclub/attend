@@ -1,0 +1,9 @@
+<div class="w-full max-w-2xl mx-auto">
+  <%= link_to "← Back to #{@event.name}", dashboard_event_path(@participant_event), class: "text-sm text-[#ec3750]" %>
+  <div class="portal-card p-5 mt-5 space-y-3">
+    <h1 class="portal-title text-xl"><%= @change_request.kind.titleize %> request</h1>
+    <p>Status: <strong><%= @change_request.status.titleize %></strong></p>
+    <% if @change_request.staff_response.present? %><div class="portal-note portal-note-info"><%= simple_format(@change_request.staff_response) %></div><% end %>
+    <% if @change_request.follow_up_needed? %><p class="portal-hint text-sm">You can submit a new request from the relevant correction page.</p><% end %>
+  </div>
+</div>

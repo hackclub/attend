@@ -142,6 +142,37 @@ RSpec.describe "Admin::EventSeries", type: :request do
       expect(series.reload.name).to eq("Sunbeam Renamed")
     end
 
+    it "lets owners brand registration for every event in the series" do
+      sign_in owner
+
+      patch admin_series_path(series), params: { event_series: {
+        brand: { background: "#FFF6D6", ink: "#4a2a12", accent: "#ed5615", heading_font: "darumadrop-one" },
+        registration_note: "Bring a laptop!"
+      } }
+
+      expect(series.reload.brand).to include("background" => "#fff6d6", "heading_font" => "darumadrop-one")
+      expect(sub_event.reload.brand_theme).to be_active
+      expect(sub_event.registration_note).to eq("Bring a laptop!")
+    end
+
+    it "lets owners choose which accounts onboarding asks for" do
+      sign_in owner
+
+      patch admin_series_path(series), params: { event_series: { github_linking: "required", itch_linking: "optional" } }
+
+      expect(sub_event.reload.required_account_providers).to eq(%w[github])
+      expect(sub_event.linked_account_providers).to eq(%w[github itch])
+    end
+
+    it "rejects an unknown linking mode" do
+      sign_in owner
+
+      patch admin_series_path(series), params: { event_series: { github_linking: "sometimes" } }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(series.reload.account_linking_mode("github")).to eq("off")
+    end
+
     it "only lets global admins create a series" do
       sign_in owner
       post admin_series_index_path, params: { event_series: { name: "Another Series" } }

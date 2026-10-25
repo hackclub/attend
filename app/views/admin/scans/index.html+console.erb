@@ -1,0 +1,138 @@
+<% content_for :title, "Check Ins – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Check-ins", nil ]) %>
+
+<div class="cs-header">
+  <div class="cs-header-text">
+    <h1 class="cs-h1">Check-ins</h1>
+    <p class="cs-description">Scan stats and activity for <%= current_event.name %>.</p>
+  </div>
+  <div class="cs-actions">
+    <%= link_to "Manage contexts", admin_event_scan_contexts_path(current_event), class: "cs-btn" %>
+    <%= link_to "History", history_admin_event_scans_path(current_event), class: "cs-btn" %>
+    <%= link_to scanner_admin_event_scans_path(current_event), class: "cs-btn cs-btn-primary" do %>
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+      </svg>
+      Launch scanner
+    <% end %>
+  </div>
+</div>
+
+<div class="cs-stack">
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Overview</h2>
+    </div>
+    <div class="cs-container-body">
+      <dl class="cs-kv cs-kv-4 cs-kv-divided">
+        <div><dt class="cs-kv-label">Scans today</dt><dd class="cs-kv-value-lg tabular-nums"><%= @scans_today %></dd></div>
+        <div><dt class="cs-kv-label">Scans all time</dt><dd class="cs-kv-value-lg tabular-nums"><%= @scans_total %></dd></div>
+        <div><dt class="cs-kv-label">Checked in today</dt><dd class="cs-kv-value-lg tabular-nums"><%= @checked_in_today %></dd></div>
+        <div><dt class="cs-kv-label">Checked in total</dt><dd class="cs-kv-value-lg tabular-nums"><%= @checked_in_total %></dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <div class="cs-columns cs-columns-2">
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <h2 class="cs-h2">By context <span class="cs-counter">(<%= @per_context_stats.size %>)</span></h2>
+        <div class="cs-actions">
+          <%= link_to "Manage", admin_event_scan_contexts_path(current_event), class: "cs-btn cs-btn-link" %>
+        </div>
+      </div>
+      <% if @per_context_stats.any? %>
+        <div class="cs-table-wrap">
+          <table class="cs-table cs-table-compact">
+            <thead>
+              <tr>
+                <th scope="col">Context</th>
+                <th scope="col" class="text-right">Today</th>
+                <th scope="col" class="text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @per_context_stats.each do |row| %>
+                <tr>
+                  <td>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="font-bold"><%= row[:context].name %></span>
+                      <% if row[:context].is_travel_pickup? %><%= cs_badge("Travel pickup", "blue") %><% end %>
+                      <% if row[:context].checks_in? %><%= cs_badge("Check-in", "green") %><% end %>
+                    </div>
+                  </td>
+                  <td class="text-right tabular-nums"><%= row[:today] %></td>
+                  <td class="text-right tabular-nums"><%= row[:total] %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <div class="cs-empty">
+          <p class="cs-empty-title">No scan contexts</p>
+          <p>No scan contexts configured yet.</p>
+          <div class="cs-actions">
+            <%= link_to "Create a context", new_admin_event_scan_context_path(current_event), class: "cs-btn" %>
+          </div>
+        </div>
+      <% end %>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <h2 class="cs-h2">Recent activity</h2>
+        <div class="cs-actions">
+          <%= link_to "View all", history_admin_event_scans_path(current_event), class: "cs-btn cs-btn-link" %>
+        </div>
+      </div>
+      <% if @recent_scans.any? %>
+        <ul>
+          <% @recent_scans.each do |scan| %>
+            <li class="flex items-center justify-between gap-3 border-b border-(--cs-border-divider-secondary) px-5 py-2.5 last:border-b-0">
+              <div class="min-w-0 flex-1">
+                <p class="truncate font-bold"><%= scan.participant.display_name %></p>
+                <p class="cs-small cs-muted">
+                  <%= cs_relative_time(scan.scanned_at) %>
+                  <% if scan.scan_context %>@ <%= scan.scan_context.name %><% end %>
+                  · by <%= scan.user.display_name_or_fallback %>
+                </p>
+              </div>
+              <%= link_to "View", admin_event_participant_path(current_event, scan.participant_event), class: "cs-link" %>
+            </li>
+          <% end %>
+        </ul>
+      <% else %>
+        <div class="cs-empty">
+          <p class="cs-empty-title">No scans yet.</p>
+        </div>
+      <% end %>
+    </section>
+  </div>
+
+  <% if @top_staff_today.any? %>
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <h2 class="cs-h2">Top scanners today</h2>
+      </div>
+      <div class="cs-table-wrap">
+        <table class="cs-table cs-table-compact">
+          <thead>
+            <tr>
+              <th scope="col">Staff member</th>
+              <th scope="col" class="text-right">Scans</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @top_staff_today.each do |(user_id, user_name, user_email), count| %>
+              <tr>
+                <td class="truncate"><%= user_name.presence || user_email %></td>
+                <td class="text-right tabular-nums font-bold"><%= count %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% end %>
+</div>

@@ -94,6 +94,16 @@
           <p class="text-sm text-gray-500">Hold off sending guardian invitations while waiver details are being finalised. Useful until your waivers are set up.</p>
         </div>
       </div>
+
+      <div class="flex items-start">
+        <div class="flex items-center h-5">
+          <%= f.check_box :onboarding_invites_held, { checked: f.object.onboarding_invites_held?, class: "h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded" } %>
+        </div>
+        <div class="ml-3">
+          <%= f.label :onboarding_invites_held, "Hold Onboarding Invitations", class: "text-sm font-medium text-gray-700" %>
+          <p class="text-sm text-gray-500">Add and import participants without emailing them, then send every invitation at once from the participants page or the series page. Useful when the series decides launch day.</p>
+        </div>
+      </div>
     </div>
 
     <div class="flex flex-col sm:flex-row justify-between gap-3">

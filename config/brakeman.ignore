@@ -59,6 +59,10 @@
       "user_input": "optional_document_rank_sql(optional_document_for_key(@sort_field))",
       "confidence": "Medium",
       "note": "False positive - optional_document_rank_sql builds its SQL through sanitize_sql_array with the document id bound as :id, the document itself is resolved against the current event's own document list, and the interpolated sort direction is one of two literal symbols."
+    },
+    {
+      "fingerprint": "8bf2e05cebbd678f24ba4a714dbb7a2b5744fe81df9487ec5b72e0188c77a5e7",
+      "note": "Intentional: badge.hackclub.com/t/:slack_id IS a redirect service. The target is set by the badge's owner and BadgeRedirect validates it as an http(s) URL with a host, so no javascript:/data: scheme can get through. Host-scoped to the badge domain so it is never reachable on attend.hackclub.com."
     }
   ],
   "updated": "2026-08-17",

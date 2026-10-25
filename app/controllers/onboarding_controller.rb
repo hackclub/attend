@@ -1,15 +1,20 @@
 class OnboardingController < ApplicationController
+  include RestrictsBannedUsers
   include TravelLegDateMerging
   include PhysicalDocumentUploads
   include OptionalDocumentEnrolment
+  include OnboardingAccountsStep
 
   before_action :force_html_format, except: [ :documents_status ]
   before_action :store_invitation_token
+  before_action :prepare_invitation_entry
   before_action :authenticate_user!
   before_action :process_invitation
   before_action :load_participant_event
+  before_action :apply_event_brand
   before_action :redirect_if_withdrawn
-  before_action :redirect_if_locked, except: [ :index, :waiver, :waiver_complete ]
+  before_action :redirect_if_locked, except: [ :index, :waiver, :waiver_complete, :done ]
+  before_action :hold_at_profile_if_too_old, except: [ :welcome, :start, :done ]
 
   BASE_STEPS = %w[profile travel accommodation health].freeze
   GUARDIAN_STEP = "guardian"
@@ -28,8 +33,40 @@ class OnboardingController < ApplicationController
       return
     end
 
+    if show_welcome?
+      redirect_to onboarding_welcome_path(event_id: current_event.id)
+      return
+    end
+
     current_step = steps[@participant_event.onboarding_step] || steps.first
     redirect_to onboarding_step_path(step: current_step, event_id: current_event.id)
+  end
+
+  # The "what to expect" screen, shown once before the first step.
+  def welcome
+    @steps = steps
+  end
+
+  def start
+    @participant_event.update!(onboarding_intro_seen_at: Time.current) if @participant_event.onboarding_intro_seen_at.nil?
+    redirect_to onboarding_step_path(step: steps.first, event_id: current_event.id)
+  end
+
+  # The "you're registered" screen after submitting: the entry ticket once
+  # the registration is confirmed, otherwise what's still outstanding.
+  def done
+    if @participant_event.withdrawn? || @participant_event.rejected?
+      redirect_to dashboard_path
+      return
+    end
+
+    unless submitted?
+      redirect_to onboarding_path(event_id: current_event.id)
+      return
+    end
+
+    @participant = @participant_event.participant
+    @completion = RegistrationCompletionPresenter.new(@participant_event, viewer: :participant)
   end
 
   def show
@@ -68,11 +105,20 @@ class OnboardingController < ApplicationController
 
     # Handle autosave requests - save without validation or advancing
     if params[:autosave] == "true"
-      autosave_step_data
-      return render json: { success: true, saved_at: Time.current.iso8601 }
+      result = autosave_step_data
+      status = result[:success] ? :ok : :unprocessable_content
+      return render json: result.merge(saved_at: Time.current.iso8601), status: status
     end
 
     if save_step_data
+      # Held at the profile step (see #hold_at_profile_if_too_old): the rest
+      # of the profile saved, but they go no further until staff correct the
+      # birthday.
+      if @step == "profile" && @participant_event.too_old_for_event?
+        redirect_to onboarding_step_path(step: "profile", event_id: current_event.id), notice: "Progress saved."
+        return
+      end
+
       advance_to_next_step
       next_step = steps[@participant_event.onboarding_step]
 
@@ -103,6 +149,8 @@ class OnboardingController < ApplicationController
       @medical.present? && @dietary.present? && @accessibility.present?
     when "documents"
       !@documents.nil?
+    when ACCOUNTS_STEP
+      !@account_modes.nil?
     else
       false
     end
@@ -135,6 +183,9 @@ class OnboardingController < ApplicationController
 
   def waiver_complete
     @consent = @participant_event.consents.waiver.first
+    # The webhook marks it signed too, but it can land after this redirect and
+    # the done screen would ask them to sign again. Pull it from the API now.
+    @consent.sync_from_docuseal! if @consent && !@consent.participant_portion_signed?
 
     pending_docs = @participant_event.pending_custom_documents.select(&:participant_signs?)
     if pending_docs.any?
@@ -143,9 +194,7 @@ class OnboardingController < ApplicationController
       return
     end
 
-    # The webhook will mark it as signed, but we redirect immediately
-    # so we just go back to dashboard and let them see the updated status
-    redirect_to dashboard_path, notice: "Thank you for signing! Your waiver is being processed."
+    redirect_after_submit
   end
 
   # Fired by the documents step when an embedded DocuSeal form completes (or
@@ -271,6 +320,12 @@ class OnboardingController < ApplicationController
       return
     end
 
+    if (missing = missing_required_accounts).any?
+      redirect_to onboarding_step_path(step: ACCOUNTS_STEP, event_id: current_event.id),
+                  alert: "Please connect your #{missing.map { |provider| AccountLinking.provider_name(provider) }.to_sentence} account before submitting."
+      return
+    end
+
     unless params[:code_of_conduct_accepted] == "1" && params[:code_of_conduct_signature].present?
       redirect_to onboarding_step_path(step: REVIEW_STEP, event_id: current_event.id), alert: "You must accept the Code of Conduct and Safeguarding Policy and provide your signature."
       return
@@ -298,13 +353,13 @@ class OnboardingController < ApplicationController
       # bailed on the missing code of conduct, so accepting it here can be the
       # last piece; nothing else would re-check.
       if @participant_event.mark_complete_if_eligible!
-        redirect_to dashboard_path, notice: completion_notice("Registration submitted — you're all set!")
+        redirect_after_submit
       elsif current_event.guardian_invites_locked? || Setting.waiver_sending_paused?
-        redirect_to dashboard_path, notice: completion_notice("Registration submitted! We'll notify you when waivers are ready to sign.")
+        redirect_after_submit
       elsif waiver_participant_portion_signed?
         # Already signed during the documents step
         send_guardian_invites
-        redirect_to dashboard_path, notice: completion_notice("Registration submitted! We've invited your guardian to complete their portion.")
+        redirect_after_submit
       else
         trigger_minor_waiver
         send_guardian_invites
@@ -322,12 +377,12 @@ class OnboardingController < ApplicationController
       @participant_event.safeguarding_info || @participant_event.create_safeguarding_info!
 
       if current_event.guardian_invites_locked? || Setting.waiver_sending_paused?
-        redirect_to dashboard_path, notice: completion_notice("Registration submitted! We'll notify you when waivers are ready to sign.")
+        redirect_after_submit
       elsif waiver_participant_portion_signed?
         # Already signed during the documents step — completion lands via
         # webhook/sync now that the code of conduct is accepted.
         @participant_event.mark_complete_if_eligible!
-        redirect_to dashboard_path, notice: completion_notice("Registration submitted — you're all set!")
+        redirect_after_submit
       else
         trigger_adult_waiver
         redirect_to onboarding_waiver_path(event_id: current_event.id), notice: completion_notice("Almost done! Please sign the waiver to complete your registration.")
@@ -336,6 +391,10 @@ class OnboardingController < ApplicationController
   end
 
   private
+
+  def apply_event_brand
+    @page_brand = current_event.brand_theme
+  end
 
   def load_participant_event
     participant = current_user.participant
@@ -355,8 +414,8 @@ class OnboardingController < ApplicationController
       backfill_participant_from_oidc(participant)
     else
       # Use placeholder values for required fields if OIDC claims are missing
-      participant.legal_first_name ||= "Unknown"
-      participant.legal_last_name ||= "Unknown"
+      participant.legal_first_name ||= Participant::NAME_PLACEHOLDER
+      participant.legal_last_name ||= Participant::NAME_PLACEHOLDER
       participant.save(validate: false)
     end
 
@@ -368,8 +427,11 @@ class OnboardingController < ApplicationController
     @participant_event = ParticipantEvent.find_by(participant: participant, event: current_event)
 
     unless @participant_event
+      # Held invitations don't count: they haven't been sent, so the
+      # participant has nothing to act on yet.
       has_invitation = Invitation.where(event: current_event)
                                  .for_email(current_user.email)
+                                 .sent
                                  .where("expires_at > ? OR accepted_at IS NOT NULL", Time.current)
                                  .exists?
 
@@ -378,11 +440,15 @@ class OnboardingController < ApplicationController
         return
       end
 
+      # Like an integration's invitation, a birthday already on file that ages
+      # them out doesn't block the registration: onboarding holds them at the
+      # profile step instead (see #hold_at_profile_if_too_old).
       @participant_event = ParticipantEvent.create!(
         participant: participant,
         event: current_event,
         status: :in_progress,
-        onboarding_step: 0
+        onboarding_step: 0,
+        skip_age_check: true
       )
 
       # Apply any group memberships specified at invite time
@@ -400,6 +466,11 @@ class OnboardingController < ApplicationController
       end
     end
 
+    if @participant_event.onboarding_held?
+      redirect_to dashboard_path, alert: "Registration for #{current_event.name} isn't open yet. We'll email you as soon as it is."
+      return
+    end
+
     # CSV-imported participants start with status "invited" — transition to
     # "in_progress" now that they've actually begun onboarding.
     @participant_event.update!(status: :in_progress) if @participant_event.invited?
@@ -409,13 +480,14 @@ class OnboardingController < ApplicationController
     case @step
     when "profile"
       @participant = @participant_event.participant
+      load_identity_correction
     when "travel"
       @travel_inbound = @participant_event.travel_inbound || @participant_event.travels.build(direction: "inbound")
       @travel_inbound.travel_legs.build(position: 0) if @travel_inbound.travel_legs.empty?
       @travel_outbound = @participant_event.travel_outbound || @participant_event.travels.build(direction: "outbound")
       @travel_outbound.travel_legs.build(position: 0) if @travel_outbound.travel_legs.empty?
-      @default_inbound_date = current_event.starts_at&.to_date&.strftime("%Y-%m-%d")
-      @default_outbound_date = current_event.ends_at&.to_date&.strftime("%Y-%m-%d")
+      @default_inbound_date = current_event.local_start_date&.strftime("%Y-%m-%d")
+      @default_outbound_date = current_event.local_end_date&.strftime("%Y-%m-%d")
     when "accommodation"
       @accommodation = @participant_event.accommodation || @participant_event.build_accommodation
     when "health"
@@ -428,6 +500,8 @@ class OnboardingController < ApplicationController
       @guardian = @existing_gpe&.guardian || Guardian.new
     when "emergency"
       load_emergency_step_data
+    when ACCOUNTS_STEP
+      load_accounts_step_data
     when "documents"
       load_documents_step_data
     when "review"
@@ -445,23 +519,35 @@ class OnboardingController < ApplicationController
     @accessibility = @participant_event.accessibility
     @guardians = @participant_event.guardian_participant_events.includes(:guardian)
     @emergency_contacts = @participant_event.emergency_contacts.by_priority
+    load_accounts_step_data if current_event.account_linking_step?
   end
 
   def save_step_data
     case @step
     when "profile"
-      @participant = @participant_event.participant
-      @participant.assign_attributes(profile_params)
+      load_identity_correction
+      birthday_locked = @participant_event.too_old_for_event?
+      @participant = assign_profile_attributes(profile_params)
       if profile_params[:tshirt_size].blank?
         flash.now[:alert] = "Please select a t-shirt size"
         return false
       end
       # The profile form has no error summary, so say what was actually wrong
       # (e.g. an email that belongs to this participant's guardian).
-      return true if @participant.save
+      unless @participant.save
+        flash.now[:alert] = @participant.errors.full_messages.to_sentence
+        return false
+      end
 
-      flash.now[:alert] = @participant.errors.full_messages.to_sentence
-      false
+      # Saved even so: it's what they told us. From here the birthday is
+      # locked and they can only ask staff to correct it. Someone already
+      # held can still save the rest of their profile (see #update).
+      if !birthday_locked && @participant_event.too_old_for_event?
+        flash.now[:alert] = "You will be 19 or older during this event, so you can't continue registering."
+        return false
+      end
+
+      true
     when "travel"
       save_travel_data
     when "accommodation"
@@ -472,6 +558,8 @@ class OnboardingController < ApplicationController
       save_guardian_data
     when "emergency"
       save_emergency_data
+    when ACCOUNTS_STEP
+      save_accounts_step
     when "documents"
       save_documents_step
     when "review"
@@ -486,24 +574,101 @@ class OnboardingController < ApplicationController
       # field on every save, so attaching here would purge and recreate the
       # attachment each time — two overlapping autosaves then deadlock deleting
       # the same active_storage_attachments row. The photo is attached on submit.
-      @participant_event.participant.update(profile_params.except(:headshot))
+      #
+      # Autosave never ages someone out either: a date field reports the year
+      # as it's typed ("0002", "0020", "0200"), and saving one of those would
+      # lock the birthday mid-keystroke. Submitting the form saves it.
+      participant = assign_profile_attributes(profile_params.except(:headshot))
+      participant.restore_attributes([ :date_of_birth ]) if participant.date_of_birth_changed? && @participant_event.too_old_for_event?
+      autosave_record(participant, {})
     when "travel"
       autosave_travel_data
     when "accommodation"
       accommodation = @participant_event.accommodation || @participant_event.build_accommodation
-      accommodation.update(accommodation_params)
+      persist_autosave_records([ [ accommodation, accommodation_params, "Accommodation" ] ])
     when "health"
       medical = @participant_event.medical || @participant_event.build_medical
       dietary = @participant_event.dietary || @participant_event.build_dietary
       accessibility = @participant_event.accessibility || @participant_event.build_accessibility
-      medical.update(health_medical_params)
-      dietary.update(health_dietary_params)
-      accessibility.update(health_accessibility_params)
+      persist_autosave_records([
+        [ medical, health_record_params(medical, health_medical_params), "Medical information" ],
+        [ dietary, health_record_params(dietary, health_dietary_params), "Dietary information" ],
+        [ accessibility, health_record_params(accessibility, health_accessibility_params), "Accessibility information" ]
+      ])
     when "guardian"
       autosave_guardian_data
     when "emergency"
-      @participant_event.update(emergency_contacts_params) if params["[emergency_contacts]"].present?
+      if params["[emergency_contacts]"].present?
+        persist_autosave_records([ [ @participant_event, emergency_contacts_params, "Emergency contacts" ] ])
+      else
+        autosave_success
+      end
+    else
+      autosave_success
     end
+  end
+
+  def autosave_record(record, attributes, label: nil)
+    return { success: true, errors: [] } if record.update(attributes)
+
+    errors = record.errors.full_messages
+    errors = errors.map { |error| "#{label}: #{error}" } if label
+    { success: false, errors: errors }
+  end
+
+  def persist_autosave_records(records)
+    records.each { |record, attributes, _label| record.assign_attributes(attributes) }
+    valid = records.map { |record, _attributes, _label| record.valid? }.all?
+
+    unless valid
+      errors = records.flat_map do |record, _attributes, label|
+        autosave_record_errors(record, label)
+      end
+      return { success: false, errors: errors }
+    end
+
+    ActiveRecord::Base.transaction do
+      records.each { |record, _attributes, _label| record.save! }
+    end
+
+    autosave_success
+  end
+
+  # Saves records one at a time in a single transaction, so a later record can
+  # depend on an earlier one's id. Pass a lambda for a record that has to be
+  # built after the records before it are saved. The first failure rolls back.
+  def persist_autosave_records_in_order(records)
+    errors = nil
+
+    ActiveRecord::Base.transaction do
+      records.each do |record, attributes, label|
+        record = record.call if record.respond_to?(:call)
+        record.assign_attributes(attributes)
+        next if record.save
+
+        errors = autosave_record_errors(record, label)
+        raise ActiveRecord::Rollback
+      end
+    end
+
+    errors ? { success: false, errors: errors } : autosave_success
+  end
+
+  def autosave_record_errors(record, label)
+    errors = record.errors.full_messages.map { |error| "#{label}: #{error}" }
+
+    if record.is_a?(Travel)
+      record.travel_legs.each_with_index do |leg, index|
+        direction = record.inbound? ? "Arrival" : "Departure"
+        errors.concat(leg.errors.full_messages.map { |error| "#{direction} flight leg #{index + 1}: #{error}" })
+      end
+    end
+
+    errors
+  end
+
+  def autosave_success(pending: [])
+    { success: true, errors: [], pending: pending }
   end
 
   def autosave_travel_data
@@ -517,6 +682,9 @@ class OnboardingController < ApplicationController
     inbound_params.delete(:travel_legs_attributes) if inbound_params[:mode] != "plane"
     outbound_params.delete(:travel_legs_attributes) if outbound_params[:mode] != "plane"
 
+    pending = []
+    pending << "new_flight_legs" if new_flight_legs_present?(inbound_params) || new_flight_legs_present?(outbound_params)
+
     # For autosave, only update existing legs (those with IDs) to prevent duplicates.
     # New legs without IDs will only be created on final form submission.
     filter_new_legs!(inbound_params)
@@ -526,8 +694,19 @@ class OnboardingController < ApplicationController
     normalize_leg_times!(inbound_params)
     normalize_leg_times!(outbound_params)
 
-    inbound.update(inbound_params) if inbound_params[:mode].present?
-    outbound.update(outbound_params) if outbound_params[:mode].present?
+    result = persist_autosave_records([
+      [ inbound, inbound_params, "Arrival travel" ],
+      [ outbound, outbound_params, "Departure travel" ]
+    ])
+    result[:pending] = pending
+    result
+  end
+
+  def new_flight_legs_present?(travel_params)
+    travel_params[:travel_legs_attributes]&.values&.any? do |leg_attrs|
+      leg_attrs[:id].blank? && leg_attrs[:_destroy] != "1" &&
+        leg_attrs.except(:id, :position, :_destroy).values.any?(&:present?)
+    end
   end
 
   def filter_new_legs!(travel_params)
@@ -539,8 +718,6 @@ class OnboardingController < ApplicationController
   end
 
   def autosave_guardian_data
-    return if params[:guardian_email].blank?
-
     guardian_attrs = {
       legal_first_name: params[:guardian_first_name],
       legal_last_name: params[:guardian_last_name],
@@ -551,29 +728,113 @@ class OnboardingController < ApplicationController
     # Skip autosave if guardian phone matches participant phone
     if guardian_attrs[:phone].present? && @participant_event.participant.phone.present?
       guardian_phone_e164 = PhoneNormalizer.normalize(guardian_attrs[:phone])
-      return if guardian_phone_e164 && guardian_phone_e164 == @participant_event.participant.phone
+      if guardian_phone_e164 && guardian_phone_e164 == @participant_event.participant.phone
+        return { success: false, errors: [ "Guardian phone number cannot be the same as the participant's phone number." ] }
+      end
     end
 
     # Same for the email: half-typed addresses pass through here on every
     # keystroke, so this stays silent and lets the submit path do the telling.
-    return if guardian_email_matches_participant?(guardian_attrs[:email])
+    if guardian_email_matches_participant?(guardian_attrs[:email])
+      return { success: false, errors: [ "Guardian email address cannot be the same as the participant's email address." ] }
+    end
 
     relationship = params[:guardian_relationship]
     relationship = params[:guardian_relationship_other] if relationship == "Other"
 
     existing_gpe = @participant_event.guardian_participant_events.first
     if existing_gpe
-      existing_gpe.guardian.update(guardian_attrs)
-      existing_gpe.update(relationship: relationship) if relationship.present?
+      guardian = existing_gpe.guardian
+
+      if guardian_shared?(guardian)
+        unless guardian_details_match?(guardian, guardian_attrs)
+          return { success: false, errors: [ SHARED_GUARDIAN_MISMATCH_MESSAGE ] }
+        end
+
+        return persist_autosave_records([
+          [ existing_gpe, { relationship: relationship }, "Guardian relationship" ]
+        ])
+      end
+
+      if guardian_autosave_email_locked?(guardian, guardian_attrs[:email])
+        return { success: false, errors: [ GUARDIAN_EMAIL_LOCKED_MESSAGE ] }
+      end
+
+      persist_autosave_records([
+        [ guardian, guardian_attrs, "Guardian" ],
+        [ existing_gpe, { relationship: relationship }, "Guardian relationship" ]
+      ])
     else
-      guardian = Guardian.find_or_initialize_by(email: guardian_attrs[:email])
-      guardian.assign_attributes(guardian_attrs)
-      if guardian.save
-        relationship = params[:guardian_relationship]
-        relationship = params[:guardian_relationship_other] if relationship == "Other"
-        @participant_event.guardian_participant_events.create(guardian: guardian, relationship: relationship)
+      guardian = find_guardian_by_email(guardian_attrs[:email])
+
+      if guardian
+        unless guardian_details_match?(guardian, guardian_attrs)
+          return { success: false, errors: [ SHARED_GUARDIAN_MISMATCH_MESSAGE ] }
+        end
+
+        gpe = @participant_event.guardian_participant_events.build(guardian: guardian, relationship: relationship)
+        persist_autosave_records([ [ gpe, {}, "Guardian relationship" ] ])
+      else
+        guardian = Guardian.new
+        # The link validates guardian_id, which a new guardian only has once
+        # saved, so the link is built after the guardian rather than alongside it.
+        persist_autosave_records_in_order([
+          [ guardian, guardian_attrs, "Guardian" ],
+          [ -> { @participant_event.guardian_participant_events.build(guardian: guardian, relationship: relationship) }, {}, "Guardian relationship" ]
+        ])
       end
     end
+  end
+
+  GUARDIAN_EMAIL_LOCKED_MESSAGE = "This guardian's email cannot be changed here after access or consent was issued. Please ask event staff to correct it.".freeze
+  SHARED_GUARDIAN_MISMATCH_MESSAGE = "A guardian with this email address is already on file with different details. Please check the address, or ask event staff to correct the guardian's details.".freeze
+
+  # Guardian rows are shared: two siblings registering with the same parent
+  # link to one row, and that row's contact details are what the portal centre
+  # verifies ownership against. Typing a guardian's email proves nothing about
+  # being that guardian, so onboarding may only rewrite a row that is linked to
+  # this registration alone. Anyone else's row is linked to as-is, and only
+  # when the typed details agree with what is already on file.
+  def guardian_shared?(guardian)
+    return false unless guardian.persisted?
+
+    guardian.guardian_participant_events.where.not(participant_event_id: @participant_event.id).exists?
+  end
+
+  def find_guardian_by_email(email)
+    return nil if email.blank?
+
+    Guardian.where("LOWER(email) = ?", email.to_s.strip.downcase).first
+  end
+
+  def guardian_details_match?(guardian, attrs)
+    return false unless guardian.email.to_s.strip.casecmp?(attrs[:email].to_s.strip)
+    return false unless guardian.legal_first_name.to_s.strip.casecmp?(attrs[:legal_first_name].to_s.strip)
+    return false unless guardian.legal_last_name.to_s.strip.casecmp?(attrs[:legal_last_name].to_s.strip)
+    return true if attrs[:phone].blank?
+
+    PhoneNormalizer.normalize(attrs[:phone]) == PhoneNormalizer.normalize(guardian.phone)
+  end
+
+  def guardian_autosave_email_locked?(guardian, requested_email)
+    return false if guardian.email.to_s.strip.casecmp?(requested_email.to_s.strip)
+
+    links = guardian.guardian_participant_events
+    access_issued = links.where.not(invite_token_sent_at: nil)
+      .or(links.where.not(invite_last_used_at: nil))
+      .exists?
+    consent_recorded = links.where.not(accepted_at: nil)
+      .or(links.where.not(completed_at: nil))
+      .or(links.where.not(participant_info_reviewed_at: nil))
+      .or(links.where.not(emergency_medical_consent: nil))
+      .or(links.where.not(otc_medication_consent: nil))
+      .or(links.where.not(media_permission: nil))
+      .or(links.where.not(photo_permission: nil))
+      .or(links.where.not(travel_permission: nil))
+      .or(links.where.not(status: "pending"))
+      .exists?
+
+    access_issued || consent_recorded || Consent.where(guardian_participant_event_id: links.select(:id)).exists?
   end
 
   def save_travel_data
@@ -585,18 +846,8 @@ class OnboardingController < ApplicationController
 
     errors = []
 
-    # Validate required fields
-    if inbound_params[:mode].blank?
-      errors << "Please select how you're travelling to Vienna"
-    else
-      errors.concat(validate_travel_mode_fields(inbound_params, "Arrival"))
-    end
-
-    if outbound_params[:mode].blank?
-      errors << "Please select how you're leaving Vienna"
-    else
-      errors.concat(validate_travel_mode_fields(outbound_params, "Departure"))
-    end
+    errors << "Please choose the status of your arrival travel" if inbound_params[:arrangement_status].blank?
+    errors << "Please choose the status of your departure travel" if outbound_params[:arrangement_status].blank?
 
     # Skip saving legs if not plane mode
     if inbound_params[:mode] != "plane"
@@ -626,8 +877,17 @@ class OnboardingController < ApplicationController
       return false
     end
 
-    inbound_saved = @travel_inbound.save
-    outbound_saved = @travel_outbound.save
+    inbound_saved = false
+    outbound_saved = false
+    Travel.transaction do
+      if @travel_inbound.valid? && @travel_outbound.valid?
+        @travel_inbound.save!
+        @travel_outbound.save!
+        inbound_saved = outbound_saved = true
+      else
+        raise ActiveRecord::Rollback
+      end
+    end
 
     if inbound_saved && outbound_saved && um_declared && params[:um_proof].present?
       @participant_event.um_proof.attach(params[:um_proof])
@@ -651,7 +911,8 @@ class OnboardingController < ApplicationController
   end
 
   def um_declared_in?(travel_params)
-    travel_params[:mode] == "plane" &&
+    travel_params[:arrangement_status] == "confirmed" &&
+      travel_params[:mode] == "plane" &&
       ActiveRecord::Type::Boolean.new.cast(travel_params[:is_unaccompanied_minor])
   end
 
@@ -748,11 +1009,22 @@ class OnboardingController < ApplicationController
     @dietary = @participant_event.dietary || @participant_event.build_dietary
     @accessibility = @participant_event.accessibility || @participant_event.build_accessibility
 
-    @medical.assign_attributes(health_medical_params)
-    @dietary.assign_attributes(health_dietary_params)
-    @accessibility.assign_attributes(health_accessibility_params)
+    records = [
+      [ @medical, health_record_params(@medical, health_medical_params), "Medical information" ],
+      [ @dietary, health_record_params(@dietary, health_dietary_params), "Dietary information" ],
+      [ @accessibility, health_record_params(@accessibility, health_accessibility_params), "Accessibility information" ]
+    ]
 
-    @medical.save && @dietary.save && @accessibility.save
+    records.each { |record, attributes, _label| record.assign_attributes(attributes) }
+    unless records.all? { |record, _attributes, _label| record.valid? }
+      flash.now[:alert] = records.flat_map { |record, _attributes, label|
+        record.errors.full_messages.map { |error| "#{label}: #{error}" }
+      }.to_sentence
+      return false
+    end
+
+    ActiveRecord::Base.transaction { records.each { |record, _attributes, _label| record.save! } }
+    true
   end
 
   def save_guardian_data
@@ -789,6 +1061,23 @@ class OnboardingController < ApplicationController
 
     if existing_gpe
       guardian = existing_gpe.guardian
+
+      # See guardian_shared?: a row other registrations link to is never
+      # rewritten from here, and the typed details have to match it.
+      if guardian_shared?(guardian)
+        unless guardian_details_match?(guardian, guardian_attrs)
+          flash.now[:alert] = SHARED_GUARDIAN_MISMATCH_MESSAGE
+          return false
+        end
+
+        return existing_gpe.update(relationship: relationship)
+      end
+
+      if guardian_autosave_email_locked?(guardian, guardian_attrs[:email])
+        flash.now[:alert] = GUARDIAN_EMAIL_LOCKED_MESSAGE
+        return false
+      end
+
       guardian.assign_attributes(guardian_attrs)
 
       if guardian.save
@@ -799,15 +1088,20 @@ class OnboardingController < ApplicationController
         false
       end
     else
-      guardian = Guardian.find_or_initialize_by(email: guardian_attrs[:email])
-      guardian.assign_attributes(guardian_attrs)
+      guardian = find_guardian_by_email(guardian_attrs[:email])
 
-      if guardian.save
-        gpe = @participant_event.guardian_participant_events.create(guardian: guardian, relationship: relationship)
-        gpe.persisted?
+      if guardian
+        unless guardian_details_match?(guardian, guardian_attrs)
+          flash.now[:alert] = SHARED_GUARDIAN_MISMATCH_MESSAGE
+          return false
+        end
       else
-        false
+        guardian = Guardian.new(guardian_attrs)
+        return false unless guardian.save
       end
+
+      gpe = @participant_event.guardian_participant_events.create(guardian: guardian, relationship: relationship)
+      gpe.persisted?
     end
   end
 
@@ -830,9 +1124,45 @@ class OnboardingController < ApplicationController
     )
   end
 
+  # A birthday that ages the participant out is locked: changing it to one
+  # that doesn't would let anyone past the age limit by retyping a year, so
+  # it goes through staff as a change request instead. The lock is applied
+  # to the attribute rather than the param keys, because Rails also accepts
+  # a date as date_of_birth(1i), (2i) and (3i).
+  def assign_profile_attributes(attributes)
+    participant = @participant_event.participant
+    locked = @participant_event.too_old_for_event?
+    participant.assign_attributes(attributes)
+    participant.restore_attributes([ :date_of_birth ]) if locked
+    participant
+  end
+
+  # Someone 19 or older by the end of the event can't attend. Their birthday
+  # may have come from an integration's invitation (see
+  # ParticipantEvent#skip_age_check) or from their own profile. Either way
+  # they stay on the profile step, where they can ask staff to correct it.
+  def hold_at_profile_if_too_old
+    return unless @participant_event.too_old_for_event?
+    # Only the profile step itself is exempt; the step is a path segment on
+    # these two routes, so a query string can't borrow it on another action.
+    return if %w[show update].include?(action_name) && params[:step] == "profile"
+
+    redirect_to onboarding_step_path(step: "profile", event_id: current_event.id)
+  end
+
+  # The newest identity correction, so the profile step can say whether one
+  # is already with staff or what staff asked for.
+  def load_identity_correction
+    @identity_correction = @participant_event.registration_change_requests
+      .signed_identity
+      .where(requested_by: current_user)
+      .order(created_at: :desc)
+      .first
+  end
+
   def travel_params(direction)
     params.fetch("travel_#{direction}", {}).permit(
-      :mode, :carrier, :flight_number, :departure_city, :departure_time,
+      :arrangement_status, :mode, :carrier, :flight_number, :departure_city, :departure_time,
       :arrival_city, :arrival_time, :needs_pickup, :notes, :is_unaccompanied_minor,
       :train_departure_station, :train_arrival_station,
       :bus_departure_location, :bus_arrival_location,
@@ -850,25 +1180,52 @@ class OnboardingController < ApplicationController
   end
 
   def health_medical_params
-    params.permit(
-      :allergies, :medical_conditions, :medications,
-      :has_anaphylaxis_risk, :requires_refrigeration
-    )
+    health_scope_params(:medical, :allergies, :medical_conditions, :medications,
+                        :allergy_severity, :emergency_action_plan, :additional_notes, :has_anaphylaxis_risk,
+                        :requires_refrigeration, :section_response, :clear_details)
   end
 
   def health_dietary_params
-    permitted = params.permit(:diet_type, :intolerances, :life_threatening_allergies)
+    permitted = health_scope_params(:dietary, :diet_type, :intolerances, :life_threatening_allergies,
+                                    :notes, :cross_contamination_risk, :section_response, :clear_details)
     # Convert empty string to nil for enum field
     permitted[:diet_type] = nil if permitted[:diet_type].blank?
     permitted
   end
 
   def health_accessibility_params
-    params.permit(
+    health_scope_params(:accessibility,
       :has_adhd, :has_dyslexia, :has_autism, :neurodivergent_notes,
       :uses_wheelchair, :step_free_required, :needs_large_print,
-      :needs_captioning, :needs_sign_language, :other_needs
+      :needs_captioning, :needs_sign_language, :other_needs, :mobility_needs,
+      :sensory_needs, :communication_needs, :religious_practices,
+      :distance_limitations, :unavailable_times, :light_sensitivity,
+      :noise_sensitivity, :prayer_space_required, :requires_private_space,
+      :strobe_sensitivity, :section_response, :clear_details
     )
+  end
+
+  def health_scope_params(scope, *keys)
+    nested = params.fetch(scope, {})
+    return nested.permit(*keys) if nested.present?
+
+    params.permit(*keys)
+  end
+
+  def health_record_params(record, attributes)
+    values = attributes.to_h.symbolize_keys
+    clear = ActiveModel::Type::Boolean.new.cast(values.delete(:clear_details))
+    # A series that hides the privacy notes offers no private follow-up, so a
+    # new "private" answer is ignored; one already saved is kept.
+    if values[:section_response] == "private" && current_event.hide_privacy_notes? && !record.section_response_private?
+      values.delete(:section_response)
+    end
+    if values[:section_response] == "nothing_to_add" && clear
+      record.class.health_section_detail_fields.each do |field|
+        values[field] = record.class.health_section_boolean_fields.include?(field) ? false : nil
+      end
+    end
+    values
   end
 
   def load_emergency_step_data
@@ -932,6 +1289,7 @@ class OnboardingController < ApplicationController
       else
         s << EMERGENCY_STEP
       end
+      s << ACCOUNTS_STEP if current_event.account_linking_step?
       s << DOCUMENTS_STEP
       s << REVIEW_STEP
       s
@@ -947,6 +1305,30 @@ class OnboardingController < ApplicationController
 
   def all_steps_complete?
     @participant_event.onboarding_step >= steps.length - 1
+  end
+
+  def show_welcome?
+    @participant_event.onboarding_intro_seen_at.nil? &&
+      @participant_event.onboarding_step.zero?
+  end
+
+  # `complete` records the code of conduct before checking for a guardian or
+  # an emergency contact, so an accepted code of conduct alone doesn't mean
+  # the registration went through.
+  def submitted?
+    return false if @participant_event.code_of_conduct_accepted_at.blank?
+
+    if @participant_event.requires_guardian?
+      @participant_event.awaiting_guardian? || @participant_event.complete?
+    else
+      @participant_event.emergency_contacts.any?
+    end
+  end
+
+  # Submitting lands on the "you're registered" screen, which shows where
+  # the registration stands.
+  def redirect_after_submit
+    redirect_to onboarding_done_path(event_id: current_event.id)
   end
 
   def completion_notice(base)
@@ -967,7 +1349,7 @@ class OnboardingController < ApplicationController
   end
 
   def trigger_adult_waiver
-    consent = @participant_event.consents.find_or_create_by!(consent_type: :waiver) do |c|
+    consent = @participant_event.find_or_create_consent!(:waiver) do |c|
       c.status = :pending
     end
 
@@ -986,7 +1368,7 @@ class OnboardingController < ApplicationController
     guardian_participant_event = @participant_event.guardian_participant_events.first
     return unless guardian_participant_event
 
-    consent = @participant_event.consents.find_or_create_by!(consent_type: :waiver) do |c|
+    consent = @participant_event.find_or_create_consent!(:waiver) do |c|
       c.status = :pending
       c.guardian_participant_event = guardian_participant_event
     end
@@ -1104,7 +1486,7 @@ class OnboardingController < ApplicationController
       guardian_participant_event = @participant_event.guardian_participant_events.first
       return unless guardian_participant_event
 
-      consent = @participant_event.consents.find_or_create_by!(consent_type: :waiver) do |c|
+      consent = @participant_event.find_or_create_consent!(:waiver) do |c|
         c.status = :pending
         c.guardian_participant_event = guardian_participant_event
       end
@@ -1113,7 +1495,7 @@ class OnboardingController < ApplicationController
         DocusealJobs::CreateMinorWaiverJob.perform_later(consent.id)
       end
     else
-      consent = @participant_event.consents.find_or_create_by!(consent_type: :waiver) do |c|
+      consent = @participant_event.find_or_create_consent!(:waiver) do |c|
         c.status = :pending
       end
 
@@ -1157,34 +1539,123 @@ class OnboardingController < ApplicationController
     session[:invitation_token] = params[:invite]
   end
 
+  def prepare_invitation_entry
+    # A dashboard continuation is already tied to an authenticated registration
+    # and remains authoritative if an old invite token is still in the session.
+    if params[:event_id].present? && Event.exists?(id: params[:event_id])
+      session.delete(:invitation_token)
+      return
+    end
+
+    token = params[:invite] || session[:invitation_token]
+    return if token.blank?
+
+    @invitation = Invitation.find_by(token: token)
+    unless @invitation
+      session.delete(:invitation_token)
+      @invitation_entry_state = :invalid
+      @invitation_support_email = "team@hackclub.com"
+      render :invitation_entry, status: :not_found
+      return
+    end
+
+    prepare_invitation_presentation
+    @invitation_account_mismatch = user_signed_in? && !invitation_matches_current_user?
+
+    if @invitation.expired?
+      if user_signed_in? && !@invitation_account_mismatch && existing_invited_registration?
+        @resume_existing_invitation = true
+        return
+      end
+
+      @invitation_entry_state = :expired
+      render :invitation_entry, status: :gone
+      return
+    end
+
+    if @invitation.accepted?
+      if user_signed_in? && !@invitation_account_mismatch && existing_invited_registration?
+        @resume_existing_invitation = true
+        return
+      end
+
+      session.delete(:invitation_token) if user_signed_in? && !@invitation_account_mismatch
+      @invitation_entry_state = :used
+      render :invitation_entry, status: :gone
+      return
+    end
+
+    unless user_signed_in?
+      @invitation_entry_state = :sign_in
+      render :invitation_entry
+      return
+    end
+
+    return unless @invitation_account_mismatch
+
+    @invitation_entry_state = :email_mismatch
+    render :invitation_entry
+  end
+
   def process_invitation
     # First, check for explicit event_id parameter (used for "Continue Onboarding" links)
     if params[:event_id].present?
       event = Event.find_by(id: params[:event_id])
       if event
+        session.delete(:invitation_token)
         set_current_event(event)
         return
       end
+    end
+
+    if @resume_existing_invitation
+      session.delete(:invitation_token)
+      set_current_event(@invitation.event)
+      return
     end
 
     # Then, check for invitation token
     token = params[:invite] || session[:invitation_token]
     return unless token
 
-    invitation = Invitation.find_by(token: token)
+    invitation = @invitation || Invitation.find_by(token: token)
     return unless invitation
 
-    if invitation.expired?
-      redirect_to dashboard_path, alert: "This invitation has expired. Please contact the event organizers."
-      return
-    end
-
-    session[:invitation_token] = token
     set_current_event(invitation.event)
 
-    unless invitation.accepted?
-      invitation.accept! if current_user.email.downcase == invitation.email.downcase
+    invitation.accept! unless invitation.accepted?
+    session.delete(:invitation_token)
+  end
+
+  def prepare_invitation_presentation
+    @invitation_event = @invitation.event
+    @page_brand = @invitation_event.brand_theme
+    @invitation_support_email = @invitation_event.effective_support_email
+    @invitation_location = [
+      @invitation_event.venue_name,
+      @invitation_event.location_address,
+      @invitation_event.location_city,
+      @invitation_event.location_country
+    ].filter_map(&:presence).uniq.join(", ")
+    deadline = @invitation_event.registration_close_at
+    @invitation_deadline = deadline.in_time_zone(@invitation_event.event_time_zone)
+      .strftime("%B %-d, %Y at %-I:%M %p %Z") if deadline
+
+    participant = Participant.find_by("LOWER(email) = ?", @invitation.email.downcase)
+    @invitation_guardian_requirement = if participant&.date_of_birth
+      participant.minor_on?(@invitation_event.starts_at&.in_time_zone(@invitation_event.event_time_zone)&.to_date || Date.current) ? :minor : :adult
+    else
+      :unknown_age
     end
+  end
+
+  def invitation_matches_current_user?
+    current_user.email.to_s.casecmp?(@invitation.email)
+  end
+
+  def existing_invited_registration?
+    participant = current_user.participant || Participant.find_by("LOWER(email) = ?", current_user.email.to_s.downcase)
+    participant&.participant_events&.exists?(event: @invitation.event)
   end
 
   def backfill_participant_from_oidc(participant)
@@ -1192,8 +1663,8 @@ class OnboardingController < ApplicationController
     updates = {}
 
     # Only backfill fields that are blank/placeholder
-    updates[:legal_first_name] = oidc_attrs[:legal_first_name] if participant.legal_first_name.blank? || participant.legal_first_name == "Unknown"
-    updates[:legal_last_name] = oidc_attrs[:legal_last_name] if participant.legal_last_name.blank? || participant.legal_last_name == "Unknown"
+    updates[:legal_first_name] = oidc_attrs[:legal_first_name] if Participant.name_placeholder?(participant.legal_first_name)
+    updates[:legal_last_name] = oidc_attrs[:legal_last_name] if Participant.name_placeholder?(participant.legal_last_name)
     updates[:preferred_name] = oidc_attrs[:preferred_name] if participant.preferred_name.blank? && oidc_attrs[:preferred_name].present?
     updates[:phone] = oidc_attrs[:phone] if participant.phone.blank? && oidc_attrs[:phone].present?
     updates[:date_of_birth] = oidc_attrs[:date_of_birth] if participant.date_of_birth.blank? && oidc_attrs[:date_of_birth].present?

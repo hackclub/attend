@@ -22,6 +22,7 @@ class Participant < ApplicationRecord
   has_many :guardian_participant_events, through: :participant_events
   has_many :guardians, through: :guardian_participant_events
   has_many :sibling_memberships, dependent: :destroy
+  has_many :connected_accounts, dependent: :destroy
   has_many :sibling_groups, through: :sibling_memberships
 
   has_one_attached :headshot, dependent: :purge_later
@@ -104,13 +105,55 @@ class Participant < ApplicationRecord
   before_validation :normalize_public_profile_slug
   before_validation :generate_public_profile_slug, if: -> { public_profile_enabled? && public_profile_slug.blank? }
   after_update_commit :touch_participant_events
+  # Sign-in sync from Hack Club Auth, Slack OAuth and CSV import all land here.
+  after_update_commit :invite_to_slack_channels, if: -> { saved_change_to_slack_user_id? && slack_user_id.present? }
 
+  # Onboarding writes this into the required name fields when OIDC claims
+  # arrive without a name, so a row can carry it until the person registers.
+  NAME_PLACEHOLDER = "Unknown"
+  PENDING_NAME_LABEL = "Not registered yet"
+
+  def self.name_placeholder?(value)
+    value.blank? || value == NAME_PLACEHOLDER
+  end
+
+  # The subset of +attributes+ this participant has no real value for yet:
+  # blank fields, and legal names still on the placeholder. Backfills use it
+  # so they never overwrite something the person entered themselves.
+  def blank_attributes_only(attributes)
+    attributes.select do |field, _value|
+      current = public_send(field)
+      field.to_sym.in?(%i[legal_first_name legal_last_name]) ? self.class.name_placeholder?(current) : current.blank?
+    end
+  end
+
+  # True until the participant has given us any real legal name.
+  def name_pending?
+    known_legal_names.empty?
+  end
+
+  # Drops the placeholder so pending rows don't read "Unknown Unknown". The
+  # fallback is a neutral label rather than the email, since names end up in
+  # exports, badges and other places an address shouldn't.
   def full_name
-    "#{legal_first_name} #{legal_last_name}"
+    name_pending? ? PENDING_NAME_LABEL : known_legal_names.join(" ")
   end
 
   def display_name
     preferred_name.presence || full_name
+  end
+
+  # nil when we don't know what to call them, so mailers can fall back to
+  # "Hi there".
+  def greeting_name
+    preferred_name.presence || (legal_first_name unless self.class.name_placeholder?(legal_first_name))
+  end
+
+  # "?" for a pending participant, for avatar placeholders.
+  def initials
+    return "?" if name_pending?
+
+    known_legal_names.map { |name| name[0] }.join.upcase
   end
 
   def age_on(date)
@@ -142,8 +185,11 @@ class Participant < ApplicationRecord
     (sibling_group_ids & other_participant.sibling_group_ids).any?
   end
 
+  # Invitations this participant can act on. Held ones are left out: the
+  # participant hasn't been told about the event yet, and the dashboard must
+  # not be the way they find out.
   def pending_invitations
-    Invitation.pending.for_email(email).where.not(event_id: event_ids)
+    Invitation.pending.sent.for_email(email).where.not(event_id: event_ids)
   end
 
   # Events that may appear on the public profile: fully registered, actually
@@ -188,6 +234,20 @@ class Participant < ApplicationRecord
       .order(starts_at: :desc)
   end
 
+  # The registration a "Connect Slack" link is signed for; the OAuth callback
+  # invites to that event's channel. Prefers the live or soonest upcoming event
+  # the participant is still going to, then the most recent one that ended.
+  # Withdrawn and rejected registrations count only when there's nothing else,
+  # so linking Slack still works for them.
+  def slack_connect_participant_event
+    registrations = participant_events.includes(:event).to_a
+    active = registrations.reject { |pe| pe.withdrawn? || pe.rejected? }
+    registrations = active if active.any?
+
+    ended, current = registrations.partition { |pe| pe.event.phase_at == :ended }
+    current.min_by { |pe| slack_connect_rank(pe) } || ended.max_by { |pe| pe.event.ends_at }
+  end
+
   # Verified through Hack Club Auth identity verification.
   def hca_verified?
     user&.hca_verified? || false
@@ -208,6 +268,10 @@ class Participant < ApplicationRecord
   end
 
   private
+
+  def known_legal_names
+    [ legal_first_name, legal_last_name ].reject { |name| self.class.name_placeholder?(name) }
+  end
 
   def travel_calendar_event_ids
     ParticipantEvent.where(participant_id: id).distinct.pluck(:event_id)
@@ -231,6 +295,30 @@ class Participant < ApplicationRecord
 
   def touch_participant_events
     participant_events.touch_all
+  end
+
+  # Most- to least-committed registration.
+  SLACK_CONNECT_STATUS_ORDER = %w[complete awaiting_guardian in_progress invited withdrawn rejected].freeze
+
+  # Sort key for #slack_connect_participant_event. A registration the person
+  # has actually taken up beats one they were only invited to, so an untouched
+  # import for a sooner event can't win. Then the live or soonest upcoming
+  # event. An event with a start date but no end date never leaves :live, so
+  # once its start has passed it sorts with the undated ones rather than
+  # beating a real upcoming event on a start date from years ago.
+  def slack_connect_rank(participant_event)
+    event = participant_event.event
+    dated = event.starts_at.present? && (event.ends_at.present? || !event.starts_at.past?)
+
+    [ SLACK_CONNECT_STATUS_ORDER.index(participant_event.status) || SLACK_CONNECT_STATUS_ORDER.size,
+      dated ? 0 : 1,
+      event.starts_at.to_i ]
+  end
+
+  def invite_to_slack_channels
+    participant_events.complete.joins(:event).where.not(events: { slack_channel_id: [ nil, "" ] }).pluck(:id).each do |participant_event_id|
+      InviteToEventSlackChannelJob.perform_later(participant_event_id)
+    end
   end
 
   def email_differs_from_guardians

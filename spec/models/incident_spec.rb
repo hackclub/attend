@@ -7,7 +7,7 @@ RSpec.describe Incident, type: :model do
   let(:participant_event) { create(:participant_event, event: event) }
 
   def build_incident(**attrs)
-    event.incidents.build(reported_by: reporter, category: "medical", severity: "low", **attrs)
+    event.incidents.build(reported_by: reporter, category: "medical", severity: "s3", **attrs)
   end
 
   describe "medical incidents" do
@@ -59,7 +59,7 @@ RSpec.describe Incident, type: :model do
 
   describe "non-medical incidents" do
     it "does not require a participant or staff member" do
-      expect(event.incidents.build(reported_by: reporter, category: "behavior", severity: "low")).to be_valid
+      expect(event.incidents.build(reported_by: reporter, category: "behavior", severity: "s3")).to be_valid
     end
 
     it "clears medications left over from a medical category" do

@@ -11,22 +11,37 @@
 #
 # `normalizes` runs on assignment and on write, not on load, so values already
 # in the database keep whatever text they hold until the record is next saved.
-# Readers that interpret legacy text — see Medical::NEGATIVE_RESPONSES, whose
-# list is deliberately broader than this one — still need to.
+# Readers that interpret legacy text — see meaningful_response?, whose list is
+# deliberately broader than this one — still need to.
 module ClearsNegativeResponses
   extend ActiveSupport::Concern
 
   # Deliberately narrow. Ambiguous answers ("nil", "-", "0") are left for a
   # human to read rather than silently dropped from a medical record.
-  BLANK_EQUIVALENTS = %w[no none n/a na].freeze
+  BLANK_EQUIVALENTS = [ "n/a", "na", "not applicable" ].freeze
 
-  # A trailing full stop is tolerated ("None.") because it is punctuation, not
-  # content. Anything else keeps the participant's own text, stripped.
+  # What a reader treats as "nothing to report". Broader than the write-time
+  # list because these answers stay in the record for a human to read; they
+  # just don't raise an allergy flag.
+  NEGATIVE_RESPONSES = [
+    "none", "no", "n/a", "na", "nil", "null", "nothing", "nope", "-", "0",
+    "no allergies", "no known allergies", "no food allergies", "nka"
+  ].freeze
+
+  def self.meaningful_response?(value)
+    return false if value.blank?
+
+    !NEGATIVE_RESPONSES.include?(value.strip.downcase)
+  end
+
+  # Only exact, case-insensitive placeholders are cleared. Anything else,
+  # including punctuation variants and ambiguous answers, remains data.
   NORMALIZER = lambda do |value|
-    text = value.to_s.strip
-    return nil if text.empty?
+    text = value.to_s
+    trimmed = text.strip
+    return nil if trimmed.empty?
 
-    BLANK_EQUIVALENTS.include?(text.downcase.delete_suffix(".")) ? nil : text
+    BLANK_EQUIVALENTS.include?(trimmed.downcase) ? nil : text
   end
 
   class_methods do

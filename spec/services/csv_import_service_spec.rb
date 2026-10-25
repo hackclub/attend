@@ -268,6 +268,7 @@ RSpec.describe CsvImportService do
 
         expect(ParticipantMailer).to have_received(:invitation).with(
           email: "minimal@example.com",
+          name: nil,
           event: event,
           participant: an_instance_of(Participant)
         )
@@ -310,6 +311,25 @@ RSpec.describe CsvImportService do
       expect(Participant.find_by(email: "xs@example.com").tshirt_size).to eq("XS")
       expect(Participant.find_by(email: "xl@example.com").tshirt_size).to eq("XL")
       expect(Participant.find_by(email: "xxl@example.com").tshirt_size).to eq("XXL")
+    end
+  end
+
+  describe "dietary answers that mention allergies" do
+    let(:dietary_csv) do
+      CSV.generate do |csv|
+        csv << [ "Email", "First Name", "Last Name", "Do you have any dietary requirements we need to know about?" ]
+        csv << [ "peanut@example.com", "Test", "Peanut", "Allergic to peanuts" ]
+        csv << [ "none@example.com", "Test", "None", "No allergies" ]
+      end
+    end
+
+    it "keeps a negative answer out of the life-threatening allergy field" do
+      service.import(dietary_csv)
+
+      allergic = Participant.find_by(email: "peanut@example.com").participant_events.first.dietary
+      negative = Participant.find_by(email: "none@example.com").participant_events.first.dietary
+      expect(allergic.life_threatening_allergies).to eq("Allergic to peanuts")
+      expect(negative).to have_attributes(life_threatening_allergies: nil, notes: "No allergies")
     end
   end
 

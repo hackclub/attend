@@ -1,7 +1,6 @@
 module Admin
   class AuditLogsController < BaseController
-    # Record types whose audit trail must honor Incident#visible_to_roles.
-    INCIDENT_RECORD_TYPES = %w[Incident IncidentComment].freeze
+    include IncidentAuditVisibility
 
     before_action :require_audit_access
     before_action :set_audit_log, only: [ :show ]
@@ -42,10 +41,14 @@ module Admin
     end
 
     def show
-      @record_versions = PaperTrail::Version
-        .where(item_type: @audit_log.record_type, item_id: @audit_log.record_id)
-        .order(created_at: :desc)
-        .limit(50)
+      @record_versions = if can_view_record_history?(@audit_log)
+        PaperTrail::Version
+          .where(item_type: @audit_log.record_type, item_id: @audit_log.record_id)
+          .order(created_at: :desc)
+          .limit(50)
+      else
+        PaperTrail::Version.none
+      end
     end
 
     # Raw PaperTrail feed across every record in the app. Versions carry no
@@ -102,40 +105,28 @@ module Admin
       return true if current_user.global_admin?
       return false unless audit_log.event_id.present? && current_user.event_admin_for?(audit_log.event)
 
+      # The same rows exclude_hidden_incident_logs lists: a reporter outside
+      # the incident's roles can open the row for what they filed, and nothing
+      # about the comments or edits that followed.
       case audit_log.record_type
       when "Incident"
-        visible_incident_ids.include?(audit_log.record_id)
+        casework_incident_ids.include?(audit_log.record_id) ||
+          (audit_log.record_create? && visible_incident_ids.include?(audit_log.record_id))
       when "IncidentComment"
         incident_id = IncidentComment.find_by(id: audit_log.record_id)&.incident_id
-        incident_id.present? && visible_incident_ids.include?(incident_id)
+        incident_id.present? && casework_incident_ids.include?(incident_id)
       else
         true
       end
     end
 
-    def exclude_hidden_incident_logs(scope)
-      scope.where.not(record_type: INCIDENT_RECORD_TYPES)
-        .or(scope.where(record_type: "Incident", record_id: visible_incident_ids))
-        .or(scope.where(record_type: "IncidentComment",
-          record_id: IncidentComment.where(incident_id: visible_incident_ids).select(:id)))
-    end
+    # The record history is every version of the record, so on an incident it
+    # is the timeline the incident page keeps from reporters.
+    def can_view_record_history?(audit_log)
+      return true if current_user.global_admin?
+      return true unless audit_log.record_type == "Incident"
 
-    # Incidents (across the user's events) whose visible_to_roles intersects
-    # the user's roles for that event — the same rule IncidentPolicy enforces,
-    # but computed for all events since audit logs span events.
-    def visible_incident_ids
-      @visible_incident_ids ||= begin
-        roles_by_event = current_user.event_role_assignments
-          .pluck(:event_id, :role)
-          .group_by(&:first)
-          .transform_values { |pairs| pairs.map(&:last) }
-
-        Incident.where(event_id: roles_by_event.keys)
-          .pluck(:id, :event_id, :visible_to_roles)
-          .filter_map do |id, event_id, visible_to_roles|
-            id if ((visible_to_roles || []) & roles_by_event[event_id]).any?
-          end
-      end
+      casework_incident_ids.include?(audit_log.record_id)
     end
 
     def require_audit_access

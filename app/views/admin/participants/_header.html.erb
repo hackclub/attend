@@ -4,12 +4,12 @@
       <%= image_tag @participant.headshot, class: "w-20 h-20 rounded-full object-cover border-2 border-gray-200" %>
     <% else %>
       <div class="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-medium text-2xl">
-        <%= @participant.legal_first_name[0] %><%= @participant.legal_last_name[0] %>
+        <%= @participant.initials %>
       </div>
     <% end %>
     <div>
       <div class="flex flex-wrap items-center gap-2 sm:gap-4">
-        <h1 class="text-2xl font-bold"><%= @participant.display_name %></h1>
+        <h1 class="text-2xl font-bold"><%= participant_name(@participant) %></h1>
         <%= render_display_status_badge(@participant_event) %>
         <%= render_blocking_step_badge(@participant_event) %>
         <% if current_event.groups_enabled? %>
@@ -31,7 +31,7 @@
         <% end %>
       </div>
       <% if @participant.preferred_name.present? %>
-        <p class="text-gray-600">Legal name: <%= @participant.full_name %></p>
+        <p class="text-gray-600">Legal name: <%= participant_name(@participant, legal: true) %></p>
       <% end %>
       <p class="text-gray-600">
         <%= @participant.email %>
@@ -49,9 +49,10 @@
     <div class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10 py-1" data-dropdown-target="menu">
       <%= link_to "Edit", edit_admin_event_participant_path(current_event, @participant_event), class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" %>
       <% if policy(@participant_event).update? && @participant_event.invitation_resendable? %>
-        <%= button_to "Resend Invitation", resend_invitation_admin_event_participant_path(current_event, @participant_event),
+        <% invitation_held = current_event.invitations.held.for_email(@participant.email).exists? %>
+        <%= button_to invitation_held ? "Send Invitation" : "Resend Invitation", resend_invitation_admin_event_participant_path(current_event, @participant_event),
             method: :post,
-            data: { turbo_confirm: "Resend the onboarding invitation to #{@participant.email}?" },
+            data: { turbo_confirm: invitation_held ? "#{@participant.email} hasn't been sent their onboarding invitation yet#{current_event.onboarding_invites_held? ? ' (this event is holding them)' : ''}. Send it now?" : "Resend the onboarding invitation to #{@participant.email}?" },
             class: "w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer" %>
       <% end %>
       <% if policy(@participant_event).merge_duplicate? %>
@@ -59,6 +60,13 @@
       <% end %>
       <% if @participant_event.participant.slack_user_id.present? %>
         <%= link_to "View on Slack", "https://hackclub.enterprise.slack.com/team/#{@participant_event.participant.slack_user_id}", target: "_blank", rel: "noopener noreferrer", class: "block px-4 py-2 text-sm text-purple-700 hover:bg-gray-50" %>
+        <button type="button"
+                data-controller="clipboard"
+                data-clipboard-content-value="<%= @participant_event.participant.slack_user_id %>"
+                data-action="click->clipboard#copy"
+                class="w-full text-left px-4 py-2 text-sm text-purple-700 hover:bg-gray-50 cursor-pointer">
+          Copy Slack ID
+        </button>
       <% end %>
       <% if policy(@participant_event).withdraw? || policy(@participant_event).destroy? %>
         <div class="border-t border-gray-100 my-1"></div>

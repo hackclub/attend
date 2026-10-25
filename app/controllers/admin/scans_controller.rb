@@ -48,8 +48,7 @@ module Admin
         .recent
         .limit(50)
 
-      @scan_contexts = current_event.scan_contexts
-      @default_scan_context = @scan_contexts.find { |c| c.checks_in? } || @scan_contexts.first
+      @scan_contexts = current_event.scan_contexts.to_a
     end
 
     def search
@@ -159,12 +158,15 @@ module Admin
       end
 
       participant = participant_event.participant
+      # Flags only: the allergy free text stays on the medical page.
+      food_safety = participant_event.food_safety_summary
 
       render json: {
         success: true,
         scan_id: scan.id,
         first_scan_in_context: first_scan_in_context,
         scanned_by: current_user.display_name_or_fallback,
+        scanned_at: scan.scanned_at.iso8601,
         scan_context: {
           id: scan_context.id,
           name: scan_context.name,
@@ -177,13 +179,21 @@ module Admin
           display_name: participant.display_name,
           full_name: participant.full_name,
           email: participant.email,
-          phone: participant.phone,
+          # The phone is omitted, not blanked, for PII-restricted roles; the
+          # scanner modal hides that row entirely for them.
+          **(can_view_participant_pii? ? { phone: participant.phone } : {}),
           pronouns: participant.pronouns,
           tshirt_size: participant.tshirt_size,
           status: participant_event.status,
-          has_anaphylaxis_risk: participant_event.medical&.has_anaphylaxis_risk || false,
+          display_status: participant_event.display_status,
+          has_anaphylaxis_risk: food_safety.anaphylaxis_risk?,
           requires_refrigeration: participant_event.medical&.requires_refrigeration || false,
-          dietary: participant_event.dietary&.diet_type,
+          dietary: food_safety.diet_type,
+          # Health-form allergies are a medical fact, so only roles that can
+          # open the medical summary learn whether there are any.
+          **(policy(participant_event.medical || Medical.new(participant_event: participant_event)).show? ? { has_allergies: food_safety.allergies? } : {}),
+          has_life_threatening_food_allergies: food_safety.life_threatening_food_allergies?,
+          cross_contamination_risk: food_safety.cross_contamination_risk?,
           show_url: admin_event_participant_path(current_event, participant_event),
           nfc_badge_token: current_event.nfc_badges_enabled? ? participant_event.nfc_badge_token : nil,
           nfc_badge_assigned: participant_event.nfc_badge_assigned?,
@@ -208,6 +218,13 @@ module Admin
             "LOWER(participants.email) LIKE :q",
             q: search_term
           )
+      end
+
+      # The participant profile links here for one person's scans. It filters by
+      # id rather than putting their email in the URL, which roles that can't
+      # see contact details must not be handed.
+      if params[:participant_event_id].present?
+        @scans = @scans.where(participant_event_id: params[:participant_event_id])
       end
 
       if params[:scan_context_id].present?

@@ -1,0 +1,11 @@
+<% content_for :title, "Change requests – #{current_event.name} – Attend" %>
+<div class="flex items-center justify-between mb-6"><div><h1 class="text-2xl font-bold">Registration change requests</h1><p class="text-sm text-gray-500"><%= current_event.name %></p></div></div>
+<div class="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+  <% @change_requests.each do |request_record| %>
+    <%= link_to admin_event_registration_change_request_path(current_event, request_record), class: "block p-4 hover:bg-gray-50" do %>
+      <div class="flex justify-between"><span class="font-medium"><%= request_record.participant.display_name %> · <%= request_record.kind.titleize %></span><span class="text-sm"><%= request_record.status.titleize %></span></div>
+      <% if request_record.support? %><p class="text-sm text-gray-600 mt-1"><%= truncate(request_record.requester_note, length: 160) %></p><% end %>
+    <% end %>
+  <% end %>
+  <% if @change_requests.empty? %><p class="p-8 text-center text-gray-500">No visible change requests.</p><% end %>
+</div>

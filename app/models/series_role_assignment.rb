@@ -44,4 +44,11 @@ class SeriesRoleAssignment < ApplicationRecord
   validates :role, presence: true
   validates :user_id, presence: true, uniqueness: { scope: :event_series_id }
   validates :event_series_id, presence: true
+
+  # Series members act as event admins on every event in the series; the job
+  # skips them if none of those events are still to come.
+  after_create_commit do
+    SyncAdminHelpSlackChannelJob.perform_later([ user_id ])
+    SyncOrgSupportSlackChannelJob.perform_later([ user_id ])
+  end
 end

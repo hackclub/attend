@@ -1,0 +1,14 @@
+<div id="sibling_group_<%= sibling_group.id %>" class="flex flex-wrap items-center justify-between gap-3 py-2 border-b border-(--cs-border-divider-secondary) last:border-b-0">
+  <div class="min-w-0">
+    <span class="font-bold">
+      <%= sibling_group.label.presence || "Sibling group" %>
+    </span>
+    <span class="cs-secondary ml-2">
+      <%= sibling_group.participants.map(&:display_name).join(", ") %>
+    </span>
+  </div>
+  <%= link_to "Remove",
+              admin_event_sibling_group_path(@event.slug, sibling_group),
+              data: { turbo_method: :delete, turbo_confirm: "Remove this sibling group?" },
+              class: "cs-btn cs-btn-link" %>
+</div>

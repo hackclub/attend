@@ -96,7 +96,7 @@
               </p>
             </div>
             <div class="p-4 bg-white">
-              <div class="prose prose-sm max-w-none">
+              <div class="text-sm leading-relaxed [&_p]:my-4 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_ul]:my-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_blockquote]:my-4 [&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-4 [&_a]:text-[#ec3750] [&_a]:underline">
                 <%= sanitize @message.body_as_html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
               </div>
             </div>
@@ -150,13 +150,13 @@
         <% if @message.scheduled_at.present? && @message.scheduled_at > Time.current %>
           <%= button_to "Schedule Message", send_now_admin_event_message_path(current_event, @message), 
               method: :post,
-              data: { confirm: "Schedule this message to be sent on #{@message.scheduled_at.strftime("%B %d at %l:%M %p")}?" },
+              form: { data: { turbo_confirm: "Schedule this message to be sent on #{@message.scheduled_at.strftime("%B %d at %l:%M %p")}?" } },
               class: "bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-6 rounded-lg",
               disabled: @total_count == 0 %>
         <% else %>
           <%= button_to "Send Now", send_now_admin_event_message_path(current_event, @message), 
               method: :post,
-              data: { confirm: "Send this message to #{@total_count} recipients now?" },
+              form: { data: { turbo_confirm: "Send this message to #{@total_count} recipients now?" } },
               class: "bg-[#d42f46] hover:bg-[#b82840] text-white font-semibold py-2 px-6 rounded-lg",
               disabled: @total_count == 0 %>
         <% end %>

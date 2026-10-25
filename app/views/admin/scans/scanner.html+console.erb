@@ -1,0 +1,1351 @@
+<% content_for :title, "Scanner – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Check-ins", admin_event_scans_path(current_event) ], [ "Scanner", nil ]) %>
+
+<%= content_for :head do %>
+  <script src="<%= asset_path("vendor/zxing.min.js") %>"></script>
+  <%# Turbo doesn't re-run scripts when it restores a cached snapshot, so a %>
+  <%# back-navigation would land on a dead preview. Opt out of the cache and %>
+  <%# every arrival here is a fresh render that boots the camera again. %>
+  <meta name="turbo-cache-control" content="no-cache">
+<% end %>
+
+<div class="cs-header">
+  <div class="cs-header-text">
+    <h1 class="cs-h1">Scanner</h1>
+    <p class="cs-description hidden sm:block">Check in participants by scanning QR codes or NFC tokens</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
+  <!-- Scanner -->
+  <section class="cs-container lg:col-span-2">
+    <div class="cs-container-header">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h2 class="cs-h2">Camera scanner</h2>
+        <div id="camera-status" class="cs-status cs-status-pending">
+          <span class="w-2 h-2 rounded-full bg-current" id="status-dot"></span>
+          <span id="status-text">Initializing...</span>
+        </div>
+        <button type="button" id="restart-camera-btn" class="hidden cs-btn cs-btn-link min-h-11 sm:min-h-8">Restart camera</button>
+      </div>
+
+      <div class="flex w-full flex-wrap items-center gap-x-2 gap-y-1 sm:w-auto" data-controller="role-info">
+        <% if @scan_contexts.size > 1 %>
+          <label for="scan-context" class="cs-kv-label whitespace-nowrap">Context</label>
+          <select id="scan-context" data-role-info-target="select" data-action="role-info#update" class="cs-select min-h-11 sm:min-h-8" autocomplete="off" required aria-invalid="true" aria-describedby="scan-context-required">
+            <option value="" selected disabled>Choose a context</option>
+            <% @scan_contexts.each do |context| %>
+              <option value="<%= context.id %>">
+                <%= context.name %> — <%= context.kind_label %>
+              </option>
+            <% end %>
+          </select>
+        <% else %>
+          <input type="hidden" id="scan-context" value="<%= @scan_contexts.first&.id %>" data-role-info-target="select">
+        <% end %>
+        <% @scan_contexts.select { |context| context.usage_note.present? }.each do |context| %>
+          <p class="hidden w-full cs-small cs-muted" data-role-info-target="panel" data-role="<%= context.id %>"><%= context.usage_note %></p>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="cs-container-body">
+      <div class="flex items-center gap-2 mb-3 hidden" id="camera-select-wrapper">
+        <label for="camera-select" class="cs-kv-label whitespace-nowrap">Camera</label>
+        <select id="camera-select" class="cs-select flex-1 min-h-11 sm:min-h-8"></select>
+      </div>
+
+      <div id="qr-reader" class="w-full bg-black rounded-(--cs-radius-container) overflow-hidden relative" style="min-height: 280px;">
+        <video id="qr-video" class="w-full h-full object-cover" style="min-height: 280px;" muted playsinline></video>
+        <!-- iOS home-screen web apps often refuse a camera prompt that isn't
+             tied to a tap, so keep a manual way to (re)start it. -->
+        <button type="button" id="start-camera-btn"
+                class="hidden absolute inset-0 w-full h-full flex items-center justify-center text-white text-sm font-bold bg-black/80">
+          Tap to start camera
+        </button>
+        <% if @scan_contexts.size > 1 %>
+          <div id="scan-context-required" class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 px-6 text-center bg-(--cs-topnav-bg) text-(--cs-topnav-text)">
+            <p class="font-bold">Choose a context to start scanning</p>
+            <p class="cs-small text-(--cs-topnav-muted)">Pick where you're scanning people in from the Context menu.</p>
+          </div>
+        <% end %>
+      </div>
+
+      <%# Stays up until dismissed or replaced by the next result, so a busy %>
+      <%# organizer can always look back and see what their last scan did. %>
+      <div id="scan-result" class="mt-4 hidden" role="status" aria-live="polite">
+        <!-- Scan result appears here -->
+      </div>
+      <p id="scan-queue-note" class="cs-small cs-muted mt-2 hidden" aria-live="polite"></p>
+
+      <!-- Search by name or ID -->
+      <div class="cs-field mt-5 pt-4 border-t border-(--cs-border-divider-secondary)">
+        <label for="participant-search" class="cs-field-label">Search by name or ID</label>
+        <div class="relative">
+          <label class="cs-search">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
+            <input type="text" id="participant-search" placeholder="Name or first 8 chars of ID..."
+                   class="cs-input min-h-11 text-base sm:min-h-8 sm:text-sm"
+                   autocomplete="off">
+          </label>
+          <div id="search-results" class="cs-menu cs-menu-scroll left-0 right-0 max-w-none! hidden">
+            <!-- Search results appear here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Manual entry fallback -->
+      <div class="cs-field mt-4 pt-4 border-t border-(--cs-border-divider-secondary)">
+        <label for="manual-participant-id" class="cs-field-label">Or enter full participant ID manually</label>
+        <form id="manual-scan-form" class="flex flex-col sm:flex-row gap-2">
+          <input type="text" id="manual-participant-id" placeholder="Participant ID (UUID)"
+                 class="cs-input flex-1 min-h-11 text-base sm:min-h-8 sm:text-sm">
+          <button type="submit" class="cs-btn cs-btn-primary min-h-11 sm:min-h-8">
+            Look up
+          </button>
+        </form>
+      </div>
+
+      <!-- NFC Scanner (via macOS bridge) -->
+      <div class="mt-4 pt-4 border-t border-(--cs-border-divider-secondary)" id="nfc-scanner-section">
+          <div class="flex items-center justify-between gap-2 mb-1">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h3 class="cs-h3">NFC Scanner</h3>
+              <div id="nfc-status" class="cs-status cs-status-stopped">
+                <span class="w-2 h-2 rounded-full bg-current" id="nfc-status-dot"></span>
+                <span id="nfc-status-text">Not connected</span>
+              </div>
+            </div>
+            <button type="button" id="nfc-connect-btn" class="cs-btn min-h-11 sm:min-h-8">
+              Connect
+            </button>
+          </div>
+          <p class="cs-small cs-muted">
+            Connect to the Attend NFC Bridge app to scan NFC badges or passports.
+            <a href="https://github.com/hackclub/attend-nfc/releases/latest" target="_blank" class="cs-link">Download bridge app →</a>
+          </p>
+
+          <% if current_event.nfc_badges_enabled? %>
+          <!-- NFC Write Panel (shown after QR scan) -->
+          <div id="nfc-write-panel" class="hidden cs-alert mt-3">
+            <%= cs_status_icon(:info) %>
+            <div class="flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <p class="cs-alert-title">Write NFC badge</p>
+                <button type="button" id="nfc-write-cancel" class="cs-btn cs-btn-link min-h-11 sm:min-h-8">Cancel</button>
+              </div>
+              <p class="cs-small">
+                Tap a fresh NFC badge to the reader to assign it to <strong id="nfc-write-participant-name"></strong>
+              </p>
+              <p id="nfc-write-status" class="cs-small cs-secondary mt-2">Waiting for badge...</p>
+            </div>
+          </div>
+          <% end %>
+      </div>
+    </div>
+  </section>
+
+  <!-- Recent Scans -->
+  <section class="cs-container flex flex-col" data-controller="event-scans" data-event-scans-event-id-value="<%= current_event.id %>">
+    <div class="cs-container-header cs-container-header-divided">
+      <h2 class="cs-h2">Recent scans</h2>
+      <%= link_to "View all", history_admin_event_scans_path(current_event), class: "cs-btn cs-btn-link" %>
+    </div>
+    <div class="cs-container-body flex-1 pt-3!">
+      <div id="recent-scans" class="space-y-3 max-h-[300px] sm:max-h-[500px] overflow-y-auto" data-event-scans-target="scans">
+        <% if @recent_scans.any? %>
+          <% @recent_scans.each do |scan| %>
+            <div class="flex items-center justify-between border-b border-(--cs-border-divider-secondary) pb-3 last:border-0">
+              <div class="min-w-0 flex-1 mr-2">
+                <p class="font-bold truncate"><%= scan.participant.display_name %></p>
+                <p class="cs-small cs-muted">
+                  <%= cs_relative_time(scan.scanned_at) %>
+                  <% if scan.scan_context %>
+                    <span>@ <%= scan.scan_context.name %></span>
+                  <% end %>
+                </p>
+                <p class="cs-small cs-muted">by <%= scan.user.display_name_or_fallback %></p>
+              </div>
+              <%= link_to "View", admin_event_participant_path(current_event, scan.participant_event),
+                  class: "cs-link min-h-[44px] min-w-[44px] flex items-center justify-center" %>
+            </div>
+          <% end %>
+        <% else %>
+          <p class="cs-empty" data-event-scans-target="empty">No scans yet today</p>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="cs-container-footer">
+      <span class="font-bold cs-secondary" id="scan-count" data-event-scans-target="count"><%= @recent_scans.count %></span> scans today
+    </div>
+  </section>
+</div>
+
+<!-- Participant Modal -->
+<div id="participant-modal" class="cs-modal-overlay hidden">
+  <div class="cs-modal max-w-lg! max-h-[calc(100dvh-88px)] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="modal-name">
+    <!-- Header -->
+    <div id="modal-header" class="cs-modal-header">
+      <div class="min-w-0 flex-1">
+        <span class="cs-badge cs-badge-green" id="modal-action-text">Checked In</span>
+        <h2 class="truncate mt-1" id="modal-name"></h2>
+        <div id="modal-groups" class="flex flex-wrap gap-1 mt-1"></div>
+        <p class="cs-small cs-muted mt-1" id="modal-context-name"></p>
+      </div>
+      <button type="button" data-close-participant-modal class="cs-modal-close min-h-[44px] min-w-[44px] items-center justify-center -mr-2" aria-label="Close">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"/></svg>
+      </button>
+    </div>
+
+    <!-- Alerts -->
+    <div id="modal-alerts" class="px-5"></div>
+
+    <!-- Content -->
+    <div class="cs-modal-body pt-4!">
+      <dl class="cs-kv cs-kv-2">
+        <div>
+          <dt class="cs-kv-label">Status</dt>
+          <dd id="modal-status" class="cs-kv-value font-bold"></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Pronouns</dt>
+          <dd id="modal-pronouns" class="cs-kv-value"></dd>
+        </div>
+        <div class="md:col-span-2">
+          <dt class="cs-kv-label">Email</dt>
+          <dd id="modal-email" class="cs-kv-value truncate"></dd>
+        </div>
+        <% if can_view_participant_pii? %>
+          <div>
+            <dt class="cs-kv-label">Phone</dt>
+            <dd id="modal-phone" class="cs-kv-value"></dd>
+          </div>
+        <% end %>
+        <div>
+          <dt class="cs-kv-label">T-shirt size</dt>
+          <dd id="modal-tshirt" class="cs-kv-value"></dd>
+        </div>
+        <div class="md:col-span-2">
+          <dt class="cs-kv-label">Dietary</dt>
+          <dd id="modal-dietary" class="cs-kv-value"></dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="cs-modal-footer flex-col-reverse sm:flex-row">
+      <button type="button" data-close-participant-modal class="cs-btn min-h-11 sm:min-h-8">
+        Scan next
+      </button>
+      <a id="modal-view-link" href="#" class="cs-btn cs-btn-primary min-h-11 sm:min-h-8">
+        View full profile
+      </a>
+    </div>
+    <% if current_event.nfc_badges_enabled? %>
+    <div id="modal-nfc-section" class="px-5 pb-4 hidden">
+      <button type="button" id="modal-write-nfc-btn" class="cs-btn w-full min-h-11 sm:min-h-8">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
+        <span id="modal-nfc-btn-text">Write NFC Badge</span>
+      </button>
+      <p id="modal-nfc-status" class="cs-small cs-muted text-center mt-2"></p>
+    </div>
+    <% end %>
+  </div>
+</div>
+
+<script nonce="<%= content_security_policy_nonce %>">
+// Mirror of app/javascript/utils/html.js, inlined because this is a classic
+// script and can't import from the importmap. Participant names, group labels
+// and scan context names are all user-controlled, so every template literal
+// that becomes markup here is tagged `html` and escapes its interpolations.
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/[&<>"'`=]/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+    "'": '&#39;', '`': '&#96;', '=': '&#61;'
+  })[char]);
+}
+
+// Marks a string as markup we built ourselves, so `html` inlines it as-is.
+function safeMarkup(value) {
+  return Object.assign(Object.create(safeMarkup.prototype), { value: String(value) });
+}
+safeMarkup.prototype.toString = function() { return this.value; };
+
+function html(strings, ...values) {
+  return safeMarkup(values.reduce((out, value, i) => {
+    let piece;
+    if (value instanceof safeMarkup) piece = value.value;
+    else if (Array.isArray(value)) piece = value.map((v) => html`${v}`.value).join('');
+    else if (value === null || value === undefined || value === false) piece = '';
+    else piece = escapeHtml(value);
+    return out + piece + strings[i + 1];
+  }, strings[0]));
+}
+
+// Groups are admin-created but their colour still lands in a style attribute,
+// so only accept the 6-digit hex the model validates and fall back otherwise.
+function safeHexColor(value) {
+  return /^#?[0-9a-fA-F]{6}$/.test(String(value || '')) ? String(value) : null;
+}
+
+function groupBadgeHtml(group) {
+  const color = safeHexColor(group.color);
+  if (!color) return html`<span class="cs-badge">${group.name}</span>`;
+  return html`<span class="cs-badge" style="background-color: ${color}; color: white;">${group.name}</span>`;
+}
+
+// Runs on every render, not just the first: this script sits below the markup
+// it touches, and on a Turbo Drive visit DOMContentLoaded has long since fired
+// (which is why the scanner used to sit on "Initializing..." forever whenever
+// you arrived here from another page - e.g. always, inside the installed PWA).
+(function() {
+  // Everything bound to document/window is torn down when we navigate away,
+  // so repeat visits don't stack handlers over detached nodes.
+  const pageListeners = new AbortController();
+  const signal = pageListeners.signal;
+  // Shared with the NFC bridge below, which tears down on the same signal.
+  window.scannerPageSignal = signal;
+
+  const scanUrl = '<%= admin_event_scans_path(current_event) %>';
+  const searchUrl = '<%= search_admin_event_scans_path(current_event) %>';
+  const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+  // The one camera stream we own, and the decode loop reading from it. Each
+  // (re)start bumps the generation so a loop left over from the last stream
+  // notices and exits instead of running alongside the new one.
+  let cameraStream = null;
+  let decodeTimer = null;
+  let decodeGeneration = 0;
+  let cameraStatus = ['Initializing...', 'loading'];
+  let lastScannedCode = null;
+  let scanCooldown = false;
+  let searchTimeout = null;
+  // Scans that arrive while one is in flight or cooling down wait here rather
+  // than being dropped, so a tap on a search result is never lost.
+  const pendingScans = [];
+
+  function getCurrentContextId() {
+    const contextSelect = document.getElementById('scan-context');
+    return contextSelect ? contextSelect.value : null;
+  }
+
+  // Staff must pick a context themselves: until they do, flag the selector
+  // and cover the camera with an empty state. Start from the placeholder even
+  // if the browser restored an earlier choice, since that fires no change.
+  const contextSelect = document.querySelector('select#scan-context');
+  if (contextSelect) {
+    contextSelect.value = '';
+    contextSelect.addEventListener('change', () => {
+      contextSelect.removeAttribute('aria-invalid');
+      contextSelect.removeAttribute('aria-describedby');
+      document.getElementById('scan-context-required')?.classList.add('hidden');
+      lastScannedCode = null;
+      startScannerOnce();
+    });
+  }
+
+  // Shows the "choose a context" error and returns null when none is picked.
+  function requireContextId() {
+    const scanContextId = getCurrentContextId();
+    if (!scanContextId) showResult('Choose a context before scanning', true);
+    return scanContextId;
+  }
+
+  function updateStatus(message, state = 'loading') {
+    const wrapper = document.getElementById('camera-status');
+    const dot = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    text.textContent = message;
+
+    // Cloudscape status indicator: the wrapper carries the colour and the
+    // dot paints itself with currentColor.
+    const tone = { ready: 'success', error: 'error', scanning: 'in-progress' }[state] || 'pending';
+    wrapper.className = 'cs-status cs-status-' + tone;
+    dot.className = 'w-2 h-2 rounded-full bg-current';
+    if (state === 'scanning') dot.classList.add('animate-pulse');
+  }
+
+  // Camera state outlives a scan's "Processing..." flash, so remember it and
+  // put it back afterwards rather than claiming the camera is ready.
+  function updateCameraStatus(message, state) {
+    cameraStatus = [message, state];
+    if (!scanCooldown) updateStatus(message, state);
+  }
+
+  function offerManualStart() {
+    document.getElementById('start-camera-btn').classList.remove('hidden');
+  }
+
+  function stopScanner() {
+    decodeGeneration++;
+    clearTimeout(decodeTimer);
+    if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
+    cameraStream = null;
+    const video = document.getElementById('qr-video');
+    if (video) video.srcObject = null;
+  }
+
+
+  function waitForZXing(timeoutMs = 8000) {
+    return new Promise((resolve) => {
+      const deadline = performance.now() + timeoutMs;
+      (function poll() {
+        if (typeof ZXing !== 'undefined' && ZXing.QRCodeReader) return resolve();
+        if (performance.now() > deadline) return resolve();
+        setTimeout(poll, 50);
+      })();
+    });
+  }
+
+  const RESULT_ICONS = {
+    success: '<%= j cs_status_icon(:success) %>',
+    warning: '<%= j cs_status_icon(:warning) %>',
+    error: '<%= j cs_status_icon(:error) %>'
+  };
+
+  // `tone` is 'success' / 'warning' / 'error'; true and false are still
+  // accepted (error / success) for the NFC bridge script below.
+  function showResult(message, tone = 'success', { detail = null, reload = false } = {}) {
+    if (tone === true) tone = 'error';
+    if (tone === false) tone = 'success';
+    if (!RESULT_ICONS[tone]) tone = 'success';
+    const result = document.getElementById('scan-result');
+    result.className = `mt-4 cs-alert cs-alert-${tone}`;
+    result.innerHTML = RESULT_ICONS[tone] + html`
+      <div class="min-w-0 flex-1">
+        <p class="font-bold">${message}</p>
+        ${detail ? html`<p class="cs-small">${detail}</p>` : ''}
+        ${reload ? html`<button type="button" data-scan-result-reload class="cs-link cs-small mt-1">Reload page</button>` : ''}
+      </div>
+      <button type="button" data-scan-result-dismiss class="cs-btn cs-btn-inline-icon cs-btn-link -my-1 -mr-3 text-lg leading-none" title="Dismiss" aria-label="Dismiss">&times;</button>
+    `.toString();
+    result.classList.remove('hidden');
+  }
+
+  document.getElementById('scan-result').addEventListener('click', function(e) {
+    if (e.target.closest('[data-scan-result-dismiss]')) this.classList.add('hidden');
+    if (e.target.closest('[data-scan-result-reload]')) window.location.reload();
+  });
+
+  function formatStatus(participant) {
+    return participant.display_status || String(participant.status || '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  }
+
+  // What the scan actually did, in words: where, the person's resulting
+  // status, who scanned them and when. The alert's status icon carries the
+  // tone, so unlike the classic scanner there's no ✓ / ↻ prefix.
+  function showScanSuccess(data, via = '') {
+    const name = data.participant.display_name;
+    const context = data.scan_context || {};
+    const contextName = context.name || 'this scan point';
+    const firstScan = data.first_scan_in_context;
+    let message;
+    if (context.checks_in) {
+      message = firstScan ? `${name} checked in to ${contextName}` : `${name} was already checked in to ${contextName}`;
+    } else {
+      message = firstScan ? `${name} scanned at ${contextName}` : `${name} re-scanned at ${contextName}`;
+    }
+    if (via) message += ` ${via}`;
+
+    const status = formatStatus(data.participant);
+    const at = data.scanned_at ? new Date(data.scanned_at) : new Date();
+    const time = at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const detail = [status && `Status: ${status}`, data.scanned_by && `by ${data.scanned_by}`, time].filter(Boolean).join(' · ');
+
+    const flagged = ['Withdrawn', 'Rejected'].includes(data.participant.display_status);
+    showResult(message, flagged || !firstScan ? 'warning' : 'success', { detail });
+  }
+
+  // POSTs a scan and turns every way it can fail into something a person at
+  // the door can act on. An expired session or a stale CSRF token comes back
+  // as a redirect to an HTML page, not JSON, so the content type is checked
+  // before parsing.
+  async function submitScan(body) {
+    let response;
+    try {
+      response = await fetch(scanUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-Token': csrfToken
+        },
+        body: JSON.stringify(body)
+      });
+    } catch (error) {
+      console.error('Scan request failed:', error);
+      return { ok: false, message: "Couldn't reach the server — check your connection and scan again.", detail: 'The scan was not recorded.' };
+    }
+
+    const isJson = (response.headers.get('content-type') || '').includes('application/json');
+    let data = null;
+    if (isJson) {
+      try { data = await response.json(); } catch (_) { data = null; }
+    }
+
+    if (response.ok && data && data.success) return { ok: true, data };
+
+    if (response.status === 401 || response.status === 403 || response.redirected || (response.ok && !data)) {
+      return { ok: false, message: 'Your session has expired.', detail: 'The scan was not recorded. Reload the page (and sign in again if asked), then scan again.', reload: true };
+    }
+    if (response.status >= 500) {
+      return { ok: false, message: 'Server error — the scan may not have been recorded.', detail: 'Check Recent Scans, and scan again if it is not listed.' };
+    }
+    if (response.status === 404) {
+      return { ok: false, message: data?.error || 'Participant not found for this event' };
+    }
+    return { ok: false, message: data?.error || `The scan couldn't be processed (error ${response.status}).` };
+  }
+
+  function updateQueueNote() {
+    const note = document.getElementById('scan-queue-note');
+    if (pendingScans.length) {
+      note.textContent = `Please wait… ${pendingScans.length} more scan${pendingScans.length === 1 ? '' : 's'} queued.`;
+      note.classList.remove('hidden');
+    } else {
+      note.classList.add('hidden');
+    }
+  }
+
+  function parseQrCode(scannedValue) {
+    const deepLinkMatch = scannedValue.match(/^attend:\/\/checkin\/(.+)$/);
+    if (deepLinkMatch) {
+      return deepLinkMatch[1];
+    }
+    return scannedValue;
+  }
+
+  // The one gate for every scan path. Returns whether the scan was sent or
+  // queued, so manual entry and search only clear what staff typed once it
+  // has. `manual` is a deliberate action (search result, typed ID): the camera
+  // reports the same code on every frame it stays in view, so only camera
+  // repeats are ignored; anything else arriving mid-scan waits its turn.
+  function processScan(scannedValue, { manual = false } = {}) {
+    if (scanCooldown) {
+      if (!manual && (scannedValue === lastScannedCode || pendingScans.some(p => p.value === scannedValue))) return false;
+      pendingScans.push({ value: scannedValue, manual });
+      updateQueueNote();
+      return true;
+    }
+    if (!manual && scannedValue === lastScannedCode) return false;
+    
+    const participantId = parseQrCode(scannedValue);
+    const scanContextId = requireContextId();
+    if (!scanContextId) {
+      // Report a code held up to the camera once rather than every frame, but
+      // forget it after the usual cooldown so showing it again gets feedback.
+      lastScannedCode = scannedValue;
+      setTimeout(() => {
+        if (lastScannedCode === scannedValue) lastScannedCode = null;
+      }, 2000);
+      return false;
+    }
+    
+    scanCooldown = true;
+    lastScannedCode = scannedValue;
+    sendScan(participantId, scanContextId);
+    return true;
+  }
+
+  async function sendScan(participantId, scanContextId) {
+    updateStatus('Processing...', 'scanning');
+
+    try {
+      const result = await submitScan({
+        participant_id: participantId,
+        scan_context_id: scanContextId
+      });
+
+      if (result.ok) {
+        const data = result.data;
+        showScanSuccess(data);
+        
+        showParticipantModal(data.participant, data.scan_context, data.first_scan_in_context);
+        addToRecentScans(data.participant, data.scan_context, data.scanned_by);
+        updateScanCount();
+        
+        // Offer NFC write if enabled, check-in context, and badge not yet assigned
+        console.log('NFC write check:', {
+          nfcBridge: !!window.nfcBridge,
+          writeOnCheckinEnabled: window.nfcBridge?.writeOnCheckinEnabled,
+          isConnected: window.nfcBridge?.isConnected?.(),
+          checksIn: data.scan_context?.checks_in,
+          hasBadgeToken: !!data.participant.nfc_badge_token,
+          hasSlackId: !!data.participant.slack_user_id,
+          badgeAssigned: data.participant.nfc_badge_assigned
+        });
+        
+        if (window.nfcBridge && 
+            window.nfcBridge.writeOnCheckinEnabled && 
+            window.nfcBridge.isConnected() &&
+            data.scan_context?.checks_in && 
+            data.participant.nfc_badge_token &&
+            !data.participant.nfc_badge_assigned) {
+          
+          if (!data.participant.slack_user_id) {
+            console.warn('NFC write skipped: participant missing slack_user_id', data.participant.display_name);
+          } else {
+            window.nfcBridge.showWritePanel(
+              data.participant.display_name,
+              data.participant.participant_event_id,
+              data.participant.nfc_badge_token,
+              data.participant.slack_user_id
+            );
+          }
+        }
+      } else {
+        showResult(result.message, 'error', { detail: result.detail, reload: result.reload });
+      }
+    } catch (error) {
+      // Anything thrown here is our own rendering, after the server answered.
+      console.error('Scan error:', error);
+      showResult('Something went wrong showing this scan.', 'error', { detail: 'Check Recent Scans to see whether it was recorded.' });
+    }
+
+    setTimeout(() => {
+      scanCooldown = false;
+      lastScannedCode = null;
+      updateStatus(...cameraStatus);
+      const next = pendingScans.shift();
+      updateQueueNote();
+      if (next) processScan(next.value, { manual: next.manual });
+    }, 2000);
+  }
+
+  // Maps a getUserMedia rejection to something staff can act on.
+  function describeCameraError(err) {
+    switch (err.name) {
+      case 'NotAllowedError':
+      case 'PermissionDeniedError':
+        return 'Camera blocked - check browser settings';
+      case 'NotFoundError':
+      case 'DevicesNotFoundError':
+        return 'No camera found on device';
+      case 'NotReadableError':
+      case 'TrackStartError':
+        return 'Camera in use by another app';
+      default:
+        return 'Camera error: ' + err.name + ' - ' + err.message;
+    }
+  }
+
+  // Opens the camera exactly once and keeps that stream for decoding. We used
+  // to open a probe stream, stop it, and have ZXing reopen the camera by id,
+  // which iOS Safari answers with black frames or NotReadableError right after
+  // a first permission grant.
+  async function openCamera(deviceId) {
+    const attempts = [{ facingMode: 'environment' }, true];
+    if (deviceId) attempts.unshift({ deviceId: { exact: deviceId } });
+    for (let i = 0; ; i++) {
+      try {
+        return await navigator.mediaDevices.getUserMedia({ video: attempts[i] });
+      } catch (err) {
+        // Only a camera that doesn't match is worth another try; a refusal or
+        // a busy camera fails the same way again.
+        if (err.name !== 'OverconstrainedError' || i === attempts.length - 1) throw err;
+      }
+    }
+  }
+
+  // Device labels are only readable once we hold a stream, so this runs after
+  // the camera is open.
+  async function populateCameraPicker(activeId) {
+    let cameras = [];
+    try {
+      cameras = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    } catch (err) {
+      console.warn('Could not list cameras:', err);
+    }
+    const select = document.getElementById('camera-select');
+    select.innerHTML = cameras
+      .map((c, i) => html`<option value="${c.deviceId}">${c.label || `Camera ${i + 1}`}</option>`)
+      .join('');
+    if (activeId) select.value = activeId;
+    // Only show the picker when there's an actual choice to make
+    document.getElementById('camera-select-wrapper').classList.toggle('hidden', cameras.length < 2);
+  }
+
+  async function initScanner(deviceId = localStorage.getItem('scannerCameraId')) {
+    stopScanner(); // re-entrant: restart, camera switch and tap-to-start all land here
+    const generation = decodeGeneration;
+    document.getElementById('start-camera-btn').classList.add('hidden');
+    document.getElementById('restart-camera-btn').classList.remove('hidden');
+
+    if (typeof ZXing === 'undefined' || !ZXing.QRCodeReader) {
+      updateCameraStatus('Scanner library not loaded', 'error');
+      return;
+    }
+
+    // Check for secure context (HTTPS or localhost)
+    if (!window.isSecureContext) {
+      updateCameraStatus('Camera requires HTTPS or localhost', 'error');
+      console.error('Camera access requires a secure context (HTTPS or localhost). Current URL:', window.location.href);
+      return;
+    }
+
+    // Check if mediaDevices API is available
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      updateCameraStatus('Camera API not available', 'error');
+      return;
+    }
+
+    updateCameraStatus('Requesting camera access...', 'loading');
+    let stream;
+    try {
+      stream = await openCamera(deviceId);
+    } catch (err) {
+      console.error('Camera permission error:', err.name, err.message, err);
+      if (generation !== decodeGeneration) return;
+      updateCameraStatus(describeCameraError(err), 'error');
+      offerManualStart();
+      return;
+    }
+
+    // Restarted or navigated away while the permission prompt was up.
+    if (generation !== decodeGeneration) {
+      stream.getTracks().forEach(track => track.stop());
+      return;
+    }
+    cameraStream = stream;
+
+    const track = stream.getVideoTracks()[0];
+    // iOS ends the track when another app takes the camera.
+    track.addEventListener('ended', () => {
+      if (generation !== decodeGeneration) return;
+      stopScanner();
+      updateCameraStatus('Camera stopped', 'error');
+      offerManualStart();
+    });
+    populateCameraPicker(track.getSettings().deviceId);
+
+    const video = document.getElementById('qr-video');
+    video.srcObject = stream;
+    updateCameraStatus('Starting camera...', 'loading');
+    try {
+      await video.play();
+    } catch (err) {
+      if (generation !== decodeGeneration) return;
+      // Playback that isn't tied to a tap can be refused, e.g. in the installed PWA.
+      console.error('Camera playback error:', err);
+      updateCameraStatus('Tap to start camera', 'error');
+      offerManualStart();
+      return;
+    }
+    decodeFrames(generation);
+  }
+
+  function markCameraReady() {
+    if (cameraStatus[1] === 'ready') return;
+    updateCameraStatus('Ready to scan', 'ready');
+    document.getElementById('start-camera-btn').classList.add('hidden');
+  }
+
+  // Our own loop rather than ZXing's decodeFromVideoDevice. Its loop sizes the
+  // capture canvas once, from the first frame, and stops for good on any error
+  // other than "no code in this frame". Right after a camera grant iOS can
+  // report a 0x0 frame, reading it throws, and the page sat on "Ready to scan"
+  // with nothing decoding until staff reloaded.
+  function decodeFrames(generation) {
+    const reader = new ZXing.QRCodeReader();
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const video = document.getElementById('qr-video');
+    const startedAt = performance.now();
+    let failures = 0;
+
+    (function tick() {
+      if (generation !== decodeGeneration) return;
+      // Schedule first, so nothing below can end the loop.
+      decodeTimer = setTimeout(tick, 100);
+
+      if (video.readyState < video.HAVE_CURRENT_DATA || !video.videoWidth || !video.videoHeight) {
+        if (performance.now() - startedAt > 8000 && cameraStatus[1] !== 'error') {
+          updateCameraStatus('Camera not showing a picture', 'error');
+          offerManualStart();
+        }
+        return;
+      }
+
+      // The stream can change resolution or orientation mid-session.
+      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      }
+
+      let text = null;
+      try {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // `true` inverts every other frame, so light-on-dark codes read too.
+        const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas, true);
+        text = reader.decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source))).getText();
+      } catch (err) {
+        // Every frame without a readable code lands here; that's normal.
+        const expected = err instanceof ZXing.NotFoundException ||
+          err instanceof ZXing.ChecksumException ||
+          err instanceof ZXing.FormatException;
+        if (!expected) {
+          failures++;
+          console.warn('QR decode error:', err);
+          if (failures === 10) {
+            updateCameraStatus('Scanner error - restart the camera', 'error');
+            offerManualStart();
+          }
+          return;
+        }
+      }
+
+      failures = 0;
+      markCameraReady();
+      if (text) processScan(text);
+    })();
+  }
+
+  // Manual form submission
+  document.getElementById('manual-scan-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const input = document.getElementById('manual-participant-id');
+    const participantId = input.value.trim();
+    if (participantId && processScan(participantId, { manual: true })) {
+      input.value = '';
+    }
+  });
+
+  // Search functionality
+  const searchInput = document.getElementById('participant-search');
+  const searchResults = document.getElementById('search-results');
+
+  searchInput.addEventListener('input', function() {
+    const query = this.value.trim();
+    
+    if (searchTimeout) clearTimeout(searchTimeout);
+    
+    if (query.length < 2) {
+      searchResults.classList.add('hidden');
+      return;
+    }
+
+    searchTimeout = setTimeout(async () => {
+      try {
+        const response = await fetch(`${searchUrl}?q=${encodeURIComponent(query)}`, {
+          headers: { 'Accept': 'application/json' }
+        });
+        const isJson = (response.headers.get('content-type') || '').includes('application/json');
+        if (!response.ok || !isJson || response.redirected) {
+          searchResults.innerHTML = (response.redirected || response.status === 401 || (response.ok && !isJson))
+            ? '<div class="cs-menu-header">Your session has expired — reload the page to search.</div>'
+            : '<div class="cs-menu-header">Search failed — try again.</div>';
+          searchResults.classList.remove('hidden');
+          return;
+        }
+        const data = await response.json();
+        
+        if (data.results.length === 0) {
+          searchResults.innerHTML = '<div class="cs-menu-header">No participants found</div>';
+        } else {
+          searchResults.innerHTML = data.results.map(p => html`
+            <div class="cs-menu-item min-h-11 justify-between search-result"
+                 data-participant-id="${p.id}">
+              <div class="min-w-0">
+                <p class="font-bold truncate">${p.display_name}</p>
+                <p class="cs-small cs-muted">ID: ${p.short_id}</p>
+                ${(p.groups && p.groups.length) ? html`<div class="flex flex-wrap gap-1 mt-1">${p.groups.map(g => groupBadgeHtml(g))}</div>` : ''}
+              </div>
+              <span class="cs-badge ${p.status === 'complete' ? 'cs-badge-green' : ''}">
+                ${p.status.replace('_', ' ')}
+              </span>
+            </div>
+          `).join('');
+        }
+        
+        searchResults.classList.remove('hidden');
+      } catch (error) {
+        console.error('Search error:', error);
+        searchResults.innerHTML = '<div class="cs-menu-header">Couldn\'t reach the server — check your connection.</div>';
+        searchResults.classList.remove('hidden');
+      }
+    }, 300);
+  });
+
+  // Handle search result click
+  searchResults.addEventListener('click', function(e) {
+    const result = e.target.closest('.search-result');
+    if (result && processScan(result.dataset.participantId, { manual: true })) {
+      searchInput.value = '';
+      searchResults.classList.add('hidden');
+    }
+  });
+
+  // Hide search results when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+      searchResults.classList.add('hidden');
+    }
+  }, { signal });
+
+  // Both restart on whichever camera is picked, and count as the tap iOS
+  // wants before it hands over the camera.
+  function restartCamera() {
+    initScanner(document.getElementById('camera-select').value || undefined);
+  }
+  document.getElementById('start-camera-btn').addEventListener('click', restartCamera);
+  document.getElementById('restart-camera-btn').addEventListener('click', restartCamera);
+
+  document.getElementById('camera-select').addEventListener('change', function() {
+    localStorage.setItem('scannerCameraId', this.value);
+    initScanner(this.value);
+  });
+
+
+  // Initialize scanner. The zxing tag lives in <head>, and on a Turbo visit
+  // Turbo appends it without waiting for it to load, so poll for the global
+  // rather than betting on a fixed delay. With several contexts the camera
+  // waits until staff pick one (see the change handler): every scan is
+  // refused until then and the overlay hides the video anyway.
+  let scannerStarted = false;
+  function startScannerOnce() {
+    if (scannerStarted) return;
+    scannerStarted = true;
+    waitForZXing().then(initScanner);
+  }
+
+  if (contextSelect) {
+    updateStatus('Choose a context');
+  } else {
+    startScannerOnce();
+  }
+
+  // Hand the camera back as soon as we navigate away, otherwise iOS keeps the
+  // capture (and its indicator) alive behind the next page.
+  document.addEventListener('turbo:before-render', function() {
+    stopScanner();
+    pageListeners.abort();
+  }, { signal });
+
+  // Expose functions for NFC bridge integration
+  window.showResult = showResult;
+  window.showScanSuccess = showScanSuccess;
+  window.submitScan = submitScan;
+  window.getCurrentContextId = getCurrentContextId;
+})();
+
+// var, not let: Turbo re-runs this script on each visit to the page.
+var currentModalParticipant = null;
+
+function showParticipantModal(data, scanContext, firstScan) {
+  const modal = document.getElementById('participant-modal');
+  const actionText = document.getElementById('modal-action-text');
+  const contextName = document.getElementById('modal-context-name');
+  
+  // Store participant data for NFC write button
+  currentModalParticipant = data;
+  
+  // Update header based on whether it's first scan or re-scan
+  if (firstScan) {
+    actionText.textContent = scanContext?.checks_in ? 'Checked In' : 'Scanned';
+    actionText.className = 'cs-badge cs-badge-green';
+  } else {
+    actionText.textContent = 'Already Scanned';
+    actionText.className = 'cs-badge cs-badge-yellow';
+  }
+  
+  contextName.textContent = scanContext?.name ? '@ ' + scanContext.name : '';
+  
+  document.getElementById('modal-name').textContent = data.display_name;
+  const groupsEl = document.getElementById('modal-groups');
+  if (groupsEl) {
+    groupsEl.innerHTML = (data.groups && data.groups.length)
+      ? data.groups.map(g => groupBadgeHtml(g)).join('')
+      : '';
+  }
+  document.getElementById('modal-status').textContent = data.display_status || data.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+  document.getElementById('modal-pronouns').textContent = data.pronouns || '—';
+  document.getElementById('modal-email').textContent = data.email || '—';
+  // The phone row is absent for roles that can't see phone numbers, and the
+  // lookup response leaves the field out for them too.
+  const phoneEl = document.getElementById('modal-phone');
+  if (phoneEl) phoneEl.textContent = data.phone || '—';
+  document.getElementById('modal-tshirt').textContent = data.tshirt_size?.toUpperCase() || '—';
+  // The diet type plus the food-allergy flags, so a recorded allergy never
+  // reads as "None specified".
+  const dietaryParts = [
+    data.dietary?.replace('_', ' '),
+    data.has_life_threatening_food_allergies && 'life-threatening food allergies',
+    data.cross_contamination_risk && 'cross-contamination risk',
+    data.has_allergies && 'allergies on health form'
+  ].filter(Boolean);
+  document.getElementById('modal-dietary').textContent = dietaryParts.join(' · ') || 'None specified';
+  document.getElementById('modal-view-link').href = data.show_url;
+
+  const alertsDiv = document.getElementById('modal-alerts');
+  alertsDiv.innerHTML = '';
+
+  if (data.has_anaphylaxis_risk) {
+    alertsDiv.innerHTML += '<div class="cs-alert cs-alert-error mt-3"><%= j cs_status_icon(:warning) %><p class="cs-alert-title">Anaphylaxis Risk</p></div>';
+  }
+  if (data.has_life_threatening_food_allergies) {
+    alertsDiv.innerHTML += '<div class="cs-alert cs-alert-error mt-3"><%= j cs_status_icon(:warning) %><p class="cs-alert-title">Life-Threatening Food Allergies</p></div>';
+  }
+  // Health-form allergies can be food allergies too (older records often put
+  // them there), so they get an alert rather than only the muted Dietary line.
+  if (data.has_allergies) {
+    alertsDiv.innerHTML += '<div class="cs-alert cs-alert-warning mt-3"><%= j cs_status_icon(:warning) %><p class="cs-alert-title">Allergies on Health Form — Check Medical Details</p></div>';
+  }
+  if (data.requires_refrigeration) {
+    alertsDiv.innerHTML += '<div class="cs-alert mt-3"><%= j cs_status_icon(:info) %><p class="cs-alert-title">Needs Medication Refrigeration</p></div>';
+  }
+
+  // Show NFC section if NFC is enabled and bridge is connected
+  const nfcSection = document.getElementById('modal-nfc-section');
+  const nfcBtnText = document.getElementById('modal-nfc-btn-text');
+  const nfcStatus = document.getElementById('modal-nfc-status');
+  
+  if (nfcSection && window.nfcBridge) {
+    if (window.nfcBridge.isConnected()) {
+      nfcSection.classList.remove('hidden');
+      if (data.nfc_badge_assigned) {
+        nfcBtnText.textContent = 'Rewrite NFC Badge';
+        nfcStatus.textContent = 'Badge already assigned - rewrite will update the badge';
+      } else {
+        nfcBtnText.textContent = 'Write NFC Badge';
+        nfcStatus.textContent = data.slack_user_id ? '' : 'Missing Slack ID - badge URL will be limited';
+      }
+    } else {
+      nfcSection.classList.add('hidden');
+    }
+  }
+
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+async function triggerNfcWriteFromModal() {
+  if (!currentModalParticipant || !window.nfcBridge) return;
+  
+  const data = currentModalParticipant;
+  const nfcStatus = document.getElementById('modal-nfc-status');
+  
+  // If no badge token, fetch/generate one first
+  let badgeToken = data.nfc_badge_token;
+  if (!badgeToken) {
+    if (nfcStatus) nfcStatus.textContent = 'Generating badge token...';
+    try {
+      const response = await fetch(`/api/v1/events/<%= current_event.id %>/participant_events/${data.participant_event_id}/nfc_badge/ensure`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+        }
+      });
+      const result = await response.json();
+      if (response.ok && result.badge_token) {
+        badgeToken = result.badge_token;
+        currentModalParticipant.nfc_badge_token = badgeToken;
+      } else {
+        if (nfcStatus) nfcStatus.textContent = 'Failed to generate badge token';
+        return;
+      }
+    } catch (error) {
+      console.error('Error generating badge token:', error);
+      if (nfcStatus) nfcStatus.textContent = 'Error generating badge token';
+      return;
+    }
+  }
+  
+  // Close the modal and show the write panel
+  closeModal();
+  
+  window.nfcBridge.showWritePanel(
+    data.display_name,
+    data.participant_event_id,
+    badgeToken,
+    data.slack_user_id || ''
+  );
+}
+
+function closeModal() {
+  const modal = document.getElementById('participant-modal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+
+function addToRecentScans(participant, scanContext, scannedBy) {
+  const container = document.getElementById('recent-scans');
+  const emptyMessage = container.querySelector('[data-event-scans-target="empty"]');
+  if (emptyMessage) emptyMessage.remove();
+
+  const contextInfo = scanContext?.name ? html`<span>@ ${scanContext.name}</span>` : '';
+  const scanHtml = html`
+    <div class="flex items-center justify-between border-b border-(--cs-border-divider-secondary) pb-3 bg-(--cs-success-bg) -mx-2 px-2 rounded transition-colors">
+      <div class="min-w-0 flex-1 mr-2">
+        <p class="font-bold truncate">${participant.display_name}</p>
+        <p class="cs-small cs-muted"><time datetime="${new Date().toISOString()}">Now</time> ${contextInfo}</p>
+        <p class="cs-small cs-muted">by ${scannedBy}</p>
+      </div>
+      <a href="${participant.show_url}" class="cs-link min-h-[44px] min-w-[44px] flex items-center justify-center">View</a>
+    </div>
+  `;
+  container.insertAdjacentHTML('afterbegin', scanHtml.toString());
+
+  setTimeout(() => {
+    const firstChild = container.firstElementChild;
+    if (firstChild) firstChild.classList.remove('bg-(--cs-success-bg)');
+  }, 2000);
+}
+
+function updateScanCount() {
+  const countEl = document.getElementById('scan-count');
+  if (countEl) countEl.textContent = parseInt(countEl.textContent) + 1;
+}
+
+document.getElementById('participant-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+document.querySelectorAll('[data-close-participant-modal]').forEach((el) => {
+  el.addEventListener('click', closeModal);
+});
+
+// Bind at click time so the bridge can connect after the page loads.
+document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => {
+  triggerNfcWriteFromModal();
+});
+
+// NFC Bridge Integration
+(function() {
+  const nfcWriteOnCheckin = <%= !!(current_event.nfc_badges_enabled? && current_event.nfc_badge_write_on_checkin_enabled?) %>;
+  const eventId = '<%= current_event.id %>';
+  const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+  
+  let nfcBridge = null;
+  let pendingWriteData = null;
+  
+  const nfcStatusDot = document.getElementById('nfc-status-dot');
+  const nfcStatusText = document.getElementById('nfc-status-text');
+  const nfcConnectBtn = document.getElementById('nfc-connect-btn');
+  const nfcWritePanel = document.getElementById('nfc-write-panel');
+  const nfcWriteCancel = document.getElementById('nfc-write-cancel');
+  const nfcWriteParticipantName = document.getElementById('nfc-write-participant-name');
+  const nfcWriteStatus = document.getElementById('nfc-write-status');
+  
+  function updateNfcStatus(status, message) {
+    if (!nfcStatusDot || !nfcStatusText) return;
+    
+    const nfcStatusWrapper = document.getElementById('nfc-status');
+    const tone = { connected: 'success', connecting: 'in-progress', error: 'error' }[status] || 'stopped';
+    if (nfcStatusWrapper) nfcStatusWrapper.className = 'cs-status cs-status-' + tone;
+    nfcStatusDot.className = 'w-2 h-2 rounded-full bg-current';
+    switch (status) {
+      case 'connected':
+        nfcConnectBtn.textContent = 'Disconnect';
+        break;
+      case 'connecting':
+        nfcStatusDot.classList.add('animate-pulse');
+        nfcConnectBtn.textContent = 'Connecting...';
+        break;
+      case 'error':
+        nfcConnectBtn.textContent = 'Retry';
+        break;
+      default:
+        nfcConnectBtn.textContent = 'Connect';
+    }
+    nfcStatusText.textContent = message;
+  }
+  
+  function connectNfcBridge() {
+    if (nfcBridge && nfcBridge.readyState === WebSocket.OPEN) {
+      nfcBridge.close();
+      nfcBridge = null;
+      updateNfcStatus('disconnected', 'Not connected');
+      return;
+    }
+    
+    updateNfcStatus('connecting', 'Connecting...');
+    
+    try {
+      nfcBridge = new WebSocket('ws://localhost:9876');
+      
+      nfcBridge.onopen = function() {
+        updateNfcStatus('connected', 'Ready to scan');
+      };
+      
+      nfcBridge.onclose = function() {
+        updateNfcStatus('disconnected', 'Disconnected');
+        nfcBridge = null;
+      };
+      
+      nfcBridge.onerror = function() {
+        updateNfcStatus('error', 'Bridge not running');
+        nfcBridge = null;
+      };
+      
+      nfcBridge.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        handleNfcMessage(data);
+      };
+    } catch (e) {
+      updateNfcStatus('error', 'Connection failed');
+    }
+  }
+  
+  function handleNfcMessage(data) {
+    switch (data.type) {
+      case 'tag_read':
+        handleNfcTagRead(data.tag);
+        break;
+      case 'write_result':
+        handleNfcWriteResult(data);
+        break;
+      case 'write_pending':
+        if (nfcWriteStatus) nfcWriteStatus.textContent = 'Tap badge to reader...';
+        break;
+    }
+  }
+  
+  function handleNfcTagRead(tag) {
+    // If we're in write mode (waiting for write or verifying), don't process as normal scan
+    if (pendingWriteData) {
+      if (pendingWriteData.verifying) {
+        // Verify the written badge - check for attend token in external record
+        if (tag.attendToken === pendingWriteData.token) {
+          confirmNfcBadge(pendingWriteData.participantEventId, pendingWriteData.token);
+        } else {
+          if (nfcWriteStatus) nfcWriteStatus.textContent = 'Badge mismatch! Try again.';
+        }
+      } else {
+        // Still waiting for write - tag was tapped, bridge should handle writing
+        if (nfcWriteStatus) nfcWriteStatus.textContent = 'Writing...';
+      }
+      return;
+    }
+    
+    // Normal NFC scan - use attend token from external record
+    if (tag.attendToken) {
+      processNfcScan(tag.attendToken);
+    } else {
+      console.log('Tag has no attendToken, showing as unrecognized');
+      window.showResult?.('Unrecognized NFC tag - no badge data found', true);
+    }
+  }
+  
+  async function processNfcScan(badgeToken) {
+    const scanContextId = window.getCurrentContextId?.();
+    if (!scanContextId) {
+      window.showResult?.('Choose a context before scanning', true);
+      return;
+    }
+    
+    try {
+      const result = await window.submitScan({
+        badge_token: badgeToken,
+        scan_context_id: scanContextId
+      });
+      
+      if (result.ok) {
+        window.showScanSuccess(result.data, 'via NFC');
+        showParticipantModal(result.data.participant, result.data.scan_context, result.data.first_scan_in_context);
+      } else {
+        window.showResult?.(result.message, 'error', { detail: result.detail, reload: result.reload });
+      }
+    } catch (error) {
+      console.error('NFC scan error:', error);
+      window.showResult?.('Something went wrong showing this NFC scan.', 'error', { detail: 'Check Recent Scans to see whether it was recorded.' });
+    }
+  }
+  
+  function handleNfcWriteResult(data) {
+    if (data.success) {
+      if (nfcWriteStatus) nfcWriteStatus.textContent = 'Written! Tap again to verify...';
+      if (pendingWriteData) {
+        pendingWriteData.verifying = true;
+      }
+    } else {
+      if (nfcWriteStatus) nfcWriteStatus.textContent = 'Write failed: ' + (data.error || 'Unknown error');
+    }
+  }
+  
+  async function confirmNfcBadge(participantEventId, token) {
+    const confirmUrl = `/admin/events/<%= current_event.slug %>/participant_events/${participantEventId}/confirm_nfc_badge`;
+    
+    try {
+      const response = await fetch(confirmUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken
+        },
+        body: JSON.stringify({ badge_token: token })
+      });
+      
+      if (response.ok) {
+        if (nfcWriteStatus) nfcWriteStatus.textContent = '✓ Badge assigned successfully!';
+        setTimeout(hideNfcWritePanel, 2000);
+      } else {
+        if (nfcWriteStatus) nfcWriteStatus.textContent = 'Confirmation failed';
+      }
+    } catch (error) {
+      if (nfcWriteStatus) nfcWriteStatus.textContent = 'Error confirming badge';
+    }
+    
+    pendingWriteData = null;
+  }
+  
+  function showNfcWritePanel(participantName, participantEventId, token, slackUserId) {
+    if (!nfcWritePanel) return;
+    
+    nfcWriteParticipantName.textContent = participantName;
+    nfcWriteStatus.textContent = 'Waiting for badge...';
+    nfcWritePanel.classList.remove('hidden');
+    
+    pendingWriteData = {
+      participantEventId: participantEventId,
+      token: token,
+      slackUserId: slackUserId,
+      verifying: false
+    };
+    
+    // Send write command to bridge with both payloads
+    if (nfcBridge && nfcBridge.readyState === WebSocket.OPEN) {
+      nfcBridge.send(JSON.stringify({
+        action: 'write',
+        badge_url: 'https://badge.hackclub.com/t/' + slackUserId,
+        attend_token: token
+      }));
+    } else {
+      nfcWriteStatus.textContent = 'NFC bridge not connected';
+    }
+  }
+  
+  function hideNfcWritePanel() {
+    if (nfcWritePanel) nfcWritePanel.classList.add('hidden');
+    pendingWriteData = null;
+  }
+  
+  // Wire up UI events
+  if (nfcConnectBtn) {
+    nfcConnectBtn.addEventListener('click', connectNfcBridge);
+  }
+  
+  if (nfcWriteCancel) {
+    nfcWriteCancel.addEventListener('click', hideNfcWritePanel);
+  }
+  
+  // Expose functions for use in main scanner code
+  window.nfcBridge = {
+    isConnected: function() {
+      return nfcBridge && nfcBridge.readyState === WebSocket.OPEN;
+    },
+    showWritePanel: showNfcWritePanel,
+    writeOnCheckinEnabled: nfcWriteOnCheckin
+  };
+  
+  // Auto-connect on page load
+  const autoConnect = setTimeout(connectNfcBridge, 1000);
+
+  // Disconnect when we navigate away, otherwise the next visit opens a second
+  // connection and every tap is scanned twice.
+  window.scannerPageSignal.addEventListener('abort', function() {
+    clearTimeout(autoConnect);
+    if (nfcBridge) nfcBridge.close();
+  });
+})();
+</script>

@@ -1,0 +1,49 @@
+<% content_for :title, "Slack Invite – #{@participant_event.participant.display_name} – #{current_event.name} – Attend" %>
+
+<div>
+  <%= render "header" %>
+
+  <div class="max-w-2xl">
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Slack OAuth invite link</h2>
+          <p class="cs-container-description">
+            Share this link with <strong><%= @participant_event.participant.display_name %></strong> to allow them to connect their Slack account.
+          </p>
+        </div>
+      </div>
+
+      <div class="cs-container-body cs-stack">
+        <div class="cs-field">
+          <label for="slack-invite-url" class="cs-field-label">Invite link</label>
+          <div class="flex items-center gap-2">
+            <input type="text"
+                   id="slack-invite-url"
+                   value="<%= @invite_url %>"
+                   readonly
+                   class="cs-input flex-1">
+            <button type="button"
+                    data-controller="clipboard"
+                    data-clipboard-content-value="<%= @invite_url %>"
+                    data-action="click->clipboard#copy"
+                    class="cs-btn shrink-0">
+              Copy link
+            </button>
+          </div>
+        </div>
+
+        <div class="cs-alert cs-alert-warning">
+          <%= cs_status_icon(:warning) %>
+          <p>
+            <strong>Note:</strong> This link expires in 1 hour. The participant will be asked to authorize access to their Slack identity.
+            <% if @participant_event.event.slack_channel_id.present? %>
+              Once connected, they will automatically be invited to the event's Slack channel.
+            <% end %>
+          </p>
+        </div>
+      </div>
+
+    </section>
+  </div>
+</div>

@@ -4,9 +4,9 @@ RSpec.describe "Admin::Settings", type: :request do
   include Devise::Test::IntegrationHelpers
 
   let(:event) { create(:event) }
-  let(:global_admin) { User.create!(email: "ga-settings@example.com", name: "Global Admin", global_role: "global_admin") }
+  let(:global_admin) { User.create!(email: "ga-settings@example.com", name: "Global Admin", global_role: "global_admin", admin_console_beta: false) }
   let(:event_admin) do
-    User.create!(email: "ea-settings@example.com", name: "Event Admin").tap do |user|
+    User.create!(email: "ea-settings@example.com", name: "Event Admin", admin_console_beta: false).tap do |user|
       EventRoleAssignment.create!(user: user, event: event, role: "event_admin")
     end
   end
@@ -21,6 +21,21 @@ RSpec.describe "Admin::Settings", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Support Inbox Notifications")
       expect(response.body).to include("+14155551234")
+    end
+
+    context "with the admin console beta" do
+      before { global_admin.update!(admin_console_beta: true) }
+
+      it "renders the sentence-case notification card" do
+        Setting.support_sms_notification_numbers = [ "+14155551234" ]
+        sign_in global_admin
+
+        get admin_settings_path
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("Support inbox notifications")
+        expect(response.body).to include("+14155551234")
+      end
     end
 
     it "denies non-global-admins" do
@@ -67,6 +82,137 @@ RSpec.describe "Admin::Settings", type: :request do
       post toggle_support_sms_admin_settings_path
 
       expect(Setting.support_sms_notifications_enabled?).to be(true)
+    end
+  end
+
+  describe "admin help Slack channel" do
+    include ActiveJob::TestHelper
+
+    it "shows the channel and how many people would be synced" do
+      Setting.admin_help_slack_channel_id = "CHELP"
+      event_admin
+      sign_in global_admin
+
+      get admin_settings_path
+
+      expect(response.body).to include("Admin Help Slack Channel")
+      expect(response.body).to include("CHELP")
+      expect(response.body).to include("2 eligible people") # the event admin plus the signed-in global admin
+    end
+
+    context "with the admin console beta" do
+      before { global_admin.update!(admin_console_beta: true) }
+
+      it "shows the sentence-case channel card and how many people would be synced" do
+        Setting.admin_help_slack_channel_id = "CHELP"
+        event_admin
+        sign_in global_admin
+
+        get admin_settings_path
+
+        expect(response.body).to include("Admin help Slack channel")
+        expect(response.body).to include("CHELP")
+        expect(response.body).to include("2 eligible people")
+      end
+    end
+
+    it "saves the channel ID and rejects junk" do
+      sign_in global_admin
+
+      post update_admin_help_slack_channel_admin_settings_path, params: { admin_help_slack_channel_id: " CHELP123 " }
+      expect(Setting.admin_help_slack_channel_id).to eq("CHELP123")
+
+      post update_admin_help_slack_channel_admin_settings_path, params: { admin_help_slack_channel_id: "#attend-help" }
+      expect(flash[:alert]).to be_present
+      expect(Setting.admin_help_slack_channel_id).to eq("CHELP123")
+    end
+
+    it "enqueues a full sync" do
+      Setting.admin_help_slack_channel_id = "CHELP"
+      sign_in global_admin
+
+      expect {
+        post sync_admin_help_slack_channel_admin_settings_path
+      }.to have_enqueued_job(SyncAdminHelpSlackChannelJob).with(no_args)
+    end
+
+    it "denies non-global-admins" do
+      Setting.admin_help_slack_channel_id = "CHELP"
+      sign_in event_admin
+
+      expect {
+        post sync_admin_help_slack_channel_admin_settings_path
+      }.not_to have_enqueued_job(SyncAdminHelpSlackChannelJob)
+      expect(response).to redirect_to(admin_root_path)
+    end
+  end
+
+  describe "org support Slack channel" do
+    include ActiveJob::TestHelper
+
+    it "shows the channel and how many people would be synced" do
+      Setting.org_support_slack_channel_id = "CORG"
+      event_admin
+      sign_in global_admin
+
+      get admin_settings_path
+
+      expect(response.body).to include("Org Support Slack Channel")
+      expect(response.body).to include("CORG")
+    end
+
+    it "shows people outside the Slack workspace in the last sync" do
+      Setting.org_support_slack_channel_id = "CORG"
+      Setting.org_support_slack_last_sync = { "at" => Time.current.iso8601, "added" => 3, "failed" => 0, "not_in_workspace" => 2 }
+      sign_in global_admin
+
+      get admin_settings_path
+
+      expect(response.body).to include("2 not in this Slack workspace")
+    end
+
+    context "with the admin console beta" do
+      before { global_admin.update!(admin_console_beta: true) }
+
+      it "shows the sentence-case channel card" do
+        Setting.org_support_slack_channel_id = "CORG"
+        sign_in global_admin
+
+        get admin_settings_path
+
+        expect(response.body).to include("Org support Slack channel")
+        expect(response.body).to include("CORG")
+      end
+    end
+
+    it "saves the channel ID and rejects junk" do
+      sign_in global_admin
+
+      post update_org_support_slack_channel_admin_settings_path, params: { org_support_slack_channel_id: " CORG123 " }
+      expect(Setting.org_support_slack_channel_id).to eq("CORG123")
+
+      post update_org_support_slack_channel_admin_settings_path, params: { org_support_slack_channel_id: "#attend-org-support" }
+      expect(flash[:alert]).to be_present
+      expect(Setting.org_support_slack_channel_id).to eq("CORG123")
+    end
+
+    it "enqueues a full sync" do
+      Setting.org_support_slack_channel_id = "CORG"
+      sign_in global_admin
+
+      expect {
+        post sync_org_support_slack_channel_admin_settings_path
+      }.to have_enqueued_job(SyncOrgSupportSlackChannelJob).with(no_args)
+    end
+
+    it "denies non-global-admins" do
+      Setting.org_support_slack_channel_id = "CORG"
+      sign_in event_admin
+
+      expect {
+        post sync_org_support_slack_channel_admin_settings_path
+      }.not_to have_enqueued_job(SyncOrgSupportSlackChannelJob)
+      expect(response).to redirect_to(admin_root_path)
     end
   end
 end

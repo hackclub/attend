@@ -21,6 +21,26 @@ class EventSeriesPolicy < ApplicationPolicy
     user.series_owner_for?(record)
   end
 
+  # A series API key acts as an event admin on every event in the series and
+  # can create new ones, so issuing it is owner-only — the same bar as handing
+  # someone series membership.
+  def manage_api_tokens?
+    user.series_owner_for?(record)
+  end
+
+  # Creating a vote.hackclub.com event publishes the event's name and artwork
+  # to another service, so the same bar as issuing an API key: owner-only.
+  def manage_integrations?
+    user.series_owner_for?(record)
+  end
+
+  # Releasing held onboarding invitations emails every held participant on
+  # every event in the series at once — the timing HQ has been holding for —
+  # so it is the owners' call, like everything else series-wide.
+  def send_held_invitations?
+    user.series_owner_for?(record)
+  end
+
   def destroy?
     user.global_admin?
   end

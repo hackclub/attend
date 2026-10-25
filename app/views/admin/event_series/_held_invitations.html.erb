@@ -1,0 +1,55 @@
+<%# Held onboarding invitations are HQ's own pending action, not something to
+    chase: nobody has been emailed, so nobody is late. Hence a callout of its
+    own above the chase list, with the one button that releases them. Rendered
+    only when an event is holding or has something held, so a series that
+    doesn't use the hold never sees it. %>
+<% held_rows = event_rows.select { |row| row[:held_invitations].positive? || row[:event].onboarding_invites_held? } %>
+<% held_total = totals[:held_invitations] %>
+<% holding_events = totals[:holding_events] %>
+
+<section class="mb-6" data-testid="series-held-invitations">
+  <div class="bg-(--bg-elev) border border-amber-300 rounded-lg overflow-hidden">
+    <div class="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3">
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-(--text-strong)">
+          <% if held_total.positive? %>
+            <%= pluralize(held_total, "onboarding invitation") %> held across <%= pluralize(held_rows.length, "event") %>
+          <% else %>
+            <%= pluralize(holding_events, "event") %> holding onboarding invitations
+          <% end %>
+        </p>
+        <p class="text-xs text-(--text-soft) mt-0.5">
+          <% if held_total.positive? %>
+            These participants have been added but not emailed. Sending releases every held invitation and stops the hold on those events.
+          <% else %>
+            Nothing has been added yet. Participants added to these events will be recorded without an email until you send.
+          <% end %>
+        </p>
+      </div>
+      <% if policy(series).send_held_invitations? %>
+        <%= button_to send_held_invitations_admin_series_path(series),
+            method: :post,
+            data: { turbo_confirm: held_total.positive? ? "Email #{pluralize(held_total, 'held invitation')} across #{pluralize(held_rows.length, 'event')} now? Those events will email new participants as they're added from here on." : "Stop holding onboarding invitations on #{pluralize(holding_events, 'event')}? They will email new participants as they're added." },
+            class: "shrink-0 inline-flex items-center gap-2 cursor-pointer bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
+          <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+          <%= held_total.positive? ? "Send #{pluralize(held_total, 'held invitation')}" : "Stop holding invitations" %>
+        <% end %>
+      <% end %>
+    </div>
+    <ul class="border-t border-(--border)">
+      <% held_rows.sort_by { |row| -row[:held_invitations] }.each do |row| %>
+        <li class="series-row">
+          <%= link_to admin_event_participants_path(row[:event].slug, status: "pending_invitations"),
+                class: "series-row-link flex items-center gap-3 px-4 py-2.5 min-h-11 cursor-pointer" do %>
+            <span class="text-xs font-semibold text-(--text-strong) tabular-nums w-8 text-right flex-shrink-0"><%= row[:held_invitations] %></span>
+            <span class="text-xs text-(--text-soft) truncate"><%= row[:event].name %></span>
+            <% if row[:event].onboarding_invites_held? %>
+              <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-amber-100 text-amber-800 whitespace-nowrap">Holding</span>
+            <% end %>
+            <span class="ml-auto text-xs text-(--text-link) whitespace-nowrap">Open list →</span>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+</section>

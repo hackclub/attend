@@ -17,7 +17,7 @@ module Exports
     CATEGORIES = {
       "identity"           => { label: "Identity", tier: :identity, description: "Participant name and email" },
       "basic"              => { label: "Participant", tier: :general, description: "Contact details, address, and profile information",
-                                pii_restricted_description: "Contact details and profile information" },
+                                pii_restricted_description: "Profile information" },
       "event_status"       => { label: "Event Status", tier: :general, description: "Registration status, check-in, and onboarding progress" },
       "travel"             => { label: "Travel", tier: :general, description: "Inbound and outbound travel details" },
       "flight_legs"        => { label: "Flight Legs", tier: :general, description: "Per-leg flight details (only in one-row-per-flight-leg mode)" },
@@ -44,8 +44,11 @@ module Exports
     # EventRoleAssignment::PII_RESTRICTED_ROLES). "Age at Event Start" stays, so
     # a Limited exporter can still do the rooming and minor-count work that
     # needs an age. The travel origin addresses are here too: for a car
-    # journey that field is the participant's doorstep.
+    # journey that field is the participant's doorstep. The phone number goes
+    # with them; a participant's email address does not, since those roles work
+    # from it every day.
     PII_RESTRICTED_FIELD_KEYS = %w[
+      participant.phone
       participant.date_of_birth
       participant.address_line_1
       participant.address_line_2
@@ -94,7 +97,7 @@ module Exports
                           includes: :participant, extractor: ->(pe) { pe.participant.public_send(attr) })
     end
     fields << Field.new(key: "participant.age_at_event", label: "Age at Event Start", category: "basic", type: :string,
-                        includes: :participant, extractor: ->(pe) { pe.participant.age_on(pe.event.starts_at&.to_date || Date.current) })
+                        includes: :participant, extractor: ->(pe) { pe.participant.age_on(pe.event.local_start_date || Date.current) })
     fields << Field.new(key: "participant.engagement_preference", label: "Engagement Preference", category: "basic", type: :enum,
                         enum_values: Participant.engagement_preferences.keys, includes: :participant,
                         extractor: ->(pe) { pe.participant.engagement_preference })
@@ -339,6 +342,7 @@ module Exports
           participant.full_legal_name participant.email
           dietary.diet_type dietary.intolerances dietary.life_threatening_allergies
           dietary.cross_contamination_risk dietary.notes
+          medical.has_anaphylaxis_risk
         ]
       },
       "medical_flags" => {

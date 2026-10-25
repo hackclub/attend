@@ -96,6 +96,48 @@ RSpec.describe Participant, type: :model do
     end
   end
 
+  # Onboarding stores "Unknown" in both name fields when the sign-in claims
+  # carry no name, which used to surface as "Unknown Unknown".
+  describe "names for a participant who hasn't registered yet" do
+    def build_named(first, last, **attrs)
+      build(:participant, legal_first_name: first, legal_last_name: last, **attrs)
+    end
+
+    it "shows a pending label instead of the placeholder" do
+      participant = build_named("Unknown", "Unknown")
+
+      expect(participant).to be_name_pending
+      expect(participant.full_name).to eq("Not registered yet")
+      expect(participant.display_name).to eq("Not registered yet")
+      expect(participant.greeting_name).to be_nil
+      expect(participant.initials).to eq("?")
+    end
+
+    it "keeps the half of the name it knows" do
+      participant = build_named("Robin", "Unknown")
+
+      expect(participant).not_to be_name_pending
+      expect(participant.full_name).to eq("Robin")
+      expect(participant.greeting_name).to eq("Robin")
+      expect(participant.initials).to eq("R")
+    end
+
+    it "uses a preferred name when one has been given" do
+      participant = build_named("Unknown", "Unknown", preferred_name: "Robin")
+
+      expect(participant.display_name).to eq("Robin")
+      expect(participant.greeting_name).to eq("Robin")
+    end
+
+    it "leaves a full name alone" do
+      participant = build_named("Robin", "Example")
+
+      expect(participant).not_to be_name_pending
+      expect(participant.full_name).to eq("Robin Example")
+      expect(participant.initials).to eq("RE")
+    end
+  end
+
   describe "#hca_verified?" do
     it "is true only when the linked user is HCA-verified" do
       expect(create(:participant)).not_to be_hca_verified
@@ -234,6 +276,46 @@ RSpec.describe Participant, type: :model do
       participant.update_column(:email, gpe.guardian.email)
 
       expect(participant.reload.update(preferred_name: "Sam")).to be(true)
+    end
+  end
+
+  describe "Slack channel invite when the Slack ID changes" do
+    include ActiveJob::TestHelper
+
+    it "enqueues an invite for a complete registration in an event with a channel" do
+      participant = create(:participant)
+      pe = create(:participant_event, participant: participant, event: create(:event, slack_channel_id: "C123"), status: :complete)
+
+      expect { participant.update!(slack_user_id: "U1") }
+        .to have_enqueued_job(InviteToEventSlackChannelJob).with(pe.id)
+    end
+  end
+
+  describe "#slack_connect_participant_event" do
+    it "picks the upcoming registration over an older one" do
+      participant = create(:participant)
+      create(:participant_event, participant: participant, event: create(:event, starts_at: 3.months.ago, ends_at: 3.months.ago + 2.days))
+      upcoming = create(:participant_event, participant: participant, event: create(:event, starts_at: 1.month.from_now, ends_at: 1.month.from_now + 2.days))
+
+      expect(participant.slack_connect_participant_event).to eq(upcoming)
+    end
+
+    it "prefers a complete registration over a sooner one they were only invited to" do
+      participant = create(:participant)
+      create(:participant_event, participant: participant, status: :invited,
+                                 event: create(:event, starts_at: 1.week.from_now, ends_at: 1.week.from_now + 2.days))
+      attending = create(:participant_event, participant: participant, status: :complete,
+                                             event: create(:event, starts_at: 2.months.from_now, ends_at: 2.months.from_now + 2.days))
+
+      expect(participant.slack_connect_participant_event).to eq(attending)
+    end
+
+    it "ignores a past event that never got an end date" do
+      participant = create(:participant)
+      create(:participant_event, participant: participant, event: create(:event, starts_at: 1.year.ago, ends_at: nil))
+      upcoming = create(:participant_event, participant: participant, event: create(:event, starts_at: 1.month.from_now, ends_at: 1.month.from_now + 2.days))
+
+      expect(participant.slack_connect_participant_event).to eq(upcoming)
     end
   end
 end

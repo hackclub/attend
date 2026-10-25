@@ -14,6 +14,19 @@ class Setting < ApplicationRecord
   INCIDENT_REPORTS_CUSTOM_EVENTS = "incident_reports_custom_events".freeze
   SUPPORT_SMS_NOTIFICATIONS_ENABLED = "support_sms_notifications_enabled".freeze
   SUPPORT_SMS_NOTIFICATION_NUMBERS = "support_sms_notification_numbers".freeze
+  ADMIN_HELP_SLACK_CHANNEL_ID = "admin_help_slack_channel_id".freeze
+  ADMIN_HELP_SLACK_LAST_SYNC = "admin_help_slack_last_sync".freeze
+
+  # Slack channel where event admins ask questions about Attend. Only defaulted
+  # in production so dev and staging never invite people to the real channel.
+  DEFAULT_ADMIN_HELP_SLACK_CHANNEL_ID = "C0C6QQ6M23D".freeze
+
+  ORG_SUPPORT_SLACK_CHANNEL_ID = "org_support_slack_channel_id".freeze
+  ORG_SUPPORT_SLACK_LAST_SYNC = "org_support_slack_last_sync".freeze
+
+  # Slack channel (#attend-org-support) holding every kind of admin while
+  # their events are on. Production-only default, as above.
+  DEFAULT_ORG_SUPPORT_SLACK_CHANNEL_ID = "C0C8FDYLNR3".freeze
 
   class << self
     def maintenance_mode?
@@ -122,6 +135,46 @@ class Setting < ApplicationRecord
     # E.164 numbers texted when a new inbound support ticket is opened.
     def support_sms_notification_number_list
       get(SUPPORT_SMS_NOTIFICATION_NUMBERS).to_s.split(",").map(&:strip).reject(&:blank?)
+    end
+
+    def admin_help_slack_channel_id
+      get(ADMIN_HELP_SLACK_CHANNEL_ID).presence ||
+        (Rails.env.production? ? DEFAULT_ADMIN_HELP_SLACK_CHANNEL_ID : nil)
+    end
+
+    def admin_help_slack_channel_id=(channel_id)
+      set(ADMIN_HELP_SLACK_CHANNEL_ID, channel_id.to_s.strip)
+    end
+
+    # Counts from the last full sync, e.g. { "at" => ..., "added" => 3 }.
+    def admin_help_slack_last_sync
+      JSON.parse(get(ADMIN_HELP_SLACK_LAST_SYNC).presence || "{}")
+    rescue JSON::ParserError
+      {}
+    end
+
+    def admin_help_slack_last_sync=(summary)
+      set(ADMIN_HELP_SLACK_LAST_SYNC, summary.to_json)
+    end
+
+    def org_support_slack_channel_id
+      get(ORG_SUPPORT_SLACK_CHANNEL_ID).presence ||
+        (Rails.env.production? ? DEFAULT_ORG_SUPPORT_SLACK_CHANNEL_ID : nil)
+    end
+
+    def org_support_slack_channel_id=(channel_id)
+      set(ORG_SUPPORT_SLACK_CHANNEL_ID, channel_id.to_s.strip)
+    end
+
+    # Counts from the last full sync, e.g. { "at" => ..., "added" => 3, "removed" => 1 }.
+    def org_support_slack_last_sync
+      JSON.parse(get(ORG_SUPPORT_SLACK_LAST_SYNC).presence || "{}")
+    rescue JSON::ParserError
+      {}
+    end
+
+    def org_support_slack_last_sync=(summary)
+      set(ORG_SUPPORT_SLACK_LAST_SYNC, summary.to_json)
     end
 
     def get(key)

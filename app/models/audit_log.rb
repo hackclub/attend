@@ -23,6 +23,8 @@ class AuditLog < ApplicationRecord
     event_select: "select",
     reset_waiver: "reset_waiver",
     reset_freedom_waiver: "reset_freedom_waiver",
+    approve_registration_change_request: "approve",
+    request_follow_up: "request_follow_up",
     send_travel_update_reminder: "send_travel_update_reminder",
     approve_um: "approve_um",
     reject_um: "reject_um",
@@ -45,6 +47,7 @@ class AuditLog < ApplicationRecord
     passport_pair: "passport_pair",
     passport_revoke: "passport_revoke",
     regenerate_api_key: "regenerate_api_key",
+    clear_waiver_dates_warning: "clear_waiver_dates_warning",
     attach_image: "attach_image",
     update_groups: "update_groups",
     use_default_docuseal_template: "use_default",
@@ -73,25 +76,35 @@ class AuditLog < ApplicationRecord
     refresh_all: "refresh_all",
     revoke: "revoke",
     reinstate: "reinstate",
+    move: "move",
     rotate_api_token: "rotate",
     reorder_groups: "reorder",
     unassign: "unassign",
     cancel: "cancel",
     confirm: "confirm",
     send_to_slack: "send_to_slack",
+    escalate: "escalate",
     send_now: "send_now",
     retry_delivery: "retry_delivery",
     retry_failed: "retry_failed",
+    send_to_new_recipients: "send_to_new_recipients",
     retry_recipient: "retry_recipient",
     link_guardian: "link_guardian",
     refresh_flight_tracking: "refresh_flight_tracking",
     resync_airtable: "resync_airtable",
+    connect_airtable: "connect_airtable",
+    disconnect_airtable: "disconnect_airtable",
     revoke_invite: "revoke_invite",
+    send_held_invitations: "send_held_invitations",
     destroy_avatar: "destroy_avatar",
     toggle_maintenance: "toggle_maintenance",
     toggle_twilio: "toggle_twilio",
     toggle_waiver_sending: "toggle_waiver_sending",
-    update_twilio_from_number: "update_twilio_from_number"
+    update_twilio_from_number: "update_twilio_from_number",
+    update_admin_help_slack_channel: "update_admin_help_slack_channel",
+    sync_admin_help_slack_channel: "sync_admin_help_slack_channel",
+    update_org_support_slack_channel: "update_org_support_slack_channel",
+    sync_org_support_slack_channel: "sync_org_support_slack_channel"
   }
 
   validates :record_type, presence: true
@@ -101,6 +114,17 @@ class AuditLog < ApplicationRecord
   scope :for_record, ->(record) { where(record_type: record.class.name, record_id: record.id) }
   scope :by_actor, ->(user) { where(actor_user_id: user.id) }
   scope :recent, -> { order(created_at: :desc).limit(100) }
+
+  # Values of `encrypts`-declared attributes are plaintext in previous_changes;
+  # keep them out of the audit_logs jsonb so encrypted-at-rest content never
+  # lands there readable. Every audit writer (admin, MCP, API) goes through this.
+  def self.redact_encrypted_fields(record, changed_fields)
+    encrypted = record.class.try(:encrypted_attributes)
+    return changed_fields if encrypted.blank? || changed_fields.blank?
+
+    names = encrypted.map(&:to_s)
+    changed_fields.to_h { |field, change| [ field, names.include?(field.to_s) ? "[REDACTED]" : change ] }
+  end
 
   def self.log!(action:, record:, actor: nil, event: nil, changed_fields: {}, metadata: {})
     create!(

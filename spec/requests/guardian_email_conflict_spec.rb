@@ -24,9 +24,9 @@ RSpec.describe "Guardian and participant email collisions", type: :request do
       sign_in user
     end
 
-    def submit_guardian(email:, autosave: false)
+    def submit_guardian(email:, autosave: false, first_name: "Alex")
       params = {
-        guardian_first_name: "Alex",
+        guardian_first_name: first_name,
         guardian_last_name: "Guardian",
         guardian_email: email,
         guardian_phone: "+12025559876",
@@ -49,6 +49,12 @@ RSpec.describe "Guardian and participant email collisions", type: :request do
     it "does not quietly create the guardian on autosave either" do
       expect { submit_guardian(email: participant.email, autosave: true) }
         .not_to change(Guardian, :count)
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body).to include(
+        "success" => false,
+        "errors" => [ "Guardian email address cannot be the same as the participant's email address." ]
+      )
     end
 
     it "refuses to move the participant's own email onto their guardian's" do
@@ -72,6 +78,61 @@ RSpec.describe "Guardian and participant email collisions", type: :request do
         .to change(Guardian, :count).by(1)
 
       expect(participant_event.guardian_participant_events.count).to eq(1)
+    end
+
+    it "refuses an autosaved email change when a shared guardian link has issued access" do
+      guardian = create(:guardian, email: "guardian-before@example.com")
+      create(:guardian_participant_event, :never_sent, guardian: guardian, participant_event: participant_event)
+      create(:guardian_participant_event, guardian: guardian)
+
+      submit_guardian(email: "guardian-after@example.com", autosave: true)
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["errors"])
+        .to include(a_string_including("ask event staff to correct"))
+      expect(guardian.reload.email).to eq("guardian-before@example.com")
+    end
+
+    it "refuses an autosaved email change after an invite was used even if its send stamp was cleared" do
+      guardian = create(:guardian, email: "guardian-before@example.com")
+      gpe = create(:guardian_participant_event, :never_sent, guardian: guardian, participant_event: participant_event)
+      gpe.update!(invite_last_used_at: 1.hour.ago)
+
+      submit_guardian(email: "guardian-after@example.com", autosave: true)
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(guardian.reload.email).to eq("guardian-before@example.com")
+    end
+
+    it "refuses an autosaved email change after consent was recorded" do
+      guardian = create(:guardian, email: "guardian-before@example.com")
+      gpe = create(:guardian_participant_event, :never_sent, guardian: guardian, participant_event: participant_event)
+      create(:consent, :signed, participant_event: participant_event, guardian_participant_event: gpe)
+
+      submit_guardian(email: "guardian-after@example.com", autosave: true)
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(guardian.reload.email).to eq("guardian-before@example.com")
+    end
+
+    it "still autosaves non-email edits after guardian access was issued" do
+      guardian = create(:guardian, legal_first_name: "Before", email: "guardian@example.com")
+      create(:guardian_participant_event, guardian: guardian, participant_event: participant_event)
+
+      submit_guardian(email: guardian.email, autosave: true, first_name: "After")
+
+      expect(response).to have_http_status(:ok)
+      expect(guardian.reload.legal_first_name).to eq("After")
+    end
+
+    it "allows an initial unsigned guardian draft to correct its email" do
+      guardian = create(:guardian, email: "guardian-before@example.com")
+      create(:guardian_participant_event, :never_sent, guardian: guardian, participant_event: participant_event)
+
+      submit_guardian(email: "guardian-after@example.com", autosave: true)
+
+      expect(response).to have_http_status(:ok)
+      expect(guardian.reload.email).to eq("guardian-after@example.com")
     end
   end
 

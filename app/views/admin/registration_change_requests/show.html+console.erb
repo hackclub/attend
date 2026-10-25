@@ -1,0 +1,93 @@
+<% content_for :title, "Change request – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Change requests", admin_event_registration_change_requests_path(current_event) ], [ @change_request.participant.display_name, nil ]) %>
+<% change_request_status_types = { "pending" => :pending, "approved" => :success, "follow_up_needed" => :warning } %>
+
+<div class="cs-stack max-w-3xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1"><%= @change_request.participant.display_name %></h1>
+      <p class="cs-description flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span><%= @change_request.kind.humanize %></span>
+        <%= cs_status(change_request_status_types.fetch(@change_request.status, :info), @change_request.status.humanize) %>
+      </p>
+    </div>
+  </div>
+
+  <% if @change_request.requested_changes.present? %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Requested changes</h2>
+      </div>
+      <div class="cs-container-body">
+        <dl class="cs-kv cs-kv-2">
+          <% @change_request.requested_changes.each do |field, value| %>
+            <div>
+              <dt class="cs-kv-label"><%= field.humanize %></dt>
+              <dd class="cs-kv-value"><%= value %></dd>
+            </div>
+          <% end %>
+        </dl>
+      </div>
+    </section>
+  <% end %>
+
+  <% if @change_request.requester_note.present? || @change_request.staff_response.present? %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Notes</h2>
+      </div>
+      <div class="cs-container-body">
+        <dl class="cs-kv">
+          <% if @change_request.requester_note.present? %>
+            <div>
+              <dt class="cs-kv-label">Attendee note</dt>
+              <dd class="cs-kv-value"><%= simple_format(@change_request.requester_note) %></dd>
+            </div>
+          <% end %>
+          <% if @change_request.staff_response.present? %>
+            <div>
+              <dt class="cs-kv-label">Staff response</dt>
+              <dd class="cs-kv-value"><%= simple_format(@change_request.staff_response) %></dd>
+            </div>
+          <% end %>
+        </dl>
+      </div>
+    </section>
+  <% end %>
+
+  <% if @change_request.pending? %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Review</h2>
+      </div>
+      <div class="cs-container-body cs-stack">
+        <% if @change_request.signed_identity? || @change_request.guardian? %>
+          <div class="cs-alert cs-alert-warning">
+            <%= cs_status_icon(:warning) %>
+            <p>Approval may reset signed documents and make the registration incomplete. A replacement guardian must verify and sign again.</p>
+          </div>
+          <div>
+            <%= button_to "Approve request", approve_admin_event_registration_change_request_path(current_event, @change_request), method: :patch, class: "cs-btn cs-btn-primary", data: { turbo_confirm: "Approve this request and apply the documented resets?" } %>
+          </div>
+        <% else %>
+          <div>
+            <%= button_to "Mark resolved", approve_admin_event_registration_change_request_path(current_event, @change_request), method: :patch, class: "cs-btn cs-btn-primary" %>
+          </div>
+        <% end %>
+
+        <%= form_with model: @change_request, url: request_follow_up_admin_event_registration_change_request_path(current_event, @change_request), scope: :registration_change_request, method: :patch, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+          <%= cs_form_field f, :staff_response, label: "Follow-up message",
+                description: "Sent to the attendee with the request marked as needing follow-up.",
+                constraint: "Explain what the attendee needs to provide.",
+                messages: { blank: "Follow-up message is required." } do |aria| %>
+            <%= f.text_area :staff_response, class: "cs-input", required: true, **aria %>
+          <% end %>
+          <%= cs_form_errors f %>
+          <div class="mt-3">
+            <%= f.button "Request follow-up", class: "cs-btn" %>
+          </div>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+</div>

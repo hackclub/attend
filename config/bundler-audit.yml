@@ -1,4 +1,12 @@
 # Audit all gems listed in the Gemfile for known security problems by running bin/bundler-audit.
 # CVEs that are not relevant to the application can be enumerated on the ignore list below.
 
-ignore: []
+ignore:
+  # rubyzip < 3.4.0 path traversal in Zip::Entry#extract (GHSA-47m2-wp7j-p9vc).
+  # rubyzip is held at 2.x by passkit, whose gemspec pins "~> 2.0" in every
+  # release (0.8.1 included) and on master. passkit only writes .pkpass
+  # archives through Zip::OutputStream and nothing in this app extracts zip
+  # files, so the vulnerable extract path is never reached. selenium-webdriver
+  # also depends on rubyzip but only in the test group. Drop this entry once
+  # passkit allows rubyzip >= 3.4.
+  - CVE-2026-85396

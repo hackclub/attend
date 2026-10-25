@@ -146,7 +146,7 @@ class TicketPdfService
       pdf.fill_color LIGHT_TEXT
       pdf.draw_text "DATE", at: [ 15 + col_width, info_y ], size: 8
       pdf.fill_color DARK_TEXT
-      pdf.draw_text @event.starts_at&.strftime("%b %d") || "TBD", at: [ 15 + col_width, info_y - 15 ], size: 11, style: :bold
+      pdf.draw_text @event.local_starts_at&.strftime("%b %d") || "TBD", at: [ 15 + col_width, info_y - 15 ], size: 11, style: :bold
 
       pdf.fill_color LIGHT_TEXT
       pdf.draw_text "T-SHIRT", at: [ 15 + col_width * 2, info_y ], size: 8
@@ -263,7 +263,7 @@ class TicketPdfService
       travel.travel_legs.each do |leg|
         flight_info = leg.flight_code.to_s
         route = "#{leg.departure_airport} → #{leg.arrival_airport}"
-        time = leg.departure_time&.strftime("%b %d, %Y at %H:%M")
+        time = leg.local_departure_time&.strftime("%b %d, %Y at %H:%M %Z")
         parts << [ flight_info, route, time ].compact.join("  ")
       end
     else
@@ -302,9 +302,9 @@ class TicketPdfService
     return "TBD" unless @event.starts_at.present?
 
     if @event.ends_at.present?
-      "#{@event.starts_at.strftime('%B %d')} - #{@event.ends_at.strftime('%B %d, %Y')}"
+      "#{@event.local_starts_at.strftime('%B %d')} - #{@event.local_ends_at.strftime('%B %d, %Y')}"
     else
-      @event.starts_at.strftime("%B %d, %Y")
+      @event.local_starts_at.strftime("%B %d, %Y")
     end
   end
 

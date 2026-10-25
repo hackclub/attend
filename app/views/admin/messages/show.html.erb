@@ -100,14 +100,14 @@
         
         <%= button_to "Send Now", send_now_admin_event_message_path(current_event, @message), 
             method: :post,
-            data: { confirm: "Are you sure you want to send this message now?" },
+            form: { data: { turbo_confirm: "Are you sure you want to send this message now?" } },
             class: "bg-[#d42f46] hover:bg-[#b82840] text-white font-semibold py-2 px-4 rounded-lg" %>
       <% end %>
 
       <% if @message.scheduled? %>
         <%= button_to "Cancel", cancel_admin_event_message_path(current_event, @message), 
             method: :post,
-            data: { confirm: "Are you sure you want to cancel this scheduled message?" },
+            form: { data: { turbo_confirm: "Are you sure you want to cancel this scheduled message?" } },
             class: "bg-red-100 hover:bg-red-200 text-red-800 font-semibold py-2 px-4 rounded-lg" %>
       <% end %>
 
@@ -115,6 +115,13 @@
         <%= button_to "Retry Failed (#{@message.failed_count})", retry_failed_admin_event_message_path(current_event, @message), 
             method: :post,
             class: "bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg" %>
+      <% end %>
+
+      <% if @new_recipient_count > 0 %>
+        <%= button_to "Send to #{pluralize(@new_recipient_count, "New Recipient")}", send_to_new_recipients_admin_event_message_path(current_event, @message),
+            method: :post,
+            form: { data: { turbo_confirm: "Send this message to #{pluralize(@new_recipient_count, "new recipient")}? They match this audience now but haven't received it." } },
+            class: "bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg" %>
       <% end %>
     </div>
   </div>
@@ -139,6 +146,9 @@
                 <% elsif first_delivery.guardian.present? %>
                   <div class="text-xs text-gray-500">Guardian</div>
                 <% end %>
+                <% if first_delivery.catch_up? %>
+                  <span class="inline-flex items-center mt-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">Sent later</span>
+                <% end %>
               </div>
             </div>
             <div class="space-y-2">
@@ -153,7 +163,16 @@
                           end %>">
                       <%= delivery.channel.titleize %>
                     </span>
-                    <span class="text-gray-500"><%= delivery.recipient_identifier %></span>
+                    <span class="text-gray-500">
+                      <%# For an SMS the identifier is the recipient's phone number, which
+                          PII-restricted roles don't get; an email address or Slack ID is
+                          fine for them. %>
+                      <% if can_view_participant_pii? || delivery.channel != "sms" %>
+                        <%= delivery.recipient_identifier %>
+                      <% else %>
+                        <%= contact_hidden_placeholder %>
+                      <% end %>
+                    </span>
                   </div>
                   <div class="flex items-center gap-3">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium

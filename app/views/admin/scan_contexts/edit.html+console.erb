@@ -1,0 +1,12 @@
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Check-ins", admin_event_scans_path(current_event) ], [ "Scan contexts", admin_event_scan_contexts_path(current_event) ], [ @scan_context.name_was.presence || @scan_context.name, nil ]) %>
+
+<div class="max-w-2xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Edit scan context</h1>
+      <p class="cs-description">Update settings for "<%= @scan_context.name %>"</p>
+    </div>
+  </div>
+
+  <%= render "form", scan_context: @scan_context %>
+</div>

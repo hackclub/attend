@@ -120,6 +120,40 @@ class Consent < ApplicationRecord
     participant_signed_at.present?
   end
 
+  # The guardian who signs (or co-signs) this document: whoever it was issued
+  # to, else the participant's first guardian — the same fallback the
+  # Create*WaiverJobs use when they build the submission.
+  def signing_guardian_participant_event
+    guardian_participant_event || participant_event&.guardian_participant_events&.order(:created_at)&.first
+  end
+
+  # Wipes a DocuSeal waiver back to pending so the Create*WaiverJob (or the
+  # portal) issues a fresh submission. Voiding the old submission in DocuSeal
+  # is the caller's job. The guardian link is kept on purpose so the new
+  # submission goes to the same guardian. Pass docuseal_host to move the
+  # consent onto a different DocuSeal server (e.g. the event's current one).
+  def reset_for_reissue!(docuseal_host: nil)
+    attributes = {
+      status: :pending,
+      docuseal_envelope_id: nil,
+      docuseal_guardian_slug: nil,
+      docuseal_participant_slug: nil,
+      docuseal_template_id: nil,
+      guardian_signed_at: nil,
+      participant_signed_at: nil,
+      signed_at: nil,
+      document_url: nil,
+      failure_reason: nil,
+      pending_on: nil,
+      sent_at: nil
+    }
+    attributes[:docuseal_host] = docuseal_host if docuseal_host.present?
+    update!(attributes)
+
+    # The guardian chooses again on the new freedom waiver.
+    participant_event.safeguarding_info&.update!(freedom_waiver_granted: false) if freedom_waiver?
+  end
+
   def physical_document?
     custom_document&.physical? || false
   end

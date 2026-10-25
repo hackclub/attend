@@ -1,6 +1,56 @@
 require "rails_helper"
 
 RSpec.describe GuardianMailer, type: :mailer do
+  describe "#waiver_signing" do
+    let(:event) { create(:event, freedom_waivers_enabled: false, name: "Midnight") }
+    let(:participant_event) do
+      create(:participant_event, event: event, status: :awaiting_guardian,
+        code_of_conduct_accepted_at: Time.current)
+    end
+    let(:guardian_participant_event) do
+      create(:guardian_participant_event, participant_event: participant_event,
+        status: :completed, completed_at: Time.current)
+    end
+    let!(:waiver) do
+      create(:consent, participant_event: participant_event, status: :sent,
+        participant_signed_at: Time.current, docuseal_guardian_slug: "guardian")
+    end
+
+    it "does not promise completion while another document remains" do
+      document = create(:custom_document, event: event, name: "Hotel waiver")
+      create(:consent, participant_event: participant_event, consent_type: :custom_document,
+        custom_document: document, docuseal_participant_slug: "participant")
+
+      mail = described_class.waiver_signing(
+        guardian_participant_event: guardian_participant_event, consent: waiver
+      )
+
+      expect(mail.body.encoded).to include("remaining steps")
+      expect(mail.body.encoded).not_to include("finalize everything")
+      expect(mail.body.encoded).not_to include("registration will be complete")
+    end
+
+    it "says the final waiver will be processed when it is the only remaining task" do
+      mail = described_class.waiver_signing(
+        guardian_participant_event: guardian_participant_event, consent: waiver
+      )
+
+      expect(mail.body.encoded).to include("process the completed waiver")
+    end
+
+    it "names the participant by legal name, not preferred name" do
+      participant_event.participant.update!(legal_first_name: "Robin", preferred_name: "Birdie")
+
+      mail = described_class.waiver_signing(
+        guardian_participant_event: guardian_participant_event, consent: waiver
+      )
+
+      expect(mail.subject).to start_with("Robin signed their waiver")
+      expect(mail.body.encoded).to include("Robin has completed their portion")
+      expect(mail.body.encoded).not_to include("Birdie")
+    end
+  end
+
   describe "#optional_document_added" do
     let(:event) { create(:event, name: "Midnight") }
     let(:participant_event) { create(:participant_event, event: event) }
@@ -77,6 +127,38 @@ RSpec.describe GuardianMailer, type: :mailer do
       expect(
         GuardianParticipantEvent.find_by_invite_token!(guardian_participant_event.invite_token)
       ).to eq(guardian_participant_event)
+    end
+  end
+  describe "#waiver_dates_changed" do
+    let(:event) { create(:event) }
+    let(:participant_event) { create(:participant_event, event: event) }
+    let(:guardian_participant_event) do
+      create(:guardian_participant_event, participant_event: participant_event)
+    end
+
+    it "names every re-issued waiver and the new dates in one email" do
+      mail = described_class.waiver_dates_changed(
+        guardian_participant_event: guardian_participant_event,
+        waiver_types: [ :waiver, :freedom_waiver ]
+      )
+
+      expect(mail.subject).to include("Waiver and Freedom Waiver")
+      expect(mail.text_part.body.to_s).to include(event.formatted_date_range)
+      expect(mail.text_part.body.to_s).to include("signs their part of the Waiver first")
+    end
+
+    it "restarts the invite window so the emailed link still resolves" do
+      guardian_participant_event.generate_invite_token!
+      guardian_participant_event.update!(
+        invite_token_sent_at: (GuardianParticipantEvent::INVITE_VALIDITY + 1.day).ago
+      )
+
+      described_class.waiver_dates_changed(
+        guardian_participant_event: guardian_participant_event,
+        waiver_types: [ :freedom_waiver ]
+      ).deliver_now
+
+      expect(guardian_participant_event.reload.invite_expired?).to be(false)
     end
   end
 end

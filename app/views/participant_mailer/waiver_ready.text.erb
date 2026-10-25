@@ -2,8 +2,10 @@ Hi <%= @preferred_name %>,
 
 <% if @participant_event.requires_guardian? %>
 You're almost there! Before your parent/guardian can complete the waiver for <%= @event_name %>, we need you to sign your portion first.
-<% else %>
+<% elsif @waiver_is_final_task %>
 You're almost there! Please sign the waiver for <%= @event_name %> to complete your registration.
+<% else %>
+Please sign the waiver for <%= @event_name %>. Any remaining steps will stay visible on your dashboard.
 <% end %>
 
 Sign your waiver here: <%= @waiver_link %>

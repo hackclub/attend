@@ -15,28 +15,47 @@
     <ul class="divide-y" style="border-color: var(--border);">
       <% guardian_docs.each do |doc| %>
         <% consent = @participant_event.consents.find { |c| c.custom_document_id == doc.id } %>
+        <% document_tasks = @completion.outstanding_tasks.select { |task| task.custom_document == doc } %>
+        <% participant_task = document_tasks.find { |task| task.owner == :participant } %>
+        <% guardian_task = document_tasks.find do |task|
+             task.owner == :guardian && task.guardian_participant_event == @guardian_participant_event
+           end %>
+        <% processing_task = document_tasks.find { |task| task.owner == :document_processing } %>
+        <% paused_task = document_tasks.find { |task| task.owner == :staff && task.status == :paused } %>
+        <% failed_task = document_tasks.find { |task| task.owner == :staff && task.status == :failed } %>
         <% if doc.physical? %>
-          <% awaiting_upload = doc.participant_signs? && !consent&.physical_uploads&.attached? %>
           <li class="py-5 first:pt-4 last:pb-0">
             <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 mb-1">
               <h3 class="portal-heading text-base"><%= doc.name %></h3>
               <% if consent&.signed? %>
                 <span class="portal-badge portal-badge-done">Confirmed</span>
-              <% elsif awaiting_upload %>
+              <% elsif failed_task %>
+                <span class="portal-badge portal-badge-waiting">Staff action needed</span>
+              <% elsif paused_task %>
+                <span class="portal-badge portal-badge-waiting">Signing paused</span>
+              <% elsif processing_task && guardian_task.nil? %>
+                <span class="portal-badge portal-badge-waiting">Processing</span>
+              <% elsif participant_task %>
                 <span class="portal-badge portal-badge-waiting">Waiting on <%= first_name %></span>
-              <% else %>
+              <% elsif guardian_task&.status == :actionable %>
                 <span class="portal-badge portal-badge-pending">Needs you</span>
               <% end %>
             </div>
 
             <% if consent&.signed? %>
               <p class="portal-hint text-sm">Confirmed on <%= consent.signed_at&.strftime("%B %-d, %Y at %-I:%M %p") %>.</p>
-            <% elsif awaiting_upload %>
+            <% elsif failed_task %>
+              <p class="portal-hint text-sm">The event team needs to retry this document. Check back later or contact the event organizers.</p>
+            <% elsif paused_task %>
+              <p class="portal-hint text-sm">Signing isn't open yet. Check back later or contact the event organizers.</p>
+            <% elsif processing_task && guardian_task.nil? %>
+              <p class="portal-hint text-sm">The signatures were received and the document is processing.</p>
+            <% elsif participant_task %>
               <p class="portal-hint text-sm">
                 This one is signed on paper. <%= first_name %> uploads a photo of the signed form first —
                 then you'll review and confirm it here.
               </p>
-            <% elsif doc.signed_by_guardian? %>
+            <% elsif guardian_task&.status == :actionable && doc.signed_by_guardian? %>
               <p class="portal-hint text-sm mb-3">
                 Download it, print and sign it, then upload a photo of the signed form.
               </p>
@@ -44,7 +63,7 @@
                     class: "portal-btn portal-btn-primary w-full sm:w-auto" do %>
                 Sign and upload<span class="sr-only"> <%= doc.name %></span>
               <% end %>
-            <% else %>
+            <% elsif guardian_task&.status == :actionable %>
               <p class="portal-hint text-sm mb-3">
                 <%= first_name %> uploaded a photo of the signed document — please review and confirm it.
               </p>
@@ -57,29 +76,37 @@
           <% next %>
         <% end %>
 
-        <% participant_handling = consent&.docuseal_envelope_id.present? && consent.docuseal_guardian_slug.blank? %>
-        <% awaiting_participant = (doc.signed_by_participant_and_guardian? || doc.signed_by_minor_and_guardian?) && !consent&.participant_signed? %>
         <li class="py-5 first:pt-4 last:pb-0">
           <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 mb-1">
             <h3 class="portal-heading text-base"><%= doc.name %></h3>
             <% if consent&.signed? %>
               <span class="portal-badge portal-badge-done">Signed</span>
-            <% elsif participant_handling || awaiting_participant %>
+            <% elsif failed_task %>
+              <span class="portal-badge portal-badge-waiting">Staff action needed</span>
+            <% elsif paused_task %>
+              <span class="portal-badge portal-badge-waiting">Signing paused</span>
+            <% elsif processing_task && guardian_task.nil? %>
+              <span class="portal-badge portal-badge-waiting">Processing</span>
+            <% elsif participant_task %>
               <span class="portal-badge portal-badge-waiting">Waiting on <%= first_name %></span>
-            <% else %>
+            <% elsif guardian_task&.status == :actionable %>
               <span class="portal-badge portal-badge-pending">Needs you</span>
             <% end %>
           </div>
 
           <% if consent&.signed? %>
             <p class="portal-hint text-sm">Signed on <%= consent.signed_at&.strftime("%B %-d, %Y at %-I:%M %p") %>.</p>
-          <% elsif participant_handling %>
-            <p class="portal-hint text-sm"><%= first_name %> is signing this one themselves.</p>
-          <% elsif awaiting_participant %>
+          <% elsif failed_task %>
+            <p class="portal-hint text-sm">The event team needs to retry this document. Check back later or contact the event organizers.</p>
+          <% elsif paused_task %>
+            <p class="portal-hint text-sm">Signing isn't open yet. Check back later or contact the event organizers.</p>
+          <% elsif processing_task && guardian_task.nil? %>
+            <p class="portal-hint text-sm">The signatures were received and the document is processing.</p>
+          <% elsif participant_task %>
             <p class="portal-hint text-sm">
               <%= first_name %> signs their portion first — then you'll be able to sign yours.
             </p>
-          <% else %>
+          <% elsif guardian_task&.status == :actionable %>
             <p class="portal-hint text-sm mb-3">
               Please sign this for <%= first_name %>'s participation.
             </p>

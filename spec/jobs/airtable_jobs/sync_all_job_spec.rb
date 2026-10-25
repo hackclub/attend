@@ -6,7 +6,8 @@ RSpec.describe AirtableJobs::SyncAllJob do
       :event,
       airtable_sync_source_id: "sncTest",
       airtable_sync_table_id: "tblTest",
-      config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" },
+      airtable_api_key: "key-test",
+      config: { "airtable_base_id" => "app-test" },
       **attrs
     )
   end
@@ -99,7 +100,7 @@ RSpec.describe AirtableJobs::SyncAllJob do
       "HTTP 504: Gateway Time-out",
       response: instance_double(Faraday::Response, status: 504)
     )
-    broken = configured_event
+    broken = configured_event(airtable_sync_failures: Event::AIRTABLE_SYNC_ALERT_AFTER_FAILURES - 1)
     stub_sync(broken, raising: server_error)
 
     described_class.perform_now
@@ -114,7 +115,7 @@ RSpec.describe AirtableJobs::SyncAllJob do
     broken = configured_event
     healthy = configured_event
     allow(Airtable::SyncService).to receive(:new).with(broken)
-      .and_raise(ArgumentError, "Airtable API key is required")
+      .and_raise(Airtable::ConfigurationError, "Airtable API key is required")
     healthy_service = stub_sync(healthy)
 
     expect { described_class.perform_now }.not_to raise_error
@@ -125,9 +126,24 @@ RSpec.describe AirtableJobs::SyncAllJob do
     expect(broken.airtable_sync_error_at).to be_present
 
     expect(Sentry).to have_received(:capture_exception) do |exception, **options|
-      expect(exception).to be_a(ArgumentError)
+      expect(exception).to be_a(Airtable::ConfigurationError)
       expect(options[:tags]).to include(airtable_status: nil)
-      expect(options[:fingerprint]).to eq([ "airtable-sync-all", "ArgumentError", broken.id ])
+      expect(options[:fingerprint]).to eq([ "airtable-sync-all", "Airtable::ConfigurationError", broken.id ])
+    end
+  end
+
+  describe "an unexpected error" do
+    it "reports it straight away without pausing, once per streak" do
+      buggy = configured_event
+      stub_sync(buggy, raising: ArgumentError.new("wrong number of arguments"))
+
+      described_class.perform_now
+      described_class.perform_now
+
+      buggy.reload
+      expect(buggy.airtable_sync_paused?).to be(false)
+      expect(buggy.airtable_sync_failures).to eq(2)
+      expect(Sentry).to have_received(:capture_exception).once
     end
   end
 
@@ -181,10 +197,32 @@ RSpec.describe AirtableJobs::SyncAllJob do
     expect(Airtable::SyncService).not_to have_received(:new)
   end
 
-  describe "pausing after a failure" do
+  describe "pausing on a config error" do
     it "pauses the event's sync on the first failure" do
       broken = configured_event
       stub_sync(broken, raising: not_found)
+
+      described_class.perform_now
+
+      expect(broken.reload.airtable_sync_paused?).to be(true)
+    end
+
+    it "keeps syncing after a rate limit and counts the failure" do
+      flaky = configured_event
+      service = stub_sync(flaky, raising: Airtable::RateLimitError.new)
+
+      described_class.perform_now
+      described_class.perform_now
+
+      flaky.reload
+      expect(flaky.airtable_sync_paused?).to be(false)
+      expect(flaky.airtable_sync_failures).to eq(2)
+      expect(service).to have_received(:sync_via_api).twice
+    end
+
+    it "pauses when the workspace's monthly API allowance is used up" do
+      broken = configured_event
+      stub_sync(broken, raising: Airtable::QuotaExceededError.new)
 
       described_class.perform_now
 
@@ -296,6 +334,52 @@ RSpec.describe AirtableJobs::SyncAllJob do
 
       expect(healthy_service).to have_received(:sync_via_api)
       expect(broken.reload.airtable_sync_paused?).to be(true)
+    end
+  end
+
+  describe "alerting on a lasting transient failure" do
+    let(:server_error) { Airtable::ServerError.new(response: instance_double(Faraday::Response, status: 503)) }
+    let(:owner) { create(:user) }
+    let(:threshold) { Event::AIRTABLE_SYNC_ALERT_AFTER_FAILURES }
+
+    it "emails the config owner and reports once the threshold is reached" do
+      flaky = configured_event(airtable_config_updated_by: owner, airtable_sync_failures: threshold - 1)
+      stub_sync(flaky, raising: server_error)
+
+      expect { described_class.perform_now }
+        .to have_enqueued_mail(AirtableMailer, :sync_failing)
+        .with(event: flaky, recipient: owner, error_message: server_error.message, failures: threshold)
+
+      expect(flaky.reload.airtable_sync_alerted_at).to be_present
+      expect(Sentry).to have_received(:capture_exception) do |_exception, **options|
+        expect(options[:tags]).to include(airtable_sync_paused: false)
+        expect(options[:contexts][:airtable_sync]).to include(consecutive_failures: threshold)
+      end
+    end
+
+    it "doesn't count a manual Sync Now towards the streak" do
+      flaky = configured_event(airtable_config_updated_by: owner, airtable_sync_failures: threshold - 1)
+      stub_sync(flaky, raising: server_error)
+
+      expect { described_class.perform_now(flaky.id) }.not_to have_enqueued_mail(AirtableMailer, :sync_failing)
+
+      flaky.reload
+      expect(flaky.airtable_sync_failures).to eq(threshold - 1)
+      expect(flaky.airtable_sync_error).to eq(server_error.message)
+    end
+  end
+
+  describe "syncing a single event" do
+    it "syncs only the event it is given" do
+      wanted = configured_event
+      other = configured_event
+      wanted_service = stub_sync(wanted)
+      allow(Airtable::SyncService).to receive(:new).with(other)
+
+      described_class.perform_now(wanted.id)
+
+      expect(wanted_service).to have_received(:sync_via_api)
+      expect(Airtable::SyncService).not_to have_received(:new).with(other)
     end
   end
 end

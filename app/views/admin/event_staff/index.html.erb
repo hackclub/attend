@@ -4,6 +4,8 @@
     <%= link_to "Add Staff Member", new_admin_event_staff_path(current_event), class: "w-full sm:w-auto text-center px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] transition-colors" %>
   </div>
 
+  <%= render "admin/event_staff/training_summary", summary: @training_status.summary %>
+
   <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
     <% if @event_role_assignments.any? %>
       <table class="min-w-full divide-y divide-gray-100">
@@ -11,6 +13,7 @@
           <tr>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Training</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Added</th>
             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
           </tr>
@@ -23,17 +26,32 @@
                 <div class="text-sm text-gray-500"><%= assignment.user.email %></div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                  <%= case assignment.role
-                      when 'event_admin' then 'bg-purple-100 text-purple-800'
-                      when 'ops' then 'bg-blue-100 text-blue-800'
-                      when 'limited' then 'bg-teal-100 text-teal-800'
-                      when 'safeguarding_lead' then 'bg-red-100 text-red-800'
-                      when 'read_only' then 'bg-gray-100 text-gray-800'
-                      end %>">
-                  <%= assignment.role.titleize %>
-                </span>
+                <% refusal = role_change_refusal(assignment) %>
+                <% if refusal %>
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                    <%= case assignment.role
+                        when 'event_admin' then 'bg-purple-100 text-purple-800'
+                        when 'ops' then 'bg-blue-100 text-blue-800'
+                        when 'limited' then 'bg-teal-100 text-teal-800'
+                        when 'safeguarding_lead' then 'bg-red-100 text-red-800'
+                        when 'read_only' then 'bg-gray-100 text-gray-800'
+                        end %>" title="<%= refusal %>">
+                    <%= assignment.role.titleize %>
+                  </span>
+                <% else %>
+                  <%= form_with model: assignment, url: admin_event_staff_path(current_event, assignment), method: :patch,
+                        class: "flex items-center gap-2", data: { turbo: false } do |f| %>
+                    <%= f.select :role,
+                          options_for_select(EventRoleAssignment::ROLE_DETAILS.map { |role, details| [ details[:label], role ] }, assignment.role),
+                          {},
+                          class: "text-sm border border-gray-300 rounded-md py-1 pl-2 pr-8",
+                          id: dom_id(assignment, :role_select),
+                          aria: { label: "Role for #{assignment.user.display_name_or_fallback}" } %>
+                    <%= f.button "Save", class: "text-sm font-medium text-[#d42f46] hover:text-[#b82840]" %>
+                  <% end %>
+                <% end %>
               </td>
+              <td class="px-6 py-4 whitespace-nowrap"><%= training_status_flag(@training_status.for(assignment.user_id)) %></td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 <%= assignment.created_at.strftime("%B %d, %Y") %>
               </td>
@@ -55,6 +73,58 @@
         <p class="text-gray-500">No staff members assigned to this event yet.</p>
         <p class="text-sm text-gray-400 mt-2">Add staff members to give them access to manage this event.</p>
       </div>
+    <% end %>
+  </div>
+
+  <% if @series_team.any? %>
+    <div id="series-team" class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-900">Series Team (<%= @series_team.size %>)</h2>
+        <p class="text-sm text-gray-500">Owners and organizers of <%= current_event.event_series.name %>, who act as event admins here.</p>
+      </div>
+      <table class="min-w-full divide-y divide-gray-100">
+        <tbody class="bg-white divide-y divide-gray-100">
+          <% @series_team.each do |user| %>
+            <tr>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900"><%= user.display_name_or_fallback %></div>
+                <div class="text-sm text-gray-500"><%= user.email %></div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap"><%= training_status_flag(@training_status.for(user.id)) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+
+  <div id="volunteers" class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100">
+      <h2 class="text-lg font-semibold text-gray-900">Volunteers (<%= @volunteers.size %>)</h2>
+      <p class="text-sm text-gray-500">People working the event without access to Attend. They're listed here so you can see their training.</p>
+      <%= form_with url: admin_event_volunteers_path(current_event), method: :post, class: "mt-3 flex flex-col sm:flex-row gap-2" do %>
+        <%= email_field_tag :email, nil, class: "flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm", placeholder: "volunteer@example.com", required: true, "aria-label": "Volunteer email address" %>
+        <%= button_tag "Add Volunteer", class: "px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] text-sm" %>
+      <% end %>
+    </div>
+    <% if @volunteers.any? %>
+      <table class="min-w-full divide-y divide-gray-100">
+        <tbody class="bg-white divide-y divide-gray-100">
+          <% @volunteers.each do |volunteer| %>
+            <tr>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="text-sm font-medium text-gray-900"><%= volunteer.user.display_name_or_fallback %></div>
+                <div class="text-sm text-gray-500"><%= volunteer.user.email %></div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap"><%= training_status_flag(@training_status.for(volunteer.user_id)) %></td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <%= button_to "Remove", admin_event_volunteer_path(current_event, volunteer), method: :delete, class: "text-red-600 hover:text-red-900",
+                      data: { turbo_confirm: "Remove #{volunteer.user.email} from this event's volunteers?" } %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
     <% end %>
   </div>
 

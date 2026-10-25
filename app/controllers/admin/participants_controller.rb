@@ -3,7 +3,7 @@ module Admin
     include TravelLegDateMerging
 
     before_action :require_event_selected
-    before_action :set_participant_event, except: [ :index, :table, :new_invite, :send_invite, :revoke_invite, :sync_slack_channel_preview, :sync_slack_channel ]
+    before_action :set_participant_event, except: [ :index, :table, :new_invite, :send_invite, :revoke_invite, :send_held_invitations, :sync_slack_channel_preview, :sync_slack_channel ]
     before_action :set_participant_header_data, only: [ :show, :travel, :update_travel, :accommodation, :update_accommodation, :medical, :update_medical, :safeguarding, :update_safeguarding, :consents, :notes, :history, :slack_invite_link, :merge ]
     before_action :require_safeguarding_access, only: [ :safeguarding ]
 
@@ -26,7 +26,9 @@ module Admin
         # preload (not includes): the string order on participants.legal_last_name
         # would otherwise flip every association into one giant eager-load LEFT JOIN.
         @participant_events = policy_scope(current_event.participant_events)
-          .preload(:participant, :event, :travel_inbound, :travel_outbound, :accommodation, :medical, :safeguarding_info, :dietary, :accessibility, :consents, :emergency_contacts, :groups, guardian_participant_events: :emergency_contacts)
+          .preload(:participant, :event, :travel_inbound, :travel_outbound, :accommodation, :medical, :safeguarding_info, :dietary, :accessibility, :consents, :emergency_contacts, :groups, guardian_participant_events: :emergency_contacts, latest_placing_scan: :scan_context)
+        # Once the event has ended the status cell asks whether each row ever checked in.
+        @participant_events = @participant_events.preload(scans: :scan_context) if current_event.phase_at == :ended
 
         if params[:search].present?
           search_term = "%#{ActiveRecord::Base.sanitize_sql_like(params[:search])}%"
@@ -61,6 +63,8 @@ module Admin
           @participant_events = @participant_events.joins(:safeguarding_info).where(safeguarding_infos: { high_support_flag: true })
         when "anaphylaxis"
           @participant_events = @participant_events.joins(:medical).where(medicals: { has_anaphylaxis_risk: true })
+        when "over_age_limit"
+          @participant_events = @participant_events.where(id: over_age_limit_ids(@participant_events))
         end
       end
 
@@ -155,12 +159,21 @@ module Admin
       @safeguarding_info = @participant_event.safeguarding_info
       @consents = @participant_event.consents
       @guardian_participant_events = @participant_event.guardian_participant_events.includes(:guardian)
-      @notes = @participant_event.notes.includes(:author).order(created_at: :desc)
       @scans = @participant_event.scans.includes(:user, :scan_context).recent.limit(3)
+      @emergency_contacts = emergency_contacts_for_profile
     end
 
     def link_guardian
       authorize @participant_event, :update?
+
+      # A guardian's contact details stay hidden from PII-restricted roles, so
+      # they have no business writing them either. The form is hidden for them;
+      # this stops a hand-crafted POST.
+      unless can_view_participant_pii?
+        redirect_to admin_event_participant_path(current_event, @participant_event),
+          alert: "Your role cannot add guardians, because it cannot see their contact details."
+        return
+      end
 
       guardian_email = params[:guardian_email].to_s.strip.downcase
       participant_email = @participant_event.participant.email.to_s.strip.downcase
@@ -228,16 +241,24 @@ module Admin
       @travel_outbound = @participant_event.travel_outbound || @participant_event.build_travel_outbound
 
       Travel.transaction do
-        inbound_saved = @travel_inbound.update(travel_params(:inbound))
-        outbound_saved = @travel_outbound.update(travel_params(:outbound))
+        @travel_inbound.assign_attributes(travel_params(:inbound))
+        @travel_outbound.assign_attributes(travel_params(:outbound))
+        inbound_saved = @travel_inbound.valid?
+        outbound_saved = @travel_outbound.valid?
 
         if inbound_saved && outbound_saved
+          @travel_inbound.save!
+          @travel_outbound.save!
           redirect_to travel_admin_event_participant_path(current_event, @participant_event), notice: "Travel information updated."
         else
-          @travel_inbound.travel_legs.build(position: 0) if @travel_inbound.plane? && @travel_inbound.travel_legs.reject(&:marked_for_destruction?).empty?
-          @travel_outbound.travel_legs.build(position: 0) if @travel_outbound.plane? && @travel_outbound.travel_legs.reject(&:marked_for_destruction?).empty?
-          render :travel, status: :unprocessable_entity
+          raise ActiveRecord::Rollback
         end
+      end
+
+      unless performed?
+        @travel_inbound.travel_legs.build(position: 0) if @travel_inbound.plane? && @travel_inbound.travel_legs.reject(&:marked_for_destruction?).empty?
+        @travel_outbound.travel_legs.build(position: 0) if @travel_outbound.plane? && @travel_outbound.travel_legs.reject(&:marked_for_destruction?).empty?
+        render :travel, status: :unprocessable_entity
       end
     end
 
@@ -369,18 +390,7 @@ module Admin
 
       waiver_consent = @participant_event.consents.find_by(consent_type: :waiver)
       if waiver_consent
-        waiver_consent.update!(
-          status: :pending,
-          docuseal_envelope_id: nil,
-          docuseal_guardian_slug: nil,
-          docuseal_participant_slug: nil,
-          docuseal_template_id: nil,
-          guardian_signed_at: nil,
-          participant_signed_at: nil,
-          signed_at: nil,
-          document_url: nil,
-          failure_reason: nil
-        )
+        waiver_consent.reset_for_reissue!
 
         reopen_guardian_portal_access
         send_waiver_reset_email(waiver_type: :waiver)
@@ -403,20 +413,8 @@ module Admin
 
       freedom_waiver_consent = @participant_event.consents.find_by(consent_type: :freedom_waiver)
       if freedom_waiver_consent
-        freedom_waiver_consent.update!(
-          status: :pending,
-          docuseal_envelope_id: nil,
-          docuseal_guardian_slug: nil,
-          docuseal_participant_slug: nil,
-          docuseal_template_id: nil,
-          guardian_signed_at: nil,
-          participant_signed_at: nil,
-          signed_at: nil,
-          document_url: nil,
-          failure_reason: nil
-        )
-
-        @participant_event.safeguarding_info&.update!(freedom_waiver_granted: false)
+        # Also clears safeguarding_info.freedom_waiver_granted.
+        freedom_waiver_consent.reset_for_reissue!
 
         reopen_guardian_portal_access
         send_waiver_reset_email(waiver_type: :freedom_waiver)
@@ -508,7 +506,6 @@ module Admin
 
     def notes
       authorize @participant_event, :view_notes?
-      @notes = @participant_event.notes.includes(:author).order(created_at: :desc)
     end
 
     def history
@@ -533,7 +530,8 @@ module Admin
       keys << [ "Travel", pe.travels.pluck(:id) ]
       keys << [ "TravelLeg", TravelLeg.where(travel_id: pe.travels.pluck(:id)).pluck(:id) ]
       keys << [ "Consent", pe.consents.pluck(:id) ]
-      keys << [ "Note", pe.notes.pluck(:id) ]
+      keys << [ "RegistrationChangeRequest", pe.registration_change_requests.pluck(:id) ]
+      keys << [ "Note", policy_scope(pe.notes).pluck(:id) ]
       keys << [ "EmergencyContact", EmergencyContact.where(participant_event_id: pe.id).or(EmergencyContact.where(guardian_participant_event_id: gpe_ids)).pluck(:id) ]
       keys << [ "RoomAssignment", Array(pe.room_assignment&.id) ]
       keys << [ "RoommatePreference", pe.roommate_preferences.pluck(:id) ]
@@ -593,25 +591,34 @@ module Admin
     end
 
     def withdraw
-      authorize @participant_event, :update?
+      authorize @participant_event, :withdraw?
       @participant_event.withdrawn!
       redirect_to admin_event_participant_path(current_event, @participant_event),
         notice: "#{@participant_event.participant.display_name} has been marked as withdrawn."
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
+      redirect_to admin_event_participant_path(current_event, @participant_event),
+        alert: "Couldn't withdraw #{@participant_event.participant.display_name} — nothing was changed: #{e.message}"
     end
 
     def unwithdraw
-      authorize @participant_event, :update?
+      authorize @participant_event, :withdraw?
       # Reset to a non-terminal status; #display_status recomputes the real state
       # (Awaiting Participant / Awaiting Parent / Complete) from onboarding progress.
       @participant_event.in_progress!
       redirect_to admin_event_participant_path(current_event, @participant_event),
         notice: "#{@participant_event.participant.display_name} has been reinstated."
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
+      redirect_to admin_event_participant_path(current_event, @participant_event),
+        alert: "Couldn't reinstate #{@participant_event.participant.display_name} — nothing was changed: #{e.message}"
     end
 
     def destroy
       authorize @participant_event
       participant_name = @participant_event.participant.display_name
-      @participant_event.destroy!
+      ActiveRecord::Base.transaction do
+        @participant_event.revoke_invitations!
+        @participant_event.destroy!
+      end
       redirect_to admin_event_participants_path(current_event), notice: "#{participant_name} has been removed from this event."
     end
 
@@ -687,6 +694,10 @@ module Admin
     # Re-send the participant's onboarding invitation. The mailer reuses the
     # pending Invitation when there is one, so the link they were already sent
     # keeps working; an expired one is replaced with a fresh token.
+    #
+    # Deliberately sends even while the event is holding onboarding
+    # invitations: this is one named person, chosen by a staff member, not the
+    # bulk send the hold exists to time.
     def resend_invitation
       authorize @participant_event, :update?
 
@@ -698,6 +709,8 @@ module Admin
         return
       end
 
+      was_held = current_event.invitations.held.for_email(participant.email).exists?
+
       ParticipantMailer.invitation(
         email: participant.email,
         event: current_event,
@@ -705,7 +718,7 @@ module Admin
       ).deliver_later
 
       redirect_to admin_event_participant_path(current_event, @participant_event),
-        notice: "Invitation resent to #{participant.email}."
+        notice: "Invitation #{was_held ? 'sent' : 'resent'} to #{participant.email}."
     end
 
     def update_groups
@@ -729,10 +742,14 @@ module Admin
     end
 
     def new_invite
+      authorize current_event, :invite_participants?
+
       @invite = Struct.new(:email, :name, :group_ids).new("", "", [])
     end
 
     def send_invite
+      authorize current_event, :invite_participants?
+
       email = params[:invite][:email]&.strip&.downcase
       name = params[:invite][:name]
       group_ids = Array(params[:invite][:group_ids]).reject(&:blank?)
@@ -748,13 +765,23 @@ module Admin
       end
 
       begin
-        ParticipantMailer.invitation(
-          email: email,
-          name: name,
-          event: current_event,
-          group_ids: group_ids
-        ).deliver_later
-        redirect_to admin_event_participants_path(current_event), notice: "Invitation sent to #{email}."
+        if params[:invite][:send_now].present?
+          # The pending-invitations tab's per-row Send/Resend. It emails even
+          # while the event is holding onboarding invitations: the hold is the
+          # event's default, and this is a staff member overriding it for one
+          # named person.
+          Invitation.issue!(event: current_event, email: email, name: name, group_ids: group_ids, send: false)
+          participant = Participant.find_by("LOWER(email) = ?", email)
+          ParticipantMailer.invitation(email: email, name: name, event: current_event, participant: participant).deliver_later
+          redirect_to admin_event_participants_path(current_event, status: "pending_invitations"), notice: "Invitation sent to #{email}."
+        elsif current_event.onboarding_invites_held?
+          Invitation.issue!(event: current_event, email: email, name: name, group_ids: group_ids)
+          redirect_to admin_event_participants_path(current_event, status: "pending_invitations"),
+            notice: "#{email} added. Their invitation is held until this event's onboarding invitations are sent."
+        else
+          Invitation.issue!(event: current_event, email: email, name: name, group_ids: group_ids)
+          redirect_to admin_event_participants_path(current_event), notice: "Invitation sent to #{email}."
+        end
       rescue ActiveRecord::RecordInvalid => e
         redirect_to new_invite_admin_event_participants_path(current_event), alert: e.record.errors.full_messages.join(", ")
       rescue ArgumentError => e
@@ -762,7 +789,23 @@ module Admin
       end
     end
 
+    # Emails every invitation this event recorded while holding onboarding
+    # invitations, and stops holding new ones. The series page has the same
+    # button for every event at once.
+    def send_held_invitations
+      authorize current_event, :invite_participants?
+
+      count = current_event.held_invitations_count
+      current_event.release_onboarding_invites!
+      @record = current_event
+
+      redirect_to admin_event_participants_path(current_event, status: "pending_invitations"),
+        notice: "Sending #{helpers.pluralize(count, 'held invitation')}. New participants will be emailed as they're added."
+    end
+
     def revoke_invite
+      authorize current_event, :invite_participants?
+
       invitation = current_event.invitations.find(params[:id])
       email = invitation.email
       invitation.destroy!
@@ -924,6 +967,21 @@ module Admin
       end
     end
 
+    # Evaluated in Ruby, like the blocking stages, so the list matches
+    # ParticipantEvent#too_old_for_event? to the day, leap-day birthdays
+    # included.
+    def over_age_limit_ids(scope)
+      # Only the birthday is needed here; the roster preloads are run once,
+      # on the filtered set.
+      scope.unscope(:preload, :includes, :eager_load, :order)
+           .select(:id, :participant_id, :event_id)
+           .preload(:participant)
+           .filter_map do |pe|
+        pe.association(:event).target = current_event
+        pe.id if pe.too_old_for_event?
+      end
+    end
+
     def active_participant_events(scope)
       scope.to_a.reject { |pe| SeriesDashboard::INACTIVE_STATUSES.include?(pe.status) }.each do |pe|
         # onboarding_progress asks the event about accommodation, freedom waivers
@@ -937,10 +995,24 @@ module Admin
       @participant_event = current_event.participant_events.find(params[:id])
     end
 
+    # Emergency contacts for the profile page. Safeguarding viewers see them in
+    # full (the same list the safeguarding tab shows); PII-restricted roles get
+    # a first name and a phone number, because running an incident means being
+    # able to call someone. Every other role sees no section at all, which is
+    # what they saw before this block existed.
+    def emergency_contacts_for_profile
+      return nil unless !can_view_participant_pii? || policy(@participant_event).view_safeguarding?
+
+      EmergencyContact.left_joins(:guardian_participant_event).where(
+        "emergency_contacts.participant_event_id = :pe_id OR guardian_participant_events.participant_event_id = :pe_id",
+        pe_id: @participant_event.id
+      ).by_priority
+    end
+
     def set_participant_header_data
       @participant = @participant_event.participant
       @safeguarding_info = @participant_event.safeguarding_info
-      @notes = @participant_event.notes.includes(:author).order(created_at: :desc)
+      @notes = policy_scope(@participant_event.notes).includes(:author).order(created_at: :desc)
     end
 
     def participant_params
@@ -948,10 +1020,11 @@ module Admin
         :legal_first_name, :legal_last_name, :preferred_name, :email,
         :date_of_birth, :phone, :pronouns, :tshirt_size, :headshot
       ]
-      # The edit form hides the field for PII-restricted roles; dropping it here
-      # too means a hand-crafted POST can't write (or probe) a date of birth
-      # the same user isn't allowed to read back.
-      permitted.delete(:date_of_birth) unless can_view_participant_pii?
+      # The edit form hides these fields for PII-restricted roles; dropping them
+      # here too means a hand-crafted POST can't write (or probe) a date of
+      # birth or phone number the same user isn't allowed to read back. Email
+      # stays: those roles can see and search on a participant's address.
+      permitted -= [ :date_of_birth, :phone ] unless can_view_participant_pii?
 
       params.require(:participant).permit(*permitted)
     end
@@ -961,7 +1034,7 @@ module Admin
       return { direction: direction } unless params[key].present?
 
       allowed = [
-        :mode, :carrier, :flight_number, :departure_city, :departure_time,
+        :arrangement_status, :mode, :carrier, :flight_number, :departure_city, :departure_time,
         :arrival_city, :arrival_time, :arrival_location, :booking_reference,
         :visa_status, :visa_notes, :is_unaccompanied_minor, :notes,
         :train_departure_station, :train_arrival_station,
@@ -1237,7 +1310,7 @@ module Admin
     end
 
     def apply_age_filter(scope, operator, value)
-      event_date = current_event.starts_at&.to_date || Date.current
+      event_date = current_event.local_start_date || Date.current
       birth_date = event_date - value.to_i.years
 
       case operator
@@ -1276,7 +1349,7 @@ module Admin
     end
 
     def apply_minor_filter(scope, operator, value)
-      event_date = current_event.starts_at&.to_date || Date.current
+      event_date = current_event.local_start_date || Date.current
       adult_birth_date = event_date - 18.years
       is_minor = value == "true"
 
@@ -1440,7 +1513,7 @@ module Admin
       when "tshirt_size"
         scope.group_by { |pe| pe.participant.tshirt_size || "Not set" }
       when "is_minor"
-        event_date = current_event.starts_at&.to_date || Date.current
+        event_date = current_event.local_start_date || Date.current
         scope.group_by { |pe| pe.participant.minor_on?(event_date) ? "Minor" : "Adult" }
       when "onboarding_complete"
         scope.group_by { |pe| pe.onboarding_complete? ? "Complete" : "Incomplete" }
@@ -1534,7 +1607,7 @@ module Admin
       end
 
       return "#{participant.email} is bouncing — correct their email address before resending." if participant.email_undeliverable?
-      return "#{participant.email} is banned from events and cannot be invited." if Ban.banned?(participant.email)
+      return "#{participant.email} is banned from events and cannot be invited." if Ban.banned?(participant.email, slack_ids: Ban.slack_ids_for(participant))
 
       nil
     end
@@ -1627,9 +1700,7 @@ module Admin
     def reopen_guardian_portal_access
       return unless @participant_event.requires_guardian?
 
-      @participant_event.guardian_participant_events.each do |gpe|
-        gpe.update!(status: :in_progress) if gpe.completed?
-      end
+      @participant_event.reopen_guardian_portal_access!
     end
   end
 end

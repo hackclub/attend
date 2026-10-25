@@ -93,7 +93,7 @@ module Admin
 
     def set_event
       @event = Event.find_by!(slug: params[:slug])
-      authorize @event, :update?
+      authorize @event, :manage_integrations?
       set_current_event(@event)
     end
 

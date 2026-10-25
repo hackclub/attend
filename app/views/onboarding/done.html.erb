@@ -1,0 +1,49 @@
+<% content_for :title, "You're registered for #{current_event.name} - Attend" %>
+
+<div class="w-full max-w-2xl mx-auto">
+  <%= render "onboarding/event_card", event: current_event, eyebrow: "You're registered for" %>
+
+  <header class="mt-8 mb-6">
+    <% if @completion.confirmed? %>
+      <h1 class="portal-title text-3xl sm:text-4xl">You're all set!</h1>
+      <p class="portal-body mt-3">Show the entry ticket below when you arrive. You can always find it again on your dashboard.</p>
+    <% else %>
+      <h1 class="portal-title text-3xl sm:text-4xl">You're registered!</h1>
+      <p class="portal-body mt-3">Thanks for signing up. There's just a little left before your entry ticket is ready.</p>
+    <% end %>
+  </header>
+
+  <% if @completion.entry_pass_eligible? %>
+    <%= render "dashboard/entry_ticket", participant_event: @participant_event, participant: @participant, event: current_event %>
+  <% else %>
+    <section class="portal-card p-5 sm:p-6 mb-8 flex flex-col sm:flex-row sm:items-center gap-4">
+      <div class="flex-1 min-w-0">
+        <p class="portal-meta text-xs uppercase tracking-wide">Your entry ticket</p>
+        <h2 class="portal-heading text-lg mt-1"><%= @completion.headline %></h2>
+        <p class="portal-body text-sm mt-1"><%= @completion.body %></p>
+      </div>
+      <% if @completion.state == :information_needed %>
+        <%= link_to "Continue registration", onboarding_path(event_id: current_event.id), class: "portal-btn portal-btn-primary w-full sm:w-auto shrink-0" %>
+      <% elsif @completion.state == :action_needed && @completion.next_task&.kind == :waiver %>
+        <%= link_to "Sign the event waiver", onboarding_waiver_path(event_id: current_event.id), class: "portal-btn portal-btn-primary w-full sm:w-auto shrink-0" %>
+      <% elsif @completion.state == :action_needed && @completion.next_task&.custom_document %>
+        <%= link_to "Sign #{@completion.next_task.name}", dashboard_sign_document_path(@participant_event, @completion.next_task.custom_document), class: "portal-btn portal-btn-primary w-full sm:w-auto shrink-0" %>
+      <% end %>
+    </section>
+  <% end %>
+
+  <% if @participant_event.unaccompanied_minor_declared? %>
+    <p class="portal-body text-sm mb-6">Since you're travelling as an unaccompanied minor, we'll reach out to you with pickup/dropoff information within 2 weeks of the event.</p>
+  <% end %>
+
+  <% if current_event.registration_note %>
+    <section>
+      <h2 class="portal-title text-2xl mb-4">Next steps</h2>
+      <%= render "onboarding/registration_note", event: current_event %>
+    </section>
+  <% end %>
+
+  <div class="mt-8">
+    <%= link_to "Go to your dashboard", dashboard_event_path(@participant_event), class: "portal-btn portal-btn-secondary w-full sm:w-auto" %>
+  </div>
+</div>

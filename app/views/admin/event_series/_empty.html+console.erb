@@ -1,0 +1,11 @@
+<section class="cs-container">
+  <div class="cs-empty">
+    <p class="cs-empty-title">No events in this series yet</p>
+    <p>Create the first event — it'll inherit this series' branding automatically.</p>
+    <% if policy(Event.new(event_series_id: @series.id)).create? %>
+      <div class="cs-actions">
+        <%= link_to "Create event", admin_new_event_path(series: @series.slug), class: "cs-btn" %>
+      </div>
+    <% end %>
+  </div>
+</section>

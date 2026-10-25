@@ -17,7 +17,7 @@ RSpec.describe "Admin::AuditLogs", type: :request do
       event: event,
       reported_by: reporter,
       category: "behavior",
-      severity: "low",
+      severity: "s3",
       summary: "Confidential summary",
       details: "Confidential details",
       visible_to_roles: visible_to_roles
@@ -96,10 +96,23 @@ RSpec.describe "Admin::AuditLogs", type: :request do
       expect(response.body).not_to include(hidden.id.first(8))
     end
 
+    it "shows an event admin the audit rows for incidents they reported" do
+      own = Incident.create!(
+        event: event, reported_by: event_admin, category: "behavior", severity: "s3",
+        summary: "Own summary", visible_to_roles: [ "safeguarding_lead" ]
+      )
+      AuditLog.log!(action: "create", record: own, actor: event_admin, event: event)
+      sign_in event_admin
+
+      get admin_audit_logs_path
+
+      expect(response.body).to include(own.id.first(8))
+    end
+
     it "does not let an event admin read another event's logs via event_id param" do
       other_event = create(:event)
       other_incident = Incident.create!(
-        event: other_event, reported_by: reporter, category: "behavior", severity: "low",
+        event: other_event, reported_by: reporter, category: "behavior", severity: "s3",
         summary: "Other event", visible_to_roles: [ "event_admin" ]
       )
       AuditLog.log!(action: "update", record: other_incident, actor: reporter, event: other_event)
@@ -119,6 +132,97 @@ RSpec.describe "Admin::AuditLogs", type: :request do
       get admin_audit_logs_path
 
       expect(response.body).to include(hidden.id.first(8))
+    end
+  end
+
+  # IncidentPolicy#view_casework?: a reporter who holds none of the incident's
+  # roles gets a receipt for what they filed, not the casework that followed.
+  # The audit log is a second view onto that casework, so it draws the same line.
+  describe "an incident reported by someone outside its roles" do
+    let(:handler) do
+      User.create!(email: "handler-audit@example.com", name: "Handler").tap do |user|
+        EventRoleAssignment.create!(user: user, event: event, role: "safeguarding_lead")
+      end
+    end
+    let(:incident) do
+      PaperTrail.request(whodunnit: event_admin.id) do
+        Incident.create!(
+          event: event, reported_by: event_admin, category: "behavior", severity: "s3",
+          summary: "Own summary", visible_to_roles: [ "safeguarding_lead" ]
+        )
+      end
+    end
+    let!(:create_log) { AuditLog.log!(action: "create", record: incident, actor: event_admin, event: event) }
+    let!(:update_log) do
+      PaperTrail.request(whodunnit: handler.id) { incident.update!(status: "in_review") }
+      AuditLog.log!(action: "update", record: incident, actor: handler, event: event,
+        changed_fields: { "status" => [ "open", "in_review" ] })
+    end
+    let!(:comment_log) do
+      comment = IncidentComment.create!(incident: incident, user: handler, body: "Contacted the guardian")
+      AuditLog.log!(action: "create", record: comment, actor: handler, event: event)
+    end
+
+    it "lists the reporter's own create row and none of the casework" do
+      sign_in event_admin
+
+      get admin_audit_logs_path
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(admin_audit_log_path(create_log))
+      expect(response.body).not_to include(admin_audit_log_path(update_log))
+      expect(response.body).not_to include(admin_audit_log_path(comment_log))
+    end
+
+    it "opens the create row without the incident's version history" do
+      sign_in event_admin
+
+      get admin_audit_log_path(create_log)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("Full record history")
+    end
+
+    it "won't open a comment row by id" do
+      sign_in event_admin
+
+      get admin_audit_log_path(comment_log)
+
+      expect(response).to redirect_to(admin_audit_logs_path)
+    end
+
+    it "won't open a handler's update row by id" do
+      sign_in event_admin
+
+      get admin_audit_log_path(update_log)
+
+      expect(response).to redirect_to(admin_audit_logs_path)
+    end
+
+    context "for staff the incident is shared with" do
+      before { EventRoleAssignment.create!(user: handler, event: event, role: "event_admin") }
+
+      it "lists every row" do
+        sign_in handler
+
+        get admin_audit_logs_path
+
+        expect(response.body).to include(admin_audit_log_path(create_log))
+        expect(response.body).to include(admin_audit_log_path(update_log))
+        expect(response.body).to include(admin_audit_log_path(comment_log))
+      end
+
+      it "opens every row, with the version history" do
+        sign_in handler
+
+        [ create_log, update_log, comment_log ].each do |log|
+          get admin_audit_log_path(log)
+          expect(response).to have_http_status(:ok)
+        end
+
+        get admin_audit_log_path(create_log)
+        expect(response.body).to include("Full record history")
+      end
     end
   end
 
@@ -145,7 +249,7 @@ RSpec.describe "Admin::AuditLogs", type: :request do
       incident = nil
       PaperTrail.request(whodunnit: reporter.id) do
         incident = create_incident(visible_to_roles: [])
-        incident.update!(summary: "updated secret", severity: "high")
+        incident.update!(summary: "updated secret", severity: "s1")
       end
 
       changesets = incident.versions.map(&:changeset)
@@ -169,13 +273,13 @@ RSpec.describe "Admin::AuditLogs", type: :request do
       get admin_event_incident_path(event_slug: event.slug, id: incident.id)
 
       patch admin_event_incident_path(event_slug: event.slug, id: incident.id),
-        params: { incident: { summary: "new secret summary", severity: "high" } }
+        params: { incident: { summary: "new secret summary", severity: "s1" } }
 
       log = AuditLog.where(record_type: "Incident", record_id: incident.id, action: "update").last
       expect(log).to be_present
       expect(log.changed_fields["summary"]).to eq("[REDACTED]")
       expect(log.changed_fields.to_json).not_to include("new secret summary")
-      expect(log.changed_fields["severity"]).to eq([ "low", "high" ])
+      expect(log.changed_fields["severity"]).to eq([ "s3", "s1" ])
     end
   end
 end

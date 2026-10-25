@@ -1,0 +1,287 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Users", admin_users_path ], [ @user.display_name_or_fallback, nil ]) %>
+
+<div class="cs-stack">
+  <div class="cs-header mb-0!">
+    <div class="cs-header-text">
+      <h1 class="cs-h1"><%= @user.display_name_or_fallback %></h1>
+    </div>
+    <div class="cs-actions">
+      <% if current_user.global_admin? && @user != current_user %>
+        <%= button_to "Impersonate", admin_user_impersonation_path(@user), method: :post, class: "cs-btn cs-btn-full", form: { data: { turbo_confirm: "You will be signed in as #{@user.display_name_or_fallback}. Continue?" } } %>
+      <% end %>
+      <%= link_to "Edit", edit_admin_user_path(@user), class: "cs-btn cs-btn-primary cs-btn-full" %>
+    </div>
+  </div>
+
+  <% if @active_bans.any? %>
+    <section class="cs-alert cs-alert-error" data-testid="user-ban-alert">
+      <%= cs_status_icon(:error) %>
+      <div class="flex-1 min-w-0">
+        <p class="cs-alert-title">This user is on the ban list</p>
+        <p>They are blocked from being added to any event. <%= link_to "Open the ban list", admin_bans_path, class: "cs-link" %>.</p>
+        <ul class="mt-2 space-y-1">
+          <% @active_bans.each do |ban| %>
+            <li>
+              <%= link_to admin_ban_path(ban), class: "cs-link" do %>
+                <%= ban.reason.presence || "No reason recorded" %>
+              <% end %>
+              <span class="cs-muted">
+                — matched on <%= ban.identifiers_matching(@user).join(", ") %>,
+                <%= ban.expires_at ? "expires #{l(ban.expires_at, format: :long)}" : "indefinite" %>
+              </span>
+              <% if ban.ucat? && ban.ucat_cases.any? %>
+                <span class="cs-muted">— UCAT <%= "case".pluralize(ban.ucat_case_links.size) %>: <%= render "admin/bans/ucat_cases", ban: ban, link_class: "cs-link" %></span>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    </section>
+  <% end %>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">User details</h2>
+    </div>
+    <div class="cs-container-body">
+      <dl class="cs-kv cs-kv-3">
+        <div>
+          <dt class="cs-kv-label">Email</dt>
+          <dd class="cs-kv-value"><%= @user.email %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Name</dt>
+          <dd class="cs-kv-value"><%= @user.name || "—" %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Global role</dt>
+          <dd class="cs-kv-value">
+            <% if @user.global_admin? %>
+              <%= cs_badge("Global admin", "red") %>
+            <% elsif @user.read_only? %>
+              <%= cs_badge("Read only") %>
+            <% else %>
+              <span class="cs-muted">No global role</span>
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Hack Club Auth ID</dt>
+          <dd class="cs-kv-value"><%= @user.hack_club_account_id || "—" %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Slack ID</dt>
+          <dd class="cs-kv-value">
+            <% if @user.oidc_claims["slack_id"].present? %>
+              <%= link_to "slack://user?team=T0266FRGM&id=#{@user.oidc_claims["slack_id"]}", class: "cs-link" do %><code class="cs-copy-value"><%= @user.oidc_claims["slack_id"] %></code><% end %>
+            <% else %>
+              <span class="cs-muted">—</span>
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Verification status</dt>
+          <dd class="cs-kv-value flex flex-wrap items-center gap-2">
+            <% status = @user.oidc_claims["verification_status"] %>
+            <% if status == "verified" %>
+              <%= cs_status(:success, "Verified") %>
+            <% elsif status.present? %>
+              <%= cs_status(:warning, status.titleize) %>
+            <% else %>
+              <span class="cs-muted">—</span>
+            <% end %>
+            <% if @user.oidc_claims["ysws_eligible"] == true %>
+              <%= cs_badge("YSWS eligible", "blue") %>
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Sign in count</dt>
+          <dd class="cs-kv-value"><%= @user.sign_in_count %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Last sign in</dt>
+          <dd class="cs-kv-value">
+            <% if @user.last_sign_in_at %>
+              <%= cs_relative_time(@user.last_sign_in_at) %>
+              <span class="cs-secondary">from <%= @user.last_sign_in_ip %></span>
+            <% else %>
+              Never
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Created</dt>
+          <dd class="cs-kv-value"><%= cs_relative_time(@user.created_at) %></dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <%# No admin-only outline: this whole page is global-admin only. %>
+  <div class="cs-container"
+       data-controller="passport-pairing"
+       data-passport-pairing-create-url-value="<%= admin_user_passports_path(@user) %>">
+    <div class="cs-container-header cs-container-header-divided">
+      <div>
+        <h2 class="cs-h2">Hack Club Passports <span class="cs-counter">(<%= @passports.size %>)</span></h2>
+        <p class="cs-container-description">Pair an event-agnostic NFC passport to this user.</p>
+      </div>
+      <div class="cs-actions">
+        <span class="inline-flex items-center gap-2 cs-small cs-secondary">
+          <span class="size-2 rounded-full bg-gray-400" data-passport-pairing-target="statusDot"></span>
+          <span data-passport-pairing-target="statusText">Not connected</span>
+        </span>
+        <button type="button"
+                class="cs-btn"
+                data-passport-pairing-target="connectButton"
+                data-action="passport-pairing#toggleConnection">
+          Connect
+        </button>
+        <button type="button"
+                class="cs-btn cs-btn-primary"
+                data-passport-pairing-target="pairButton"
+                data-action="passport-pairing#pair"
+                disabled>
+          Pair passport
+        </button>
+      </div>
+    </div>
+
+    <div class="px-5 py-3 border-b border-(--cs-border-divider-secondary)">
+      <p class="text-gray-600" data-passport-pairing-target="progress">
+        Connect the Attend NFC Bridge to pair a passport.
+      </p>
+    </div>
+
+    <% if @passports.any? %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Serial</th>
+              <th scope="col">Status</th>
+              <th scope="col">Paired</th>
+              <th scope="col" class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @passports.each do |passport| %>
+              <tr>
+                <td class="whitespace-nowrap font-mono"><%= passport.serial_number %></td>
+                <td class="whitespace-nowrap">
+                  <% if passport.revoked? %>
+                    <%= cs_status(:stopped, "Revoked") %>
+                  <% elsif passport.active? %>
+                    <%= cs_status(:success, "Active") %>
+                  <% else %>
+                    <%= cs_status(:pending, "Pending") %>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap">
+                  <% if passport.paired_at? %>
+                    <%= cs_relative_time(passport.paired_at) %>
+                    <% if passport.paired_by %>
+                      <span class="block cs-small cs-muted">by <%= passport.paired_by.display_name_or_fallback %></span>
+                    <% end %>
+                  <% else %>
+                    <span class="cs-muted">Not yet paired</span>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap text-right">
+                  <% if passport.active? %>
+                    <%= button_to "Revoke",
+                      admin_user_passport_path(@user, passport),
+                      method: :delete,
+                      class: "cs-btn cs-btn-link",
+                      data: { turbo_confirm: "Revoke passport #{passport.serial_number}?" } %>
+                  <% elsif passport.revoked? %>
+                    <span class="cs-small cs-muted">Revoked <%= cs_relative_time(passport.revoked_at, inline: true) %></span>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="cs-empty">
+        <p class="cs-empty-title">No passports</p>
+        <p>No passports have been paired with this user.</p>
+      </div>
+    <% end %>
+  </div>
+
+  <%= render "admin/users/training", user: @user, awards: @training_awards, enrollments: @training_enrollments, disclosure: @training_disclosure %>
+
+  <% if @event_role_assignments.any? %>
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <h2 class="cs-h2">Event roles <span class="cs-counter">(<%= @event_role_assignments.size %>)</span></h2>
+      </div>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Event</th>
+              <th scope="col">Role</th>
+              <th scope="col">Assigned</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @event_role_assignments.each do |assignment| %>
+              <tr>
+                <td class="whitespace-nowrap">
+                  <%= link_to assignment.event.name, admin_event_dashboard_path(assignment.event.slug), class: "cs-link" %>
+                </td>
+                <td class="whitespace-nowrap"><%= assignment.role.titleize %></td>
+                <td class="whitespace-nowrap cs-secondary"><%= cs_relative_time(assignment.created_at) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% end %>
+
+  <% if @participant_events.any? %>
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <h2 class="cs-h2">Event attendance <span class="cs-counter">(<%= @participant_events.size %>)</span></h2>
+      </div>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Event</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @participant_events.each do |pe| %>
+              <tr>
+                <td>
+                  <%= link_to pe.event.name, admin_event_participant_path(pe.event, pe), class: "cs-link" %>
+                  <% if pe.participant.user_id != @user.id %>
+                    <div class="cs-alert cs-alert-warning mt-2">
+                      <%= cs_status_icon(:warning) %>
+                      <p>
+                        On a participant record that isn't linked to this account
+                        (<%= pe.participant.email %>) &mdash; their dashboard follows the
+                        linked record, not this one.
+                        <% if @user.participant %>
+                          <%= link_to "Merge the records", merge_admin_event_participant_path(pe.event, pe, duplicate_id: @user.participant.id), class: "cs-link cs-link-strong" %>
+                        <% end %>
+                      </p>
+                    </div>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap"><%= pe.status.titleize %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% end %>
+</div>

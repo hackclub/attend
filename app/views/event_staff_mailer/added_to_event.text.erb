@@ -28,6 +28,10 @@ Sign in with your Hack Club account using this email address (<%= @user.email %>
 
 <%= @dashboard_url %>
 
+<% if @training_badges.any? %>
+Before you work the event, you'll need to hold <%= @training_badges.map(&:name).to_sentence %>. You can do the training on Attend: <%= @training_url %>
+
+<% end %>
 Everything in Attend is audit-logged, and staff often see participants' medical, travel, and safeguarding details -- please only look at what you need for your role.
 
 <% if @added_by %>

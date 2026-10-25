@@ -8,20 +8,21 @@ RSpec.describe Event, type: :model do
       expect(event.errors[:support_email]).to include("can't be blank")
     end
 
-    it "accepts @hackclub.com and @events.hackclub.com addresses" do
+    it "accepts @hackclub.com, @events.hackclub.com, and @haven.hackclub.com addresses" do
       expect(build(:event, support_email: "sunbeam@hackclub.com")).to be_valid
       expect(build(:event, support_email: "sunbeam@events.hackclub.com")).to be_valid
+      expect(build(:event, support_email: "sunbeam@haven.hackclub.com")).to be_valid
     end
 
     it "rejects addresses on any other domain" do
       event = build(:event, support_email: "sunbeam@gmail.com")
       expect(event).not_to be_valid
       expect(event.errors[:support_email])
-        .to include("must be a @hackclub.com or @events.hackclub.com address")
+        .to include("must be a @hackclub.com, @events.hackclub.com, or @haven.hackclub.com address")
     end
 
     it "rejects lookalike domains" do
-      %w[sunbeam@nothackclub.com sunbeam@hackclub.com.evil.com sunbeam@sub.events.hackclub.com]
+      %w[sunbeam@nothackclub.com sunbeam@hackclub.com.evil.com sunbeam@sub.events.hackclub.com sunbeam@sub.haven.hackclub.com]
         .each do |address|
           expect(build(:event, support_email: address)).not_to be_valid
         end
@@ -45,13 +46,108 @@ RSpec.describe Event, type: :model do
     end
   end
 
+  describe "#formatted_arrival_window" do
+    let(:event) { build(:event, timezone: "Europe/London") }
+
+    it "is nil when neither end of the window is published" do
+      expect(event.formatted_arrival_window).to be_nil
+    end
+
+    it "reads times in the event's timezone and collapses a same-day window" do
+      event.arrival_opens_at = "2026-08-01T09:00"
+      event.arrival_closes_at = "2026-08-01T11:30"
+      event.validate
+
+      expect(event.formatted_arrival_window)
+        .to eq("Arrive between 9:00 AM and 11:30 AM BST on Saturday, August 1.")
+    end
+
+    it "spells out both dates when the window spans days" do
+      event.arrival_opens_at = "2026-08-01T21:00"
+      event.arrival_closes_at = "2026-08-02T01:00"
+      event.validate
+
+      expect(event.formatted_arrival_window)
+        .to eq("Arrive between Saturday, August 1 at 9:00 PM and Sunday, August 2 at 1:00 AM BST.")
+    end
+
+    it "handles a half-published window" do
+      event.arrival_opens_at = "2026-08-01T09:00"
+      event.validate
+      expect(event.formatted_arrival_window).to eq("Arrive from Saturday, August 1 at 9:00 AM BST.")
+
+      event.arrival_opens_at = nil
+      event.arrival_closes_at = "2026-08-01T11:30"
+      event.validate
+      expect(event.formatted_arrival_window).to eq("Arrive by Saturday, August 1 at 11:30 AM BST.")
+    end
+  end
+
+  describe "#phase_at" do
+    let(:event) do
+      create(:event, timezone: "Europe/London",
+        starts_at: Time.zone.parse("2026-09-19 09:00"),
+        ends_at: Time.zone.parse("2026-09-21 17:00"))
+    end
+
+    it "keeps the second day of a multi-day event live" do
+      expect(event.phase_at(Time.zone.parse("2026-09-20 12:00"))).to eq(:live)
+    end
+
+    it "distinguishes before start and after end" do
+      expect(event.phase_at(Time.zone.parse("2026-09-18 12:00"))).to eq(:upcoming)
+      expect(event.phase_at(Time.zone.parse("2026-09-21 17:00"))).to eq(:ended)
+    end
+
+    it "treats an event without a start as upcoming until configured" do
+      event.update_columns(starts_at: nil)
+
+      expect(event.phase_at).to eq(:upcoming)
+    end
+  end
+
+  describe "event-local dates" do
+    include ActiveSupport::Testing::TimeHelpers
+
+    # 5pm Pacific on Nov 5 is 01:00 UTC on Nov 6.
+    let(:event) do
+      build(:event, timezone: "Pacific Time (US & Canada)",
+        starts_at: Time.utc(2026, 11, 6, 1), ends_at: Time.utc(2026, 11, 10, 0))
+    end
+
+    it "reads start and end dates on the event's clock" do
+      expect(event.local_start_date).to eq(Date.new(2026, 11, 5))
+      expect(event.local_end_date).to eq(Date.new(2026, 11, 9))
+      expect(event.local_starts_at.strftime("%b %-d %-l%P")).to eq("Nov 5 5pm")
+    end
+
+    it "is nil-safe" do
+      event.starts_at = nil
+
+      expect(event.local_starts_at).to be_nil
+      expect(event.local_start_date).to be_nil
+    end
+
+    it "is completed once its last day is over where the event is" do
+      # 22:00 on Nov 9 Pacific: still the last day.
+      travel_to Time.utc(2026, 11, 10, 6) do
+        expect(event).not_to be_completed
+      end
+      # 01:00 on Nov 10 Pacific, though still Nov 10 in UTC as well.
+      travel_to Time.utc(2026, 11, 10, 9) do
+        expect(event).to be_completed
+      end
+    end
+  end
+
   describe "#airtable_sync_stale?" do
     def configured_event(**attrs)
       build(
         :event,
         airtable_sync_source_id: "sncTest",
         airtable_sync_table_id: "tblTest",
-        config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" },
+        airtable_api_key: "key-test",
+        config: { "airtable_base_id" => "app-test" },
         **attrs
       )
     end
@@ -85,7 +181,8 @@ RSpec.describe Event, type: :model do
         :event,
         airtable_sync_source_id: "sncTest",
         airtable_sync_table_id: "tblTest",
-        config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" },
+        airtable_api_key: "key-test",
+        config: { "airtable_base_id" => "app-test" },
         **attrs
       )
     end
@@ -95,7 +192,8 @@ RSpec.describe Event, type: :model do
         event.update_columns(
           airtable_sync_source_id: source,
           airtable_sync_table_id: table,
-          config: event.config.merge("airtable_api_key" => key, "airtable_base_id" => base)
+          airtable_api_key: key,
+          config: event.config.merge("airtable_base_id" => base)
         )
       end
     end
@@ -140,6 +238,25 @@ RSpec.describe Event, type: :model do
       expect(described_class.with_airtable_sync_active).not_to include(event)
     end
 
+    it "counts a connected event with just a base, since Attend creates its own table" do
+      event = create(:event, config: { "airtable_base_id" => "app-test" })
+      event.create_airtable_connection!(access_token: "fictional", refresh_token: "fictional",
+        access_token_expires_at: 1.hour.from_now, refresh_token_expires_at: 60.days.from_now)
+
+      expect(event.reload).to be_airtable_sync_configured
+      expect(described_class.with_airtable_sync_configured).to include(event)
+    end
+
+    it "forgets Attend's table when a connected event moves to another base" do
+      event = create(:event, airtable_sync_table_id: "tblOurs", config: { "airtable_base_id" => "app-old" })
+      event.create_airtable_connection!(access_token: "fictional", refresh_token: "fictional",
+        access_token_expires_at: 1.hour.from_now, refresh_token_expires_at: 60.days.from_now)
+
+      event.update!(airtable_base_id: "app-new")
+
+      expect(event.reload.airtable_sync_table_id).to be_nil
+    end
+
     it "matches the record-level #airtable_sync_configured? for every event" do
       configured_event
       create(:event)
@@ -158,7 +275,8 @@ RSpec.describe Event, type: :model do
         :event,
         airtable_sync_source_id: "sncTest",
         airtable_sync_table_id: "tblTest",
-        config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" }
+        airtable_api_key: "key-test",
+        config: { "airtable_base_id" => "app-test" }
       )
     end
 
@@ -180,6 +298,35 @@ RSpec.describe Event, type: :model do
       expect(event).not_to be_airtable_sync_paused
       expect(event.airtable_sync_error).to be_nil
       expect(event.airtable_sync_error_at).to be_nil
+    end
+  end
+
+  describe "#claim_airtable_sync_alert!" do
+    it "is not claimed before the streak is due" do
+      event = create(:event, airtable_sync_failures: 2, airtable_sync_failing_since: 10.minutes.ago)
+
+      expect(event.claim_airtable_sync_alert!).to be(false)
+    end
+
+    it "is claimed once the streak has lasted long enough" do
+      event = create(:event, airtable_sync_failures: 2, airtable_sync_failing_since: 4.hours.ago)
+
+      expect(event.claim_airtable_sync_alert!).to be(true)
+    end
+
+    it "is not claimed again once the streak was reported" do
+      event = create(:event, airtable_sync_failures: 50, airtable_sync_alerted_at: 1.hour.ago)
+
+      expect(event.claim_airtable_sync_alert!).to be(false)
+    end
+  end
+
+  describe "#record_airtable_sync_failure!" do
+    it "does nothing when the event was deleted mid-run" do
+      # An in-memory event whose row is gone, as when it's deleted mid-run.
+      event = build(:event, id: SecureRandom.uuid)
+
+      expect { event.record_airtable_sync_failure!("HTTP 503") }.not_to raise_error
     end
   end
 
@@ -290,7 +437,7 @@ RSpec.describe Event, type: :model do
     # notes, so anything still pointing at a participant event at that moment
     # used to blow up with a foreign key violation.
     it "tears down records that point at its participant events" do
-      incident = Incident.create!(event: event, reported_by: reporter, category: :other, severity: :low)
+      incident = Incident.create!(event: event, reported_by: reporter, category: :other, severity: :s3)
       incident.incident_participants.create!(participant_event: participant_event)
       Note.create!(event: event, participant_event: participant_event, author: reporter, body: "note")
       RoommatePreference.create!(participant_event: other_participant_event, preferred_participant_event: participant_event)

@@ -8,7 +8,8 @@ RSpec.describe "Admin::Integrations", type: :request do
     create(:event,
       airtable_sync_source_id: "syncabc",
       airtable_sync_table_id: "tbltest",
-      config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" })
+      airtable_api_key: "key-test",
+      config: { "airtable_base_id" => "app-test" })
   end
 
   before { sign_in admin }
@@ -60,6 +61,59 @@ RSpec.describe "Admin::Integrations", type: :request do
 
       expect(response.body).not_to include("Stale")
     end
+
+    # The token list exists in both admin UIs, so pin it in each.
+    { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+      context ui do
+        before { admin.update!(admin_console_beta: console) }
+
+        # Browsers drop a <form> nested inside another, so a button_to inside
+        # the settings form silently submits the settings form instead.
+        it "gives Sync Now its own form rather than nesting it in the settings form" do
+          get admin_event_integrations_path(event)
+
+          button = Nokogiri::HTML5(response.body).xpath("//button[normalize-space()='Sync Now']").first
+          expect(button).to be_present
+          form = button["form"].present? ? Nokogiri::HTML5(response.body).at_css("form##{button['form']}") : button.ancestors("form").first
+          expect(form["action"]).to eq(admin_event_trigger_airtable_sync_path(event))
+        end
+
+        it "says the sync is retrying, not that the settings are wrong, when it goes stale" do
+          event.update_columns(airtable_synced_at: 2.hours.ago, airtable_sync_error: "HTTP 503", airtable_sync_failures: 3)
+
+          get admin_event_integrations_path(event)
+
+          expect(response.body).to include("Airtable is showing stale data while Attend retries.")
+          expect(response.body).to include("3 failed attempts in a row. Attend keeps retrying every 5 minutes.")
+        end
+
+        it "lists the event's active API tokens" do
+          EventApiToken.generate_for(event, user: admin, name: "fictional-widget-sync")
+
+          get admin_event_integrations_path(event)
+
+          expect(response.body).to include("admin-integrations@fictional-widget-sync")
+          expect(response.body).not_to include("No API tokens yet")
+        end
+
+        it "leaves revoked tokens and other events' tokens out of the list" do
+          EventApiToken.generate_for(event, user: admin, name: "fictional-retired-sync").revoke!
+          EventApiToken.generate_for(create(:event), user: admin, name: "fictional-elsewhere-sync")
+
+          get admin_event_integrations_path(event)
+
+          expect(response.body).not_to include("fictional-retired-sync")
+          expect(response.body).not_to include("fictional-elsewhere-sync")
+          expect(response.body).to include("No API tokens yet")
+        end
+
+        it "shows the empty state when the event has no API tokens" do
+          get admin_event_integrations_path(event)
+
+          expect(response.body).to include("No API tokens yet")
+        end
+      end
+    end
   end
 
   describe "PATCH /admin/:slug/integrations" do
@@ -70,7 +124,7 @@ RSpec.describe "Admin::Integrations", type: :request do
         patch admin_event_integrations_path(event), params: {
           event: { airtable_api_key: "key-rotated" }
         }
-      }.to have_enqueued_job(AirtableJobs::SyncAllJob)
+      }.to have_enqueued_job(AirtableJobs::SyncAllJob).with(event.id)
 
       expect(flash[:notice]).to eq("Integration settings updated. Airtable sync started.")
     end
@@ -124,6 +178,52 @@ RSpec.describe "Admin::Integrations", type: :request do
       expect(event.reload.airtable_config_updated_by).to eq(previous)
     end
 
+    it "fills the base, table and sync ids from a pasted sync endpoint URL" do
+      expect {
+        patch admin_event_integrations_path(event), params: {
+          event: { airtable_sync_endpoint_url: " https://api.airtable.com/v0/appNew/tblNew/sync/sncNew \n" }
+        }
+      }.to have_enqueued_job(AirtableJobs::SyncAllJob)
+
+      event.reload
+      expect([ event.airtable_base_id, event.airtable_sync_table_id, event.airtable_sync_source_id ])
+        .to eq(%w[appNew tblNew sncNew])
+    end
+
+    it "rejects a URL that isn't a sync endpoint and keeps the old settings" do
+      patch admin_event_integrations_path(event), params: {
+        event: { airtable_sync_endpoint_url: "https://airtable.com/appNew/tblNew/viwNew" }
+      }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.body).to include("doesn&#39;t look like an Airtable sync endpoint")
+      expect(event.reload.airtable_base_id).to eq("app-test")
+    end
+
+    it "keeps the saved token when the token field is left blank" do
+      patch admin_event_integrations_path(event), params: {
+        event: { airtable_api_key: "", slack_channel_id: "C123456" }
+      }
+
+      expect(event.reload.airtable_api_key).to eq("key-test")
+    end
+
+    it "never echoes the saved token back into the page" do
+      get admin_event_integrations_path(event)
+
+      expect(response.body).not_to include("key-test")
+    end
+
+    it "keeps the token out of the audit log and the event's versions" do
+      patch admin_event_integrations_path(event), params: {
+        event: { airtable_api_key: "patFictionalRotated" }
+      }
+
+      expect(AuditLog.where(event: event).pluck(:changed_fields).to_s).not_to include("patFictionalRotated")
+      expect(PaperTrail::Version.where(item_type: "Event", item_id: event.id).pluck(:object, :object_changes).to_s)
+        .not_to include("patFictionalRotated")
+    end
+
     it "resumes a paused sync when the settings are saved again" do
       event.pause_airtable_sync!("HTTP 403: INVALID_PERMISSIONS")
 
@@ -145,7 +245,7 @@ RSpec.describe "Admin::Integrations", type: :request do
 
       expect {
         post admin_event_trigger_airtable_sync_path(event)
-      }.to have_enqueued_job(AirtableJobs::SyncAllJob)
+      }.to have_enqueued_job(AirtableJobs::SyncAllJob).with(event.id)
 
       expect(event.reload.airtable_sync_paused?).to be(false)
       expect(flash[:notice]).to eq("Airtable sync resumed and triggered. It will complete shortly.")
@@ -154,7 +254,7 @@ RSpec.describe "Admin::Integrations", type: :request do
     it "just triggers a sync when nothing is paused" do
       expect {
         post admin_event_trigger_airtable_sync_path(event)
-      }.to have_enqueued_job(AirtableJobs::SyncAllJob)
+      }.to have_enqueued_job(AirtableJobs::SyncAllJob).with(event.id)
 
       expect(flash[:notice]).to eq("Airtable sync triggered. It will complete shortly.")
     end

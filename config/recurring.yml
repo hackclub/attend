@@ -16,6 +16,10 @@ default: &default
   airtable_sync:
     class: AirtableJobs::SyncAllJob
     schedule: every 5 minutes
+  # A no-op unless the channel is set (it's only defaulted in production).
+  sync_org_support_slack_channel:
+    class: SyncOrgSupportSlackChannelJob
+    schedule: every day at 9am
 
 # Deliberately does not inherit *default: airtable_sync writes back to the
 # Airtable base it reads, so a staging box running it every 5 minutes would
@@ -31,6 +35,11 @@ staging:
 
 production:
   <<: *default
+  # Production only: dev and staging have no UCAT token and must not revoke
+  # bans from a partial view of the base.
+  sync_ucat_bans:
+    class: SyncUcatBansJob
+    schedule: every day at 3am America/New_York
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
     schedule: every hour at minute 12

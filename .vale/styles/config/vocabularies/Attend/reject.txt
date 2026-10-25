@@ -1,0 +1,5 @@
+# Misspellings of product names we use.
+Docuseal
+DocSeal
+Hackclub
+HackClub

@@ -1,0 +1,12 @@
+Hi <%= @preferred_name %>,
+
+The event team needs more information before they can finish reviewing your <%= @change_request.kind.titleize.downcase %> request for <%= @event_name %>.
+
+Their message:
+
+<%= @change_request.staff_response %>
+
+View your request:
+<%= @dashboard_link %>
+
+You can submit a new request from the relevant correction page after reviewing this message.

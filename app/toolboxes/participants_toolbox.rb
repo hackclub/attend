@@ -46,21 +46,12 @@ class ParticipantsToolbox < ApplicationToolbox
   def update
     @participant = accessible_participants.find(params[:participant_id])
     permitted = %i[preferred_name email phone pronouns tshirt_size city state country_of_residence]
-    permitted -= %i[city state country_of_residence] unless view_pii?
+    permitted -= %i[phone city state country_of_residence] unless view_pii?
     @participant.update!(params.permit(*permitted).to_h)
     render json: serialize_participant(@participant, full: true)
   end
 
   private
-
-  # Whether this account may see exact dates of birth and addresses at all.
-  # Participants here aren't scoped to one event, so a PII-restricted role on
-  # one event doesn't hide anything for someone who is ops elsewhere.
-  def view_pii?
-    return @view_pii if defined?(@view_pii)
-
-    @view_pii = current_user.can_view_participant_pii?
-  end
 
   # Participants reachable through the events this connection can access.
   def accessible_participants
@@ -93,7 +84,7 @@ class ParticipantsToolbox < ApplicationToolbox
     return base unless full
 
     base.merge(
-      phone: p.phone,
+      **(view_pii? ? { phone: p.phone } : {}),
       slack_user_id: p.slack_user_id,
       tshirt_size: p.tshirt_size,
       **(view_pii? ? { date_of_birth: p.date_of_birth, city: p.city, state: p.state,

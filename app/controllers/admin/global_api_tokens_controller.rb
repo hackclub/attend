@@ -7,7 +7,11 @@ module Admin
     end
 
     def create
-      token = GlobalApiToken.generate_for(current_user, name: params[:name].presence)
+      token = GlobalApiToken.generate_for(
+        current_user,
+        name: params[:name].presence,
+        scopes: submitted_scopes
+      )
       flash[:global_api_token] = token.token
       redirect_to admin_global_api_tokens_path,
         notice: "Global API token created. Copy it now — it won't be shown again."
@@ -22,6 +26,13 @@ module Admin
     end
 
     private
+
+    # Unchecked boxes leave scopes empty, which means an unrestricted token —
+    # the behaviour this form had before scoping existed. Unknown values are
+    # dropped here and rejected again by the model.
+    def submitted_scopes
+      Array.wrap(params[:scopes]).map(&:to_s) & GlobalApiToken::SCOPES.keys
+    end
 
     def require_global_admin
       unless current_user&.global_admin?

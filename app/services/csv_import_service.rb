@@ -61,6 +61,45 @@ class CsvImportService
     "Groups" => :groups
   }.freeze
 
+  # Other spellings organizers' spreadsheets use for the template's columns.
+  # Matched like the template headers: ignoring case and extra spaces.
+  HEADER_ALIASES = {
+    "Email Address" => :email,
+    "E-mail" => :email,
+    "E-mail Address" => :email,
+    "Legal First Name" => :legal_first_name,
+    "Given Name" => :legal_first_name,
+    "Legal Last Name" => :legal_last_name,
+    "Surname" => :legal_last_name,
+    "Family Name" => :legal_last_name,
+    "Phone" => :phone,
+    "Date of Birth" => :date_of_birth,
+    "DOB" => :date_of_birth,
+    "Postal Code" => :postal_code,
+    "Zip" => :postal_code,
+    "Shirt Size" => :tshirt_size,
+    "T-Shirt" => :tshirt_size
+  }.freeze
+
+  def self.normalize_header(header)
+    header.to_s.gsub(/[[:space:]]+/, " ").strip.downcase
+  end
+
+  HEADER_LOOKUP = COLUMN_MAPPING.merge(HEADER_ALIASES)
+    .transform_keys { |header| normalize_header(header) }
+    .freeze
+
+  TEMPLATE_HEADERS = COLUMN_MAPPING.keys.map { |header| normalize_header(header) }.to_set.freeze
+
+  # The import field a CSV header fills, or nil for a column the import ignores.
+  def self.column_for(header)
+    HEADER_LOOKUP[normalize_header(header)]
+  end
+
+  def self.template_header?(header)
+    TEMPLATE_HEADERS.include?(normalize_header(header))
+  end
+
   TSHIRT_SIZE_MAPPING = {
     "xs" => "XS",
     "s" => "S",
@@ -161,7 +200,7 @@ class CsvImportService
       create_travel(participant_event, row)
       apply_groups(participant_event, row)
 
-      send_invitation(participant) if @send_invitations
+      record_invitation(participant)
 
       @imported_count += 1
     end
@@ -234,7 +273,10 @@ class CsvImportService
     return unless row[:dietary_requirements].present?
 
     dietary_text = row[:dietary_requirements]
-    is_allergy = dietary_text.to_s.downcase.include?("allerg")
+    # "No allergies" mentions allergies too; it belongs in the notes, not the
+    # life-threatening field the scanner raises a red alert for.
+    is_allergy = dietary_text.to_s.downcase.include?("allerg") &&
+      ClearsNegativeResponses.meaningful_response?(dietary_text.to_s)
 
     Dietary.create!(
       participant_event: participant_event,
@@ -455,15 +497,14 @@ class CsvImportService
     end
   end
 
-  def send_invitation(participant)
-    ParticipantMailer.invitation(
-      email: participant.email,
-      event: @event,
-      participant: participant
-    ).deliver_later
+  # Emailed now unless the caller asked for a silent import or the event is
+  # holding onboarding invitations; either way the invitation is on record so
+  # it can be sent later from the event or series page.
+  def record_invitation(participant)
+    Invitation.issue!(event: @event, email: participant.email, participant: participant, send: @send_invitations)
   rescue StandardError => e
-    Rails.logger.error("[CsvImportService] Failed to send invitation to #{participant.email}: #{e.message}")
-    @errors << { email: participant.email, error: "Imported but failed to send invitation: #{e.message}" }
+    Rails.logger.error("[CsvImportService] Failed to record invitation for #{participant.email}: #{e.message}")
+    @errors << { email: participant.email, error: "Imported but failed to record invitation: #{e.message}" }
   end
 
   # Returns E.164, or nil when the cell isn't a real number. It deliberately

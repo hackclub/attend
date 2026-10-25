@@ -1,0 +1,691 @@
+<% content_for :title, "Integrations – #{current_event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Integrations", nil ]) %>
+
+<div class="cs-header">
+  <div class="cs-header-text">
+    <h1 class="cs-h1">Integrations</h1>
+    <p class="cs-description">Configure external services and API access for <%= current_event.name %></p>
+  </div>
+</div>
+
+<div class="cs-stack">
+  <%= form_with model: current_event, url: admin_event_integrations_path(current_event), method: :patch, class: "cs-stack", html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+    <%# DocuSeal %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">DocuSeal</h2>
+          <p class="cs-container-description">Digital waiver and consent form signing</p>
+        </div>
+        <div class="cs-actions">
+          <%= link_to "Need to use custom waivers?",
+              "https://docs.hackclub.com/hack-club-playbook/events/attend/custom-waivers",
+              target: "_blank", rel: "noopener",
+              class: "cs-btn cs-btn-link" %>
+          <%= link_to "Guided waiver setup",
+              admin_event_setup_waivers_path(current_event, return_to: "integrations"),
+              class: "cs-btn" %>
+        </div>
+      </div>
+      <div class="cs-container-body cs-stack">
+        <dl class="cs-kv cs-kv-2 cs-kv-divided">
+          <div>
+            <dt class="cs-kv-label">Waiver template</dt>
+            <dd class="cs-kv-value cs-secondary cs-small">Standard participant waiver for minors (dual-signer: teen + guardian)</dd>
+            <dd class="cs-kv-value mt-2">
+              <% if current_event.docuseal_waiver_template_id.present? %>
+                <%= cs_status(:success, "Configured") %>
+              <% else %>
+                <%= cs_status(:stopped, "Not configured") %>
+              <% end %>
+            </dd>
+            <dd class="cs-kv-value mt-2 flex flex-wrap items-center gap-3">
+              <% if current_event.docuseal_waiver_template_id.present? %>
+                <span class="font-mono">ID: <%= current_event.docuseal_waiver_template_id %></span>
+                <%= link_to "Configure mappings", admin_event_docuseal_template_mappings_path(current_event, "waiver"), class: "cs-link" %>
+              <% else %>
+                <%= link_to "Use default template",
+                    admin_event_docuseal_template_use_default_path(current_event, "waiver"),
+                    data: { turbo_method: :post },
+                    class: "cs-btn cs-btn-primary" %>
+              <% end %>
+            </dd>
+          </div>
+
+          <% if current_event.freedom_waivers_enabled? %>
+            <div>
+              <dt class="cs-kv-label">Freedom waiver template</dt>
+              <dd class="cs-kv-value cs-secondary cs-small">Independence waiver (single-signer: guardian only).</dd>
+              <dd class="cs-kv-value mt-2">
+                <% if current_event.docuseal_freedom_waiver_template_id.present? %>
+                  <%= cs_status(:success, "Configured") %>
+                <% else %>
+                  <%= cs_status(:stopped, "Not configured") %>
+                <% end %>
+              </dd>
+              <dd class="cs-kv-value mt-2 flex flex-wrap items-center gap-3">
+                <% if current_event.docuseal_freedom_waiver_template_id.present? %>
+                  <span class="font-mono">ID: <%= current_event.docuseal_freedom_waiver_template_id %></span>
+                  <%= link_to "Configure mappings", admin_event_docuseal_template_mappings_path(current_event, "freedom_waiver"), class: "cs-link" %>
+                <% else %>
+                  <%= link_to "Use default template",
+                      admin_event_docuseal_template_use_default_path(current_event, "freedom_waiver"),
+                      data: { turbo_method: :post },
+                      class: "cs-btn" %>
+                <% end %>
+              </dd>
+            </div>
+          <% end %>
+        </dl>
+
+        <%# Manual template ID entry (advanced) %>
+        <details class="cs-expandable">
+          <summary>Advanced: enter template IDs manually</summary>
+          <div class="cs-expandable-content">
+            <div class="cs-field-grid">
+              <% [ [ :docuseal_waiver_template_id, "Waiver template ID" ], [ :docuseal_freedom_waiver_template_id, "Freedom waiver template ID" ] ].each do |attribute, label| %>
+                <%= cs_form_field f, attribute, label: label, optional: true,
+                      messages: { invalid: "Enter a valid #{label[0].downcase}#{label[1..]}. Use numbers only." },
+                      constraint: "The template ID from DocuSeal. Numbers only." do |aria| %>
+                  <%= f.text_field attribute, class: "cs-input font-mono", inputmode: "numeric", pattern: "[0-9]+",
+                        data: { cs_pattern_message: "Enter a valid #{label[0].downcase}#{label[1..]}. Use numbers only." }, **aria %>
+                <% end %>
+              <% end %>
+            </div>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <%# Slack %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Slack</h2>
+          <p class="cs-container-description">Team communication and notifications</p>
+        </div>
+        <div class="cs-actions">
+          <%= current_event.slack_channel_id.present? ? cs_status(:success, "Configured") : cs_status(:stopped, "Not configured") %>
+        </div>
+      </div>
+      <div class="cs-container-body">
+        <%= cs_form_field f, :slack_channel_id, label: "Channel ID", optional: true,
+              description: "The private channel participants are invited to after linking Slack. In Slack, open the channel details and scroll to the bottom to find the ID.",
+              constraint: "For example: C0123456789" do |aria| %>
+          <%= f.text_field :slack_channel_id, class: "cs-input font-mono", **aria %>
+        <% end %>
+      </div>
+    </section>
+
+    <%# Airtable sync %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Airtable sync</h2>
+          <p class="cs-container-description">Mirror of participant data in an Airtable table</p>
+        </div>
+        <div class="cs-actions">
+          <% if @airtable_sync_paused %>
+            <%= cs_status(:warning, "Paused") %>
+          <% elsif @airtable_sync_stale %>
+            <%= cs_status(:error, "Stale") %>
+          <% elsif @airtable_sync_configured %>
+            <%= cs_status(:success, "Active") %>
+          <% end %>
+        </div>
+      </div>
+      <div class="cs-container-body cs-stack">
+        <%# Connection. The buttons submit forms that sit after this one: a
+            form nested in the settings form would be dropped by the browser. %>
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div>
+            <h3 class="cs-h3">Airtable account</h3>
+            <p class="cs-secondary cs-small mt-1">
+              <% if @airtable_connection %>
+                Connected<% if @airtable_connection.account_label.present? %> as <strong><%= @airtable_connection.account_label %></strong><% end %>
+              <% elsif current_event.airtable_api_key.present? %>
+                Using a personal access token. Connect Airtable to replace it.
+              <% else %>
+                Not connected
+              <% end %>
+            </p>
+          </div>
+          <div class="cs-actions shrink-0">
+            <% if @airtable_connection %>
+              <button type="submit" form="airtable-disconnect-form" class="cs-btn whitespace-nowrap">Disconnect</button>
+            <% end %>
+            <% if @airtable_oauth_configured %>
+              <button type="submit" form="airtable-connect-form" class="cs-btn whitespace-nowrap<%= " cs-btn-primary" unless @airtable_connection %>">
+                <%= @airtable_connection ? "Reconnect" : "Connect Airtable" %>
+              </button>
+            <% end %>
+          </div>
+        </div>
+
+        <% unless @airtable_oauth_configured || @airtable_connection %>
+          <div class="cs-alert">
+            <%= cs_status_icon(:info) %>
+            <p>Connecting with Airtable isn't set up on this server yet, so this event needs a personal access token (under Advanced).</p>
+          </div>
+        <% end %>
+
+        <% if @airtable_base_not_granted %>
+          <div class="cs-alert cs-alert-warning">
+            <%= cs_status_icon(:warning) %>
+            <p>The connected Airtable account didn't give Attend access to this base. Reconnect and select the base on Airtable's consent screen.</p>
+          </div>
+        <% end %>
+
+        <% if @airtable_connection %>
+          <%= cs_form_field f, :airtable_base_id, label: "Base",
+                constraint: "Only bases you selected on Airtable's consent screen are listed. Reconnect to add more." do |aria| %>
+            <% if @airtable_base_options.any? %>
+              <%= f.select :airtable_base_id, @airtable_base_options, { include_blank: "Choose a base" }, class: "cs-select", **aria %>
+            <% else %>
+              <%= f.text_field :airtable_base_id, class: "cs-input font-mono", placeholder: "app…", autocomplete: "off", **aria %>
+            <% end %>
+          <% end %>
+          <p class="cs-secondary cs-small">
+            Attend keeps a table called <strong><%= Airtable::RecordsSync.table_name_for(current_event) %></strong> in this base up to date, creating it on the first sync.
+            Columns you add are left alone; edits to Attend's columns are overwritten on the next sync.
+            <% if current_event.airtable_base_id.present? && current_event.airtable_sync_table_id.present? %>
+              <%= link_to "Open in Airtable", "https://airtable.com/#{current_event.airtable_base_id}/#{current_event.airtable_sync_table_id}", target: "_blank", rel: "noopener", class: "cs-link" %>
+            <% end %>
+          </p>
+        <% else %>
+          <details class="cs-expandable" <%= "open" if current_event.airtable_api_key.present? || current_event.errors.include?(:airtable_api_key) || current_event.errors.include?(:airtable_sync_endpoint_url) %>>
+            <summary>Advanced: use a personal access token instead</summary>
+            <div class="cs-expandable-content cs-stack">
+              <%= cs_form_field f, :airtable_api_key, label: "Personal access token", optional: true,
+                    constraint: safe_join([ "Needs the ", content_tag(:code, "data.records:write"), " and ", content_tag(:code, "schema.bases:write"), " scopes. Leave blank to keep the saved token." ]) do |aria| %>
+                <%= f.password_field :airtable_api_key, value: nil, placeholder: (current_event.airtable_api_key.present? ? "Saved, hidden" : "pat…"), class: "cs-input font-mono", autocomplete: "off", **aria %>
+              <% end %>
+              <%= cs_form_field f, :airtable_sync_endpoint_url, label: "Sync endpoint URL", optional: true,
+                    constraint: safe_join([ "A token syncs through Airtable's Sync API. Add a synced table from the Sync API and copy its endpoint URL: https://api.airtable.com/v0/", content_tag(:strong, "app…"), "/", content_tag(:strong, "tbl…"), "/sync/…" ]) do |aria| %>
+                <%= f.text_field :airtable_sync_endpoint_url, class: "cs-input font-mono", autocomplete: "off", spellcheck: false, **aria %>
+              <% end %>
+            </div>
+          </details>
+        <% end %>
+
+        <% if @airtable_sync_configured %>
+          <%# Sync status %>
+          <div class="border-t border-(--cs-border-divider-secondary) pt-4 cs-stack">
+            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <h3 class="cs-h3">Sync status</h3>
+              <button type="submit" form="airtable-sync-now-form" class="cs-btn whitespace-nowrap shrink-0 self-start">
+                <%= @airtable_sync_paused ? "Resume & Sync Now" : "Sync Now" %>
+              </button>
+            </div>
+
+            <% if @airtable_sync_paused %>
+              <div class="cs-alert cs-alert-warning">
+                <%= cs_status_icon(:warning) %>
+                <div>
+                  <p class="cs-alert-title">
+                    Sync paused after a failure<% if @airtable_sync_paused_at %> <%= cs_relative_time(@airtable_sync_paused_at) %><% end %>
+                  </p>
+                  <p>
+                    Attend stops syncing an event as soon as Airtable rejects its settings, rather than retrying
+                    broken settings every 5 minutes.
+                    <% if @airtable_config_owner %>
+                      <%= @airtable_config_owner.name.presence || @airtable_config_owner.email %> was emailed
+                      because they last saved these settings.
+                    <% end %>
+                    Fix the settings above and save, or hit Resume &amp; Sync Now to try again as-is.
+                  </p>
+                  <% if @airtable_synced_at %>
+                    <p class="mt-1">
+                      Airtable still shows the snapshot from
+                      <strong><%= cs_relative_time(@airtable_synced_at) %></strong>.
+                    </p>
+                  <% else %>
+                    <p class="mt-1">This integration has never synced successfully.</p>
+                  <% end %>
+                </div>
+              </div>
+            <% elsif @airtable_sync_stale %>
+              <div class="cs-alert cs-alert-error">
+                <%= cs_status_icon(:error) %>
+                <div>
+                  <p class="cs-alert-title">
+                    <% if @airtable_synced_at %>
+                      Sync is failing — last successful sync was <%= cs_relative_time(@airtable_synced_at, inline: true) %>
+                    <% else %>
+                      Never synced successfully
+                    <% end %>
+                  </p>
+                  <p>
+                    <% unless @airtable_synced_at %>If you just saved these settings, a sync is already running — refresh in a minute. Otherwise, <% end %>
+                    <% if @airtable_sync_failures.positive? %>
+                      Airtable is showing stale data while Attend retries. A rate limit or an Airtable outage clears
+                      up by itself; anything else has been reported to the Attend team.
+                    <% elsif @airtable_connection %>
+                      Airtable is showing stale data — check that the connected account can still see the base above.
+                    <% else %>
+                      Airtable is showing stale data — check that the sync endpoint above still exists in
+                      Airtable and that the token can see that base.
+                    <% end %>
+                  </p>
+                </div>
+              </div>
+            <% end %>
+
+            <% if @airtable_sync_error %>
+              <div class="cs-alert cs-alert-error">
+                <%= cs_status_icon(:error) %>
+                <div class="min-w-0">
+                  <p class="cs-alert-title">
+                    Last sync attempt failed<% if @airtable_sync_error_at %> <%= cs_relative_time(@airtable_sync_error_at, inline: true) %><% end %>
+                  </p>
+                  <p class="font-mono break-all"><%= @airtable_sync_error %></p>
+                  <% if !@airtable_sync_paused && @airtable_sync_failures.positive? %>
+                    <p><%= pluralize(@airtable_sync_failures, "failed attempt") %> in a row. Attend keeps retrying every 5 minutes.</p>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+
+            <dl class="cs-kv cs-kv-3 cs-kv-divided">
+              <% unless @airtable_sync_paused || @airtable_sync_stale %>
+                <div>
+                  <dt class="cs-kv-label">Last synced</dt>
+                  <dd class="cs-kv-value">
+                    <strong><%= cs_relative_time(@airtable_synced_at) %></strong>
+                  </dd>
+                </div>
+              <% end %>
+              <div>
+                <dt class="cs-kv-label">Participant records</dt>
+                <dd class="cs-kv-value"><%= @airtable_participant_count %> participant records will be synced</dd>
+              </div>
+              <div>
+                <dt class="cs-kv-label">Schedule</dt>
+                <dd class="cs-kv-value">
+                  <% if @airtable_sync_paused %>
+                    Automatic syncing is stopped until these settings are saved again
+                  <% else %>
+                    Syncs automatically every 5 minutes and whenever these settings are saved. If Airtable rejects these settings, syncing pauses until they are fixed.
+                  <% end %>
+                </dd>
+              </div>
+            </dl>
+          </div>
+        <% end %>
+      </div>
+    </section>
+
+    <%= cs_form_errors f %>
+
+    <div class="flex justify-end">
+      <%= f.button "Save integration settings", class: "cs-btn cs-btn-primary" %>
+    </div>
+  <% end %>
+
+  <%# Targets for the Airtable buttons inside the settings form above. %>
+  <%= form_with url: admin_event_trigger_airtable_sync_path(current_event), method: :post, id: "airtable-sync-now-form", class: "hidden" do %><% end %>
+  <%= form_with url: admin_event_airtable_connection_path(current_event), method: :post, id: "airtable-connect-form", class: "hidden", data: { turbo: false } do %><% end %>
+  <%= form_with url: admin_event_airtable_connection_path(current_event), method: :delete, id: "airtable-disconnect-form", class: "hidden",
+        data: { turbo_confirm: "Disconnect Airtable? The sync stops until someone connects it again." } do %><% end %>
+
+  <%# Custom documents (not part of the form) %>
+  <% active_custom_documents = current_event.custom_documents.active.order(:created_at) %>
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided">
+      <div>
+        <h2 class="cs-h2">Custom documents <span class="cs-counter">(<%= active_custom_documents.size %>)</span></h2>
+        <p class="cs-container-description">Extra DocuSeal documents participants must sign, for example a hotel waiver</p>
+      </div>
+    </div>
+    <% if active_custom_documents.any? %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Document</th>
+              <th scope="col">Details</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% active_custom_documents.each do |doc| %>
+              <tr>
+                <td>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-bold"><%= doc.name %></span>
+                    <% if doc.physical? %>
+                      <%= cs_badge("Physical", "yellow") %>
+                    <% end %>
+                    <% if doc.optional? %>
+                      <%= cs_badge("Optional", "blue") %>
+                    <% end %>
+                    <%= cs_badge(doc.signer_type.humanize) %>
+                  </div>
+                </td>
+                <td class="cs-small cs-secondary">
+                  <% if doc.physical? %>
+                    <span>Downloaded, physically signed, and uploaded as a photo</span>
+                  <% else %>
+                    <span class="font-mono">Template ID: <%= doc.docuseal_template_id %></span>
+                    <% if doc.field_mapper.has_mappings? %>
+                      · <%= cs_status(:success, "Pre-fill configured") %>
+                    <% end %>
+                  <% end %>
+                  <% if doc.optional? %>
+                    · <span>Hidden until a participant adds it — <%= pluralize(doc.consents.where(withdrawn_at: nil).count, "participant") %> so far</span>
+                  <% end %>
+                </td>
+                <td>
+                  <div class="flex items-center justify-end gap-1 whitespace-nowrap">
+                    <% if doc.physical? %>
+                      <% if doc.template_pdf.attached? %>
+                        <%= link_to "Download PDF", rails_blob_path(doc.template_pdf, disposition: "attachment"), class: "cs-btn cs-btn-link" %>
+                      <% end %>
+                    <% else %>
+                      <%= link_to "Configure mappings", admin_event_docuseal_template_mappings_path(current_event, doc.mapping_key), class: "cs-btn cs-btn-link" %>
+                    <% end %>
+                    <%= link_to "Edit", admin_event_custom_document_edit_path(current_event, doc), class: "cs-btn cs-btn-link" %>
+                    <%= button_to "Remove", admin_event_custom_document_path(current_event, doc),
+                        method: :delete,
+                        data: { turbo_confirm: "Remove \"#{doc.name}\"? Participants will no longer be asked to sign it. Existing signatures are kept." },
+                        class: "cs-btn cs-btn-link",
+                        form: { class: "contents" } %>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="cs-empty">
+        <p class="cs-empty-title">No custom documents yet</p>
+        <p>Add one below and participants will be asked to sign it during registration.</p>
+      </div>
+    <% end %>
+
+    <div class="cs-container-footer">
+      <%= form_with url: admin_event_custom_documents_path(current_event), scope: :custom_document, method: :post,
+          multipart: true, html: { novalidate: true }, data: { controller: "document-kind cs-form-validation" }, class: "cs-stack py-2" do |cd| %>
+        <h3 class="cs-h3">Add a document</h3>
+        <fieldset>
+          <legend class="sr-only">Document type</legend>
+          <div class="cs-tiles sm:grid sm:grid-cols-2" role="radiogroup" aria-label="Document type">
+            <label class="cs-tile">
+              <span class="cs-option">
+                <%= cd.radio_button :document_kind, "electronic", checked: true,
+                    data: { action: "document-kind#toggle" } %>
+                <span>
+                  <span class="cs-option-label font-bold block">Electronic</span>
+                  <span class="cs-option-description block mt-1">Signed online through DocuSeal, with participant details pre-filled.</span>
+                </span>
+              </span>
+            </label>
+            <label class="cs-tile">
+              <span class="cs-option">
+                <%= cd.radio_button :document_kind, "physical",
+                    data: { action: "document-kind#toggle" } %>
+                <span>
+                  <span class="cs-option-label font-bold block">Physical</span>
+                  <span class="cs-option-description block mt-1">Downloaded as a PDF, signed on paper, and uploaded as a photo.</span>
+                </span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <%= cs_form_field cd, :name, label: "Document name", constraint: "For example: Hotel waiver" do |aria| %>
+            <%= cd.text_field :name, required: true, class: "cs-input", **aria %>
+          <% end %>
+          <%= cs_form_field cd, :docuseal_template_id, label: "DocuSeal template ID", data: { document_kind_target: "electronic" },
+                constraint: "Numbers only. For example: 1234" do |aria| %>
+            <%= cd.text_field :docuseal_template_id, required: true, class: "cs-input font-mono", inputmode: "numeric", pattern: "[0-9]+",
+                  data: { cs_pattern_message: "Enter a valid DocuSeal template ID. Use numbers only." }, **aria %>
+          <% end %>
+          <%= cs_form_field cd, :template_pdf, label: "PDF document", class: "hidden", data: { document_kind_target: "physical" },
+                constraint: "PDF, up to 25 MB." do |aria| %>
+            <%= cd.file_field :template_pdf, required: true, accept: "application/pdf", class: "cs-file", **aria %>
+          <% end %>
+          <%= cs_form_field cd, :signer_type, label: "Who signs?",
+                constraint: "Guardian roles only apply to under-18s. Adults sign by themselves, and guardian-only or under-18s-only documents are skipped for them." do |aria| %>
+            <%= cd.select :signer_type,
+                [ [ "Participant", "participant" ], [ "Guardian", "guardian" ],
+                  [ "Participant + Guardian", "participant_and_guardian" ],
+                  [ "Participant + Guardian, under-18s only", "minor_and_guardian" ] ],
+                {},
+                class: "cs-select", **aria %>
+          <% end %>
+        </div>
+        <label class="cs-tile">
+          <span class="cs-option">
+            <%= cd.check_box :optional %>
+            <span>
+              <span class="cs-option-label font-bold block">Optional — participants choose whether to add it</span>
+              <span class="cs-option-description block mt-1">
+                For opt-in activities like zip lining or a hike. The document stays hidden — including from
+                parents/guardians — until the participant adds it themselves, so nobody is handed a waiver for
+                something their child isn't doing. Once added it must be signed like any other document, and
+                the participant can remove it again if they change their mind.
+              </span>
+            </span>
+          </span>
+        </label>
+        <%= cs_form_field cd, :description, label: "Description", optional: true,
+              constraint: "Shown to participants. Say which activity it's for, or which sections to fill in." do |aria| %>
+          <%= cd.text_area :description, rows: 2, class: "cs-input", **aria %>
+        <% end %>
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+          <%= cd.button "Add document", type: :submit, class: "cs-btn shrink-0" %>
+          <p class="cs-small cs-muted">
+            Participants can't complete registration until it's signed — optional ones only once they've added it.
+            <span data-document-kind-target="electronic">After adding, use <strong>Configure mappings</strong> to set up pre-fill.</span>
+            <span data-document-kind-target="physical" class="hidden">Participants download the PDF, sign it on paper, and
+            upload a photo of the signed form. For under-18s, the parent/guardian then reviews the photo and confirms it's
+            complete.</span>
+          </p>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <%# API access (not part of the form) %>
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2">API access</h2>
+        <p class="cs-container-description">Programmatic access to add and list participants</p>
+      </div>
+      <div class="cs-actions">
+        <%= link_to "API docs", docs_path, target: "_blank", rel: "noopener", class: "cs-btn cs-btn-link" %>
+      </div>
+    </div>
+    <div class="cs-container-body cs-stack">
+      <div>
+        <p class="cs-kv-label">API endpoints</p>
+        <div class="mt-1 space-y-1">
+          <code class="block font-mono cs-small overflow-x-auto">POST <%= api_v1_event_participants_url(current_event) %></code>
+          <code class="block font-mono cs-small overflow-x-auto">GET&nbsp; <%= api_v1_event_participants_url(current_event) %></code>
+        </div>
+      </div>
+
+      <%# API tokens %>
+      <div>
+        <h3 class="cs-h3">API tokens</h3>
+
+        <% if flash[:event_api_token] %>
+          <div class="cs-alert cs-alert-warning mt-3">
+            <%= cs_status_icon(:warning) %>
+            <div class="min-w-0">
+              <p class="cs-alert-title">Copy this token now. It won't be shown again.</p>
+              <code class="cs-copy-value block mt-1"><%= flash[:event_api_token] %></code>
+            </div>
+          </div>
+        <% end %>
+
+        <% if @event_api_tokens.present? %>
+          <div class="cs-table-wrap mt-3">
+            <table class="cs-table cs-table-compact">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Last used</th>
+                  <th scope="col">Created</th>
+                  <% if policy(current_event).manage_api_tokens? %>
+                    <th scope="col"><span class="sr-only">Actions</span></th>
+                  <% end %>
+                </tr>
+              </thead>
+              <tbody>
+                <% @event_api_tokens.each do |token| %>
+                  <tr>
+                    <td class="font-mono"><%= token.name %></td>
+                    <td class="whitespace-nowrap cs-secondary">
+                      <% if token.last_used_at %>
+                        <%= cs_relative_time(token.last_used_at) %>
+                      <% else %>
+                        Never
+                      <% end %>
+                    </td>
+                    <td class="whitespace-nowrap cs-secondary"><%= cs_relative_time(token.created_at) %></td>
+                    <% if policy(current_event).manage_api_tokens? %>
+                      <td>
+                        <div class="flex items-center justify-end gap-1 whitespace-nowrap">
+                          <%= button_to "Rotate", admin_rotate_event_api_token_path(current_event.slug, token.id),
+                              method: :post,
+                              form: { class: "contents", data: { turbo_confirm: "Rotating issues a new secret and invalidates the current one. Integrations using this token will stop working until updated. Continue?" } },
+                              class: "cs-btn cs-btn-link" %>
+                          <%= button_to "Revoke", admin_event_api_token_path(current_event.slug, token.id),
+                              method: :delete,
+                              form: { class: "contents", data: { turbo_confirm: "This permanently revokes the token. Any integration using it will stop working. Continue?" } },
+                              class: "cs-btn cs-btn-link" %>
+                        </div>
+                      </td>
+                    <% end %>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% else %>
+          <p class="cs-muted mt-2">No API tokens yet.</p>
+        <% end %>
+
+        <% if policy(current_event).manage_api_tokens? %>
+          <%= form_with url: admin_event_api_tokens_path(current_event.slug), method: :post, class: "mt-3", html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+            <%= cs_field id: "name", label: "Token name", constraint: "Describes what uses the token. For example: attend-integration-name" do |aria| %>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-mono cs-secondary select-none"><%= current_user.email.to_s.split("@").first %>@</span>
+                <%= f.text_field :name, required: true, pattern: ".*\\S.*", data: { cs_pattern_message: "Token name is required." },
+                      class: "cs-input font-mono flex-1 min-w-48", **aria %>
+                <%= f.button "Create token", class: "cs-btn" %>
+              </div>
+            <% end %>
+          <% end %>
+        <% else %>
+          <p class="cs-small cs-muted mt-3">Tokens can invite participants, so only event admins can create, rotate, or revoke them.</p>
+        <% end %>
+      </div>
+
+      <% if current_event.api_key_set? %>
+        <div class="border-t border-(--cs-border-divider-secondary) pt-4">
+          <h3 class="cs-h3">Legacy API key</h3>
+          <div class="flex flex-wrap items-center gap-3 mt-2">
+            <% if flash[:api_key] %>
+              <div class="cs-alert cs-alert-warning flex-1">
+                <%= cs_status_icon(:warning) %>
+                <div class="min-w-0">
+                  <p class="cs-alert-title">Copy this key now. It won't be shown again.</p>
+                  <code class="cs-copy-value block mt-1"><%= flash[:api_key] %></code>
+                </div>
+              </div>
+            <% else %>
+              <code class="cs-copy-value flex-1">••••••••••••••••••••••••••••••••</code>
+            <% end %>
+            <% if policy(current_event).regenerate_api_key? %>
+              <%= button_to "Regenerate",
+                  regenerate_api_key_admin_event_path(current_event),
+                  method: :post,
+                  form: { class: "shrink-0", data: { turbo_confirm: "This will invalidate the existing legacy API key. Any integrations using it will stop working. Continue?" } },
+                  class: "cs-btn" %>
+            <% end %>
+          </div>
+          <p class="cs-small cs-muted mt-2">The single-key access from before named tokens. Still works; prefer named tokens above.</p>
+        </div>
+      <% end %>
+
+      <details class="cs-expandable">
+        <summary>View API usage example</summary>
+        <div class="cs-expandable-content">
+          <p class="cs-kv-label mb-2">Invite a participant:</p>
+          <pre class="cs-copy-value whitespace-pre overflow-x-auto"><code>curl -X POST <%= api_v1_event_participants_url(current_event) %> \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "first_name": "Jane",
+    "last_name": "Doe",
+    "email": "jane@example.com"
+  }'</code></pre>
+          <p class="cs-kv-label mt-4 mb-2">List participants:</p>
+          <pre class="cs-copy-value whitespace-pre overflow-x-auto"><code>curl <%= api_v1_event_participants_url(current_event) %> \
+  -H "Authorization: Bearer YOUR_API_TOKEN"</code></pre>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <%# vote.hackclub.com (not part of the form) %>
+  <% vote_ready = current_event.logo.attached? && current_event.banner.attached? %>
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2">vote.hackclub.com</h2>
+        <p class="cs-container-description">Create a peer-voting gallery for this event</p>
+      </div>
+      <div class="cs-actions">
+        <%= current_event.vote_event_linked? ? cs_status(:success, "Linked") : cs_status(:stopped, "Not linked") %>
+      </div>
+    </div>
+    <div class="cs-container-body cs-stack">
+      <% if current_event.vote_event_linked? %>
+        <% if current_event.vote_event_linked_at %>
+          <dl class="cs-kv">
+            <div>
+              <dt class="cs-kv-label">Linked</dt>
+              <dd class="cs-kv-value"><%= cs_relative_time(Time.zone.parse(current_event.vote_event_linked_at.to_s)) %></dd>
+            </div>
+          </dl>
+        <% end %>
+        <div class="cs-actions">
+          <% if current_event.vote_event_admin_url.present? %>
+            <%= link_to "Manage on vote.hackclub.com", current_event.vote_event_admin_url, target: "_blank", rel: "noopener", class: "cs-btn cs-btn-primary" %>
+          <% end %>
+          <% if current_event.vote_event_gallery_url.present? %>
+            <%= link_to "View gallery", current_event.vote_event_gallery_url, target: "_blank", rel: "noopener", class: "cs-btn" %>
+          <% end %>
+        </div>
+      <% else %>
+        <p>
+          Creates a new <strong>DRAFT</strong> event on vote.hackclub.com using this event's
+          name, slug, logo and banner. You can then finish setting it up on vote.hackclub.com.
+          If an event with this slug already exists, it will be linked instead.
+        </p>
+
+        <% unless vote_ready %>
+          <div class="cs-alert cs-alert-warning">
+            <%= cs_status_icon(:warning) %>
+            <p>This event needs both a <strong>logo</strong> and a <strong>banner</strong> image before you can create a vote event.</p>
+          </div>
+        <% end %>
+
+        <div>
+          <%= button_to "Create vote.hackclub.com event",
+              admin_event_create_vote_event_path(current_event),
+              method: :post,
+              disabled: !vote_ready,
+              form: { data: { turbo_confirm: "Create a new DRAFT event on vote.hackclub.com for \"#{current_event.name}\"?" } },
+              class: "cs-btn" %>
+        </div>
+      <% end %>
+    </div>
+  </section>
+</div>

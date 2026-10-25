@@ -8,6 +8,9 @@ module Admin
     STEPS = %w[basics schedule modules waivers team review].freeze
 
     before_action :require_staff_management_access, only: [ :add_team_member, :remove_team_member ]
+    # The waivers step edits the same DocuSeal templates as the integrations
+    # page, so it is gated the same way.
+    before_action :require_integrations_access, only: [ :waivers, :update_waivers ]
 
     def show
       redirect_to resume_step_path
@@ -62,6 +65,12 @@ module Admin
       user = User.find_by(email: params[:email].to_s.strip.downcase)
 
       unless user
+        # The console shows the problem under the email field; the original
+        # UI keeps its flash.
+        if console_team_form?
+          @email_error = params[:email].blank? ? "User email is required." : "No Attend account uses this email address. Ask them to sign in to Attend first, then add them."
+          return render_team_with_errors(@event.event_role_assignments.build(role: params.dig(:event_role_assignment, :role)))
+        end
         redirect_to admin_event_setup_team_path(@event), alert: "User not found with that email. They need to sign in to Attend first."
         return
       end
@@ -74,6 +83,8 @@ module Admin
       if @event_role_assignment.save
         notify_new_staff_member(@event_role_assignment)
         redirect_to admin_event_setup_team_path(@event), notice: "#{user.email} added as #{@event_role_assignment.role.humanize.downcase}."
+      elsif console_team_form?
+        render_team_with_errors(@event_role_assignment)
       else
         redirect_to admin_event_setup_team_path(@event), alert: @event_role_assignment.errors.full_messages.to_sentence
       end
@@ -99,7 +110,7 @@ module Admin
     def complete
       if @event.support_email.blank?
         redirect_to edit_admin_event_path(@event),
-          alert: "Set a support email (@hackclub.com or @events.hackclub.com) before finishing setup — it's the from and reply-to address on every participant and guardian email."
+          alert: "Set a support email (#{Event::SUPPORT_EMAIL_DOMAINS_SENTENCE}) before finishing setup — it's the from and reply-to address on every participant and guardian email."
         return
       end
 
@@ -109,10 +120,25 @@ module Admin
 
     private
 
+    def console_team_form?
+      Array(request.variant).include?(:console)
+    end
+
+    # Re-renders the team step with the failed assignment's errors inline.
+    def render_team_with_errors(assignment)
+      @event_role_assignments = @event.event_role_assignments.includes(:user).order("users.email")
+      @event_role_assignment = assignment
+      render :team, status: :unprocessable_entity
+    end
+
     def set_event
       @event = Event.find_by!(slug: params[:slug])
       authorize @event, :update?
       set_current_event(@event)
+    end
+
+    def require_integrations_access
+      authorize @event, :manage_integrations?
     end
 
     def resume_step_path
@@ -165,6 +191,7 @@ module Admin
       params.require(:event).permit(
         :starts_at, :ends_at,
         :registration_open_at, :registration_close_at,
+        :arrival_opens_at, :arrival_closes_at,
         :location_city, :location_country, :location_address,
         :location_latitude, :location_longitude,
         :venue_name
@@ -180,6 +207,7 @@ module Admin
         :accommodation_enabled,
         :roommate_preferences_enabled,
         :guardian_invites_locked,
+        :onboarding_invites_held,
         :nfc_badges_enabled,
         :nfc_badge_write_on_checkin_enabled,
         :groups_enabled

@@ -40,4 +40,22 @@ module DashboardHelper
   def display_status_badge_class(display_status)
     DISPLAY_STATUS_STYLES[display_status] || "bg-gray-100 text-gray-800"
   end
+
+  COMPLETION_STATUS_STYLES = {
+    confirmed: "bg-green-100 text-green-800",
+    information_needed: "bg-blue-100 text-blue-800",
+    action_needed: "bg-blue-100 text-blue-800",
+    waiting_on_guardian: "bg-amber-100 text-amber-800",
+    waiting_on_participant: "bg-amber-100 text-amber-800",
+    paused: "bg-amber-100 text-amber-800",
+    staff_attention: "bg-red-100 text-red-800",
+    preparing: "bg-gray-100 text-gray-800",
+    processing: "bg-gray-100 text-gray-800",
+    withdrawn: "bg-red-100 text-red-800",
+    rejected: "bg-red-100 text-red-800"
+  }.freeze
+
+  def completion_status_badge_class(state)
+    COMPLETION_STATUS_STYLES.fetch(state, "bg-gray-100 text-gray-800")
+  end
 end
