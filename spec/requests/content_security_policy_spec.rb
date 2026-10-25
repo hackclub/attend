@@ -125,6 +125,18 @@ RSpec.describe "Content Security Policy", type: :request do
 
       expect(response.headers["Content-Security-Policy"][/form-action[^;]*/]).to include("https://airtable.com")
     end
+
+    # Address fields (the event venue, profile and travel addresses) load the
+    # Google Maps JS API, which pulls modules from both hosts and fetches
+    # predictions from maps.googleapis.com. Blocked, the field just shows no
+    # suggestions.
+    it "allows Google Maps for address autocomplete" do
+      get root_path
+
+      header = response.headers["Content-Security-Policy"]
+      expect(header[/script-src[^;]*/]).to include("https://maps.googleapis.com", "https://maps.gstatic.com")
+      expect(header[/connect-src[^;]*/]).to include("https://maps.googleapis.com")
+    end
   end
 
   ADMIN_UIS.each do |ui, console|

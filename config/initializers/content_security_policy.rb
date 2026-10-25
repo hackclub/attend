@@ -22,6 +22,12 @@ Rails.application.configure do
   # stop learners seeking ahead.
   training_video_players = %w[https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com]
   training_video_apis = %w[https://www.youtube.com https://player.vimeo.com]
+  # Google Maps JS API with the Places library: the venue address field and
+  # address_autocomplete_controller.js. The loader pulls its modules from
+  # maps.googleapis.com and maps.gstatic.com, and fetches predictions from
+  # maps.googleapis.com. Without these the script is blocked and the field
+  # silently shows no suggestions.
+  google_maps = %w[https://maps.googleapis.com https://maps.gstatic.com]
 
   config.content_security_policy do |policy|
     policy.default_src :self
@@ -30,9 +36,9 @@ Rails.application.configure do
     policy.object_src  :none
     # Uploaded lesson videos stream from the storage bucket.
     policy.media_src   :self, :https
-    policy.script_src  :self, "https://cdn.docuseal.com", *docuseal_origins, "https://cdn.cloudflare.com", "https://unpkg.com", "https://cdn.jsdelivr.net", "https://challenges.cloudflare.com", "https://plausible.io", mintlify_widget, *hcaptcha, *training_video_apis
+    policy.script_src  :self, "https://cdn.docuseal.com", *docuseal_origins, "https://cdn.cloudflare.com", "https://unpkg.com", "https://cdn.jsdelivr.net", "https://challenges.cloudflare.com", "https://plausible.io", mintlify_widget, *hcaptcha, *training_video_apis, *google_maps
     policy.style_src   :self, :unsafe_inline, "https://cdn.docuseal.com", *docuseal_origins, "https://cdn.jsdelivr.net", mintlify_widget
-    policy.connect_src :self, "https://api.docuseal.com", *docuseal_origins, "ws://localhost:9876", "ws://127.0.0.1:9876", "https://challenges.cloudflare.com", "https://plausible.io", mintlify_widget, *mintlify_api, *hcaptcha
+    policy.connect_src :self, "https://api.docuseal.com", *docuseal_origins, "ws://localhost:9876", "ws://127.0.0.1:9876", "https://challenges.cloudflare.com", "https://plausible.io", mintlify_widget, *mintlify_api, *hcaptcha, *google_maps
     policy.frame_src   :self, *docuseal_origins, "https://challenges.cloudflare.com", *hcaptcha, *training_video_players
     policy.frame_ancestors :self
     policy.base_uri    :self
