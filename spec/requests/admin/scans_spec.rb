@@ -61,6 +61,49 @@ RSpec.describe "Admin::Scans", type: :request do
       expect(response).to have_http_status(:not_found)
       expect(participation.scans).to be_empty
     end
+
+    it "flags food allergies from both health records without sending their free text" do
+      participant_event.create_medical!(allergies: "Penicillin", has_anaphylaxis_risk: true)
+      participant_event.create_dietary!(diet_type: "vegan", life_threatening_allergies: "Peanuts", cross_contamination_risk: true)
+
+      post admin_event_scans_path(event), params: {
+        participant_id: participant_event.id, scan_context_id: scan_context.id
+      }, as: :json
+
+      expect(response.parsed_body["participant"]).to include(
+        "has_anaphylaxis_risk" => true, "dietary" => "vegan", "has_allergies" => true,
+        "has_life_threatening_food_allergies" => true, "cross_contamination_risk" => true
+      )
+      expect(response.body).not_to include("Peanuts", "Penicillin")
+    end
+
+    it "reads \"None\" in the allergy fields as no allergy" do
+      participant_event.create_medical!(allergies: "None")
+      participant_event.create_dietary!(life_threatening_allergies: "No known allergies")
+
+      post admin_event_scans_path(event), params: {
+        participant_id: participant_event.id, scan_context_id: scan_context.id
+      }, as: :json
+
+      expect(response.parsed_body["participant"]).to include(
+        "has_allergies" => false, "has_life_threatening_food_allergies" => false
+      )
+    end
+
+    it "leaves health-form allergies out for roles that can't see the medical summary" do
+      # Read-only here, but staff elsewhere, so the admin area is open to them.
+      read_only = create(:event_role_assignment, event: event, role: "read_only").user
+      create(:event_role_assignment, user: read_only, event: create(:event), role: "ops")
+      participant_event.create_medical!(allergies: "Penicillin")
+      sign_in read_only
+
+      post admin_event_scans_path(event), params: {
+        participant_id: participant_event.id, scan_context_id: scan_context.id
+      }, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["participant"]).not_to have_key("has_allergies")
+    end
   end
 
   it "shows NFC reading but hides writing when issuance is disabled" do

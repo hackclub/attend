@@ -398,6 +398,10 @@ class ParticipantEvent < ApplicationRecord
     { steps: steps, blocking_step: blocking&.dig(:name) }
   end
 
+  def food_safety_summary
+    FoodSafetySummary.new(medical: medical, dietary: dietary)
+  end
+
   def checked_in?
     if scans.loaded?
       scans.any? { |s| s.scan_context&.checks_in? }

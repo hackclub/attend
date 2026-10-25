@@ -143,6 +143,20 @@
   <td class="cs-secondary max-w-[120px] truncate" data-column="intolerances" title="<%= pe.dietary&.intolerances %>">
     <%= pe.dietary&.intolerances.presence || "—" %>
   </td>
+  <%# "None" and the like stay in the record but aren't an allergy. %>
+  <% food_allergies = pe.dietary.life_threatening_allergies if pe.dietary&.has_life_threatening_allergy? %>
+  <td class="cs-secondary max-w-[120px] truncate" data-column="food_allergies" title="<%= food_allergies %>">
+    <%= food_allergies || "—" %>
+  </td>
+  <td class="whitespace-nowrap" data-column="cross_contamination">
+    <% if pe.dietary&.cross_contamination_risk %>
+      <%= cs_badge("Yes", "red") %>
+    <% elsif pe.dietary.nil? %>
+      <span class="cs-muted">—</span>
+    <% else %>
+      <span class="cs-muted">No</span>
+    <% end %>
+  </td>
   <td class="cs-secondary max-w-[120px] truncate" data-column="allergies" title="<%= pe.medical&.allergies %>">
     <%= pe.medical&.allergies.presence || "—" %>
   </td>
