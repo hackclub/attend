@@ -130,8 +130,9 @@
         <% end %>
 
         <!-- Flash messages -->
+        <%# A fresh id each render makes a morph insert (and reveal) a new notice instead of rewriting the old one in place; scroll-mt clears the sticky mobile header. %>
         <% if flash[:notice] %>
-          <div class="border-b border-[#33d6a6]/30 border-l-4 border-l-[#33d6a6] bg-white" data-controller="flash" data-flash-target="container">
+          <div id="flash-<%= SecureRandom.hex(4) %>" class="scroll-mt-14 lg:scroll-mt-0 border-b border-[#33d6a6]/30 border-l-4 border-l-[#33d6a6] bg-white" data-controller="flash" data-flash-target="container" data-flash-reveal-value="true">
             <div class="px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
               <p class="text-sm text-[#1f2d3d]"><%= flash[:notice] %></p>
               <button type="button" class="text-[#8492a6] hover:text-[#3c4858]" data-action="flash#dismiss">
@@ -144,7 +145,7 @@
         <% end %>
 
         <% if flash[:alert] %>
-          <div class="border-b border-[#ec3750]/30 border-l-4 border-l-[#ec3750] bg-white" data-controller="flash" data-flash-target="container">
+          <div id="flash-<%= SecureRandom.hex(4) %>" class="scroll-mt-14 lg:scroll-mt-0 border-b border-[#ec3750]/30 border-l-4 border-l-[#ec3750] bg-white" data-controller="flash" data-flash-target="container" data-flash-reveal-value="true">
             <div class="px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
               <p class="text-sm text-[#1f2d3d]"><%= flash[:alert] %></p>
               <button type="button" class="text-[#8492a6] hover:text-[#3c4858]" data-action="flash#dismiss">
