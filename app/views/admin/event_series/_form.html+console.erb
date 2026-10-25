@@ -136,6 +136,13 @@
           <%= f.text_field :tshirt_note, class: "cs-input", placeholder: "Unisex, US sizing.", **aria %>
         <% end %>
       </div>
+      <div class="cs-option">
+        <%= f.check_box :hide_privacy_notes, { checked: @series.hide_privacy_notes? } %>
+        <div>
+          <%= f.label :hide_privacy_notes, "Hide the privacy notes", class: "cs-option-label" %>
+          <p class="cs-option-description">Leaves out the notes on who can see rooming and health answers, and the private request links, on the accommodation and health steps. Health sections also stop offering to discuss privately.</p>
+        </div>
+      </div>
     </div>
   </section>
 

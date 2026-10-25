@@ -29,6 +29,9 @@ class MessageDelivery < ApplicationRecord
 
   delegate :event, to: :message
 
+  # `catch_up?` (from the column) is true for deliveries created by
+  # Message#send_to_new_recipients! rather than the original send.
+
   def recipient
     participant_event&.participant || guardian
   end
@@ -45,6 +48,8 @@ class MessageDelivery < ApplicationRecord
       recipient_email
     when "sms"
       recipient_phone
+    when "push"
+      participant_event&.participant&.user&.email || "App"
     end
   end
 

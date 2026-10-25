@@ -607,6 +607,10 @@ class Event < ApplicationRecord
     event_series&.tshirt_note.presence
   end
 
+  def hide_privacy_notes?
+    event_series&.hide_privacy_notes? || false
+  end
+
   # Account linking is set on the event, falling back to its series; an
   # event outside a series can still ask for accounts.
   def account_linking_mode(provider)

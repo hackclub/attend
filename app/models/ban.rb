@@ -30,6 +30,26 @@ class Ban < ApplicationRecord
       (slack_ids.any? && BanSlackId.joins(:ban).merge(Ban.active).where(slack_id: slack_ids).exists?)
   end
 
+  # The banned subset of a whole list, for callers checking many identities at
+  # once (the CSV import preview) instead of one per row. Normalised the way
+  # banned? does, so the sets can be compared against the same input.
+  def self.banned_emails(emails)
+    emails = Array(emails).compact_blank.map { |email| email.strip.downcase }
+    return Set.new if emails.empty?
+
+    BanEmail.joins(:ban).merge(Ban.active)
+      .where("LOWER(ban_emails.email) IN (?)", emails)
+      .pluck(Arel.sql("LOWER(ban_emails.email)")).to_set
+  end
+
+  def self.banned_slack_ids(slack_ids)
+    slack_ids = Array(slack_ids).compact_blank.map { |id| id.strip.upcase }
+    return Set.new if slack_ids.empty?
+
+    BanSlackId.joins(:ban).merge(Ban.active)
+      .where(slack_id: slack_ids).pluck(:slack_id).map { |id| id.to_s.strip.upcase }.to_set
+  end
+
   # The Slack IDs we know for a participant, for passing to banned?.
   def self.slack_ids_for(participant)
     [ participant&.slack_user_id, participant&.user&.verified_slack_id ]

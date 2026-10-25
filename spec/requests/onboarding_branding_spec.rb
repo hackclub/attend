@@ -56,6 +56,22 @@ RSpec.describe "Onboarding branding", type: :request do
     expect(response.body).to include('html[data-branded][data-theme="light"]')
   end
 
+  # Turbo swaps <body> but not <html>'s attributes, so branded pages carry a
+  # tracked element that forces a full load when a visit crosses brands.
+  it "marks the page so Turbo fully loads it when the brand changes" do
+    get onboarding_step_path(step: "profile", event_id: event.id)
+
+    meta = Nokogiri::HTML(response.body).at('meta[name="attend-brand"]')
+    expect(meta["data-turbo-track"]).to eq("reload")
+    expect(meta["content"]).to be_present
+
+    other = create(:event_series, name: "Moonbeam", brand: brand.merge("accent" => "#2f6fd0"))
+    event.update!(event_series: other)
+    get onboarding_step_path(step: "profile", event_id: event.id)
+
+    expect(Nokogiri::HTML(response.body).at('meta[name="attend-brand"]')["content"]).not_to eq(meta["content"])
+  end
+
   it "adds the registration note to the review step" do
     participant.participant_events.find_by!(event: event).update!(onboarding_step: 99)
 
@@ -73,6 +89,7 @@ RSpec.describe "Onboarding branding", type: :request do
       expect(response).to have_http_status(:ok)
       html = Nokogiri::HTML(response.body).at("html")
       expect(html["data-branded"]).to be_nil
+      expect(response.body).not_to include('name="attend-brand"')
       expect(response.body).not_to include("brand-bottom-strip")
       expect(response.body).not_to include("We post stickers")
       expect(response.body).to include("Registering for")

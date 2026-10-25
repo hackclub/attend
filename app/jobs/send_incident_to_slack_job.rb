@@ -58,7 +58,7 @@ class SendIncidentToSlackJob < ApplicationJob
           },
           {
             type: "mrkdwn",
-            text: "*Severity:*\n#{incident.severity.humanize}"
+            text: "*Level:*\n#{IncidentLevel.label(incident.severity)}"
           },
           {
             type: "mrkdwn",

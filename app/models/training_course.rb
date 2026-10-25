@@ -9,6 +9,7 @@ class TrainingCourse < ApplicationRecord
   has_many :lessons, -> { ordered }, class_name: "TrainingLesson", dependent: :destroy, inverse_of: :course
   has_many :enrollments, class_name: "TrainingEnrollment", dependent: :destroy
   has_many :invitations, class_name: "TrainingCourseInvitation", dependent: :destroy
+  has_many :disclosures, class_name: "TrainingDisclosure", dependent: :nullify
 
   enum :status, { draft: "draft", published: "published", archived: "archived" }, default: :draft
 
@@ -35,6 +36,10 @@ class TrainingCourse < ApplicationRecord
 
   def to_param
     slug
+  end
+
+  def disclosure_question_text
+    disclosure_question.presence || TrainingDisclosure::DEFAULT_QUESTION
   end
 
   def question_count

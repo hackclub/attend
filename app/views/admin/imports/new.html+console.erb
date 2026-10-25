@@ -40,7 +40,7 @@
                 <p><span class="cs-status cs-status-success"><%= cs_status_icon(:success) %><span class="font-bold" data-dropzone-target="fileName"></span></span></p>
                 <p class="cs-small cs-muted mt-2">Select to change the file</p>
               </div>
-              <%= file_field_tag :csv_file, accept: ".csv", required: true, class: "hidden cs-file", data: { dropzone_target: "input", action: "change->dropzone#fileSelected" }, **aria %>
+              <%= file_field_tag :csv_file, accept: ".csv,.txt", required: true, class: "hidden cs-file", data: { dropzone_target: "input", action: "change->dropzone#fileSelected" }, **aria %>
             </div>
           <% end %>
         </div>

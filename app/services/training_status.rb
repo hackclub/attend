@@ -6,9 +6,13 @@
 #   status = TrainingStatus.for_event(event)
 #   status.for(user).state  # => :trained, :expiring, :untrained or :not_required
 class TrainingStatus
-  Result = Data.define(:required, :missing, :lapsed, :expiring, :awards) do
+  Result = Data.define(:required, :missing, :lapsed, :expiring, :awards, :ineligible) do
+    # Ineligible beats everything: a "yes" declaration the Hack Club Safety
+    # Team hasn't cleared (TrainingDisclosure) means they can't work the
+    # event, whatever badges they hold.
     def state
-      if required.empty? then :not_required
+      if ineligible then :ineligible
+      elsif required.empty? then :not_required
       elsif missing.any? then :untrained
       elsif expiring.any? then :expiring
       else :trained
@@ -25,7 +29,7 @@ class TrainingStatus
     end
   end
 
-  NOT_REQUIRED = Result.new(required: [], missing: [], lapsed: [], expiring: [], awards: [])
+  NOT_REQUIRED = Result.new(required: [], missing: [], lapsed: [], expiring: [], awards: [], ineligible: false)
 
   # Staff by their event roles, volunteers as "volunteer", and the event's
   # series owners and organizers as "event_admin" — they act as event admins
@@ -66,7 +70,8 @@ class TrainingStatus
     {
       required: states.count { |state| state != :not_required },
       untrained: states.count(:untrained),
-      expiring: states.count(:expiring)
+      expiring: states.count(:expiring),
+      ineligible: states.count(:ineligible)
     }
   end
 
@@ -80,6 +85,7 @@ class TrainingStatus
         .where(user_id: @roles_by_user_id.keys, training_badge_id: badges.map(&:id))
         .order(:expires_at).to_a
       awards_by_user = awards.group_by(&:user_id)
+      ineligible_ids = TrainingDisclosure.ineligible_user_ids(@roles_by_user_id.keys)
 
       @roles_by_user_id.to_h do |user_id, roles|
         required = badges.select { |badge| badge.required_for?(roles) }
@@ -89,7 +95,8 @@ class TrainingStatus
         lapsed = missing.select { |badge| held.any? { |award| award.training_badge_id == badge.id } }
         expiring = required.select { |badge| current.any? { |award| award.training_badge_id == badge.id && award.expiring_soon?(@now) } }
 
-        [ user_id, Result.new(required: required, missing: missing, lapsed: lapsed, expiring: expiring, awards: current) ]
+        [ user_id, Result.new(required: required, missing: missing, lapsed: lapsed, expiring: expiring, awards: current,
+          ineligible: ineligible_ids.include?(user_id)) ]
       end
     end
   end

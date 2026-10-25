@@ -9,6 +9,7 @@ class IncidentReportsController < ApplicationController
     @incident_report = IncidentReport.new
     prefill_from_user
     @events = reportable_events
+    @organizer_events = organizer_events
 
     # Remember this page so signing in via Hack Club returns the user here.
     store_location_for(:user, incident_report_path) unless user_signed_in?
@@ -21,18 +22,17 @@ class IncidentReportsController < ApplicationController
 
     unless user_signed_in? || verify_turnstile
       @events = reportable_events
+      @organizer_events = organizer_events
       flash.now[:alert] = "Please complete the verification challenge and try again."
       return render :new, status: :unprocessable_entity
     end
 
     if @incident_report.save
-      IncidentReportMailer.new_report(@incident_report).deliver_later
-      SendIncidentReportToSlackJob.perform_later(@incident_report.id)
-      SendIncidentReportConfirmationSmsJob.perform_later(@incident_report.id)
-      InitiateEmergencyIncidentCallsJob.perform_later(@incident_report.id) if @incident_report.emergency?
+      @incident_report.dispatch_notifications!
       redirect_to incident_report_submitted_path
     else
       @events = reportable_events
+      @organizer_events = organizer_events
       render :new, status: :unprocessable_entity
     end
   end
@@ -71,6 +71,14 @@ class IncidentReportsController < ApplicationController
       .where("starts_at <= ?", Time.current)
       .where("ends_at >= ?", 6.months.ago)
       .order(starts_at: :desc)
+  end
+
+  # Events the signed-in user helps run, so the form can point organizers at
+  # their event's incident log (which can escalate to HQ) as the better path.
+  def organizer_events
+    return Event.none unless user_signed_in?
+
+    reportable_events.where(id: current_user.event_role_assignments.select(:event_id)).limit(3)
   end
 
   # Memoized (the view calls this more than once per render, and each call
