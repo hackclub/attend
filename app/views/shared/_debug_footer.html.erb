@@ -1,7 +1,9 @@
+<%# The app footer is #17171d under every theme, so its build line needs the
+    lighter grey to clear 4.5:1 there. %>
 <% if (info = debug_footer_info) %>
   <div class="flex-shrink-0 px-3 py-3">
     <% if info[:commit].present? && info[:built_at].present? %>
-      <div class="mt-1 text-[10px] text-[#5a6473]">
+      <div class="mt-1 text-[11px] <%= local_assigns[:on_dark] ? "text-[#8492a6]" : "text-[#5a6473]" %>">
         Built <%= time_ago_in_words(info[:built_at]) %> ago
         <% if info[:commit_url] %>
           <a href="<%= info[:commit_url] %>" target="_blank" rel="noopener" class="font-mono hover:underline">(<%= info[:commit] %>)</a>

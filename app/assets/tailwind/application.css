@@ -836,26 +836,32 @@
     border-bottom: 1px solid var(--border-card);
   }
 
+  /* Grows rather than overflows: at large text sizes on a phone the sign-in
+   * button drops under the wordmark and its label wraps there, instead of
+   * pushing the page sideways. */
   .landing-header-inner {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
-    height: 4rem;
+    column-gap: 1rem;
+    row-gap: 0.5rem;
+    min-height: 4rem;
+    padding-block: 0.625rem;
     margin: 0 auto;
     max-width: 80rem;
-    padding: 0 1rem;
+    padding-inline: 1rem;
   }
 
   @media (min-width: 640px) {
     .landing-header-inner {
-      padding: 0 1.5rem;
+      padding-inline: 1.5rem;
     }
   }
 
   @media (min-width: 1024px) {
     .landing-header-inner {
-      padding: 0 2.5rem;
+      padding-inline: 2.5rem;
     }
   }
 
@@ -865,7 +871,6 @@
     display: inline-flex;
     align-items: center;
     gap: 0.625rem;
-    white-space: nowrap;
     min-height: 2.75rem;
     padding: 0.625rem 1.125rem;
     border-radius: 6px;
@@ -886,9 +891,16 @@
     outline-offset: 3px;
   }
 
+  /* Tightened so the wordmark and the button share one line on a 375px
+   * phone; at 320px they can't, and the button takes its own row. */
   @media (max-width: 400px) {
     .landing-cta {
-      padding-inline: 0.875rem;
+      gap: 0.5rem;
+      padding-inline: 0.75rem;
+    }
+
+    .landing-header-inner {
+      column-gap: 0.75rem;
     }
   }
 
@@ -939,43 +951,72 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .landing-doors {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    column-gap: 1.5rem;
-    row-gap: 0.25rem;
-    margin-top: 1.5rem;
+  .landing-actions {
+    margin-top: 2rem;
   }
 
-  .landing-doors-label {
-    color: var(--text-soft);
-    font-size: 0.875rem;
-  }
-
-  .landing-door {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    min-height: 2.75rem;
+  /* Same voice as the roll's heading below, so the page has one kind of
+   * section title. */
+  .landing-actions-label {
+    margin-bottom: 0.75rem;
     font-size: 0.875rem;
     font-weight: 600;
     color: var(--text-strong);
-    border-radius: 6px;
-    transition: color 150ms ease;
   }
 
-  /* Phones keep the 44px tap height; beside the map the row has to stay one
-   * line, so the targets shrink to the text and the row gap. */
-  @media (min-width: 1024px) {
-    .landing-door { min-height: 2rem; }
+  .landing-actions-list {
+    display: grid;
+    gap: 0.5rem;
+    max-width: 26rem;
   }
 
-  .landing-door:hover {
+  /* Whole card is the tap target, so phones get well past 44px. */
+  .landing-action {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    height: 100%;
+    padding: 0.75rem 2rem 0.75rem 0.875rem;
+    border: 1px solid var(--border-card);
+    border-radius: 8px;
+    background-color: var(--bg-elev);
+    transition: border-color 150ms ease, background-color 150ms ease;
+  }
+
+  .landing-action-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-strong);
+  }
+
+  .landing-action-hint {
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: var(--text-soft);
+    overflow-wrap: anywhere;
+  }
+
+  .landing-action-arrow {
+    position: absolute;
+    top: 50%;
+    right: 0.875rem;
+    translate: 0 -50%;
+    font-size: 0.875rem;
+    color: var(--text-soft);
+    transition: transform 150ms ease, color 150ms ease;
+  }
+
+  .landing-action:hover {
+    border-color: var(--accent);
+  }
+
+  .landing-action:hover .landing-action-arrow {
     color: var(--accent);
+    transform: translateX(2px);
   }
 
-  .landing-door:focus-visible {
+  .landing-action:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
@@ -1046,7 +1087,10 @@
     bottom: 0.75rem;
     z-index: 1;
     display: flex;
-    gap: 0.875rem;
+    flex-wrap: wrap;
+    column-gap: 0.875rem;
+    row-gap: 0.25rem;
+    max-width: calc(100% - 1.5rem);
     padding: 0.375rem 0.625rem;
     border: 1px solid var(--border-card);
     border-radius: 6px;
@@ -1171,10 +1215,13 @@
     break-inside: avoid;
   }
 
+  /* 44px tall on phones, where the roll is tapped; beside the map on a
+   * desktop it tightens back to the text. */
   .landing-country {
     display: flex;
     width: 100%;
-    align-items: baseline;
+    min-height: 2.75rem;
+    align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
     padding: 0.4375rem 0.25rem;
@@ -1187,7 +1234,13 @@
     transition: color 150ms ease, background-color 150ms ease;
   }
 
+  @media (min-width: 1024px) {
+    .landing-country { min-height: 0; }
+  }
+
   .landing-country-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
     font-weight: 600;
     color: var(--text-strong);
   }
@@ -1219,12 +1272,6 @@
   }
   .landing-country--static:hover .landing-country-name {
     color: inherit;
-  }
-
-  .landing-foot {
-    margin-top: 1.5rem;
-    font-size: 0.75rem;
-    color: var(--text-soft);
   }
 
   .landing-dev {
