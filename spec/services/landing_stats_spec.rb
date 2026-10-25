@@ -3,13 +3,14 @@ require "rails_helper"
 RSpec.describe LandingStats do
   let(:now) { Time.zone.parse("2026-10-24 12:00:00") }
 
-  def register(event, country:, status: :complete)
+  def register(event, country:, scanned: true)
     participant = create(:participant, country_of_residence: country)
-    create(:participant_event, participant: participant, event: event, status: status)
+    traits = scanned ? [ :checked_in ] : []
+    create(:participant_event, *traits, participant: participant, event: event, status: :complete)
     participant
   end
 
-  it "counts started events with standing registrations, distinct students, and folded countries" do
+  it "counts started events with scanned-in people, distinct students, and folded countries" do
     happened = create(:event, name: "Mock Winter", starts_at: now - 30.days, ends_at: now - 27.days,
                       location_latitude: 48.2345, location_longitude: 16.4123)
     second = create(:event, name: "Mock Spring", starts_at: now - 10.days, ends_at: now - 8.days,
@@ -23,15 +24,15 @@ RSpec.describe LandingStats do
                       location_latitude: 35.6, location_longitude: 139.7)
 
     returning = register(happened, country: "United States")
-    create(:participant_event, participant: returning, event: second, status: :complete)
+    create(:participant_event, :checked_in, participant: returning, event: second, status: :complete)
     register(happened, country: "US")
     register(happened, country: "USA")
     register(second, country: "IN")
     register(second, country: "India")
     register(second, country: "Narnia")
-    register(second, country: "Morocco", status: :withdrawn)
-    register(second, country: "Peru", status: :rejected)
-    register(empty, country: "Ireland", status: :withdrawn)
+    register(second, country: "Morocco", scanned: false)
+    register(second, country: "Peru", scanned: false)
+    register(empty, country: "Ireland", scanned: false)
     register(unlisted, country: "Japan")
 
     stats = described_class.new(now: now).to_h

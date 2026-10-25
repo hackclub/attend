@@ -7,7 +7,7 @@ RSpec.describe "Landing page", type: :request do
     event = create(:event, name: "Mock Harbour", starts_at: 2.weeks.ago, ends_at: 13.days.ago,
                    location_city: "Rotterdam", location_country: "Netherlands")
     participant = create(:participant, country_of_residence: "Netherlands")
-    create(:participant_event, participant: participant, event: event, status: :complete)
+    create(:participant_event, :checked_in, participant: participant, event: event, status: :complete)
 
     get root_path
 
@@ -30,7 +30,7 @@ RSpec.describe "Landing page", type: :request do
 
   it "escapes event names in the pins payload" do
     event = create(:event, name: "<script>alert(1)</script>", starts_at: 2.weeks.ago, ends_at: 13.days.ago)
-    create(:participant_event, event: event, status: :complete)
+    create(:participant_event, :checked_in, event: event, status: :complete)
 
     get root_path
 
