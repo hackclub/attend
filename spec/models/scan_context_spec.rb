@@ -40,7 +40,34 @@ RSpec.describe ScanContext, type: :model do
       venue.kind = "outing"
 
       expect(venue).not_to be_valid
-      expect(venue.errors[:base].first).to include("at least one Venue")
+      expect(venue.errors[:kind].first).to include("at least one Venue")
+    end
+
+    it "takes the kind from the old flags when they're written without it" do
+      lunch = event.scan_contexts.create!(name: "Lunch", kind: "tracking_only")
+
+      lunch.update!(checks_in: true)
+      expect(lunch.reload.kind).to eq("venue")
+    end
+
+    it "counts a hotel point saved without a kind as placing, like its kind_label" do
+      hotel = event.scan_contexts.create!(name: "Hotel")
+      event.update_columns(hotel_scan_context_id: hotel.id)
+      hotel.update_columns(kind: nil)
+
+      expect(hotel.reload.kind_label).to eq("Lodging")
+      expect(ScanContext.placing).to include(hotel)
+    end
+
+    it "makes a tracking-only point lodging when the event picks it as its hotel scan point" do
+      hotel = event.scan_contexts.create!(name: "Hotel")
+      pickup = event.scan_contexts.create!(name: "Airport", kind: "pickup")
+
+      event.update!(hotel_scan_context: hotel)
+      expect(hotel.reload.kind).to eq("lodging")
+
+      event.update!(hotel_scan_context: pickup)
+      expect(pickup.reload.kind).to eq("pickup")
     end
   end
 

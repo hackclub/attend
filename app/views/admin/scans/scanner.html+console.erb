@@ -34,7 +34,7 @@
           <select id="scan-context" data-role-info-target="select" data-action="role-info#update" class="cs-select min-h-11 sm:min-h-8">
             <% @scan_contexts.each do |context| %>
               <option value="<%= context.id %>" <%= "selected" if context == @default_scan_context %>>
-                <%= context.name %><%= " — Travel pickup" if context.is_travel_pickup? %><% if context.checks_in? %> ✓<% end %>
+                <%= context.name %> — <%= context.kind_label %>
               </option>
             <% end %>
           </select>

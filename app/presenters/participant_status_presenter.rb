@@ -24,26 +24,31 @@ class ParticipantStatusPresenter
     "departure" => [ "Signed out", :idle, "Their latest scan was leaving the event." ]
   }.freeze
 
-  ATTENDED = [ "Attended", :done, "The event has ended, and a scan placed them at it at least once." ].freeze
-  NO_SHOW = [ "No-show", :wait, "The event has ended, and no scan ever placed them at it." ].freeze
+  ATTENDED = [ "Attended", :done, "The event has ended, and they checked in at least once." ].freeze
+  NO_SHOW = [ "No-show", :wait, "The event has ended. Their registration was complete, but they never checked in." ].freeze
 
   attr_reader :label, :tone, :meaning, :scan
 
   def initialize(participant_event, now: Time.current)
     @participant_event = participant_event
     @now = now
-    @scan = participant_event.latest_placing_scan unless gone?
+    @scan = latest_placing_scan unless gone?
     @label, @tone, @meaning = resolve
   end
 
   # When the scan behind the status happened, on the event's clock: "09:14"
-  # today, "Tue 22:10" on another day. Nil for registration statuses.
+  # today, "Tue 22:10" within the last week, "3 Oct 22:10" before that. Nil
+  # for registration statuses.
   def scanned_at_label
     return unless scan
 
     @scanned_at_label ||= begin
       at = scan.scanned_at.in_time_zone(event.event_time_zone)
-      at.to_date == @now.in_time_zone(at.time_zone).to_date ? at.strftime("%H:%M") : at.strftime("%a %H:%M")
+      today = @now.in_time_zone(at.time_zone).to_date
+      if at.to_date == today then at.strftime("%H:%M")
+      elsif at.to_date > today - 7 then at.strftime("%a %H:%M")
+      else at.strftime("%-d %b %H:%M")
+      end
     end
   end
 
@@ -62,6 +67,16 @@ class ParticipantStatusPresenter
     participant_event.event
   end
 
+  # Taken from the registration's scans when a list already loaded them all
+  # (the participants table), so it costs no second query.
+  def latest_placing_scan
+    return participant_event.latest_placing_scan unless participant_event.scans.loaded?
+
+    participant_event.scans
+      .select { |s| s.scan_context.effective_kind.in?(ScanContext::PLACING_KINDS) }
+      .max_by { |s| [ s.scanned_at, s.created_at ] }
+  end
+
   def gone?
     participant_event.withdrawn? || participant_event.rejected?
   end
@@ -69,7 +84,14 @@ class ParticipantStatusPresenter
   def resolve
     registration = REGISTRATION.fetch(participant_event.display_status)
     return registration if gone?
-    return (scan ? ATTENDED : NO_SHOW) if ended?
+    if ended?
+      return ATTENDED if participant_event.checked_in?
+      # Only a finished registration was expected to turn up.
+      return NO_SHOW if participant_event.display_status == "Complete"
+
+      @scan = nil
+      return registration
+    end
 
     place = WHEREABOUTS[scan.scan_context.effective_kind] if scan
     return place if place
@@ -79,6 +101,6 @@ class ParticipantStatusPresenter
   end
 
   def ended?
-    event.ends_at.present? && @now >= event.ends_at
+    event.phase_at(@now) == :ended
   end
 end

@@ -27,6 +27,8 @@ module Admin
         # would otherwise flip every association into one giant eager-load LEFT JOIN.
         @participant_events = policy_scope(current_event.participant_events)
           .preload(:participant, :event, :travel_inbound, :travel_outbound, :accommodation, :medical, :safeguarding_info, :dietary, :accessibility, :consents, :emergency_contacts, :groups, guardian_participant_events: :emergency_contacts, latest_placing_scan: :scan_context)
+        # Once the event has ended the status cell asks whether each row ever checked in.
+        @participant_events = @participant_events.preload(scans: :scan_context) if current_event.phase_at == :ended
 
         if params[:search].present?
           search_term = "%#{ActiveRecord::Base.sanitize_sql_like(params[:search])}%"
@@ -125,9 +127,7 @@ module Admin
           scans: [ :scan_context, :user ],
           groups: []
         )
-        # preload, never includes: a filter that forces eager_load would fold this
-        # DISTINCT ON association into the join and attach the wrong scan.
-        .preload(room: { participant_events: :participant }, latest_placing_scan: :scan_context)
+        .preload(room: { participant_events: :participant })
 
       @sort_field = params[:sort] || "legal_last_name"
       @sort_direction = params[:direction] == "desc" ? "desc" : "asc"

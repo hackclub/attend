@@ -28,7 +28,14 @@ class ScanContext < ApplicationRecord
 
   # Points whose scans place people, counting a point saved without a kind
   # (by older code mid-deploy) by its flags, as kind_from_old_flags does.
-  scope :placing, -> { where(kind: PLACING_KINDS).or(where(kind: nil).where("checks_in OR is_travel_pickup")) }
+  scope :placing, -> {
+    where(kind: PLACING_KINDS).or(where(kind: nil).where(<<~SQL.squish))
+      checks_in OR is_travel_pickup OR EXISTS (
+        SELECT 1 FROM events
+        WHERE events.id = scan_contexts.event_id AND events.hotel_scan_context_id = scan_contexts.id
+      )
+    SQL
+  }
 
   # Browsers count a line break as one character but submit two.
   normalizes :usage_note, with: ->(note) { note.gsub("\r\n", "\n").strip.presence }
@@ -69,14 +76,23 @@ class ScanContext < ApplicationRecord
   end
 
   # Setting a kind writes the old flags; a point saved without a kind (the
-  # default check-in point, older callers) gets one from its flags. Saves
-  # that don't change the kind leave the flags alone.
+  # default check-in point, older callers) gets one from its flags, and so
+  # does one whose flags were written without its kind (older code
+  # mid-deploy, a console update). Other saves leave the flags alone.
   def sync_kind_and_old_flags
     if kind.nil?
       self.kind = kind_from_old_flags
     elsif will_save_change_to_kind?
       assign_attributes(checks_in: venue?, is_travel_pickup: pickup?)
+    elsif !old_flags_match_kind?
+      self.kind = kind_from_old_flags
     end
+  end
+
+  # A Venue may also be a travel pickup: points that were both keep marking
+  # travel as collected until staff change their kind.
+  def old_flags_match_kind?
+    checks_in? == venue? && (is_travel_pickup? == pickup? || venue?)
   end
 
   def travel_calendar_event_ids
@@ -97,7 +113,7 @@ class ScanContext < ApplicationRecord
 
   def cannot_disable_last_check_in_context
     if last_check_in_context_for_event?
-      errors.add(:base, "This scan point must stay Venue: the event needs at least one Venue scan point to check people in.")
+      errors.add(:kind, "must stay Venue: the event needs at least one Venue scan point to check people in")
     end
   end
 

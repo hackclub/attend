@@ -29,6 +29,7 @@ RSpec.describe ParticipantStatusPresenter do
 
     expect(status(now: now)).to have_attributes(label: "Out", tone: :wait, scanned_at_label: "14:00")
     expect(status(now: now + 1.day).scanned_at_label).to eq((now - 1.hour).strftime("%a 14:00"))
+    expect(status(now: now + 10.days).scanned_at_label).to eq((now - 1.hour).strftime("%-d %b 14:00"))
     expect(status(now: now).explanation).to include("Free time")
   end
 
@@ -41,10 +42,27 @@ RSpec.describe ParticipantStatusPresenter do
   end
 
   it "says whether they attended once the event has ended" do
+    allow_any_instance_of(ParticipantEvent).to receive(:display_status).and_return("Complete")
+    expect(status(now: 2.days.from_now).label).to eq("No-show")
+
+    scan("Airport", "pickup", 4.hours.ago)
     expect(status(now: 2.days.from_now).label).to eq("No-show")
 
     scan(event.scan_contexts.first.name, "venue", 3.hours.ago)
     expect(status(now: 2.days.from_now).label).to eq("Attended")
+  end
+
+  it "keeps the registration status for unfinished registrations once the event has ended" do
+    expect(status(now: 2.days.from_now).label).to eq("Awaiting participant")
+  end
+
+  it "reads the latest placing scan from scans a list already loaded" do
+    scan(event.scan_contexts.first.name, "venue", 2.hours.ago)
+    scan("Lunch", "tracking_only", 10.minutes.ago)
+    loaded = ParticipantEvent.preload(scans: :scan_context).find(registration.id)
+
+    expect(described_class.new(loaded).label).to eq("At venue")
+    expect(loaded.association(:latest_placing_scan)).not_to be_loaded
   end
 
   it "says Not coming for a withdrawn registration, whatever their scans" do
