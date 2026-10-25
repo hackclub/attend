@@ -554,4 +554,15 @@ RSpec.describe ParticipantEvent, type: :model do
       }.not_to change(Invitation, :count)
     end
   end
+
+  describe "Slack channel invite on completion" do
+    include ActiveJob::TestHelper
+
+    it "enqueues an invite when a registration in an event with a channel becomes complete" do
+      pe = create(:participant_event, event: create(:event, slack_channel_id: "C123"))
+
+      expect { pe.update!(status: :complete) }
+        .to have_enqueued_job(InviteToEventSlackChannelJob).with(pe.id)
+    end
+  end
 end

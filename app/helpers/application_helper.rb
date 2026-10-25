@@ -376,7 +376,7 @@ def admin_tool(class_name = "", element = "div", **options, &block)
   def slack_oauth_url_for_user(user)
     return nil unless user&.participant.present?
 
-    participant_event = user.participant.participant_events.first
+    participant_event = user.participant.slack_connect_participant_event
     return nil unless participant_event.present?
 
     SlackService.new.authorization_url(
