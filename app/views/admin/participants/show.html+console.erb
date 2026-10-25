@@ -193,7 +193,7 @@
       <% end %>
 
       <% if policy(@medical || Medical.new(participant_event: @participant_event)).show? %>
-        <section class="cs-container">
+        <section class="cs-container" data-testid="medical-summary">
           <div class="cs-container-header">
             <h2 class="cs-h2">Medical summary</h2>
             <div class="cs-actions">
@@ -201,18 +201,26 @@
             </div>
           </div>
           <div class="cs-container-body">
-            <% if @medical %>
+            <% food_safety = @participant_event.food_safety_summary %>
+            <%# Dietary flags show without a Medical record, but only a Medical record can say there are none. %>
+            <% if @medical || food_safety.any_flags? %>
               <div class="flex flex-wrap gap-2">
-                <% if @medical.has_anaphylaxis_risk %>
+                <% if food_safety.anaphylaxis_risk? %>
                   <%= cs_status(:error, "Anaphylaxis risk") %>
                 <% end %>
-                <% if @medical.has_allergies? %>
+                <% if food_safety.life_threatening_food_allergies? %>
+                  <%= cs_status(:error, "Life-threatening food allergies") %>
+                <% end %>
+                <% if food_safety.cross_contamination_risk? %>
+                  <%= cs_badge("Cross-contamination risk", "red") %>
+                <% end %>
+                <% if food_safety.allergies? %>
                   <%= cs_badge("Has allergies", "red") %>
                 <% end %>
-                <% if @medical.needs_medication_storage? %>
+                <% if @medical&.needs_medication_storage? %>
                   <%= cs_badge("Needs refrigeration", "blue") %>
                 <% end %>
-                <% unless @medical.has_anaphylaxis_risk || @medical.has_allergies? || @medical.needs_medication_storage? %>
+                <% unless food_safety.any_flags? || @medical&.needs_medication_storage? %>
                   <span class="cs-muted">No special medical flags</span>
                 <% end %>
               </div>

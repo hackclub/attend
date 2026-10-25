@@ -6,7 +6,7 @@ module Admin
     def create
       @comment = @incident.comments.build(comment_params)
       @comment.user = current_user
-      authorize @incident, :update?
+      authorize @incident, :comment?
 
       if @comment.save
         SendIncidentCommentToSlackJob.perform_later(@comment.id) if @incident.slack_message_ts.present?
@@ -27,8 +27,12 @@ module Admin
       @incident = current_event.incidents.find(params[:incident_id])
     end
 
+    # Commenting is open to the reporter, changing the incident isn't — and a
+    # status picked here is applied by IncidentComment#update_incident_status,
+    # so it has to answer to the same rule as the edit form.
     def comment_params
-      params.require(:incident_comment).permit(:body, :new_status)
+      permitted = params.require(:incident_comment).permit(:body, :new_status)
+      policy(@incident).update? ? permitted : permitted.except(:new_status)
     end
   end
 end

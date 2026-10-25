@@ -2,7 +2,10 @@ class HomeController < ApplicationController
   def index
     stash_post_login_return
 
-    return unless user_signed_in?
+    unless user_signed_in?
+      @landing = LandingStats.fetch
+      return
+    end
 
     landing = landing_path_for(current_user)
     redirect_to landing if landing

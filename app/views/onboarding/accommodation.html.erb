@@ -11,15 +11,15 @@
        elsif @accommodation.preferences_submitted?
          "Your rooming preferences have been saved and are awaiting review by the rooming team."
        end %>
-    <% show_rooming_note = !current_event.hide_rooming_note? %>
-    <% if show_rooming_note || rooming_status %>
+    <% show_privacy_note = !current_event.hide_privacy_notes? %>
+    <% if show_privacy_note || rooming_status %>
       <div class="portal-note portal-note-info mt-4">
-        <% if show_rooming_note %>
+        <% if show_privacy_note %>
           <p class="portal-body text-sm"><strong class="portal-heading">Who sees this?</strong> Rooming details are used by the event team to plan assignments and are visible to staff managing accommodation. Other attendees cannot see them. Your selections are recorded as requests, not confirmed placements.</p>
           <p class="portal-body text-sm mt-2">If a rooming concern is sensitive, <%= link_to "send a private request to event staff", edit_dashboard_event_correction_path(@participant_event, section: :support), class: "portal-link" %>. You can choose event administrators, operations, or safeguarding staff for that request.</p>
         <% end %>
         <% if rooming_status %>
-          <p class="portal-body text-sm <%= "mt-2" if show_rooming_note %>"><%= rooming_status %></p>
+          <p class="portal-body text-sm <%= "mt-2" if show_privacy_note %>"><%= rooming_status %></p>
         <% end %>
       </div>
     <% end %>

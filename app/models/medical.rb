@@ -20,13 +20,8 @@ class Medical < ApplicationRecord
 
   before_save :set_last_updated_by
 
-  NEGATIVE_RESPONSES = %w[none no n/a na nil null nothing nope - 0].freeze
-
   def has_allergies?
-    return false if allergies.blank?
-
-    normalized = allergies.strip.downcase
-    !NEGATIVE_RESPONSES.include?(normalized)
+    ClearsNegativeResponses.meaningful_response?(allergies)
   end
 
   def anaphylaxis_risk?

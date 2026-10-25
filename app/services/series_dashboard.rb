@@ -276,7 +276,7 @@ class SeriesDashboard
         event.incidents.open_incidents.count
       else
         roles = incident_roles_by_event[event.id]
-        roles.present? ? event.incidents.open_incidents.for_roles(roles).count : nil
+        roles.present? ? event.incidents.open_incidents.visible_to_staff(user, roles).count : nil
       end
     end
   end

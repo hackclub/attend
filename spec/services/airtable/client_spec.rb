@@ -47,4 +47,33 @@ RSpec.describe Airtable::Client do
       expect(WebMock).to have_requested(:post, records_url).once
     end
   end
+
+  describe "rate limiting" do
+    let(:list_url) { "https://api.airtable.com/v0/appTest/tblTest" }
+
+    it "raises a 429 straight away instead of holding the job thread" do
+      stub_request(:get, list_url).to_return(status: 429, body: '{"errors":[{"error":"RATE_LIMIT_REACHED"}]}')
+
+      expect { client.list_records("tblTest") }.to raise_error(Airtable::RateLimitError)
+      expect(WebMock).to have_requested(:get, list_url).once
+    end
+
+    it "tells a used-up monthly allowance apart from a burst limit" do
+      stub_request(:get, list_url).to_return(status: 429, body: '{"errors":[{"error":"PUBLIC_API_BILLING_LIMIT_EXCEEDED"}]}')
+
+      expect { client.list_records("tblTest") }.to raise_error(Airtable::QuotaExceededError)
+    end
+  end
+
+  it "raises ConfigurationError when there's no API key" do
+    expect { described_class.new(api_key: "", base_id: "appTest") }
+      .to raise_error(Airtable::ConfigurationError, "Airtable API key is required")
+  end
+
+  it "raises ForbiddenError on a 403" do
+    stub_request(:post, sync_url).to_return(status: 403, body: "")
+
+    expect { client.post_sync_csv("tblTest", "sncTest", "a,b\n") }
+      .to raise_error(Airtable::ForbiddenError, "Airtable denied access")
+  end
 end

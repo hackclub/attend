@@ -266,7 +266,7 @@
                       Sync paused after a failure<%= " #{time_ago_in_words(@airtable_sync_paused_at)} ago" if @airtable_sync_paused_at %>
                     </p>
                     <p class="text-sm text-amber-700">
-                      Attend stops syncing an event as soon as it fails, rather than retrying
+                      Attend stops syncing an event as soon as Airtable rejects its settings, rather than retrying
                       broken settings every 5 minutes.
                       <% if @airtable_config_owner %>
                         <%= @airtable_config_owner.name.presence || @airtable_config_owner.email %> was emailed
@@ -294,7 +294,10 @@
                     </p>
                     <p class="text-sm text-red-600">
                       <% unless @airtable_synced_at %>If you just saved these settings, a sync is already running — refresh in a minute. Otherwise, <% end %>
-                      <% if @airtable_connection %>
+                      <% if @airtable_sync_failures.positive? %>
+                        Airtable is showing stale data while Attend retries. A rate limit or an Airtable outage clears
+                        up by itself; anything else has been reported to the Attend team.
+                      <% elsif @airtable_connection %>
                         Airtable is showing stale data — check that the connected account can still see the base above.
                       <% else %>
                         Airtable is showing stale data — check that the sync endpoint above still exists in
@@ -313,6 +316,9 @@
                         Last sync attempt failed<%= " #{time_ago_in_words(@airtable_sync_error_at)} ago" if @airtable_sync_error_at %>
                       </p>
                       <p class="text-sm text-red-600 font-mono break-all"><%= @airtable_sync_error %></p>
+                      <% if !@airtable_sync_paused && @airtable_sync_failures.positive? %>
+                        <p class="text-sm text-red-600"><%= pluralize(@airtable_sync_failures, "failed attempt") %> in a row. Attend keeps retrying every 5 minutes.</p>
+                      <% end %>
                     </div>
                   <% end %>
                   <p class="text-sm text-gray-500"><%= @airtable_participant_count %> participant records will be synced</p>
@@ -320,7 +326,7 @@
                     <% if @airtable_sync_paused %>
                       Automatic syncing is stopped until these settings are saved again
                     <% else %>
-                      Syncs automatically every 5 minutes and whenever these settings are saved. A failed sync pauses automatically.
+                      Syncs automatically every 5 minutes and whenever these settings are saved. If Airtable rejects these settings, syncing pauses until they are fixed.
                     <% end %>
                   </p>
                 </div>

@@ -300,6 +300,17 @@ RSpec.describe ParticipantEvent, type: :model do
       }.not_to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
     end
 
+    it "never completes a withdrawn or rejected registration" do
+      pe = adult_pe
+      create(:consent, :signed, participant_event: pe)
+
+      pe.withdrawn!
+      expect(pe.mark_complete_if_eligible!).to be false
+      pe.rejected!
+      expect(pe.mark_complete_if_eligible!).to be false
+      expect(pe.reload).to be_rejected
+    end
+
     it "refuses to complete before the registration is submitted" do
       pe = adult_pe
       pe.update!(code_of_conduct_accepted_at: nil)
@@ -541,6 +552,17 @@ RSpec.describe ParticipantEvent, type: :model do
       expect {
         ParticipantMergeService.new(primary: primary, duplicate: duplicate).merge!
       }.not_to change(Invitation, :count)
+    end
+  end
+
+  describe "Slack channel invite on completion" do
+    include ActiveJob::TestHelper
+
+    it "enqueues an invite when a registration in an event with a channel becomes complete" do
+      pe = create(:participant_event, event: create(:event, slack_channel_id: "C123"))
+
+      expect { pe.update!(status: :complete) }
+        .to have_enqueued_job(InviteToEventSlackChannelJob).with(pe.id)
     end
   end
 end

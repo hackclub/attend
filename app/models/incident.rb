@@ -39,6 +39,18 @@ class Incident < ApplicationRecord
 
   scope :open_incidents, -> { where(status: %w[open in_review]) }
   scope :for_roles, ->(roles) { where("visible_to_roles && ARRAY[?]::varchar[]", roles) }
+  # What event staff holding `roles` can see: incidents shared with one of
+  # those roles, plus the ones `user` reported. visible_to_staff? is the same
+  # rule for a loaded record; keep the two in step.
+  scope :visible_to_staff, ->(user, roles) { for_roles(roles).or(where(reported_by_user_id: user.id)) }
+
+  def visible_to_staff?(user, roles)
+    reported_by_user_id == user.id || shared_with_roles?(roles)
+  end
+
+  def shared_with_roles?(roles)
+    (visible_to_roles & roles).any?
+  end
 
   def escalated?
     hq_report.present?

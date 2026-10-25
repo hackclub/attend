@@ -73,7 +73,7 @@ class IncidentsToolbox < ApplicationToolbox
   end
   def add_comment
     @incident = load_incident!
-    authorize! @incident, :show?
+    authorize! @incident, :comment?
     @comment = @incident.comments.create!(user: current_user, body: params[:body])
     render json: serialize_incident(@incident, full: true)
   end
@@ -104,12 +104,19 @@ class IncidentsToolbox < ApplicationToolbox
     }
     return base unless full
 
-    base.merge(
+    full_record = base.merge(
       details: i.details,
-      actions_taken: i.actions_taken,
       reported_by: i.reported_by&.display_name_or_fallback,
       visible_to_roles: i.visible_to_roles,
-      participant_event_id: i.participant_event_id,
+      participant_event_id: i.participant_event_id
+    )
+    # A reporter who holds none of the incident's roles gets what they filed and
+    # where it stands, not the casework — IncidentPolicy#view_casework?. The web
+    # page hides the same two things.
+    return full_record unless Pundit.policy!(current_user, i).view_casework?
+
+    full_record.merge(
+      actions_taken: i.actions_taken,
       comments: i.comments.includes(:user).order(:created_at).map { |c|
         { author: c.user&.display_name_or_fallback, body: c.body, at: c.created_at }
       }
