@@ -3,13 +3,18 @@
 
   <header class="mb-6">
     <h1 class="portal-title text-2xl">Health and support</h1>
-    <p class="portal-hint text-sm mt-2"><% if current_event.hide_privacy_notes? %>Choose “Nothing to add” when a section does not apply, or add details.<% else %>Choose “Nothing to add” when a section does not apply. You can add details or ask to discuss a section privately. Event staff with a relevant health, operations, or safeguarding role can access these answers. Other attendees cannot. <%= "Your parent or guardian can also see and edit them in their portal." if @participant_event.requires_guardian? %><% end %></p>
+    <% hide_privacy_notes = current_event.hide_privacy_notes? %>
+    <p class="portal-hint text-sm mt-2">
+      Choose “Nothing to add” when a section does not apply. You can add details<%= " or ask to discuss a section privately" unless hide_privacy_notes %>.
+      <% unless hide_privacy_notes %>Event staff with a relevant health, operations, or safeguarding role can access these answers. Other attendees cannot.<% end %>
+      <%= "Your parent or guardian can also see and edit them in their portal." if @participant_event.requires_guardian? %>
+    </p>
   </header>
 
   <%= form_with url: onboarding_step_path(step: @step, event_id: current_event.id), method: :patch, local: true, data: { turbo: false, controller: "autosave", autosave_url_value: onboarding_step_path(step: @step, event_id: current_event.id), action: "input->autosave#input change->autosave#change" } do |f| %>
     <%= render "autosave_status" %>
     <%= render "shared/health_sections", medical: @medical, dietary: @dietary, accessibility: @accessibility,
-      guardian_required: @participant_event.requires_guardian?, hide_privacy_notes: current_event.hide_privacy_notes?,
+      guardian_required: @participant_event.requires_guardian?, hide_privacy_notes: hide_privacy_notes,
       private_support_path: edit_dashboard_event_correction_path(@participant_event, section: :support) %>
     <%= f.hidden_field :onboarding_step, value: "health" %>
     <%= render "step_navigation" %>
