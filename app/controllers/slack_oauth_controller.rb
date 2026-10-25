@@ -34,7 +34,12 @@ class SlackOauthController < ApplicationController
       participant.slack_user_id = result[:slack_user_id]
       participant.save!(validate: false)
 
-      if participant_event.event.slack_channel_id.present?
+      # Link first, then decide about the channel: a banned person's Slack ID
+      # is worth recording (it's how later ban matching finds them), but a ban
+      # can land long after the registration completed and nothing rejects the
+      # registration, so the channel invite is off the table. They're told the
+      # link worked and nothing more — their ban isn't ours to announce here.
+      if participant_event.event.slack_channel_id.present? && !participant_event.participant_banned?
         slack_service = SlackService.new
         slack_service.invite_to_channel(
           channel_id: participant_event.event.slack_channel_id,

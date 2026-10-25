@@ -22,7 +22,7 @@ class InviteToEventSlackChannelJob < ApplicationJob
     # A ban lands after the registration is already complete, and nothing
     # rejects the registration, so the status alone can't be trusted here —
     # only an admin sync should decide to add someone we've banned.
-    return if banned?(participant_event, participant)
+    return if skip_banned?(participant_event)
 
     SlackService.new.invite_to_channel(channel_id: channel_id, user_id: slack_id)
   rescue SlackService::RateLimited, SlackService::TransportError
@@ -35,11 +35,10 @@ class InviteToEventSlackChannelJob < ApplicationJob
 
   private
 
-  def banned?(participant_event, participant)
-    slack_ids = Ban.slack_ids_for(participant) + [ participant_event.slack_user_id ]
-    return false unless Ban.banned?(participant.email, slack_ids: slack_ids)
+  def skip_banned?(participant_event)
+    return false unless participant_event.participant_banned?
 
-    Rails.logger.warn("[InviteToEventSlackChannel] Skipped banned participant #{participant.id} for #{participant_event.id}")
+    Rails.logger.warn("[InviteToEventSlackChannel] Skipped banned participant for #{participant_event.id}")
     true
   end
 end

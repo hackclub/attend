@@ -511,6 +511,17 @@ class ParticipantEvent < ApplicationRecord
     travel_inbound.travel_legs.last&.arrival_airport
   end
 
+  # Whether the person behind this registration is banned, matched on the
+  # participant's email and every Slack ID we know for them, including the
+  # one recorded on the registration itself. A ban can land long after the
+  # registration was created and nothing rejects it, so anything that acts
+  # on a registration's own say-so (Slack channel invites) has to ask.
+  def participant_banned?
+    return false unless participant
+
+    Ban.banned?(participant.email, slack_ids: Ban.slack_ids_for(participant) + [ slack_user_id ])
+  end
+
   private
 
   def travel_calendar_event_ids
@@ -577,7 +588,7 @@ class ParticipantEvent < ApplicationRecord
   end
 
   def participant_not_banned
-    return unless participant && Ban.banned?(participant.email, slack_ids: Ban.slack_ids_for(participant) + [ slack_user_id ])
+    return unless participant_banned?
 
     errors.add(:base, "#{participant.email} is banned from events")
   end
