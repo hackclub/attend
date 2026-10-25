@@ -119,13 +119,19 @@
           <%= f.text_area :body, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "Add a comment or note about this incident..." %>
         </div>
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div class="flex items-center gap-3">
-            <%= f.label :new_status, "Change status to:", class: "text-sm font-medium text-gray-700" %>
-            <%= f.select :new_status, 
-                [["No change", ""]] + Incident.statuses.keys.map { |s| [s.humanize.titleize, s] },
-                {},
-                class: "border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
-          </div>
+          <%# A reporter who holds none of the incident's roles comments without
+              the dropdown — closing it is an update. The span keeps the button right. %>
+          <% if policy(@incident).update? %>
+            <div class="flex items-center gap-3">
+              <%= f.label :new_status, "Change status to:", class: "text-sm font-medium text-gray-700" %>
+              <%= f.select :new_status,
+                  [["No change", ""]] + Incident.statuses.keys.map { |s| [s.humanize.titleize, s] },
+                  {},
+                  class: "border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+            </div>
+          <% else %>
+            <span></span>
+          <% end %>
           <%= f.submit "Add Comment", class: "bg-[#d42f46] text-white px-4 py-2 rounded-md hover:bg-[#b82840] cursor-pointer" %>
         </div>
       <% end %>

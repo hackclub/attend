@@ -97,6 +97,26 @@ RSpec.describe "Admin::Incidents visibility", type: :request do
       expect(incident.reload.visible_to_roles).to eq([ "safeguarding_lead" ])
     end
 
+    # IncidentComment#update_incident_status applies new_status on create, so
+    # the comment box is the other door onto the same change.
+    it "doesn't let the reporter close it from the comment box" do
+      sign_in reporter
+
+      post admin_event_incident_comments_path(event, incident),
+        params: { incident_comment: { body: "Closing this", new_status: "closed" } }
+
+      expect(incident.comments.last.body).to eq("Closing this")
+      expect(incident.reload.status).to eq("open")
+    end
+
+    it "keeps the status dropdown off the reporter's comment box" do
+      sign_in reporter
+
+      get admin_event_incident_path(event, incident)
+
+      expect(response.body).not_to include("incident_comment[new_status]")
+    end
+
     it "hides it from other staff whose role isn't ticked" do
       other = staff("limited", email: "other-limited-incidents-spec@example.com")
       sign_in other
@@ -150,6 +170,34 @@ RSpec.describe "Admin::Incidents visibility", type: :request do
           get admin_event_dashboard_path(event)
 
           expect(response.body).to include("McFixture")
+        end
+
+        # The activity feed reads the audit log, where "Create Incident, just
+        # now, <reporter>" gives away an incident this viewer cannot open.
+        it "leaves hidden incidents out of the activity feed" do
+          hidden = event.incidents.first
+          hidden_log = AuditLog.log!(action: "create", record: hidden, actor: hidden.reported_by, event: event)
+          # Something the viewer may see, so a passing expectation below can't
+          # just mean the panel didn't render.
+          visible_log = AuditLog.log!(action: "update", record: participant_event,
+            actor: hidden.reported_by, event: event)
+          sign_in staff("ops", email: "ops-feed-incidents-spec@example.com", console: console)
+
+          get admin_event_dashboard_path(event)
+
+          expect(response).to have_http_status(:ok)
+          expect(response.body).to include(admin_audit_log_path(visible_log))
+          expect(response.body).not_to include(admin_audit_log_path(hidden_log))
+        end
+
+        it "keeps the activity feed for an incident shared with the viewer" do
+          hidden = event.incidents.first
+          log = AuditLog.log!(action: "create", record: hidden, actor: hidden.reported_by, event: event)
+          sign_in staff("safeguarding_lead", email: "sl-feed-incidents-spec@example.com", console: console)
+
+          get admin_event_dashboard_path(event)
+
+          expect(response.body).to include(admin_audit_log_path(log))
         end
       end
     end
