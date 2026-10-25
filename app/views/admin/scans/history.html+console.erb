@@ -177,7 +177,7 @@
             <select id="edit-scan-context" name="scan[scan_context_id]" class="cs-select">
               <% @scan_contexts.each do |context| %>
                 <option value="<%= context.id %>">
-                  <%= context.name %><%= " — Travel pickup" if context.is_travel_pickup? %><% if context.checks_in? %> ✓<% end %>
+                  <%= context.name %> — <%= context.kind_label %>
                 </option>
               <% end %>
             </select>

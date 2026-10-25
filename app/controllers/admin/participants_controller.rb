@@ -26,7 +26,9 @@ module Admin
         # preload (not includes): the string order on participants.legal_last_name
         # would otherwise flip every association into one giant eager-load LEFT JOIN.
         @participant_events = policy_scope(current_event.participant_events)
-          .preload(:participant, :event, :travel_inbound, :travel_outbound, :accommodation, :medical, :safeguarding_info, :dietary, :accessibility, :consents, :emergency_contacts, :groups, guardian_participant_events: :emergency_contacts)
+          .preload(:participant, :event, :travel_inbound, :travel_outbound, :accommodation, :medical, :safeguarding_info, :dietary, :accessibility, :consents, :emergency_contacts, :groups, guardian_participant_events: :emergency_contacts, latest_placing_scan: :scan_context)
+        # Once the event has ended the status cell asks whether each row ever checked in.
+        @participant_events = @participant_events.preload(scans: :scan_context) if current_event.phase_at == :ended
 
         if params[:search].present?
           search_term = "%#{ActiveRecord::Base.sanitize_sql_like(params[:search])}%"
@@ -157,7 +159,6 @@ module Admin
       @safeguarding_info = @participant_event.safeguarding_info
       @consents = @participant_event.consents
       @guardian_participant_events = @participant_event.guardian_participant_events.includes(:guardian)
-      @notes = @participant_event.notes.includes(:author).order(created_at: :desc)
       @scans = @participant_event.scans.includes(:user, :scan_context).recent.limit(3)
       @emergency_contacts = emergency_contacts_for_profile
     end
@@ -505,7 +506,6 @@ module Admin
 
     def notes
       authorize @participant_event, :view_notes?
-      @notes = @participant_event.notes.includes(:author).order(created_at: :desc)
     end
 
     def history
@@ -531,7 +531,7 @@ module Admin
       keys << [ "TravelLeg", TravelLeg.where(travel_id: pe.travels.pluck(:id)).pluck(:id) ]
       keys << [ "Consent", pe.consents.pluck(:id) ]
       keys << [ "RegistrationChangeRequest", pe.registration_change_requests.pluck(:id) ]
-      keys << [ "Note", pe.notes.pluck(:id) ]
+      keys << [ "Note", policy_scope(pe.notes).pluck(:id) ]
       keys << [ "EmergencyContact", EmergencyContact.where(participant_event_id: pe.id).or(EmergencyContact.where(guardian_participant_event_id: gpe_ids)).pluck(:id) ]
       keys << [ "RoomAssignment", Array(pe.room_assignment&.id) ]
       keys << [ "RoommatePreference", pe.roommate_preferences.pluck(:id) ]
@@ -1006,7 +1006,7 @@ module Admin
     def set_participant_header_data
       @participant = @participant_event.participant
       @safeguarding_info = @participant_event.safeguarding_info
-      @notes = @participant_event.notes.includes(:author).order(created_at: :desc)
+      @notes = policy_scope(@participant_event.notes).includes(:author).order(created_at: :desc)
     end
 
     def participant_params

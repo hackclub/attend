@@ -37,6 +37,7 @@ class NotePolicy < ApplicationPolicy
             base_scope
           else
             base_scope.where.not(note_type: "safeguarding").for_roles(user_roles)
+              .or(base_scope.where(author_user_id: user.id))
           end
         end
       else
@@ -55,10 +56,11 @@ class NotePolicy < ApplicationPolicy
     return false if user_roles.empty?
 
     return true if user_roles.include?("safeguarding_lead")
+    return true if record.author_user_id == user.id
 
     return false if record.safeguarding?
 
-    (record.visible_to_roles & user_roles).any?
+    record.visible_to_roles.blank? || (record.visible_to_roles & user_roles).any?
   end
 
   def can_edit?

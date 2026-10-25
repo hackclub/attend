@@ -8,7 +8,8 @@ module Admin
     end
 
     def new
-      @scan_context = current_event.scan_contexts.new
+      # Same as the old unticked checkboxes: a new point changes nobody's status until staff pick a kind.
+      @scan_context = current_event.scan_contexts.new(kind: "tracking_only")
     end
 
     def create
@@ -51,7 +52,7 @@ module Admin
     end
 
     def scan_context_params
-      params.require(:scan_context).permit(:name, :checks_in, :is_travel_pickup, :position, :starts_at, :ends_at)
+      params.require(:scan_context).permit(:name, :kind, :usage_note, :position, :starts_at, :ends_at)
     end
   end
 end

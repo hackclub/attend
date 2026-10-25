@@ -140,7 +140,7 @@ RSpec.describe "Admin::Scans", type: :request do
 
     get scanner_admin_event_scans_path(event)
 
-    expect(response.body).to include(%(<input type="hidden" id="scan-context" value="#{scan_context.id}">))
+    expect(response.body).to include(%(<input type="hidden" id="scan-context" value="#{scan_context.id}"))
   end
 
   it "renders the NFC write flag as false when NFC badges were never set up" do
