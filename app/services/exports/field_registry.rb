@@ -342,7 +342,7 @@ module Exports
           participant.full_legal_name participant.email
           dietary.diet_type dietary.intolerances dietary.life_threatening_allergies
           dietary.cross_contamination_risk dietary.notes
-          medical.allergies medical.allergy_severity medical.has_anaphylaxis_risk
+          medical.has_anaphylaxis_risk
         ]
       },
       "medical_flags" => {

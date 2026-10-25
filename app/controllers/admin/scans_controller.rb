@@ -188,7 +188,9 @@ module Admin
           has_anaphylaxis_risk: food_safety.anaphylaxis_risk?,
           requires_refrigeration: participant_event.medical&.requires_refrigeration || false,
           dietary: food_safety.diet_type,
-          has_allergies: food_safety.allergies?,
+          # Health-form allergies are a medical fact, so only roles that can
+          # open the medical summary learn whether there are any.
+          **(policy(participant_event.medical || Medical.new(participant_event: participant_event)).show? ? { has_allergies: food_safety.allergies? } : {}),
           has_life_threatening_food_allergies: food_safety.life_threatening_food_allergies?,
           cross_contamination_risk: food_safety.cross_contamination_risk?,
           show_url: admin_event_participant_path(current_event, participant_event),

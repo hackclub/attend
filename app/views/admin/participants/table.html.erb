@@ -203,6 +203,7 @@
     <div class="overflow-x-auto">
       <table class="min-w-full divide-y divide-gray-100 text-xs" data-data-table-target="table">
         <thead class="bg-gray-50">
+        <% header_row = capture do %>
           <tr>
             <th class="px-2 py-2 text-left w-8 sticky left-0 bg-gray-50 z-10">
               <input type="checkbox" class="rounded border-gray-300 text-[#ec3750]" data-action="change->data-table#selectAll">
@@ -290,12 +291,16 @@
             </th>
             <th class="px-2 py-2 text-right font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap sticky right-0 bg-gray-50 z-10">Actions</th>
           </tr>
+        <% end %>
+        <%= header_row %>
+        <%# Every full-width row spans this, so adding a column needs no colspan edits. %>
+        <% column_count = header_row.scan(/<th\b/).size %>
         </thead>
         <tbody class="bg-white divide-y divide-gray-100">
           <% if @grouped_participants.present? %>
             <% @grouped_participants.each do |group_name, participants| %>
               <tr class="bg-gray-100 cursor-pointer" data-action="click->data-table#collapseGroup" data-group-id="<%= group_name.to_s.parameterize %>">
-                <td colspan="<%= 37 + @optional_documents.size %>" class="px-2 py-2">
+                <td colspan="<%= column_count %>" class="px-2 py-2">
                   <div class="flex items-center gap-2 font-medium text-gray-700">
                     <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -317,7 +322,7 @@
 
           <% if @participant_events.empty? %>
             <tr>
-              <td colspan="37" class="px-6 py-12 text-center text-gray-500">
+              <td colspan="<%= column_count %>" class="px-6 py-12 text-center text-gray-500">
                 No participants found.
               </td>
             </tr>

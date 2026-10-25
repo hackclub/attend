@@ -196,7 +196,10 @@ class ProcessImportBatchJob < ApplicationJob
     return unless row[:dietary_requirements].present?
 
     dietary_text = row[:dietary_requirements]
-    is_allergy = dietary_text.to_s.downcase.include?("allerg")
+    # "No allergies" mentions allergies too; it belongs in the notes, not the
+    # life-threatening field the scanner raises a red alert for.
+    is_allergy = dietary_text.to_s.downcase.include?("allerg") &&
+      ClearsNegativeResponses.meaningful_response?(dietary_text.to_s)
 
     Dietary.create!(
       participant_event: participant_event,

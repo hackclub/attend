@@ -28,9 +28,7 @@ class Dietary < ApplicationRecord
   # "None" and "no" survive ClearsNegativeResponses, so read them the way
   # Medical#has_allergies? does rather than as an allergy.
   def has_life_threatening_allergy?
-    return false if life_threatening_allergies.blank?
-
-    !Medical::NEGATIVE_RESPONSES.include?(life_threatening_allergies.strip.downcase)
+    ClearsNegativeResponses.meaningful_response?(life_threatening_allergies)
   end
 
   def dietary_restrictions?

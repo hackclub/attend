@@ -262,6 +262,7 @@
     <div class="cs-table-wrap">
       <table class="cs-table cs-table-compact" data-data-table-target="table">
         <thead>
+        <% header_row = capture do %>
           <tr>
             <th scope="col" class="w-8 sticky left-0 z-10">
               <input type="checkbox" aria-label="Select all" class="accent-(--cs-accent)" data-action="change->data-table#selectAll">
@@ -349,12 +350,16 @@
             </th>
             <th scope="col" class="text-right sticky right-0 z-10">Actions</th>
           </tr>
+        <% end %>
+        <%= header_row %>
+        <%# Every full-width row spans this, so adding a column needs no colspan edits. %>
+        <% column_count = header_row.scan(/<th\b/).size %>
         </thead>
         <tbody>
           <% if @grouped_participants.present? %>
             <% @grouped_participants.each do |group_name, participants| %>
               <tr class="cursor-pointer" data-action="click->data-table#collapseGroup" data-group-id="<%= group_name.to_s.parameterize %>">
-                <td colspan="<%= 37 + @optional_documents.size %>" class="bg-(--cs-bg-shaded)">
+                <td colspan="<%= column_count %>" class="bg-(--cs-bg-shaded)">
                   <div class="flex items-center gap-2 font-bold">
                     <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -376,7 +381,7 @@
 
           <% if @participant_events.empty? %>
             <tr>
-              <td colspan="<%= 37 + @optional_documents.size %>" class="cs-table-empty-cell">
+              <td colspan="<%= column_count %>" class="cs-table-empty-cell">
                 <% if table_filtering %>
                   <%= cs_no_match(clear_href: clear_table_filters_href, data: { testid: "filter-no-match" }) %>
                 <% else %>
@@ -390,7 +395,7 @@
           <% else %>
             <%# Shown by data-table#search when the text filter hides every row. %>
             <tr class="hidden" data-data-table-target="noMatch">
-              <td colspan="<%= 37 + @optional_documents.size %>" class="cs-table-empty-cell">
+              <td colspan="<%= column_count %>" class="cs-table-empty-cell">
                 <div class="cs-empty">
                   <p class="cs-empty-title">No matches</p>
                   <p>We can't find a match.</p>

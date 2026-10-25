@@ -146,12 +146,16 @@
   <td class="px-2 py-1.5 text-gray-500 max-w-[120px] truncate" data-column="intolerances" title="<%= pe.dietary&.intolerances %>">
     <%= pe.dietary&.intolerances.presence || "—" %>
   </td>
-  <td class="px-2 py-1.5 text-gray-500 max-w-[120px] truncate" data-column="food_allergies" title="<%= pe.dietary&.life_threatening_allergies %>">
-    <%= pe.dietary&.life_threatening_allergies.presence || "—" %>
+  <%# "None" and the like stay in the record but aren't an allergy. %>
+  <% food_allergies = pe.dietary.life_threatening_allergies if pe.dietary&.has_life_threatening_allergy? %>
+  <td class="px-2 py-1.5 text-gray-500 max-w-[120px] truncate" data-column="food_allergies" title="<%= food_allergies %>">
+    <%= food_allergies || "—" %>
   </td>
   <td class="px-2 py-1.5 whitespace-nowrap" data-column="cross_contamination">
     <% if pe.dietary&.cross_contamination_risk %>
       <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-red-100 text-red-700">Yes</span>
+    <% elsif pe.dietary.nil? %>
+      <span class="text-gray-400">—</span>
     <% else %>
       <span class="text-gray-400">No</span>
     <% end %>
