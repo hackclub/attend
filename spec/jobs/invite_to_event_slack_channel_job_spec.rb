@@ -22,6 +22,17 @@ RSpec.describe InviteToEventSlackChannelJob, type: :job do
     expect(Rails.logger).to have_received(:error).with(/Failed to add U1 to C123: not_in_channel/)
   end
 
+  it "skips a participant banned after the registration completed" do
+    allow(slack_service).to receive(:invite_to_channel)
+    participant = create(:participant, slack_user_id: "U1")
+    pe = registration(participant: participant)
+    create(:ban, email: participant.email)
+
+    described_class.perform_now(pe.id)
+
+    expect(slack_service).not_to have_received(:invite_to_channel)
+  end
+
   it "retries when Slack rate-limits it" do
     allow(slack_service).to receive(:invite_to_channel).and_raise(SlackService::RateLimited.new(30))
     pe = registration

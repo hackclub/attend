@@ -299,5 +299,23 @@ RSpec.describe Participant, type: :model do
 
       expect(participant.slack_connect_participant_event).to eq(upcoming)
     end
+
+    it "prefers a complete registration over a sooner one they were only invited to" do
+      participant = create(:participant)
+      create(:participant_event, participant: participant, status: :invited,
+                                 event: create(:event, starts_at: 1.week.from_now, ends_at: 1.week.from_now + 2.days))
+      attending = create(:participant_event, participant: participant, status: :complete,
+                                             event: create(:event, starts_at: 2.months.from_now, ends_at: 2.months.from_now + 2.days))
+
+      expect(participant.slack_connect_participant_event).to eq(attending)
+    end
+
+    it "ignores a past event that never got an end date" do
+      participant = create(:participant)
+      create(:participant_event, participant: participant, event: create(:event, starts_at: 1.year.ago, ends_at: nil))
+      upcoming = create(:participant_event, participant: participant, event: create(:event, starts_at: 1.month.from_now, ends_at: 1.month.from_now + 2.days))
+
+      expect(participant.slack_connect_participant_event).to eq(upcoming)
+    end
   end
 end

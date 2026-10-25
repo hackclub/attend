@@ -245,8 +245,7 @@ class Participant < ApplicationRecord
     registrations = active if active.any?
 
     ended, current = registrations.partition { |pe| pe.event.phase_at == :ended }
-    # Events with no start date yet sort after dated ones.
-    current.min_by { |pe| [ pe.event.starts_at ? 0 : 1, pe.event.starts_at.to_i ] } || ended.max_by { |pe| pe.event.ends_at }
+    current.min_by { |pe| slack_connect_rank(pe) } || ended.max_by { |pe| pe.event.ends_at }
   end
 
   # Verified through Hack Club Auth identity verification.
@@ -296,6 +295,24 @@ class Participant < ApplicationRecord
 
   def touch_participant_events
     participant_events.touch_all
+  end
+
+  # Most- to least-committed registration.
+  SLACK_CONNECT_STATUS_ORDER = %w[complete awaiting_guardian in_progress invited withdrawn rejected].freeze
+
+  # Sort key for #slack_connect_participant_event. A registration the person
+  # has actually taken up beats one they were only invited to, so an untouched
+  # import for a sooner event can't win. Then the live or soonest upcoming
+  # event. An event with a start date but no end date never leaves :live, so
+  # once its start has passed it sorts with the undated ones rather than
+  # beating a real upcoming event on a start date from years ago.
+  def slack_connect_rank(participant_event)
+    event = participant_event.event
+    dated = event.starts_at.present? && (event.ends_at.present? || !event.starts_at.past?)
+
+    [ SLACK_CONNECT_STATUS_ORDER.index(participant_event.status) || SLACK_CONNECT_STATUS_ORDER.size,
+      dated ? 0 : 1,
+      event.starts_at.to_i ]
   end
 
   def invite_to_slack_channels
