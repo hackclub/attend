@@ -1,4 +1,6 @@
 class Admin::DashboardController < Admin::BaseController
+  include IncidentAuditVisibility
+
   skip_before_action :set_current_event_from_session, only: [ :show, :integrations, :update_integrations, :trigger_airtable_sync, :create_vote_event ]
 
   def index
@@ -195,9 +197,12 @@ class Admin::DashboardController < Admin::BaseController
       .includes(:participant)
       .to_a
 
-    # Recent activity
-    @recent_activity = AuditLog
-      .where(event: current_event)
+    # Recent activity. Incident rows go through the same filter the audit log
+    # applies: "Create Incident, 3 minutes ago, <reporter>" still gives away an
+    # incident this viewer isn't allowed to open.
+    activity = AuditLog.where(event: current_event)
+    activity = exclude_hidden_incident_logs(activity) unless current_user.global_admin?
+    @recent_activity = activity
       .includes(:actor)
       .order(created_at: :desc)
       .limit(8)
