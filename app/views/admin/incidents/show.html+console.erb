@@ -100,10 +100,12 @@
           <dt class="cs-kv-label">Details</dt>
           <dd class="cs-kv-value whitespace-pre-wrap"><%= @incident.details.presence || "No details provided" %></dd>
         </div>
-        <div>
-          <dt class="cs-kv-label">Actions taken</dt>
-          <dd class="cs-kv-value whitespace-pre-wrap"><%= @incident.actions_taken.presence || "No actions recorded yet" %></dd>
-        </div>
+        <% if policy(@incident).view_casework? %>
+          <div>
+            <dt class="cs-kv-label">Actions taken</dt>
+            <dd class="cs-kv-value whitespace-pre-wrap"><%= @incident.actions_taken.presence || "No actions recorded yet" %></dd>
+          </div>
+        <% end %>
       </dl>
     </div>
   </section>
@@ -113,6 +115,9 @@
       <h2 class="cs-h2">Add comment</h2>
     </div>
     <div class="cs-container-body">
+      <% unless policy(@incident).view_casework? %>
+        <p class="cs-field-description mb-4">You can add to the report you filed. The team handling it works the incident separately.</p>
+      <% end %>
       <%= form_with model: @comment || IncidentComment.new, url: admin_event_incident_comments_path(current_event, @incident),
             html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
         <%= cs_form_field f, :body, label: "Comment", description: "A comment or note about this incident." do |aria| %>
@@ -138,6 +143,10 @@
     </div>
   </section>
 
+  <%# The timeline is the casework: handlers' comments and every field they
+      changed. A reporter reading it back would see the follow-up to their own
+      report, which is what visible_to_roles exists to hold. %>
+  <% if policy(@incident).view_casework? %>
   <section class="cs-container">
     <div class="cs-container-header">
       <h2 class="cs-h2">Timeline</h2>
@@ -207,4 +216,5 @@
       </ol>
     </div>
   </section>
+  <% end %>
 </div>

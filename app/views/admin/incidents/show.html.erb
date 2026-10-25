@@ -90,12 +90,14 @@
         </div>
       </div>
 
-      <div>
-        <h3 class="text-sm font-medium text-gray-500">Actions Taken</h3>
-        <div class="mt-1 text-sm text-gray-900 whitespace-pre-wrap bg-gray-50 p-4 rounded-md">
-          <%= @incident.actions_taken.presence || "No actions recorded yet" %>
+      <% if policy(@incident).view_casework? %>
+        <div>
+          <h3 class="text-sm font-medium text-gray-500">Actions Taken</h3>
+          <div class="mt-1 text-sm text-gray-900 whitespace-pre-wrap bg-gray-50 p-4 rounded-md">
+            <%= @incident.actions_taken.presence || "No actions recorded yet" %>
+          </div>
         </div>
-      </div>
+      <% end %>
 
       <div>
         <h3 class="text-sm font-medium text-gray-500">Visible To</h3>
@@ -113,6 +115,9 @@
   <div class="mt-8">
     <h2 class="text-lg font-semibold mb-4">Add Comment</h2>
     <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <% unless policy(@incident).view_casework? %>
+        <p class="mb-4 text-sm text-gray-500">You can add to the report you filed. The team handling it works the incident separately.</p>
+      <% end %>
       <%= form_with model: IncidentComment.new, url: admin_event_incident_comments_path(current_event, @incident), class: "space-y-4" do |f| %>
         <div>
           <%= f.label :body, "Comment", class: "block text-sm font-medium text-gray-700 mb-1" %>
@@ -138,6 +143,10 @@
     </div>
   </div>
 
+  <%# The timeline is the casework: handlers' comments and every field they
+      changed. A reporter reading it back would see the follow-up to their own
+      report, which is what visible_to_roles exists to hold. %>
+  <% if policy(@incident).view_casework? %>
   <div class="mt-8">
     <h2 class="text-lg font-semibold mb-4">Timeline</h2>
     <div class="bg-white border border-gray-200 rounded-lg p-6">
@@ -234,4 +243,5 @@
       </div>
     </div>
   </div>
+  <% end %>
 </div>

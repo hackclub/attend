@@ -109,6 +109,43 @@ RSpec.describe "Admin::Incidents visibility", type: :request do
       expect(incident.reload.status).to eq("open")
     end
 
+    # Option 2 from the PR discussion: a receipt, not the case file. The
+    # follow-up is written by the people handling it, in both UIs.
+    [ false, true ].each do |console|
+      context(console ? "in the console" : "in the original admin") do
+        before do
+          incident.update!(actions_taken: "Spoke to the organiser")
+          incident.comments.create!(
+            user: staff("safeguarding_lead", email: "sl-writes-casework-#{console}@example.com"),
+            body: "Contacted the guardian"
+          )
+        end
+
+        it "shows the reporter what they filed without the casework" do
+          reporter.update!(admin_console_beta: console)
+          sign_in reporter
+
+          get admin_event_incident_path(event, incident)
+
+          expect(response).to have_http_status(:ok)
+          expect(response.body).to include("Confidential summary")
+          expect(response.body).not_to include("Spoke to the organiser")
+          expect(response.body).not_to include("Contacted the guardian")
+          expect(response.body).not_to include("Timeline")
+        end
+
+        it "shows the casework to staff the incident is shared with" do
+          sign_in staff("safeguarding_lead", email: "sl-reads-casework-#{console}@example.com", console: console)
+
+          get admin_event_incident_path(event, incident)
+
+          expect(response.body).to include("Spoke to the organiser")
+          expect(response.body).to include("Contacted the guardian")
+          expect(response.body).to include("Timeline")
+        end
+      end
+    end
+
     it "keeps the status dropdown off the reporter's comment box" do
       sign_in reporter
 

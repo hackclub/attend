@@ -37,9 +37,32 @@ RSpec.describe "MCP incident tools", type: :request do
 
     # Not shared with Limited, but the reporter can still read and comment on it.
     id = created.fetch("id")
-    expect(call_tool("incidents_show", "incident_id" => id)["summary"]).to eq("Lost badge")
+    shown = call_tool("incidents_show", "incident_id" => id)
+    expect(shown["summary"]).to eq("Lost badge")
+    # The casework belongs to the roles it's shared with, here and on the page.
+    expect(shown).not_to have_key("actions_taken")
+    expect(shown).not_to have_key("comments")
 
-    commented = call_tool("incidents_add_comment", "incident_id" => id, "body" => "Found it")
-    expect(commented["comments"].map { |c| c["body"] }).to eq([ "Found it" ])
+    call_tool("incidents_add_comment", "incident_id" => id, "body" => "Found it")
+    expect(Incident.find(id).comments.map(&:body)).to eq([ "Found it" ])
+  end
+
+  context "for staff the incident is shared with" do
+    let(:user) do
+      create(:user).tap { |u| EventRoleAssignment.create!(user: u, event: event, role: "safeguarding_lead") }
+    end
+
+    it "renders the actions taken and the comment thread" do
+      incident = Incident.create!(
+        event: event, reported_by: user, category: "behavior", severity: "s3",
+        summary: "Lost badge", actions_taken: "Reissued", visible_to_roles: [ "safeguarding_lead" ]
+      )
+      incident.comments.create!(user: user, body: "Handled")
+
+      shown = call_tool("incidents_show", "incident_id" => incident.id)
+
+      expect(shown["actions_taken"]).to eq("Reissued")
+      expect(shown["comments"].map { |c| c["body"] }).to eq([ "Handled" ])
+    end
   end
 end

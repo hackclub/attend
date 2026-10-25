@@ -21,6 +21,16 @@ class IncidentPolicy < ApplicationPolicy
     can_view_incident?
   end
 
+  # A reporter who holds none of the incident's roles gets a receipt: what they
+  # submitted and where it stands, not the casework that followed it. The
+  # actions taken and the comment thread are written by the people handling the
+  # incident, and a safeguarding lead's follow-up is not the reporter's to read
+  # just because they raised it. Everyone who can see the incident by role sees
+  # all of it.
+  def view_casework?
+    can_view_incident?(include_reporter: false)
+  end
+
   def escalate?
     can_view_incident?
   end
