@@ -61,6 +61,45 @@ class CsvImportService
     "Groups" => :groups
   }.freeze
 
+  # Other spellings organizers' spreadsheets use for the template's columns.
+  # Matched like the template headers: ignoring case and extra spaces.
+  HEADER_ALIASES = {
+    "Email Address" => :email,
+    "E-mail" => :email,
+    "E-mail Address" => :email,
+    "Legal First Name" => :legal_first_name,
+    "Given Name" => :legal_first_name,
+    "Legal Last Name" => :legal_last_name,
+    "Surname" => :legal_last_name,
+    "Family Name" => :legal_last_name,
+    "Phone" => :phone,
+    "Date of Birth" => :date_of_birth,
+    "DOB" => :date_of_birth,
+    "Postal Code" => :postal_code,
+    "Zip" => :postal_code,
+    "Shirt Size" => :tshirt_size,
+    "T-Shirt" => :tshirt_size
+  }.freeze
+
+  def self.normalize_header(header)
+    header.to_s.gsub(/[[:space:]]+/, " ").strip.downcase
+  end
+
+  HEADER_LOOKUP = COLUMN_MAPPING.merge(HEADER_ALIASES)
+    .transform_keys { |header| normalize_header(header) }
+    .freeze
+
+  TEMPLATE_HEADERS = COLUMN_MAPPING.keys.map { |header| normalize_header(header) }.to_set.freeze
+
+  # The import field a CSV header fills, or nil for a column the import ignores.
+  def self.column_for(header)
+    HEADER_LOOKUP[normalize_header(header)]
+  end
+
+  def self.template_header?(header)
+    TEMPLATE_HEADERS.include?(normalize_header(header))
+  end
+
   TSHIRT_SIZE_MAPPING = {
     "xs" => "XS",
     "s" => "S",

@@ -20,10 +20,30 @@
         <dl class="cs-kv cs-kv-3 cs-kv-divided">
           <div><dt class="cs-kv-label">Total rows</dt><dd class="cs-kv-value-lg"><%= @import_batch.total_count %></dd></div>
           <div><dt class="cs-kv-label">Will be imported</dt><dd class="cs-kv-value-lg"><%= @valid_rows.count %></dd></div>
-          <div><dt class="cs-kv-label">Will be skipped</dt><dd class="cs-kv-value-lg"><%= @skipped_rows.count %></dd></div>
+          <div><dt class="cs-kv-label">Won't be imported</dt><dd class="cs-kv-value-lg"><%= @skipped_rows.count %></dd></div>
         </dl>
       </div>
     </section>
+
+    <% if params[:read_as] == "windows-1252" %>
+      <div class="cs-alert cs-alert-warning">
+        <%= cs_status_icon(:warning) %>
+        <div>
+          <p class="cs-alert-title">Check the names below</p>
+          <p>This file wasn't saved as UTF-8, so it was read as Windows-1252. If accented names look wrong, save it from your spreadsheet as "CSV UTF-8" and upload it again.</p>
+        </div>
+      </div>
+    <% end %>
+
+    <% if @missing_columns.any? %>
+      <div class="cs-alert cs-alert-error">
+        <%= cs_status_icon(:error) %>
+        <div>
+          <p class="cs-alert-title">The file has no <%= @missing_columns.to_sentence %> <%= "column".pluralize(@missing_columns.count) %></p>
+          <p>New participants need a legal first and last name, so their rows can't be imported. Add the <%= "column".pluralize(@missing_columns.count) %> and upload the file again.</p>
+        </div>
+      </div>
+    <% end %>
 
     <% if @valid_rows.any? %>
       <section class="cs-container">
@@ -70,7 +90,7 @@
     <% if @skipped_rows.any? %>
       <section class="cs-container">
         <div class="cs-container-header cs-container-header-divided">
-          <h2 class="cs-h2">Participants to skip <span class="cs-counter">(<%= @skipped_rows.count %>)</span></h2>
+          <h2 class="cs-h2">Participants not imported <span class="cs-counter">(<%= @skipped_rows.count %>)</span></h2>
         </div>
         <div class="cs-table-wrap">
           <table class="cs-table cs-table-compact">
@@ -88,7 +108,7 @@
                   <td class="cs-muted"><%= row[:row_number] %></td>
                   <td class="font-bold"><%= row[:name].presence || "—" %></td>
                   <td><%= row[:email] %></td>
-                  <td><%= cs_status(:warning, row[:reason]) %></td>
+                  <td><%= cs_status(row[:failing] ? :error : :warning, row[:reason]) %></td>
                 </tr>
               <% end %>
               <% if @skipped_rows.count > 50 %>
