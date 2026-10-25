@@ -21,9 +21,9 @@
     <link rel="icon" href="/icon-32.png?v=3" type="image/png" sizes="32x32">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3">
 
-    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
-    <%= stylesheet_link_tag "hackclub", "data-turbo-track": "reload" %>
-    <%= stylesheet_link_tag "themes", "data-turbo-track": "reload" %>
+    <%# Listed rather than :app, which links every stylesheet and left hackclub and
+        themes loaded twice. This is the order the cascade already ran in. %>
+    <%= stylesheet_link_tag "application", "tailwind", "hackclub", "themes", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
   </head>
 

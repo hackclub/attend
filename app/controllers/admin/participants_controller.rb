@@ -595,6 +595,9 @@ module Admin
       @participant_event.withdrawn!
       redirect_to admin_event_participant_path(current_event, @participant_event),
         notice: "#{@participant_event.participant.display_name} has been marked as withdrawn."
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
+      redirect_to admin_event_participant_path(current_event, @participant_event),
+        alert: "Couldn't withdraw #{@participant_event.participant.display_name} — nothing was changed: #{e.message}"
     end
 
     def unwithdraw
@@ -604,6 +607,9 @@ module Admin
       @participant_event.in_progress!
       redirect_to admin_event_participant_path(current_event, @participant_event),
         notice: "#{@participant_event.participant.display_name} has been reinstated."
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
+      redirect_to admin_event_participant_path(current_event, @participant_event),
+        alert: "Couldn't reinstate #{@participant_event.participant.display_name} — nothing was changed: #{e.message}"
     end
 
     def destroy

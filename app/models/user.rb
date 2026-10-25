@@ -26,6 +26,9 @@ class User < ApplicationRecord
   # and so do global admins, who answer the questions.
   ADMIN_HELP_CHANNEL_ROLES = %w[event_admin ops safeguarding_lead].freeze
 
+  # Event roles that can use the admin (see #admin?). Read-only staff can't.
+  ADMIN_EVENT_ROLES = %w[event_admin ops limited safeguarding_lead].freeze
+
   after_commit :invite_to_admin_help_channel, on: %i[create update],
     if: -> { saved_change_to_global_role? && global_admin? }
   after_commit :invite_to_org_support_channel, on: %i[create update],
@@ -398,8 +401,18 @@ class User < ApplicationRecord
 
   def admin?
     global_admin? ||
-      event_role_assignments.exists?(role: %w[event_admin ops limited safeguarding_lead]) ||
+      event_role_assignments.exists?(role: ADMIN_EVENT_ROLES) ||
       series_role_assignments.exists?
+  end
+
+  # Whether this user's admin access still has work behind it: a global or
+  # series role, or an admin role on an event that hasn't ended. Someone whose
+  # only admin roles are on finished events keeps their access, but signing in
+  # as a participant should land them on their own dashboard, not the admin.
+  def admin_for_current_events?
+    global_admin? ||
+      series_role_assignments.exists? ||
+      event_role_assignments.where(role: ADMIN_EVENT_ROLES).joins(:event).merge(Event.not_ended).exists?
   end
 
   # Whether this user may see participants' identifying details: exact dates of

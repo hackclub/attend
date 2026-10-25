@@ -73,9 +73,12 @@
         <% end %>
       </div>
       
-      <div id="scan-result" class="mt-4 p-3 sm:p-4 rounded-lg hidden">
+      <%# Stays up until dismissed or replaced by the next result, so a busy %>
+      <%# organizer can always look back and see what their last scan did. %>
+      <div id="scan-result" class="mt-4 rounded-lg hidden" role="status" aria-live="polite">
         <!-- Scan result appears here -->
       </div>
+      <p id="scan-queue-note" class="mt-2 text-xs text-gray-500 hidden" aria-live="polite"></p>
 
       <!-- Search by name or ID -->
       <div class="mt-4 pt-4 border-t border-gray-200">
@@ -312,7 +315,9 @@ function groupBadgeHtml(group, fallbackColor) {
   let lastScannedCode = null;
   let scanCooldown = false;
   let searchTimeout = null;
-  let resultHideTimeout = null;
+  // Scans that arrive while one is in flight or cooling down wait here rather
+  // than being dropped, so a tap on a search result is never lost.
+  const pendingScans = [];
 
   function getCurrentContextId() {
     const contextSelect = document.getElementById('scan-context');
@@ -384,14 +389,114 @@ function groupBadgeHtml(group, fallbackColor) {
     });
   }
 
-  function showResult(message, isError = false) {
+  const RESULT_TONES = {
+    success: 'bg-green-50 text-green-800 border border-green-200',
+    warning: 'bg-yellow-50 text-yellow-800 border border-yellow-200',
+    error: 'bg-red-50 text-red-700 border border-red-200'
+  };
+
+  // `tone` is 'success' / 'warning' / 'error'; true and false are still
+  // accepted (error / success) for the NFC bridge script below.
+  function showResult(message, tone = 'success', { detail = null, reload = false } = {}) {
+    if (tone === true) tone = 'error';
+    if (tone === false) tone = 'success';
     const result = document.getElementById('scan-result');
-    result.className = `mt-4 p-4 rounded-lg ${isError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`;
-    result.textContent = message;
+    result.className = `mt-4 rounded-lg ${RESULT_TONES[tone] || RESULT_TONES.success}`;
+    result.innerHTML = html`
+      <div class="flex items-start gap-3 p-3 sm:p-4">
+        <div class="min-w-0 flex-1">
+          <p class="font-medium">${message}</p>
+          ${detail ? html`<p class="text-sm mt-0.5 opacity-90">${detail}</p>` : ''}
+          ${reload ? html`<button type="button" data-scan-result-reload class="mt-2 text-sm font-medium underline">Reload page</button>` : ''}
+        </div>
+        <button type="button" data-scan-result-dismiss aria-label="Dismiss" class="text-xl leading-none opacity-60 hover:opacity-100 min-h-[44px] min-w-[44px] -m-3 flex items-center justify-center">&times;</button>
+      </div>
+    `.toString();
     result.classList.remove('hidden');
-    
-    clearTimeout(resultHideTimeout);
-    resultHideTimeout = setTimeout(() => result.classList.add('hidden'), 3000);
+  }
+
+  document.getElementById('scan-result').addEventListener('click', function(e) {
+    if (e.target.closest('[data-scan-result-dismiss]')) this.classList.add('hidden');
+    if (e.target.closest('[data-scan-result-reload]')) window.location.reload();
+  });
+
+  function formatStatus(participant) {
+    return participant.display_status || String(participant.status || '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  }
+
+  // What the scan actually did, in words: where, the person's resulting
+  // status, who scanned them and when.
+  function showScanSuccess(data, via = '') {
+    const name = data.participant.display_name;
+    const context = data.scan_context || {};
+    const contextName = context.name || 'this scan point';
+    const firstScan = data.first_scan_in_context;
+    let message;
+    if (context.checks_in) {
+      message = firstScan ? `✓ ${name} checked in to ${contextName}` : `↻ ${name} was already checked in to ${contextName}`;
+    } else {
+      message = firstScan ? `✓ ${name} scanned at ${contextName}` : `↻ ${name} re-scanned at ${contextName}`;
+    }
+    if (via) message += ` ${via}`;
+
+    const status = formatStatus(data.participant);
+    const at = data.scanned_at ? new Date(data.scanned_at) : new Date();
+    const time = at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const detail = [status && `Status: ${status}`, data.scanned_by && `by ${data.scanned_by}`, time].filter(Boolean).join(' · ');
+
+    const flagged = ['Withdrawn', 'Rejected'].includes(data.participant.display_status);
+    showResult(message, flagged || !firstScan ? 'warning' : 'success', { detail });
+  }
+
+  // POSTs a scan and turns every way it can fail into something a person at
+  // the door can act on. An expired session or a stale CSRF token comes back
+  // as a redirect to an HTML page, not JSON, so the content type is checked
+  // before parsing.
+  async function submitScan(body) {
+    let response;
+    try {
+      response = await fetch(scanUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-Token': csrfToken
+        },
+        body: JSON.stringify(body)
+      });
+    } catch (error) {
+      console.error('Scan request failed:', error);
+      return { ok: false, message: "Couldn't reach the server — check your connection and scan again.", detail: 'The scan was not recorded.' };
+    }
+
+    const isJson = (response.headers.get('content-type') || '').includes('application/json');
+    let data = null;
+    if (isJson) {
+      try { data = await response.json(); } catch (_) { data = null; }
+    }
+
+    if (response.ok && data && data.success) return { ok: true, data };
+
+    if (response.status === 401 || response.status === 403 || response.redirected || (response.ok && !data)) {
+      return { ok: false, message: 'Your session has expired.', detail: 'The scan was not recorded. Reload the page (and sign in again if asked), then scan again.', reload: true };
+    }
+    if (response.status >= 500) {
+      return { ok: false, message: 'Server error — the scan may not have been recorded.', detail: 'Check Recent Scans, and scan again if it is not listed.' };
+    }
+    if (response.status === 404) {
+      return { ok: false, message: data?.error || 'Participant not found for this event' };
+    }
+    return { ok: false, message: data?.error || `The scan couldn't be processed (error ${response.status}).` };
+  }
+
+  function updateQueueNote() {
+    const note = document.getElementById('scan-queue-note');
+    if (pendingScans.length) {
+      note.textContent = `Please wait… ${pendingScans.length} more scan${pendingScans.length === 1 ? '' : 's'} queued.`;
+      note.classList.remove('hidden');
+    } else {
+      note.classList.add('hidden');
+    }
   }
 
   function parseQrCode(scannedValue) {
@@ -402,11 +507,19 @@ function groupBadgeHtml(group, fallbackColor) {
     return scannedValue;
   }
 
-  // The one gate for every scan path. Returns whether the scan was sent, so
-  // manual entry and search only clear what staff typed once it has.
-  function processScan(scannedValue) {
-    if (scanCooldown) return false;
-    if (scannedValue === lastScannedCode) return false;
+  // The one gate for every scan path. Returns whether the scan was sent or
+  // queued, so manual entry and search only clear what staff typed once it
+  // has. `manual` is a deliberate action (search result, typed ID): the camera
+  // reports the same code on every frame it stays in view, so only camera
+  // repeats are ignored; anything else arriving mid-scan waits its turn.
+  function processScan(scannedValue, { manual = false } = {}) {
+    if (scanCooldown) {
+      if (!manual && (scannedValue === lastScannedCode || pendingScans.some(p => p.value === scannedValue))) return false;
+      pendingScans.push({ value: scannedValue, manual });
+      updateQueueNote();
+      return true;
+    }
+    if (!manual && scannedValue === lastScannedCode) return false;
     
     const participantId = parseQrCode(scannedValue);
     const scanContextId = requireContextId();
@@ -430,31 +543,16 @@ function groupBadgeHtml(group, fallbackColor) {
     updateStatus('Processing...', 'scanning');
 
     try {
-      const response = await fetch(scanUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': csrfToken
-        },
-        body: JSON.stringify({ 
-          participant_id: participantId,
-          scan_context_id: scanContextId
-        })
+      const result = await submitScan({
+        participant_id: participantId,
+        scan_context_id: scanContextId
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        const contextName = data.scan_context?.name || '';
-        const firstScan = data.first_scan_in_context;
+      if (result.ok) {
+        const data = result.data;
+        showScanSuccess(data);
         
-        if (firstScan) {
-          showResult('✓ ' + data.participant.display_name + ' scanned in at ' + contextName);
-        } else {
-          showResult('↻ ' + data.participant.display_name + ' re-scanned at ' + contextName);
-        }
-        
-        showParticipantModal(data.participant, data.scan_context, firstScan);
+        showParticipantModal(data.participant, data.scan_context, data.first_scan_in_context);
         addToRecentScans(data.participant, data.scan_context, data.scanned_by);
         updateScanCount();
         
@@ -488,17 +586,21 @@ function groupBadgeHtml(group, fallbackColor) {
           }
         }
       } else {
-        showResult(data.error || 'Participant not found', true);
+        showResult(result.message, 'error', { detail: result.detail, reload: result.reload });
       }
     } catch (error) {
+      // Anything thrown here is our own rendering, after the server answered.
       console.error('Scan error:', error);
-      showResult('Error processing scan', true);
+      showResult('Something went wrong showing this scan.', 'error', { detail: 'Check Recent Scans to see whether it was recorded.' });
     }
 
     setTimeout(() => {
       scanCooldown = false;
       lastScannedCode = null;
       updateStatus(...cameraStatus);
+      const next = pendingScans.shift();
+      updateQueueNote();
+      if (next) processScan(next.value, { manual: next.manual });
     }, 2000);
   }
 
@@ -695,7 +797,7 @@ function groupBadgeHtml(group, fallbackColor) {
     e.preventDefault();
     const input = document.getElementById('manual-participant-id');
     const participantId = input.value.trim();
-    if (participantId && processScan(participantId)) {
+    if (participantId && processScan(participantId, { manual: true })) {
       input.value = '';
     }
   });
@@ -716,7 +818,17 @@ function groupBadgeHtml(group, fallbackColor) {
 
     searchTimeout = setTimeout(async () => {
       try {
-        const response = await fetch(`${searchUrl}?q=${encodeURIComponent(query)}`);
+        const response = await fetch(`${searchUrl}?q=${encodeURIComponent(query)}`, {
+          headers: { 'Accept': 'application/json' }
+        });
+        const isJson = (response.headers.get('content-type') || '').includes('application/json');
+        if (!response.ok || !isJson || response.redirected) {
+          searchResults.innerHTML = (response.redirected || response.status === 401 || (response.ok && !isJson))
+            ? '<div class="px-4 py-3 text-sm text-red-700">Your session has expired — reload the page to search.</div>'
+            : '<div class="px-4 py-3 text-sm text-red-700">Search failed — try again.</div>';
+          searchResults.classList.remove('hidden');
+          return;
+        }
         const data = await response.json();
         
         if (data.results.length === 0) {
@@ -742,6 +854,8 @@ function groupBadgeHtml(group, fallbackColor) {
         searchResults.classList.remove('hidden');
       } catch (error) {
         console.error('Search error:', error);
+        searchResults.innerHTML = '<div class="px-4 py-3 text-sm text-red-700">Couldn\'t reach the server — check your connection.</div>';
+        searchResults.classList.remove('hidden');
       }
     }, 300);
   });
@@ -749,7 +863,7 @@ function groupBadgeHtml(group, fallbackColor) {
   // Handle search result click
   searchResults.addEventListener('click', function(e) {
     const result = e.target.closest('.search-result');
-    if (result && processScan(result.dataset.participantId)) {
+    if (result && processScan(result.dataset.participantId, { manual: true })) {
       searchInput.value = '';
       searchResults.classList.add('hidden');
     }
@@ -802,6 +916,8 @@ function groupBadgeHtml(group, fallbackColor) {
 
   // Expose functions for NFC bridge integration
   window.showResult = showResult;
+  window.showScanSuccess = showScanSuccess;
+  window.submitScan = submitScan;
   window.getCurrentContextId = getCurrentContextId;
 })();
 
@@ -835,7 +951,7 @@ function showParticipantModal(data, scanContext, firstScan) {
       ? data.groups.map(g => groupBadgeHtml(g, '#ffffff')).join('')
       : '';
   }
-  document.getElementById('modal-status').textContent = data.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+  document.getElementById('modal-status').textContent = data.display_status || data.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
   document.getElementById('modal-pronouns').textContent = data.pronouns || '—';
   document.getElementById('modal-email').textContent = data.email || '—';
   // The phone row is absent for roles that can't see phone numbers, and the
@@ -1106,7 +1222,6 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
   }
   
   async function processNfcScan(badgeToken) {
-    const scanUrl = '<%= admin_event_scans_path(current_event) %>';
     const scanContextId = window.getCurrentContextId?.();
     if (!scanContextId) {
       window.showResult?.('Choose a context before scanning', true);
@@ -1114,37 +1229,20 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
     }
     
     try {
-      const response = await fetch(scanUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': csrfToken
-        },
-        body: JSON.stringify({ 
-          badge_token: badgeToken,
-          scan_context_id: scanContextId
-        })
+      const result = await window.submitScan({
+        badge_token: badgeToken,
+        scan_context_id: scanContextId
       });
       
-      const result = await response.json();
-      
-      if (response.ok) {
-        const contextName = result.scan_context?.name || '';
-        const firstScan = result.first_scan_in_context;
-        
-        if (firstScan) {
-          window.showResult?.('📱 ' + result.participant.display_name + ' scanned via NFC at ' + contextName);
-        } else {
-          window.showResult?.('↻ ' + result.participant.display_name + ' re-scanned via NFC at ' + contextName);
-        }
-        
-        showParticipantModal(result.participant, result.scan_context, firstScan);
+      if (result.ok) {
+        window.showScanSuccess(result.data, 'via NFC');
+        showParticipantModal(result.data.participant, result.data.scan_context, result.data.first_scan_in_context);
       } else {
-        window.showResult?.(result.error || 'Unknown participant', true);
+        window.showResult?.(result.message, 'error', { detail: result.detail, reload: result.reload });
       }
     } catch (error) {
       console.error('NFC scan error:', error);
-      window.showResult?.('Error processing NFC scan', true);
+      window.showResult?.('Something went wrong showing this NFC scan.', 'error', { detail: 'Check Recent Scans to see whether it was recorded.' });
     }
   }
   
