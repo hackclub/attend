@@ -111,7 +111,7 @@ RSpec.describe SeriesDashboard do
     before do
       Incident.create!(
         event: event, reported_by: global_admin, category: "safeguarding",
-        severity: "low", status: "open", visible_to_roles: [ "safeguarding_lead" ]
+        severity: "s3", status: "open", visible_to_roles: [ "safeguarding_lead" ]
       )
     end
 

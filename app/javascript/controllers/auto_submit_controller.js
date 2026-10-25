@@ -2,10 +2,12 @@ import { Controller } from "@hotwired/stimulus"
 
 // Submits the form as soon as a filter changes, so there's no Filter button
 // to press. Text input is debounced so each keystroke isn't a request.
+//   <form data-controller="auto-submit">
+//     <select data-action="change->auto-submit#submit">
 //
-// The page morphs on these submits (turbo_refreshes_with :morph), so the
-// form, its controls and this controller stay in place: focus, caret and
-// anything typed while results load all carry over.
+// The participant list morphs on these submits (turbo_refreshes_with :morph),
+// so the form, its controls and this controller stay in place: focus, caret
+// and anything typed while results load all carry over.
 export default class extends Controller {
   static targets = ["search"]
   static values = { delay: { type: Number, default: 300 } }

@@ -1,0 +1,10 @@
+<div class="cs-field-grid">
+  <%= cs_field(id: "escalation_reporter_phone", label: "Number HQ can call you on", constraint: "Include the country code, for example +1 555 555 0100.") do |aria| %>
+    <%= telephone_field_tag "escalation[reporter_phone]", phone, id: "escalation_reporter_phone", class: "cs-input", required: true, **aria %>
+  <% end %>
+</div>
+<p class="cs-small cs-muted mt-2">HQ responds at the incident's level: S0 pages the safeguarding team's phones within minutes, S1 within the hour, S2 within 12 hours.</p>
+<label class="cs-option mt-4 cursor-pointer">
+  <%= check_box_tag "escalation[emergency_services_called]", "1", params.dig(:escalation, :emergency_services_called) == "1" %>
+  <span class="cs-option-label">Emergency services (police, ambulance) have been called</span>
+</label>

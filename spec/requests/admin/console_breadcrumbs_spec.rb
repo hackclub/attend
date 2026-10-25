@@ -18,7 +18,7 @@ RSpec.describe "Admin console breadcrumbs", type: :request do
   let!(:participant_event) { create(:participant_event, event: event, participant: participant) }
   let(:participant_label) { participant.display_name }
   let!(:incident) do
-    Incident.create!(event: event, reported_by: admin, category: :other, severity: :low,
+    Incident.create!(event: event, reported_by: admin, category: :other, severity: :s3,
       summary: "A made-up incident")
   end
   let!(:change_request) do
@@ -106,8 +106,8 @@ RSpec.describe "Admin console breadcrumbs", type: :request do
       expect_trail admin_settings_path, "Settings"
       expect_trail admin_global_api_tokens_path, "API tokens"
       expect_trail admin_audit_logs_path, "Audit log"
-      expect_trail admin_bans_path, "Ban list"
-      expect_trail admin_incidents_path, "Incident reports"
+      expect_trail admin_bans_path, "Conduct bans"
+      expect_trail admin_incident_reports_path, "Incidents"
     end
   end
 

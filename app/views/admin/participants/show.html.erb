@@ -416,21 +416,30 @@
         <% end %>
       </section>
 
-      <% if @participant_event.complete? %>
+      <% if @participant_event.complete? || @participant_event.participant.slack_user_id.present? %>
         <section class="bg-white rounded-lg border border-gray-200 p-6">
           <h2 class="text-lg font-semibold mb-4">Slack Integration</h2>
           <% if @participant_event.participant.slack_user_id.present? %>
-            <div class="flex items-center gap-2 mb-3">
+            <div class="flex items-center gap-2 <%= "mb-3" if @participant_event.complete? %>">
               <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Connected</span>
               <%= link_to "slack://user?team=T0266FRGM&id=#{@participant_event.participant.slack_user_id}", class: "hover:underline" do %><code class="text-xs bg-gray-100 px-1.5 py-0.5 rounded"><%= @participant_event.participant.slack_user_id %></code><% end %>
+              <button type="button"
+                      data-controller="clipboard"
+                      data-clipboard-content-value="<%= @participant_event.participant.slack_user_id %>"
+                      data-action="click->clipboard#copy"
+                      class="text-xs text-[#ec3750] hover:text-blue-800 font-medium">
+                Copy
+              </button>
             </div>
-            <% if current_event.slack_channel_id.present? %>
-              <%= button_to "Invite to Channel",
-                  invite_to_slack_channel_admin_event_participant_path(current_event, @participant_event),
-                  method: :post,
-                  class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
-            <% else %>
-              <p class="text-sm text-gray-500">No Slack channel configured for this event.</p>
+            <% if @participant_event.complete? %>
+              <% if current_event.slack_channel_id.present? %>
+                <%= button_to "Invite to Channel",
+                    invite_to_slack_channel_admin_event_participant_path(current_event, @participant_event),
+                    method: :post,
+                    class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
+              <% else %>
+                <p class="text-sm text-gray-500">No Slack channel configured for this event.</p>
+              <% end %>
             <% end %>
           <% else %>
             <p class="text-sm text-gray-600 mb-3">Participant has not linked their Slack account via Hack Club Auth.</p>

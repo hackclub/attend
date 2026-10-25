@@ -139,7 +139,8 @@ if Rails.env.development?
     },
     registration_note: "Bring a laptop! You'll need one to build your project at the event.",
     address_note: "We ask for your address for safety reasons, and so we can ship prizes to attendees in the US.",
-    tshirt_note: "Unisex, US sizing. You'll pick it up at the event."
+    tshirt_note: "Unisex, US sizing. You'll pick it up at the event.",
+    hide_rooming_note: true
   )
 
   haven_boston = Event.find_or_create_by!(slug: "haven-boston") do |e|

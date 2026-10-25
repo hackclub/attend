@@ -50,6 +50,17 @@ module BrandHelper
     }.compact
   end
 
+  # Turbo swaps <body> but never <html>'s attributes, so a visit into a
+  # branded page from an unbranded one (or the other way, or between brands)
+  # would keep the old page's attributes until a reload. A tracked element
+  # only branded pages carry, keyed to the brand, makes Turbo do a full load
+  # whenever a visit crosses that line.
+  def brand_shell_meta_tag(brand)
+    return unless brand
+
+    tag.meta(name: "attend-brand", content: Digest::SHA256.hexdigest(brand.settings.to_json).first(16), data: { turbo_track: "reload" })
+  end
+
   def brand_style_tag(brand)
     return unless brand
 

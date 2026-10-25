@@ -1,5 +1,14 @@
 <%# How many people on this event's roster are missing required training.
     Locals: summary (TrainingStatus#summary) %>
+<% if summary[:ineligible].to_i.positive? %>
+  <div class="cs-alert cs-alert-error">
+    <%= cs_status_icon(:error) %>
+    <div>
+      <p class="cs-alert-title"><%= pluralize(summary[:ineligible], "person is", plural: "people are") %> not eligible to work this event</p>
+      <p>They're marked "Ineligible" below. Contact the <%= TrainingDisclosure::SAFETY_TEAM_NAME %> at <%= mail_to TrainingDisclosure::SAFETY_TEAM_EMAIL, class: "cs-link" %> before they work it.</p>
+    </div>
+  </div>
+<% end %>
 <% if summary[:untrained].positive? %>
   <div class="cs-alert cs-alert-error">
     <%= cs_status_icon(:error) %>
