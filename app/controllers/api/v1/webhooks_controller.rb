@@ -69,6 +69,7 @@ module Api
           document_url: data["documents"]&.first&.dig("url")
         )
 
+        complete_ready_guardians(consent)
         check_onboarding_completion(consent)
 
         # Send completion notification when waiver is fully signed
@@ -105,6 +106,10 @@ module Api
           if consent.freedom_waiver?
             process_freedom_waiver_result(consent, data)
           end
+
+          # Guardians who have signed everything are done even if they never
+          # press "Submit and finish".
+          complete_ready_guardians(consent)
 
           # Send waiver completion notification when all guardian waivers are signed
           notify_waiver_completion(consent)
@@ -237,12 +242,25 @@ module Api
         end
       end
 
+      def complete_ready_guardians(consent)
+        participant_event = consent.participant_event
+        return unless participant_event.requires_guardian?
+
+        completed = GuardianPortalCompletion.complete_ready_guardians!(participant_event)
+        Rails.logger.info("[Docuseal] Completed #{completed} guardian(s) for participant_event #{participant_event.id} after #{consent.consent_type} signed") if completed.positive?
+      end
+
       def check_onboarding_completion(consent)
         participant_event = consent.participant_event
         return unless participant_event
 
         # Completion can be unblocked by the main waiver, freedom waiver, or a custom document
         return unless consent.signed? && (consent.waiver? || consent.freedom_waiver? || consent.custom_document?)
+
+        # complete_ready_guardians may already have completed the participant
+        # through the guardian's commit hook; reload so this copy sees it and
+        # doesn't send the confirmation email a second time.
+        participant_event.reload
 
         if participant_event.mark_complete_if_eligible!
           Rails.logger.info("[Docuseal] Participant #{participant_event.id} marked complete after #{consent.consent_type} signed")

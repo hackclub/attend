@@ -314,6 +314,9 @@ class ParticipantEvent < ApplicationRecord
   # webhook and the guardian portal so neither path can complete a participant
   # the other would still consider blocked.
   def eligible_for_completion?
+    # A withdrawn or rejected registration is closed: a still-open DocuSeal
+    # link finishing later must not flip it back to complete.
+    return false if withdrawn? || rejected?
     # Signing can now happen before the participant submits their registration
     # (documents step) — never complete someone who hasn't hit submit yet.
     return false unless code_of_conduct_accepted_at.present?
@@ -332,9 +335,19 @@ class ParticipantEvent < ApplicationRecord
     return false if complete?
     return false unless eligible_for_completion?
 
-    update!(status: :complete, onboarding_completed_at: onboarding_completed_at || Time.current)
-    ParticipantMailer.registration_confirmed(participant_event: self).deliver_later
-    true
+    # Concurrent webhooks (or a webhook racing a guardian's commit hook) can
+    # both get this far. Re-check under a row lock so only one of them
+    # completes the registration and sends the confirmation email.
+    completed_now = with_lock do
+      reset_document_memoisation!
+      next false if complete? || !eligible_for_completion?
+
+      update!(status: :complete, onboarding_completed_at: onboarding_completed_at || Time.current)
+      true
+    end
+
+    ParticipantMailer.registration_confirmed(participant_event: self).deliver_later if completed_now
+    completed_now
   end
 
   # Computed display status for the UI. Maps the DB status + actual progress

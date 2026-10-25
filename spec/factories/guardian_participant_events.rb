@@ -11,5 +11,13 @@ FactoryBot.define do
     trait :never_sent do
       invite_token_sent_at { nil }
     end
+
+    # The portal overview's participant-info and details sections filled in,
+    # which automatic completion waits for.
+    trait :details_reviewed do
+      guardian { association :guardian, :with_address }
+      relationship { "Parent" }
+      participant_info_reviewed_at { Time.current }
+    end
   end
 end

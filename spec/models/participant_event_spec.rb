@@ -300,6 +300,17 @@ RSpec.describe ParticipantEvent, type: :model do
       }.not_to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
     end
 
+    it "never completes a withdrawn or rejected registration" do
+      pe = adult_pe
+      create(:consent, :signed, participant_event: pe)
+
+      pe.withdrawn!
+      expect(pe.mark_complete_if_eligible!).to be false
+      pe.rejected!
+      expect(pe.mark_complete_if_eligible!).to be false
+      expect(pe.reload).to be_rejected
+    end
+
     it "refuses to complete before the registration is submitted" do
       pe = adult_pe
       pe.update!(code_of_conduct_accepted_at: nil)
