@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_24_120100) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_25_120100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1572,10 +1572,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_24_120100) do
   create_table "travel_legs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "arrival_airport"
     t.datetime "arrival_time"
+    t.string "arrival_time_zone"
     t.string "confirmation_code"
     t.datetime "created_at", null: false
     t.string "departure_airport"
     t.datetime "departure_time"
+    t.string "departure_time_zone"
     t.string "flight_code"
     t.datetime "last_tracked_at"
     t.datetime "live_arrival_time"

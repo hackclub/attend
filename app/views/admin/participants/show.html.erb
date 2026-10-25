@@ -79,7 +79,7 @@
                     <% first_leg = @travel_inbound.travel_legs.first %>
                     <% last_leg = @travel_inbound.travel_legs.last %>
                     <div><span class="text-gray-500">From:</span> <%= first_leg.departure_airport %></div>
-                    <div><span class="text-gray-500">Arrival:</span> <%= [ flight_local_time(last_leg.arrival_time, last_leg.arrival_airport), last_leg.arrival_airport ].compact.join(" - ") %></div>
+                    <div><span class="text-gray-500">Arrival:</span> <%= [ flight_local_time(last_leg, :arrival), last_leg.arrival_airport ].compact.join(" - ") %></div>
                     <div><span class="text-gray-500">Flight:</span> <%= first_leg.flight_code %></div>
                   <% elsif @travel_inbound.car? %>
                     <div><span class="text-gray-500">From:</span>
@@ -110,7 +110,7 @@
                     <% first_leg = @travel_outbound.travel_legs.first %>
                     <% last_leg = @travel_outbound.travel_legs.last %>
                     <div><span class="text-gray-500">To:</span> <%= last_leg.arrival_airport %></div>
-                    <div><span class="text-gray-500">Departure:</span> <%= flight_local_time(first_leg.departure_time, first_leg.departure_airport) %> - <%= first_leg.departure_airport %></div>
+                    <div><span class="text-gray-500">Departure:</span> <%= flight_local_time(first_leg, :departure) %> - <%= first_leg.departure_airport %></div>
                     <div><span class="text-gray-500">Flight:</span> <%= first_leg.flight_code %></div>
                   <% elsif @travel_outbound.car? %>
                     <div><span class="text-gray-500">To:</span>

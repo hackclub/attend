@@ -80,7 +80,7 @@
                       <% first_leg = @travel_inbound.travel_legs.first %>
                       <% last_leg = @travel_inbound.travel_legs.last %>
                       <div><dt class="cs-kv-label">From</dt><dd class="cs-kv-value"><%= first_leg.departure_airport %></dd></div>
-                      <div><dt class="cs-kv-label">Arrival</dt><dd class="cs-kv-value"><%= safe_join([ cs_absolute_time_tag(last_leg.arrival_time, zone: FlightTrackingService.airport_timezone(last_leg.arrival_airport)), last_leg.arrival_airport.presence ].compact, " - ") %></dd></div>
+                      <div><dt class="cs-kv-label">Arrival</dt><dd class="cs-kv-value"><%= safe_join([ cs_absolute_time_tag(last_leg.local_arrival_time, zone: last_leg.local_arrival_time&.time_zone), last_leg.arrival_airport.presence ].compact, " - ") %></dd></div>
                       <div><dt class="cs-kv-label">Flight</dt><dd class="cs-kv-value"><%= first_leg.flight_code %></dd></div>
                     <% elsif @travel_inbound.car? %>
                       <div><dt class="cs-kv-label">From</dt><dd class="cs-kv-value">
@@ -111,7 +111,7 @@
                       <% first_leg = @travel_outbound.travel_legs.first %>
                       <% last_leg = @travel_outbound.travel_legs.last %>
                       <div><dt class="cs-kv-label">To</dt><dd class="cs-kv-value"><%= last_leg.arrival_airport %></dd></div>
-                      <div><dt class="cs-kv-label">Departure</dt><dd class="cs-kv-value"><%= safe_join([ cs_absolute_time_tag(first_leg.departure_time, zone: FlightTrackingService.airport_timezone(first_leg.departure_airport)), first_leg.departure_airport.presence ].compact, " - ") %></dd></div>
+                      <div><dt class="cs-kv-label">Departure</dt><dd class="cs-kv-value"><%= safe_join([ cs_absolute_time_tag(first_leg.local_departure_time, zone: first_leg.local_departure_time&.time_zone), first_leg.departure_airport.presence ].compact, " - ") %></dd></div>
                       <div><dt class="cs-kv-label">Flight</dt><dd class="cs-kv-value"><%= first_leg.flight_code %></dd></div>
                     <% elsif @travel_outbound.car? %>
                       <div><dt class="cs-kv-label">To</dt><dd class="cs-kv-value">

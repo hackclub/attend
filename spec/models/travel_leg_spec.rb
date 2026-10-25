@@ -27,6 +27,50 @@ RSpec.describe TravelLeg, type: :model do
     end
   end
 
+  describe "time zones" do
+    let(:travel) { Travel.create!(participant_event: create(:participant_event), direction: "inbound", mode: "plane") }
+
+    def build_leg(**attrs)
+      travel.travel_legs.build(
+        position: 0, flight_code: "BA112", departure_airport: "JFK", arrival_airport: "LHR",
+        departure_time: Time.utc(2026, 6, 6, 1, 0), arrival_time: Time.utc(2026, 6, 6, 8, 30), **attrs
+      )
+    end
+
+    it "reads times back in the stored zone" do
+      leg = build_leg(departure_time_zone: "Eastern Time (US & Canada)")
+
+      expect(leg.local_departure_time.strftime("%Y-%m-%d %H:%M %Z")).to eq("2026-06-05 21:00 EDT")
+    end
+
+    it "falls back to the airport's zone, then UTC, when no zone is stored" do
+      expect(build_leg.local_arrival_time.strftime("%H:%M %Z")).to eq("09:30 BST")
+      expect(build_leg(arrival_airport: "ZZZ").local_arrival_time.strftime("%H:%M %Z")).to eq("08:30 UTC")
+    end
+
+    it "pre-selects Auto when the stored zone is the airport's own" do
+      leg = build_leg(departure_time_zone: "America/New_York", arrival_time_zone: "Europe/Vienna")
+
+      expect(leg.time_zone_pick(:departure)).to eq("")
+      expect(leg.time_zone_pick(:arrival)).to eq("Europe/Vienna")
+    end
+
+    it "requires a zone only for times typed as local wall-clock times" do
+      expect(build_leg(departure_airport: "ZZZ")).to be_valid
+
+      leg = build_leg(departure_airport: "ZZZ", entered_as_local_time: true, arrival_time_zone: "Europe/London")
+      expect(leg).not_to be_valid
+      expect(leg.errors[:departure_time_zone]).to be_present
+    end
+
+    it "rejects an arrival that isn't after the departure" do
+      leg = build_leg(arrival_time: Time.utc(2026, 6, 6, 1, 0))
+
+      expect(leg).not_to be_valid
+      expect(leg.errors[:arrival_time]).to include(a_string_including("must be after the departure time"))
+    end
+  end
+
   describe "#fetch_known_flight_data!" do
     let(:participant_event) { create(:participant_event) }
     let(:travel) { Travel.create!(participant_event: participant_event, direction: "inbound", mode: "plane") }

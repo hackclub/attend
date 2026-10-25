@@ -404,7 +404,7 @@
                       </p>
                       <% if leg.departure_time.present? %>
                         <p class="text-xs text-(--text-muted) mt-0.5">
-                          <%= leg.departure_time.strftime("%b %d · %H:%M") %>
+                          <%= flight_local_time(leg, :departure, format: "%b %d · %H:%M %Z") %>
                         </p>
                       <% end %>
                     </div>
@@ -674,7 +674,7 @@
                           <dt class="text-(--text-muted)">Flight <%= i + 1 %></dt>
                           <dd class="font-medium text-(--text-strong)">
                             <%= leg.flight_code %> · <%= leg.departure_airport %> → <%= leg.arrival_airport %><br>
-                            <span class="text-(--text-soft)">Departs: <%= leg.departure_time&.strftime("%b %d, %Y %H:%M") %> · Arrives: <%= leg.arrival_time&.strftime("%b %d, %Y %H:%M") %></span>
+                            <span class="text-(--text-soft)">Departs: <%= flight_local_time(leg, :departure) %> · Arrives: <%= flight_local_time(leg, :arrival) %></span>
                           </dd>
                         </div>
                       <% end %>

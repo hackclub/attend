@@ -69,20 +69,20 @@
   </div>
 
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <% [ [ "departure", "Departure time", leg.departure_time, leg.departure_airport ], [ "arrival", "Arrival time", leg.arrival_time, leg.arrival_airport ] ].each do |kind, label, time, airport| %>
+    <% [ [ "departure", "Departure time" ], [ "arrival", "Arrival time" ] ].each do |kind, label| %>
       <div data-cs-field data-cs-label="<%= label %>">
         <label class="cs-field-label" for="<%= "#{direction}_leg_#{index}_#{kind}_time" %>"><%= label %></label>
         <input type="datetime-local"
                id="<%= "#{direction}_leg_#{index}_#{kind}_time" %>"
                name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][<%= kind %>_time]"
-               value="<%= flight_local_input_value(time, airport, default_date: default_date) %>"
+               value="<%= flight_local_input_value(leg, kind, default_date: default_date) %>"
                required
                class="cs-input">
         <select name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][<%= kind %>_time_zone]"
                 class="cs-select mt-1"
                 aria-label="<%= label %> zone"
                 data-cs-validate="false">
-          <%= travel_leg_time_zone_options %>
+          <%= travel_leg_time_zone_options(leg.time_zone_pick(kind)) %>
         </select>
         <p class="cs-field-hint">Local time at the <%= kind %> airport.</p>
       </div>

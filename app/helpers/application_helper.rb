@@ -342,13 +342,19 @@ def admin_tool(class_name = "", element = "div", **options, &block)
     end
   end
 
-  # Wall-clock value (YYYY-MM-DDThh:mm) for a stored-UTC leg time, rendered in
-  # the airport's local zone so a `datetime-local` input shows the booked time.
-  def flight_local_input_value(time, airport_code, default_date: nil)
-    return nil if time.blank?
+  # Flight leg times are stored in true UTC. Render one in the zone it was
+  # entered in (see TravelLeg#local_departure_time), with the zone's
+  # abbreviation, so attendees and organizers see the time on the ticket.
+  # `endpoint` is :departure or :arrival.
+  def flight_local_time(leg, endpoint, format: "%b %d, %Y %H:%M %Z")
+    leg.public_send(:"local_#{endpoint}_time")&.strftime(format)
+  end
 
-    tz = FlightTrackingService.airport_timezone(airport_code)
-    (tz ? time.in_time_zone(tz) : time).strftime("%Y-%m-%dT%H:%M")
+  # Wall-clock value (YYYY-MM-DDThh:mm) for a stored-UTC leg time, rendered in
+  # the zone it was entered in so a `datetime-local` input shows the booked time.
+  # `endpoint` is :departure or :arrival.
+  def flight_local_input_value(leg, endpoint, default_date: nil)
+    leg.public_send(:"local_#{endpoint}_time")&.strftime("%Y-%m-%dT%H:%M")
   end
 
   def attend_deep_link(participant_id)

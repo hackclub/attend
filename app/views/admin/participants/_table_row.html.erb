@@ -97,14 +97,14 @@
   </td>
   <td class="px-2 py-1.5 text-gray-600 whitespace-nowrap" data-column="arrival">
     <% if pe.travel_inbound&.last_arrival_time %>
-      <div><%= pe.travel_inbound.last_arrival_time.strftime("%b %d %H:%M") %></div>
+      <div><%= pe.travel_inbound.local_last_arrival_time.strftime("%b %d %H:%M %Z") %></div>
     <% else %>
       <span class="text-gray-400">—</span>
     <% end %>
   </td>
   <td class="px-2 py-1.5 text-gray-600 whitespace-nowrap" data-column="departure">
     <% if pe.travel_outbound&.first_departure_time %>
-      <div><%= pe.travel_outbound.first_departure_time.strftime("%b %d %H:%M") %></div>
+      <div><%= pe.travel_outbound.local_first_departure_time.strftime("%b %d %H:%M %Z") %></div>
     <% else %>
       <span class="text-gray-400">—</span>
     <% end %>
