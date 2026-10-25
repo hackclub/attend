@@ -46,7 +46,10 @@ class ScanContext < ApplicationRecord
   validates :is_travel_pickup, inclusion: { in: [ true, false ] }
   validate :ends_at_after_starts_at
 
-  default_scope { order(:position, :created_at) }
+  # Every context list (scanner, admin list, filters) uses one order:
+  # scheduled contexts by start time, unscheduled ones after, then by manual
+  # position.
+  default_scope { order(arel_table[:starts_at].asc.nulls_last, :position, :created_at) }
 
   before_validation :sync_kind_and_old_flags
 

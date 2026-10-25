@@ -48,8 +48,7 @@ module Admin
         .recent
         .limit(50)
 
-      @scan_contexts = current_event.scan_contexts
-      @default_scan_context = @scan_contexts.find { |c| c.checks_in? } || @scan_contexts.first
+      @scan_contexts = current_event.scan_contexts.to_a
     end
 
     def search

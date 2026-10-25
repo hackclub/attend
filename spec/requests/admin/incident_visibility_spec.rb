@@ -236,6 +236,45 @@ RSpec.describe "Admin::Incidents visibility", type: :request do
 
           expect(response.body).to include(admin_audit_log_path(log))
         end
+
+        # IncidentPolicy#view_casework?: the reporter gets the row for what
+        # they filed, not the handlers' comments and edits that followed.
+        context "for an incident reported from outside its roles" do
+          let(:handler) { event.incidents.first.reported_by }
+          let(:reporter) { staff("ops", email: "ops-reporter-feed-incidents-spec@example.com", console: console) }
+          let(:own) { create_incident(reported_by: reporter, visible_to_roles: [ "safeguarding_lead" ]) }
+          let!(:create_log) { AuditLog.log!(action: "create", record: own, actor: reporter, event: event) }
+          let!(:update_log) do
+            AuditLog.log!(action: "update", record: own, actor: handler, event: event,
+              changed_fields: { "status" => [ "open", "in_review" ] })
+          end
+          let!(:comment_log) do
+            comment = own.comments.create!(user: handler, body: "Contacted the guardian")
+            AuditLog.log!(action: "create", record: comment, actor: handler, event: event)
+          end
+
+          it "shows the reporter their create row but none of the casework" do
+            sign_in reporter
+
+            get admin_event_dashboard_path(event)
+
+            expect(response).to have_http_status(:ok)
+            expect(response.body).to include(admin_audit_log_path(create_log))
+            expect(response.body).not_to include(admin_audit_log_path(update_log))
+            expect(response.body).not_to include(admin_audit_log_path(comment_log))
+          end
+
+          it "shows staff it's shared with every row" do
+            handler.update!(admin_console_beta: console)
+            sign_in handler
+
+            get admin_event_dashboard_path(event)
+
+            expect(response.body).to include(admin_audit_log_path(create_log))
+            expect(response.body).to include(admin_audit_log_path(update_log))
+            expect(response.body).to include(admin_audit_log_path(comment_log))
+          end
+        end
       end
     end
   end

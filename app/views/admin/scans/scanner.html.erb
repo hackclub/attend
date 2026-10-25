@@ -32,15 +32,16 @@
         <div class="flex flex-wrap items-center gap-x-2 gap-y-1" data-controller="role-info">
           <% if @scan_contexts.size > 1 %>
             <label for="scan-context" class="text-xs sm:text-sm text-gray-500 whitespace-nowrap">Context:</label>
-            <select id="scan-context" data-role-info-target="select" data-action="role-info#update" class="border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]">
+            <select id="scan-context" data-role-info-target="select" data-action="role-info#update" class="border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750] aria-[invalid=true]:border-red-500 aria-[invalid=true]:ring-2 aria-[invalid=true]:ring-red-200" autocomplete="off" required aria-invalid="true" aria-describedby="scan-context-required">
+              <option value="" selected disabled>Choose a context</option>
               <% @scan_contexts.each do |context| %>
-                <option value="<%= context.id %>" <%= "selected" if context == @default_scan_context %>>
+                <option value="<%= context.id %>">
                   <%= context.name %> — <%= context.kind_label %>
                 </option>
               <% end %>
             </select>
           <% else %>
-            <input type="hidden" id="scan-context" value="<%= @default_scan_context&.id %>" data-role-info-target="select">
+            <input type="hidden" id="scan-context" value="<%= @scan_contexts.first&.id %>" data-role-info-target="select">
           <% end %>
           <% @scan_contexts.select { |context| context.usage_note.present? }.each do |context| %>
             <p class="hidden w-full text-xs text-gray-500" data-role-info-target="panel" data-role="<%= context.id %>"><%= context.usage_note %></p>
@@ -61,6 +62,12 @@
                 class="hidden absolute inset-0 w-full h-full flex items-center justify-center text-white text-sm font-medium bg-gray-900/80">
           Tap to start camera
         </button>
+        <% if @scan_contexts.size > 1 %>
+          <div id="scan-context-required" class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 px-6 text-center text-white bg-gray-900">
+            <p class="text-sm sm:text-base font-semibold">Choose a context to start scanning</p>
+            <p class="text-xs sm:text-sm text-gray-300">Pick where you're scanning people in from the Context menu.</p>
+          </div>
+        <% end %>
       </div>
       
       <%# Stays up until dismissed or replaced by the next result, so a busy %>
@@ -308,6 +315,28 @@ function groupBadgeHtml(group, fallbackColor) {
     return contextSelect ? contextSelect.value : null;
   }
 
+  // Staff must pick a context themselves: until they do, flag the selector
+  // and cover the camera with an empty state. Start from the placeholder even
+  // if the browser restored an earlier choice, since that fires no change.
+  const contextSelect = document.querySelector('select#scan-context');
+  if (contextSelect) {
+    contextSelect.value = '';
+    contextSelect.addEventListener('change', () => {
+      contextSelect.removeAttribute('aria-invalid');
+      contextSelect.removeAttribute('aria-describedby');
+      document.getElementById('scan-context-required')?.classList.add('hidden');
+      lastScannedCode = null;
+      startScannerOnce();
+    });
+  }
+
+  // Shows the "choose a context" error and returns null when none is picked.
+  function requireContextId() {
+    const scanContextId = getCurrentContextId();
+    if (!scanContextId) showResult('Choose a context before scanning', true);
+    return scanContextId;
+  }
+
   function updateStatus(message, state = 'loading') {
     const dot = document.getElementById('status-dot');
     const text = document.getElementById('status-text');
@@ -458,23 +487,39 @@ function groupBadgeHtml(group, fallbackColor) {
     return scannedValue;
   }
 
-  // `manual` is a deliberate action (search result, typed ID). The camera
+  // The one gate for every scan path. Returns whether the scan was sent or
+  // queued, so manual entry and search only clear what staff typed once it
+  // has. `manual` is a deliberate action (search result, typed ID): the camera
   // reports the same code on every frame it stays in view, so only camera
-  // repeats are ignored; everything else waits its turn.
-  async function processScan(scannedValue, { manual = false } = {}) {
+  // repeats are ignored; anything else arriving mid-scan waits its turn.
+  function processScan(scannedValue, { manual = false } = {}) {
     if (scanCooldown) {
-      if (!manual && (scannedValue === lastScannedCode || pendingScans.some(p => p.value === scannedValue))) return;
+      if (!manual && (scannedValue === lastScannedCode || pendingScans.some(p => p.value === scannedValue))) return false;
       pendingScans.push({ value: scannedValue, manual });
       updateQueueNote();
-      return;
+      return true;
     }
-    if (!manual && scannedValue === lastScannedCode) return;
+    if (!manual && scannedValue === lastScannedCode) return false;
     
     const participantId = parseQrCode(scannedValue);
-    const scanContextId = getCurrentContextId();
+    const scanContextId = requireContextId();
+    if (!scanContextId) {
+      // Report a code held up to the camera once rather than every frame, but
+      // forget it after the usual cooldown so showing it again gets feedback.
+      lastScannedCode = scannedValue;
+      setTimeout(() => {
+        if (lastScannedCode === scannedValue) lastScannedCode = null;
+      }, 2000);
+      return false;
+    }
     
     scanCooldown = true;
     lastScannedCode = scannedValue;
+    sendScan(participantId, scanContextId);
+    return true;
+  }
+
+  async function sendScan(participantId, scanContextId) {
     updateStatus('Processing...', 'scanning');
 
     try {
@@ -657,8 +702,7 @@ function groupBadgeHtml(group, fallbackColor) {
     e.preventDefault();
     const input = document.getElementById('manual-participant-id');
     const participantId = input.value.trim();
-    if (participantId) {
-      processScan(participantId, { manual: true });
+    if (participantId && processScan(participantId, { manual: true })) {
       input.value = '';
     }
   });
@@ -724,9 +768,7 @@ function groupBadgeHtml(group, fallbackColor) {
   // Handle search result click
   searchResults.addEventListener('click', function(e) {
     const result = e.target.closest('.search-result');
-    if (result) {
-      const participantId = result.dataset.participantId;
-      processScan(participantId, { manual: true });
+    if (result && processScan(result.dataset.participantId, { manual: true })) {
       searchInput.value = '';
       searchResults.classList.add('hidden');
     }
@@ -746,8 +788,21 @@ function groupBadgeHtml(group, fallbackColor) {
 
   // Initialize scanner. The zxing tag lives in <head>, and on a Turbo visit
   // Turbo appends it without waiting for it to load, so poll for the global
-  // rather than betting on a fixed delay.
-  waitForZXing().then(initScanner);
+  // rather than betting on a fixed delay. With several contexts the camera
+  // waits until staff pick one (see the change handler): every scan is
+  // refused until then and the overlay hides the video anyway.
+  let scannerStarted = false;
+  function startScannerOnce() {
+    if (scannerStarted) return;
+    scannerStarted = true;
+    waitForZXing().then(initScanner);
+  }
+
+  if (contextSelect) {
+    updateStatus('Choose a context');
+  } else {
+    startScannerOnce();
+  }
 
   // Hand the camera back as soon as we navigate away, otherwise iOS keeps the
   // capture (and its indicator) alive behind the next page.
@@ -1065,6 +1120,10 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
   
   async function processNfcScan(badgeToken) {
     const scanContextId = window.getCurrentContextId?.();
+    if (!scanContextId) {
+      window.showResult?.('Choose a context before scanning', true);
+      return;
+    }
     
     try {
       const result = await window.submitScan({

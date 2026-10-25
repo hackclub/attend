@@ -41,10 +41,14 @@ module Admin
     end
 
     def show
-      @record_versions = PaperTrail::Version
-        .where(item_type: @audit_log.record_type, item_id: @audit_log.record_id)
-        .order(created_at: :desc)
-        .limit(50)
+      @record_versions = if can_view_record_history?(@audit_log)
+        PaperTrail::Version
+          .where(item_type: @audit_log.record_type, item_id: @audit_log.record_id)
+          .order(created_at: :desc)
+          .limit(50)
+      else
+        PaperTrail::Version.none
+      end
     end
 
     # Raw PaperTrail feed across every record in the app. Versions carry no
@@ -101,15 +105,28 @@ module Admin
       return true if current_user.global_admin?
       return false unless audit_log.event_id.present? && current_user.event_admin_for?(audit_log.event)
 
+      # The same rows exclude_hidden_incident_logs lists: a reporter outside
+      # the incident's roles can open the row for what they filed, and nothing
+      # about the comments or edits that followed.
       case audit_log.record_type
       when "Incident"
-        visible_incident_ids.include?(audit_log.record_id)
+        casework_incident_ids.include?(audit_log.record_id) ||
+          (audit_log.record_create? && visible_incident_ids.include?(audit_log.record_id))
       when "IncidentComment"
         incident_id = IncidentComment.find_by(id: audit_log.record_id)&.incident_id
-        incident_id.present? && visible_incident_ids.include?(incident_id)
+        incident_id.present? && casework_incident_ids.include?(incident_id)
       else
         true
       end
+    end
+
+    # The record history is every version of the record, so on an incident it
+    # is the timeline the incident page keeps from reporters.
+    def can_view_record_history?(audit_log)
+      return true if current_user.global_admin?
+      return true unless audit_log.record_type == "Incident"
+
+      casework_incident_ids.include?(audit_log.record_id)
     end
 
     def require_audit_access
