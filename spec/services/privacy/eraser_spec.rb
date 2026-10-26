@@ -456,7 +456,7 @@ RSpec.describe Privacy::Eraser do
 
     it "is needed when they're named in a safeguarding incident" do
       Incident.create!(event: past_event, participant_event: registration, reported_by_user_id: create(:user).id,
-        category: :safeguarding, severity: :medium, summary: "fictional")
+        category: :safeguarding, severity: Incident.severities.keys.first, summary: "fictional")
 
       expect_review("safeguarding_record")
     end

@@ -59,7 +59,7 @@ RSpec.describe Privacy::Eraser, "under concurrent writes" do
     eraser = described_class.new(subject_claims)
     outcome = write_after_checks(eraser) do
       Incident.create!(event: past_event, participant_event_id: registration.id, reported_by_user_id: reporter.id,
-        category: :safeguarding, severity: :medium, summary: "fictional")
+        category: :safeguarding, severity: Incident.severities.keys.first, summary: "fictional")
     end
 
     eraser.call(dry_run: false)
