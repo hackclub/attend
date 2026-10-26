@@ -78,6 +78,7 @@ RSpec.describe Privacy::Eraser do
   end
 
   it "erases a guardian on their own request" do
+    guardian.update!(user: create(:user, email: guardian.email, hack_club_account_id: "ident!parent"))
     described_class.new(subject_for(emails: [ "parent@example.com" ])).call(dry_run: false)
 
     expect(Guardian.exists?(guardian.id)).to be(false)
@@ -209,6 +210,7 @@ RSpec.describe Privacy::Eraser do
     end
 
     it "takes a parent or emergency contact's details off another child's row, leaving the child's" do
+      guardian.update!(user: create(:user, email: guardian.email, hack_club_account_id: "ident!parent"))
       batch = ImportBatch.create!(event: past_event, status: :previewing, total_count: 1, rows_data: [
         row("child@example.com", parent_first_name: "Fictional", parent_email: "parent@example.com", parent_phone: "+12025550111",
           emergency_first_name: "Fictional", emergency_email: "parent@example.com", medical_requirements: "fictional")
@@ -240,6 +242,7 @@ RSpec.describe Privacy::Eraser do
   end
 
   it "keeps a consent the guardian signed for a child who stays, with its uploads" do
+    guardian.update!(user: create(:user, email: guardian.email, hack_club_account_id: "ident!parent"))
     consent = registration.consents.create!(consent_type: "waiver", status: "signed", guardian_participant_event: guardian_link,
       docuseal_envelope_id: "fake-envelope", docuseal_guardian_slug: "fake-guardian-slug", docuseal_participant_slug: "fake-participant-slug")
     consent.physical_uploads.attach(io: file_fixture("headshot.png").open, filename: "signed.png", content_type: "image/png")
@@ -362,6 +365,51 @@ RSpec.describe Privacy::Eraser do
       expect(User.exists?(user.id)).to be(true)
     end
 
+    it "stops on a standalone profile's editable Slack ID, even if another account vouches for that ID" do
+      imported = create(:participant, email: "someone-else@example.com", slack_user_id: "U0FAKE1")
+      imported_registration = create(:participant_event, participant: imported, event: past_event)
+
+      expect_conflict(subject_for(slack_id: "U0FAKE1"))
+      expect(Participant.exists?(imported.id)).to be(true)
+      expect(ParticipantEvent.exists?(imported_registration.id)).to be(true)
+      expect(User.exists?(user.id)).to be(true)
+    end
+
+    it "stops on a standalone profile's Slack ID when no HCA account matches" do
+      participant.update!(user: nil)
+      user.update!(oidc_claims: {})
+
+      expect_conflict(subject_for(slack_id: "U0FAKE1"))
+      expect(Participant.exists?(participant.id)).to be(true)
+      expect(ParticipantEvent.exists?(registration.id)).to be(true)
+    end
+
+    it "allows an unclaimed profile independently matched on its email as well as its Slack ID" do
+      imported = create(:participant, email: "imported@example.com", slack_user_id: "U0IMPORTED")
+
+      described_class.new(subject_for(emails: [ imported.email ], slack_id: imported.slack_user_id)).call(dry_run: false)
+
+      expect(Participant.exists?(imported.id)).to be(false)
+    end
+
+    it "stops on a placeholder's email after its staff role was removed" do
+      placeholder = create(:user, email: "placeholder@example.com", global_role: :global_admin)
+      placeholder.update!(global_role: :no_role)
+      profile = create(:participant, email: placeholder.email, user: placeholder)
+
+      expect_conflict(subject_for(emails: [ placeholder.email ], identity_id: "ident!unproven"))
+      expect(User.exists?(placeholder.id)).to be(true)
+      expect(Participant.exists?(profile.id)).to be(true)
+    end
+
+    it "allows an account without an identity ID when its HCA Slack claim matches" do
+      user.update!(hack_club_account_id: nil)
+
+      described_class.new(subject_for(emails: [ user.email ], slack_id: "U0FAKE1")).call(dry_run: false)
+
+      expect(User.exists?(user.id)).to be(false)
+    end
+
     it "stops on a Slack ID typed onto someone else's registration" do
       participant.update!(slack_user_id: nil)
       user.update!(slack_user_id: nil, oidc_claims: {})
@@ -377,6 +425,14 @@ RSpec.describe Privacy::Eraser do
 
       expect_conflict(subject_for(emails: [ "parent@example.com" ]))
       expect(Guardian.exists?(guardian.id)).to be(true)
+    end
+
+    it "stops when a standalone guardian is matched only on an editable email" do
+      expect_conflict(subject_for(emails: [ guardian.email ]))
+
+      expect(Guardian.exists?(guardian.id)).to be(true)
+      expect(GuardianParticipantEvent.exists?(guardian_link.id)).to be(true)
+      expect(ParticipantEvent.exists?(registration.id)).to be(true)
     end
 
     it "erases an imported profile no account has claimed, matched on its email" do
@@ -448,7 +504,19 @@ RSpec.describe Privacy::Eraser do
       expect_review("event_not_over")
     end
 
+    it "is needed for an event that started but has no end time" do
+      past_event.update!(ends_at: nil)
+
+      expect(past_event.phase_at).to eq(:live)
+      expect_review("event_not_over")
+    end
+
+    it "allows erasure exactly when the event ends" do
+      expect(described_class.new(subject_for(emails: [ user.email ]), now: past_event.ends_at).call(dry_run: true).found).to be(true)
+    end
+
     it "is needed when the guardian has a child at an event still to come" do
+      guardian.update!(user: create(:user, email: guardian.email, hack_club_account_id: "ident!parent"))
       create(:guardian_participant_event, guardian:, participant_event: create(:participant_event, event: create(:event)))
 
       expect_review("event_not_over", emails: [ "parent@example.com" ])
@@ -459,6 +527,18 @@ RSpec.describe Privacy::Eraser do
         category: :safeguarding, severity: Incident.severities.keys.first, summary: "fictional")
 
       expect_review("safeguarding_record")
+    end
+
+    %w[pending upheld].each do |status|
+      it "preserves a safety disclosure marked #{status} and its eligibility restriction" do
+        disclosure = TrainingDisclosure.create!(user:, question: "Fictional declaration", answer: "yes",
+          review_status: status, review_note: "Fictional review")
+
+        expect_review("safeguarding_record")
+
+        expect(TrainingDisclosure.exists?(disclosure.id)).to be(true)
+        expect(user.reload.eligible_to_work_events?).to be(false)
+      end
     end
 
     it "is needed for a banned address" do
@@ -472,5 +552,40 @@ RSpec.describe Privacy::Eraser do
 
       expect(described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: true, review: false).found).to be(true)
     end
+  end
+
+  it "erases dependent training and volunteer history, with identical dry-run counts" do
+    records = PaperTrail.request(enabled: true) do
+      enrollment = create(:training_enrollment, user:)
+      [ enrollment,
+        create(:training_badge_award, user:),
+        TrainingCourseInvitation.create!(user:, course: enrollment.course),
+        TrainingDisclosure.create!(user:, enrollment:, question: "Fictional declaration", answer: "no"),
+        TrainingDisclosure.create!(user:, question: "Fictional declaration", answer: "yes", review_status: "cleared", review_note: "Cleared"),
+        create(:event_volunteer, user:, event: past_event) ]
+    end
+    ids = records.map(&:id)
+    records.each { |record| AuditLog.log!(action: "create", record:) }
+    other = PaperTrail.request(enabled: true) { create(:training_enrollment) }
+    AuditLog.log!(action: "create", record: other)
+    expect(PaperTrail::Version.where(item_id: ids).distinct.pluck(:item_id)).to match_array(ids)
+    eraser = described_class.new(subject_for(emails: [ user.email ]))
+
+    dry = eraser.call(dry_run: true)
+    records.each { |record| expect(record.class.exists?(record.id)).to be(true) }
+    expect(PaperTrail::Version.where(item_id: ids).count).to eq(ids.size)
+    expect(AuditLog.where(record_id: ids).count).to eq(ids.size)
+
+    real = eraser.call(dry_run: false)
+
+    expect(real.deleted).to eq(dry.deleted)
+    expect(real.deleted).to include("training_enrollments" => 1, "training_badge_awards" => 1,
+      "training_course_invitations" => 1, "training_disclosures" => 2, "event_volunteers" => 1)
+    records.each { |record| expect(record.class.exists?(record.id)).to be(false) }
+    expect(PaperTrail::Version.where(item_id: ids)).not_to exist
+    expect(AuditLog.where(record_id: ids)).not_to exist
+    expect(TrainingEnrollment.exists?(other.id)).to be(true)
+    expect(PaperTrail::Version.where(item_id: other.id)).to exist
+    expect(AuditLog.where(record_id: other.id)).to exist
   end
 end

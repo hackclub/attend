@@ -74,6 +74,22 @@ RSpec.describe "Privacy hub endpoints", type: :request do
     expect(response).to have_http_status(:service_unavailable)
   end
 
+  it "answers 503 for an unusable key set and succeeds when keys recover" do
+    stub_request(:get, Privacy::Token::JWKS_URL).to_return(status: 200, body: { keys: [] }.to_json)
+    claims = privacy_claims(emails: [ participant.email ], dry_run: false)
+    call_hub("/api/privacy/delete", claims)
+
+    expect(response).to have_http_status(:service_unavailable)
+    expect(response.parsed_body).to eq("error" => "jwks_unavailable")
+    expect(Participant.exists?(participant.id)).to be(true)
+
+    stub_privacy_jwks
+    call_hub("/api/privacy/delete", claims)
+
+    expect(response).to have_http_status(:ok)
+    expect(Participant.exists?(participant.id)).to be(false)
+  end
+
   it "answers 503 when attachment files can't be deleted, leaving the subject for the retry" do
     allow_any_instance_of(Privacy::Eraser).to receive(:delete_files!).and_raise(Privacy::Eraser::Unavailable.new("storage_unavailable"))
 

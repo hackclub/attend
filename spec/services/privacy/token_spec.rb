@@ -81,6 +81,8 @@ RSpec.describe Privacy::Token do
 
   {
     "isn't JSON" => "nope",
+    "is empty" => { keys: [] }.to_json,
+    "has only unsupported keys" => { keys: [ { kty: "RSA", kid: "rsa" }, { kty: "EC", crv: "P-384", kid: "wrong-curve" } ] }.to_json,
     "has no key list" => { keys: "nope" }.to_json,
     "has a key that won't decode" => { keys: [ { kty: "EC", crv: "P-256", kid: "bad", x: "!!", y: "!!" } ] }.to_json,
     "has a point that isn't on the curve" => { keys: [ { kty: "EC", crv: "P-256", kid: "bad", x: Base64.urlsafe_encode64("\x01" * 32, padding: false), y: Base64.urlsafe_encode64("\x01" * 32, padding: false) } ] }.to_json
@@ -91,6 +93,23 @@ RSpec.describe Privacy::Token do
       expect { described_class.verify!(privacy_token) }
         .to raise_error(Privacy::Token::Invalid) { |error| expect(error.code).to eq("jwks_unavailable") }
     end
+  end
+
+  it "does not cache an empty key set, allowing an immediate retry after recovery" do
+    stub_request(:get, Privacy::Token::JWKS_URL).to_return(status: 200, body: { keys: [] }.to_json)
+    expect { described_class.verify!(privacy_token) }
+      .to raise_error(Privacy::Token::Invalid) { |error| expect(error.code).to eq("jwks_unavailable") }
+
+    stub_privacy_jwks
+
+    expect(described_class.verify!(privacy_token).action).to eq("delete")
+  end
+
+  it "reports jwks_unavailable when the only key has a blank kid" do
+    stub_privacy_jwks(kid: "")
+
+    expect { described_class.verify!(privacy_token) }
+      .to raise_error(Privacy::Token::Invalid) { |error| expect(error.code).to eq("jwks_unavailable") }
   end
 
   it "refetches the keys for an unknown kid once the throttle allows, picking up a rotated key" do

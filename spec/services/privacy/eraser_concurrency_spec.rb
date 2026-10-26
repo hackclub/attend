@@ -7,13 +7,18 @@ RSpec.describe Privacy::Eraser, "under concurrent writes" do
   self.use_transactional_tests = false
 
   let!(:past_event) { create(:event, starts_at: 3.weeks.ago, ends_at: 2.weeks.ago, registration_open_at: 2.months.ago, registration_close_at: 1.month.ago) }
-  let!(:user) { create(:user, email: "concurrent-attendee@example.com") }
+  let!(:user) { create(:user, email: "concurrent-attendee@example.com", hack_club_account_id: "ident!concurrent") }
   let!(:participant) { create(:participant, email: "concurrent-attendee@example.com", user:) }
   let!(:registration) { create(:participant_event, participant:, event: past_event, status: :complete) }
   let!(:reporter) { create(:user) }
   let(:subject_claims) { Privacy::Token::Subject.new(emails: [ "concurrent-attendee@example.com" ], slack_id: nil, identity_id: nil) }
 
   after do
+    EmailLog.where(to_address: user.email).destroy_all
+    Invitation.where(event: past_event).destroy_all
+    Ticket.where(phone_number: participant.phone).destroy_all
+    AutomatedSmsLog.where(phone_number: participant.phone).delete_all
+    TrainingDisclosure.where(user_id: user.id).delete_all
     Incident.where(event: past_event).delete_all
     User.where(id: reporter.id).delete_all
     EventRoleAssignment.where(event: past_event).delete_all
@@ -21,6 +26,49 @@ RSpec.describe Privacy::Eraser, "under concurrent writes" do
     Participant.where(id: participant.id).destroy_all
     User.where(id: user.id).destroy_all
     past_event.destroy
+  end
+
+  def create_loose_record(kind)
+    case kind
+    when :email_log then create(:email_log, to_address: user.email)
+    when :invitation then create(:invitation, email: user.email, event: past_event)
+    when :ticket then Ticket.create!(channel: "sms", phone_number: participant.phone)
+    when :sms_log then AutomatedSmsLog.create!(phone_number: participant.phone, body: "Fictional", sent_at: Time.current)
+    end
+  end
+
+  %i[email_log invitation ticket sms_log].each do |kind|
+    it "holds off a new #{kind} after the final match" do
+      eraser = described_class.new(subject_claims)
+      outcome = write_after_checks(eraser) { create_loose_record(kind) }
+
+      eraser.call(dry_run: false)
+
+      expect(outcome.call).to eq(:blocked)
+      expect(User.exists?(user.id)).to be(false)
+    end
+
+    it "holds off an update to a matched #{kind} until it is erased" do
+      record = create_loose_record(kind)
+      eraser = described_class.new(subject_claims)
+      outcome = write_after_checks(eraser) { record.update_columns(updated_at: 1.day.from_now) }
+
+      eraser.call(dry_run: false)
+
+      expect(outcome.call).to eq(:blocked)
+      expect(record.class.exists?(record.id)).to be(false)
+    end
+  end
+
+  it "holds off a disclosure becoming blocking after the safeguarding check" do
+    disclosure = TrainingDisclosure.create!(user:, question: "Fictional declaration", answer: "no")
+    eraser = described_class.new(subject_claims)
+    outcome = write_after_checks(eraser) { disclosure.update!(answer: "yes", review_status: "pending") }
+
+    eraser.call(dry_run: false)
+
+    expect(outcome.call).to eq(:blocked)
+    expect(TrainingDisclosure.exists?(disclosure.id)).to be(false)
   end
 
   # runs the write on its own connection once the eraser has passed its

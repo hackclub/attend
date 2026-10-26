@@ -65,6 +65,8 @@ module Privacy
       [ "IncidentParticipant", :participant_event_id ]
     ].freeze
 
+    USER_RECORDS = %w[TrainingEnrollment TrainingBadgeAward TrainingCourseInvitation TrainingDisclosure EventVolunteer].freeze
+
     DOCUSEAL_REASON = "signed waivers and documents stay in DocuSeal as liability records; " \
                       "Attend's copy of the signing status and its link to them are removed".freeze
     UNSIGNED_DOCUSEAL_REASON = "documents sent for signature but never signed stay in DocuSeal; " \
@@ -131,6 +133,14 @@ module Privacy
     # matches, then locks what it matched and matches again. If the match
     # moved while we waited for the locks, it goes round again
     def lock_people!
+      # These can match by editable identifiers without a foreign key to a
+      # locked person. Row locks alone miss inserts and newly matching rows.
+      # Hold off writes until commit, taking the table locks before row locks
+      # so concurrent erasures acquire them in the same order.
+      ActiveRecord::Base.connection.execute(<<~SQL)
+        LOCK TABLE automated_sms_logs, email_logs, emergency_contacts,
+          invitations, message_deliveries, tickets IN SHARE ROW EXCLUSIVE MODE
+      SQL
       3.times do
         people = match
         lock!(people)
@@ -149,6 +159,7 @@ module Privacy
       Guardian.where(id: people.guardians).order(:id).lock.pluck(:id)
       GuardianParticipantEvent.where(id: people.guardian_links).order(:id).lock.pluck(:id)
       ImportBatch.where(id: people.import_batches).order(:id).lock.pluck(:id)
+      USER_RECORDS.each { |model| model.constantize.where(user_id: people.users).order(:id).lock.pluck(:id) }
       Event.where(id: event_ids(people)).order(:id).lock("FOR SHARE").pluck(:id)
     end
 
@@ -167,18 +178,19 @@ module Privacy
       user_ids = users.pluck(:id)
       # HCA claims are encrypted, so compare through the models. The editable
       # Slack override must neither establish nor hide an account match.
-      if slack_id
-        user_ids |= User.where.not(oidc_claims: nil).find_each.filter_map { |user| user.id if user.verified_slack_id == slack_id }
-      end
+      slack_user_ids = slack_id ? User.where.not(oidc_claims: nil).find_each.filter_map { |user| user.id if user.verified_slack_id == slack_id } : []
+      user_ids |= slack_user_ids
+      # Admin-created placeholders have an editable email, not an HCA identity.
+      conflict! if users.where(hack_club_account_id: [ nil, "" ]).where.not(id: slack_user_ids).exists?
       conflict! if identity_id && User.where(id: user_ids).where.not(hack_club_account_id: [ nil, identity_id ]).exists?
 
       participants = email_in(Participant, :email, emails)
-      participants = participants.or(Participant.where(slack_user_id: slack_id)) if slack_id
       conflict! if participants.where.not(user_id: nil).where.not(user_id: user_ids).exists?
-      # a Slack ID on a registration was typed by whoever registered them,
-      # often an organiser, so it isn't evidence of whose profile it is
+      # A Slack ID on a profile or registration was typed by whoever registered
+      # them, often an organiser. It needs an independent email or account match.
       if slack_id
-        conflict! if Participant.where(id: ParticipantEvent.where(slack_user_id: slack_id).select(:participant_id))
+        conflict! if Participant.where(slack_user_id: slack_id)
+                                .or(Participant.where(id: ParticipantEvent.where(slack_user_id: slack_id).select(:participant_id)))
                                 .where.not(id: participants.or(Participant.where(user_id: user_ids)).select(:id)).exists?
       end
       participant_ids = participants.or(Participant.where(user_id: user_ids)).pluck(:id)
@@ -188,7 +200,7 @@ module Privacy
       # is a child being erased: with the registration gone, their details
       # serve nothing
       guardians = email_in(Guardian, :email, emails)
-      conflict! if guardians.where.not(user_id: nil).where.not(user_id: user_ids).exists?
+      conflict! if guardians.where(user_id: nil).or(guardians.where.not(user_id: user_ids)).exists?
       matched_guardian_ids = guardians.or(Guardian.where(user_id: user_ids)).pluck(:id)
       linked_guardian_ids = GuardianParticipantEvent.where(participant_event_id: participant_event_ids).distinct.pluck(:guardian_id)
       orphaned_guardian_ids = Guardian.where(id: linked_guardian_ids)
@@ -295,7 +307,7 @@ module Privacy
     # them out of the organisers' headcount, rooming and medical lists, so the
     # organisers remove the registration first
     def open_registration?
-      Event.where(id: event_ids(people)).where("COALESCE(ends_at, starts_at) IS NULL OR COALESCE(ends_at, starts_at) > ?", @now).exists?
+      Event.where(id: event_ids(people)).where("ends_at IS NULL OR ends_at > ?", @now).exists?
     end
 
     # every event the people being erased are registered for, guard, or are
@@ -316,7 +328,8 @@ module Privacy
         IncidentReport.where(user_id: users).or(email_in(IncidentReport, :reporter_email, people.emails)).exists? ||
         IncidentHelpingStaff.where(user_id: users).exists? ||
         IncidentComment.where(user_id: users).exists? ||
-        IncidentReportComment.where(user_id: users).exists?
+        IncidentReportComment.where(user_id: users).exists? ||
+        TrainingDisclosure.blocking.where(user_id: users).exists?
     end
 
     def retained_counts
@@ -470,6 +483,7 @@ module Privacy
       ids = people.users + people.participants + pes + people.guardians + people.guardian_links +
         people.emergency_contacts + people.invitations + people.tickets
       REGISTRATION_RECORDS.each { |model, column| ids.concat(model.constantize.where(column => pes).pluck(:id)) }
+      USER_RECORDS.each { |model| ids.concat(model.constantize.where(user_id: people.users).pluck(:id)) }
       ids.concat(TravelLeg.where(travel_id: Travel.where(participant_event_id: pes).select(:id)).pluck(:id))
       ids.concat(SiblingMembership.where(participant_id: people.participants).pluck(:id))
       ids.concat(TicketMessage.where(ticket_id: people.tickets).pluck(:id))

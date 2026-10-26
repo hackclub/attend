@@ -55,16 +55,18 @@ never reach into an account on their own:
 
 - **Users** by `email` (synced from HCA at sign-in), `hack_club_account_id`
   (the subject's `identity_id`), or the verified Slack ID in their HCA claims.
-  The editable Slack override does not establish or hide an account match
-- **Participants** by linked user, or by their own `email` or `slack_user_id`
-- **Guardians** by linked user, or by their own `email`
+  An email-only placeholder without an HCA identity needs review. The editable
+  Slack override does not establish or hide an account match
+- **Participants** by linked user or their own `email`; editable Slack IDs
+  require one of those independent matches
+- **Guardians** by linked user; a standalone editable email match needs review
 - Every profile on a matched account goes with it
 
 Anything that points at an account the subject's verified identifiers don't
 reach stops the run with `identity_conflict`: a participant or guardian
 matched on its own email or Slack ID but linked to an unmatched account, an
 account whose HCA identity differs from the subject's `identity_id`, or a
-participant found only through a Slack ID on a registration (typed by
+participant found only through a Slack ID on a profile or registration (typed by
 whoever registered them, often an organiser). A profile no account has
 claimed, like an imported one, is erased on its own email.
 - Emergency contacts on other people's registrations, by the subject's own emails
@@ -88,8 +90,8 @@ deal with the cause in Attend, then rerun the request from the hub.
 | `reason` | When | Why |
 | --- | --- | --- |
 | `staff_account` | Global role, event or series role, or an API token | Staff authored incidents, notes, messages and audit history other records depend on, and their tokens may feed other services |
-| `event_not_over` | A registration, guardian link or emergency-contact entry for an event that hasn't ended | Pulling someone out of an upcoming or running event changes organisers' headcount, rooming and medical lists, so organisers remove the registration first |
-| `safeguarding_record` | Named in an incident, or filed or commented on an incident report | Safeguarding records have their own retention rules, and the safeguarding lead decides |
+| `event_not_over` | A registration, guardian link or emergency-contact entry for an event that hasn't ended, including one without an end time | Pulling someone out of an upcoming or running event changes organisers' headcount, rooming and medical lists, so organisers remove the registration first |
+| `safeguarding_record` | Named in an incident, filed or commented on an incident report, or has a pending or upheld training disclosure | Safeguarding records have their own retention rules, and the safeguarding lead decides |
 | `banned` | One of their emails is on a ban list | Erasing would lift the ban |
 | `identity_conflict` | An editable email or Slack ID leads to an account the subject's verified identifiers don't (see above) | It may be someone else's account; a human works out whose it is |
 | `import_in_progress` | An import holding their row is pending or running | The import would write its copy of them back |
@@ -101,12 +103,20 @@ Exports skip every check except `staff_account` and `identity_conflict`.
 
 Matching, the checks and the erasure run in one transaction. The matched
 users, participants, registrations, guardians, guardian links and import
-batches are locked `FOR UPDATE` and their events `FOR SHARE`, then matched
+batches, plus dependent training and volunteer records, are locked `FOR UPDATE`
+and their events `FOR SHARE`, then matched
 again; if the match moved while waiting, it goes round again. With those locks
 held, a role assignment, incident, registration or guardian link created
 mid-run waits for the erasure and then fails its foreign key, a role change or
 event date change waits, and an import can't be confirmed. Lock waits give up
 after 5 seconds with `503 database_busy`.
+
+Email logs, invitations, emergency contacts, message deliveries, SMS logs and
+tickets also match without an account foreign key. Before matching, their
+tables are locked `SHARE ROW EXCLUSIVE` for the transaction: reads continue,
+but writes wait, including inserts that row locks would miss. This briefly
+pauses unrelated writes to those tables too; it does not prevent new data
+being recorded after the transaction ends.
 
 Ban emails and incident reports filed by email have no foreign key to the
 person, so one added in the instant between the check and the commit isn't
@@ -118,6 +128,8 @@ All in one transaction, with PaperTrail switched off:
 
 - the user account, with its mobile and push tokens, passports, NFC tokens,
   badge redirect, and MCP OAuth grants, tokens and connection settings
+- training enrollments, progress, badge awards, course invitations, nonblocking
+  safety disclosures and volunteer records, including their versions and audit logs
 - the participant, with sibling-group memberships, headshot and public-profile photo
 - every registration and everything hanging off it: medical, dietary,
   accessibility, safeguarding info, accommodation, travel and travel legs,

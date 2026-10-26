@@ -127,14 +127,17 @@ module Privacy
         keys = JSON.parse(response.body).fetch("keys")
         raise Invalid, "jwks_unavailable" unless keys.is_a?(Array)
 
-        @keys = keys.filter_map { |jwk| [ jwk["kid"], public_key(jwk) ] if usable?(jwk) }.to_h
+        keys = keys.filter_map { |jwk| [ jwk["kid"], public_key(jwk) ] if usable?(jwk) }.to_h
+        raise Invalid, "jwks_unavailable" if keys.empty?
+
+        @keys = keys
         @fetched_at = Time.now
       rescue Invalid, JSON::ParserError, KeyError, TypeError, ArgumentError, OpenSSL::OpenSSLError, SocketError, SystemCallError, Net::OpenTimeout, Net::ReadTimeout
         raise Invalid, "jwks_unavailable"
       end
 
       def usable?(jwk)
-        jwk.is_a?(Hash) && jwk["kty"] == "EC" && jwk["crv"] == "P-256" && jwk["kid"].is_a?(String) &&
+        jwk.is_a?(Hash) && jwk["kty"] == "EC" && jwk["crv"] == "P-256" && jwk["kid"].is_a?(String) && jwk["kid"].present? &&
           (jwk["alg"].nil? || jwk["alg"] == "ES256") && (jwk["use"].nil? || jwk["use"] == "sig")
       end
 
