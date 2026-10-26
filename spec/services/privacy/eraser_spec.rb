@@ -96,12 +96,24 @@ RSpec.describe Privacy::Eraser do
 
   it "erases their MCP grants and tokens" do
     application = Toolchest::OauthApplication.create!(name: "Fictional client", redirect_uri: "https://example.com/callback")
-    McpConnectionSetting.create!(application:, resource_owner_id: user.id)
+    settings = McpConnectionSetting.create!(application:, resource_owner_id: user.id)
+    connection_event = settings.mcp_connection_events.create!(event: past_event)
+    settings.update!(all_events: false)
+    other_settings = McpConnectionSetting.create!(application:, resource_owner_id: create(:user).id)
 
-    result = described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false)
+    eraser = described_class.new(subject_for(emails: [ "attendee@example.com" ]))
+    dry = eraser.call(dry_run: true)
+    expect(McpConnectionSetting.exists?(settings.id)).to be(true)
+    expect(McpConnectionEvent.exists?(connection_event.id)).to be(true)
 
-    expect(result.deleted).to include("mcp_connection_settings" => 1)
+    result = eraser.call(dry_run: false)
+
+    expect(result.deleted).to eq(dry.deleted)
+    expect(result.deleted).to include("mcp_connection_settings" => 1, "mcp_connection_events" => 1)
     expect(McpConnectionSetting.where(resource_owner_id: user.id)).not_to exist
+    expect(McpConnectionEvent.exists?(connection_event.id)).to be(false)
+    expect(McpConnectionSetting.exists?(other_settings.id)).to be(true)
+    expect(User.exists?(user.id)).to be(false)
   end
 
   describe "attachment files" do
@@ -153,6 +165,34 @@ RSpec.describe Privacy::Eraser do
       expect(result.found).to be(true)
       expect(result.deleted).to include("import_batches.rows_data" => 1)
       expect(batch.reload.rows_data.map { |r| r["email"] }).to eq([ "someone-else@example.com" ])
+    end
+
+    it "matches an import-only Slack ID without expanding to the row's typed email" do
+      matched = row("old-address@example.com", slack_id: "U0IMPORT")
+      other = row("old-address@example.com", slack_id: "U0OTHER")
+      batch = ImportBatch.create!(event: past_event, status: :previewing, total_count: 2, rows_data: [ matched, other ])
+      invitation = create(:invitation, event: past_event, email: "old-address@example.com")
+      eraser = described_class.new(subject_for(slack_id: "U0IMPORT"))
+
+      dry = eraser.call(dry_run: true)
+      expect(dry.found).to be(true)
+      expect(batch.reload.rows_data).to eq([ matched, other ])
+
+      real = eraser.call(dry_run: false)
+
+      expect(real.deleted).to eq(dry.deleted)
+      expect(real.deleted).to include("import_batches.rows_data" => 1)
+      expect(batch.reload.rows_data).to eq([ other ])
+      expect(Invitation.exists?(invitation.id)).to be(true)
+    end
+
+    it "needs a human when an import matched only on Slack is running" do
+      batch = ImportBatch.create!(event: past_event, status: :importing, total_count: 1,
+        rows_data: [ row("old-address@example.com", slack_id: "U0IMPORT") ])
+
+      expect { described_class.new(subject_for(slack_id: "U0IMPORT")).call(dry_run: false) }
+        .to raise_error(described_class::ManualReviewRequired) { |error| expect(error.reason).to eq("import_in_progress") }
+      expect(batch.reload.rows_data.size).to eq(1)
     end
 
     it "removes their errors from a finished batch, and only theirs" do
@@ -250,6 +290,50 @@ RSpec.describe Privacy::Eraser do
     def expect_conflict(subject)
       expect { described_class.new(subject).call(dry_run: false) }
         .to raise_error(described_class::ManualReviewRequired) { |error| expect(error.reason).to eq("identity_conflict") }
+    end
+
+    %i[participant guardian].each do |profile|
+      it "does not expand email searches through an erased #{profile}'s editable email" do
+        bob = create(:user, email: "bob@example.com", hack_club_account_id: "ident!bob")
+        bob_profile = create(:participant, email: bob.email, user: bob)
+        bob_registration = create(:participant_event, participant: bob_profile, event: past_event)
+        public_send(profile).update!(email: bob.email)
+        invitation = create(:invitation, event: past_event, email: bob.email)
+        email_log = create(:email_log, to_address: bob.email)
+        linked_log = create(:email_log, to_address: bob.email, emailable: public_send(profile))
+        message = Message.create!(event: past_event, sent_by_user: bob, audience: "all_attendees", channels: [ "email" ], body: "Fictional")
+        delivery = message.message_deliveries.create!(participant_event: bob_registration, channel: "email", recipient_email: bob.email)
+        rows = [ { "email" => bob.email, "legal_first_name" => "Fictional Bob" } ]
+        batch = ImportBatch.create!(event: past_event, status: :previewing, total_count: 1, rows_data: rows)
+
+        described_class.new(subject_for(emails: [ "attendee@example.com" ], identity_id: "ident!fake1")).call(dry_run: false)
+
+        expect(User.exists?(user.id)).to be(false)
+        expect(User.exists?(bob.id)).to be(true)
+        expect(Participant.exists?(bob_profile.id)).to be(true)
+        expect(Invitation.exists?(invitation.id)).to be(true)
+        expect(EmailLog.exists?(email_log.id)).to be(true)
+        expect(EmailLog.exists?(linked_log.id)).to be(false)
+        expect(MessageDelivery.exists?(delivery.id)).to be(true)
+        expect(batch.reload.rows_data).to eq(rows)
+      end
+    end
+
+    [ nil, "U0OVERRIDE" ].each do |override|
+      it "matches the verified Slack ID when the editable override is #{override.inspect}" do
+        user.update!(slack_user_id: override)
+        eraser = described_class.new(subject_for(slack_id: "U0FAKE1"))
+
+        dry = eraser.call(dry_run: true)
+        expect(dry.found).to be(true)
+        expect(User.exists?(user.id)).to be(true)
+
+        real = eraser.call(dry_run: false)
+
+        expect(real.deleted).to eq(dry.deleted)
+        expect(User.exists?(user.id)).to be(false)
+        expect(Participant.exists?(participant.id)).to be(false)
+      end
     end
 
     # Alice's profile carries Bob's email; Bob asks to be erased

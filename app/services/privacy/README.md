@@ -54,8 +54,8 @@ emails and Slack IDs that anyone can type, so those can find a profile but
 never reach into an account on their own:
 
 - **Users** by `email` (synced from HCA at sign-in), `hack_club_account_id`
-  (the subject's `identity_id`), or `slack_user_id` when the Slack ID HCA
-  gives for that account agrees. The profile's Slack ID is a free-text override
+  (the subject's `identity_id`), or the verified Slack ID in their HCA claims.
+  The editable Slack override does not establish or hide an account match
 - **Participants** by linked user, or by their own `email` or `slack_user_id`
 - **Guardians** by linked user, or by their own `email`
 - Every profile on a matched account goes with it
@@ -68,14 +68,17 @@ participant found only through a Slack ID on a registration (typed by
 whoever registered them, often an organiser). A profile no account has
 claimed, like an imported one, is erased on its own email.
 - Emergency contacts on other people's registrations, by the subject's own emails
-- Invitations, email logs and message deliveries, by any of the matched people's emails
+- Invitations, email logs and message deliveries, by emails from the hub or
+  matched HCA accounts, or their direct links to erased people and registrations.
+  Editable profile and guardian emails never expand these searches
 - Automated SMS logs and support tickets, by the matched people's phone numbers.
   A number that anyone staying on file also has is never used, since children
   often give a parent's number. Tickets filed against another person always stay
-- Import batches whose uploaded CSV rows or per-row errors hold any of the
-  matched people's emails
+- Import batches whose uploaded CSV rows or per-row errors hold emails from
+  the hub or matched HCA accounts. CSV rows also match on the subject's Slack ID;
+  a typed email on a Slack-matched row never expands the search to other rows
 
-An empty email list matches nothing.
+An empty email list never matches blank-email rows; Slack matching still applies.
 
 ## Needs a human first
 

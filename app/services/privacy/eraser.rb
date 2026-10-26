@@ -165,8 +165,11 @@ module Privacy
       users = email_in(User, :email, emails)
       users = users.or(User.where(hack_club_account_id: identity_id)) if identity_id
       user_ids = users.pluck(:id)
-      # slack_user_id is a profile override, so it only counts where HCA agrees
-      user_ids |= User.where(slack_user_id: slack_id).select { |user| user.verified_slack_id == slack_id }.map(&:id) if slack_id
+      # HCA claims are encrypted, so compare through the models. The editable
+      # Slack override must neither establish nor hide an account match.
+      if slack_id
+        user_ids |= User.where.not(oidc_claims: nil).find_each.filter_map { |user| user.id if user.verified_slack_id == slack_id }
+      end
       conflict! if identity_id && User.where(id: user_ids).where.not(hack_club_account_id: [ nil, identity_id ]).exists?
 
       participants = email_in(Participant, :email, emails)
@@ -195,10 +198,11 @@ module Privacy
       guardian_link_ids = GuardianParticipantEvent.where(participant_event_id: participant_event_ids)
                                                   .or(GuardianParticipantEvent.where(guardian_id: guardian_ids)).pluck(:id)
 
-      all_emails = (emails +
-        User.where(id: user_ids).pluck(:email) +
-        Participant.where(id: participant_ids).pluck(:email) +
-        Guardian.where(id: guardian_ids).pluck(:email)).compact.map { |email| email.strip.downcase }.compact_blank.uniq
+      # Only the hub and matched HCA accounts vouch for these addresses.
+      # A profile can carry someone else's email; deleting that profile must
+      # not erase the other person's invitations, logs or import rows.
+      all_emails = (emails + User.where(id: user_ids).pluck(:email))
+                     .compact.map { |email| email.strip.downcase }.compact_blank.uniq
       # phones are encrypted, so they're read back through the models. A child
       # often gives a parent's number, so a phone anyone staying on file also
       # has is never used to match: it would sweep up their texts and tickets
@@ -372,9 +376,10 @@ module Privacy
       execute([ "DELETE FROM nfc_tokens WHERE user_id IN (?)", users.presence || [ nil ] ])
       # MCP grants and tokens name their owner as a string, with no foreign key
       owners = users.map(&:to_s).presence || [ nil ]
-      %w[toolchest_oauth_access_grants toolchest_oauth_access_tokens mcp_connection_settings].each do |table|
+      %w[toolchest_oauth_access_grants toolchest_oauth_access_tokens].each do |table|
         execute([ "DELETE FROM #{table} WHERE resource_owner_id IN (?)", owners ])
       end
+      McpConnectionSetting.where(resource_owner_id: owners).destroy_all
       User.where(id: users).destroy_all
 
       PaperTrail::Version.where(item_id: ids).delete_all
@@ -415,11 +420,13 @@ module Privacy
 
     # import batches hold the CSV rows an organiser uploaded until the import
     # finishes, and the per-row errors after. Narrowed with a text search,
-    # then checked field by field
+    # then checked field by field. A CSV profile can also be matched on its
+    # Slack ID, even when its email is no longer one the hub knows.
     def import_batch_ids(emails)
-      return [] if emails.empty?
+      identifiers = emails + [ @subject.slack_id ].compact
+      return [] if identifiers.empty?
 
-      patterns = emails.map { |email| "%#{ImportBatch.sanitize_sql_like(email)}%" }
+      patterns = identifiers.map { |identifier| "%#{ImportBatch.sanitize_sql_like(identifier.downcase)}%" }
       ImportBatch.where("lower(rows_data::text) LIKE ANY (ARRAY[?]) OR lower(errors_data::text) LIKE ANY (ARRAY[?])", patterns, patterns)
                  .select { |batch| scrubbed_import(batch, emails).present? }.map(&:id)
     end
@@ -431,7 +438,9 @@ module Privacy
       erased = ->(value) { value.is_a?(String) && emails.include?(value.strip.downcase) }
       mentioned = ->(text) { text.is_a?(String) && emails.any? { |email| text.match?(/(?<![\w.+-])#{Regexp.escape(email)}(?![\w-])/i) } }
 
-      rows = batch.rows_data.reject { |row| erased.(row["email"]) }.map do |row|
+      rows = batch.rows_data.reject do |row|
+        erased.(row["email"]) || (@subject.slack_id && row["slack_id"] == @subject.slack_id)
+      end.map do |row|
         IMPORT_CONTACTS.reduce(row) { |kept, (field, fields)| erased.(kept[field]) ? kept.except(*fields) : kept }
       end
       errors = batch.errors_data.reject { |error| erased.(error["email"]) || mentioned.(error["error"]) }
