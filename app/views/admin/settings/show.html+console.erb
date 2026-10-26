@@ -7,7 +7,7 @@
       <h1 class="cs-h1">Global settings</h1>
     </div>
     <div class="cs-actions">
-      <%= link_to "Incident report settings", admin_incident_settings_path, class: "cs-btn" %>
+      <%= link_to "Incident report settings", admin_incident_report_settings_path, class: "cs-btn" %>
     </div>
   </div>
 
@@ -172,6 +172,54 @@
               disabled: @admin_help_slack_channel_id.blank?,
               class: "cs-btn shrink-0",
               data: { turbo_confirm: "Invite all #{@admin_help_member_count - @admin_help_members_without_slack} people with Slack accounts to the channel?" } %>
+      </div>
+    </div>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Org support Slack channel</h2>
+    </div>
+    <div class="cs-container-body">
+      <%= form_with url: update_org_support_slack_channel_admin_settings_path, method: :post, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+        <%= cs_field id: "org_support_slack_channel_id", label: "Channel ID", optional: true,
+              description: "Every kind of admin: global admins and global read-only users, plus anyone with any role on an event or its series (Limited and Read Only included), from when they get the role until 7 days after the event ends. People Attend added are removed daily once that's passed; anyone who joined on their own is never removed. The Attend Slack bot must be in the channel, with permission to remove people.",
+              constraint: "Starts with C or G, then capital letters and numbers. For example: C0123ABCD" do |aria| %>
+          <div class="flex flex-wrap items-center gap-2">
+            <%= f.text_field :org_support_slack_channel_id,
+                  value: @org_support_slack_channel_id,
+                  pattern: "\\s*[CG][A-Z0-9]+\\s*",
+                  data: { cs_pattern_message: "Enter a valid Slack channel ID. For example: C0123ABCD" },
+                  class: "cs-input max-w-xs font-mono", **aria %>
+            <%= f.button "Save", class: "cs-btn" %>
+          </div>
+        <% end %>
+      <% end %>
+
+      <div class="<%= row_divider %> flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="cs-setting-title">Sync all admins</h3>
+          <p class="cs-setting-description">
+            <%= pluralize(@org_support_member_count, "eligible person", plural: "eligible people") %>,
+            <%= @org_support_members_without_slack %> without a Slack account linked through Hack Club Auth (they can't be invited).
+          </p>
+          <% if @org_support_last_sync["at"].present? %>
+            <p class="cs-field-description mt-1">
+              Last synced <%= cs_relative_time(Time.zone.parse(@org_support_last_sync["at"])) %>:
+              <%= @org_support_last_sync["added"] %> added,
+              <%= @org_support_last_sync["already_member"] %> already in the channel,
+              <%= @org_support_last_sync["removed"] %> removed,
+              <%= @org_support_last_sync["failed"] %> failed,
+              <%= @org_support_last_sync["no_slack"] %> without Slack<% if @org_support_last_sync["not_in_workspace"].to_i.positive? %>,
+              <%= @org_support_last_sync["not_in_workspace"] %> not in this Slack workspace<% end %>.
+            </p>
+          <% end %>
+        </div>
+        <%= button_to "Sync to channel", sync_org_support_slack_channel_admin_settings_path,
+              method: :post,
+              disabled: @org_support_slack_channel_id.blank?,
+              class: "cs-btn shrink-0",
+              data: { turbo_confirm: "Invite all #{@org_support_member_count - @org_support_members_without_slack} people with Slack accounts to the channel, and remove anyone Attend added whose events ended over 7 days ago?" } %>
       </div>
     </div>
   </section>

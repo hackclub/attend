@@ -3,7 +3,7 @@ module Api
     class BansController < BaseController
       requires_scope "bans:write"
 
-      before_action :require_global_admin!
+      before_action -> { require_global_admin!("Only global admins can manage the ban list") }
       before_action :set_paper_trail_whodunnit
 
       # One ban record covers every email belonging to the same person, so a
@@ -61,12 +61,6 @@ module Api
           error: "Already on the ban list: #{ban_emails.map(&:email).sort.join(', ')}",
           bans: ban_emails.map(&:ban).uniq.map { |ban| ban_json(ban) }
         }, status: :conflict
-      end
-
-      def require_global_admin!
-        return if current_user&.global_admin?
-
-        render json: { error: "Only global admins can manage the ban list" }, status: :forbidden
       end
 
       # Api::V1::BaseController descends from ActionController::API, so it

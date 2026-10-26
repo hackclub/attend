@@ -69,6 +69,7 @@ class ParticipantMergeService
     actions = []
     merge_participant_events(actions, execute:)
     merge_sibling_memberships(actions, execute:)
+    merge_connected_accounts(actions, execute:)
     merge_profile_fields(actions, execute:)
     merge_headshot(actions, execute:)
     merge_user_link(actions, execute:)
@@ -103,6 +104,15 @@ class ParticipantMergeService
 
       actions << "Transfer sibling group membership"
       membership.update!(participant: primary) if execute
+    end
+  end
+
+  def merge_connected_accounts(actions, execute:)
+    duplicate.connected_accounts.to_a.each do |account|
+      next if primary.connected_accounts.exists?(provider: account.provider)
+
+      actions << "Transfer connected #{account.provider_name} account (#{account.username})"
+      account.update!(participant: primary) if execute
     end
   end
 

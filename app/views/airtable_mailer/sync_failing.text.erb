@@ -1,0 +1,29 @@
+Hi <%= @first_name %>,
+
+The Airtable sync for <%= @event.name %> has failed <%= pluralize(@failures, "time") %> in a row.
+Attend is still retrying every 5 minutes, because errors like this are usually
+Airtable rate limiting the base or having an outage, which clear up by
+themselves. If the error below looks like something else, the settings may
+need fixing.
+
+You're getting this because you were the last person to save the Airtable
+settings for this event.
+
+What Airtable said:
+
+<%= @error_message %>
+
+If it doesn't recover, check that nothing else is sending a lot of requests to
+the same base, and look at https://status.airtable.com.
+
+<%= @integrations_url %>
+
+<% if @last_synced_at %>
+Last successful sync was <%= @last_synced_at.strftime("%b %-d, %Y at %-I:%M %p %Z") %> -- Airtable still shows that data.
+<% else %>
+This integration has never synced successfully.
+<% end %>
+
+We'll only email again if it fails for a while after its next successful sync.
+
+If you're not the right person for this any more, just reply and we'll sort it out.

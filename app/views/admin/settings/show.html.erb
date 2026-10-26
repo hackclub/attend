@@ -1,7 +1,7 @@
 <div class="max-w-4xl mx-auto px-4 py-6">
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-3xl font-bold">Global Settings</h1>
-    <%= link_to "Incident Report Settings →", admin_incident_settings_path,
+    <%= link_to "Incident Report Settings →", admin_incident_report_settings_path,
           class: "text-sm font-medium text-[#ec3750] hover:text-[#d42f46]" %>
   </div>
 
@@ -187,6 +187,55 @@
               disabled: @admin_help_slack_channel_id.blank?,
               class: "px-4 py-2 bg-[#d42f46] hover:bg-[#b82840] text-white rounded-md font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
               data: { turbo_confirm: "Invite all #{@admin_help_member_count - @admin_help_members_without_slack} people with Slack accounts to the channel?" } %>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="text-xl font-bold mt-8 mb-4">Org Support Slack Channel</h2>
+
+  <div class="bg-white border border-gray-200 rounded-lg ">
+    <div class="p-6 border-b border-gray-200">
+      <h3 class="text-lg font-semibold">Channel</h3>
+      <p class="text-gray-600 text-sm mt-1 mb-3">
+        Every kind of admin: global admins and global read-only users, plus anyone with any role on an event or its series
+        (Limited and Read Only included), from when they get the role until 7 days after the event ends. People Attend added are
+        removed daily once that's passed; anyone who joined on their own is never removed. The Attend Slack bot must be in the
+        channel, with permission to remove people.
+      </p>
+      <%= form_with url: update_org_support_slack_channel_admin_settings_path, method: :post, class: "flex flex-wrap items-center gap-2" do |f| %>
+        <%= f.text_field :org_support_slack_channel_id,
+              value: @org_support_slack_channel_id,
+              placeholder: "C0123ABCD",
+              class: "px-3 py-2 border border-gray-300 rounded-md text-sm font-mono focus:ring-2 focus:ring-[#ec3750] focus:border-[#ec3750]" %>
+        <%= f.submit "Save", class: "px-4 py-2 bg-[#d42f46] hover:bg-[#b82840] text-white rounded-md font-medium transition-colors cursor-pointer" %>
+      <% end %>
+    </div>
+
+    <div class="p-6">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h3 class="text-lg font-semibold">Sync All Admins</h3>
+          <p class="text-gray-600 text-sm mt-1">
+            <%= pluralize(@org_support_member_count, "eligible person", plural: "eligible people") %>,
+            <%= @org_support_members_without_slack %> without a Slack account linked through Hack Club Auth (they can't be invited).
+          </p>
+          <% if @org_support_last_sync["at"].present? %>
+            <p class="text-gray-500 text-sm mt-1">
+              Last synced <%= time_ago_in_words(Time.zone.parse(@org_support_last_sync["at"])) %> ago:
+              <%= @org_support_last_sync["added"] %> added,
+              <%= @org_support_last_sync["already_member"] %> already in the channel,
+              <%= @org_support_last_sync["removed"] %> removed,
+              <%= @org_support_last_sync["failed"] %> failed,
+              <%= @org_support_last_sync["no_slack"] %> without Slack<% if @org_support_last_sync["not_in_workspace"].to_i.positive? %>,
+              <%= @org_support_last_sync["not_in_workspace"] %> not in this Slack workspace<% end %>.
+            </p>
+          <% end %>
+        </div>
+        <%= button_to "Sync to channel", sync_org_support_slack_channel_admin_settings_path,
+              method: :post,
+              disabled: @org_support_slack_channel_id.blank?,
+              class: "px-4 py-2 bg-[#d42f46] hover:bg-[#b82840] text-white rounded-md font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+              data: { turbo_confirm: "Invite all #{@org_support_member_count - @org_support_members_without_slack} people with Slack accounts to the channel, and remove anyone Attend added whose events ended over 7 days ago?" } %>
       </div>
     </div>
   </div>

@@ -97,7 +97,7 @@ module Exports
                           includes: :participant, extractor: ->(pe) { pe.participant.public_send(attr) })
     end
     fields << Field.new(key: "participant.age_at_event", label: "Age at Event Start", category: "basic", type: :string,
-                        includes: :participant, extractor: ->(pe) { pe.participant.age_on(pe.event.starts_at&.to_date || Date.current) })
+                        includes: :participant, extractor: ->(pe) { pe.participant.age_on(pe.event.local_start_date || Date.current) })
     fields << Field.new(key: "participant.engagement_preference", label: "Engagement Preference", category: "basic", type: :enum,
                         enum_values: Participant.engagement_preferences.keys, includes: :participant,
                         extractor: ->(pe) { pe.participant.engagement_preference })
@@ -342,6 +342,7 @@ module Exports
           participant.full_legal_name participant.email
           dietary.diet_type dietary.intolerances dietary.life_threatening_allergies
           dietary.cross_contamination_risk dietary.notes
+          medical.has_anaphylaxis_risk
         ]
       },
       "medical_flags" => {

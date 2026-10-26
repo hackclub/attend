@@ -27,8 +27,8 @@ info:
       when issued, in which case it reaches only the endpoints that accept
       that scope and returns `403` everywhere else, read-only endpoints
       included. An unscoped token carries its owner's full access. Scopes are
-      noted on the endpoints that accept them; the only one today is
-      `bans:write`.
+      noted on the endpoints that accept them: `bans:write` and
+      `support:read`.
     - **Series API key** — one key for a whole event series, issued from
       **Series → API Keys** in the dashboard by a series owner. Does **not** set
       a current user. It acts as an event API key on *every* event in its
@@ -239,6 +239,66 @@ paths:
               schema: { $ref: "#/components/schemas/UserProfile" }
         "401":
           description: Unauthorized.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /users/lookup:
+    get:
+      tags: [Account]
+      summary: Look up an event admin by Slack ID
+      x-mint:
+        href: /api-reference/account/look-up-an-event-admin-by-slack-id
+      description: >-
+        Global admins only. Finds a member of the admin help Slack channel by
+        the Slack ID Hack Club Auth verified (the profile override is ignored)
+        and lists the events they run that haven't ended: those where they are
+        an event admin, ops or safeguarding lead, plus every event in a series
+        they belong to. Global admin access on its own lists no events.
+
+
+        Reachable by a global API token scoped to `support:read`.
+      parameters:
+        - name: slack_id
+          in: query
+          required: true
+          schema: { type: string, example: U0123ABCDEF }
+      responses:
+        "200":
+          description: The user and their events, ordered by start date.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      name: { type: string }
+                      email: { type: string, format: email }
+                      global_admin: { type: boolean }
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        slug: { type: string }
+                        starts_at: { type: string, format: date-time, nullable: true }
+                        ends_at: { type: string, format: date-time, nullable: true }
+                        dashboard_url: { type: string, format: uri }
+        "422":
+          description: slack_id is required.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: More than one user carries that verified Slack ID.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -1023,6 +1083,14 @@ paths:
         legal names that are replaced from their account on first sign-in.
 
 
+        `date_of_birth`, `phone` and `country` are optional too. Everything sent
+        is stored on the participant and used to prefill the Hack Club Auth
+        signup form when they open the invitation and don't have an account
+        yet. If the email already belongs to someone Attend knows (from another
+        event), only the fields they have no value for are filled in; nothing
+        they entered is overwritten.
+
+
         While the event is holding onboarding invitations
         (`modules.onboarding_invites_held`), the invitation is recorded but not
         emailed: it goes out when the event's held invitations are released
@@ -1042,6 +1110,13 @@ paths:
                 email: { type: string, format: email }
                 first_name: { type: string }
                 last_name: { type: string }
+                date_of_birth: { type: string, format: date, example: "2009-04-02" }
+                phone:
+                  type: string
+                  description: E.164 format, e.g. +12025550100
+                country:
+                  type: string
+                  description: ISO 3166-1 alpha-2 code (e.g. `US`) or the country's English name.
       responses:
         "201":
           description: Invitation enqueued, or recorded as held.
@@ -1123,14 +1198,34 @@ paths:
       x-mint:
         href: /api-reference/participants/look-up-a-registration-by-email
       description: >-
-        Read-only check of whether an email is registered for the event. Safe
-        to call on every sign-in; never mutates. Available to event API keys.
+        Read-only check of whether an email or Slack ID is registered for the
+        event. Pass exactly one of `email` or `slack_id`; sending both is a
+        422. The response echoes whichever one was matched on and leaves the
+        other null. Safe to call on every sign-in; never mutates. Looking up
+        by `email` is available to event and series API keys and to global
+        API tokens scoped to `support:read`. Looking up by `slack_id` is for
+        the support bot only: it needs a global API token that permits
+        `support:read`, and any other caller gets a 403.
+        `admin_url` links to the registration's admin page;
+        `participant_event_id` is the id
+        `GET /events/{event_id}/participants/{id}` takes.
       parameters:
         - $ref: "#/components/parameters/EventId"
         - name: email
           in: query
-          required: true
+          required: false
           schema: { type: string, format: email }
+        - name: slack_id
+          in: query
+          required: false
+          description: >-
+            Matches only the Slack ID Hack Club Auth verified for the
+            participant's account, case-insensitively. Slack IDs typed onto a
+            profile or registration are ignored, so someone who has never
+            signed in to Attend can't be found this way. Requires a global API
+            token that permits `support:read`; event and series API keys get
+            a 403.
+          schema: { type: string, example: U0123ABCDEF }
       responses:
         "200":
           description: Lookup result.
@@ -1139,19 +1234,33 @@ paths:
               schema:
                 type: object
                 properties:
-                  email: { type: string, format: email }
+                  email: { type: string, format: email, nullable: true }
+                  slack_id: { type: string, nullable: true }
                   registered: { type: boolean }
-                  participant_id: { type: integer, nullable: true }
+                  participant_id: { type: string, format: uuid, nullable: true }
+                  participant_event_id: { type: string, format: uuid, nullable: true }
+                  admin_url: { type: string, format: uri, nullable: true }
                   status:
                     allOf: [{ $ref: "#/components/schemas/ParticipantStatus" }]
                     nullable: true
         "422":
-          description: Email is required.
+          description: Neither or both of email and slack_id were sent.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: More than one registration matches that Slack ID.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+        "403":
+          description: >-
+            The caller can't reach this event, or sent `slack_id` without a
+            global API token that permits `support:read`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /events/{event_id}/participants/roster:
@@ -1227,6 +1336,13 @@ paths:
         Date of birth and phone number are writable by every caller that gets
         this far, including API keys and PII-restricted roles, which cannot
         read them back: the response is redacted exactly as a read would be.
+
+        To backfill details without overwriting anything the participant
+        entered themselves, send `fill_blanks: true`. Only fields that are
+        empty (or legal names still on the "Unknown" placeholder) are written,
+        and the response lists the fields that were left alone in
+        `skipped_fields`. Find the registration id for an email with the
+        lookup endpoint.
       parameters:
         - $ref: "#/components/parameters/EventId"
         - $ref: "#/components/parameters/RegistrationId"
@@ -1240,6 +1356,10 @@ paths:
                 status:
                   type: string
                   enum: [invited, in_progress, awaiting_guardian, complete, withdrawn, rejected]
+                fill_blanks:
+                  type: boolean
+                  default: false
+                  description: Only write participant fields that have no value yet.
                 participant:
                   type: object
                   properties:
@@ -1253,6 +1373,9 @@ paths:
                       description: E.164 format, e.g. +12025550100
                     pronouns: { type: string }
                     tshirt_size: { type: string }
+                    country_of_residence:
+                      type: string
+                      description: ISO 3166-1 alpha-2 code (e.g. `US`) or the country's English name.
       responses:
         "200":
           description: The updated participant.
@@ -1262,6 +1385,12 @@ paths:
                 type: object
                 properties:
                   participant: { $ref: "#/components/schemas/Participant" }
+                  skipped_fields:
+                    type: array
+                    items: { type: string }
+                    description: >-
+                      Only with `fill_blanks`: the fields sent that already had
+                      a value, so were not written.
         "422":
           description: >-
             Nothing to update, an unknown status, or the model rejected the

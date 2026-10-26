@@ -26,7 +26,9 @@ module Admin
         # preload (not includes): the string order on participants.legal_last_name
         # would otherwise flip every association into one giant eager-load LEFT JOIN.
         @participant_events = policy_scope(current_event.participant_events)
-          .preload(:participant, :event, :travel_inbound, :travel_outbound, :accommodation, :medical, :safeguarding_info, :dietary, :accessibility, :consents, :emergency_contacts, :groups, guardian_participant_events: :emergency_contacts)
+          .preload(:participant, :event, :travel_inbound, :travel_outbound, :accommodation, :medical, :safeguarding_info, :dietary, :accessibility, :consents, :emergency_contacts, :groups, guardian_participant_events: :emergency_contacts, latest_placing_scan: :scan_context)
+        # Once the event has ended the status cell asks whether each row ever checked in.
+        @participant_events = @participant_events.preload(scans: :scan_context) if current_event.phase_at == :ended
 
         if params[:search].present?
           search_term = "%#{ActiveRecord::Base.sanitize_sql_like(params[:search])}%"
@@ -61,6 +63,8 @@ module Admin
           @participant_events = @participant_events.joins(:safeguarding_info).where(safeguarding_infos: { high_support_flag: true })
         when "anaphylaxis"
           @participant_events = @participant_events.joins(:medical).where(medicals: { has_anaphylaxis_risk: true })
+        when "over_age_limit"
+          @participant_events = @participant_events.where(id: over_age_limit_ids(@participant_events))
         end
       end
 
@@ -155,7 +159,6 @@ module Admin
       @safeguarding_info = @participant_event.safeguarding_info
       @consents = @participant_event.consents
       @guardian_participant_events = @participant_event.guardian_participant_events.includes(:guardian)
-      @notes = @participant_event.notes.includes(:author).order(created_at: :desc)
       @scans = @participant_event.scans.includes(:user, :scan_context).recent.limit(3)
       @emergency_contacts = emergency_contacts_for_profile
     end
@@ -387,18 +390,7 @@ module Admin
 
       waiver_consent = @participant_event.consents.find_by(consent_type: :waiver)
       if waiver_consent
-        waiver_consent.update!(
-          status: :pending,
-          docuseal_envelope_id: nil,
-          docuseal_guardian_slug: nil,
-          docuseal_participant_slug: nil,
-          docuseal_template_id: nil,
-          guardian_signed_at: nil,
-          participant_signed_at: nil,
-          signed_at: nil,
-          document_url: nil,
-          failure_reason: nil
-        )
+        waiver_consent.reset_for_reissue!
 
         reopen_guardian_portal_access
         send_waiver_reset_email(waiver_type: :waiver)
@@ -421,20 +413,8 @@ module Admin
 
       freedom_waiver_consent = @participant_event.consents.find_by(consent_type: :freedom_waiver)
       if freedom_waiver_consent
-        freedom_waiver_consent.update!(
-          status: :pending,
-          docuseal_envelope_id: nil,
-          docuseal_guardian_slug: nil,
-          docuseal_participant_slug: nil,
-          docuseal_template_id: nil,
-          guardian_signed_at: nil,
-          participant_signed_at: nil,
-          signed_at: nil,
-          document_url: nil,
-          failure_reason: nil
-        )
-
-        @participant_event.safeguarding_info&.update!(freedom_waiver_granted: false)
+        # Also clears safeguarding_info.freedom_waiver_granted.
+        freedom_waiver_consent.reset_for_reissue!
 
         reopen_guardian_portal_access
         send_waiver_reset_email(waiver_type: :freedom_waiver)
@@ -526,7 +506,6 @@ module Admin
 
     def notes
       authorize @participant_event, :view_notes?
-      @notes = @participant_event.notes.includes(:author).order(created_at: :desc)
     end
 
     def history
@@ -552,7 +531,7 @@ module Admin
       keys << [ "TravelLeg", TravelLeg.where(travel_id: pe.travels.pluck(:id)).pluck(:id) ]
       keys << [ "Consent", pe.consents.pluck(:id) ]
       keys << [ "RegistrationChangeRequest", pe.registration_change_requests.pluck(:id) ]
-      keys << [ "Note", pe.notes.pluck(:id) ]
+      keys << [ "Note", policy_scope(pe.notes).pluck(:id) ]
       keys << [ "EmergencyContact", EmergencyContact.where(participant_event_id: pe.id).or(EmergencyContact.where(guardian_participant_event_id: gpe_ids)).pluck(:id) ]
       keys << [ "RoomAssignment", Array(pe.room_assignment&.id) ]
       keys << [ "RoommatePreference", pe.roommate_preferences.pluck(:id) ]
@@ -616,6 +595,9 @@ module Admin
       @participant_event.withdrawn!
       redirect_to admin_event_participant_path(current_event, @participant_event),
         notice: "#{@participant_event.participant.display_name} has been marked as withdrawn."
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
+      redirect_to admin_event_participant_path(current_event, @participant_event),
+        alert: "Couldn't withdraw #{@participant_event.participant.display_name} — nothing was changed: #{e.message}"
     end
 
     def unwithdraw
@@ -625,6 +607,9 @@ module Admin
       @participant_event.in_progress!
       redirect_to admin_event_participant_path(current_event, @participant_event),
         notice: "#{@participant_event.participant.display_name} has been reinstated."
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
+      redirect_to admin_event_participant_path(current_event, @participant_event),
+        alert: "Couldn't reinstate #{@participant_event.participant.display_name} — nothing was changed: #{e.message}"
     end
 
     def destroy
@@ -982,6 +967,21 @@ module Admin
       end
     end
 
+    # Evaluated in Ruby, like the blocking stages, so the list matches
+    # ParticipantEvent#too_old_for_event? to the day, leap-day birthdays
+    # included.
+    def over_age_limit_ids(scope)
+      # Only the birthday is needed here; the roster preloads are run once,
+      # on the filtered set.
+      scope.unscope(:preload, :includes, :eager_load, :order)
+           .select(:id, :participant_id, :event_id)
+           .preload(:participant)
+           .filter_map do |pe|
+        pe.association(:event).target = current_event
+        pe.id if pe.too_old_for_event?
+      end
+    end
+
     def active_participant_events(scope)
       scope.to_a.reject { |pe| SeriesDashboard::INACTIVE_STATUSES.include?(pe.status) }.each do |pe|
         # onboarding_progress asks the event about accommodation, freedom waivers
@@ -1012,7 +1012,7 @@ module Admin
     def set_participant_header_data
       @participant = @participant_event.participant
       @safeguarding_info = @participant_event.safeguarding_info
-      @notes = @participant_event.notes.includes(:author).order(created_at: :desc)
+      @notes = policy_scope(@participant_event.notes).includes(:author).order(created_at: :desc)
     end
 
     def participant_params
@@ -1310,7 +1310,7 @@ module Admin
     end
 
     def apply_age_filter(scope, operator, value)
-      event_date = current_event.starts_at&.to_date || Date.current
+      event_date = current_event.local_start_date || Date.current
       birth_date = event_date - value.to_i.years
 
       case operator
@@ -1349,7 +1349,7 @@ module Admin
     end
 
     def apply_minor_filter(scope, operator, value)
-      event_date = current_event.starts_at&.to_date || Date.current
+      event_date = current_event.local_start_date || Date.current
       adult_birth_date = event_date - 18.years
       is_minor = value == "true"
 
@@ -1513,7 +1513,7 @@ module Admin
       when "tshirt_size"
         scope.group_by { |pe| pe.participant.tshirt_size || "Not set" }
       when "is_minor"
-        event_date = current_event.starts_at&.to_date || Date.current
+        event_date = current_event.local_start_date || Date.current
         scope.group_by { |pe| pe.participant.minor_on?(event_date) ? "Minor" : "Adult" }
       when "onboarding_complete"
         scope.group_by { |pe| pe.onboarding_complete? ? "Complete" : "Incomplete" }
@@ -1607,7 +1607,7 @@ module Admin
       end
 
       return "#{participant.email} is bouncing — correct their email address before resending." if participant.email_undeliverable?
-      return "#{participant.email} is banned from events and cannot be invited." if Ban.banned?(participant.email)
+      return "#{participant.email} is banned from events and cannot be invited." if Ban.banned?(participant.email, slack_ids: Ban.slack_ids_for(participant))
 
       nil
     end
@@ -1700,9 +1700,7 @@ module Admin
     def reopen_guardian_portal_access
       return unless @participant_event.requires_guardian?
 
-      @participant_event.guardian_participant_events.each do |gpe|
-        gpe.update!(status: :in_progress) if gpe.completed?
-      end
+      @participant_event.reopen_guardian_portal_access!
     end
   end
 end

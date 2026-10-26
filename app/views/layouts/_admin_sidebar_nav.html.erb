@@ -82,7 +82,7 @@
         <% end %>
       <% end %>
 
-      <%= link_to admin_event_incidents_path(current_event), class: "nav-item #{request.path.include?('/incidents') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+      <%= link_to admin_event_incidents_path(current_event), class: "nav-item #{request.path.start_with?(admin_event_incidents_path(current_event)) ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
         </svg>
@@ -166,34 +166,26 @@
           Users
         <% end %>
 
-        <% conduct_active = request.path.start_with?('/admin/bans') || request.path.start_with?('/admin/incidents') %>
-        <details class="group" <%= "open" if conduct_active %>>
-          <summary class="nav-item w-full cursor-pointer list-none <%= "nav-item-active" if conduct_active %>">
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            Conduct
-            <svg class="h-4 w-4 ml-auto !mr-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-            </svg>
-          </summary>
+        <%= link_to admin_training_path, class: "nav-item #{request.path.start_with?('/admin/training') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"/>
+          </svg>
+          Training
+        <% end %>
 
-          <div class="mt-0.5 ml-3 space-y-0.5 border-l border-[#e5e7eb] pl-2">
-            <%= link_to admin_bans_path, class: "nav-item #{request.path.start_with?('/admin/bans') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
-              </svg>
-              Ban List
-            <% end %>
+        <%= link_to admin_incident_reports_path, class: "nav-item #{request.path.start_with?('/admin/incidents') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2z"/>
+          </svg>
+          Incidents
+        <% end %>
 
-            <%= link_to admin_incidents_path, class: "nav-item #{request.path.start_with?('/admin/incidents') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19H19a2 2 0 001.75-2.96l-6.93-12a2 2 0 00-3.5 0l-6.93 12A2 2 0 005.07 19z"/>
-              </svg>
-              Incident Reports
-            <% end %>
-          </div>
-        </details>
+        <%= link_to admin_bans_path, class: "nav-item #{request.path.start_with?('/admin/bans') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+          </svg>
+          Conduct Bans
+        <% end %>
 
         <% logs_active = request.path.start_with?('/admin/audit_logs') || request.path.start_with?('/admin/email_logs') %>
         <details class="group" <%= "open" if logs_active %>>

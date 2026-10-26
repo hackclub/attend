@@ -1,0 +1,31 @@
+<%= form_with model: badge, url: (badge.persisted? ? admin_training_badge_path(badge) : admin_training_badges_path), class: "space-y-6", html: { multipart: true } do |f| %>
+  <%= render "admin/training/errors", record: badge %>
+  <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+    <div><%= f.label :name, class: "block text-sm font-medium text-gray-700" %><%= f.text_field :name, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+    <div><%= f.label :description, class: "block text-sm font-medium text-gray-700" %><%= f.text_area :description, rows: 3, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+    <div>
+      <%= f.label :image, "Artwork (square PNG, JPEG or WebP, up to 5 MB)", class: "block text-sm font-medium text-gray-700" %>
+      <% if badge.image.attached? && badge.persisted? %>
+        <div class="flex items-center gap-3 my-2">
+          <%= image_tag badge.image, alt: "", class: "size-16 rounded-xl object-contain border border-gray-200" %>
+          <label class="inline-flex items-center gap-2 text-sm"><%= check_box_tag "training_badge[remove_image]", "1", false %> Remove artwork</label>
+        </div>
+      <% end %>
+      <%= f.file_field :image, accept: TrainingBadge::IMAGE_CONTENT_TYPES.join(","), class: "mt-1 text-sm" %>
+    </div>
+    <div><%= f.label :validity_months, "Valid for (months) — blank never expires", class: "block text-sm font-medium text-gray-700" %><%= f.number_field :validity_months, min: 1, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-3">
+    <h2 class="text-lg font-medium text-gray-900">Required for</h2>
+    <p class="text-sm text-gray-500">People in these roles show as untrained on an event's staff page until they hold a current badge.</p>
+    <%= hidden_field_tag "training_badge[required_roles][]", "" %>
+    <label class="flex items-center gap-2 text-sm font-medium"><%= check_box_tag "training_badge[required_roles][]", TrainingBadge::EVERYONE, badge.required_of_everyone?, id: "required_role_everyone" %> Everyone working an event (every role, volunteers and series members — overrides the rest)</label>
+    <% TrainingBadge::REQUIRABLE_ROLES.each do |role| %>
+      <label class="flex items-center gap-2 text-sm"><%= check_box_tag "training_badge[required_roles][]", role, badge.required_roles.include?(role), id: "required_role_#{role}" %> <%= TrainingBadge.role_label(role) %></label>
+    <% end %>
+  </div>
+  <div class="flex justify-end gap-2">
+    <%= link_to "Cancel", (badge.persisted? ? admin_training_badge_path(badge) : admin_training_path), class: "px-4 py-2 text-sm text-gray-600" %>
+    <%= f.button (badge.persisted? ? "Save Badge" : "Create Badge"), class: "px-4 py-2 bg-[#d42f46] text-white rounded-md text-sm hover:bg-[#b82840]" %>
+  </div>
+<% end %>

@@ -113,6 +113,44 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#verified_slack_id" do
+    it "keeps a plain, upcased copy of the Hack Club Auth Slack ID in step with the claims" do
+      user = create(:user, oidc_claims: { "slack_id" => " u123abc " })
+      expect(user.reload.verified_slack_id).to eq("U123ABC")
+
+      user.update!(oidc_claims: { "slack_id" => "U1,U2" })
+      expect(user.reload.verified_slack_id).to be_nil
+    end
+
+    it "ignores the profile override" do
+      user = create(:user, slack_user_id: "U999XYZ")
+      expect(user.verified_slack_id).to be_nil
+    end
+
+    it "heals a stale copy on the next save even though the claims are unchanged" do
+      user = create(:user, oidc_claims: { "slack_id" => "U0FAKE111" })
+      # A write that skipped the callback (old code mid-deploy, a missed backfill)
+      user.update_column(:verified_slack_id, nil)
+
+      user.update!(name: "Testy McTestface")
+      expect(user.reload.verified_slack_id).to eq("U0FAKE111")
+
+      user.update_column(:verified_slack_id, "U0WRONG99")
+      user.save!
+      expect(user.reload.verified_slack_id).to eq("U0FAKE111")
+    end
+
+    it "does not write the column when the copy already matches" do
+      user = create(:user, oidc_claims: { "slack_id" => "U0FAKE111" })
+      user.reload
+
+      user.name = "Testy McTestface"
+      expect(user).to receive(:verified_slack_id=).never
+      user.save!
+      expect(user.saved_changes).not_to have_key("verified_slack_id")
+    end
+  end
+
   describe "#sync_email_to_participant" do
     let(:user) { create(:user, email: "new@example.com") }
     let!(:participant) { create(:participant, user: user, email: "old@example.com") }
@@ -186,6 +224,16 @@ RSpec.describe User, type: :model do
         "slack_id" => "U07BLJ1MBEE"
       )
       expect(user.oidc_claims["address"]).to include("locality" => "Shelburne")
+    end
+
+    it "repairs a stale verified_slack_id on sign-in when the claims haven't changed" do
+      user = User.from_omniauth(auth_hash("identity" => identity))
+      expect(user.verified_slack_id).to eq("U07BLJ1MBEE")
+      user.update_column(:verified_slack_id, nil)
+
+      User.from_omniauth(auth_hash("identity" => identity))
+
+      expect(user.reload.verified_slack_id).to eq("U07BLJ1MBEE")
     end
 
     it "prefers the identity record's names when HCA returns both" do

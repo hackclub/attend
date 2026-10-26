@@ -7,11 +7,37 @@
     </div>
     <div class="cs-actions">
       <% if current_user.global_admin? && @user != current_user %>
-        <%= button_to "Impersonate", admin_user_impersonation_path(@user), method: :post, class: "cs-btn cs-btn-full", data: { confirm: "You will be signed in as #{@user.display_name_or_fallback}. Continue?" } %>
+        <%= button_to "Impersonate", admin_user_impersonation_path(@user), method: :post, class: "cs-btn cs-btn-full", form: { data: { turbo_confirm: "You will be signed in as #{@user.display_name_or_fallback}. Continue?" } } %>
       <% end %>
       <%= link_to "Edit", edit_admin_user_path(@user), class: "cs-btn cs-btn-primary cs-btn-full" %>
     </div>
   </div>
+
+  <% if @active_bans.any? %>
+    <section class="cs-alert cs-alert-error" data-testid="user-ban-alert">
+      <%= cs_status_icon(:error) %>
+      <div class="flex-1 min-w-0">
+        <p class="cs-alert-title">This user is on the ban list</p>
+        <p>They are blocked from being added to any event. <%= link_to "Open the ban list", admin_bans_path, class: "cs-link" %>.</p>
+        <ul class="mt-2 space-y-1">
+          <% @active_bans.each do |ban| %>
+            <li>
+              <%= link_to admin_ban_path(ban), class: "cs-link" do %>
+                <%= ban.reason.presence || "No reason recorded" %>
+              <% end %>
+              <span class="cs-muted">
+                — matched on <%= ban.identifiers_matching(@user).join(", ") %>,
+                <%= ban.expires_at ? "expires #{l(ban.expires_at, format: :long)}" : "indefinite" %>
+              </span>
+              <% if ban.ucat? && ban.ucat_cases.any? %>
+                <span class="cs-muted">— UCAT <%= "case".pluralize(ban.ucat_case_links.size) %>: <%= render "admin/bans/ucat_cases", ban: ban, link_class: "cs-link" %></span>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    </section>
+  <% end %>
 
   <section class="cs-container">
     <div class="cs-container-header">
@@ -185,6 +211,8 @@
       </div>
     <% end %>
   </div>
+
+  <%= render "admin/users/training", user: @user, awards: @training_awards, enrollments: @training_enrollments, disclosure: @training_disclosure %>
 
   <% if @event_role_assignments.any? %>
     <section class="cs-container">

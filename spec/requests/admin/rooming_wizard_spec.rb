@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Admin::RoomingWizard", type: :request do
   include Devise::Test::IntegrationHelpers
 
-  let(:admin) { User.create!(email: "admin-rooming@example.com", name: "Admin", global_role: "global_admin") }
+  let(:admin) { User.create!(email: "admin-rooming@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
   let(:event) { create(:event) }
   let!(:rooming_plan) do
     event.create_rooming_plan!(created_by_user: admin, room_capacity: 2, status: :draft)
@@ -161,6 +161,27 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
           expect(stream["action"]).to eq("update")
         end
       end
+    end
+  end
+
+  describe "GET finalize" do
+    it "shows people scanned at a Lodging point as arrived" do
+      lodging = event.scan_contexts.create!(name: "Hotel lobby", kind: "lodging")
+      lunch = event.scan_contexts.create!(name: "Lunch", kind: "tracking_only")
+      arrived = create(:participant_event, event: event, participant: create(:participant, legal_first_name: "Arrived"))
+      lunching = create(:participant_event, event: event, participant: create(:participant, legal_first_name: "Lunching"))
+      room = event.rooms.create!(capacity: 2)
+      RoomAssignment.create!(room: room, participant_event: arrived)
+      RoomAssignment.create!(room: room, participant_event: lunching)
+      Scan.create!(participant_event: arrived, scan_context: lodging, user: admin, scanned_at: Time.current)
+      Scan.create!(participant_event: lunching, scan_context: lunch, user: admin, scanned_at: Time.current)
+
+      get finalize_admin_event_rooming_wizard_path(event.slug)
+
+      expect(response).to have_http_status(:ok)
+      tokens = Nokogiri::HTML(response.body).css("span.rounded-full").to_h { |token| [ token.text[/\A\s*(\S+)/, 1], token[:class] ] }
+      expect(tokens.fetch("Arrived")).to include("bg-green-100")
+      expect(tokens.fetch("Lunching")).not_to include("bg-green-100")
     end
   end
 end

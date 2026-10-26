@@ -3,6 +3,16 @@
 <div>
   <%= render "header" %>
 
+  <% if @participant_event.too_old_for_event? %>
+    <div class="cs-alert cs-alert-warning mb-5" data-testid="over-age-limit">
+      <%= cs_status_icon(:warning) %>
+      <div>
+        <p class="cs-alert-title">19 or older during this event</p>
+        <p>Their date of birth ages them out by <%= current_event.local_end_date.strftime("%B %-d, %Y") %>, so onboarding won't let them past their profile. If it's a typo, correct it here or approve their change request; otherwise withdraw them.</p>
+      </div>
+    </div>
+  <% end %>
+
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
     <div class="lg:col-span-2 cs-stack">
       <section class="cs-container">
@@ -54,7 +64,7 @@
                 send_travel_update_reminder_admin_event_participant_path(current_event, @participant_event),
                 method: :post,
                 class: "cs-btn",
-                data: { confirm: "Send a travel update reminder email to #{@participant.email}?" } %>
+                form: { data: { turbo_confirm: "Send a travel update reminder email to #{@participant.email}?" } } %>
             <%= link_to "Edit", travel_admin_event_participant_path(current_event, @participant_event), class: "cs-btn" %>
           </div>
         </div>
@@ -70,7 +80,7 @@
                       <% first_leg = @travel_inbound.travel_legs.first %>
                       <% last_leg = @travel_inbound.travel_legs.last %>
                       <div><dt class="cs-kv-label">From</dt><dd class="cs-kv-value"><%= first_leg.departure_airport %></dd></div>
-                      <div><dt class="cs-kv-label">Arrival</dt><dd class="cs-kv-value"><%= safe_join([ cs_absolute_time_tag(last_leg.arrival_time, zone: FlightTrackingService.airport_timezone(last_leg.arrival_airport)), last_leg.arrival_airport.presence ].compact, " - ") %></dd></div>
+                      <div><dt class="cs-kv-label">Arrival</dt><dd class="cs-kv-value"><%= safe_join([ cs_absolute_time_tag(last_leg.local_arrival_time, zone: last_leg.local_arrival_time&.time_zone), last_leg.arrival_airport.presence ].compact, " - ") %></dd></div>
                       <div><dt class="cs-kv-label">Flight</dt><dd class="cs-kv-value"><%= first_leg.flight_code %></dd></div>
                     <% elsif @travel_inbound.car? %>
                       <div><dt class="cs-kv-label">From</dt><dd class="cs-kv-value">
@@ -101,7 +111,7 @@
                       <% first_leg = @travel_outbound.travel_legs.first %>
                       <% last_leg = @travel_outbound.travel_legs.last %>
                       <div><dt class="cs-kv-label">To</dt><dd class="cs-kv-value"><%= last_leg.arrival_airport %></dd></div>
-                      <div><dt class="cs-kv-label">Departure</dt><dd class="cs-kv-value"><%= safe_join([ cs_absolute_time_tag(first_leg.departure_time, zone: FlightTrackingService.airport_timezone(first_leg.departure_airport)), first_leg.departure_airport.presence ].compact, " - ") %></dd></div>
+                      <div><dt class="cs-kv-label">Departure</dt><dd class="cs-kv-value"><%= safe_join([ cs_absolute_time_tag(first_leg.local_departure_time, zone: first_leg.local_departure_time&.time_zone), first_leg.departure_airport.presence ].compact, " - ") %></dd></div>
                       <div><dt class="cs-kv-label">Flight</dt><dd class="cs-kv-value"><%= first_leg.flight_code %></dd></div>
                     <% elsif @travel_outbound.car? %>
                       <div><dt class="cs-kv-label">To</dt><dd class="cs-kv-value">
@@ -183,7 +193,7 @@
       <% end %>
 
       <% if policy(@medical || Medical.new(participant_event: @participant_event)).show? %>
-        <section class="cs-container">
+        <section class="cs-container" data-testid="medical-summary">
           <div class="cs-container-header">
             <h2 class="cs-h2">Medical summary</h2>
             <div class="cs-actions">
@@ -191,18 +201,26 @@
             </div>
           </div>
           <div class="cs-container-body">
-            <% if @medical %>
+            <% food_safety = @participant_event.food_safety_summary %>
+            <%# Dietary flags show without a Medical record, but only a Medical record can say there are none. %>
+            <% if @medical || food_safety.any_flags? %>
               <div class="flex flex-wrap gap-2">
-                <% if @medical.has_anaphylaxis_risk %>
+                <% if food_safety.anaphylaxis_risk? %>
                   <%= cs_status(:error, "Anaphylaxis risk") %>
                 <% end %>
-                <% if @medical.has_allergies? %>
+                <% if food_safety.life_threatening_food_allergies? %>
+                  <%= cs_status(:error, "Life-threatening food allergies") %>
+                <% end %>
+                <% if food_safety.cross_contamination_risk? %>
+                  <%= cs_badge("Cross-contamination risk", "red") %>
+                <% end %>
+                <% if food_safety.allergies? %>
                   <%= cs_badge("Has allergies", "red") %>
                 <% end %>
-                <% if @medical.needs_medication_storage? %>
+                <% if @medical&.needs_medication_storage? %>
                   <%= cs_badge("Needs refrigeration", "blue") %>
                 <% end %>
-                <% unless @medical.has_anaphylaxis_risk || @medical.has_allergies? || @medical.needs_medication_storage? %>
+                <% unless food_safety.any_flags? || @medical&.needs_medication_storage? %>
                   <span class="cs-muted">No special medical flags</span>
                 <% end %>
               </div>
@@ -386,24 +404,33 @@
         </section>
       <% end %>
 
-      <% if @participant_event.complete? %>
+      <% if @participant_event.complete? || @participant_event.participant.slack_user_id.present? %>
         <section class="cs-container">
           <div class="cs-container-header">
             <h2 class="cs-h2">Slack integration</h2>
           </div>
           <div class="cs-container-body">
             <% if @participant_event.participant.slack_user_id.present? %>
-              <div class="flex items-center gap-2 mb-3">
+              <div class="flex items-center gap-2 <%= "mb-3" if @participant_event.complete? %>">
                 <%= cs_status(:success, "Connected") %>
                 <%= link_to "slack://user?team=T0266FRGM&id=#{@participant_event.participant.slack_user_id}", class: "cs-link" do %><code class="cs-small"><%= @participant_event.participant.slack_user_id %></code><% end %>
+                <button type="button"
+                        data-controller="clipboard"
+                        data-clipboard-content-value="<%= @participant_event.participant.slack_user_id %>"
+                        data-action="click->clipboard#copy"
+                        class="cs-btn cs-btn-link">
+                  Copy
+                </button>
               </div>
-              <% if current_event.slack_channel_id.present? %>
-                <%= button_to "Invite to channel",
-                    invite_to_slack_channel_admin_event_participant_path(current_event, @participant_event),
-                    method: :post,
-                    class: "cs-btn" %>
-              <% else %>
-                <p class="cs-muted">No Slack channel configured for this event.</p>
+              <% if @participant_event.complete? %>
+                <% if current_event.slack_channel_id.present? %>
+                  <%= button_to "Invite to channel",
+                      invite_to_slack_channel_admin_event_participant_path(current_event, @participant_event),
+                      method: :post,
+                      class: "cs-btn" %>
+                <% else %>
+                  <p class="cs-muted">No Slack channel configured for this event.</p>
+                <% end %>
               <% end %>
             <% else %>
               <p class="cs-secondary mb-3">Participant has not linked their Slack account via Hack Club Auth.</p>

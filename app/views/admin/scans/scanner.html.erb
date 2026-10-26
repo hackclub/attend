@@ -27,22 +27,29 @@
             <span class="w-2 h-2 bg-gray-400 rounded-full" id="status-dot"></span>
             <span class="text-xs sm:text-sm text-gray-500" id="status-text">Initializing...</span>
           </div>
+          <button type="button" id="restart-camera-btn" class="hidden text-xs sm:text-sm text-[#ec3750] hover:text-blue-800 min-h-[44px] sm:min-h-0 px-1">
+            Restart camera
+          </button>
         </div>
         
-        <% if @scan_contexts.size > 1 %>
-          <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1" data-controller="role-info">
+          <% if @scan_contexts.size > 1 %>
             <label for="scan-context" class="text-xs sm:text-sm text-gray-500 whitespace-nowrap">Context:</label>
-            <select id="scan-context" class="border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]">
+            <select id="scan-context" data-role-info-target="select" data-action="role-info#update" class="border border-gray-300 rounded-md px-2 py-1 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750] aria-[invalid=true]:border-red-500 aria-[invalid=true]:ring-2 aria-[invalid=true]:ring-red-200" autocomplete="off" required aria-invalid="true" aria-describedby="scan-context-required">
+              <option value="" selected disabled>Choose a context</option>
               <% @scan_contexts.each do |context| %>
-                <option value="<%= context.id %>" <%= "selected" if context == @default_scan_context %>>
-                  <%= context.name %><%= " — Travel pickup" if context.is_travel_pickup? %><% if context.checks_in? %> ✓<% end %>
+                <option value="<%= context.id %>">
+                  <%= context.name %> — <%= context.kind_label %>
                 </option>
               <% end %>
             </select>
-          </div>
-        <% else %>
-          <input type="hidden" id="scan-context" value="<%= @default_scan_context&.id %>">
-        <% end %>
+          <% else %>
+            <input type="hidden" id="scan-context" value="<%= @scan_contexts.first&.id %>" data-role-info-target="select">
+          <% end %>
+          <% @scan_contexts.select { |context| context.usage_note.present? }.each do |context| %>
+            <p class="hidden w-full text-xs text-gray-500" data-role-info-target="panel" data-role="<%= context.id %>"><%= context.usage_note %></p>
+          <% end %>
+        </div>
       </div>
       
       <div class="flex items-center gap-2 mb-3 hidden" id="camera-select-wrapper">
@@ -58,11 +65,20 @@
                 class="hidden absolute inset-0 w-full h-full flex items-center justify-center text-white text-sm font-medium bg-gray-900/80">
           Tap to start camera
         </button>
+        <% if @scan_contexts.size > 1 %>
+          <div id="scan-context-required" class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 px-6 text-center text-white bg-gray-900">
+            <p class="text-sm sm:text-base font-semibold">Choose a context to start scanning</p>
+            <p class="text-xs sm:text-sm text-gray-300">Pick where you're scanning people in from the Context menu.</p>
+          </div>
+        <% end %>
       </div>
       
-      <div id="scan-result" class="mt-4 p-3 sm:p-4 rounded-lg hidden">
+      <%# Stays up until dismissed or replaced by the next result, so a busy %>
+      <%# organizer can always look back and see what their last scan did. %>
+      <div id="scan-result" class="mt-4 rounded-lg hidden" role="status" aria-live="polite">
         <!-- Scan result appears here -->
       </div>
+      <p id="scan-queue-note" class="mt-2 text-xs text-gray-500 hidden" aria-live="polite"></p>
 
       <!-- Search by name or ID -->
       <div class="mt-4 pt-4 border-t border-gray-200">
@@ -283,18 +299,51 @@ function groupBadgeHtml(group, fallbackColor) {
   // so repeat visits don't stack handlers over detached nodes.
   const pageListeners = new AbortController();
   const signal = pageListeners.signal;
+  // Shared with the NFC bridge below, which tears down on the same signal.
+  window.scannerPageSignal = signal;
 
   const scanUrl = '<%= admin_event_scans_path(current_event) %>';
   const searchUrl = '<%= search_admin_event_scans_path(current_event) %>';
   const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-  let scanner = null;
+  // The one camera stream we own, and the decode loop reading from it. Each
+  // (re)start bumps the generation so a loop left over from the last stream
+  // notices and exits instead of running alongside the new one.
+  let cameraStream = null;
+  let decodeTimer = null;
+  let decodeGeneration = 0;
+  let cameraStatus = ['Initializing...', 'loading'];
   let lastScannedCode = null;
   let scanCooldown = false;
   let searchTimeout = null;
+  // Scans that arrive while one is in flight or cooling down wait here rather
+  // than being dropped, so a tap on a search result is never lost.
+  const pendingScans = [];
 
   function getCurrentContextId() {
     const contextSelect = document.getElementById('scan-context');
     return contextSelect ? contextSelect.value : null;
+  }
+
+  // Staff must pick a context themselves: until they do, flag the selector
+  // and cover the camera with an empty state. Start from the placeholder even
+  // if the browser restored an earlier choice, since that fires no change.
+  const contextSelect = document.querySelector('select#scan-context');
+  if (contextSelect) {
+    contextSelect.value = '';
+    contextSelect.addEventListener('change', () => {
+      contextSelect.removeAttribute('aria-invalid');
+      contextSelect.removeAttribute('aria-describedby');
+      document.getElementById('scan-context-required')?.classList.add('hidden');
+      lastScannedCode = null;
+      startScannerOnce();
+    });
+  }
+
+  // Shows the "choose a context" error and returns null when none is picked.
+  function requireContextId() {
+    const scanContextId = getCurrentContextId();
+    if (!scanContextId) showResult('Choose a context before scanning', true);
+    return scanContextId;
   }
 
   function updateStatus(message, state = 'loading') {
@@ -309,33 +358,145 @@ function groupBadgeHtml(group, fallbackColor) {
     else dot.classList.add('bg-gray-400');
   }
 
+  // Camera state outlives a scan's "Processing..." flash, so remember it and
+  // put it back afterwards rather than claiming the camera is ready.
+  function updateCameraStatus(message, state) {
+    cameraStatus = [message, state];
+    if (!scanCooldown) updateStatus(message, state);
+  }
+
   function offerManualStart() {
     document.getElementById('start-camera-btn').classList.remove('hidden');
   }
 
   function stopScanner() {
-    if (scanner) scanner.reset();
-    scanner = null;
+    decodeGeneration++;
+    clearTimeout(decodeTimer);
+    if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
+    cameraStream = null;
+    const video = document.getElementById('qr-video');
+    if (video) video.srcObject = null;
   }
 
   function waitForZXing(timeoutMs = 8000) {
     return new Promise((resolve) => {
       const deadline = performance.now() + timeoutMs;
       (function poll() {
-        if (typeof ZXing !== 'undefined' && ZXing.BrowserQRCodeReader) return resolve();
+        if (typeof ZXing !== 'undefined' && ZXing.QRCodeReader) return resolve();
         if (performance.now() > deadline) return resolve();
         setTimeout(poll, 50);
       })();
     });
   }
 
-  function showResult(message, isError = false) {
+  const RESULT_TONES = {
+    success: 'bg-green-50 text-green-800 border border-green-200',
+    warning: 'bg-yellow-50 text-yellow-800 border border-yellow-200',
+    error: 'bg-red-50 text-red-700 border border-red-200'
+  };
+
+  // `tone` is 'success' / 'warning' / 'error'; true and false are still
+  // accepted (error / success) for the NFC bridge script below.
+  function showResult(message, tone = 'success', { detail = null, reload = false } = {}) {
+    if (tone === true) tone = 'error';
+    if (tone === false) tone = 'success';
     const result = document.getElementById('scan-result');
-    result.className = `mt-4 p-4 rounded-lg ${isError ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`;
-    result.textContent = message;
+    result.className = `mt-4 rounded-lg ${RESULT_TONES[tone] || RESULT_TONES.success}`;
+    result.innerHTML = html`
+      <div class="flex items-start gap-3 p-3 sm:p-4">
+        <div class="min-w-0 flex-1">
+          <p class="font-medium">${message}</p>
+          ${detail ? html`<p class="text-sm mt-0.5 opacity-90">${detail}</p>` : ''}
+          ${reload ? html`<button type="button" data-scan-result-reload class="mt-2 text-sm font-medium underline">Reload page</button>` : ''}
+        </div>
+        <button type="button" data-scan-result-dismiss aria-label="Dismiss" class="text-xl leading-none opacity-60 hover:opacity-100 min-h-[44px] min-w-[44px] -m-3 flex items-center justify-center">&times;</button>
+      </div>
+    `.toString();
     result.classList.remove('hidden');
-    
-    setTimeout(() => result.classList.add('hidden'), 3000);
+  }
+
+  document.getElementById('scan-result').addEventListener('click', function(e) {
+    if (e.target.closest('[data-scan-result-dismiss]')) this.classList.add('hidden');
+    if (e.target.closest('[data-scan-result-reload]')) window.location.reload();
+  });
+
+  function formatStatus(participant) {
+    return participant.display_status || String(participant.status || '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  }
+
+  // What the scan actually did, in words: where, the person's resulting
+  // status, who scanned them and when.
+  function showScanSuccess(data, via = '') {
+    const name = data.participant.display_name;
+    const context = data.scan_context || {};
+    const contextName = context.name || 'this scan point';
+    const firstScan = data.first_scan_in_context;
+    let message;
+    if (context.checks_in) {
+      message = firstScan ? `✓ ${name} checked in to ${contextName}` : `↻ ${name} was already checked in to ${contextName}`;
+    } else {
+      message = firstScan ? `✓ ${name} scanned at ${contextName}` : `↻ ${name} re-scanned at ${contextName}`;
+    }
+    if (via) message += ` ${via}`;
+
+    const status = formatStatus(data.participant);
+    const at = data.scanned_at ? new Date(data.scanned_at) : new Date();
+    const time = at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const detail = [status && `Status: ${status}`, data.scanned_by && `by ${data.scanned_by}`, time].filter(Boolean).join(' · ');
+
+    const flagged = ['Withdrawn', 'Rejected'].includes(data.participant.display_status);
+    showResult(message, flagged || !firstScan ? 'warning' : 'success', { detail });
+  }
+
+  // POSTs a scan and turns every way it can fail into something a person at
+  // the door can act on. An expired session or a stale CSRF token comes back
+  // as a redirect to an HTML page, not JSON, so the content type is checked
+  // before parsing.
+  async function submitScan(body) {
+    let response;
+    try {
+      response = await fetch(scanUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-CSRF-Token': csrfToken
+        },
+        body: JSON.stringify(body)
+      });
+    } catch (error) {
+      console.error('Scan request failed:', error);
+      return { ok: false, message: "Couldn't reach the server — check your connection and scan again.", detail: 'The scan was not recorded.' };
+    }
+
+    const isJson = (response.headers.get('content-type') || '').includes('application/json');
+    let data = null;
+    if (isJson) {
+      try { data = await response.json(); } catch (_) { data = null; }
+    }
+
+    if (response.ok && data && data.success) return { ok: true, data };
+
+    if (response.status === 401 || response.status === 403 || response.redirected || (response.ok && !data)) {
+      return { ok: false, message: 'Your session has expired.', detail: 'The scan was not recorded. Reload the page (and sign in again if asked), then scan again.', reload: true };
+    }
+    if (response.status >= 500) {
+      return { ok: false, message: 'Server error — the scan may not have been recorded.', detail: 'Check Recent Scans, and scan again if it is not listed.' };
+    }
+    if (response.status === 404) {
+      return { ok: false, message: data?.error || 'Participant not found for this event' };
+    }
+    return { ok: false, message: data?.error || `The scan couldn't be processed (error ${response.status}).` };
+  }
+
+  function updateQueueNote() {
+    const note = document.getElementById('scan-queue-note');
+    if (pendingScans.length) {
+      note.textContent = `Please wait… ${pendingScans.length} more scan${pendingScans.length === 1 ? '' : 's'} queued.`;
+      note.classList.remove('hidden');
+    } else {
+      note.classList.add('hidden');
+    }
   }
 
   function parseQrCode(scannedValue) {
@@ -346,43 +507,52 @@ function groupBadgeHtml(group, fallbackColor) {
     return scannedValue;
   }
 
-  async function processScan(scannedValue) {
-    if (scanCooldown) return;
-    if (scannedValue === lastScannedCode) return;
+  // The one gate for every scan path. Returns whether the scan was sent or
+  // queued, so manual entry and search only clear what staff typed once it
+  // has. `manual` is a deliberate action (search result, typed ID): the camera
+  // reports the same code on every frame it stays in view, so only camera
+  // repeats are ignored; anything else arriving mid-scan waits its turn.
+  function processScan(scannedValue, { manual = false } = {}) {
+    if (scanCooldown) {
+      if (!manual && (scannedValue === lastScannedCode || pendingScans.some(p => p.value === scannedValue))) return false;
+      pendingScans.push({ value: scannedValue, manual });
+      updateQueueNote();
+      return true;
+    }
+    if (!manual && scannedValue === lastScannedCode) return false;
     
     const participantId = parseQrCode(scannedValue);
-    const scanContextId = getCurrentContextId();
+    const scanContextId = requireContextId();
+    if (!scanContextId) {
+      // Report a code held up to the camera once rather than every frame, but
+      // forget it after the usual cooldown so showing it again gets feedback.
+      lastScannedCode = scannedValue;
+      setTimeout(() => {
+        if (lastScannedCode === scannedValue) lastScannedCode = null;
+      }, 2000);
+      return false;
+    }
     
     scanCooldown = true;
     lastScannedCode = scannedValue;
+    sendScan(participantId, scanContextId);
+    return true;
+  }
+
+  async function sendScan(participantId, scanContextId) {
     updateStatus('Processing...', 'scanning');
 
     try {
-      const response = await fetch(scanUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': csrfToken
-        },
-        body: JSON.stringify({ 
-          participant_id: participantId,
-          scan_context_id: scanContextId
-        })
+      const result = await submitScan({
+        participant_id: participantId,
+        scan_context_id: scanContextId
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        const contextName = data.scan_context?.name || '';
-        const firstScan = data.first_scan_in_context;
+      if (result.ok) {
+        const data = result.data;
+        showScanSuccess(data);
         
-        if (firstScan) {
-          showResult('✓ ' + data.participant.display_name + ' scanned in at ' + contextName);
-        } else {
-          showResult('↻ ' + data.participant.display_name + ' re-scanned at ' + contextName);
-        }
-        
-        showParticipantModal(data.participant, data.scan_context, firstScan);
+        showParticipantModal(data.participant, data.scan_context, data.first_scan_in_context);
         addToRecentScans(data.participant, data.scan_context, data.scanned_by);
         updateScanCount();
         
@@ -416,131 +586,210 @@ function groupBadgeHtml(group, fallbackColor) {
           }
         }
       } else {
-        showResult(data.error || 'Participant not found', true);
+        showResult(result.message, 'error', { detail: result.detail, reload: result.reload });
       }
     } catch (error) {
+      // Anything thrown here is our own rendering, after the server answered.
       console.error('Scan error:', error);
-      showResult('Error processing scan', true);
+      showResult('Something went wrong showing this scan.', 'error', { detail: 'Check Recent Scans to see whether it was recorded.' });
     }
 
     setTimeout(() => {
       scanCooldown = false;
       lastScannedCode = null;
-      updateStatus('Ready to scan', 'ready');
+      updateStatus(...cameraStatus);
+      const next = pendingScans.shift();
+      updateQueueNote();
+      if (next) processScan(next.value, { manual: next.manual });
     }, 2000);
   }
 
-  async function initScanner() {
-    stopScanner(); // re-entrant: also reached from the tap-to-start button
-    if (typeof ZXing === 'undefined' || !ZXing.BrowserQRCodeReader) {
-      updateStatus('Scanner library not loaded', 'error');
+  // Maps a getUserMedia rejection to something staff can act on.
+  function describeCameraError(err) {
+    switch (err.name) {
+      case 'NotAllowedError':
+      case 'PermissionDeniedError':
+        return 'Camera blocked - check browser settings';
+      case 'NotFoundError':
+      case 'DevicesNotFoundError':
+        return 'No camera found on device';
+      case 'NotReadableError':
+      case 'TrackStartError':
+        return 'Camera in use by another app';
+      default:
+        return 'Camera error: ' + err.name + ' - ' + err.message;
+    }
+  }
+
+  // Opens the camera exactly once and keeps that stream for decoding. We used
+  // to open a probe stream, stop it, and have ZXing reopen the camera by id,
+  // which iOS Safari answers with black frames or NotReadableError right after
+  // a first permission grant.
+  async function openCamera(deviceId) {
+    const attempts = [{ facingMode: 'environment' }, true];
+    if (deviceId) attempts.unshift({ deviceId: { exact: deviceId } });
+    for (let i = 0; ; i++) {
+      try {
+        return await navigator.mediaDevices.getUserMedia({ video: attempts[i] });
+      } catch (err) {
+        // Only a camera that doesn't match is worth another try; a refusal or
+        // a busy camera fails the same way again.
+        if (err.name !== 'OverconstrainedError' || i === attempts.length - 1) throw err;
+      }
+    }
+  }
+
+  // Device labels are only readable once we hold a stream, so this runs after
+  // the camera is open.
+  async function populateCameraPicker(activeId) {
+    let cameras = [];
+    try {
+      cameras = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    } catch (err) {
+      console.warn('Could not list cameras:', err);
+    }
+    const select = document.getElementById('camera-select');
+    select.innerHTML = cameras
+      .map((c, i) => html`<option value="${c.deviceId}">${c.label || `Camera ${i + 1}`}</option>`)
+      .join('');
+    if (activeId) select.value = activeId;
+    // Only show the picker when there's an actual choice to make
+    document.getElementById('camera-select-wrapper').classList.toggle('hidden', cameras.length < 2);
+  }
+
+  async function initScanner(deviceId = localStorage.getItem('scannerCameraId')) {
+    stopScanner(); // re-entrant: restart, camera switch and tap-to-start all land here
+    const generation = decodeGeneration;
+    document.getElementById('start-camera-btn').classList.add('hidden');
+    document.getElementById('restart-camera-btn').classList.remove('hidden');
+
+    if (typeof ZXing === 'undefined' || !ZXing.QRCodeReader) {
+      updateCameraStatus('Scanner library not loaded', 'error');
       return;
     }
 
     // Check for secure context (HTTPS or localhost)
     if (!window.isSecureContext) {
-      updateStatus('Camera requires HTTPS or localhost', 'error');
+      updateCameraStatus('Camera requires HTTPS or localhost', 'error');
       console.error('Camera access requires a secure context (HTTPS or localhost). Current URL:', window.location.href);
       return;
     }
 
     // Check if mediaDevices API is available
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      updateStatus('Camera API not available', 'error');
+      updateCameraStatus('Camera API not available', 'error');
       return;
     }
 
-    // Request camera permission (also unlocks device labels for selection below)
+    updateCameraStatus('Requesting camera access...', 'loading');
+    let stream;
     try {
-      console.log('Requesting camera access...');
-      updateStatus('Requesting camera access...', 'ready');
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      console.log('Camera access granted, got stream:', stream);
-      stream.getTracks().forEach(track => track.stop());
+      stream = await openCamera(deviceId);
     } catch (err) {
       console.error('Camera permission error:', err.name, err.message, err);
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        updateStatus('Camera blocked - check browser settings', 'error');
-        offerManualStart();
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        updateStatus('No camera found on device', 'error');
-      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-        updateStatus('Camera in use by another app', 'error');
-      } else if (err.name === 'OverconstrainedError') {
-        // Try again without facing mode constraint
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          stream.getTracks().forEach(track => track.stop());
-        } catch (retryErr) {
-          updateStatus('Camera access failed: ' + retryErr.message, 'error');
-          offerManualStart();
-          return;
-        }
-      } else {
-        updateStatus('Camera error: ' + err.name + ' - ' + err.message, 'error');
-        offerManualStart();
-      }
+      if (generation !== decodeGeneration) return;
+      updateCameraStatus(describeCameraError(err), 'error');
+      offerManualStart();
       return;
     }
 
-    scanner = new ZXing.BrowserQRCodeReader();
+    // Restarted or navigated away while the permission prompt was up.
+    if (generation !== decodeGeneration) {
+      stream.getTracks().forEach(track => track.stop());
+      return;
+    }
+    cameraStream = stream;
 
+    const track = stream.getVideoTracks()[0];
+    // iOS ends the track when another app takes the camera.
+    track.addEventListener('ended', () => {
+      if (generation !== decodeGeneration) return;
+      stopScanner();
+      updateCameraStatus('Camera stopped', 'error');
+      offerManualStart();
+    });
+    populateCameraPicker(track.getSettings().deviceId);
+
+    const video = document.getElementById('qr-video');
+    video.srcObject = stream;
+    updateCameraStatus('Starting camera...', 'loading');
     try {
-      const cameras = await scanner.listVideoInputDevices();
-      if (!cameras || !cameras.length) {
-        updateStatus('No cameras found', 'error');
+      await video.play();
+    } catch (err) {
+      if (generation !== decodeGeneration) return;
+      // Playback that isn't tied to a tap can be refused, e.g. in the installed PWA.
+      console.error('Camera playback error:', err);
+      updateCameraStatus('Tap to start camera', 'error');
+      offerManualStart();
+      return;
+    }
+    decodeFrames(generation);
+  }
+
+  function markCameraReady() {
+    if (cameraStatus[1] === 'ready') return;
+    updateCameraStatus('Ready to scan', 'ready');
+    document.getElementById('start-camera-btn').classList.add('hidden');
+  }
+
+  // Our own loop rather than ZXing's decodeFromVideoDevice. Its loop sizes the
+  // capture canvas once, from the first frame, and stops for good on any error
+  // other than "no code in this frame". Right after a camera grant iOS can
+  // report a 0x0 frame, reading it throws, and the page sat on "Ready to scan"
+  // with nothing decoding until staff reloaded.
+  function decodeFrames(generation) {
+    const reader = new ZXing.QRCodeReader();
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const video = document.getElementById('qr-video');
+    const startedAt = performance.now();
+    let failures = 0;
+
+    (function tick() {
+      if (generation !== decodeGeneration) return;
+      // Schedule first, so nothing below can end the loop.
+      decodeTimer = setTimeout(tick, 100);
+
+      if (video.readyState < video.HAVE_CURRENT_DATA || !video.videoWidth || !video.videoHeight) {
+        if (performance.now() - startedAt > 8000 && cameraStatus[1] !== 'error') {
+          updateCameraStatus('Camera not showing a picture', 'error');
+          offerManualStart();
+        }
         return;
       }
 
-      // Populate the camera picker
-      const select = document.getElementById('camera-select');
-      select.innerHTML = cameras
-        .map((c, i) => html`<option value="${c.deviceId}">${c.label || `Camera ${i + 1}`}</option>`)
-        .join('');
-
-      // Pick a sensible default: remembered choice, else a back/rear camera, else last device
-      const savedId = localStorage.getItem('scannerCameraId');
-      const savedValid = savedId && cameras.some(c => c.deviceId === savedId);
-      const backCamera = cameras.find(c => /back|rear|environment/i.test(c.label));
-      const defaultId = savedValid ? savedId : (backCamera || cameras[cameras.length - 1]).deviceId;
-      select.value = defaultId;
-
-      // Only show the picker when there's an actual choice to make
-      if (cameras.length > 1) {
-        document.getElementById('camera-select-wrapper').classList.remove('hidden');
+      // The stream can change resolution or orientation mid-session.
+      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
       }
 
-      select.addEventListener('change', () => {
-        localStorage.setItem('scannerCameraId', select.value);
-        startCamera(select.value);
-      });
-
-      await startCamera(defaultId);
-    } catch (err) {
-      console.error('Camera start error:', err);
-      updateStatus('Camera access denied', 'error');
-      offerManualStart();
-    }
-  }
-
-  async function startCamera(deviceId) {
-    if (!scanner) return;
-    updateStatus('Starting camera...', 'loading');
-    document.getElementById('start-camera-btn').classList.add('hidden');
-    scanner.reset(); // stop any in-progress stream before switching
-    try {
-      await scanner.decodeFromVideoDevice(deviceId, 'qr-video', (result, err) => {
-        if (result) {
-          processScan(result.getText());
+      let text = null;
+      try {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // `true` inverts every other frame, so light-on-dark codes read too.
+        const source = new ZXing.HTMLCanvasElementLuminanceSource(canvas, true);
+        text = reader.decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(source))).getText();
+      } catch (err) {
+        // Every frame without a readable code lands here; that's normal.
+        const expected = err instanceof ZXing.NotFoundException ||
+          err instanceof ZXing.ChecksumException ||
+          err instanceof ZXing.FormatException;
+        if (!expected) {
+          failures++;
+          console.warn('QR decode error:', err);
+          if (failures === 10) {
+            updateCameraStatus('Scanner error - restart the camera', 'error');
+            offerManualStart();
+          }
+          return;
         }
-        // err is a NotFoundException on every frame without a QR code - ignore it
-      });
-      updateStatus('Ready to scan', 'ready');
-    } catch (err) {
-      console.error('Camera start error:', err);
-      updateStatus('Could not start camera', 'error');
-      offerManualStart();
-    }
+      }
+
+      failures = 0;
+      markCameraReady();
+      if (text) processScan(text);
+    })();
   }
 
   // Manual form submission
@@ -548,8 +797,7 @@ function groupBadgeHtml(group, fallbackColor) {
     e.preventDefault();
     const input = document.getElementById('manual-participant-id');
     const participantId = input.value.trim();
-    if (participantId) {
-      processScan(participantId);
+    if (participantId && processScan(participantId, { manual: true })) {
       input.value = '';
     }
   });
@@ -570,7 +818,17 @@ function groupBadgeHtml(group, fallbackColor) {
 
     searchTimeout = setTimeout(async () => {
       try {
-        const response = await fetch(`${searchUrl}?q=${encodeURIComponent(query)}`);
+        const response = await fetch(`${searchUrl}?q=${encodeURIComponent(query)}`, {
+          headers: { 'Accept': 'application/json' }
+        });
+        const isJson = (response.headers.get('content-type') || '').includes('application/json');
+        if (!response.ok || !isJson || response.redirected) {
+          searchResults.innerHTML = (response.redirected || response.status === 401 || (response.ok && !isJson))
+            ? '<div class="px-4 py-3 text-sm text-red-700">Your session has expired — reload the page to search.</div>'
+            : '<div class="px-4 py-3 text-sm text-red-700">Search failed — try again.</div>';
+          searchResults.classList.remove('hidden');
+          return;
+        }
         const data = await response.json();
         
         if (data.results.length === 0) {
@@ -596,6 +854,8 @@ function groupBadgeHtml(group, fallbackColor) {
         searchResults.classList.remove('hidden');
       } catch (error) {
         console.error('Search error:', error);
+        searchResults.innerHTML = '<div class="px-4 py-3 text-sm text-red-700">Couldn\'t reach the server — check your connection.</div>';
+        searchResults.classList.remove('hidden');
       }
     }, 300);
   });
@@ -603,9 +863,7 @@ function groupBadgeHtml(group, fallbackColor) {
   // Handle search result click
   searchResults.addEventListener('click', function(e) {
     const result = e.target.closest('.search-result');
-    if (result) {
-      const participantId = result.dataset.participantId;
-      processScan(participantId);
+    if (result && processScan(result.dataset.participantId, { manual: true })) {
       searchInput.value = '';
       searchResults.classList.add('hidden');
     }
@@ -618,15 +876,36 @@ function groupBadgeHtml(group, fallbackColor) {
     }
   }, { signal });
 
-  document.getElementById('start-camera-btn').addEventListener('click', function() {
-    this.classList.add('hidden');
-    initScanner();
+  // Both restart on whichever camera is picked, and count as the tap iOS
+  // wants before it hands over the camera.
+  function restartCamera() {
+    initScanner(document.getElementById('camera-select').value || undefined);
+  }
+  document.getElementById('start-camera-btn').addEventListener('click', restartCamera);
+  document.getElementById('restart-camera-btn').addEventListener('click', restartCamera);
+
+  document.getElementById('camera-select').addEventListener('change', function() {
+    localStorage.setItem('scannerCameraId', this.value);
+    initScanner(this.value);
   });
 
   // Initialize scanner. The zxing tag lives in <head>, and on a Turbo visit
   // Turbo appends it without waiting for it to load, so poll for the global
-  // rather than betting on a fixed delay.
-  waitForZXing().then(initScanner);
+  // rather than betting on a fixed delay. With several contexts the camera
+  // waits until staff pick one (see the change handler): every scan is
+  // refused until then and the overlay hides the video anyway.
+  let scannerStarted = false;
+  function startScannerOnce() {
+    if (scannerStarted) return;
+    scannerStarted = true;
+    waitForZXing().then(initScanner);
+  }
+
+  if (contextSelect) {
+    updateStatus('Choose a context');
+  } else {
+    startScannerOnce();
+  }
 
   // Hand the camera back as soon as we navigate away, otherwise iOS keeps the
   // capture (and its indicator) alive behind the next page.
@@ -637,10 +916,13 @@ function groupBadgeHtml(group, fallbackColor) {
 
   // Expose functions for NFC bridge integration
   window.showResult = showResult;
+  window.showScanSuccess = showScanSuccess;
+  window.submitScan = submitScan;
   window.getCurrentContextId = getCurrentContextId;
 })();
 
-let currentModalParticipant = null;
+// var, not let: Turbo re-runs this script on each visit to the page.
+var currentModalParticipant = null;
 
 function showParticipantModal(data, scanContext, firstScan) {
   const modal = document.getElementById('participant-modal');
@@ -669,7 +951,7 @@ function showParticipantModal(data, scanContext, firstScan) {
       ? data.groups.map(g => groupBadgeHtml(g, '#ffffff')).join('')
       : '';
   }
-  document.getElementById('modal-status').textContent = data.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+  document.getElementById('modal-status').textContent = data.display_status || data.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
   document.getElementById('modal-pronouns').textContent = data.pronouns || '—';
   document.getElementById('modal-email').textContent = data.email || '—';
   // The phone row is absent for roles that can't see phone numbers, and the
@@ -677,7 +959,15 @@ function showParticipantModal(data, scanContext, firstScan) {
   const phoneEl = document.getElementById('modal-phone');
   if (phoneEl) phoneEl.textContent = data.phone || '—';
   document.getElementById('modal-tshirt').textContent = data.tshirt_size?.toUpperCase() || '—';
-  document.getElementById('modal-dietary').textContent = data.dietary?.replace('_', ' ') || 'None specified';
+  // The diet type plus the food-allergy flags, so a recorded allergy never
+  // reads as "None specified".
+  const dietaryParts = [
+    data.dietary?.replace('_', ' '),
+    data.has_life_threatening_food_allergies && 'life-threatening food allergies',
+    data.cross_contamination_risk && 'cross-contamination risk',
+    data.has_allergies && 'allergies on health form'
+  ].filter(Boolean);
+  document.getElementById('modal-dietary').textContent = dietaryParts.join(' · ') || 'None specified';
   document.getElementById('modal-view-link').href = data.show_url;
 
   const alertsDiv = document.getElementById('modal-alerts');
@@ -685,6 +975,14 @@ function showParticipantModal(data, scanContext, firstScan) {
 
   if (data.has_anaphylaxis_risk) {
     alertsDiv.innerHTML += '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 px-4 py-3 mt-4"><strong>⚠️ Anaphylaxis Risk</strong></div>';
+  }
+  if (data.has_life_threatening_food_allergies) {
+    alertsDiv.innerHTML += '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 px-4 py-3 mt-4"><strong>⚠️ Life-Threatening Food Allergies</strong></div>';
+  }
+  // Health-form allergies can be food allergies too (older records often put
+  // them there), so they get an alert rather than only the muted Dietary line.
+  if (data.has_allergies) {
+    alertsDiv.innerHTML += '<div class="bg-orange-100 border-l-4 border-orange-500 text-orange-800 px-4 py-3 mt-4"><strong>⚠️ Allergies on Health Form — Check Medical Details</strong></div>';
   }
   if (data.requires_refrigeration) {
     alertsDiv.innerHTML += '<div class="bg-blue-100 border-l-4 border-[#ec3750] text-blue-700 px-4 py-3 mt-4"><strong>❄️ Needs Medication Refrigeration</strong></div>';
@@ -808,7 +1106,7 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
 
 // NFC Bridge Integration
 (function() {
-  const nfcWriteOnCheckin = <%= current_event.nfc_badges_enabled? && current_event.nfc_badge_write_on_checkin_enabled? %>;
+  const nfcWriteOnCheckin = <%= !!(current_event.nfc_badges_enabled? && current_event.nfc_badge_write_on_checkin_enabled?) %>;
   const eventId = '<%= current_event.id %>';
   const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
   
@@ -924,41 +1222,27 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
   }
   
   async function processNfcScan(badgeToken) {
-    const scanUrl = '<%= admin_event_scans_path(current_event) %>';
     const scanContextId = window.getCurrentContextId?.();
+    if (!scanContextId) {
+      window.showResult?.('Choose a context before scanning', true);
+      return;
+    }
     
     try {
-      const response = await fetch(scanUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': csrfToken
-        },
-        body: JSON.stringify({ 
-          badge_token: badgeToken,
-          scan_context_id: scanContextId
-        })
+      const result = await window.submitScan({
+        badge_token: badgeToken,
+        scan_context_id: scanContextId
       });
       
-      const result = await response.json();
-      
-      if (response.ok) {
-        const contextName = result.scan_context?.name || '';
-        const firstScan = result.first_scan_in_context;
-        
-        if (firstScan) {
-          window.showResult?.('📱 ' + result.participant.display_name + ' scanned via NFC at ' + contextName);
-        } else {
-          window.showResult?.('↻ ' + result.participant.display_name + ' re-scanned via NFC at ' + contextName);
-        }
-        
-        showParticipantModal(result.participant, result.scan_context, firstScan);
+      if (result.ok) {
+        window.showScanSuccess(result.data, 'via NFC');
+        showParticipantModal(result.data.participant, result.data.scan_context, result.data.first_scan_in_context);
       } else {
-        window.showResult?.(result.error || 'Unknown participant', true);
+        window.showResult?.(result.message, 'error', { detail: result.detail, reload: result.reload });
       }
     } catch (error) {
       console.error('NFC scan error:', error);
-      window.showResult?.('Error processing NFC scan', true);
+      window.showResult?.('Something went wrong showing this NFC scan.', 'error', { detail: 'Check Recent Scans to see whether it was recorded.' });
     }
   }
   
@@ -1049,6 +1333,13 @@ document.getElementById('modal-write-nfc-btn')?.addEventListener('click', () => 
   };
   
   // Auto-connect on page load
-  setTimeout(connectNfcBridge, 1000);
+  const autoConnect = setTimeout(connectNfcBridge, 1000);
+
+  // Disconnect when we navigate away, otherwise the next visit opens a second
+  // connection and every tap is scanned twice.
+  window.scannerPageSignal.addEventListener('abort', function() {
+    clearTimeout(autoConnect);
+    if (nfcBridge) nfcBridge.close();
+  });
 })();
 </script>

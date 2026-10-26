@@ -1,0 +1,17 @@
+Hi <%= @first_name %>,
+
+<% if @invited_by %>
+<%= @invited_by.name.presence || @invited_by.email %> invited you to take <%= @course.title %> on Attend<%= ", which earns #{@course.badge.name}" if @course.badge %>.
+<% else %>
+You've been invited to take <%= @course.title %> on Attend<%= ", which earns #{@course.badge.name}" if @course.badge %>.
+<% end %>
+<% if @course.summary.present? %>
+
+<%= @course.summary %>
+<% end %>
+
+Sign in with your Hack Club account using this email address (<%= @user.email %>) to start:
+
+<%= @course_url %>
+
+Questions? Just reply to this email.

@@ -4,6 +4,7 @@
   <header class="mb-8">
     <h1 class="portal-title text-2xl">Review Your Information</h1>
     <p class="portal-body mt-2">Please review your information below before submitting. Click any section to make changes.</p>
+    <%= render "onboarding/registration_note", event: current_event, class: "mt-4" %>
   </header>
 
   <div class="space-y-6">
@@ -106,11 +107,11 @@
                 </div>
                 <div>
                   <dt class="portal-hint">Departure</dt>
-                  <dd class="portal-body"><%= leg.departure_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                  <dd class="portal-body"><%= flight_local_time(leg, :departure) || "—" %></dd>
                 </div>
                 <div>
                   <dt class="portal-hint">Arrival</dt>
-                  <dd class="portal-body"><%= leg.arrival_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                  <dd class="portal-body"><%= flight_local_time(leg, :arrival) || "—" %></dd>
                 </div>
               <% end %>
               <% if @travel_inbound.is_unaccompanied_minor %>
@@ -182,11 +183,11 @@
                 </div>
                 <div>
                   <dt class="portal-hint">Departure</dt>
-                  <dd class="portal-body"><%= leg.departure_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                  <dd class="portal-body"><%= flight_local_time(leg, :departure) || "—" %></dd>
                 </div>
                 <div>
                   <dt class="portal-hint">Arrival</dt>
-                  <dd class="portal-body"><%= leg.arrival_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                  <dd class="portal-body"><%= flight_local_time(leg, :arrival) || "—" %></dd>
                 </div>
               <% end %>
               <% if @travel_outbound.is_unaccompanied_minor %>
@@ -326,6 +327,23 @@
             </div>
           </dl>
         <% end %>
+      </section>
+    <% end %>
+
+    <% if @account_modes.present? %>
+      <section class="portal-card p-5 sm:p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="portal-heading text-lg">Accounts</h2>
+          <%= link_to "Edit", onboarding_step_path(step: "accounts", event_id: current_event.id), class: "portal-btn portal-btn-quiet text-sm" %>
+        </div>
+        <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+          <% @account_modes.each_key do |provider| %>
+            <div>
+              <dt class="portal-hint"><%= AccountLinking.provider_name(provider) %></dt>
+              <dd class="portal-body"><%= @connected_accounts[provider]&.username || "Not connected" %></dd>
+            </div>
+          <% end %>
+        </dl>
       </section>
     <% end %>
   </div>

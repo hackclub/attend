@@ -76,12 +76,13 @@
 </div>
 
 <script nonce="<%= content_security_policy_nonce %>">
-document.addEventListener('DOMContentLoaded', function() {
-  initDragAndDrop();
-  initRoomReorder();
-});
+// var, not let: Turbo re-runs this script on each visit to the page.
+var draggedRoomId = null;
 
-let draggedRoomId = null;
+// Listeners bound to document are torn down when we navigate away, so repeat
+// visits don't stack them.
+var pageListeners = new AbortController();
+document.addEventListener('turbo:before-render', () => pageListeners.abort(), { signal: pageListeners.signal });
 
 function initRoomReorder() {
   document.querySelectorAll('.room-card').forEach(card => {
@@ -275,7 +276,20 @@ async function addStaff(e) {
 // submit bubbles, so ordering doesn't matter.
 document.addEventListener('submit', (event) => {
   if (event.target.id === 'add-staff-form') addStaff(event);
-});
+}, { signal: pageListeners.signal });
+
+// On a Turbo visit DOMContentLoaded has long since fired, so only wait for it
+// on a full page load.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAssignments);
+} else {
+  initAssignments();
+}
+
+function initAssignments() {
+  initDragAndDrop();
+  initRoomReorder();
+}
 </script>
 
 <!-- Add Staff Modal -->

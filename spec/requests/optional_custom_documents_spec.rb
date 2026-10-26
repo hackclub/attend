@@ -15,7 +15,7 @@ RSpec.describe "Optional custom documents", type: :request do
   let(:event) { create(:event, freedom_waivers_enabled: false) }
 
   describe "admin management" do
-    let(:admin) { User.create!(email: "admin-optional@example.com", name: "Admin", global_role: "global_admin") }
+    let(:admin) { User.create!(email: "admin-optional@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
 
     before { sign_in admin }
 
@@ -507,7 +507,7 @@ RSpec.describe "Optional custom documents", type: :request do
   end
 
   describe "the admin participants list" do
-    let(:admin) { User.create!(email: "admin-list@example.com", name: "Admin", global_role: "global_admin") }
+    let(:admin) { User.create!(email: "admin-list@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
     let!(:doc) { create(:custom_document, :optional, event: event, name: "Zip Lining Waiver") }
     let!(:added_pe) do
       create(:participant_event, event: event,

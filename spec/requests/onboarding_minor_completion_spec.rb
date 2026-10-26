@@ -37,8 +37,7 @@ RSpec.describe "Onboarding completion for minors", type: :request do
       expect { submit }.to change { participant_event.reload.status }.to("complete")
 
       expect(participant_event.onboarding_completed_at).to be_present
-      expect(response).to redirect_to(dashboard_path)
-      expect(flash[:notice]).to include("you're all set")
+      expect(response).to redirect_to(onboarding_done_path(event_id: event.id))
     end
 
     it "does not invite the guardian who has already finished" do

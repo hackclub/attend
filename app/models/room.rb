@@ -93,7 +93,7 @@ class Room < ApplicationRecord
   private
 
   def occupant_ages
-    event_date = event.starts_at&.to_date || Date.current
+    event_date = event.local_start_date || Date.current
     room_assignments.filter_map { |ra| ra.participant_event&.participant&.age_on(event_date) }
   end
 end

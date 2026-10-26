@@ -1,0 +1,54 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Training", admin_training_path ], [ @course.title, admin_training_course_path(@course) ], [ @lesson.title_in_database, nil ]) %>
+<% questions = @lesson.questions.includes(:options).to_a %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text"><h1 class="cs-h1"><%= @lesson.title_in_database %></h1></div>
+    <div class="cs-actions">
+      <%= button_to "Delete lesson", admin_training_course_lesson_path(@course, @lesson), method: :delete, class: "cs-btn cs-btn-full",
+            data: { turbo_confirm: "Delete this lesson and its quiz? Learners who finished it keep their progress on the other lessons." } %>
+    </div>
+  </div>
+
+  <%= render "form", lesson: @lesson %>
+
+  <section class="cs-container" id="quiz">
+    <div class="cs-container-header cs-container-header-divided">
+      <div>
+        <h2 class="cs-h2">Quiz <span class="cs-counter">(<%= questions.size %>)</span></h2>
+        <p class="cs-container-description">Optional. Learners must reach the course pass mark (<%= @course.pass_mark %>%) to finish the lesson.</p>
+      </div>
+      <div class="cs-actions"><%= link_to "Add question", new_admin_training_course_lesson_question_path(@course, @lesson), class: "cs-btn" %></div>
+    </div>
+    <% if questions.empty? %>
+      <div class="cs-empty"><p class="cs-empty-title">No questions — this lesson is finished by marking it done</p></div>
+    <% else %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Question</th>
+              <th scope="col">Answers</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% questions.each_with_index do |question, index| %>
+              <tr>
+                <td class="cs-secondary"><%= index + 1 %></td>
+                <td><%= link_to question.prompt.truncate(120), edit_admin_training_course_lesson_question_path(@course, @lesson, question), class: "cs-link" %></td>
+                <td class="whitespace-nowrap">
+                  <%= question.options.size %> <span class="cs-secondary">· <%= question.options.count(&:correct?) %> correct</span>
+                </td>
+                <td class="whitespace-nowrap text-right">
+                  <%= render "admin/training/move_buttons", path: move_admin_training_course_lesson_question_path(@course, @lesson, question), label: "question #{index + 1}", first: index.zero?, last: index == questions.size - 1 %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </section>
+</div>

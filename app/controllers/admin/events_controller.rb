@@ -165,10 +165,13 @@ module Admin
         :roommate_preferences_enabled,
         :guardian_invites_locked,
         :onboarding_invites_held,
-        :hotel_scan_context_id,
         :nfc_badges_enabled,
         :nfc_badge_write_on_checkin_enabled,
-        :groups_enabled
+        :groups_enabled,
+        :github_linking,
+        :itch_linking,
+        :github_help_url,
+        :itch_help_url
       )
       unless action_name == "create" || current_user.global_admin?
         permitted = permitted.except(:event_series_id)

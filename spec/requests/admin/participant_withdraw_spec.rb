@@ -83,6 +83,36 @@ RSpec.describe "Admin::Participants withdraw authorization", type: :request do
     end
   end
 
+  # A failed save used to fall through to the exception page, which at the
+  # door read as "did that work or not?". It now comes back as an alert.
+  describe "when the status change can't be saved" do
+    before { sign_in_with_role("event_admin") }
+
+    it "alerts instead of erroring on withdraw" do
+      allow_any_instance_of(ParticipantEvent).to receive(:withdrawn!)
+        .and_raise(ActiveRecord::RecordInvalid.new(participant_event))
+
+      post withdraw_admin_event_participant_path(event.slug, participant_event)
+
+      expect(response).to redirect_to(admin_event_participant_path(event, participant_event))
+      expect(flash[:alert]).to include("Couldn't withdraw")
+      expect(flash[:notice]).to be_nil
+      expect(participant_event.reload.status).not_to eq("withdrawn")
+    end
+
+    it "alerts instead of erroring on reinstate" do
+      participant_event.withdrawn!
+      allow_any_instance_of(ParticipantEvent).to receive(:in_progress!)
+        .and_raise(ActiveRecord::RecordNotSaved.new("Failed to save the record", participant_event))
+
+      post unwithdraw_admin_event_participant_path(event.slug, participant_event)
+
+      expect(response).to redirect_to(admin_event_participant_path(event, participant_event))
+      expect(flash[:alert]).to include("Couldn't reinstate")
+      expect(participant_event.reload.status).to eq("withdrawn")
+    end
+  end
+
   # An ops user on event A must not withdraw someone from event B. The
   # controller scopes the lookup to the current event, so the request 404s
   # before the policy runs; the policy's own Current.event guard is pinned

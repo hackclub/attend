@@ -17,23 +17,41 @@ Rails.application.configure do
   mintlify_widget = "https://widget.mintlify.com"
   mintlify_api = %w[https://api.mintlify.com https://ph.mintlify.com]
   hcaptcha = %w[https://js.hcaptcha.com https://*.hcaptcha.com]
+  # Video players a training lesson can use (TrainingLesson::VIDEO_LINKS):
+  # their frames, plus the player APIs training_video_controller.js loads to
+  # stop learners seeking ahead.
+  training_video_players = %w[https://www.youtube-nocookie.com https://www.youtube.com https://player.vimeo.com]
+  training_video_apis = %w[https://www.youtube.com https://player.vimeo.com]
+  # Google Maps JS API with the Places library: the venue address field and
+  # address_autocomplete_controller.js. The loader pulls its modules from
+  # maps.googleapis.com and maps.gstatic.com, and fetches predictions from
+  # maps.googleapis.com. Without these the script is blocked and the field
+  # silently shows no suggestions.
+  google_maps = %w[https://maps.googleapis.com https://maps.gstatic.com]
 
   config.content_security_policy do |policy|
     policy.default_src :self
     policy.font_src    :self, :data, "https://cdn.docuseal.com", *docuseal_origins, mintlify_widget
     policy.img_src     :self, :data, :https
     policy.object_src  :none
-    policy.script_src  :self, "https://cdn.docuseal.com", *docuseal_origins, "https://cdn.cloudflare.com", "https://unpkg.com", "https://cdn.jsdelivr.net", "https://challenges.cloudflare.com", "https://plausible.io", mintlify_widget, *hcaptcha
+    # Uploaded lesson videos stream from the storage bucket.
+    policy.media_src   :self, :https
+    policy.script_src  :self, "https://cdn.docuseal.com", *docuseal_origins, "https://cdn.cloudflare.com", "https://unpkg.com", "https://cdn.jsdelivr.net", "https://challenges.cloudflare.com", "https://plausible.io", mintlify_widget, *hcaptcha, *training_video_apis, *google_maps
     policy.style_src   :self, :unsafe_inline, "https://cdn.docuseal.com", *docuseal_origins, "https://cdn.jsdelivr.net", mintlify_widget
-    policy.connect_src :self, "https://api.docuseal.com", *docuseal_origins, "ws://localhost:9876", "ws://127.0.0.1:9876", "https://challenges.cloudflare.com", "https://plausible.io", mintlify_widget, *mintlify_api, *hcaptcha
-    policy.frame_src   :self, *docuseal_origins, "https://challenges.cloudflare.com", *hcaptcha
+    policy.connect_src :self, "https://api.docuseal.com", *docuseal_origins, "ws://localhost:9876", "ws://127.0.0.1:9876", "https://challenges.cloudflare.com", "https://plausible.io", mintlify_widget, *mintlify_api, *hcaptcha, *google_maps
+    policy.frame_src   :self, *docuseal_origins, "https://challenges.cloudflare.com", *hcaptcha, *training_video_players
     policy.frame_ancestors :self
     policy.base_uri    :self
     # HCA sign-in: the button posts to /users/auth/hack_club (self), which then
     # 302s to auth.hackclub.com/oauth/authorize. Browsers enforce form-action
     # across the whole redirect chain, so the OAuth host has to be listed here
-    # or the POST is blocked before it ever leaves the page.
-    policy.form_action :self, *docuseal_origins, "https://auth.hackclub.com"
+    # or the POST is blocked before it ever leaves the page. The same goes for
+    # connecting GitHub and itch.io accounts (ConnectedAccountsController)
+    # and an event's Airtable sync (Admin::AirtableConnectionsController),
+    # and for "Add to LinkedIn" on a training badge, which posts to Attend and
+    # is 302'd to LinkedIn's add-to-profile form (Training::AwardsController).
+    policy.form_action :self, *docuseal_origins, "https://auth.hackclub.com", "https://github.com", "https://itch.io", "https://www.linkedin.com",
+      "https://airtable.com"
   end
 
   # A fresh nonce per response for the importmap and our inline scripts. Not

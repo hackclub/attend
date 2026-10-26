@@ -137,7 +137,8 @@
          *(current_event.travel_enabled? ? [["Missing travel", "missing_travel"]] : []),
          ["Missing medical", "missing_medical"],
          ["High support", "high_support"],
-         ["Anaphylaxis risk", "anaphylaxis"]
+         ["Anaphylaxis risk", "anaphylaxis"],
+         ["19+ during event", "over_age_limit"]
        ]
        check_in_options = [["Checked in", "yes"], ["Not checked in", "no"]]
        show_group_filter = current_event.groups_enabled? && current_event.groups.any?
@@ -277,7 +278,7 @@
                     <% if policy(current_event).invite_participants? %>
                       <div class="flex justify-end gap-1">
                         <%= button_to invitation.held? ? "Send now" : "Resend", send_invite_admin_event_participants_path(current_event, invite: { email: invitation.email, send_now: "1" }), method: :post, class: "cs-btn cs-btn-link" %>
-                        <%= button_to "Revoke", revoke_invite_admin_event_participants_path(current_event, id: invitation.id), method: :delete, data: { confirm: "Are you sure you want to revoke the invitation for #{invitation.email}?" }, class: "cs-btn cs-btn-link" %>
+                        <%= button_to "Revoke", revoke_invite_admin_event_participants_path(current_event, id: invitation.id), method: :delete, form: { data: { turbo_confirm: "Are you sure you want to revoke the invitation for #{invitation.email}?" } }, class: "cs-btn cs-btn-link" %>
                       </div>
                     <% end %>
                   </td>

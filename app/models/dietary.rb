@@ -25,8 +25,10 @@ class Dietary < ApplicationRecord
 
   validates :participant_event_id, presence: true
 
+  # "None" and "no" survive ClearsNegativeResponses, so read them the way
+  # Medical#has_allergies? does rather than as an allergy.
   def has_life_threatening_allergy?
-    life_threatening_allergies.present?
+    ClearsNegativeResponses.meaningful_response?(life_threatening_allergies)
   end
 
   def dietary_restrictions?

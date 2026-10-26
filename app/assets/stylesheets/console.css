@@ -2012,9 +2012,13 @@
 
   .cs-tiles { display: flex; flex-direction: column; gap: 12px; }
 
-  li > .cs-status, dd > .cs-status { white-space: normal; align-items: flex-start; }
+  /* Status chips stay on one line in tables, but inside key-value and list
+   * layouts the column can be narrower than the label (e.g. "Awaiting
+   * Participant" in a 4-up grid with a vertical tab bar eating the width),
+   * so let them wrap instead of overflowing into the next column. */
+  li > .cs-status, dt > .cs-status, dd > .cs-status { white-space: normal; align-items: flex-start; }
 
-  li > .cs-status svg, dd > .cs-status svg { margin-top: 2px; }
+  li > .cs-status svg, dt > .cs-status svg, dd > .cs-status svg { margin-top: 2px; }
 
   .cs-field-description { margin: -2px 0 6px; font-size: 12px; line-height: 16px; color: var(--cs-text-muted); }
 
@@ -2509,6 +2513,7 @@
     .cs-sidenav-group > summary { padding-top: 10px; padding-bottom: 10px; }
     .cs-menu-item { padding-top: 10px; padding-bottom: 10px; }
     .cs-tab, .cs-segment { padding-top: 10px; padding-bottom: 10px; }
+    .cs-option { min-height: 40px; }
     .cs-input, .cs-select { min-height: 40px; font-size: 16px; }
     .cs-calendar-day { padding: 8px 0; }
   }
@@ -2521,8 +2526,8 @@
 }
 
 @layer components {
-  /* The opt-in beta notice under the top nav (layouts/admin.html+console.erb).
-   * Cloudscape's info treatment, one quiet line that wraps on phones. Its
+  /* The new-admin notice, with its switch-back link, under the top nav
+   * (layouts/admin.html+console.erb). Cloudscape's info treatment, one quiet line that wraps on phones. Its
    * gutters match .cs-breadcrumbs and .cs-main so the text lines up with the
    * page below it. */
   .cs-beta-bar {

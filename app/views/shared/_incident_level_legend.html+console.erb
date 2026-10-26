@@ -1,0 +1,6 @@
+<div class="flex flex-wrap items-center gap-x-4 gap-y-1 cs-small">
+  <% IncidentLevel::LEVELS.each do |level| %>
+    <span class="inline-flex items-center gap-1.5"><%= incident_level_badge(level.key) %> <span><%= level.name %> · <%= level.target %></span></span>
+  <% end %>
+  <%= link_to "Triage chart", incident_levels_docs_path, target: "_blank", rel: "noopener", class: "cs-link" %>
+</div>

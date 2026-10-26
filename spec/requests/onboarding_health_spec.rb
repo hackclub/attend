@@ -83,6 +83,19 @@ RSpec.describe "Onboarding health sections", type: :request do
     expect(medical.reload).to have_attributes(medical_conditions: "asthma", has_anaphylaxis_risk: true)
   end
 
+  it "still rejects a resubmitted nothing to add that now carries details" do
+    medical = participant_event.create_medical!(section_response: :nothing_to_add)
+
+    patch health_path, params: {
+      medical: { section_response: "nothing_to_add", has_anaphylaxis_risk: "1" },
+      dietary: { section_response: "nothing_to_add" },
+      accessibility: { section_response: "nothing_to_add" }
+    }
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(medical.reload).to have_attributes(section_response: "nothing_to_add", has_anaphylaxis_risk: false)
+  end
+
   it "clears only the selected section when explicitly requested" do
     medical = participant_event.create_medical!(medical_conditions: "asthma", has_anaphylaxis_risk: true)
     dietary = participant_event.create_dietary!(intolerances: "lactose")

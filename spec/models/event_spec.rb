@@ -106,13 +106,48 @@ RSpec.describe Event, type: :model do
     end
   end
 
+  describe "event-local dates" do
+    include ActiveSupport::Testing::TimeHelpers
+
+    # 5pm Pacific on Nov 5 is 01:00 UTC on Nov 6.
+    let(:event) do
+      build(:event, timezone: "Pacific Time (US & Canada)",
+        starts_at: Time.utc(2026, 11, 6, 1), ends_at: Time.utc(2026, 11, 10, 0))
+    end
+
+    it "reads start and end dates on the event's clock" do
+      expect(event.local_start_date).to eq(Date.new(2026, 11, 5))
+      expect(event.local_end_date).to eq(Date.new(2026, 11, 9))
+      expect(event.local_starts_at.strftime("%b %-d %-l%P")).to eq("Nov 5 5pm")
+    end
+
+    it "is nil-safe" do
+      event.starts_at = nil
+
+      expect(event.local_starts_at).to be_nil
+      expect(event.local_start_date).to be_nil
+    end
+
+    it "is completed once its last day is over where the event is" do
+      # 22:00 on Nov 9 Pacific: still the last day.
+      travel_to Time.utc(2026, 11, 10, 6) do
+        expect(event).not_to be_completed
+      end
+      # 01:00 on Nov 10 Pacific, though still Nov 10 in UTC as well.
+      travel_to Time.utc(2026, 11, 10, 9) do
+        expect(event).to be_completed
+      end
+    end
+  end
+
   describe "#airtable_sync_stale?" do
     def configured_event(**attrs)
       build(
         :event,
         airtable_sync_source_id: "sncTest",
         airtable_sync_table_id: "tblTest",
-        config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" },
+        airtable_api_key: "key-test",
+        config: { "airtable_base_id" => "app-test" },
         **attrs
       )
     end
@@ -146,7 +181,8 @@ RSpec.describe Event, type: :model do
         :event,
         airtable_sync_source_id: "sncTest",
         airtable_sync_table_id: "tblTest",
-        config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" },
+        airtable_api_key: "key-test",
+        config: { "airtable_base_id" => "app-test" },
         **attrs
       )
     end
@@ -156,7 +192,8 @@ RSpec.describe Event, type: :model do
         event.update_columns(
           airtable_sync_source_id: source,
           airtable_sync_table_id: table,
-          config: event.config.merge("airtable_api_key" => key, "airtable_base_id" => base)
+          airtable_api_key: key,
+          config: event.config.merge("airtable_base_id" => base)
         )
       end
     end
@@ -201,6 +238,25 @@ RSpec.describe Event, type: :model do
       expect(described_class.with_airtable_sync_active).not_to include(event)
     end
 
+    it "counts a connected event with just a base, since Attend creates its own table" do
+      event = create(:event, config: { "airtable_base_id" => "app-test" })
+      event.create_airtable_connection!(access_token: "fictional", refresh_token: "fictional",
+        access_token_expires_at: 1.hour.from_now, refresh_token_expires_at: 60.days.from_now)
+
+      expect(event.reload).to be_airtable_sync_configured
+      expect(described_class.with_airtable_sync_configured).to include(event)
+    end
+
+    it "forgets Attend's table when a connected event moves to another base" do
+      event = create(:event, airtable_sync_table_id: "tblOurs", config: { "airtable_base_id" => "app-old" })
+      event.create_airtable_connection!(access_token: "fictional", refresh_token: "fictional",
+        access_token_expires_at: 1.hour.from_now, refresh_token_expires_at: 60.days.from_now)
+
+      event.update!(airtable_base_id: "app-new")
+
+      expect(event.reload.airtable_sync_table_id).to be_nil
+    end
+
     it "matches the record-level #airtable_sync_configured? for every event" do
       configured_event
       create(:event)
@@ -219,7 +275,8 @@ RSpec.describe Event, type: :model do
         :event,
         airtable_sync_source_id: "sncTest",
         airtable_sync_table_id: "tblTest",
-        config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" }
+        airtable_api_key: "key-test",
+        config: { "airtable_base_id" => "app-test" }
       )
     end
 
@@ -241,6 +298,35 @@ RSpec.describe Event, type: :model do
       expect(event).not_to be_airtable_sync_paused
       expect(event.airtable_sync_error).to be_nil
       expect(event.airtable_sync_error_at).to be_nil
+    end
+  end
+
+  describe "#claim_airtable_sync_alert!" do
+    it "is not claimed before the streak is due" do
+      event = create(:event, airtable_sync_failures: 2, airtable_sync_failing_since: 10.minutes.ago)
+
+      expect(event.claim_airtable_sync_alert!).to be(false)
+    end
+
+    it "is claimed once the streak has lasted long enough" do
+      event = create(:event, airtable_sync_failures: 2, airtable_sync_failing_since: 4.hours.ago)
+
+      expect(event.claim_airtable_sync_alert!).to be(true)
+    end
+
+    it "is not claimed again once the streak was reported" do
+      event = create(:event, airtable_sync_failures: 50, airtable_sync_alerted_at: 1.hour.ago)
+
+      expect(event.claim_airtable_sync_alert!).to be(false)
+    end
+  end
+
+  describe "#record_airtable_sync_failure!" do
+    it "does nothing when the event was deleted mid-run" do
+      # An in-memory event whose row is gone, as when it's deleted mid-run.
+      event = build(:event, id: SecureRandom.uuid)
+
+      expect { event.record_airtable_sync_failure!("HTTP 503") }.not_to raise_error
     end
   end
 
@@ -351,7 +437,7 @@ RSpec.describe Event, type: :model do
     # notes, so anything still pointing at a participant event at that moment
     # used to blow up with a foreign key violation.
     it "tears down records that point at its participant events" do
-      incident = Incident.create!(event: event, reported_by: reporter, category: :other, severity: :low)
+      incident = Incident.create!(event: event, reported_by: reporter, category: :other, severity: :s3)
       incident.incident_participants.create!(participant_event: participant_event)
       Note.create!(event: event, participant_event: participant_event, author: reporter, body: "note")
       RoommatePreference.create!(participant_event: other_participant_event, preferred_participant_event: participant_event)

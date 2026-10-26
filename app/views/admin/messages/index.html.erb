@@ -33,7 +33,7 @@
                   <% if message.subject.present? %>
                     <div class="text-sm font-medium text-gray-900"><%= message.subject %></div>
                   <% end %>
-                  <div class="text-sm text-gray-500 truncate max-w-xs"><%= truncate(message.body.presence || "(empty)", length: 60) %></div>
+                  <div class="text-sm text-gray-500 truncate max-w-xs"><%= truncate(message.body_as_plain.presence || "(empty)", length: 60) %></div>
                 <% end %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
@@ -94,7 +94,7 @@
                 <% if message.draft? || message.scheduled? %>
                   <%= button_to admin_event_message_path(current_event, message), 
                       method: :delete,
-                      data: { confirm: "Delete this draft?" },
+                      form: { data: { turbo_confirm: "Delete this draft?" } },
                       class: "text-red-600 hover:text-red-800" do %>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>

@@ -1,4 +1,6 @@
 class Admin::DashboardController < Admin::BaseController
+  include IncidentAuditVisibility
+
   skip_before_action :set_current_event_from_session, only: [ :show, :integrations, :update_integrations, :trigger_airtable_sync, :create_vote_event ]
 
   def index
@@ -54,10 +56,12 @@ class Admin::DashboardController < Admin::BaseController
     if @event.airtable_sync_configured?
       # "Sync Now" is a deliberate retry, so it also lifts a pause left by an
       # earlier failure — otherwise the scheduled job would skip this event and
-      # the button would look like it did nothing.
+      # the button would look like it did nothing. A sync that isn't paused is
+      # left alone, so pressing the button can't reset the failure streak that
+      # decides when someone is told it keeps failing.
       was_paused = @event.airtable_sync_paused?
-      @event.resume_airtable_sync!
-      AirtableJobs::SyncAllJob.perform_later
+      @event.resume_airtable_sync! if was_paused
+      AirtableJobs::SyncAllJob.perform_later(@event.id)
 
       notice = if was_paused
         "Airtable sync resumed and triggered. It will complete shortly."
@@ -92,13 +96,13 @@ class Admin::DashboardController < Admin::BaseController
     if @event.update(integration_params)
       if airtable_settings_saved?
         # Whoever last touched the credentials is who we email if the sync
-        # later fails and pauses itself.
+        # later pauses itself or keeps failing.
         @event.update_column(:airtable_config_updated_by_id, current_user.id)
         @event.resume_airtable_sync!
       end
 
       if airtable_settings_saved? && @event.airtable_sync_configured?
-        AirtableJobs::SyncAllJob.perform_later
+        AirtableJobs::SyncAllJob.perform_later(@event.id)
         redirect_to admin_event_integrations_path(@event), notice: "Integration settings updated. Airtable sync started."
       else
         redirect_to admin_event_integrations_path(@event), notice: "Integration settings updated."
@@ -130,23 +134,41 @@ class Admin::DashboardController < Admin::BaseController
     @airtable_synced_at = current_event.airtable_synced_at
     @airtable_sync_error = current_event.airtable_sync_error
     @airtable_sync_error_at = current_event.airtable_sync_error_at
+    @airtable_sync_failures = current_event.airtable_sync_failures
     @airtable_sync_stale = current_event.airtable_sync_stale?
     @airtable_sync_paused = current_event.airtable_sync_paused?
     @airtable_sync_paused_at = current_event.airtable_sync_paused_at
     @airtable_config_owner = current_event.airtable_config_last_saved_by if @airtable_sync_paused
     @airtable_participant_count = current_event.participant_events.count if @airtable_sync_configured
+    @airtable_connection = current_event.airtable_connection
+    @airtable_oauth_configured = Airtable::Oauth.new.configured?
+    # Airtable only shows the bases ticked on its consent screen; the list is
+    # empty when it couldn't be read at connect time, so don't guess then.
+    @airtable_base_options = Array(@airtable_connection&.bases).map { |base| [ "#{base['name']} (#{base['id']})", base["id"] ] }
+    if @airtable_base_options.any? && current_event.airtable_base_id.present? && @airtable_base_options.none? { |_, id| id == current_event.airtable_base_id }
+      @airtable_base_options.unshift([ current_event.airtable_base_id, current_event.airtable_base_id ])
+    end
+    @airtable_base_not_granted = @airtable_connection.present? &&
+      @airtable_connection.bases.any? &&
+      current_event.airtable_base_id.present? &&
+      !@airtable_connection.base_granted?(current_event.airtable_base_id)
   end
 
   def integration_params
-    params.require(:event).permit(
+    permitted = params.require(:event).permit(
       :docuseal_waiver_template_id,
       :docuseal_freedom_waiver_template_id,
       :slack_channel_id,
       :airtable_api_key,
+      :airtable_sync_endpoint_url,
       :airtable_base_id,
       :airtable_sync_source_id,
       :airtable_sync_table_id
     )
+    # The saved token is never echoed back into the form, so a blank field
+    # means "keep it", not "delete it".
+    permitted.delete(:airtable_api_key) if permitted[:airtable_api_key].blank?
+    permitted
   end
 
   def load_dashboard_stats
@@ -164,8 +186,9 @@ class Admin::DashboardController < Admin::BaseController
     @consent_stats = compute_consent_stats
 
     # Incidents
-    @open_incidents_count = current_event.incidents.open_incidents.count
-    @recent_incidents = current_event.incidents
+    visible_incidents = policy_scope(current_event.incidents)
+    @open_incidents_count = visible_incidents.open_incidents.count
+    @recent_incidents = visible_incidents
       .includes(participant_event: :participant, reported_by: [])
       .order(created_at: :desc)
       .limit(5)
@@ -177,9 +200,12 @@ class Admin::DashboardController < Admin::BaseController
       .includes(:participant)
       .to_a
 
-    # Recent activity
-    @recent_activity = AuditLog
-      .where(event: current_event)
+    # Recent activity. Incident rows go through the same filter the audit log
+    # applies: "Create Incident, 3 minutes ago, <reporter>" still gives away an
+    # incident this viewer isn't allowed to open.
+    activity = AuditLog.where(event: current_event)
+    activity = exclude_hidden_incident_logs(activity) unless current_user.global_admin?
+    @recent_activity = activity
       .includes(:actor)
       .order(created_at: :desc)
       .limit(8)
@@ -245,7 +271,7 @@ class Admin::DashboardController < Admin::BaseController
     if event.starts_at.nil? || event.ends_at.nil?
       { phase: :draft, label: "Dates not set", color: "gray" }
     elsif now < event.starts_at
-      days_until = (event.starts_at.to_date - Date.current).to_i
+      days_until = (event.local_start_date - event.local_today).to_i
       if days_until <= 0
         { phase: :starting, label: "Starts today!", color: "green" }
       elsif days_until == 1

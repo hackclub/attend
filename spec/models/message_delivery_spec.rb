@@ -28,4 +28,35 @@ RSpec.describe MessageDelivery do
       expect(delivery.recipient_name).to eq("nobody@example.com")
     end
   end
+
+  describe "#recipient_identifier" do
+    it "names the app account a push goes to" do
+      user = build(:user, email: "app-user@example.com")
+      delivery = described_class.new(
+        participant_event: build(:participant_event, participant: build(:participant, user: user)),
+        channel: "push"
+      )
+
+      expect(delivery.recipient_identifier).to eq("app-user@example.com")
+    end
+
+    it "falls back to a generic label for a push without an account" do
+      delivery = described_class.new(participant_event: build(:participant_event), channel: "push")
+
+      expect(delivery.recipient_identifier).to eq("App")
+    end
+
+    it "uses the channel's address otherwise" do
+      delivery = described_class.new(channel: "sms", recipient_phone: "+12025550100", recipient_email: "x@example.com")
+
+      expect(delivery.recipient_identifier).to eq("+12025550100")
+    end
+  end
+
+  describe "#catch_up?" do
+    it "comes from the column, defaulting to false" do
+      expect(described_class.new).not_to be_catch_up
+      expect(described_class.new(catch_up: true)).to be_catch_up
+    end
+  end
 end

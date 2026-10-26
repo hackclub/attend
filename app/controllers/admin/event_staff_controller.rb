@@ -8,6 +8,12 @@ module Admin
       @event_role_assignments = current_event.event_role_assignments
         .includes(:user)
         .order("users.email")
+      @volunteers = current_event.event_volunteers.includes(:user).order("users.email")
+      @training_status = TrainingStatus.for_event(current_event)
+      # Series owners and organizers work every event in the series without a
+      # role on each, so they're listed separately for their training.
+      @series_team = User.where(id: TrainingStatus.series_member_ids(current_event))
+        .where.not(id: @event_role_assignments.map(&:user_id)).order(:email)
     end
 
     def new

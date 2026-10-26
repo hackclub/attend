@@ -41,7 +41,7 @@ RSpec.describe "Admin console timestamps", type: :request do
   end
 
   it "renders event pages with compliant timestamps" do
-    incident = Incident.create!(event: event, reported_by: admin, category: :other, severity: :low,
+    incident = Incident.create!(event: event, reported_by: admin, category: :other, severity: :s3,
       summary: "A made-up incident", occurred_at: 2.hours.ago)
     event.update!(registration_open_at: 10.days.ago, registration_close_at: 1.day.from_now)
     context = ScanContext.create!(event: event, name: "Front desk", starts_at: 1.day.from_now, ends_at: 2.days.from_now)
@@ -98,7 +98,7 @@ RSpec.describe "Admin console timestamps", type: :request do
     blast = create(:slack_blast, event: event, sent_by_user: admin, status: "completed")
     report = IncidentReport.create!(event: event, reporter_name: "Pat Placeholder", reporter_email: "pat@example.com",
       reporter_phone: "+14155550150", reporter_role: "participant", incident_type: "other",
-      priority: "standard", summary: "Made-up summary", details: "Made-up details")
+      priority: "s2", summary: "Made-up summary", details: "Made-up details")
     scheduled = Message.create!(event: event, sent_by_user: admin, audience: "all_attendees", channels: [ "email" ],
       subject: "Later", body: "Soon", status: "draft", scheduled_at: 2.days.from_now)
 
@@ -107,8 +107,8 @@ RSpec.describe "Admin console timestamps", type: :request do
     expect(expect_compliant(admin_series_api_tokens_path(series.slug))).not_to be_empty
     expect(expect_compliant(admin_event_slack_blasts_path(event))).not_to be_empty
     expect(expect_compliant(admin_event_slack_blast_path(event, blast))).not_to be_empty
-    expect(expect_compliant(admin_incidents_path)).not_to be_empty
-    expect(expect_compliant(admin_incident_path(report))).not_to be_empty
+    expect(expect_compliant(admin_incident_reports_path)).not_to be_empty
+    expect(expect_compliant(admin_incident_report_path(report))).not_to be_empty
     expect(expect_compliant(preview_admin_event_message_path(event, scheduled))).not_to be_empty
     expect_compliant(admin_settings_path)
     expect(expect_compliant(admin_series_index_path)).to be_empty
@@ -116,7 +116,7 @@ RSpec.describe "Admin console timestamps", type: :request do
   end
 
   it "shows relative times with the absolute time on hover" do
-    Incident.create!(event: event, reported_by: admin, category: :other, severity: :low, summary: "Made up")
+    Incident.create!(event: event, reported_by: admin, category: :other, severity: :s3, summary: "Made up")
 
     get admin_event_dashboard_path(event.slug)
     node = times.find { |t| t.text.strip == "Now" }

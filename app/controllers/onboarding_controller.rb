@@ -1,7 +1,9 @@
 class OnboardingController < ApplicationController
+  include RestrictsBannedUsers
   include TravelLegDateMerging
   include PhysicalDocumentUploads
   include OptionalDocumentEnrolment
+  include OnboardingAccountsStep
 
   before_action :force_html_format, except: [ :documents_status ]
   before_action :store_invitation_token
@@ -9,8 +11,10 @@ class OnboardingController < ApplicationController
   before_action :authenticate_user!
   before_action :process_invitation
   before_action :load_participant_event
+  before_action :apply_event_brand
   before_action :redirect_if_withdrawn
-  before_action :redirect_if_locked, except: [ :index, :waiver, :waiver_complete ]
+  before_action :redirect_if_locked, except: [ :index, :waiver, :waiver_complete, :done ]
+  before_action :hold_at_profile_if_too_old, except: [ :welcome, :start, :done ]
 
   BASE_STEPS = %w[profile travel accommodation health].freeze
   GUARDIAN_STEP = "guardian"
@@ -29,8 +33,40 @@ class OnboardingController < ApplicationController
       return
     end
 
+    if show_welcome?
+      redirect_to onboarding_welcome_path(event_id: current_event.id)
+      return
+    end
+
     current_step = steps[@participant_event.onboarding_step] || steps.first
     redirect_to onboarding_step_path(step: current_step, event_id: current_event.id)
+  end
+
+  # The "what to expect" screen, shown once before the first step.
+  def welcome
+    @steps = steps
+  end
+
+  def start
+    @participant_event.update!(onboarding_intro_seen_at: Time.current) if @participant_event.onboarding_intro_seen_at.nil?
+    redirect_to onboarding_step_path(step: steps.first, event_id: current_event.id)
+  end
+
+  # The "you're registered" screen after submitting: the entry ticket once
+  # the registration is confirmed, otherwise what's still outstanding.
+  def done
+    if @participant_event.withdrawn? || @participant_event.rejected?
+      redirect_to dashboard_path
+      return
+    end
+
+    unless submitted?
+      redirect_to onboarding_path(event_id: current_event.id)
+      return
+    end
+
+    @participant = @participant_event.participant
+    @completion = RegistrationCompletionPresenter.new(@participant_event, viewer: :participant)
   end
 
   def show
@@ -75,6 +111,14 @@ class OnboardingController < ApplicationController
     end
 
     if save_step_data
+      # Held at the profile step (see #hold_at_profile_if_too_old): the rest
+      # of the profile saved, but they go no further until staff correct the
+      # birthday.
+      if @step == "profile" && @participant_event.too_old_for_event?
+        redirect_to onboarding_step_path(step: "profile", event_id: current_event.id), notice: "Progress saved."
+        return
+      end
+
       advance_to_next_step
       next_step = steps[@participant_event.onboarding_step]
 
@@ -105,6 +149,8 @@ class OnboardingController < ApplicationController
       @medical.present? && @dietary.present? && @accessibility.present?
     when "documents"
       !@documents.nil?
+    when ACCOUNTS_STEP
+      !@account_modes.nil?
     else
       false
     end
@@ -137,6 +183,9 @@ class OnboardingController < ApplicationController
 
   def waiver_complete
     @consent = @participant_event.consents.waiver.first
+    # The webhook marks it signed too, but it can land after this redirect and
+    # the done screen would ask them to sign again. Pull it from the API now.
+    @consent.sync_from_docuseal! if @consent && !@consent.participant_portion_signed?
 
     pending_docs = @participant_event.pending_custom_documents.select(&:participant_signs?)
     if pending_docs.any?
@@ -145,9 +194,7 @@ class OnboardingController < ApplicationController
       return
     end
 
-    # The webhook will mark it as signed, but we redirect immediately
-    # so we just go back to dashboard and let them see the updated status
-    redirect_to dashboard_path, notice: "Thank you for signing! Your waiver is being processed."
+    redirect_after_submit
   end
 
   # Fired by the documents step when an embedded DocuSeal form completes (or
@@ -273,6 +320,12 @@ class OnboardingController < ApplicationController
       return
     end
 
+    if (missing = missing_required_accounts).any?
+      redirect_to onboarding_step_path(step: ACCOUNTS_STEP, event_id: current_event.id),
+                  alert: "Please connect your #{missing.map { |provider| AccountLinking.provider_name(provider) }.to_sentence} account before submitting."
+      return
+    end
+
     unless params[:code_of_conduct_accepted] == "1" && params[:code_of_conduct_signature].present?
       redirect_to onboarding_step_path(step: REVIEW_STEP, event_id: current_event.id), alert: "You must accept the Code of Conduct and Safeguarding Policy and provide your signature."
       return
@@ -300,13 +353,13 @@ class OnboardingController < ApplicationController
       # bailed on the missing code of conduct, so accepting it here can be the
       # last piece; nothing else would re-check.
       if @participant_event.mark_complete_if_eligible!
-        redirect_to dashboard_path, notice: completion_notice("Registration submitted — you're all set!")
+        redirect_after_submit
       elsif current_event.guardian_invites_locked? || Setting.waiver_sending_paused?
-        redirect_to dashboard_path, notice: completion_notice("Registration submitted! We'll notify you when waivers are ready to sign.")
+        redirect_after_submit
       elsif waiver_participant_portion_signed?
         # Already signed during the documents step
         send_guardian_invites
-        redirect_to dashboard_path, notice: completion_notice("Registration submitted! We've invited your guardian to complete their portion.")
+        redirect_after_submit
       else
         trigger_minor_waiver
         send_guardian_invites
@@ -324,12 +377,12 @@ class OnboardingController < ApplicationController
       @participant_event.safeguarding_info || @participant_event.create_safeguarding_info!
 
       if current_event.guardian_invites_locked? || Setting.waiver_sending_paused?
-        redirect_to dashboard_path, notice: completion_notice("Registration submitted! We'll notify you when waivers are ready to sign.")
+        redirect_after_submit
       elsif waiver_participant_portion_signed?
         # Already signed during the documents step — completion lands via
         # webhook/sync now that the code of conduct is accepted.
         @participant_event.mark_complete_if_eligible!
-        redirect_to dashboard_path, notice: completion_notice("Registration submitted — you're all set!")
+        redirect_after_submit
       else
         trigger_adult_waiver
         redirect_to onboarding_waiver_path(event_id: current_event.id), notice: completion_notice("Almost done! Please sign the waiver to complete your registration.")
@@ -338,6 +391,10 @@ class OnboardingController < ApplicationController
   end
 
   private
+
+  def apply_event_brand
+    @page_brand = current_event.brand_theme
+  end
 
   def load_participant_event
     participant = current_user.participant
@@ -383,11 +440,15 @@ class OnboardingController < ApplicationController
         return
       end
 
+      # Like an integration's invitation, a birthday already on file that ages
+      # them out doesn't block the registration: onboarding holds them at the
+      # profile step instead (see #hold_at_profile_if_too_old).
       @participant_event = ParticipantEvent.create!(
         participant: participant,
         event: current_event,
         status: :in_progress,
-        onboarding_step: 0
+        onboarding_step: 0,
+        skip_age_check: true
       )
 
       # Apply any group memberships specified at invite time
@@ -419,13 +480,14 @@ class OnboardingController < ApplicationController
     case @step
     when "profile"
       @participant = @participant_event.participant
+      load_identity_correction
     when "travel"
       @travel_inbound = @participant_event.travel_inbound || @participant_event.travels.build(direction: "inbound")
       @travel_inbound.travel_legs.build(position: 0) if @travel_inbound.travel_legs.empty?
       @travel_outbound = @participant_event.travel_outbound || @participant_event.travels.build(direction: "outbound")
       @travel_outbound.travel_legs.build(position: 0) if @travel_outbound.travel_legs.empty?
-      @default_inbound_date = current_event.starts_at&.to_date&.strftime("%Y-%m-%d")
-      @default_outbound_date = current_event.ends_at&.to_date&.strftime("%Y-%m-%d")
+      @default_inbound_date = current_event.local_start_date&.strftime("%Y-%m-%d")
+      @default_outbound_date = current_event.local_end_date&.strftime("%Y-%m-%d")
     when "accommodation"
       @accommodation = @participant_event.accommodation || @participant_event.build_accommodation
     when "health"
@@ -438,6 +500,8 @@ class OnboardingController < ApplicationController
       @guardian = @existing_gpe&.guardian || Guardian.new
     when "emergency"
       load_emergency_step_data
+    when ACCOUNTS_STEP
+      load_accounts_step_data
     when "documents"
       load_documents_step_data
     when "review"
@@ -455,23 +519,35 @@ class OnboardingController < ApplicationController
     @accessibility = @participant_event.accessibility
     @guardians = @participant_event.guardian_participant_events.includes(:guardian)
     @emergency_contacts = @participant_event.emergency_contacts.by_priority
+    load_accounts_step_data if current_event.account_linking_step?
   end
 
   def save_step_data
     case @step
     when "profile"
-      @participant = @participant_event.participant
-      @participant.assign_attributes(profile_params)
+      load_identity_correction
+      birthday_locked = @participant_event.too_old_for_event?
+      @participant = assign_profile_attributes(profile_params)
       if profile_params[:tshirt_size].blank?
         flash.now[:alert] = "Please select a t-shirt size"
         return false
       end
       # The profile form has no error summary, so say what was actually wrong
       # (e.g. an email that belongs to this participant's guardian).
-      return true if @participant.save
+      unless @participant.save
+        flash.now[:alert] = @participant.errors.full_messages.to_sentence
+        return false
+      end
 
-      flash.now[:alert] = @participant.errors.full_messages.to_sentence
-      false
+      # Saved even so: it's what they told us. From here the birthday is
+      # locked and they can only ask staff to correct it. Someone already
+      # held can still save the rest of their profile (see #update).
+      if !birthday_locked && @participant_event.too_old_for_event?
+        flash.now[:alert] = "You will be 19 or older during this event, so you can't continue registering."
+        return false
+      end
+
+      true
     when "travel"
       save_travel_data
     when "accommodation"
@@ -482,6 +558,8 @@ class OnboardingController < ApplicationController
       save_guardian_data
     when "emergency"
       save_emergency_data
+    when ACCOUNTS_STEP
+      save_accounts_step
     when "documents"
       save_documents_step
     when "review"
@@ -496,7 +574,13 @@ class OnboardingController < ApplicationController
       # field on every save, so attaching here would purge and recreate the
       # attachment each time — two overlapping autosaves then deadlock deleting
       # the same active_storage_attachments row. The photo is attached on submit.
-      autosave_record(@participant_event.participant, profile_params.except(:headshot))
+      #
+      # Autosave never ages someone out either: a date field reports the year
+      # as it's typed ("0002", "0020", "0200"), and saving one of those would
+      # lock the birthday mid-keystroke. Submitting the form saves it.
+      participant = assign_profile_attributes(profile_params.except(:headshot))
+      participant.restore_attributes([ :date_of_birth ]) if participant.date_of_birth_changed? && @participant_event.too_old_for_event?
+      autosave_record(participant, {})
     when "travel"
       autosave_travel_data
     when "accommodation"
@@ -1040,6 +1124,42 @@ class OnboardingController < ApplicationController
     )
   end
 
+  # A birthday that ages the participant out is locked: changing it to one
+  # that doesn't would let anyone past the age limit by retyping a year, so
+  # it goes through staff as a change request instead. The lock is applied
+  # to the attribute rather than the param keys, because Rails also accepts
+  # a date as date_of_birth(1i), (2i) and (3i).
+  def assign_profile_attributes(attributes)
+    participant = @participant_event.participant
+    locked = @participant_event.too_old_for_event?
+    participant.assign_attributes(attributes)
+    participant.restore_attributes([ :date_of_birth ]) if locked
+    participant
+  end
+
+  # Someone 19 or older by the end of the event can't attend. Their birthday
+  # may have come from an integration's invitation (see
+  # ParticipantEvent#skip_age_check) or from their own profile. Either way
+  # they stay on the profile step, where they can ask staff to correct it.
+  def hold_at_profile_if_too_old
+    return unless @participant_event.too_old_for_event?
+    # Only the profile step itself is exempt; the step is a path segment on
+    # these two routes, so a query string can't borrow it on another action.
+    return if %w[show update].include?(action_name) && params[:step] == "profile"
+
+    redirect_to onboarding_step_path(step: "profile", event_id: current_event.id)
+  end
+
+  # The newest identity correction, so the profile step can say whether one
+  # is already with staff or what staff asked for.
+  def load_identity_correction
+    @identity_correction = @participant_event.registration_change_requests
+      .signed_identity
+      .where(requested_by: current_user)
+      .order(created_at: :desc)
+      .first
+  end
+
   def travel_params(direction)
     params.fetch("travel_#{direction}", {}).permit(
       :arrangement_status, :mode, :carrier, :flight_number, :departure_city, :departure_time,
@@ -1095,6 +1215,11 @@ class OnboardingController < ApplicationController
   def health_record_params(record, attributes)
     values = attributes.to_h.symbolize_keys
     clear = ActiveModel::Type::Boolean.new.cast(values.delete(:clear_details))
+    # A series that hides the privacy notes offers no private follow-up, so a
+    # new "private" answer is ignored; one already saved is kept.
+    if values[:section_response] == "private" && current_event.hide_privacy_notes? && !record.section_response_private?
+      values.delete(:section_response)
+    end
     if values[:section_response] == "nothing_to_add" && clear
       record.class.health_section_detail_fields.each do |field|
         values[field] = record.class.health_section_boolean_fields.include?(field) ? false : nil
@@ -1164,6 +1289,7 @@ class OnboardingController < ApplicationController
       else
         s << EMERGENCY_STEP
       end
+      s << ACCOUNTS_STEP if current_event.account_linking_step?
       s << DOCUMENTS_STEP
       s << REVIEW_STEP
       s
@@ -1179,6 +1305,30 @@ class OnboardingController < ApplicationController
 
   def all_steps_complete?
     @participant_event.onboarding_step >= steps.length - 1
+  end
+
+  def show_welcome?
+    @participant_event.onboarding_intro_seen_at.nil? &&
+      @participant_event.onboarding_step.zero?
+  end
+
+  # `complete` records the code of conduct before checking for a guardian or
+  # an emergency contact, so an accepted code of conduct alone doesn't mean
+  # the registration went through.
+  def submitted?
+    return false if @participant_event.code_of_conduct_accepted_at.blank?
+
+    if @participant_event.requires_guardian?
+      @participant_event.awaiting_guardian? || @participant_event.complete?
+    else
+      @participant_event.emergency_contacts.any?
+    end
+  end
+
+  # Submitting lands on the "you're registered" screen, which shows where
+  # the registration stands.
+  def redirect_after_submit
+    redirect_to onboarding_done_path(event_id: current_event.id)
   end
 
   def completion_notice(base)
@@ -1479,6 +1629,7 @@ class OnboardingController < ApplicationController
 
   def prepare_invitation_presentation
     @invitation_event = @invitation.event
+    @page_brand = @invitation_event.brand_theme
     @invitation_support_email = @invitation_event.effective_support_email
     @invitation_location = [
       @invitation_event.venue_name,

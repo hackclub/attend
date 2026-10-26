@@ -1,4 +1,5 @@
 class RegistrationCorrectionsController < ApplicationController
+  include RestrictsBannedUsers
   SECTIONS = %w[contact health emergency guardian support].freeze
 
   rescue_from ActiveRecord::RecordNotFound, with: :render_not_found

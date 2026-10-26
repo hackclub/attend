@@ -114,13 +114,13 @@ RSpec.describe "MCP staff-only access", type: :request do
   end
 
   describe "the Connections section on /dashboard/profile" do
-    it "is hidden for a non-staff user with nothing connected" do
+    it "leaves MCP out for a non-staff user with nothing connected" do
       sign_in non_staff
 
       get dashboard_profile_path
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).not_to include("#connections")
+      expect(response.body).not_to include("Apps connected through MCP")
     end
 
     # Someone who connected a client and later lost their role still needs a way

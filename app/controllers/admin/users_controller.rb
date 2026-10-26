@@ -42,9 +42,13 @@ module Admin
     end
 
     def show
+      @active_bans = Ban.active_for_user(@user).load
       @event_role_assignments = @user.event_role_assignments.includes(:event).order("events.starts_at DESC")
       load_participant_events
       @passports = @user.passports.includes(:paired_by, :revoked_by).order(created_at: :desc)
+      @training_awards = @user.training_badge_awards.includes(:badge, :course, :awarded_by).newest_first
+      @training_enrollments = @user.training_enrollments.includes(course: :lessons).where(completed_at: nil)
+      @training_disclosure = @user.training_disclosures.where.not(review_status: "not_required").newest_first.first
     end
 
     def new

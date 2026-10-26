@@ -19,6 +19,21 @@ class EventSeries < ApplicationRecord
 
   RESERVED_SLUGS = %w[new].freeze
 
+  # Account linking modes for the onboarding accounts step.
+  ACCOUNT_LINKING_MODES = %w[off optional required].freeze
+  ACCOUNT_LINKING_PROVIDERS = %w[github itch].freeze
+
+  # Settings every event in the series inherits: onboarding branding (see
+  # BrandTheme), notes shown during registration, whether the accommodation
+  # and health steps explain who sees the answers, and account linking modes
+  # with an optional how-to link per provider. Events can override linking.
+  store_accessor :config, :brand, :registration_note, :address_note, :tshirt_note,
+    :hide_privacy_notes, :github_linking, :itch_linking, :github_help_url, :itch_help_url
+
+  validates :github_linking, :itch_linking, inclusion: { in: ACCOUNT_LINKING_MODES }, allow_blank: true
+  validates :github_help_url, :itch_help_url, format: { with: %r{\Ahttps://\S+\z}, message: "must start with https://" }, allow_blank: true
+  validate :brand_meets_contrast_floors
+
   validates :name, presence: true
   validates :contact_email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
   validates :slug, presence: true,
@@ -36,6 +51,27 @@ class EventSeries < ApplicationRecord
     logo if logo.attached?
   end
 
+  def brand=(value)
+    super(BrandTheme.normalize(value || {}))
+  end
+
+  def brand_theme
+    BrandTheme.new(brand)
+  end
+
+  def hide_privacy_notes?
+    ActiveModel::Type::Boolean.new.cast(hide_privacy_notes) || false
+  end
+
+  def account_linking_mode(provider)
+    mode = config&.[]("#{provider}_linking")
+    ACCOUNT_LINKING_MODES.include?(mode) ? mode : "off"
+  end
+
+  def account_help_url(provider)
+    config&.[]("#{provider}_help_url").presence
+  end
+
   def logo_displayable?
     return true if logo.attached? && logo.content_type == "image/svg+xml"
 
@@ -46,6 +82,15 @@ class EventSeries < ApplicationRecord
 
   def generate_slug_from_name
     self.slug = name.downcase.gsub(/\s+/, "-").gsub(/[^a-z0-9-]/, "")
+  end
+
+  def brand_meets_contrast_floors
+    theme = brand_theme
+    return if theme.valid?
+
+    theme.errors.each do |error|
+      errors.add(error.attribute == :base ? :brand : :"brand_#{error.attribute}", error.message)
+    end
   end
 
   def acceptable_logo

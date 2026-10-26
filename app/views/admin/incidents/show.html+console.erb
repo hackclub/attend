@@ -7,17 +7,20 @@
       <h1 class="cs-h1">Incident details</h1>
       <div class="cs-description flex flex-wrap items-center gap-2 mt-1">
         <%= render_category_badge(@incident.category) %>
-        <%= render_severity_badge(@incident.severity) %>
+        <%= incident_level_badge(@incident.severity, full: true) %>
         <%= incident_status(@incident.status) %>
       </div>
     </div>
     <div class="cs-actions">
-      <% if @incident.behavior? || @incident.safeguarding? || @incident.other? %>
-        <%= button_to "Send to Slack", send_to_slack_admin_event_incident_path(current_event, @incident), method: :post, class: "cs-btn", data: { turbo_confirm: "Send this conduct report to Slack?" } %>
-      <% end %>
-      <%= link_to "Edit", edit_admin_event_incident_path(current_event, @incident), class: "cs-btn cs-btn-primary" %>
+      <%= link_to "Edit", edit_admin_event_incident_path(current_event, @incident), class: "cs-btn cs-btn-primary" if policy(@incident).edit? %>
     </div>
   </div>
+
+  <% if @incident.escalated? %>
+    <%= render "admin/incidents/hq_status", incident: @incident %>
+  <% else %>
+    <%= render "admin/incidents/escalate_form", incident: @incident %>
+  <% end %>
 
   <section class="cs-container">
     <div class="cs-container-header">
@@ -97,19 +100,58 @@
           <dt class="cs-kv-label">Details</dt>
           <dd class="cs-kv-value whitespace-pre-wrap"><%= @incident.details.presence || "No details provided" %></dd>
         </div>
-        <div>
-          <dt class="cs-kv-label">Actions taken</dt>
-          <dd class="cs-kv-value whitespace-pre-wrap"><%= @incident.actions_taken.presence || "No actions recorded yet" %></dd>
-        </div>
+        <% if policy(@incident).view_casework? %>
+          <div>
+            <dt class="cs-kv-label">Actions taken</dt>
+            <dd class="cs-kv-value whitespace-pre-wrap"><%= @incident.actions_taken.presence || "No actions recorded yet" %></dd>
+          </div>
+        <% end %>
       </dl>
     </div>
   </section>
+
+  <% if @incident.medical? %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Medication dispensed</h2>
+      </div>
+      <div class="cs-container-body">
+        <% if @incident.medication_dispensed? %>
+          <div class="cs-table-wrap">
+            <table class="cs-table">
+              <thead>
+                <tr>
+                  <th scope="col">Medication</th>
+                  <th scope="col">Quantity / dose</th>
+                  <th scope="col">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @incident.medications.each do |medication| %>
+                  <tr>
+                    <td><%= medication.name %></td>
+                    <td><%= medication.dose %></td>
+                    <td class="whitespace-pre-wrap"><%= medication.notes %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% else %>
+          <p class="cs-muted">None</p>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
 
   <section class="cs-container">
     <div class="cs-container-header">
       <h2 class="cs-h2">Add comment</h2>
     </div>
     <div class="cs-container-body">
+      <% unless policy(@incident).view_casework? %>
+        <p class="cs-field-description mb-4">You can add to the report you filed. The team handling it works the incident separately.</p>
+      <% end %>
       <%= form_with model: @comment || IncidentComment.new, url: admin_event_incident_comments_path(current_event, @incident),
             html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
         <%= cs_form_field f, :body, label: "Comment", description: "A comment or note about this incident." do |aria| %>
@@ -117,11 +159,17 @@
         <% end %>
         <%= cs_form_errors f %>
         <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mt-4">
-          <%= cs_form_field f, :new_status, label: "Change status to", optional: true do |aria| %>
-            <%= f.select :new_status,
-                [["No change", ""]] + Incident.statuses.keys.map { |s| [s.humanize, s] },
-                {},
-                class: "cs-select", **aria %>
+          <%# A reporter who holds none of the incident's roles comments without
+              the dropdown — closing it is an update. The span keeps the button right. %>
+          <% if policy(@incident).update? %>
+            <%= cs_form_field f, :new_status, label: "Change status to", optional: true do |aria| %>
+              <%= f.select :new_status,
+                  [["No change", ""]] + Incident.statuses.keys.map { |s| [s.humanize, s] },
+                  {},
+                  class: "cs-select", **aria %>
+            <% end %>
+          <% else %>
+            <span></span>
           <% end %>
           <%= f.button "Add comment", class: "cs-btn cs-btn-primary cs-btn-full" %>
         </div>
@@ -129,6 +177,10 @@
     </div>
   </section>
 
+  <%# The timeline is the casework: handlers' comments and every field they
+      changed. A reporter reading it back would see the follow-up to their own
+      report, which is what visible_to_roles exists to hold. %>
+  <% if policy(@incident).view_casework? %>
   <section class="cs-container">
     <div class="cs-container-header">
       <h2 class="cs-h2">Timeline</h2>
@@ -198,4 +250,5 @@
       </ol>
     </div>
   </section>
+  <% end %>
 </div>

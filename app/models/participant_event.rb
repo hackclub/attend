@@ -51,6 +51,13 @@ class ParticipantEvent < ApplicationRecord
   has_many :registration_change_requests, dependent: :destroy
   has_many :group_memberships, dependent: :destroy
   has_many :groups, through: :group_memberships
+  # The latest scan that placed this participant somewhere, for their status.
+  # DISTINCT ON keeps it to one row per registration, so lists preload it in
+  # a single query. Preload it, never includes: eager loading drops the order.
+  has_one :latest_placing_scan, -> {
+    placing.select("DISTINCT ON (scans.participant_event_id) scans.*")
+      .order("scans.participant_event_id", scanned_at: :desc, created_at: :desc)
+  }, class_name: "Scan"
 
   enum :status, {
     invited: "invited",
@@ -74,8 +81,20 @@ class ParticipantEvent < ApplicationRecord
   validates :participant_id, presence: true
   validates :event_id, presence: true
   validates :participant_id, uniqueness: { scope: :event_id }
-  validate :participant_not_too_old, on: :create
+  # An integration's invitation records whatever birthday it was sent, even
+  # one that ages the participant out: signup forms see typos, and the signup
+  # shouldn't be lost over one. Onboarding then holds them at the profile step
+  # until staff correct it (see #too_old_for_event?).
+  attr_accessor :skip_age_check
+  validate :participant_not_too_old, on: :create, unless: :skip_age_check
   validate :participant_not_banned, on: :create
+
+  # Hooked on the status column rather than mark_complete_if_eligible!, so
+  # every route to complete (DocuSeal, guardian portal, admin status edits,
+  # CSV import) invites without each one remembering to. A participant change
+  # is a duplicate merge handing a complete registration to the Slack-linked row.
+  after_commit :invite_to_slack_channel, on: %i[create update],
+    if: -> { (saved_change_to_status? || saved_change_to_participant_id?) && complete? }
 
   # SQL mirror of !onboarding_complete? so list filters don't have to load
   # every row into Ruby. Keep in sync with #onboarding_complete?.
@@ -172,7 +191,16 @@ class ParticipantEvent < ApplicationRecord
   def requires_guardian?
     return true unless participant.date_of_birth.present?
 
-    participant.minor_on?(event.starts_at&.to_date || Date.current)
+    participant.minor_on?(event.local_start_date || Date.current)
+  end
+
+  # A waiver was reset, so guardians who'd finished the portal have something
+  # to sign again. Defaults to every guardian; pass a subset to reopen only
+  # the ones the reset waiver belongs to.
+  def reopen_guardian_portal_access!(guardian_participant_events = self.guardian_participant_events)
+    guardian_participant_events.each do |gpe|
+      gpe.update!(status: :in_progress) if gpe.completed?
+    end
   end
 
   def guardian_replacement_eligible?
@@ -180,11 +208,28 @@ class ParticipantEvent < ApplicationRecord
   end
 
   def age_on_event
-    participant.age_on(event.starts_at&.to_date || Date.current)
+    participant.age_on(event.local_start_date || Date.current)
   end
 
   def is_18_on_event?
     age_on_event == 18
+  end
+
+  # 19 or older by the last day of the event. Nobody that old may attend, so
+  # onboarding won't let them past their profile, and they can't change the
+  # birthday themselves: only staff can, through a change request.
+  def too_old_for_event?
+    return false unless participant&.date_of_birth.present? && event&.ends_at.present?
+
+    age_at_event_end = participant.age_on(event.local_end_date)
+    age_at_event_end.present? && age_at_event_end >= 19
+  end
+
+  # Still filling the wizard in for the first time. Adding an optional
+  # document reopens a completed participant, so in_progress on its own
+  # doesn't mean this.
+  def in_onboarding?
+    invited? || (in_progress? && onboarding_completed_at.nil?)
   end
 
   def assigned_to_room?
@@ -283,6 +328,9 @@ class ParticipantEvent < ApplicationRecord
   # webhook and the guardian portal so neither path can complete a participant
   # the other would still consider blocked.
   def eligible_for_completion?
+    # A withdrawn or rejected registration is closed: a still-open DocuSeal
+    # link finishing later must not flip it back to complete.
+    return false if withdrawn? || rejected?
     # Signing can now happen before the participant submits their registration
     # (documents step) — never complete someone who hasn't hit submit yet.
     return false unless code_of_conduct_accepted_at.present?
@@ -301,9 +349,19 @@ class ParticipantEvent < ApplicationRecord
     return false if complete?
     return false unless eligible_for_completion?
 
-    update!(status: :complete, onboarding_completed_at: onboarding_completed_at || Time.current)
-    ParticipantMailer.registration_confirmed(participant_event: self).deliver_later
-    true
+    # Concurrent webhooks (or a webhook racing a guardian's commit hook) can
+    # both get this far. Re-check under a row lock so only one of them
+    # completes the registration and sends the confirmation email.
+    completed_now = with_lock do
+      reset_document_memoisation!
+      next false if complete? || !eligible_for_completion?
+
+      update!(status: :complete, onboarding_completed_at: onboarding_completed_at || Time.current)
+      true
+    end
+
+    ParticipantMailer.registration_confirmed(participant_event: self).deliver_later if completed_now
+    completed_now
   end
 
   # Computed display status for the UI. Maps the DB status + actual progress
@@ -365,6 +423,10 @@ class ParticipantEvent < ApplicationRecord
     blocking = steps.find { |s| !s[:done] }
 
     { steps: steps, blocking_step: blocking&.dig(:name) }
+  end
+
+  def food_safety_summary
+    FoodSafetySummary.new(medical: medical, dietary: dietary)
   end
 
   def checked_in?
@@ -456,6 +518,17 @@ class ParticipantEvent < ApplicationRecord
     travel_inbound.travel_legs.last&.arrival_airport
   end
 
+  # Whether the person behind this registration is banned, matched on the
+  # participant's email and every Slack ID we know for them, including the
+  # one recorded on the registration itself. A ban can land long after the
+  # registration was created and nothing rejects it, so anything that acts
+  # on a registration's own say-so (Slack channel invites) has to ask.
+  def participant_banned?
+    return false unless participant
+
+    Ban.banned?(participant.email, slack_ids: Ban.slack_ids_for(participant) + [ slack_user_id ])
+  end
+
   private
 
   def travel_calendar_event_ids
@@ -509,17 +582,20 @@ class ParticipantEvent < ApplicationRecord
     [ self ]
   end
 
-  def participant_not_too_old
-    return unless participant&.date_of_birth.present? && event&.ends_at.present?
+  def invite_to_slack_channel
+    return if event.slack_channel_id.blank?
 
-    age_at_event_end = participant.age_on(event.ends_at.to_date)
-    if age_at_event_end && age_at_event_end >= 19
-      errors.add(:base, "You will be 19 or older during this event. Please contact event staff for assistance.")
-    end
+    InviteToEventSlackChannelJob.perform_later(id)
+  end
+
+  def participant_not_too_old
+    return unless too_old_for_event?
+
+    errors.add(:base, "You will be 19 or older during this event. Please contact event staff for assistance.")
   end
 
   def participant_not_banned
-    return unless participant && Ban.banned?(participant.email)
+    return unless participant_banned?
 
     errors.add(:base, "#{participant.email} is banned from events")
   end

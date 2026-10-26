@@ -155,7 +155,7 @@
         </div>
         <div>
           <h2 class="font-semibold text-gray-900">Airtable Sync</h2>
-          <p class="text-sm text-gray-500">Read-only mirror of participant data via the Sync API</p>
+          <p class="text-sm text-gray-500">Mirror of participant data in an Airtable table</p>
         </div>
         <% if @airtable_sync_paused %>
           <span class="ml-auto inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
@@ -172,37 +172,87 @@
         <% end %>
       </div>
       <div class="p-4 space-y-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <%# Connection. The buttons submit forms that sit after this one: a
+            form nested in the settings form would be dropped by the browser. %>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <%= f.label :airtable_api_key, "Personal Access Token", class: "block text-sm font-medium text-gray-700 mb-1" %>
-            <%= f.password_field :airtable_api_key,
-                value: current_event.airtable_api_key,
-                class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm",
-                placeholder: "pat..." %>
-            <p class="text-xs text-gray-500 mt-1">Requires <code>data.records:write</code> and <code>schema.bases:write</code> scopes</p>
+            <h3 class="font-medium text-gray-900 text-sm">Airtable account</h3>
+            <p class="text-sm text-gray-600">
+              <% if @airtable_connection %>
+                Connected<% if @airtable_connection.account_label.present? %> as <strong><%= @airtable_connection.account_label %></strong><% end %>
+              <% elsif current_event.airtable_api_key.present? %>
+                Using a personal access token. Connect Airtable to replace it.
+              <% else %>
+                Not connected
+              <% end %>
+            </p>
           </div>
-          <div>
-            <%= f.label :airtable_base_id, "Base ID", class: "block text-sm font-medium text-gray-700 mb-1" %>
-            <%= f.text_field :airtable_base_id,
-                class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm",
-                placeholder: "app..." %>
-            <p class="text-xs text-gray-500 mt-1">Found in Airtable URL: airtable.com/<strong>appXXXXX</strong>/...</p>
-          </div>
-          <div>
-            <%= f.label :airtable_sync_source_id, "Sync Source ID", class: "block text-sm font-medium text-gray-700 mb-1" %>
-            <%= f.text_field :airtable_sync_source_id,
-                class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm",
-                placeholder: "snc..." %>
-            <p class="text-xs text-gray-500 mt-1">The <code>apiEndpointSyncId</code> from the Sync API setup in Airtable</p>
-          </div>
-          <div>
-            <%= f.label :airtable_sync_table_id, "Sync Table", class: "block text-sm font-medium text-gray-700 mb-1" %>
-            <%= f.text_field :airtable_sync_table_id,
-                class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm",
-                placeholder: "tbl... or table name" %>
-            <p class="text-xs text-gray-500 mt-1">Table ID or name where the sync source was created</p>
+          <div class="flex gap-2 shrink-0">
+            <% if @airtable_connection %>
+              <button type="submit" form="airtable-disconnect-form" class="border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors whitespace-nowrap cursor-pointer">Disconnect</button>
+            <% end %>
+            <% if @airtable_oauth_configured %>
+              <button type="submit" form="airtable-connect-form" class="bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors whitespace-nowrap cursor-pointer">
+                <%= @airtable_connection ? "Reconnect" : "Connect Airtable" %>
+              </button>
+            <% end %>
           </div>
         </div>
+
+        <% unless @airtable_oauth_configured || @airtable_connection %>
+          <p class="text-sm text-gray-600 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+            Connecting with Airtable isn't set up on this server yet, so this event needs a personal access token (under Advanced).
+          </p>
+        <% end %>
+
+        <% if @airtable_base_not_granted %>
+          <p class="text-sm text-amber-800 rounded-md border border-amber-300 bg-amber-50 px-3 py-2">
+            The connected Airtable account didn't give Attend access to this base. Reconnect and select the base on Airtable's consent screen.
+          </p>
+        <% end %>
+
+        <% if @airtable_connection %>
+          <div>
+            <%= f.label :airtable_base_id, "Base", class: "block text-sm font-medium text-gray-700 mb-1" %>
+            <% if @airtable_base_options.any? %>
+              <%= f.select :airtable_base_id, @airtable_base_options, { include_blank: "Choose a base" },
+                  class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm" %>
+            <% else %>
+              <%= f.text_field :airtable_base_id, class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm", placeholder: "app...", autocomplete: "off" %>
+            <% end %>
+            <p class="text-xs text-gray-500 mt-1">Only bases you selected on Airtable's consent screen are listed. Reconnect to add more.</p>
+          </div>
+          <p class="text-sm text-gray-600">
+            Attend keeps a table called <strong><%= Airtable::RecordsSync.table_name_for(current_event) %></strong> in this base up to date, creating it on the first sync.
+            Columns you add are left alone; edits to Attend's columns are overwritten on the next sync.
+            <% if current_event.airtable_base_id.present? && current_event.airtable_sync_table_id.present? %>
+              <%= link_to "Open in Airtable", "https://airtable.com/#{current_event.airtable_base_id}/#{current_event.airtable_sync_table_id}", target: "_blank", rel: "noopener", class: "text-yellow-700 underline" %>
+            <% end %>
+          </p>
+        <% else %>
+          <details <%= "open" if current_event.airtable_api_key.present? || current_event.errors.include?(:airtable_sync_endpoint_url) %>>
+            <summary class="text-sm font-medium text-gray-700 cursor-pointer">Advanced: use a personal access token instead</summary>
+            <div class="mt-3 space-y-4">
+              <div>
+                <%= f.label :airtable_api_key, "Personal Access Token", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.password_field :airtable_api_key,
+                    value: nil,
+                    class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm",
+                    autocomplete: "off",
+                    placeholder: current_event.airtable_api_key.present? ? "Saved, hidden" : "pat..." %>
+                <p class="text-xs text-gray-500 mt-1">Requires <code>data.records:write</code> and <code>schema.bases:write</code> scopes. Leave blank to keep the saved token.</p>
+              </div>
+              <div>
+                <%= f.label :airtable_sync_endpoint_url, "Sync Endpoint URL", class: "block text-sm font-medium text-gray-700 mb-1" %>
+                <%= f.text_field :airtable_sync_endpoint_url,
+                    class: "block w-full rounded-md border-gray-300  focus:border-yellow-500 focus:ring-yellow-500 px-3 py-2 font-mono text-sm",
+                    autocomplete: "off", spellcheck: false,
+                    placeholder: "https://api.airtable.com/v0/app.../tbl.../sync/..." %>
+                <p class="text-xs text-gray-500 mt-1">A token syncs through Airtable's Sync API. Add a synced table from the Sync API and copy its endpoint URL.</p>
+              </div>
+            </div>
+          </details>
+        <% end %>
 
         <% if @airtable_sync_configured %>
           <!-- Sync Status -->
@@ -216,7 +266,7 @@
                       Sync paused after a failure<%= " #{time_ago_in_words(@airtable_sync_paused_at)} ago" if @airtable_sync_paused_at %>
                     </p>
                     <p class="text-sm text-amber-700">
-                      Attend stops syncing an event as soon as it fails, rather than retrying
+                      Attend stops syncing an event as soon as Airtable rejects its settings, rather than retrying
                       broken settings every 5 minutes.
                       <% if @airtable_config_owner %>
                         <%= @airtable_config_owner.name.presence || @airtable_config_owner.email %> was emailed
@@ -244,8 +294,15 @@
                     </p>
                     <p class="text-sm text-red-600">
                       <% unless @airtable_synced_at %>If you just saved these settings, a sync is already running — refresh in a minute. Otherwise, <% end %>
-                      Airtable is showing stale data — check that the Base ID, Sync Table and Sync Source ID
-                      above still exist in Airtable and that the token can see that base.
+                      <% if @airtable_sync_failures.positive? %>
+                        Airtable is showing stale data while Attend retries. A rate limit or an Airtable outage clears
+                        up by itself; anything else has been reported to the Attend team.
+                      <% elsif @airtable_connection %>
+                        Airtable is showing stale data — check that the connected account can still see the base above.
+                      <% else %>
+                        Airtable is showing stale data — check that the sync endpoint above still exists in
+                        Airtable and that the token can see that base.
+                      <% end %>
                     </p>
                   <% else %>
                     <p class="text-sm text-gray-600">
@@ -259,6 +316,9 @@
                         Last sync attempt failed<%= " #{time_ago_in_words(@airtable_sync_error_at)} ago" if @airtable_sync_error_at %>
                       </p>
                       <p class="text-sm text-red-600 font-mono break-all"><%= @airtable_sync_error %></p>
+                      <% if !@airtable_sync_paused && @airtable_sync_failures.positive? %>
+                        <p class="text-sm text-red-600"><%= pluralize(@airtable_sync_failures, "failed attempt") %> in a row. Attend keeps retrying every 5 minutes.</p>
+                      <% end %>
                     </div>
                   <% end %>
                   <p class="text-sm text-gray-500"><%= @airtable_participant_count %> participant records will be synced</p>
@@ -266,15 +326,14 @@
                     <% if @airtable_sync_paused %>
                       Automatic syncing is stopped until these settings are saved again
                     <% else %>
-                      Syncs automatically every 5 minutes and whenever these settings are saved. A failed sync pauses automatically.
+                      Syncs automatically every 5 minutes and whenever these settings are saved. If Airtable rejects these settings, syncing pauses until they are fixed.
                     <% end %>
                   </p>
                 </div>
               </div>
-              <%= button_to @airtable_sync_paused ? "Resume & Sync Now" : "Sync Now",
-                  admin_event_trigger_airtable_sync_path(current_event),
-                  method: :post,
-                  class: "bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors whitespace-nowrap shrink-0 self-start" %>
+              <button type="submit" form="airtable-sync-now-form" class="bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors whitespace-nowrap shrink-0 self-start cursor-pointer">
+                <%= @airtable_sync_paused ? "Resume & Sync Now" : "Sync Now" %>
+              </button>
             </div>
           </div>
         <% end %>
@@ -286,6 +345,12 @@
       <%= f.submit "Save Integration Settings", class: "bg-[#d42f46] hover:bg-[#b82840] text-white font-medium py-2 px-4 rounded-lg transition-colors cursor-pointer" %>
     </div>
   <% end %>
+
+  <%# Targets for the Airtable buttons inside the settings form above. %>
+  <%= form_with url: admin_event_trigger_airtable_sync_path(current_event), method: :post, id: "airtable-sync-now-form", class: "hidden" do %><% end %>
+  <%= form_with url: admin_event_airtable_connection_path(current_event), method: :post, id: "airtable-connect-form", class: "hidden", data: { turbo: false } do %><% end %>
+  <%= form_with url: admin_event_airtable_connection_path(current_event), method: :delete, id: "airtable-disconnect-form", class: "hidden",
+        data: { turbo_confirm: "Disconnect Airtable? The sync stops until someone connects it again." } do %><% end %>
 
   <!-- Custom Documents (not part of the form) -->
   <div class="bg-white border border-gray-200 rounded-lg mt-6">
@@ -508,11 +573,11 @@
                 <% if policy(current_event).manage_api_tokens? %>
                   <%= button_to "Rotate", admin_rotate_event_api_token_path(current_event.slug, token.id),
                       method: :post,
-                      data: { confirm: "Rotating issues a new secret and invalidates the current one. Integrations using this token will stop working until updated. Continue?" },
+                      form: { data: { turbo_confirm: "Rotating issues a new secret and invalidates the current one. Integrations using this token will stop working until updated. Continue?" } },
                       class: "shrink-0 text-sm font-medium text-[#ec3750] hover:text-[#d42f46]" %>
                   <%= button_to "Revoke", admin_event_api_token_path(current_event.slug, token.id),
                       method: :delete,
-                      data: { confirm: "This permanently revokes the token. Any integration using it will stop working. Continue?" },
+                      form: { data: { turbo_confirm: "This permanently revokes the token. Any integration using it will stop working. Continue?" } },
                       class: "shrink-0 text-sm font-medium text-gray-500 hover:text-gray-700" %>
                 <% end %>
               </div>
@@ -552,7 +617,7 @@
               <%= button_to "Regenerate",
                   regenerate_api_key_admin_event_path(current_event),
                   method: :post,
-                  data: { confirm: "This will invalidate the existing legacy API key. Any integrations using it will stop working. Continue?" },
+                  form: { data: { turbo_confirm: "This will invalidate the existing legacy API key. Any integrations using it will stop working. Continue?" } },
                   class: "shrink-0 text-sm font-medium text-gray-500 hover:text-gray-700" %>
             <% end %>
           </div>
@@ -628,7 +693,7 @@
               admin_event_create_vote_event_path(current_event),
               method: :post,
               disabled: !vote_ready,
-              data: { confirm: "Create a new DRAFT event on vote.hackclub.com for \"#{current_event.name}\"?" },
+              form: { data: { turbo_confirm: "Create a new DRAFT event on vote.hackclub.com for \"#{current_event.name}\"?" } },
               class: "bg-[#d42f46] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#b82840] disabled:opacity-50 disabled:cursor-not-allowed" %>
         </div>
       <% end %>

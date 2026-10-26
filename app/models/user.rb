@@ -26,8 +26,13 @@ class User < ApplicationRecord
   # and so do global admins, who answer the questions.
   ADMIN_HELP_CHANNEL_ROLES = %w[event_admin ops safeguarding_lead].freeze
 
+  # Event roles that can use the admin (see #admin?). Read-only staff can't.
+  ADMIN_EVENT_ROLES = %w[event_admin ops limited safeguarding_lead].freeze
+
   after_commit :invite_to_admin_help_channel, on: %i[create update],
     if: -> { saved_change_to_global_role? && global_admin? }
+  after_commit :invite_to_org_support_channel, on: %i[create update],
+    if: -> { saved_change_to_global_role? && !no_role? }
 
   # `oidc_claims` holds PII straight from Hack Club Auth (phone number,
   # birthdate, home address). Encrypting the whole jsonb blob works because the
@@ -37,6 +42,12 @@ class User < ApplicationRecord
   # the same treatment. Neither is queried by value, hence non-deterministic.
   encrypts :oidc_claims
   encrypts :phone_number
+
+  # A plain, indexed copy of the Slack ID inside the claims, so lookups by it
+  # don't have to decrypt every row. See verified_slack_id_from. Runs on every
+  # save, not just when the claims change, so a copy left stale by a write
+  # that skipped this callback heals on that person's next sign-in or save.
+  before_save :sync_verified_slack_id
 
   normalizes_phone_number :phone_number
   # Guarded on `_changed?`: sign-in refreshes claims through `user.update`,
@@ -54,6 +65,7 @@ class User < ApplicationRecord
   has_many :event_role_assignments, dependent: :destroy
   has_many :assigned_events, through: :event_role_assignments, source: :event
   has_many :series_role_assignments, dependent: :destroy
+  has_many :slack_channel_invites, dependent: :nullify
   has_many :event_series, through: :series_role_assignments
   has_one :participant
   has_one :guardian
@@ -62,6 +74,11 @@ class User < ApplicationRecord
   has_many :mobile_tokens, dependent: :destroy
   has_many :push_tokens, dependent: :destroy
   has_many :passports, dependent: :destroy
+  has_many :training_enrollments, dependent: :destroy
+  has_many :training_badge_awards, dependent: :destroy
+  has_many :training_course_invitations, dependent: :destroy
+  has_many :training_disclosures, dependent: :destroy
+  has_many :event_volunteers, dependent: :destroy
   # API tokens name their creator, and each kind survives that person
   # differently. Event and series keys belong to the event or series and keep
   # working with a null creator; a global key's authority *is* its owner's
@@ -243,6 +260,25 @@ class User < ApplicationRecord
         end
       end
 
+      placeholder.event_volunteers.each do |volunteer|
+        if EventVolunteer.exists?(user_id: id, event_id: volunteer.event_id)
+          volunteer.destroy!
+        else
+          volunteer.update!(user: self)
+        end
+      end
+
+      # Training an admin credited, or invited them to, before this person
+      # first signed in.
+      placeholder.training_badge_awards.update_all(user_id: id)
+      placeholder.training_course_invitations.each do |invitation|
+        if TrainingCourseInvitation.exists?(user_id: id, training_course_id: invitation.training_course_id)
+          invitation.destroy!
+        else
+          invitation.update!(user: self)
+        end
+      end
+
       if GLOBAL_ROLE_RANK.fetch(placeholder.global_role, 0) > GLOBAL_ROLE_RANK.fetch(global_role, 0)
         self.global_role = placeholder.global_role
         # Skip validations: sign-in must not be blocked by unrelated
@@ -298,17 +334,19 @@ class User < ApplicationRecord
     save(validate: false)
   end
 
-  # Global admins, plus staff holding an ADMIN_HELP_CHANNEL_ROLES role (or a
-  # series role) on an event that hasn't ended. Undated drafts count, since
-  # setting an event up is when people most need help.
+  # Global admins, plus anyone with at least one Event.admin_help_events_for
+  # event (the rule lives there, shared with the support bot's user lookup).
   def self.admin_help_channel_members
-    events = Event.not_ended
-    via_event = EventRoleAssignment.where(role: ADMIN_HELP_CHANNEL_ROLES, event_id: events.select(:id))
-    via_series = SeriesRoleAssignment.where(event_series_id: events.where.not(event_series_id: nil).select(:event_series_id))
-
     where(global_role: "global_admin")
-      .or(where(id: via_event.select(:user_id)))
-      .or(where(id: via_series.select(:user_id)))
+      .or(where(Event.admin_help_events_for(arel_table[:id]).arel.exists))
+  end
+
+  # Every kind of admin: global admins and global read-only users, plus anyone
+  # holding any event or series role (limited and read-only included) on an
+  # Event.org_support_events_for event.
+  def self.org_support_channel_members
+    where(global_role: %w[global_admin read_only])
+      .or(where(Event.org_support_events_for(arel_table[:id]).arel.exists))
   end
 
   def self.extract_oidc_claims(auth)
@@ -363,8 +401,31 @@ class User < ApplicationRecord
 
   def admin?
     global_admin? ||
-      event_role_assignments.exists?(role: %w[event_admin ops limited safeguarding_lead]) ||
+      event_role_assignments.exists?(role: ADMIN_EVENT_ROLES) ||
       series_role_assignments.exists?
+  end
+
+  # Whether this user's admin access still has work behind it: a global or
+  # series role, or an admin role on an event that hasn't ended. Someone whose
+  # only admin roles are on finished events keeps their access, but signing in
+  # as a participant should land them on their own dashboard, not the admin.
+  def admin_for_current_events?
+    global_admin? ||
+      series_role_assignments.exists? ||
+      event_role_assignments.where(role: ADMIN_EVENT_ROLES).joins(:event).merge(Event.not_ended).exists?
+  end
+
+  # Whether this user is registered for an event that hasn't ended yet, so the
+  # admin can offer a way across to their own participant dashboard. Reads the
+  # same `participant` row /dashboard does; withdrawn and rejected
+  # registrations don't count.
+  def participant_in_upcoming_events?
+    return false unless participant
+
+    participant.participant_events
+      .where.not(status: %w[withdrawn rejected])
+      .joins(:event).merge(Event.not_ended)
+      .exists?
   end
 
   # Whether this user may see participants' identifying details: exact dates of
@@ -380,6 +441,12 @@ class User < ApplicationRecord
 
     assignments = event ? event_role_assignments.where(event: event) : event_role_assignments
     assignments.where.not(role: EventRoleAssignment::PII_RESTRICTED_ROLES).exists?
+  end
+
+  # False while a "yes" criminal-record declaration is awaiting the Hack Club
+  # Safety Team's review, or was upheld (see TrainingDisclosure).
+  def eligible_to_work_events?
+    !training_disclosures.blocking.exists?
   end
 
   def safeguarding_lead_for?(event)
@@ -429,9 +496,10 @@ class User < ApplicationRecord
 
   # The Slack ID Hack Club Auth vouches for, ignoring the profile override —
   # anyone can type someone else's ID (or a comma-separated list) into that,
-  # so it must not decide who gets invited to a channel.
-  def verified_slack_id
-    id = oidc_claims&.dig("slack_id").to_s
+  # so it must not decide who gets invited to a channel or who a support lookup
+  # says someone is. Stored upcased in `verified_slack_id`.
+  def self.verified_slack_id_from(claims)
+    id = claims&.dig("slack_id").to_s.strip.upcase
     id if id.match?(/\A[UW][A-Z0-9]+\z/)
   end
 
@@ -453,8 +521,22 @@ class User < ApplicationRecord
 
   private
 
+  # Assigning an equal value leaves the attribute clean, so a save where the
+  # copy already matches writes nothing extra.
+  def sync_verified_slack_id
+    derived = self.class.verified_slack_id_from(oidc_claims)
+    self.verified_slack_id = derived unless verified_slack_id == derived
+  rescue ActiveRecord::Encryption::Errors::Decryption
+    # Claims that won't decrypt must not block an unrelated save; the copy
+    # stays as it is until the claims are rewritten.
+  end
+
   def invite_to_admin_help_channel
     SyncAdminHelpSlackChannelJob.perform_later([ id ])
+  end
+
+  def invite_to_org_support_channel
+    SyncOrgSupportSlackChannelJob.perform_later([ id ])
   end
 
   def acceptable_avatar

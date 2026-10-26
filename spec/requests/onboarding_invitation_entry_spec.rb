@@ -27,6 +27,22 @@ RSpec.describe "onboarding invitation entry", type: :request do
     expect(response.body).to include("trailblazer@hackclub.com")
   end
 
+  it "prefills Hack Club Auth's signup form from the invitation" do
+    create(:participant, email: "invited@example.com", legal_first_name: "Dana", legal_last_name: "Lee",
+      date_of_birth: Date.new(2009, 4, 2), country_of_residence: "United States")
+    get onboarding_path(invite: invitation.token)
+
+    post user_hack_club_omniauth_authorize_path
+
+    uri = URI.parse(response.location)
+    query = Rack::Utils.parse_query(uri.query)
+    expect(uri.host).to eq("auth.hackclub.com")
+    expect(query).to include(
+      "login_hint" => "invited@example.com", "email" => "invited@example.com",
+      "first_name" => "Dana", "last_name" => "Lee", "birthday" => "2009-04-02", "country" => "US"
+    )
+  end
+
   it "returns a matching account to the invited event after authentication" do
     get onboarding_path(invite: invitation.token)
     user = create(:user, email: invitation.email)
@@ -41,7 +57,7 @@ RSpec.describe "onboarding invitation entry", type: :request do
     expect(participant_event.event).to eq(event)
     expect(participant_event.participant.user).to eq(user)
     expect(invitation.reload).to be_accepted
-    expect(response).to redirect_to(onboarding_step_path(step: "profile", event_id: event.id))
+    expect(response).to redirect_to(onboarding_welcome_path(event_id: event.id))
 
     delete destroy_user_session_path
     expect(response).to redirect_to(root_path)
@@ -84,7 +100,7 @@ RSpec.describe "onboarding invitation entry", type: :request do
 
     expect(ParticipantEvent.last.event).to eq(event)
     expect(invitation.reload).to be_accepted
-    expect(response).to redirect_to(onboarding_step_path(step: "profile", event_id: event.id))
+    expect(response).to redirect_to(onboarding_welcome_path(event_id: event.id))
   end
 
   it "does not use an already accepted invitation to create another registration" do
@@ -111,7 +127,7 @@ RSpec.describe "onboarding invitation entry", type: :request do
       get onboarding_path(invite: invitation.token)
     }.to not_change(ParticipantEvent, :count)
 
-    expect(response).to redirect_to(onboarding_step_path(step: "profile", event_id: event.id))
+    expect(response).to redirect_to(onboarding_welcome_path(event_id: event.id))
     expect(participant_event.reload.event).to eq(event)
 
     delete destroy_user_session_path
@@ -142,7 +158,7 @@ RSpec.describe "onboarding invitation entry", type: :request do
 
     get onboarding_path(invite: invitation.token)
 
-    expect(response).to redirect_to(onboarding_step_path(step: "profile", event_id: event.id))
+    expect(response).to redirect_to(onboarding_welcome_path(event_id: event.id))
     expect(invitation.reload).not_to be_accepted
   end
 
@@ -177,7 +193,7 @@ RSpec.describe "onboarding invitation entry", type: :request do
 
     get onboarding_path(event_id: other_event.id)
 
-    expect(response).to redirect_to(onboarding_step_path(step: "profile", event_id: other_event.id))
+    expect(response).to redirect_to(onboarding_welcome_path(event_id: other_event.id))
   end
 
   it "stores a signed-out explicit event continuation ahead of stale invitation context" do
@@ -195,7 +211,7 @@ RSpec.describe "onboarding invitation entry", type: :request do
 
     sign_in user
     get stored_continuation
-    expect(response).to redirect_to(onboarding_step_path(step: "profile", event_id: other_event.id))
+    expect(response).to redirect_to(onboarding_welcome_path(event_id: other_event.id))
     expect(invitation.reload).not_to be_accepted
   end
 end

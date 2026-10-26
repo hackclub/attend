@@ -1,0 +1,52 @@
+<%# Feedback on one quiz attempt. Every question shows whether it was right,
+    and every answer the learner chose shows why it's right or wrong. The
+    right answers themselves are revealed once they've passed, or on every
+    attempt if the course says so (TrainingCourse#reveal_answers).
+    Locals: attempt, lesson, course %>
+<% reveal = attempt.passed? || course.reveal_answers_every_attempt? %>
+<section class="portal-card p-6 sm:p-8 mb-6" aria-labelledby="review-heading">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+    <div>
+      <h2 id="review-heading" class="portal-heading text-lg"><%= attempt.passed? ? "You passed" : "Not passed yet" %></h2>
+      <p class="portal-hint text-sm">
+        You scored <%= attempt.score %>% (<%= course.pass_mark %>% needed).
+        <% unless reveal %>Each answer you chose is explained below. The correct answers are shown once you pass.<% end %>
+      </p>
+    </div>
+    <span class="portal-badge <%= attempt.passed? ? "portal-badge-done" : "portal-badge-pending" %> self-start sm:self-auto"><%= attempt.score %>%</span>
+  </div>
+
+  <ol class="space-y-6">
+    <% lesson.questions.each_with_index do |question, qi| %>
+      <% right = attempt.answered_correctly?(question) %>
+      <li>
+        <div class="flex items-start gap-2 mb-2">
+          <span class="portal-step-marker <%= right ? "portal-step-marker-done" : "" %> shrink-0" aria-hidden="true"><%= right ? "✓" : "✗" %></span>
+          <p class="portal-heading text-base"><span class="sr-only"><%= right ? "Correct:" : "Incorrect:" %></span> <%= qi + 1 %>. <%= question.prompt %></p>
+        </div>
+        <ul class="space-y-2 ml-8">
+          <% question.options.each do |option| %>
+            <% chosen = attempt.chosen?(question, option) %>
+            <% shown = chosen || (reveal && option.correct?) %>
+            <li class="rounded-lg px-3 py-2 <%= shown ? (option.correct? && (reveal || chosen) ? "portal-note-success" : "portal-note-warn") : "" %>" style="<%= "border: 1px solid var(--border-card);" unless shown %>">
+              <p class="portal-body text-sm">
+                <%= option.body %>
+                <% if chosen %>
+                  <span class="portal-meta text-xs font-semibold ml-1">— your answer<%= option.correct? ? ", correct" : ", incorrect" %></span>
+                <% elsif reveal && option.correct? %>
+                  <span class="portal-meta text-xs font-semibold ml-1">— correct answer</span>
+                <% end %>
+              </p>
+              <% if shown && option.explanation.present? %>
+                <p class="portal-hint text-sm mt-1"><%= option.explanation %></p>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+        <% if reveal && question.explanation.present? %>
+          <p class="portal-hint text-sm mt-2 ml-8"><%= question.explanation %></p>
+        <% end %>
+      </li>
+    <% end %>
+  </ol>
+</section>

@@ -1,0 +1,20 @@
+<%# The event has no arrival window, so attendees' dashboards can't tell them
+    when to turn up. Sits at the top of every admin page for the event until
+    someone sets one; there's nothing to dismiss because the gap is real. %>
+<div class="border-b-2 border-amber-400 bg-amber-50" role="alert" data-testid="arrival-window-banner">
+  <div class="px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row sm:items-center gap-4">
+    <svg class="h-8 w-8 flex-shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+    </svg>
+    <div class="flex-1 min-w-0">
+      <p class="text-lg font-semibold text-amber-900">No arrival window set</p>
+      <p class="mt-1 text-sm text-amber-800">
+        Attendees of <%= event.name %> can't see when to arrive until you set one.
+      </p>
+    </div>
+    <% if policy(event).update? %>
+      <%= link_to "Set arrival window", edit_admin_event_path(event, anchor: "arrival-window"),
+            class: "self-start sm:self-center px-3 py-2 text-sm font-medium rounded-md bg-amber-600 text-white hover:bg-amber-700 whitespace-nowrap" %>
+    <% end %>
+  </div>
+</div>

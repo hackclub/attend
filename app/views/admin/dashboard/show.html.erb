@@ -47,7 +47,7 @@
       <span class="font-medium"><%= @event_status[:label] %></span>
       <% if @event.starts_at && @event.ends_at %>
         <span class="text-sm opacity-75 whitespace-nowrap">
-          <%= @event.starts_at.strftime("%b %d") %> – <%= @event.ends_at.strftime("%b %d, %Y") %>
+          <%= event_date_range(@event.starts_at, @event.ends_at, zone: @event.event_time_zone) %>
         </span>
       <% end %>
     </div>
@@ -283,9 +283,7 @@
               <%= link_to admin_event_incident_path(@event, incident), class: "block p-4 hover:bg-gray-50 transition-colors" do %>
                 <div class="flex items-start justify-between">
                   <div class="flex items-start gap-3">
-                    <span class="px-2 py-0.5 text-xs font-medium rounded <%= severity_badge_class(incident.severity) %>">
-                      <%= incident.severity.upcase %>
-                    </span>
+                    <%= incident_level_badge(incident.severity) %>
                     <div>
                       <p class="text-sm font-medium text-gray-900"><%= incident.category.titleize %></p>
                       <p class="text-sm text-gray-500 mt-0.5">

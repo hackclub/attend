@@ -1,0 +1,22 @@
+<div data-nested-form-target="item" class="border border-gray-200 rounded-md p-3 space-y-3 <%= "hidden" if mf.object.marked_for_destruction? %>">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div>
+      <%= mf.label :name, "Medication", class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= mf.text_field :name, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "e.g., Paracetamol" %>
+    </div>
+    <div>
+      <%= mf.label :dose, "Quantity / dose", class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= mf.text_field :dose, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "e.g., 2 x 500mg tablets" %>
+    </div>
+  </div>
+  <div>
+    <%= mf.label :notes, class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <%= mf.text_area :notes, rows: 2, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]", placeholder: "e.g., time given, who administered, follow-up" %>
+  </div>
+  <div class="flex justify-end">
+    <% if mf.object.persisted? %>
+      <%= mf.hidden_field :_destroy, data: { nested_form_target: "destroyField" } %>
+    <% end %>
+    <button type="button" data-action="nested-form#remove" class="text-sm text-gray-500 hover:text-red-600">Remove</button>
+  </div>
+</div>

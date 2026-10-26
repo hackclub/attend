@@ -108,6 +108,13 @@ RSpec.describe "Api::V1::Participants", type: :request do
       { "Authorization" => "Bearer #{api_key}" }
     end
 
+    # Slack ID lookups belong to the support bot, which holds a global token
+    # scoped to support:read.
+    def support_headers
+      @support_token ||= GlobalApiToken.generate_for(admin, scopes: [ "support:read" ]).token
+      { "Authorization" => "Bearer #{@support_token}" }
+    end
+
     it "reports a registered participant, case-insensitively, without side effects" do
       participant = create(:participant, email: "voter@example.com")
       create(:participant_event, participant: participant, event: event)
@@ -133,10 +140,152 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(body["participant_id"]).to be_nil
     end
 
-    it "requires an email" do
+    it "requires an email or Slack ID" do
       get "/api/v1/events/#{event.id}/participants/lookup", headers: api_key_headers
 
       expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it "finds a registration by the Slack ID Hack Club Auth verified, with its admin link" do
+      user = create(:user, oidc_claims: { "slack_id" => "U0TESTPART" })
+      participant = create(:participant, user: user)
+      pe = create(:participant_event, participant: participant, event: event)
+
+      get "/api/v1/events/#{event.id}/participants/lookup",
+        params: { slack_id: " u0testpart " }, headers: support_headers
+
+      body = JSON.parse(response.body)
+      expect(body["registered"]).to be(true)
+      expect(body["participant_id"]).to eq(participant.id)
+      expect(body["participant_event_id"]).to eq(pe.id)
+      expect(body["admin_url"]).to end_with("/admin/events/#{event.slug}/participants/#{pe.id}")
+      expect(body["slack_id"]).to eq("U0TESTPART")
+      expect(body["email"]).to be_nil
+    end
+
+    # Anyone can type any ID into a profile or registration; only Hack Club
+    # Auth's counts.
+    it "ignores Slack IDs typed onto the participant or registration" do
+      create(:participant_event, event: event, participant: create(:participant, slack_user_id: "U0TESTPART"))
+      create(:participant_event, event: event, slack_user_id: "U0TESTPART")
+
+      get "/api/v1/events/#{event.id}/participants/lookup",
+        params: { slack_id: "U0TESTPART" }, headers: support_headers
+
+      expect(JSON.parse(response.body)["registered"]).to be(false)
+    end
+
+    it "refuses to guess when several registrations share a Slack ID" do
+      2.times do
+        user = create(:user, oidc_claims: { "slack_id" => "U0TESTPART" })
+        create(:participant_event, event: event, participant: create(:participant, user: user))
+      end
+
+      get "/api/v1/events/#{event.id}/participants/lookup",
+        params: { slack_id: "U0TESTPART" }, headers: support_headers
+
+      expect(response).to have_http_status(:conflict)
+    end
+
+    context "when the caller isn't the support bot" do
+      let(:series) { create(:event_series, name: "Moonbeam Series", slug: "moonbeam-lookup-api") }
+      let(:series_owner) do
+        User.create!(email: "moonbeam-owner@example.com", name: "Moonbeam Owner").tap do |user|
+          SeriesRoleAssignment.create!(user: user, event_series: series, role: "owner")
+        end
+      end
+
+      before do
+        event.update!(event_series: series)
+        user = create(:user, oidc_claims: { "slack_id" => "U0TESTPART" })
+        create(:participant_event, event: event, participant: create(:participant, user: user))
+      end
+
+      {
+        "a legacy event API key" => -> { { "Authorization" => "Bearer #{api_key}" } },
+        "an event API token" => -> {
+          { "Authorization" => "Bearer #{EventApiToken.generate_for(event, user: series_owner, name: 'lookup').token}" }
+        },
+        "a series API token" => -> {
+          { "Authorization" => "Bearer #{SeriesApiToken.generate_for(series, user: series_owner, name: 'lookup').token}" }
+        },
+        "a signed-in global admin on the mobile app" => -> { auth_headers }
+      }.each do |caller, headers|
+        it "refuses a Slack ID lookup from #{caller}" do
+          get "/api/v1/events/#{event.id}/participants/lookup",
+            params: { slack_id: "U0TESTPART" }, headers: instance_exec(&headers)
+
+          expect(response).to have_http_status(:forbidden)
+          expect(JSON.parse(response.body)["error"]).to include("support:read")
+        end
+
+        it "still answers an email lookup from #{caller}" do
+          get "/api/v1/events/#{event.id}/participants/lookup",
+            params: { email: "stranger@example.com" }, headers: instance_exec(&headers)
+
+          expect(response).to have_http_status(:ok)
+          expect(JSON.parse(response.body)["registered"]).to be(false)
+        end
+      end
+    end
+
+    it "lets an unrestricted global token look up by Slack ID, as it can every support endpoint" do
+      user = create(:user, oidc_claims: { "slack_id" => "U0TESTPART" })
+      create(:participant_event, event: event, participant: create(:participant, user: user))
+      token = GlobalApiToken.generate_for(admin).token
+
+      get "/api/v1/events/#{event.id}/participants/lookup",
+        params: { slack_id: "U0TESTPART" }, headers: { "Authorization" => "Bearer #{token}" }
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)["registered"]).to be(true)
+    end
+
+    # Only one key is ever matched on, so echoing both would claim a match the
+    # lookup never checked.
+    it "rejects an email and a Slack ID sent together" do
+      participant = create(:participant, email: "voter@example.com")
+      create(:participant_event, participant: participant, event: event)
+
+      get "/api/v1/events/#{event.id}/participants/lookup",
+        params: { email: "voter@example.com", slack_id: "U0SOMEONEELSE" }, headers: support_headers
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)["error"]).to eq("Send email or slack_id, not both")
+    end
+
+    # Both lookup queries go through @event.participant_events, so Rails'
+    # automatic inverse hands each registration @event and the admin link's
+    # slug costs nothing. A scope or option on that association would quietly
+    # break the inverse; this catches it.
+    it "builds the admin link from the event it already loaded" do
+      participant = create(:participant, email: "voter@example.com")
+      pe = create(:participant_event, participant: participant, event: event)
+      headers = api_key_headers
+
+      event_selects = []
+      counter = lambda do |*, payload|
+        event_selects << payload[:sql] if payload[:sql].match?(/\ASELECT .* FROM "events"/)
+      end
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") do
+        get "/api/v1/events/#{event.id}/participants/lookup", params: { email: "voter@example.com" }, headers: headers
+      end
+
+      expect(JSON.parse(response.body)["admin_url"]).to end_with("/admin/events/#{event.slug}/participants/#{pe.id}")
+      # The legacy key resolves its event, then set_event loads it from the URL.
+      # Building the admin link must not add a third.
+      expect(event_selects.size).to eq(2), event_selects.join("\n")
+    end
+
+    it "is reachable by a global token scoped to support:read" do
+      token = GlobalApiToken.generate_for(admin, scopes: [ "support:read" ]).token
+      headers = { "Authorization" => "Bearer #{token}" }
+
+      get "/api/v1/events/#{event.id}/participants/lookup", params: { email: "stranger@example.com" }, headers: headers
+      expect(response).to have_http_status(:ok)
+
+      get "/api/v1/events/#{event.id}/participants", headers: headers
+      expect(response).to have_http_status(:forbidden)
     end
 
     it "still forbids an event API key from reading the full roster" do
@@ -397,20 +546,47 @@ RSpec.describe "Api::V1::Participants", type: :request do
     end
 
     it "does not email a registration link when a real validation rejects the registration" do
-      # Someone already on file who will be too old by the end of the event:
-      # ParticipantEvent#participant_not_too_old fails the roster entry after
-      # the invitation row has been written inside the same transaction.
-      create(:participant, email: "aged-out@example.com", date_of_birth: event.ends_at.to_date - 25.years)
+      # Someone already on file whose Slack ID is banned: the email check up
+      # front passes, and ParticipantEvent#participant_not_banned fails the
+      # roster entry after the invitation row has been written inside the
+      # same transaction.
+      create(:participant, email: "slack-banned@example.com", slack_user_id: "UBANNED1")
+      ban = build(:ban, email: "someone-else@example.com")
+      ban.ban_slack_ids.build(slack_id: "UBANNED1")
+      ban.save!
 
       post "/api/v1/events/#{event.id}/participants",
-        params: { email: "aged-out@example.com" }, headers: sign_in_headers_for("event_admin")
+        params: { email: "slack-banned@example.com" }, headers: sign_in_headers_for("event_admin")
       expect(response).to have_http_status(:unprocessable_entity)
 
       # The mailer find-or-creates the invitation, so a job that survived the
       # rollback would resurrect it and send the link the API said it hadn't.
       perform_enqueued_jobs
-      expect(Invitation.where(event: event).for_email("aged-out@example.com")).to be_empty
+      expect(Invitation.where(event: event).for_email("slack-banned@example.com")).to be_empty
       expect(ActionMailer::Base.deliveries).to be_empty
+    end
+
+    # Signup forms see typos. Onboarding holds them until staff correct it
+    # (spec/requests/onboarding_age_limit_spec.rb).
+    it "invites someone whose birthday ages them out, keeping the birthday" do
+      birthday = event.ends_at.to_date - 25.years
+
+      post "/api/v1/events/#{event.id}/participants",
+        params: { email: "typo@example.com", date_of_birth: birthday.iso8601 }, headers: sign_in_headers_for("event_admin")
+
+      expect(response).to have_http_status(:created)
+      participant = Participant.find_by!(email: "typo@example.com")
+      expect(participant.date_of_birth).to eq(birthday)
+      expect(event.participant_events.find_by!(participant: participant)).to be_too_old_for_event
+    end
+
+    it "invites someone already on file whose birthday ages them out" do
+      create(:participant, email: "aged-out@example.com", date_of_birth: event.ends_at.to_date - 25.years)
+
+      post "/api/v1/events/#{event.id}/participants",
+        params: { email: "aged-out@example.com" }, headers: sign_in_headers_for("event_admin")
+
+      expect(response).to have_http_status(:created)
     end
 
     it "409s for someone already registered under another casing of the address" do
@@ -468,6 +644,103 @@ RSpec.describe "Api::V1::Participants", type: :request do
     end
   end
 
+  describe "POST /api/v1/events/:event_id/participants with details" do
+    let(:event_token) { EventApiToken.generate_for(event, user: create(:user), name: "integration") }
+
+    def invite(params)
+      post "/api/v1/events/#{event.id}/participants", params: params,
+        headers: { "Authorization" => "Bearer #{event_token.token}" }
+    end
+
+    it "records the birthday, phone and country sent with the invitation" do
+      invite(email: "detailed@example.com", first_name: "Dana", last_name: "Lee",
+        date_of_birth: "2009-04-02", phone: "+1 202 555 0143", country: "US")
+
+      expect(response).to have_http_status(:created)
+      participant = Participant.find(JSON.parse(response.body)["participant_id"])
+      expect(participant).to have_attributes(
+        legal_first_name: "Dana", date_of_birth: Date.new(2009, 4, 2),
+        phone: "+12025550143", country_of_residence: "United States"
+      )
+    end
+
+    it "records a preferred name sent with the invitation" do
+      invite(email: "preferred@example.com", first_name: "Daniel", last_name: "Lee", preferred_name: "Dana")
+
+      expect(response).to have_http_status(:created)
+      participant = Participant.find(JSON.parse(response.body)["participant_id"])
+      expect(participant).to have_attributes(legal_first_name: "Daniel", preferred_name: "Dana")
+    end
+
+    it "accepts a country by name" do
+      invite(email: "named-country@example.com", country: "united kingdom")
+
+      expect(Participant.find(JSON.parse(response.body)["participant_id"]).country_of_residence).to eq("United Kingdom")
+    end
+
+    it "only fills in what a returning person is missing" do
+      existing = create(:participant, email: "back@example.com", legal_first_name: "Unknown", legal_last_name: "Okafor",
+        date_of_birth: nil, phone: "+12025550100")
+
+      invite(email: "back@example.com", first_name: "Ada", last_name: "Changed",
+        date_of_birth: "2008-01-31", phone: "+12025550199")
+
+      expect(response).to have_http_status(:created)
+      expect(existing.reload).to have_attributes(
+        legal_first_name: "Ada", legal_last_name: "Okafor",
+        date_of_birth: Date.new(2008, 1, 31), phone: "+12025550100"
+      )
+    end
+
+    it "logs what it fills in on a returning person's record" do
+      existing = create(:participant, email: "logged@example.com", date_of_birth: nil)
+
+      invite(email: "logged@example.com", date_of_birth: "2008-01-31")
+
+      expect(response).to have_http_status(:created)
+      log = AuditLog.record_update.find_by(record: existing)
+      expect(log).to be_present
+      expect(log.event).to eq(event)
+      expect(log.changed_fields.keys).to include("date_of_birth")
+    end
+
+    it "leaves a returning person's record alone when there's nothing to fill in" do
+      existing = create(:participant, email: "complete@example.com", date_of_birth: Date.new(2008, 1, 31))
+      # An older record that wouldn't pass today's validations.
+      existing.update_columns(phone: "12345")
+
+      invite(email: "complete@example.com", date_of_birth: "2009-04-02")
+
+      expect(response).to have_http_status(:created)
+      expect(existing.reload.date_of_birth).to eq(Date.new(2008, 1, 31))
+      expect(AuditLog.record_update.where(record: existing)).not_to exist
+    end
+
+    it "rejects a birthday that isn't a date" do
+      expect {
+        invite(email: "bad-date@example.com", date_of_birth: "02/04/2009")
+      }.not_to change(Invitation, :count)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)["error"]).to include("YYYY-MM-DD")
+    end
+
+    it "rejects a country it doesn't know" do
+      invite(email: "narnia@example.com", country: "Narnia")
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)["error"]).to include("Narnia")
+    end
+
+    it "rejects an invalid phone number without inviting" do
+      expect {
+        invite(email: "bad-phone@example.com", phone: "12345")
+      }.not_to change(Invitation, :count)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+  end
+
   describe "PATCH /api/v1/events/:event_id/participants/:id" do
     let(:participant) { create(:participant, legal_first_name: "Robin", preferred_name: nil, phone: "+12025550100") }
     let!(:participant_event) { create(:participant_event, participant: participant, event: event) }
@@ -513,6 +786,52 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
       expect(JSON.parse(response.body)["error"]).to include("in_progress")
       expect(participant_event.reload.status).to eq("in_progress")
+    end
+
+    it "sets the country from a code or a name" do
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        params: { participant: { country_of_residence: "ca" } }, headers: api_key_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(participant.reload.country_of_residence).to eq("Canada")
+
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        params: { participant: { country_of_residence: "Atlantis" } }, headers: api_key_headers
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(participant.reload.country_of_residence).to eq("Canada")
+    end
+
+    describe "fill_blanks" do
+      before { participant.update!(legal_last_name: "Unknown", date_of_birth: nil, country_of_residence: nil) }
+
+      it "only writes fields the participant has no value for, and says which it skipped" do
+        patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+          params: {
+            fill_blanks: true,
+            participant: {
+              legal_first_name: "Overwritten", legal_last_name: "Backfilled",
+              date_of_birth: "2008-06-01", phone: "+12025550188", country_of_residence: "US"
+            }
+          },
+          headers: api_key_headers
+
+        expect(response).to have_http_status(:ok)
+        expect(JSON.parse(response.body)["skipped_fields"]).to contain_exactly("legal_first_name", "phone")
+        expect(participant.reload).to have_attributes(
+          legal_first_name: "Robin", legal_last_name: "Backfilled", date_of_birth: Date.new(2008, 6, 1),
+          phone: "+12025550100", country_of_residence: "United States"
+        )
+      end
+
+      it "succeeds without writing when everything sent is already filled in" do
+        patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+          params: { fill_blanks: true, participant: { legal_first_name: "Other" } }, headers: api_key_headers
+
+        expect(response).to have_http_status(:ok)
+        expect(JSON.parse(response.body)["skipped_fields"]).to eq([ "legal_first_name" ])
+        expect(participant.reload.legal_first_name).to eq("Robin")
+      end
     end
 
     it "rejects an empty request rather than reporting a no-op as success" do

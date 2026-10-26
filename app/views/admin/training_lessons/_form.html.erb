@@ -1,0 +1,26 @@
+<% course = lesson.course %>
+<%= form_with model: lesson, url: (lesson.persisted? ? admin_training_course_lesson_path(course, lesson) : admin_training_course_lessons_path(course)), class: "space-y-6", html: { multipart: true } do |f| %>
+  <%= render "admin/training/errors", record: lesson %>
+  <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+    <div><%= f.label :title, class: "block text-sm font-medium text-gray-700" %><%= f.text_field :title, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+    <div>
+      <%= f.label :body, "Content (Markdown)", class: "block text-sm font-medium text-gray-700" %>
+      <%= f.text_area :body, rows: 18, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono" %>
+    </div>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+    <h2 class="text-lg font-medium text-gray-900">Video</h2>
+    <% if lesson.video_file.attached? && lesson.persisted? %>
+      <p class="text-sm text-gray-700">Current upload: <%= lesson.video_file.filename %> (<%= number_to_human_size(lesson.video_file.byte_size) %>)</p>
+      <label class="inline-flex items-center gap-2 text-sm"><%= check_box_tag "training_lesson[remove_video_file]", "1", false %> Remove this video</label>
+    <% end %>
+    <div><%= f.label :video_file, "Upload a video (MP4, WebM or MOV, up to 1 GB)", class: "block text-sm font-medium text-gray-700" %><%= f.file_field :video_file, accept: TrainingLesson::VIDEO_CONTENT_TYPES.join(","), class: "mt-1 text-sm" %></div>
+    <div><%= f.label :video_url, "Or a YouTube or Vimeo link", class: "block text-sm font-medium text-gray-700" %><%= f.url_field :video_url, class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+    <div><%= f.label :video_duration_seconds, "Video length (seconds)", class: "block text-sm font-medium text-gray-700" %><p class="text-xs text-gray-500"><%= training_video_length_hint(lesson) %></p><%= f.number_field :video_duration_seconds, min: 1, step: "any", class: "mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %></div>
+    <label class="flex items-start gap-2 text-sm"><%= f.check_box :require_full_watch, class: "mt-1" %> <span><strong>Must watch the whole video</strong> — no skipping ahead; the quiz and done button stay locked until the end.</span></label>
+  </div>
+  <div class="flex justify-end gap-2">
+    <%= link_to "Cancel", admin_training_course_path(course), class: "px-4 py-2 text-sm text-gray-600" %>
+    <%= f.button (lesson.persisted? ? "Save Lesson" : "Add Lesson"), class: "px-4 py-2 bg-[#d42f46] text-white rounded-md text-sm hover:bg-[#b82840]" %>
+  </div>
+<% end %>

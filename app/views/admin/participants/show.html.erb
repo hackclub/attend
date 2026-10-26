@@ -3,6 +3,13 @@
 <div>
   <%= render "header" %>
 
+  <% if @participant_event.too_old_for_event? %>
+    <div class="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" data-testid="over-age-limit">
+      <p class="font-semibold">19 or older during this event</p>
+      <p class="mt-1">Their date of birth ages them out by <%= current_event.local_end_date.strftime("%B %-d, %Y") %>, so onboarding won't let them past their profile. If it's a typo, correct it here or approve their change request; otherwise withdraw them.</p>
+    </div>
+  <% end %>
+
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <div class="lg:col-span-2 space-y-6">
       <section class="bg-white rounded-lg border border-gray-200 p-6">
@@ -56,7 +63,7 @@
                   send_travel_update_reminder_admin_event_participant_path(current_event, @participant_event),
                   method: :post,
                   class: "text-sm text-[#ec3750] hover:text-blue-800",
-                  data: { confirm: "Send a travel update reminder email to #{@participant.email}?" } %>
+                  form: { data: { turbo_confirm: "Send a travel update reminder email to #{@participant.email}?" } } %>
             </div>
             <%= link_to "Edit", travel_admin_event_participant_path(current_event, @participant_event), class: "text-sm text-[#ec3750] hover:text-blue-800" %>
           </div>
@@ -72,7 +79,7 @@
                     <% first_leg = @travel_inbound.travel_legs.first %>
                     <% last_leg = @travel_inbound.travel_legs.last %>
                     <div><span class="text-gray-500">From:</span> <%= first_leg.departure_airport %></div>
-                    <div><span class="text-gray-500">Arrival:</span> <%= [ flight_local_time(last_leg.arrival_time, last_leg.arrival_airport), last_leg.arrival_airport ].compact.join(" - ") %></div>
+                    <div><span class="text-gray-500">Arrival:</span> <%= [ flight_local_time(last_leg, :arrival), last_leg.arrival_airport ].compact.join(" - ") %></div>
                     <div><span class="text-gray-500">Flight:</span> <%= first_leg.flight_code %></div>
                   <% elsif @travel_inbound.car? %>
                     <div><span class="text-gray-500">From:</span>
@@ -103,7 +110,7 @@
                     <% first_leg = @travel_outbound.travel_legs.first %>
                     <% last_leg = @travel_outbound.travel_legs.last %>
                     <div><span class="text-gray-500">To:</span> <%= last_leg.arrival_airport %></div>
-                    <div><span class="text-gray-500">Departure:</span> <%= flight_local_time(first_leg.departure_time, first_leg.departure_airport) %> - <%= first_leg.departure_airport %></div>
+                    <div><span class="text-gray-500">Departure:</span> <%= flight_local_time(first_leg, :departure) %> - <%= first_leg.departure_airport %></div>
                     <div><span class="text-gray-500">Flight:</span> <%= first_leg.flight_code %></div>
                   <% elsif @travel_outbound.car? %>
                     <div><span class="text-gray-500">To:</span>
@@ -180,23 +187,31 @@
       <% end %>
 
       <% if policy(@medical || Medical.new(participant_event: @participant_event)).show? %>
-        <section class="bg-white rounded-lg border border-gray-200 p-6">
+        <section class="bg-white rounded-lg border border-gray-200 p-6" data-testid="medical-summary">
           <div class="flex justify-between items-center mb-4">
             <h2 class="text-lg font-semibold">Medical Summary</h2>
             <%= link_to "View Details", medical_admin_event_participant_path(current_event, @participant_event), class: "text-sm text-[#ec3750] hover:text-blue-800" %>
           </div>
-          <% if @medical %>
+          <% food_safety = @participant_event.food_safety_summary %>
+          <%# Dietary flags show without a Medical record, but only a Medical record can say there are none. %>
+          <% if @medical || food_safety.any_flags? %>
             <div class="flex flex-wrap gap-2">
-              <% if @medical.has_anaphylaxis_risk %>
+              <% if food_safety.anaphylaxis_risk? %>
                 <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">⚠️ Anaphylaxis Risk</span>
               <% end %>
-              <% if @medical.has_allergies? %>
+              <% if food_safety.life_threatening_food_allergies? %>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">Life-Threatening Food Allergies</span>
+              <% end %>
+              <% if food_safety.cross_contamination_risk? %>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">Cross-Contamination Risk</span>
+              <% end %>
+              <% if food_safety.allergies? %>
                 <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">Has Allergies</span>
               <% end %>
-              <% if @medical.needs_medication_storage? %>
+              <% if @medical&.needs_medication_storage? %>
                 <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">Needs Refrigeration</span>
               <% end %>
-              <% unless @medical.has_anaphylaxis_risk || @medical.has_allergies? || @medical.needs_medication_storage? %>
+              <% unless food_safety.any_flags? || @medical&.needs_medication_storage? %>
                 <span class="text-gray-500">No special medical flags</span>
               <% end %>
             </div>
@@ -409,21 +424,30 @@
         <% end %>
       </section>
 
-      <% if @participant_event.complete? %>
+      <% if @participant_event.complete? || @participant_event.participant.slack_user_id.present? %>
         <section class="bg-white rounded-lg border border-gray-200 p-6">
           <h2 class="text-lg font-semibold mb-4">Slack Integration</h2>
           <% if @participant_event.participant.slack_user_id.present? %>
-            <div class="flex items-center gap-2 mb-3">
+            <div class="flex items-center gap-2 <%= "mb-3" if @participant_event.complete? %>">
               <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Connected</span>
               <%= link_to "slack://user?team=T0266FRGM&id=#{@participant_event.participant.slack_user_id}", class: "hover:underline" do %><code class="text-xs bg-gray-100 px-1.5 py-0.5 rounded"><%= @participant_event.participant.slack_user_id %></code><% end %>
+              <button type="button"
+                      data-controller="clipboard"
+                      data-clipboard-content-value="<%= @participant_event.participant.slack_user_id %>"
+                      data-action="click->clipboard#copy"
+                      class="text-xs text-[#ec3750] hover:text-blue-800 font-medium">
+                Copy
+              </button>
             </div>
-            <% if current_event.slack_channel_id.present? %>
-              <%= button_to "Invite to Channel",
-                  invite_to_slack_channel_admin_event_participant_path(current_event, @participant_event),
-                  method: :post,
-                  class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
-            <% else %>
-              <p class="text-sm text-gray-500">No Slack channel configured for this event.</p>
+            <% if @participant_event.complete? %>
+              <% if current_event.slack_channel_id.present? %>
+                <%= button_to "Invite to Channel",
+                    invite_to_slack_channel_admin_event_participant_path(current_event, @participant_event),
+                    method: :post,
+                    class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
+              <% else %>
+                <p class="text-sm text-gray-500">No Slack channel configured for this event.</p>
+              <% end %>
             <% end %>
           <% else %>
             <p class="text-sm text-gray-600 mb-3">Participant has not linked their Slack account via Hack Club Auth.</p>
@@ -431,6 +455,29 @@
                 slack_invite_link_admin_event_participant_path(current_event, @participant_event),
                 class: "text-sm text-[#ec3750] hover:text-blue-800 font-medium" %>
           <% end %>
+        </section>
+      <% end %>
+
+      <% connected_accounts = @participant_event.participant.connected_accounts.to_a %>
+      <% if current_event.account_linking_step? || connected_accounts.any? %>
+        <section class="bg-white rounded-lg border border-gray-200 p-6">
+          <h2 class="text-lg font-semibold mb-4">Connected Accounts</h2>
+          <dl class="space-y-2 text-sm">
+            <% EventSeries::ACCOUNT_LINKING_PROVIDERS.each do |provider| %>
+              <% account = connected_accounts.find { |a| a.provider == provider } %>
+              <% next unless account || current_event.account_linking_mode(provider) != "off" %>
+              <div class="flex items-center justify-between gap-3">
+                <dt class="text-gray-600"><%= AccountLinking.provider_name(provider) %></dt>
+                <dd>
+                  <% if account %>
+                    <%= link_to account.username, account.profile_url, class: "font-medium text-gray-900 hover:underline", target: "_blank", rel: "noopener" %>
+                  <% else %>
+                    <span class="text-gray-500">Not connected</span>
+                  <% end %>
+                </dd>
+              </div>
+            <% end %>
+          </dl>
         </section>
       <% end %>
 

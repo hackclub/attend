@@ -2,13 +2,13 @@ class HomeController < ApplicationController
   def index
     stash_post_login_return
 
-    return unless user_signed_in?
-
-    if current_user.global_admin? || current_user.event_role_assignments.exists?
-      redirect_to admin_root_path
-    elsif current_user.participant.present?
-      redirect_to dashboard_path
+    unless user_signed_in?
+      @landing = LandingStats.fetch
+      return
     end
+
+    landing = landing_path_for(current_user)
+    redirect_to landing if landing
   end
 
   def dev_sign_in

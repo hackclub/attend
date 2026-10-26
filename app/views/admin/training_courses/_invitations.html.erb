@@ -1,0 +1,31 @@
+<%# Who can take an invite-only course: people invited here by hand, plus
+    everyone whose role at an upcoming event needs the badge it awards. %>
+<div id="invitations" class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+  <div class="px-6 py-4 border-b border-gray-100">
+    <h2 class="text-lg font-medium text-gray-900">Invitations (<%= invitations.size %>)</h2>
+    <p class="text-sm text-gray-500">
+      <% if course.access_open? %>
+        This course is open to anyone signed in, so invitations only send an email.
+      <% elsif course.badge&.required? %>
+        Staff and volunteers whose role at an upcoming event needs <%= course.badge.name %> are invited automatically. Invite anyone else here.
+      <% else %>
+        Only the people invited here can take this course.
+      <% end %>
+    </p>
+    <%= form_with url: admin_training_course_invitations_path(course), method: :post, class: "mt-3 flex flex-col sm:flex-row gap-2 sm:items-start" do %>
+      <%= text_area_tag :emails, nil, rows: 2, class: "flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm", placeholder: "One or more email addresses, separated by commas or new lines", "aria-label": "Email addresses to invite" %>
+      <%= button_tag "Invite", class: "px-4 py-2 bg-[#d42f46] text-white rounded-md text-sm hover:bg-[#b82840]" %>
+    <% end %>
+  </div>
+  <% if invitations.any? %>
+    <ul class="divide-y divide-gray-100">
+      <% invitations.each do |invitation| %>
+        <li class="px-6 py-3 flex items-center justify-between gap-4 text-sm">
+          <span><span class="font-medium text-gray-900"><%= invitation.user.display_name_or_fallback %></span> <span class="text-gray-500"><%= invitation.user.email %></span></span>
+          <%= button_to "Remove", admin_training_course_invitation_path(course, invitation), method: :delete, class: "text-red-600 hover:text-red-900",
+                data: { turbo_confirm: "Remove #{invitation.user.email}'s invitation?" } %>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</div>

@@ -48,7 +48,7 @@ module Rooming
     end
 
     def build_context
-      @event_date = @event.starts_at&.to_date || Date.current
+      @event_date = @event.local_start_date || Date.current
 
       @exclusions = Hash.new { |h, k| h[k] = Set.new }
       @preferences = Hash.new { |h, k| h[k] = [] }

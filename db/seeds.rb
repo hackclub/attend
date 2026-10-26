@@ -115,6 +115,99 @@ if Rails.env.development?
     a.sensory_needs = "May need quiet breaks during loud events"
   end
   puts "Created medical, dietary, and accessibility records"
+
+  # Haven: a series with registration branding and one local city event, so
+  # a branded registration can be walked through as an adult and as a minor.
+  haven = EventSeries.find_or_create_by!(slug: "haven") do |s|
+    s.name = "Haven"
+    s.contact_email = "haven@hackclub.com"
+  end
+  haven.update!(
+    brand: {
+      "background" => "#fff6d6", "ink" => "#4a2a12", "accent" => "#ed5615", "accent_fill" => "#b8430f",
+      "secondary" => "#b8c220", "highlight" => "#fba71f", "card_from" => "#ffe382", "card_to" => "#fee0b1",
+      "body_font" => "jua", "heading_font" => "darumadrop-one", "nav_style" => "progress",
+      "logo_image" => "brands/haven/haven-logo-color.webp",
+      "mascot_image" => "brands/haven/hedgehog.webp",
+      "footer_image" => "brands/haven/bottom-bushes.webp",
+      "tokens" => {
+        "bg-elev-2" => "#fffaea", "bg-elev-3" => "#fff3cf", "bg-sunken" => "#f6e3ad",
+        "text" => "#5b3a1e", "text-soft" => "#6e4a2a", "text-muted" => "#8a6440", "text-faint" => "#a88660",
+        "border-soft" => "#fbefcc", "border" => "#f0dca6", "border-strong" => "#a67b45", "border-card" => "#ecd29a",
+        "accent-fill-hover" => "#9a370b", "success-strong" => "#97a01a", "success-text" => "#5f6610", "done-fill" => "#6b7212"
+      }
+    },
+    registration_note: "Bring a laptop! You'll need one to build your project at the event.",
+    address_note: "We ask for your address for safety reasons, and so we can ship prizes to attendees in the US.",
+    tshirt_note: "Unisex, US sizing. You'll pick it up at the event.",
+    hide_privacy_notes: true
+  )
+
+  haven_boston = Event.find_or_create_by!(slug: "haven-boston") do |e|
+    e.name = "Haven Boston"
+    e.event_series = haven
+    e.starts_at = DateTime.new(2026, 11, 14, 9, 0, 0)
+    e.ends_at = DateTime.new(2026, 11, 15, 17, 0, 0)
+    e.venue_name = "Boston Public Library"
+    e.location_city = "Boston"
+    e.location_country = "United States"
+    e.support_email = "haven@hackclub.com"
+    e.timezone = "America/New_York"
+    e.travel_enabled = false
+    e.accommodation_enabled = false
+  end
+  puts "Created Haven series and event: #{haven_boston.name}"
+
+  ParticipantEvent.find_or_create_by!(participant: participant, event: haven_boston) do |registration|
+    registration.status = "in_progress"
+    registration.onboarding_step = 0
+  end
+
+  minor_user = User.find_or_create_by!(email: "minor@example.com") do |u|
+    u.name = "Minor Participant"
+    u.global_role = "no_role"
+  end
+  minor = Participant.find_or_create_by!(email: "minor@example.com") do |p|
+    p.user = minor_user
+    p.legal_first_name = "Mina"
+    p.legal_last_name = "Participant"
+    p.date_of_birth = Date.new(2011, 3, 2)
+    p.phone = "+12025551235"
+    p.country_of_residence = "United States"
+    p.city = "Boston"
+  end
+  ParticipantEvent.find_or_create_by!(participant: minor, event: haven_boston) do |registration|
+    registration.status = "in_progress"
+    registration.onboarding_step = 0
+  end
+  puts "Created Haven registrations for #{participant.email} and #{minor.email}"
 end
+
+# Staff training: the two badges, and a draft course with placeholder
+# content to build the real one from. Requirements are set per badge in
+# /admin/training.
+event_badge = TrainingBadge.find_or_create_by!(slug: "hack-club-child-safety-event") do |badge|
+  badge.name = "Hack Club Child Safety Event"
+  badge.description = "Completed Hack Club's child safety training for working at events."
+  badge.validity_months = 12
+  badge.required_roles = %w[event_admin ops limited safeguarding_lead volunteer]
+end
+TrainingBadge.find_or_create_by!(slug: "safeguarding-child-safety-trained") do |badge|
+  badge.name = "Safeguarding/Child Safety Trained"
+  badge.description = "Completed Hack Club's in-depth safeguarding training."
+  badge.validity_months = 24
+  badge.required_roles = %w[safeguarding_lead]
+end
+unless TrainingCourse.exists?(slug: "example-child-safety")
+  course = TrainingCourse.create!(title: "Example child safety course", slug: "example-child-safety", badge: event_badge,
+    summary: "Placeholder content for trying the course flow in development.", estimated_minutes: 10)
+  course.lessons.create!(title: "Why this matters", body: "## Placeholder\n\nReplace this with the real lesson.\n\n> Callouts look like this.")
+  quiz = course.lessons.create!(title: "Check your understanding", body: "A short quiz.", require_full_watch: true)
+  question = quiz.questions.new(prompt: "Placeholder: who should you tell about a concern?", explanation: "Placeholder explanation.")
+  question.options.build(body: "The safeguarding lead", correct: true, explanation: "Placeholder: why this is right.")
+  question.options.build(body: "Nobody", explanation: "Placeholder: why this is wrong.")
+  question.save!
+end
+puts "Created training badges and an example draft course"
 
 puts "Seeding complete!"

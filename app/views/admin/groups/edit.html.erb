@@ -23,7 +23,7 @@
             <%= button_to "Remove", unassign_admin_event_group_path(current_event, @group, participant_event_ids: [pe.id]),
                 method: :post,
                 class: "text-sm text-red-600 hover:text-red-800",
-                data: { confirm: "Remove this participant from the group?" } %>
+                form: { data: { turbo_confirm: "Remove this participant from the group?" } } %>
           </div>
         <% end %>
       </div>

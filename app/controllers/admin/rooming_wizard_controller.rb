@@ -333,7 +333,8 @@ module Admin
     def finalize
       @rooms = @event.rooms.includes(:event, room_assignments: { participant_event: [ :event, :participant, :accommodation, :scans ] }).order(:name, :created_at).load
       @stats = calculate_finalize_stats
-      @hotel_scan_context = @event.hotel_scan_context
+      # Anyone scanned at a Lodging point shows as arrived.
+      @lodging_scan_context_ids = @event.scan_contexts.lodging.ids.to_set
     end
 
     def do_finalize
@@ -446,7 +447,7 @@ module Admin
         .where(status: %w[complete in_progress])
         .joins(:accommodation)
 
-      event_date = @event.starts_at&.to_date || Date.current
+      event_date = @event.local_start_date || Date.current
 
       stats = {
         total: participant_events.count,

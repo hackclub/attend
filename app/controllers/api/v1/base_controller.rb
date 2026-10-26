@@ -15,12 +15,17 @@ module Api
       end
 
       class_attribute :required_scope, instance_writer: false, default: nil
+      class_attribute :action_scopes, instance_writer: false, default: {}.freeze
 
-      # Declares the GlobalApiToken scope that reaches this controller. A
-      # scoped token can call nothing else, so leaving it unset — as every
-      # controller but Bans does — keeps that controller full-access only.
-      def self.requires_scope(scope)
-        self.required_scope = scope
+      # Declares the GlobalApiToken scope that reaches this controller, or with
+      # `only:` just those actions. A scoped token can call nothing else, so
+      # leaving it unset keeps a controller (or action) full-access only.
+      def self.requires_scope(scope, only: nil)
+        if only
+          self.action_scopes = action_scopes.merge(Array(only).to_h { |action| [ action.to_s, scope ] }).freeze
+        else
+          self.required_scope = scope
+        end
       end
 
       private
@@ -30,7 +35,7 @@ module Api
       # already restricted per-controller.
       def authorize_token_scope!
         return unless current_token.is_a?(GlobalApiToken)
-        return if current_token.permits?(self.class.required_scope)
+        return if current_token.permits?(action_scopes.fetch(action_name, required_scope))
 
         render json: {
           error: "This token is limited to: #{current_token.scope_labels.join(', ')}"
@@ -138,6 +143,15 @@ module Api
         unless current_user.can_access_event?(event)
           render json: { error: "Forbidden" }, status: :forbidden
         end
+      end
+
+      # For before_action, where a render halts the chain:
+      #   before_action -> { require_global_admin!("Only global admins can ...") }
+      # API keys have no user, so they're refused here too.
+      def require_global_admin!(message)
+        return if current_user&.global_admin?
+
+        render json: { error: message }, status: :forbidden
       end
 
       def render_error(message, status: :unprocessable_entity)

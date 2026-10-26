@@ -43,6 +43,11 @@ class Rack::Attack
     end
   end
 
+  # Each connect starts an OAuth round trip to GitHub or itch.io.
+  throttle("connected_accounts/ip", limit: 20, period: 1.minute) do |req|
+    req.ip if req.path.start_with?("/connected_accounts")
+  end
+
   throttle("api/participants", limit: 60, period: 1.minute) do |req|
     if req.path == "/api/v1/participants" && req.post?
       req.ip

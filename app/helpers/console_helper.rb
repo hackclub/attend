@@ -43,6 +43,15 @@ module ConsoleHelper
     mode == SYSTEM_THEME ? "light" : mode
   end
 
+  # Both admin layouts link across to /dashboard for staff who are also
+  # registered for an upcoming event. Memoized because the original admin
+  # renders its sidebar footer twice (drawer and desktop).
+  def show_participant_dashboard_link?
+    return @show_participant_dashboard_link if defined?(@show_participant_dashboard_link)
+
+    @show_participant_dashboard_link = current_user&.participant_in_upcoming_events? || false
+  end
+
   # Cloudscape's status indicator: an icon plus a coloured word. The word
   # always carries the meaning; the colour and icon only reinforce it.
   def cs_status(type, label)
@@ -274,6 +283,12 @@ module ConsoleHelper
     else
       "#{start_date.strftime("%B %-d")} – #{cs_absolute_date(end_date)}"
     end
+  end
+
+  # An event's dates as its attendees see them. Events store UTC, so an
+  # evening start in a zone behind UTC would otherwise land on the next day.
+  def cs_event_date_range(event)
+    cs_date_range(event.starts_at, event.ends_at, zone: event.event_time_zone)
   end
 
   # Internals for the timestamp helpers above.

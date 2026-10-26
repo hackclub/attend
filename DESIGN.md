@@ -195,7 +195,7 @@ State colours, used as badge tints and status dots, never as brand:
 
 **The One Voice Rule.** Hack Club red covers ≤10% of any screen. If two things on a page are red, at most one of them is a button. Its rarity is what makes a red thing mean "act on me".
 
-**The No Literal Hex Rule.** Every colour resolves through a semantic custom property or a Tailwind token remapped in `themes.css`. A raw hex in a template is a theme bug: it renders correctly in light and wrong in the other seven. New work uses `var(--accent)`, not `#ec3750`.
+**The No Literal Hex Rule.** Every colour resolves through a semantic custom property or a Tailwind token remapped in `themes.css`. A raw hex in a template is a theme bug: it renders correctly in light and wrong in the other seven. New work uses `var(--accent)`, not `#ec3750`. The one exception is a pin drawn onto OpenStreetMap tiles: the tiles stay light under every theme, so map markers (series map, public profile map, landing map) pin their fill and white ring as literal hex; everything the app paints around the map still resolves through tokens.
 
 **The Theme Foreground Rule.** `text-white` is not a colour outside the default theme. It compiles to `var(--color-white)`, which `themes.css` remaps to `var(--bg-elev)` so `bg-white` re-skins — correct for surfaces, silently wrong for text. A filled surface therefore declares its own foreground in `themes.css` rather than trusting `text-white`: accent fills take `--accent-on`, fills that resolve to `--bg-dark`/`--bg-darker` take `--text-on-dark`, fills that resolve to `--bg-elev-2` take `--text-strong` (it is a *light* surface under Catppuccin Latte), and unremapped literal fills pin `#ffffff`. Pin it with a descendant selector (`.bg-x .text-white`), not inheritance — a `text-white` on the child outranks a colour inherited from the parent.
 
@@ -293,6 +293,17 @@ Attend's most-repeated pattern on Clipboard surfaces and the closest thing it ha
 ### Navigation
 - **Participant header:** 64px tall, white, hairline bottom border. Links are 14px/500 in `{colors.text}`, 6px radius, and the active item takes an `{colors.accent-soft}` background with `{colors.accent}` text. Collapses to a hamburger below `md`.
 - **Admin navigation:** the light 256px admin sidebar, its uppercase section eyebrows, the full-round user/event selector pills and the faux-input search trigger were all retired when `/admin` moved to the console. Admin navigation is now documented in *Admin Console*; don't rebuild those pieces on a Clipboard surface.
+
+## Event Branding
+
+A series can brand registration for all of its events (**Registration branding** on the series form, in both the classic admin and the console). Onboarding pages for those events, including the signed-out invitation page, render with `<html data-branded>` plus a `<style>` of token values from `BrandTheme`. It is the one sanctioned exception to the rules below, and it is scoped to participant onboarding: the app shell, admin, dashboard and guardian portal stay on the system above. No code is specific to any one brand; a brand is data on the series.
+
+- **What an admin sets:** page background, text colour (ink) and accent (required); optionally a button colour, secondary, highlight and event-card gradient; body and heading fonts; logo, mascot, footer and t-shirt images; and the step navigation (numbered steps or a progress bar). Fonts are self-hosted files listed in `BrandTheme::FONTS` (`app/assets/fonts/<font>/`, declared in `app/assets/tailwind/brand.css`). Images are picked from `app/assets/images/brands/`. Adding a brand means pushing its assets and then filling in the form.
+- **How the tokens are made:** `BrandTheme#resolved_tokens` works out the full light-theme set (`--bg-*`, `--text-*`, `--border-*`, `--accent-*`, `--success-*`, plus `--brand-*` extras) from those colours. Text shades are mixed from the ink and pulled back until they clear 4.5:1, and fills are darkened until white text clears 4.5:1. Any token can be pinned to an exact value under "Exact token values".
+- **What it keeps:** every contrast floor. A brand won't save unless every text token clears 4.5:1 on the page and on cards, white clears 4.5:1 on every fill, ink clears 4.5:1 on both card gradient stops, and `--border-strong` and `--focus-ring` clear 3:1. The accent is for decoration and never carries words.
+- **Themes:** the colours apply only on the light theme. Someone who picked another theme keeps it on branded pages, with the brand's fonts and artwork on top.
+- **Why the fonts are self-hosted:** the CSP allows no font hosts, and registrants are mostly minors whose browsers shouldn't be sent to Google. Each font's OFL licence sits next to its files.
+- **Every event, branded or not,** gets the welcome screen before the first step and the "you're registered" screen after submitting, both headed by the event card.
 
 ## Do's and Don'ts
 

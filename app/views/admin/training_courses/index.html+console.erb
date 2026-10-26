@@ -1,0 +1,106 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Training", nil ]) %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Training</h1>
+      <p class="cs-description">Courses award badges; badges can be required for event roles.</p>
+    </div>
+    <div class="cs-actions">
+      <%= link_to "Learner view", training_path, class: "cs-btn cs-btn-full" %>
+      <%= link_to "Safety reviews", admin_training_disclosures_path, class: "cs-btn cs-btn-full" %>
+      <%= link_to "New badge", new_admin_training_badge_path, class: "cs-btn cs-btn-full" %>
+      <%= link_to "New course", new_admin_training_course_path, class: "cs-btn cs-btn-primary cs-btn-full" %>
+    </div>
+  </div>
+
+  <% if @pending_disclosures.positive? %>
+    <div class="cs-alert cs-alert-error">
+      <%= cs_status_icon(:error) %>
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+        <div>
+          <p class="cs-alert-title"><%= pluralize(@pending_disclosures, "declaration") %> awaiting the <%= TrainingDisclosure::SAFETY_TEAM_NAME %></p>
+          <p>They can't train or work events until reviewed.</p>
+        </div>
+        <%= link_to "Review", admin_training_disclosures_path, class: "cs-btn self-start sm:self-auto whitespace-nowrap" %>
+      </div>
+    </div>
+  <% end %>
+
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided">
+      <h2 class="cs-h2">Courses <span class="cs-counter">(<%= @courses.size %>)</span></h2>
+    </div>
+    <% if @courses.empty? %>
+      <div class="cs-empty">
+        <p class="cs-empty-title">No courses yet</p>
+        <p>Create a badge first, then a course that awards it.</p>
+        <div class="cs-actions"><%= link_to "New course", new_admin_training_course_path, class: "cs-btn" %></div>
+      </div>
+    <% else %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Course</th>
+              <th scope="col">Status</th>
+              <th scope="col">Awards</th>
+              <th scope="col">Lessons</th>
+              <th scope="col">Learners</th>
+              <th scope="col"><span class="sr-only">Order</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @courses.each_with_index do |course, index| %>
+              <tr>
+                <td><%= link_to course.title, admin_training_course_path(course), class: "cs-link" %></td>
+                <td class="whitespace-nowrap"><%= render "admin/training/course_status", course: course %><div class="cs-small cs-secondary"><%= course.access_open? ? "Open to anyone" : "Invite-only" %></div></td>
+                <td><%= course.badge ? link_to(course.badge.name, admin_training_badge_path(course.badge), class: "cs-link") : tag.span("No badge", class: "cs-muted") %></td>
+                <td class="whitespace-nowrap"><%= course.lessons.size %> <span class="cs-secondary">· <%= pluralize(course.question_count, "question") %></span></td>
+                <td class="whitespace-nowrap"><%= @completion_counts.fetch(course.id, 0) %> completed <span class="cs-secondary">of <%= @enrollment_counts.fetch(course.id, 0) %> started</span></td>
+                <td class="whitespace-nowrap text-right">
+                  <%= render "admin/training/move_buttons", path: move_admin_training_course_path(course), label: course.title, first: index.zero?, last: index == @courses.size - 1 %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided">
+      <h2 class="cs-h2">Badges <span class="cs-counter">(<%= @badges.size %>)</span></h2>
+    </div>
+    <% if @badges.empty? %>
+      <div class="cs-empty">
+        <p class="cs-empty-title">No badges yet</p>
+        <div class="cs-actions"><%= link_to "New badge", new_admin_training_badge_path, class: "cs-btn" %></div>
+      </div>
+    <% else %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Badge</th>
+              <th scope="col">Required for</th>
+              <th scope="col">Validity</th>
+              <th scope="col">Current holders</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @badges.each do |badge| %>
+              <tr>
+                <td><%= link_to badge.name, admin_training_badge_path(badge), class: "cs-link" %></td>
+                <td><%= render "admin/training/required_roles", badge: badge %></td>
+                <td class="whitespace-nowrap"><%= training_validity(badge) %></td>
+                <td class="whitespace-nowrap"><%= @holder_counts.fetch(badge.id, 0) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </section>
+</div>

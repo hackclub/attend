@@ -1,0 +1,7 @@
+<% if badge.required? %>
+  <span class="inline-flex flex-wrap gap-1">
+    <% badge.required_roles.each do |role| %><%= cs_badge(TrainingBadge.role_label(role), "red") %><% end %>
+  </span>
+<% else %>
+  <span class="cs-muted">Not required</span>
+<% end %>

@@ -11,27 +11,26 @@
           <%= f.text_field :name, class: "cs-input", required: true, **aria %>
         <% end %>
 
-        <div class="space-y-3">
-          <%= cs_form_field f, :checks_in, label: "Checks person in to event", bare: true do |aria| %>
-            <div class="cs-option">
-              <%= f.check_box :checks_in, **aria %>
-              <div>
-                <%= f.label :checks_in, "Checks person in to event", class: "cs-option-label" %>
-                <p class="cs-option-description">When scanned at this location, mark the participant as checked in to the event</p>
+        <%= cs_form_field f, :kind, label: "What a scan here means", group: true,
+              description: "Sets each participant's status when they're scanned here." do |aria| %>
+          <div class="space-y-3">
+            <% ScanContext::KIND_DESCRIPTIONS.each do |kind, description| %>
+              <div class="cs-option">
+                <%= f.radio_button :kind, kind, **aria %>
+                <div>
+                  <%= f.label :kind, kind.humanize, value: kind, class: "cs-option-label" %>
+                  <p class="cs-option-description"><%= description %></p>
+                </div>
               </div>
-            </div>
-          <% end %>
+            <% end %>
+          </div>
+        <% end %>
 
-          <%= cs_form_field f, :is_travel_pickup, label: "Travel pickup location", bare: true do |aria| %>
-            <div class="cs-option">
-              <%= f.check_box :is_travel_pickup, **aria %>
-              <div>
-                <%= f.label :is_travel_pickup, "Travel pickup location", class: "cs-option-label" %>
-                <p class="cs-option-description">When scanned at this location, mark the participant as collected from their travel arrival point</p>
-              </div>
-            </div>
-          <% end %>
-        </div>
+        <%= cs_form_field f, :usage_note, label: "When to use this", optional: true,
+              description: "Recommended. Shown under the name in the scanner, so staff pick the right point.",
+              constraint: "Up to 200 characters. For example: Scan everyone as they board the bus back from the museum." do |aria| %>
+          <%= f.text_area :usage_note, class: "cs-input", rows: 2, maxlength: 200, **aria %>
+        <% end %>
 
         <div class="cs-field-grid">
           <%= cs_form_field f, :starts_at, label: "Starts at", optional: true,
@@ -46,7 +45,7 @@
         </div>
 
         <%= cs_form_field f, :position, label: "Display order", optional: true,
-              constraint: "A whole number, 0 or more. Lower numbers appear first in the dropdown." do |aria| %>
+              constraint: "A whole number, 0 or more. Contexts are listed by start time. Lower numbers come first among contexts with the same or no start time." do |aria| %>
           <%= f.number_field :position, class: "cs-input w-32!", min: 0, step: 1, **aria %>
         <% end %>
       </div>

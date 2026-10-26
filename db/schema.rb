@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_25_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -96,6 +96,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
   end
 
+  create_table "airtable_connections", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "access_token", null: false
+    t.datetime "access_token_expires_at", null: false
+    t.string "airtable_email"
+    t.string "airtable_user_id"
+    t.jsonb "bases", default: [], null: false
+    t.uuid "connected_by_id"
+    t.datetime "created_at", null: false
+    t.uuid "event_id", null: false
+    t.text "refresh_token", null: false
+    t.datetime "refresh_token_expires_at", null: false
+    t.string "scope"
+    t.datetime "updated_at", null: false
+    t.index ["connected_by_id"], name: "index_airtable_connections_on_connected_by_id"
+    t.index ["event_id"], name: "index_airtable_connections_on_event_id", unique: true
+  end
+
   create_table "audit_logs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "action", null: false
     t.uuid "actor_user_id"
@@ -151,22 +168,36 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
     t.datetime "created_at", null: false
     t.string "email", null: false
     t.datetime "updated_at", null: false
-    t.index "lower((email)::text)", name: "index_ban_emails_on_lower_email", unique: true
+    t.index "ban_id, lower((email)::text)", name: "index_ban_emails_on_ban_id_and_lower_email", unique: true
+    t.index "lower((email)::text)", name: "index_ban_emails_on_lower_email"
     t.index ["ban_id"], name: "index_ban_emails_on_ban_id"
+  end
+
+  create_table "ban_slack_ids", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "ban_id", null: false
+    t.datetime "created_at", null: false
+    t.string "slack_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["ban_id", "slack_id"], name: "index_ban_slack_ids_on_ban_id_and_slack_id", unique: true
+    t.index ["slack_id"], name: "index_ban_slack_ids_on_slack_id"
   end
 
   create_table "bans", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.uuid "created_by_id"
     t.datetime "expires_at"
+    t.string "external_key"
     t.text "reason"
     t.datetime "revoked_at"
     t.uuid "revoked_by_id"
+    t.string "source", default: "manual", null: false
+    t.jsonb "ucat_cases", default: [], null: false
     t.datetime "updated_at", null: false
     t.index ["created_by_id"], name: "index_bans_on_created_by_id"
     t.index ["expires_at"], name: "index_bans_on_expires_at"
     t.index ["revoked_at"], name: "index_bans_on_revoked_at"
     t.index ["revoked_by_id"], name: "index_bans_on_revoked_by_id"
+    t.index ["source", "external_key"], name: "index_bans_on_source_and_external_key", unique: true, where: "(external_key IS NOT NULL)"
   end
 
   create_table "blazer_audits", force: :cascade do |t|
@@ -223,6 +254,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
     t.string "status"
     t.datetime "updated_at", null: false
     t.index ["creator_id"], name: "index_blazer_queries_on_creator_id"
+  end
+
+  create_table "connected_accounts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "access_token", null: false
+    t.datetime "connected_at", null: false
+    t.datetime "created_at", null: false
+    t.uuid "participant_id", null: false
+    t.jsonb "profile", default: {}, null: false
+    t.string "provider", null: false
+    t.string "scope"
+    t.string "uid", null: false
+    t.datetime "updated_at", null: false
+    t.string "username", null: false
+    t.index ["participant_id", "provider"], name: "index_connected_accounts_on_participant_id_and_provider", unique: true
+    t.index ["participant_id"], name: "index_connected_accounts_on_participant_id"
+    t.index ["provider", "uid"], name: "index_connected_accounts_on_provider_and_uid"
   end
 
   create_table "consents", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -399,6 +446,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
   end
 
   create_table "event_series", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.jsonb "config", default: {}, null: false
     t.string "contact_email"
     t.datetime "created_at", null: false
     t.text "description"
@@ -408,10 +456,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
     t.index ["slug"], name: "index_event_series_on_slug", unique: true
   end
 
+  create_table "event_volunteers", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "added_by_id"
+    t.datetime "created_at", null: false
+    t.uuid "event_id", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["added_by_id"], name: "index_event_volunteers_on_added_by_id"
+    t.index ["event_id", "user_id"], name: "index_event_volunteers_on_event_id_and_user_id", unique: true
+    t.index ["user_id"], name: "index_event_volunteers_on_user_id"
+  end
+
   create_table "events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "airtable_api_key"
     t.uuid "airtable_config_updated_by_id"
+    t.datetime "airtable_sync_alerted_at"
     t.text "airtable_sync_error"
     t.datetime "airtable_sync_error_at"
+    t.datetime "airtable_sync_failing_since"
+    t.integer "airtable_sync_failures", default: 0, null: false
     t.datetime "airtable_sync_paused_at"
     t.string "airtable_sync_source_id"
     t.string "airtable_sync_table_id"
@@ -662,6 +725,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
     t.index ["user_id"], name: "index_incident_helping_staff_on_user_id"
   end
 
+  create_table "incident_medications", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "dose", null: false
+    t.uuid "incident_id", null: false
+    t.text "name", null: false
+    t.text "notes"
+    t.datetime "updated_at", null: false
+    t.index ["incident_id"], name: "index_incident_medications_on_incident_id"
+  end
+
   create_table "incident_participants", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.uuid "incident_id", null: false
@@ -696,6 +769,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
     t.text "details", null: false
     t.boolean "emergency_services_called"
     t.uuid "event_id"
+    t.uuid "incident_id"
     t.string "incident_type", null: false
     t.string "priority", null: false
     t.string "reporter_email", null: false
@@ -710,6 +784,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
     t.uuid "user_id"
     t.index ["created_at"], name: "index_incident_reports_on_created_at"
     t.index ["event_id"], name: "index_incident_reports_on_event_id"
+    t.index ["incident_id"], name: "index_incident_reports_on_incident_id", unique: true
     t.index ["priority"], name: "index_incident_reports_on_priority"
     t.index ["status"], name: "index_incident_reports_on_status"
     t.index ["user_id"], name: "index_incident_reports_on_user_id"
@@ -722,6 +797,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
     t.text "details"
     t.uuid "event_id", null: false
     t.string "location"
+    t.boolean "medication_dispensed", default: false, null: false
     t.datetime "occurred_at"
     t.uuid "participant_event_id"
     t.uuid "reported_by_user_id", null: false
@@ -792,6 +868,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
   end
 
   create_table "message_deliveries", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.boolean "catch_up", default: false, null: false
     t.string "channel", null: false
     t.datetime "created_at", null: false
     t.datetime "delivered_at"
@@ -892,6 +969,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
     t.uuid "nfc_badge_assigned_by_id"
     t.uuid "nfc_badge_token", default: -> { "gen_random_uuid()" }
     t.datetime "onboarding_completed_at"
+    t.datetime "onboarding_intro_seen_at"
     t.jsonb "onboarding_payload", default: {}
     t.integer "onboarding_step", default: 0
     t.uuid "participant_id", null: false
@@ -1028,6 +1106,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
 
   create_table "registration_change_requests", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.string "follow_up_reason"
     t.string "kind", null: false
     t.uuid "participant_event_id", null: false
     t.uuid "requested_by_id", null: false
@@ -1128,10 +1207,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
     t.uuid "event_id", null: false
     t.boolean "is_airport", default: false, null: false
     t.boolean "is_travel_pickup", default: false, null: false
+    t.string "kind"
     t.string "name", null: false
     t.integer "position", default: 0, null: false
     t.datetime "starts_at"
     t.datetime "updated_at", null: false
+    t.text "usage_note"
     t.index ["event_id", "position"], name: "index_scan_contexts_on_event_id_and_position"
     t.index ["event_id"], name: "index_scan_contexts_on_event_id"
   end
@@ -1225,6 +1306,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
     t.datetime "updated_at", null: false
     t.index ["event_id"], name: "index_slack_blasts_on_event_id"
     t.index ["sent_by_user_id"], name: "index_slack_blasts_on_sent_by_user_id"
+  end
+
+  create_table "slack_channel_invites", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "channel_id", null: false
+    t.datetime "created_at", null: false
+    t.string "slack_user_id", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id"
+    t.index ["channel_id", "slack_user_id"], name: "index_slack_channel_invites_on_channel_id_and_slack_user_id", unique: true
+    t.index ["user_id"], name: "index_slack_channel_invites_on_user_id"
   end
 
   create_table "ticket_messages", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1328,13 +1419,181 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
     t.index ["uid"], name: "index_toolchest_oauth_applications_on_uid", unique: true
   end
 
+  create_table "training_badge_awards", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "awarded_at", null: false
+    t.uuid "awarded_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "expires_at"
+    t.text "note"
+    t.datetime "revoked_at"
+    t.uuid "revoked_by_id"
+    t.text "revoked_reason"
+    t.string "share_token"
+    t.datetime "shared_at"
+    t.uuid "training_badge_id", null: false
+    t.uuid "training_course_id"
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["awarded_by_id"], name: "index_training_badge_awards_on_awarded_by_id"
+    t.index ["revoked_by_id"], name: "index_training_badge_awards_on_revoked_by_id"
+    t.index ["share_token"], name: "index_training_badge_awards_on_share_token", unique: true
+    t.index ["training_badge_id"], name: "index_training_badge_awards_on_training_badge_id"
+    t.index ["training_course_id"], name: "index_training_badge_awards_on_training_course_id"
+    t.index ["user_id", "training_badge_id"], name: "index_training_badge_awards_on_user_id_and_training_badge_id"
+  end
+
+  create_table "training_badges", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.string "required_roles", default: [], null: false, array: true
+    t.string "slug", null: false
+    t.datetime "updated_at", null: false
+    t.integer "validity_months"
+    t.index ["slug"], name: "index_training_badges_on_slug", unique: true
+  end
+
+  create_table "training_course_invitations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "invited_by_id"
+    t.uuid "training_course_id", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["invited_by_id"], name: "index_training_course_invitations_on_invited_by_id"
+    t.index ["training_course_id", "user_id"], name: "index_training_course_invitations_on_course_and_user", unique: true
+    t.index ["user_id"], name: "index_training_course_invitations_on_user_id"
+  end
+
+  create_table "training_courses", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "access", default: "invite_only", null: false
+    t.datetime "created_at", null: false
+    t.text "disclosure_question"
+    t.boolean "disclosure_required", default: false, null: false
+    t.integer "estimated_minutes"
+    t.integer "pass_mark", default: 80, null: false
+    t.integer "position", default: 0, null: false
+    t.string "reveal_answers", default: "after_pass", null: false
+    t.string "slug", null: false
+    t.string "status", default: "draft", null: false
+    t.text "summary"
+    t.string "title", null: false
+    t.uuid "training_badge_id"
+    t.datetime "updated_at", null: false
+    t.index ["slug"], name: "index_training_courses_on_slug", unique: true
+    t.index ["training_badge_id"], name: "index_training_courses_on_training_badge_id"
+  end
+
+  create_table "training_disclosures", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "answer", null: false
+    t.datetime "answered_at", null: false
+    t.datetime "created_at", null: false
+    t.text "question", null: false
+    t.text "review_note"
+    t.string "review_status", null: false
+    t.datetime "reviewed_at"
+    t.uuid "reviewed_by_id"
+    t.uuid "training_course_id"
+    t.uuid "training_enrollment_id"
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["review_status"], name: "index_training_disclosures_on_review_status"
+    t.index ["reviewed_by_id"], name: "index_training_disclosures_on_reviewed_by_id"
+    t.index ["training_course_id"], name: "index_training_disclosures_on_training_course_id"
+    t.index ["training_enrollment_id"], name: "index_training_disclosures_on_training_enrollment_id"
+    t.index ["user_id"], name: "index_training_disclosures_on_user_id"
+  end
+
+  create_table "training_enrollments", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.datetime "started_at", null: false
+    t.uuid "training_course_id", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["training_course_id"], name: "index_training_enrollments_on_training_course_id"
+    t.index ["user_id", "training_course_id"], name: "index_training_enrollments_on_user_id_and_training_course_id", unique: true
+  end
+
+  create_table "training_lesson_completions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "completed_at", null: false
+    t.datetime "created_at", null: false
+    t.integer "score"
+    t.uuid "training_enrollment_id", null: false
+    t.uuid "training_lesson_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["training_enrollment_id", "training_lesson_id"], name: "index_training_lesson_completions_on_enrollment_and_lesson", unique: true
+    t.index ["training_lesson_id"], name: "index_training_lesson_completions_on_training_lesson_id"
+  end
+
+  create_table "training_lessons", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "body"
+    t.datetime "created_at", null: false
+    t.integer "position", default: 0, null: false
+    t.boolean "require_full_watch", default: true, null: false
+    t.string "title", null: false
+    t.uuid "training_course_id", null: false
+    t.datetime "updated_at", null: false
+    t.float "video_duration_seconds"
+    t.string "video_url"
+    t.index ["training_course_id"], name: "index_training_lessons_on_training_course_id"
+  end
+
+  create_table "training_question_options", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "body", null: false
+    t.boolean "correct", default: false, null: false
+    t.datetime "created_at", null: false
+    t.text "explanation"
+    t.integer "position", default: 0, null: false
+    t.uuid "training_question_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["training_question_id"], name: "index_training_question_options_on_training_question_id"
+  end
+
+  create_table "training_questions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "explanation"
+    t.integer "position", default: 0, null: false
+    t.text "prompt", null: false
+    t.uuid "training_lesson_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["training_lesson_id"], name: "index_training_questions_on_training_lesson_id"
+  end
+
+  create_table "training_quiz_attempts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.boolean "passed", null: false
+    t.jsonb "responses", default: {}, null: false
+    t.integer "score", null: false
+    t.uuid "training_enrollment_id", null: false
+    t.uuid "training_lesson_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["training_enrollment_id"], name: "index_training_quiz_attempts_on_training_enrollment_id"
+    t.index ["training_lesson_id"], name: "index_training_quiz_attempts_on_training_lesson_id"
+  end
+
+  create_table "training_video_views", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.float "duration_seconds"
+    t.datetime "last_heartbeat_at"
+    t.uuid "training_enrollment_id", null: false
+    t.uuid "training_lesson_id", null: false
+    t.datetime "updated_at", null: false
+    t.float "watched_seconds", default: 0.0, null: false
+    t.index ["training_enrollment_id", "training_lesson_id"], name: "index_training_video_views_on_enrollment_and_lesson", unique: true
+    t.index ["training_lesson_id"], name: "index_training_video_views_on_training_lesson_id"
+  end
+
   create_table "travel_legs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "arrival_airport"
     t.datetime "arrival_time"
+    t.string "arrival_time_zone"
     t.string "confirmation_code"
     t.datetime "created_at", null: false
     t.string "departure_airport"
     t.datetime "departure_time"
+    t.string "departure_time_zone"
     t.string "flight_code"
     t.datetime "last_tracked_at"
     t.datetime "live_arrival_time"
@@ -1386,7 +1645,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
   end
 
   create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.boolean "admin_console_beta", default: false, null: false
+    t.boolean "admin_console_beta", default: true, null: false
     t.datetime "created_at", null: false
     t.datetime "current_sign_in_at"
     t.string "current_sign_in_ip"
@@ -1408,10 +1667,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
     t.string "theme"
     t.string "time_zone", default: "UTC"
     t.datetime "updated_at", null: false
+    t.string "verified_slack_id"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["global_role"], name: "index_users_on_global_role"
     t.index ["hack_club_account_id"], name: "index_users_on_hack_club_account_id", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
+    t.index ["verified_slack_id"], name: "index_users_on_verified_slack_id"
   end
 
   create_table "versions", force: :cascade do |t|
@@ -1429,12 +1690,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
   add_foreign_key "accommodations", "participant_events"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "airtable_connections", "events"
+  add_foreign_key "airtable_connections", "users", column: "connected_by_id", on_delete: :nullify
   add_foreign_key "audit_logs", "events"
   add_foreign_key "audit_logs", "users", column: "actor_user_id"
   add_foreign_key "badge_redirects", "users", on_delete: :nullify
   add_foreign_key "ban_emails", "bans"
+  add_foreign_key "ban_slack_ids", "bans"
   add_foreign_key "bans", "users", column: "created_by_id"
   add_foreign_key "bans", "users", column: "revoked_by_id"
+  add_foreign_key "connected_accounts", "participants"
   add_foreign_key "consents", "custom_documents"
   add_foreign_key "consents", "guardian_participant_events"
   add_foreign_key "consents", "participant_events"
@@ -1448,6 +1713,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
   add_foreign_key "event_api_tokens", "users", on_delete: :nullify
   add_foreign_key "event_role_assignments", "events"
   add_foreign_key "event_role_assignments", "users"
+  add_foreign_key "event_volunteers", "events", on_delete: :cascade
+  add_foreign_key "event_volunteers", "users", column: "added_by_id", on_delete: :nullify
+  add_foreign_key "event_volunteers", "users", on_delete: :cascade
   add_foreign_key "events", "event_series"
   add_foreign_key "events", "scan_contexts", column: "hotel_scan_context_id"
   add_foreign_key "events", "users", column: "airtable_config_updated_by_id"
@@ -1471,11 +1739,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
   add_foreign_key "incident_comments", "users"
   add_foreign_key "incident_helping_staff", "incidents"
   add_foreign_key "incident_helping_staff", "users"
+  add_foreign_key "incident_medications", "incidents"
   add_foreign_key "incident_participants", "incidents"
   add_foreign_key "incident_participants", "participant_events"
   add_foreign_key "incident_report_comments", "incident_reports"
   add_foreign_key "incident_report_comments", "users"
   add_foreign_key "incident_reports", "events"
+  add_foreign_key "incident_reports", "incidents", on_delete: :nullify
   add_foreign_key "incident_reports", "users"
   add_foreign_key "incidents", "events"
   add_foreign_key "incidents", "participant_events"
@@ -1536,6 +1806,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
   add_foreign_key "slack_blast_recipients", "slack_blasts"
   add_foreign_key "slack_blasts", "events"
   add_foreign_key "slack_blasts", "users", column: "sent_by_user_id"
+  add_foreign_key "slack_channel_invites", "users", on_delete: :nullify
   add_foreign_key "ticket_messages", "tickets"
   add_foreign_key "ticket_messages", "tickets", column: "merged_from_ticket_id"
   add_foreign_key "ticket_messages", "users"
@@ -1547,6 +1818,30 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_120000) do
   add_foreign_key "tickets", "users", column: "merged_by_id"
   add_foreign_key "toolchest_oauth_access_grants", "toolchest_oauth_applications", column: "application_id"
   add_foreign_key "toolchest_oauth_access_tokens", "toolchest_oauth_applications", column: "application_id"
+  add_foreign_key "training_badge_awards", "training_badges"
+  add_foreign_key "training_badge_awards", "training_courses", on_delete: :nullify
+  add_foreign_key "training_badge_awards", "users", column: "awarded_by_id", on_delete: :nullify
+  add_foreign_key "training_badge_awards", "users", column: "revoked_by_id", on_delete: :nullify
+  add_foreign_key "training_badge_awards", "users", on_delete: :cascade
+  add_foreign_key "training_course_invitations", "training_courses", on_delete: :cascade
+  add_foreign_key "training_course_invitations", "users", column: "invited_by_id", on_delete: :nullify
+  add_foreign_key "training_course_invitations", "users", on_delete: :cascade
+  add_foreign_key "training_courses", "training_badges"
+  add_foreign_key "training_disclosures", "training_courses", on_delete: :nullify
+  add_foreign_key "training_disclosures", "training_enrollments", on_delete: :nullify
+  add_foreign_key "training_disclosures", "users", column: "reviewed_by_id", on_delete: :nullify
+  add_foreign_key "training_disclosures", "users", on_delete: :cascade
+  add_foreign_key "training_enrollments", "training_courses", on_delete: :cascade
+  add_foreign_key "training_enrollments", "users", on_delete: :cascade
+  add_foreign_key "training_lesson_completions", "training_enrollments", on_delete: :cascade
+  add_foreign_key "training_lesson_completions", "training_lessons", on_delete: :cascade
+  add_foreign_key "training_lessons", "training_courses", on_delete: :cascade
+  add_foreign_key "training_question_options", "training_questions", on_delete: :cascade
+  add_foreign_key "training_questions", "training_lessons", on_delete: :cascade
+  add_foreign_key "training_quiz_attempts", "training_enrollments", on_delete: :cascade
+  add_foreign_key "training_quiz_attempts", "training_lessons", on_delete: :cascade
+  add_foreign_key "training_video_views", "training_enrollments", on_delete: :cascade
+  add_foreign_key "training_video_views", "training_lessons", on_delete: :cascade
   add_foreign_key "travel_legs", "travels"
   add_foreign_key "travels", "participant_events"
 end

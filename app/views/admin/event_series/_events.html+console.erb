@@ -24,7 +24,7 @@
                 <div class="min-w-0">
                   <%= link_to event.name, admin_event_dashboard_path(event.slug), class: "cs-link cs-link-strong" %>
                   <p class="cs-small cs-secondary">
-                    <span class="whitespace-nowrap"><%= cs_date_range(event.starts_at, event.ends_at) %></span>
+                    <span class="whitespace-nowrap"><%= cs_event_date_range(event) %></span>
                     <% if event.location_city.present? %>
                       · <%= [ event.location_city, event.location_country ].compact_blank.join(", ") %>
                     <% end %>

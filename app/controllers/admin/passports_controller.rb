@@ -12,6 +12,7 @@ module Admin
         id: @passport.id,
         token: @passport.token,
         serial_number: @passport.serial_number,
+        badge_url: passport_badge_url,
         confirm_url: confirm_admin_user_passport_path(@user, @passport)
       }, status: :created
     end
@@ -54,6 +55,13 @@ module Admin
 
     def set_passport
       @passport = @user.passports.find(params[:id])
+    end
+
+    # The NFC bridge refuses to write a tag without a URI record, so every
+    # passport gets one. Mirrors event badges when the user has a Slack ID.
+    def passport_badge_url
+      slack_user_id = @user.slack_user_id.presence || @user.participant&.slack_user_id.presence
+      slack_user_id ? "https://badge.hackclub.com/t/#{slack_user_id}" : root_url
     end
 
     def log_passport_action(action)

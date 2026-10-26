@@ -45,7 +45,7 @@
           <dt class="cs-kv-label">Dates</dt>
           <dd class="cs-kv-value">
             <% if @event.starts_at && @event.ends_at %>
-              <%= cs_date_range(@event.starts_at, @event.ends_at) %>
+              <%= cs_event_date_range(@event) %>
             <% else %>
               <span class="cs-muted">Not set</span>
             <% end %>
@@ -194,7 +194,7 @@
             <table class="cs-table cs-table-compact">
               <thead>
                 <tr>
-                  <th scope="col">Severity</th>
+                  <th scope="col">Level</th>
                   <th scope="col">Category</th>
                   <th scope="col">Participant</th>
                   <th scope="col">Status</th>
@@ -204,7 +204,7 @@
               <tbody>
                 <% @recent_incidents.each do |incident| %>
                   <tr>
-                    <td><%= cs_severity_badge(incident.severity) %></td>
+                    <td><%= incident_level_badge(incident.severity) %></td>
                     <td><%= link_to incident.category.titleize, admin_event_incident_path(@event, incident), class: "cs-link cs-link-strong" %></td>
                     <td>
                       <% if incident.participant_event %>

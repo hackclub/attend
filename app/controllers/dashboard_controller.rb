@@ -1,4 +1,5 @@
 class DashboardController < ApplicationController
+  include RestrictsBannedUsers
   include TravelLegDateMerging
   include PhysicalDocumentUploads
   include OptionalDocumentEnrolment
@@ -53,6 +54,10 @@ class DashboardController < ApplicationController
     # needs a way to clear the (now dead) connection out.
     @mcp_connections = mcp_connections
     @show_mcp_connections = current_user.admin? || @mcp_connections.any?
+    # Linked GitHub and itch.io accounts belong to the participant, so anyone
+    # with a participant record gets the section to connect them.
+    @connected_accounts = @participant ? @participant.connected_accounts.index_by(&:provider) : {}
+    @show_connections = @participant.present? || @show_mcp_connections
 
     # Badge links are keyed by Slack ID (that's what the printed QR encodes),
     # so someone whose account has no Slack ID gets the section as a prompt to
@@ -185,10 +190,7 @@ class DashboardController < ApplicationController
     @optional_documents = @participant_event.relevant_optional_custom_documents
     # Documents live in the wizard while the participant is still filling it
     # in for the first time, and on the dashboard once they've submitted.
-    # Adding an optional document reopens a completed participant, so
-    # "in_progress" on its own no longer means "still in the wizard".
-    @show_documents_section = @custom_documents.any? && !@participant_event.invited? &&
-      (!@participant_event.in_progress? || @participant_event.onboarding_completed_at.present?)
+    @show_documents_section = @custom_documents.any? && !@participant_event.in_onboarding?
     @custom_document_consents = @participant_event.consents
       .select(&:custom_document_id)
       .index_by(&:custom_document_id)

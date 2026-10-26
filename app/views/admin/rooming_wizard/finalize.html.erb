@@ -91,10 +91,10 @@
                 </span>
               <% end %>
               <% room.room_assignments.each do |assignment| %>
-                <% has_hotel_scan = @hotel_scan_context && assignment.participant_event.scans.any? { |s| s.scan_context_id == @hotel_scan_context.id } %>
-                <span class="inline-flex items-center px-2 py-1 rounded-full text-sm <%= has_hotel_scan ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' %>">
+                <% has_lodging_scan = assignment.participant_event.scans.any? { |s| @lodging_scan_context_ids.include?(s.scan_context_id) } %>
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-sm <%= has_lodging_scan ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' %>">
                   <%= assignment.participant_event.participant.full_name %>
-                  <span class="ml-1 <%= has_hotel_scan ? 'text-green-600' : 'text-gray-500' %> text-xs">(Age <%= assignment.participant_event.age_on_event %>)</span>
+                  <span class="ml-1 <%= has_lodging_scan ? 'text-green-600' : 'text-gray-500' %> text-xs">(Age <%= assignment.participant_event.age_on_event %>)</span>
                 </span>
               <% end %>
             </div>

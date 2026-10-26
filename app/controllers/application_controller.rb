@@ -20,12 +20,19 @@ class ApplicationController < ActionController::Base
   rescue_from ActionController::InvalidAuthenticityToken, with: :handle_invalid_authenticity_token
   rescue_from ActiveRecord::RecordNotFound, with: :handle_record_not_found
 
-  helper_method :current_event, :impersonating?, :impersonator
+  helper_method :current_event, :impersonating?, :impersonator, :page_brand
 
   def current_event
     return @current_event if defined?(@current_event)
 
     @current_event = Event.find_by(id: session[:current_event_id])
+  end
+
+  # Onboarding pages for an event with branding set @page_brand to its
+  # BrandTheme; the layout then adds the brand's tokens, fonts and artwork
+  # (see app/assets/tailwind/brand.css).
+  def page_brand
+    @page_brand
   end
 
   def set_current_event(event)
@@ -45,6 +52,23 @@ class ApplicationController < ActionController::Base
   end
 
   private
+
+  # Where a signed-in person starts out: the admin for anyone who can use it
+  # (User#admin? — global admins, event staff, series owners and organizers),
+  # unless they're also a participant and every event they staff has ended;
+  # their dashboard if they're a participant, and the training page for
+  # people working events who can't use the admin (read-only staff,
+  # volunteers) or who've been invited to a course. nil means the home page.
+  # Shared by the home page and the sign-in callback so they can't disagree.
+  def landing_path_for(user)
+    if user.admin? && (user.participant.blank? || user.admin_for_current_events?)
+      admin_root_path
+    elsif user.participant.present?
+      dashboard_path
+    elsif user.event_role_assignments.exists? || user.event_volunteers.exists? || user.training_course_invitations.exists?
+      training_path
+    end
+  end
 
   def preserve_invitation_token_for_sign_out
     return unless devise_controller? && action_name == "destroy"

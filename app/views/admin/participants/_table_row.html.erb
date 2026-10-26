@@ -30,9 +30,12 @@
     </td>
   <% end %>
   <td class="px-2 py-1.5 whitespace-nowrap" data-column="age">
-    <% age = pe.participant.age_on(current_event.starts_at&.to_date || Date.current) %>
+    <% age = pe.participant.age_on(current_event.local_start_date || Date.current) %>
     <% if age %>
       <span class="<%= age < 18 ? 'text-amber-600 font-medium' : 'text-gray-700' %>"><%= age %></span>
+      <% if pe.too_old_for_event? %>
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800" title="19 or older during the event">19+</span>
+      <% end %>
     <% else %>
       <span class="text-gray-400">—</span>
     <% end %>
@@ -94,14 +97,14 @@
   </td>
   <td class="px-2 py-1.5 text-gray-600 whitespace-nowrap" data-column="arrival">
     <% if pe.travel_inbound&.last_arrival_time %>
-      <div><%= pe.travel_inbound.last_arrival_time.strftime("%b %d %H:%M") %></div>
+      <div><%= pe.travel_inbound.local_last_arrival_time.strftime("%b %d %H:%M %Z") %></div>
     <% else %>
       <span class="text-gray-400">—</span>
     <% end %>
   </td>
   <td class="px-2 py-1.5 text-gray-600 whitespace-nowrap" data-column="departure">
     <% if pe.travel_outbound&.first_departure_time %>
-      <div><%= pe.travel_outbound.first_departure_time.strftime("%b %d %H:%M") %></div>
+      <div><%= pe.travel_outbound.local_first_departure_time.strftime("%b %d %H:%M %Z") %></div>
     <% else %>
       <span class="text-gray-400">—</span>
     <% end %>
@@ -142,6 +145,20 @@
   </td>
   <td class="px-2 py-1.5 text-gray-500 max-w-[120px] truncate" data-column="intolerances" title="<%= pe.dietary&.intolerances %>">
     <%= pe.dietary&.intolerances.presence || "—" %>
+  </td>
+  <%# "None" and the like stay in the record but aren't an allergy. %>
+  <% food_allergies = pe.dietary.life_threatening_allergies if pe.dietary&.has_life_threatening_allergy? %>
+  <td class="px-2 py-1.5 text-gray-500 max-w-[120px] truncate" data-column="food_allergies" title="<%= food_allergies %>">
+    <%= food_allergies || "—" %>
+  </td>
+  <td class="px-2 py-1.5 whitespace-nowrap" data-column="cross_contamination">
+    <% if pe.dietary&.cross_contamination_risk %>
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-red-100 text-red-700">Yes</span>
+    <% elsif pe.dietary.nil? %>
+      <span class="text-gray-400">—</span>
+    <% else %>
+      <span class="text-gray-400">No</span>
+    <% end %>
   </td>
   <td class="px-2 py-1.5 text-gray-500 max-w-[120px] truncate" data-column="allergies" title="<%= pe.medical&.allergies %>">
     <%= pe.medical&.allergies.presence || "—" %>

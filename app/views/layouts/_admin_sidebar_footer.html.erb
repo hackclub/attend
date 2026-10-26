@@ -1,4 +1,17 @@
 <div class="px-3 py-3">
+  <% if show_participant_dashboard_link? %>
+    <%= link_to dashboard_path, class: "sidebar-pill mb-3 text-sm font-medium text-[#1f2d3d]", data: close_action ? { action: close_action } : {} do %>
+      <span class="flex items-center gap-2 min-w-0 pl-1">
+        <svg class="h-4 w-4 text-[#8492a6] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+        </svg>
+        <span class="truncate">My dashboard</span>
+      </span>
+      <svg class="h-4 w-4 text-[#8492a6] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+      </svg>
+    <% end %>
+  <% end %>
   <div class="mb-3">
     <p class="text-[10px] font-semibold uppercase tracking-wide text-[#8492a6] mb-1.5">Scanner app</p>
     <%= render "shared/app_download_badges", compact: true %>

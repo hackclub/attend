@@ -47,6 +47,12 @@ class RegistrationChangeRequest < ApplicationRecord
     order(Arel.sql("CASE registration_change_requests.status WHEN 'pending' THEN 0 ELSE 1 END"), created_at: :desc)
   }
 
+  # Approve could not apply an identity change on its own, and staff have
+  # not written anything for the participant yet.
+  def awaiting_staff_reset?
+    follow_up_needed? && follow_up_reason == "shared_identity"
+  end
+
   private
 
   def consequential_requests_use_event_admin_audience

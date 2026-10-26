@@ -20,7 +20,7 @@
                     <% end %>
                   </div>
                   <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-(--text-soft)">
-                    <span class="whitespace-nowrap"><%= event_date_range(event.starts_at, event.ends_at) %></span>
+                    <span class="whitespace-nowrap"><%= event_date_range(event.starts_at, event.ends_at, zone: event.event_time_zone) %></span>
                     <% if event.location_city.present? %>
                       <span class="truncate"><%= [ event.location_city, event.location_country ].compact_blank.join(", ") %></span>
                     <% end %>

@@ -151,6 +151,41 @@ class GuardianMailer < ApplicationMailer
     )
   end
 
+  # The event's dates moved after this guardian's waivers went out, so they've
+  # been voided and re-issued with the new dates (Docuseal::WaiverDateRegeneration).
+  # One email covers every waiver that was re-issued.
+  def waiver_dates_changed(guardian_participant_event:, waiver_types:)
+    @guardian_participant_event = guardian_participant_event
+    @guardian = guardian_participant_event.guardian
+    @participant_event = guardian_participant_event.participant_event
+    @participant = @participant_event.participant
+    @event = @participant_event.event
+    @emailable = @guardian
+
+    # Same as #waiver_reset: restart the invite window so the link works.
+    token = guardian_participant_event.generate_invite_token!
+    guardian_participant_event.update!(invite_token_sent_at: Time.current)
+
+    @first_name = @guardian.legal_first_name
+    @child_first_name = @participant.legal_first_name
+    @event_name = @event.name
+    @event_dates = @event.formatted_date_range
+    @waiver_types = waiver_types.map(&:to_sym)
+    @waiver_names = @waiver_types.map { |type| type == :freedom_waiver ? "Freedom Waiver" : "Waiver" }.to_sentence
+    # The main waiver is signed by the participant first; the guardian's turn
+    # comes once they have.
+    @participant_signs_first = @waiver_types.include?(:waiver)
+    @portal_url = guardian_portal_url(token)
+    @support_email = @event.effective_support_email
+
+    mail(
+      to: @guardian.email,
+      from: "Hack Club #{@event_name} <#{@support_email}>",
+      subject: "Action Required: #{@event_name} has new dates. Please re-sign #{@child_first_name}'s #{@waiver_names}",
+      reply_to: @support_email
+    )
+  end
+
   def portal_center_verification(email:, code:, guardian:)
     @code = code
     @emailable = guardian

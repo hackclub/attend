@@ -105,6 +105,7 @@ RSpec.describe "Api::V1::Bans", type: :request do
         headers: { "Authorization" => "Bearer #{MobileToken.generate_for(staff).token}" }
 
       expect(response).to have_http_status(:forbidden)
+      expect(JSON.parse(response.body)).to eq("error" => "Only global admins can manage the ban list")
       expect(Ban.count).to eq(0)
     end
 

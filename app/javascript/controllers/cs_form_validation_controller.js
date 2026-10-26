@@ -1,11 +1,13 @@
 import { Controller } from "@hotwired/stimulus"
 import { html, safeMarkup } from "utils/html"
+import { incompleteDateTimeMessage } from "utils/incomplete_date_time"
 
 // Cloudscape's validation timing for console forms
 // (cloudscape.design/patterns/general/errors/validation):
 //
 // - never on first load
-// - on blur, when the field has a value or is required and was left empty
+// - on blur, when the field has a value, is half-typed (a date missing its
+//   AM/PM) or is required and was left empty
 // - on every keypress while a field is in error (so the message clears live)
 // - on submit: show every client-side error, focus the top-most one and stop
 //   the submit. Server errors don't block; the server stays authoritative.
@@ -79,7 +81,7 @@ export default class extends Controller {
     const control = event.target
     if (!this.isValidatable(control)) return
     if (CHOICE_TYPES.has(control.type)) return
-    if (control.value.trim() !== "" || control.required || this.isInError(control)) {
+    if (control.value.trim() !== "" || control.required || control.validity.badInput || this.isInError(control)) {
       this.validate(control)
     }
   }
@@ -160,7 +162,9 @@ export default class extends Controller {
     if (validity.valueMissing) return data.csRequiredMessage || `${label} is required.`
 
     if (validity.badInput) {
-      return data.csTypeMessage || (control.type === "number" ? "Enter a valid number." : `Enter a valid ${thing}.${example}`)
+      if (data.csTypeMessage) return data.csTypeMessage
+      if (control.type === "number") return "Enter a valid number."
+      return incompleteDateTimeMessage(control) || `Enter a valid ${thing}.${example}`
     }
 
     if (validity.typeMismatch) {

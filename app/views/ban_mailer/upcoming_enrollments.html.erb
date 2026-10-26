@@ -1,0 +1,21 @@
+<p>
+  These people are on the Attend ban list but still enrolled in events that
+  haven't ended. The ban only blocks new adds, so review and withdraw them by hand.
+</p>
+
+<% @by_participant.each do |participant, participant_events| %>
+  <p style="margin: 16px 0 4px 0;">
+    <strong><%= participant.full_name %></strong>
+    <span style="color: #6b7280;">(<%= participant.email %>)</span>
+  </p>
+  <ul style="margin-top: 0;">
+    <% participant_events.each do |pe| %>
+      <li>
+        <%= link_to pe.event.name, participant_url(pe) %><%= " (#{pe.event.starts_at.strftime('%b %-d, %Y')})" if pe.event.starts_at %>,
+        <%= pe.status.humanize.downcase %>
+      </li>
+    <% end %>
+  </ul>
+<% end %>
+
+<p><%= link_to "Open the ban list", @bans_url %></p>

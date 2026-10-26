@@ -38,7 +38,7 @@
               <td class="whitespace-nowrap">
                 <div class="flex items-center gap-1">
                   <%= link_to "Edit", edit_admin_event_group_path(current_event, group), class: "cs-btn cs-btn-link" %>
-                  <%= button_to "Delete", admin_event_group_path(current_event, group), method: :delete, class: "cs-btn cs-btn-link", form: { class: "contents" }, data: { confirm: "Delete #{group.name}? This removes the group from all members." } %>
+                  <%= button_to "Delete", admin_event_group_path(current_event, group), method: :delete, class: "cs-btn cs-btn-link", form: { class: "contents", data: { turbo_confirm: "Delete #{group.name}? This removes the group from all members." } } %>
                 </div>
               </td>
             </tr>

@@ -76,19 +76,24 @@ class AuditLog < ApplicationRecord
     refresh_all: "refresh_all",
     revoke: "revoke",
     reinstate: "reinstate",
+    move: "move",
     rotate_api_token: "rotate",
     reorder_groups: "reorder",
     unassign: "unassign",
     cancel: "cancel",
     confirm: "confirm",
     send_to_slack: "send_to_slack",
+    escalate: "escalate",
     send_now: "send_now",
     retry_delivery: "retry_delivery",
     retry_failed: "retry_failed",
+    send_to_new_recipients: "send_to_new_recipients",
     retry_recipient: "retry_recipient",
     link_guardian: "link_guardian",
     refresh_flight_tracking: "refresh_flight_tracking",
     resync_airtable: "resync_airtable",
+    connect_airtable: "connect_airtable",
+    disconnect_airtable: "disconnect_airtable",
     revoke_invite: "revoke_invite",
     send_held_invitations: "send_held_invitations",
     destroy_avatar: "destroy_avatar",
@@ -97,7 +102,9 @@ class AuditLog < ApplicationRecord
     toggle_waiver_sending: "toggle_waiver_sending",
     update_twilio_from_number: "update_twilio_from_number",
     update_admin_help_slack_channel: "update_admin_help_slack_channel",
-    sync_admin_help_slack_channel: "sync_admin_help_slack_channel"
+    sync_admin_help_slack_channel: "sync_admin_help_slack_channel",
+    update_org_support_slack_channel: "update_org_support_slack_channel",
+    sync_org_support_slack_channel: "sync_org_support_slack_channel"
   }
 
   validates :record_type, presence: true

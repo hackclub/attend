@@ -36,7 +36,7 @@ module Rooming
           else
             room.room_assignments.each do |assignment|
               participant = assignment.participant_event.participant
-              age = participant.age_on(@event.starts_at&.to_date || Date.current)
+              age = participant.age_on(@event.local_start_date || Date.current)
 
               csv << row(
                 room.name || room.display_name,

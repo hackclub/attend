@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe Airtable::SyncService do
   # Check-in is a Scan in a checks_in context, so the sync reads it from scans.
   let(:event) do
-    create(:event, config: { "airtable_api_key" => "key-test", "airtable_base_id" => "app-test" })
+    create(:event, airtable_api_key: "key-test", config: { "airtable_base_id" => "app-test" })
   end
   let(:user) { create(:user) }
   let(:check_in) { event.scan_contexts.find_by!(checks_in: true) }
@@ -63,5 +63,17 @@ RSpec.describe Airtable::SyncService do
     end
 
     expect(queries).to eq(0)
+  end
+
+  # Slack linking writes participants.slack_user_id; the participant_events
+  # column it replaced is no longer kept up to date.
+  it "takes the Slack User ID from the participant" do
+    participant = create(:participant, slack_user_id: "U0FICTION1")
+    pe = create(:participant_event, event: event, participant: participant)
+    pe.update_columns(slack_user_id: "U0STALE")
+
+    rows = CSV.parse(described_class.new(event).serialize_all_to_csv([ pe ]))
+
+    expect(rows[1][rows.first.index("Slack User ID")]).to eq("U0FICTION1")
   end
 end

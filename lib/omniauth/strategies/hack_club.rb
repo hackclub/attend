@@ -11,6 +11,11 @@ module OmniAuth
         token_url: "/oauth/token"
       }
 
+      # A callable taking the Rack env and returning details to prefill on
+      # HCA's signup form (email, first_name, last_name, ...). HCA ignores
+      # them for people who already have an account.
+      option :prefill, nil
+
       uid { raw_info.dig("identity", "id") }
 
       info do
@@ -58,6 +63,13 @@ module OmniAuth
         # Names are a nice-to-have; never block sign-in on userinfo being down.
         OmniAuth.logger.warn("[hack_club] userinfo fetch failed: #{e.class}: #{e.message}")
         {}
+      end
+
+      def authorize_params
+        params = super
+        prefill = options.prefill&.call(env) || {}
+        prefill.compact_blank.each { |key, value| params[key.to_s] = value }
+        params
       end
 
       def callback_url

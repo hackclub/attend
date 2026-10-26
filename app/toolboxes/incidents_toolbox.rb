@@ -33,12 +33,13 @@ class IncidentsToolbox < ApplicationToolbox
     param :event_id, :string, "Event ID", optional: true
     param :event_slug, :string, "Event slug", optional: true
     param :category, :string, "Category", enum: %w[safeguarding medical behavior other]
-    param :severity, :string, "Severity", enum: %w[low medium high critical]
+    param :severity, :string, "Level (S0 high priority … S3 follow-up)", enum: IncidentLevel::KEYS
     param :summary, :string, "Short summary"
     param :details, :string, "Full details", optional: true
     param :location, :string, "Where it happened", optional: true
     param :occurred_at, :string, "When it happened (ISO8601)", optional: true
-    param :participant_event_id, :string, "Related registration, if any", optional: true
+    param :participant_event_id, :string, "Related registration, if any (required for medical)", optional: true
+    param :helping_staff_ids, [ :string ], "User IDs of staff who helped (at least one required for medical)", optional: true
     param :visible_to_roles, [ :string ], "Roles that may see this (defaults to event_admin + safeguarding_lead)", optional: true
   end
   def create
@@ -47,8 +48,9 @@ class IncidentsToolbox < ApplicationToolbox
       params.permit(:category, :severity, :summary, :details, :location, :occurred_at,
                     :participant_event_id).to_h
     )
+    @incident.helping_staff_ids = params[:helping_staff_ids] if params[:helping_staff_ids].present?
     @incident.reported_by_user_id = current_user.id
-    @incident.visible_to_roles = params[:visible_to_roles].presence || %w[event_admin safeguarding_lead]
+    @incident.visible_to_roles = params[:visible_to_roles].presence || Incident::DEFAULT_VISIBLE_TO_ROLES
     authorize! @incident, :create?
     @incident.save!
     render json: serialize_incident(@incident, full: true)
@@ -58,7 +60,7 @@ class IncidentsToolbox < ApplicationToolbox
     param :incident_id, :string, "Incident ID"
     param :status, :string, "New status", enum: %w[open in_review closed], optional: true
     param :actions_taken, :string, "Actions taken", optional: true
-    param :severity, :string, "Severity", enum: %w[low medium high critical], optional: true
+    param :severity, :string, "Level (S0 high priority … S3 follow-up)", enum: IncidentLevel::KEYS, optional: true
   end
   def update
     @incident = load_incident!
@@ -73,8 +75,8 @@ class IncidentsToolbox < ApplicationToolbox
   end
   def add_comment
     @incident = load_incident!
-    authorize! @incident, :show?
-    @comment = @incident.incident_comments.create!(user: current_user, body: params[:body])
+    authorize! @incident, :comment?
+    @comment = @incident.comments.create!(user: current_user, body: params[:body])
     render json: serialize_incident(@incident, full: true)
   end
 
@@ -104,13 +106,20 @@ class IncidentsToolbox < ApplicationToolbox
     }
     return base unless full
 
-    base.merge(
+    full_record = base.merge(
       details: i.details,
-      actions_taken: i.actions_taken,
-      reported_by: i.reported_by_user&.display_name_or_fallback,
+      reported_by: i.reported_by&.display_name_or_fallback,
       visible_to_roles: i.visible_to_roles,
-      participant_event_id: i.participant_event_id,
-      comments: i.incident_comments.includes(:user).order(:created_at).map { |c|
+      participant_event_id: i.participant_event_id
+    )
+    # A reporter who holds none of the incident's roles gets what they filed and
+    # where it stands, not the casework — IncidentPolicy#view_casework?. The web
+    # page hides the same two things.
+    return full_record unless Pundit.policy!(current_user, i).view_casework?
+
+    full_record.merge(
+      actions_taken: i.actions_taken,
+      comments: i.comments.includes(:user).order(:created_at).map { |c|
         { author: c.user&.display_name_or_fallback, body: c.body, at: c.created_at }
       }
     )

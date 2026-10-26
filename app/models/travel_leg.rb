@@ -22,6 +22,18 @@ class TravelLeg < ApplicationRecord
             format: { with: AIRPORT_CODE_REGEX, message: "must be a 3-letter IATA or 4-letter ICAO code" },
             if: :arrival_airport_changed?,
             allow_blank: true
+  # Set by TravelLegDateMerging when the times came from a form as local
+  # wall-clock times. Those can't be read without a zone, so one is required
+  # rather than guessing UTC.
+  attribute :entered_as_local_time, :boolean, default: false
+
+  validates :departure_time_zone,
+            presence: { message: "is needed: we don't know the time zone for that airport, so pick one" },
+            if: -> { entered_as_local_time && departure_time.present? }
+  validates :arrival_time_zone,
+            presence: { message: "is needed: we don't know the time zone for that airport, so pick one" },
+            if: -> { entered_as_local_time && arrival_time.present? }
+  validate :arrival_after_departure, if: -> { departure_time_changed? || arrival_time_changed? }
 
   normalizes :departure_airport, with: ->(v) { v.to_s.strip.upcase.presence }
   normalizes :arrival_airport,   with: ->(v) { v.to_s.strip.upcase.presence }
@@ -32,6 +44,23 @@ class TravelLeg < ApplicationRecord
 
   def display_route
     "#{departure_airport} → #{arrival_airport}"
+  end
+
+  # Leg times are stored as true UTC. These return them in the zone they were
+  # entered in, so they read the same as the ticket. Legs saved before zones
+  # were recorded (and imported ones) fall back to the airport's zone, then UTC.
+  def local_departure_time = in_leg_zone(departure_time, departure_time_zone, departure_airport)
+  def local_arrival_time = in_leg_zone(arrival_time, arrival_time_zone, arrival_airport)
+
+  # The value to pre-select in a form's zone picker: blank ("Auto") when the
+  # stored zone is just the airport's, so changing the airport re-derives it.
+  def time_zone_pick(endpoint)
+    stored = public_send(:"#{endpoint}_time_zone").presence
+    return "" if stored.nil?
+
+    airport_zone = FlightTrackingService.airport_timezone(public_send(:"#{endpoint}_airport"))
+    same = airport_zone && ActiveSupport::TimeZone[airport_zone]&.tzinfo == ActiveSupport::TimeZone[stored]&.tzinfo
+    same ? "" : stored
   end
 
   def fetch_oag_instance_key!
@@ -143,6 +172,21 @@ class TravelLeg < ApplicationRecord
   end
 
   private
+
+  def in_leg_zone(time, stored_zone, airport)
+    return nil if time.blank?
+
+    zone = ActiveSupport::TimeZone[stored_zone.to_s] if stored_zone.present?
+    zone ||= FlightTrackingService.airport_timezone(airport)
+    time.in_time_zone(zone || "UTC")
+  end
+
+  def arrival_after_departure
+    return if departure_time.blank? || arrival_time.blank?
+    return if arrival_time > departure_time
+
+    errors.add(:arrival_time, "must be after the departure time (check the date and time zone)")
+  end
 
   def travel_calendar_event_ids
     travel_ids = [ travel_id, saved_change_to_travel_id&.first ].compact

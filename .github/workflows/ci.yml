@@ -105,11 +105,20 @@ jobs:
       - name: Prepare the test database
         run: bin/rails db:test:prepare
 
+      # The layouts link tailwind.css by name, and it only exists once built
+      # (app/assets/builds is gitignored), so every rendered page needs it.
+      - name: Build Tailwind
+        run: bin/rails tailwindcss:build
+
       - name: Test container entrypoint
         run: bash spec/bin/docker_entrypoint_spec.sh
 
       - name: Run tests
         run: bundle exec rspec
+
+      # Plain node:test files with no dependencies, so the runner's Node is enough.
+      - name: Run JavaScript tests
+        run: node --test spec/javascript/*.mjs
 
       - name: Upload failure screenshots
         uses: actions/upload-artifact@v7
