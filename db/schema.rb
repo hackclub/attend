@@ -1089,6 +1089,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_25_130000) do
     t.index ["user_id"], name: "index_passports_on_user_id"
   end
 
+  create_table "privacy_token_uses", primary_key: "jti", id: :string, force: :cascade do |t|
+    t.datetime "used_at", null: false
+    t.index ["used_at"], name: "index_privacy_token_uses_on_used_at"
+  end
+
   create_table "push_tokens", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "platform"
