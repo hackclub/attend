@@ -45,18 +45,13 @@ class LandingStats
   }.freeze
 
   # The picker's list, plus territories people actually live in that it leaves
-  # out. Anything else is left off the roll rather than published as typed.
+  # out. Anything else is left out of the count rather than published as typed.
   KNOWN_COUNTRIES = (ApplicationHelper::COUNTRIES.without("---") + [
     "Hong Kong", "Macau", "Puerto Rico", "Guam", "Bermuda", "Cayman Islands", "Anguilla",
     "Gibraltar", "Greenland", "Faroe Islands", "Isle of Man", "Jersey", "Guernsey",
     "Aruba", "Curaçao", "Réunion", "French Polynesia", "New Caledonia",
     "British Virgin Islands", "U.S. Virgin Islands", "Turks and Caicos Islands", "Montserrat"
   ]).to_set.freeze
-
-  # A country with one or two students still gets its row, but not the link to
-  # which events they went: "the student from X was in city Y that weekend" is
-  # a detail about a person, not a statistic.
-  MIN_STUDENTS_FOR_PINS = 3
 
   # Map pins are rounded to about a kilometre. The map never zooms past the
   # country level, so nothing is lost, and the exact venue stays off the page.
@@ -76,15 +71,11 @@ class LandingStats
   end
 
   def to_h
-    pins = build_pins
-    index_by_event = pins.each_with_index.to_h { |pin, i| [ pin.delete(:event_id), i ] }
-
     {
       events: counted_event_ids.size,
       students: counted_registrations.distinct.count(:participant_id),
-      countries: roll(index_by_event).size,
-      roll: roll(index_by_event),
-      pins: pins
+      countries: countries.size,
+      pins: build_pins
     }
   end
 
@@ -100,28 +91,14 @@ class LandingStats
     @counted_event_ids ||= counted_registrations.distinct.pluck(:event_id)
   end
 
-  # One row per country: distinct students, and which pins their students
-  # went to (indexes into the pins array, so the page can light them up).
-  def roll(index_by_event)
-    @roll ||= begin
-      residents = counted_registrations.joins(:participant)
-        .where.not(participants: { country_of_residence: [ nil, "" ] })
-
-      students = Hash.new(0)
-      residents.group("participants.country_of_residence").distinct.count(:participant_id).each do |raw, n|
-        students[self.class.normalize_country(raw)] += n
-      end
-
-      events = Hash.new { |h, k| h[k] = Set.new }
-      residents.distinct.pluck("participants.country_of_residence", "participant_events.event_id").each do |raw, event_id|
-        pin = index_by_event[event_id]
-        events[self.class.normalize_country(raw)] << pin if pin
-      end
-
-      students.select { |name, _| KNOWN_COUNTRIES.include?(name) }
-        .map { |name, n| { name: name, students: n, pins: n >= MIN_STUDENTS_FOR_PINS ? events[name].sort : [] } }
-        .sort_by { |row| [ -row[:students], row[:name] ] }
-    end
+  # Distinct countries of residence across counted students, folded and
+  # filtered to names the product offers.
+  def countries
+    counted_registrations.joins(:participant)
+      .where.not(participants: { country_of_residence: [ nil, "" ] })
+      .distinct.pluck("participants.country_of_residence")
+      .map { |raw| self.class.normalize_country(raw) }
+      .to_set & KNOWN_COUNTRIES
   end
 
   def build_pins
@@ -135,7 +112,6 @@ class LandingStats
       .order(:starts_at)
       .map do |event|
         {
-          event_id: event.id,
           name: event.name,
           location: [ event.location_city, event.location_country ].compact_blank.join(", "),
           dates: ApplicationController.helpers.event_date_range(event.starts_at, event.ends_at),

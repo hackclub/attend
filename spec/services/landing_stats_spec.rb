@@ -48,13 +48,6 @@ RSpec.describe LandingStats do
     ])
     expect(stats[:pins].first.keys).to contain_exactly(:name, :location, :dates, :lat, :lon, :students, :state)
     expect(stats[:pins].first.slice(:lat, :lon)).to eq(lat: 48.23, lon: 16.41)
-
-    # Countries below the pin threshold keep their row but not their events.
-    expect(stats[:roll]).to eq([
-      { name: "United States", students: 3, pins: [ 0, 1 ] },
-      { name: "India", students: 2, pins: [] },
-      { name: "Japan", students: 1, pins: [] }
-    ])
   end
 
   it "marks an event that is running right now as live" do

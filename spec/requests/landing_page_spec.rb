@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Landing page", type: :request do
   before { Rails.cache.delete(LandingStats::CACHE_KEY) }
 
-  it "renders the live sentence, the country roll, and the map pins for signed-out visitors" do
+  it "renders the live sentence and the map pins for signed-out visitors" do
     event = create(:event, name: "Mock Harbour", starts_at: 2.weeks.ago, ends_at: 13.days.ago,
                    location_city: "Rotterdam", location_country: "Netherlands")
     participant = create(:participant, country_of_residence: "Netherlands")
@@ -16,7 +16,6 @@ RSpec.describe "Landing page", type: :request do
     expect(response.body).to include("Continue with Hack Club")
     expect(response.body).to include("Parent or guardian")
     expect(response.body).to include("Report an incident")
-    expect(response.body).to include("landing-country-name\">Netherlands<")
     expect(response.body).to include("data-landing-map-pins-value")
     expect(response.body).to include("Rotterdam, Netherlands")
   end
