@@ -34,25 +34,11 @@
  * kit's `components` layer sits above preflight and below utilities. */
 @layer theme, base, components, utilities;
 
-@font-face {
-  font-family: "Open Sans";
-  src: url("/open-sans-normal.woff2") format("woff2");
-  font-weight: 300 800;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Open Sans";
-  src: url("/open-sans-italic.woff2") format("woff2");
-  font-weight: 300 800;
-  font-style: italic;
-  font-display: swap;
-}
-
 /* ---------- tokens: light ---------- */
 :root.cs-console {
-  --cs-font: "Open Sans", "Helvetica Neue", Roboto, Arial, sans-serif;
+  /* Same system stack as the rest of the app (Tailwind's default), so the
+   * console reads like the old admin and loads no webfont. */
+  --cs-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --cs-font-mono: Monaco, Menlo, Consolas, "Courier Prime", Courier, monospace;
 
   --cs-bg-page: #ffffff;
