@@ -203,7 +203,7 @@ State colours, used as badge tints and status dots, never as brand:
 
 ## Typography
 
-**Display Font:** the system UI stack (`ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto`) — Tailwind's default, adopted deliberately. Clipboard surfaces load no webfont; a guardian on a slow connection gets text on first paint. (The admin console self-hosts Open Sans for staff only; that font must never reach a Clipboard surface.)
+**Display Font:** the system UI stack (`ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto`) — Tailwind's default, adopted deliberately. Clipboard surfaces load no webfont; a guardian on a slow connection gets text on first paint. The admin console uses the same stack.
 **Body Font:** the same stack. One family, differentiated entirely by weight and size.
 **Label/Mono Font:** none distinct.
 
@@ -321,7 +321,7 @@ A series can brand registration for all of its events (**Registration branding**
 - **Don't** add new `bg-blue-600` buttons or `ring-blue-500` focus rings. The blue running through the onboarding wizard and guardian portal (35 blue fills, 277 blue rings) is **drift from a Tailwind default, not a decision**. Red is the accent everywhere; converge on it when touching those files.
 - **Don't** let Hack Club red occupy area. It fills buttons, badges, and 1px borders. Large red panels, red page headers, and red backgrounds behind body copy are out — use `{colors.accent-soft}` if a red-tinted region is genuinely needed.
 - **Don't** ship gradients, hero imagery, or marketing motion inside the app shell. Attend is a tool someone uses to do a job, not a consumer event app.
-- **Don't** introduce a webfont on a Clipboard surface. The system stack is a deliberate performance choice for guardians on slow connections and old phones. (The console's Open Sans is staff-only and loads only under `/admin`.)
+- **Don't** introduce a webfont on a Clipboard surface. The system stack is a deliberate performance choice for guardians on slow connections and old phones.
 - **Don't** add a third container radius. 6px controls, 8px containers, full for state and identity.
 - **Don't** use `rounded-full` on a plain action button. A pill in Attend means state or identity; the Hack Club brand pill is the one sanctioned exception.
 - **Don't** trust `text-white` to be white. Outside the default theme it resolves to a surface colour; a new filled surface needs its foreground declared in `themes.css` per **The Theme Foreground Rule**, or its label disappears.
@@ -343,7 +343,7 @@ The console is a translation, not a remix. Where Cloudscape has a component, the
 **Key Characteristics:**
 - Dark top navigation in both modes, white (or dark-mode slate) side navigation, bordered 16px containers
 - Hack Club red as the interactive colour (`--cs-accent`), Cloudscape's own status colours for state
-- Open Sans at 14/20, bold (700) for labels, headings and buttons
+- The system UI stack at 14/20, bold (700) for labels, headings and buttons
 - Two modes only: the app's nine themes collapse to light or dark inside the console
 - Status as icon + word; badges as 4px-radius chips
 - One content width for every page, capped at 1680px
@@ -380,7 +380,7 @@ The console palette is Cloudscape's neutral ramp plus one accent. All values are
 
 ### Typography
 
-**Font:** Open Sans, self-hosted (variable 300–800, normal and italic woff2, `font-display: swap`, preloaded by the admin layout only), falling back to Helvetica Neue, Roboto, Arial. **Mono:** Monaco, Menlo, Consolas for `code`, `kbd`, `pre` and copy-to-clipboard values.
+**Font:** the same system UI stack as the rest of the app (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial`), via `--cs-font`. No webfont is loaded; the console deliberately shares the old admin's typeface. **Mono:** Monaco, Menlo, Consolas for `code`, `kbd`, `pre` and copy-to-clipboard values.
 
 **Character:** Cloudscape's: one family, bold for structure, regular for data. Numbers in tables and key-value values are tabular.
 
@@ -506,4 +506,4 @@ Components are Cloudscape's, translated to `cs-*` classes; each block in console
 - **Don't** make a destructive action primary or red-filled on the page.
 - **Don't** use uppercase table headers or full-round status pills in new console markup.
 - **Don't** wrap global-admin-only pages or sections in the dashed orange admin marker.
-- **Don't** use Open Sans, `cs-*` classes or console tokens on a Clipboard surface.
+- **Don't** use `cs-*` classes or console tokens on a Clipboard surface.
