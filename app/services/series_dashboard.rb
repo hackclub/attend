@@ -81,7 +81,7 @@ class SeriesDashboard
   STAGE_INDEX = STAGES.each_with_index.to_h { |stage, i| [ stage.key, i ] }.freeze
 
   # Onboarding is done with these; they are not people anyone chases.
-  INACTIVE_STATUSES = %w[withdrawn rejected].freeze
+  INACTIVE_STATUSES = ParticipantEvent::INACTIVE_STATUSES
 
   # The order a series lead needs to read the events in: the one running right
   # now, then the one they are about to run, then undated drafts, then history
