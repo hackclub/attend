@@ -243,10 +243,16 @@ module Passkit
       actions
     end
 
+    # Most venues never get an Apple place id (Apple's POI coverage is patchy
+    # outside the US), so fall back to a coordinate link: the pass keeps a
+    # working directions link and only the iOS 27 tile needs the id.
     def apple_maps_url
-      return if event.apple_place_id.blank?
-
-      "https://maps.apple.com/place?place-id=#{event.apple_place_id}"
+      if event.apple_place_id.present?
+        "https://maps.apple.com/place?place-id=#{event.apple_place_id}"
+      elsif event.location_latitude.present? && event.location_longitude.present?
+        query = { ll: "#{event.location_latitude.to_f},#{event.location_longitude.to_f}", q: event.venue_name.presence || event.name }
+        "https://maps.apple.com/?#{query.to_query}"
+      end
     end
 
     def semantics

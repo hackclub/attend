@@ -86,7 +86,18 @@ RSpec.describe Passkit::EventTicket do
       keys = pass.additional_pass_keys
       expect(keys[:preferredStyleSchemes]).to eq(%w[posterEventTicket eventTicket])
       expect(keys[:eventLogoText]).to eq(event.name)
-      expect(keys[:directionsInformationURL]).to be_nil
+      expect(keys[:directionsInformationURL]).to start_with("https://maps.apple.com/?")
+      expect(Rack::Utils.parse_query(URI(keys[:directionsInformationURL]).query)).to include("ll" => "37.7749,-122.4194", "q" => event.name)
+    end
+
+    it "labels the coordinate link with the venue name when there is one" do
+      event.update_columns(venue_name: "Mock Hall")
+      expect(Rack::Utils.parse_query(URI(pass.additional_pass_keys[:directionsInformationURL]).query)).to include("q" => "Mock Hall")
+    end
+
+    it "has no directions link without coordinates or a place id" do
+      event.update_columns(location_latitude: nil, location_longitude: nil)
+      expect(pass.additional_pass_keys[:directionsInformationURL]).to be_nil
     end
 
     it "links directions to the Apple Maps place" do
