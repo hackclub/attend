@@ -1,5 +1,6 @@
-# Extend Passkit::Generator to support relevantDates (iOS 18+)
-# This adds support for the new relevantDates array alongside the legacy relevantDate
+# Extend Passkit::Generator with pass.json keys the gem doesn't know about:
+# relevantDates (iOS 18), poster event ticket keys (iOS 18) and
+# featuredActions (iOS 27).
 
 module PasskitGeneratorExtensions
   def generate_json_pass
@@ -46,9 +47,20 @@ module PasskitGeneratorExtensions
     pass[:store_card] = @pass.store_card if @pass.store_card
     pass[:userInfo] = @pass.user_info if @pass.user_info
 
+    # Passkit::Pass only delegates the gem's own attribute list, so anything
+    # newer has to be read off the pass class instance directly.
+    instance = @pass.instance
+
     # iOS 18+ relevantDates support
-    if @pass.respond_to?(:relevant_dates) && @pass.relevant_dates.present?
-      pass[:relevantDates] = @pass.relevant_dates
+    if instance.respond_to?(:relevant_dates) && instance.relevant_dates.present?
+      pass[:relevantDates] = instance.relevant_dates
+    end
+
+    # Poster event ticket (iOS 18) and featured action (iOS 27) keys. Older
+    # Wallet versions ignore keys they don't know, so these are safe to
+    # always send; see Passkit::EventTicket#additional_pass_keys.
+    if instance.respond_to?(:additional_pass_keys)
+      pass.merge!(instance.additional_pass_keys.compact_blank)
     end
 
     pass[@pass.pass_type] = {
