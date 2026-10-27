@@ -77,6 +77,17 @@
   color-scheme: light;
 }
 
+/* light declares its deepened fill pair outside the :root block above so
+ * the other themes do not inherit it: #ec3750 under #ffffff is 4.02:1, so
+ * the fill under white text is --accent-strong and hovers one step deeper
+ * (DESIGN.md's Deepened Red Rule). dark and solarized-dark declare their
+ * own pair below; the rest clear AA on --accent and fall through to it. */
+:root:not([data-theme]),
+[data-theme="light"] {
+  --accent-fill: #d42f46;
+  --accent-fill-hover: #b82840;
+}
+
 /* ---------- dark (neutral, brand-preserving) ---------- */
 [data-theme="dark"] {
   --bg-app: #0f1115;
