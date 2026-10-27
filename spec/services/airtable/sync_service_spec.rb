@@ -44,6 +44,26 @@ RSpec.describe Airtable::SyncService do
     expect(cells.map { |(_, at)| at.present? }).to eq([ true, false ])
   end
 
+  it "leaves withdrawn and rejected registrations out of the full sync" do
+    kept = create(:participant_event, event: event, status: :complete)
+    create(:participant_event, event: event, status: :withdrawn)
+    create(:participant_event, event: event, status: :rejected)
+
+    loaded = described_class.new(event).send(:load_participant_events)
+
+    expect(loaded).to eq([ kept ])
+  end
+
+  it "does not push a withdrawn registration one-off either" do
+    withdrawn = create(:participant_event, event: event, status: :withdrawn, airtable_record_id: "recOLD")
+    service = described_class.new(event)
+    client = service.instance_variable_get(:@client)
+    expect(client).not_to receive(:update_record)
+    expect(client).not_to receive(:create_record)
+
+    expect(service.push_participant_event(withdrawn)).to be_nil
+  end
+
   it "loads scan contexts up front so a full sync does not query per scan" do
     3.times do
       pe = create(:participant_event, event: event)

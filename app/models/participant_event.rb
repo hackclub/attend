@@ -96,6 +96,12 @@ class ParticipantEvent < ApplicationRecord
   after_commit :invite_to_slack_channel, on: %i[create update],
     if: -> { (saved_change_to_status? || saved_change_to_participant_id?) && complete? }
 
+  # Registrations still on the books. Withdrawn and rejected rows stay for the
+  # audit trail, but dashboard totals, headcounts and "who still needs X"
+  # arithmetic must leave them out.
+  INACTIVE_STATUSES = %w[withdrawn rejected].freeze
+  scope :active, -> { where.not(status: INACTIVE_STATUSES) }
+
   # SQL mirror of !onboarding_complete? so list filters don't have to load
   # every row into Ruby. Keep in sync with #onboarding_complete?.
   scope :missing_onboarding_data, ->(accommodation_required:, travel_required: true) {

@@ -139,7 +139,7 @@ class Admin::DashboardController < Admin::BaseController
     @airtable_sync_paused = current_event.airtable_sync_paused?
     @airtable_sync_paused_at = current_event.airtable_sync_paused_at
     @airtable_config_owner = current_event.airtable_config_last_saved_by if @airtable_sync_paused
-    @airtable_participant_count = current_event.participant_events.count if @airtable_sync_configured
+    @airtable_participant_count = current_event.participant_events.active.count if @airtable_sync_configured
     @airtable_connection = current_event.airtable_connection
     @airtable_oauth_configured = Airtable::Oauth.new.configured?
     # Airtable only shows the bases ticked on its consent screen; the list is
@@ -173,8 +173,11 @@ class Admin::DashboardController < Admin::BaseController
 
   def load_dashboard_stats
     @participant_events = current_event.participant_events.includes(:participant, :safeguarding_info)
+    # Withdrawn and rejected people still appear in the status breakdown below,
+    # but they are not part of the headcount or of anything derived from it.
+    @active_participant_events = @participant_events.active
 
-    @total_participants = @participant_events.count
+    @total_participants = @active_participant_events.count
     @status_counts = @participant_events.group(:status).count
     @display_status_counts = compute_display_status_counts
     @pending_invitations_count = current_event.invitations.pending.count
@@ -194,7 +197,7 @@ class Admin::DashboardController < Admin::BaseController
       .limit(5)
 
     # High support participants (materialized: the view reads it five times)
-    @high_support_participants = @participant_events
+    @high_support_participants = @active_participant_events
       .joins(:safeguarding_info)
       .where(safeguarding_infos: { high_support_flag: true })
       .includes(:participant)
@@ -230,7 +233,7 @@ class Admin::DashboardController < Admin::BaseController
 
   def compute_travel_stats
     travels = Travel.joins(:participant_event)
-      .where(participant_events: { event_id: current_event.id })
+      .merge(@active_participant_events.unscope(:includes))
     inbound_travels = travels.where(direction: :inbound)
     outbound_travels = travels.where(direction: :outbound)
 
@@ -253,7 +256,7 @@ class Admin::DashboardController < Admin::BaseController
 
   def compute_consent_stats
     consents = Consent.joins(:participant_event)
-      .where(participant_events: { event_id: current_event.id })
+      .merge(@active_participant_events.unscope(:includes))
 
     {
       total: consents.count,

@@ -6,19 +6,33 @@ RSpec.describe "Admin::Dashboard#show headcount", type: :request do
   let(:admin) { User.create!(email: "admin-headcount@example.com", name: "Admin", global_role: "global_admin") }
   let(:event) { create(:event, travel_enabled: true) }
 
-  before { sign_in admin }
-
-  def stat(body, label)
-    value = body[/#{Regexp.escape(label)}<\/p>\s*<p[^>]*>(\d+)<\/p>/m, 1]
-    expect(value).not_to be_nil, "no #{label} stat in the page"
-    value.to_i
+  # The legacy and console templates lay the tiles out differently, so find the
+  # smallest element whose text is the label, climb to the tile around it and
+  # read the first number in that tile. Travel's "Missing" appears twice, in
+  # arrivals-then-departures order in both UIs.
+  def tile_values(doc, label)
+    matches = doc.css("p, dt, span, h3").select { |el| el.text.strip.casecmp?(label) }
+    matches.filter_map do |el|
+      tile = el.ancestors("div").first
+      tile&.text&.[](/\d+/)&.to_i
+    end
   end
 
-  def travel_missing(body, heading)
-    section = body.split(heading).last
-    value = section[/Missing<\/span>\s*<span[^>]*>(\d+)<\/span>/m, 1]
-    expect(value).not_to be_nil, "no Missing count under #{heading}"
-    value.to_i
+  def tile_value(doc, label)
+    values = tile_values(doc, label)
+    expect(values).not_to be_empty, "no #{label} tile in the page"
+    values.first
+  end
+
+  def each_admin_ui
+    [ false, true ].each do |console|
+      admin.update!(admin_console_beta: console)
+      sign_in admin
+      get admin_event_dashboard_path(event.slug)
+      expect(response).to have_http_status(:ok)
+      doc = Nokogiri::HTML(response.body)
+      yield doc, (console ? "console" : "legacy")
+    end
   end
 
   it "leaves withdrawn and rejected registrations out of the total and the travel maths" do
@@ -28,20 +42,18 @@ RSpec.describe "Admin::Dashboard#show headcount", type: :request do
     create(:participant_event, event: event, status: :rejected)
     Travel.create!(participant_event: withdrawn, mode: "train", direction: "inbound", arrival_time: 1.day.from_now)
 
-    get admin_event_dashboard_path(event.slug)
-
-    expect(response).to have_http_status(:ok)
-    expect(stat(response.body, "Total Participants")).to eq(2)
-    expect(travel_missing(response.body, "Arrivals (Inbound)")).to eq(2)
-    expect(travel_missing(response.body, "Departures (Outbound)")).to eq(2)
+    each_admin_ui do |doc, ui|
+      expect(tile_value(doc, "Total participants")).to eq(2), "#{ui}: total"
+      expect(tile_values(doc, "Missing")).to eq([ 2, 2 ]), "#{ui}: travel missing counts"
+    end
   end
 
   it "still shows withdrawn people in the status breakdown" do
     create(:participant_event, event: event, status: :withdrawn)
 
-    get admin_event_dashboard_path(event.slug)
-
-    expect(stat(response.body, "Total Participants")).to eq(0)
-    expect(response.body).to match(/<p class="text-2xl font-bold">1<\/p>\s*<p[^>]*>Withdrawn<\/p>/m)
+    each_admin_ui do |doc, ui|
+      expect(tile_value(doc, "Total participants")).to eq(0), "#{ui}: total"
+      expect(tile_value(doc, "Withdrawn")).to eq(1), "#{ui}: withdrawn tile"
+    end
   end
 end
