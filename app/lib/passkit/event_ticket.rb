@@ -295,12 +295,13 @@ module Passkit
       @file_name ||= SecureRandom.uuid
     end
 
-    # Strip sizes match the shipped strip.png/strip@2x.png in
+    # Strip sizes are what Apple's Pass Designer validates event tickets
+    # against (375x144pt) and match the shipped defaults in
     # private/passkit/event_ticket. Artwork and background are what the poster
-    # event ticket layout needs (480x340pt, as Apple's Pass Designer exports
-    # them); without both, Wallet falls back to the classic layout.
+    # event ticket layout needs (480x340pt, as the designer exports them);
+    # without both, Wallet falls back to the classic layout.
     BANNER_IMAGES = {
-      "strip.png" => [ 750, 246 ], "strip@2x.png" => [ 1500, 492 ],
+      "strip.png" => [ 375, 144 ], "strip@2x.png" => [ 750, 288 ], "strip@3x.png" => [ 1125, 432 ],
       "artwork@2x.png" => [ 960, 680 ], "artwork@3x.png" => [ 1440, 1020 ],
       "background@2x.png" => [ 960, 680 ], "background@3x.png" => [ 1440, 1020 ]
     }.freeze
