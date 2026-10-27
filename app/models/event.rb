@@ -816,10 +816,19 @@ class Event < ApplicationRecord
   end
 
   def should_geocode?
-    return false if location_latitude.present? && !location_address_changed?
+    # Coordinates saved alongside the change (the form's autocomplete pick)
+    # are more precise than anything the geocoder would return.
+    return false if saved_change_to_location_latitude? || saved_change_to_location_longitude?
 
-    saved_change_to_venue_name? || saved_change_to_location_address? ||
-      saved_change_to_location_city? || saved_change_to_location_country?
+    if location_latitude.blank?
+      saved_change_to_venue_name? || saved_change_to_location_address? ||
+        saved_change_to_location_city? || saved_change_to_location_country?
+    else
+      # Already pinned: only a new address moves it. (This used to check
+      # location_address_changed?, which is always false after save, so a
+      # pinned event never re-geocoded at all.)
+      saved_change_to_location_address?
+    end
   end
 
   def geocode_location
