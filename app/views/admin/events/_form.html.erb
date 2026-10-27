@@ -106,6 +106,7 @@
     </div>
     <%= f.hidden_field :location_latitude, id: "venue-latitude" %>
     <%= f.hidden_field :location_longitude, id: "venue-longitude" %>
+    <%= f.hidden_field :google_place_id, id: "venue-google-place-id" %>
   </div>
 
   <script nonce="<%= content_security_policy_nonce %>">
@@ -130,6 +131,9 @@
         if (place.geometry) {
           document.getElementById('venue-latitude').value = place.geometry.location.lat();
           document.getElementById('venue-longitude').value = place.geometry.location.lng();
+        }
+        if (place.place_id) {
+          document.getElementById('venue-google-place-id').value = place.place_id;
         }
         if (place.formatted_address) {
           input.value = place.formatted_address;

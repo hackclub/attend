@@ -155,6 +155,7 @@ module Admin
         :location_latitude,
         :location_longitude,
         :venue_name,
+        :google_place_id,
         :timezone,
         :support_email,
         :freedom_waivers_enabled,
