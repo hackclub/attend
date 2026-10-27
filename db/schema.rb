@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_25_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_27_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -480,6 +480,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_25_130000) do
     t.string "airtable_sync_table_id"
     t.datetime "airtable_synced_at"
     t.string "api_key_digest"
+    t.string "apple_place_id"
     t.datetime "arrival_closes_at"
     t.datetime "arrival_opens_at"
     t.jsonb "config", default: {}
@@ -494,6 +495,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_25_130000) do
     t.string "docuseal_waiver_template_id"
     t.datetime "ends_at"
     t.uuid "event_series_id"
+    t.string "google_place_id"
     t.uuid "hotel_scan_context_id"
     t.datetime "last_slack_sync_at"
     t.string "location_address"

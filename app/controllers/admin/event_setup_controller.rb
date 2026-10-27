@@ -194,7 +194,7 @@ module Admin
         :arrival_opens_at, :arrival_closes_at,
         :location_city, :location_country, :location_address,
         :location_latitude, :location_longitude,
-        :venue_name
+        :venue_name, :google_place_id
       )
     end
 
