@@ -23,6 +23,7 @@ RSpec.describe Event, "place ids" do
   end
 
   it "keeps an id picked in the same save as the venue change" do
+    allow(GeocoderService).to receive(:geocode).and_return(nil)
     event = create(:event, venue_name: "Mock Hall", apple_place_id: "IOLD", google_place_id: "ChIJold")
 
     event.update!(venue_name: "Mock Arena", location_address: "1 Mock Way", google_place_id: "ChIJnew")
