@@ -616,7 +616,6 @@
   .bg-\[\#17171d\] { background-color: var(--bg-dark); }
   .bg-\[\#252429\] { background-color: var(--bg-elev-2); }
   .bg-\[\#1a1a2e\] { background-color: var(--bg-darker); }
-  .bg-\[\#1a1d21\] { background-color: var(--bg-elev-2); }
   .bg-\[\#4A154B\] { background-color: var(--bg-darker); }
   .bg-\[\#ec3750\] { background-color: var(--accent); }
   /* the resting fill under white text. themes that clear AA on their own
@@ -696,15 +695,24 @@
 
   /* fills that resolve to --bg-elev-2, which is a *light* surface under
    * catppuccin latte — --text-strong is the foreground that holds in both */
-  .bg-\[\#252429\], .bg-\[\#1a1d21\],
-  .bg-\[\#252429\] .text-white,
-  .bg-\[\#1a1d21\] .text-white { color: var(--text-strong); }
+  .bg-\[\#252429\],
+  .bg-\[\#252429\] .text-white { color: var(--text-strong); }
 
   /* literal fills with no theme remap above: they stay saturated in every
    * theme, so their labels must stay white rather than following
    * --color-white. */
   .bg-\[\#2470b0\], .bg-\[\#2470b0\] .text-white { color: #ffffff; }
 }
+
+/* The admin message preview's Slack mock (`bg-[#1a1d21]`) copies Slack's own
+ * dark message view, so it keeps Slack's colours in every theme. Its fill
+ * has no remap above; its text needs pinning, because every theme but plain
+ * light remaps --color-white and the grays (dark themes put gray-100 on the
+ * very surface it used to fill, and the light console's gray-400 is under
+ * 4.5:1 on it). Unscoped, so the light console is covered too. */
+.bg-\[\#1a1d21\] .text-white { color: #ffffff; }
+.bg-\[\#1a1d21\] .text-gray-100 { color: #f3f4f6; }
+.bg-\[\#1a1d21\] .text-gray-400 { color: #9ca3af; }
 
 /* ====================================================================
  * hack club legacy variables — keep them aligned with the active theme
