@@ -58,9 +58,9 @@
             <span class="font-normal min-w-0">
               <% case group[:kind] %>
               <% when :unsent %>
-                <%= "invitation".pluralize(group[:count]) %> haven't been sent yet
+                <%= "invitation".pluralize(group[:count]) %> <%= group[:count] == 1 ? "has" : "have" %>n't been sent yet
               <% when :invites %>
-                <%= "invitation".pluralize(group[:count]) %> haven't been accepted yet
+                <%= "invitation".pluralize(group[:count]) %> <%= group[:count] == 1 ? "has" : "have" %>n't been accepted yet
               <% when :incidents %>
                 open <%= "incident".pluralize(group[:count]) %> need a decision
               <% else %>

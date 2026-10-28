@@ -217,7 +217,7 @@ RSpec.describe "Onboarding invitations held", type: :request do
 
       get admin_series_path(series)
 
-      expect(response.body).to include("invitation haven't been accepted yet")
+      expect(response.body).to include("invitation hasn't been accepted yet")
       expect(response.body).not_to include("2 invitations haven't been accepted yet")
     end
 

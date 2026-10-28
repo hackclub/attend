@@ -60,7 +60,7 @@
             <svg class="series-chevron w-4 h-4 mt-0.5 text-(--text-muted) flex-shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             <span class="text-sm font-bold text-(--text-strong) tabular-nums w-8 text-right flex-shrink-0"><%= unsent_total %></span>
             <span class="text-sm text-(--text) min-w-0">
-              <%= "invitation".pluralize(unsent_total) %> haven't been sent yet
+              <%= "invitation".pluralize(unsent_total) %> <%= unsent_total == 1 ? "has" : "have" %>n't been sent yet
             </span>
             <span class="ml-auto text-xs text-(--text-soft) whitespace-nowrap pl-3 hidden sm:inline">
               <%= pluralize(unsent_rows.length, "event") %>
@@ -88,7 +88,7 @@
             <svg class="series-chevron w-4 h-4 mt-0.5 text-(--text-muted) flex-shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             <span class="text-sm font-bold text-(--text-strong) tabular-nums w-8 text-right flex-shrink-0"><%= invite_total %></span>
             <span class="text-sm text-(--text) min-w-0">
-              <%= "invitation".pluralize(invite_total) %> haven't been accepted yet
+              <%= "invitation".pluralize(invite_total) %> <%= invite_total == 1 ? "has" : "have" %>n't been accepted yet
             </span>
             <span class="ml-auto text-xs text-(--text-soft) whitespace-nowrap pl-3 hidden sm:inline">
               <%= pluralize(invite_rows.length, "event") %>
