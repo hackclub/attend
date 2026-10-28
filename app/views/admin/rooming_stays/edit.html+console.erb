@@ -1,0 +1,15 @@
+<% content_for :title, "#{@stay.name} – Accommodation – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Accommodation", admin_event_rooming_stays_path(@event.slug) ], [ @stay.name, nil ], event: @event) %>
+<div class="cs-header">
+  <div class="cs-header-text">
+    <h1 class="cs-h1"><%= @stay.name %></h1>
+  </div>
+  <div class="cs-actions">
+    <% if @stay.eligible_only? %>
+      <%= link_to "Who's staying", admin_event_rooming_stay_roster_entries_path(@event.slug, @stay), class: "cs-btn cs-btn-normal" %>
+    <% end %>
+    <%= link_to "Rooming", admin_event_rooming_wizard_path(@event.slug, stay_id: (@stay.id unless @stay.main?)), class: "cs-btn cs-btn-normal" %>
+  </div>
+</div>
+
+<%= render "form", stay: @stay, url: admin_event_rooming_stay_path(@event.slug, @stay), method: :patch, submit: "Save", return_to: params[:return_to].presence %>

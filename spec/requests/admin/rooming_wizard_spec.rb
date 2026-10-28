@@ -165,7 +165,7 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
   end
 
   # A post-event stay sits alongside the main stay. Until the wizard has a
-  # stay switcher it's reached with ?context=, and nothing done in one stay
+  # stay switcher it's reached with /stays/:stay_id, and nothing done in one stay
   # may touch the other's rooms.
   describe "with a post-event stay" do
     let(:post_event) { event.rooming_contexts.create!(name: "Post-event night", kind: :post_event, enrollment: :everyone) }
@@ -178,13 +178,25 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
     it "moves someone into a post-event room without taking their main-stay room" do
       main_assignment = RoomAssignment.create!(room: main_room, participant_event: participant_event)
 
-      post move_assignment_admin_event_rooming_wizard_path(event.slug, context: post_event.id),
+      post move_assignment_admin_event_rooming_wizard_path(event.slug, stay_id: post_event.id),
         params: { participant_event_id: participant_event.id, room_id: post_room.id },
         headers: { "Accept" => "text/vnd.turbo-stream.html" }
 
       expect(response).to have_http_status(:ok)
       expect(main_assignment.reload.room).to eq(main_room)
       expect(participant_event.room_assignments.find_by(rooming_context: post_event).room).to eq(post_room)
+    end
+
+    { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+      it "keeps the wizard's own links inside the stay #{ui}" do
+        admin.update!(admin_console_beta: console)
+
+        get assignments_admin_event_rooming_wizard_path(event.slug, stay_id: post_event.id)
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include(move_assignment_admin_event_rooming_wizard_path(event.slug, stay_id: post_event.id))
+        expect(response.body).not_to include(%("#{move_assignment_admin_event_rooming_wizard_path(event.slug)}"))
+      end
     end
 
     it "won't put someone in another stay's room" do
@@ -212,7 +224,7 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
       post_room.update!(name: "Post 201")
       RoomAssignment.create!(room: post_room, participant_event: participant_event)
 
-      get export_csv_admin_event_rooming_wizard_path(event.slug, context: post_event.id, format: :csv)
+      get export_csv_admin_event_rooming_wizard_path(event.slug, stay_id: post_event.id, format: :csv)
 
       expect(response.body).to include("Post 201")
       expect(response.body).not_to include("Main 101")

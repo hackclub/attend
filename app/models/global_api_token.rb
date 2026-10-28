@@ -23,6 +23,7 @@ class GlobalApiToken < ApplicationRecord
   # `required_scope`; anything that hasn't is unreachable by a scoped token.
   SCOPES = {
     "bans:write" => "Add emails to the ban list",
+    "rooming:write" => "Add people to and remove them from stay rosters",
     "support:read" => "Look up event admins and registrations by Slack ID"
   }.freeze
 

@@ -12,7 +12,9 @@
    current_index = steps.index { |s| s[:key] == current_step } %>
 
 <%# The step list below names the step, so the trail stops at the section. %>
-<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Rooming", nil ], event: @event) %>
+<% content_for :breadcrumbs, @rooming_context.main? ?
+     cs_event_breadcrumbs([ "Rooming", nil ], event: @event) :
+     cs_event_breadcrumbs([ "Rooming", admin_event_rooming_wizard_path(@event.slug, stay_id: nil) ], [ @rooming_context.name, nil ], event: @event) %>
 
 <div class="cs-wizard">
   <nav class="cs-wizard-nav" aria-label="Rooming wizard steps">
@@ -41,6 +43,7 @@
         <% end %>
       </div>
     </div>
+    <%= render "stay_switcher" %>
     <%= yield %>
   </div>
 </div>

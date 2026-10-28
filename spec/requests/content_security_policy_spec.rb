@@ -199,7 +199,8 @@ RSpec.describe "Content Security Policy", type: :request do
     # participant, so the counts here also pin that the delegated listeners
     # aren't being installed once per copy.
     describe "the rooming wizard in the #{ui}" do
-      let(:event) { create(:event) }
+      # The wizard needs a stay to room; one during the event is the usual.
+      let(:event) { create(:event).tap(&:main_rooming_context) }
       let(:admin) do
         User.create!(email: "csp-rooming@example.com", name: "CSP Rooming", global_role: "global_admin", admin_console_beta: console)
       end

@@ -373,14 +373,18 @@ module Admin
       authorize @event, :manage_rooming?
     end
 
-    # Defaults to the main stay. Pre/post-event stays are picked by id once
-    # the wizard grows a stay switcher.
+    # The stay the URL names (/stays/:stay_id), else the during-the-event
+    # stay, else the first one. An event with no stays has nothing to room.
     def set_rooming_context
-      @rooming_context = if params[:context].present?
-        @event.rooming_contexts.find(params[:context])
+      @rooming_context = if params[:stay_id].present?
+        @event.rooming_contexts.find(params[:stay_id])
       else
-        @event.main_rooming_context
+        @event.rooming_contexts.find_by(kind: :main) || @event.rooming_contexts.ordered.first
       end
+      return if @rooming_context
+
+      redirect_to admin_event_rooming_stays_path(@event.slug),
+        notice: "Add a stay first: who you're putting up, and when."
     end
 
     def set_rooming_plan

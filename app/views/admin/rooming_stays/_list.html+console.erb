@@ -1,0 +1,58 @@
+<%# The event's stays with who's in each. locals: stays:, roster_counts:, exempt_count:, return_to: (optional) %>
+<% if stays.empty? %>
+  <div class="cs-empty">
+    <p class="cs-empty-title">No stays</p>
+    <p>Add one below for each stretch of accommodation you're providing. If nobody needs a bed, for example everyone sleeps at the venue, you don't need any.</p>
+  </div>
+<% else %>
+  <div class="cs-table-wrap">
+    <table class="cs-table">
+      <thead>
+        <tr>
+          <th scope="col">Stay</th>
+          <th scope="col">When</th>
+          <th scope="col">Who's in it</th>
+          <th scope="col">Rooms</th>
+          <th scope="col">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% stays.each do |stay| %>
+          <tr>
+            <td>
+              <div class="font-medium whitespace-nowrap"><%= stay.name %></div>
+              <% if stay.eligible_only? && stay.eligibility_options.any? %>
+                <div class="cs-small cs-secondary"><%= stay.eligibility_options.map(&:display_label).join(" · ") %></div>
+              <% end %>
+            </td>
+            <td class="whitespace-nowrap">
+              <%= stay.kind_label %>
+              <% if stay.starts_on || stay.ends_on %>
+                <div class="cs-small cs-secondary"><%= [ stay.starts_on, stay.ends_on ].compact.map { |d| l(d, format: :short) }.join(" – ") %></div>
+              <% end %>
+            </td>
+            <td>
+              <% if stay.everyone? %>
+                Everyone with accommodation
+                <% if exempt_count.positive? %>
+                  <div class="cs-small cs-secondary">except <%= exempt_count %> marked exempt</div>
+                <% end %>
+              <% else %>
+                <%= link_to "#{pluralize(roster_counts[stay.id] || 0, "person")} on the list", admin_event_rooming_stay_roster_entries_path(@event.slug, stay), class: "cs-link" %>
+              <% end %>
+            </td>
+            <td class="whitespace-nowrap"><%= stay.rooms.size %></td>
+            <td class="whitespace-nowrap">
+              <div class="flex items-center gap-1">
+                <%= link_to "Rooming", admin_event_rooming_wizard_path(@event.slug, stay_id: (stay.id unless stay.main?)), class: "cs-btn cs-btn-link" %>
+                <%= link_to "Edit", edit_admin_event_rooming_stay_path(@event.slug, stay, return_to: local_assigns[:return_to]), class: "cs-btn cs-btn-link" %>
+                <%= button_to "Remove", admin_event_rooming_stay_path(@event.slug, stay, return_to: local_assigns[:return_to]), method: :delete, class: "cs-btn cs-btn-link",
+                      form: { class: "contents", data: { turbo_confirm: "Remove #{stay.name}? Its rooms and room assignments#{" and its list of who's staying" if stay.eligible_only?} go with it." } } %>
+              </div>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

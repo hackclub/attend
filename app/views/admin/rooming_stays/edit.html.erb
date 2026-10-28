@@ -1,0 +1,11 @@
+<% content_for :title, "#{@stay.name} – Accommodation – Attend" %>
+<div class="w-full max-w-3xl space-y-6">
+  <div>
+    <%= link_to "← Accommodation", admin_event_rooming_stays_path(@event.slug), class: "text-sm text-gray-500 hover:text-gray-700" %>
+    <h1 class="text-2xl font-bold mt-2"><%= @stay.name %></h1>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <%= render "form", stay: @stay, url: admin_event_rooming_stay_path(@event.slug, @stay), method: :patch, submit: "Save", return_to: params[:return_to].presence %>
+  </div>
+</div>

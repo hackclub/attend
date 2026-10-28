@@ -1,0 +1,108 @@
+<%# Add or edit a stay. locals: stay:, url:, method:, submit:, return_to: (optional) %>
+<% kinds = RoomingContext::KIND_LABELS.map { |value, label| [ label, value ] } %>
+<%= form_with model: stay, scope: :rooming_context, url: url, method: method, local: true, class: "cs-stack", html: { novalidate: true }, data: { controller: "cs-form-validation wizard-reveal" } do |f| %>
+  <%= hidden_field_tag :return_to, local_assigns[:return_to] if local_assigns[:return_to] %>
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2"><%= stay.new_record? ? "Add a stay" : "Stay details" %></h2>
+        <% if stay.new_record? %>
+          <p class="cs-container-description">A stretch of accommodation you're providing: a hotel during the event, the night before, the night after. Each stay is roomed separately.</p>
+        <% end %>
+      </div>
+    </div>
+    <div class="cs-container-body">
+      <%= cs_form_field f, :name, label: "Name",
+            constraint: "For example: Hotel, Night before, Night after",
+            messages: { taken: "Another stay at this event already has this name." } do |aria| %>
+        <%= f.text_field :name, class: "cs-input", required: true, **aria %>
+      <% end %>
+
+      <%= cs_form_field f, :kind, label: "When" do |aria| %>
+        <%= f.select :kind, kinds, {}, class: "cs-select", **aria %>
+      <% end %>
+
+      <div class="cs-columns cs-columns-2">
+        <%= cs_form_field f, :starts_on, label: "First night", optional: true do |aria| %>
+          <%= f.date_field :starts_on, class: "cs-input", **aria %>
+        <% end %>
+        <%= cs_form_field f, :ends_on, label: "Check-out day", optional: true do |aria| %>
+          <%= f.date_field :ends_on, class: "cs-input", **aria %>
+        <% end %>
+      </div>
+
+      <%= cs_field id: "rooming_context_enrollment", label: "Who's in it", group: true do %>
+        <div class="cs-option">
+          <%= f.radio_button :enrollment, "everyone", data: { wizard_reveal_target: "input", action: "change->wizard-reveal#update" } %>
+          <div>
+            <%= f.label :enrollment_everyone, "Everyone with accommodation", class: "cs-option-label" %>
+            <p class="cs-option-description">Everyone who fills in the accommodation form, except people you mark exempt in the rooming wizard, for example because they live locally.</p>
+          </div>
+        </div>
+        <div class="cs-option">
+          <%= f.radio_button :enrollment, "eligible_only", data: { wizard_reveal_target: "input", action: "change->wizard-reveal#update" } %>
+          <div>
+            <%= f.label :enrollment_eligible_only, "Only people on its list", class: "cs-option-label" %>
+            <p class="cs-option-description">You add people by hand, from a pasted email list or a group, or a shop adds buyers through the API.</p>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <section class="cs-container" data-wizard-reveal-target="panel" data-show-when="eligible_only">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2">Eligibility options <span class="cs-secondary font-normal">- optional</span></h2>
+        <p class="cs-container-description">Reasons you can tag people with when you add them to the list, and that a shop can send through the API. For example: Bought it in the shop; Paying $40 for the night; Other. Leave these blank if you don't need them.</p>
+      </div>
+    </div>
+    <div class="cs-container-body">
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Option</th>
+              <th scope="col">Price (optional)</th>
+              <% if stay.eligibility_options.any?(&:persisted?) %>
+                <th scope="col"><span class="sr-only">Remove</span></th>
+              <% end %>
+            </tr>
+          </thead>
+          <tbody>
+            <%= f.fields_for :eligibility_options do |o| %>
+              <tr>
+                <td>
+                  <%= o.label :label, "Option", class: "sr-only" %>
+                  <%= o.text_field :label, class: "cs-input", placeholder: ("Bought it in the shop" if o.index.zero? && o.object.new_record?) %>
+                  <% o.object.errors.full_messages_for(:label).each do |message| %>
+                    <p class="cs-field-error"><%= message %></p>
+                  <% end %>
+                </td>
+                <td class="w-40">
+                  <%= o.label :price, "Price", class: "sr-only" %>
+                  <%= o.text_field :price, value: (o.object.price && format("%.2f", o.object.price)), class: "cs-input", inputmode: "decimal", placeholder: "$" %>
+                  <% o.object.errors.full_messages_for(:price).each do |message| %>
+                    <p class="cs-field-error"><%= message %></p>
+                  <% end %>
+                </td>
+                <% if stay.eligibility_options.any?(&:persisted?) %>
+                  <td class="whitespace-nowrap">
+                    <% if o.object.persisted? %>
+                      <label class="cs-small"><%= o.check_box :_destroy %> Remove</label>
+                    <% end %>
+                  </td>
+                <% end %>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+      <p class="cs-small cs-muted mt-2">Need more rows? Save, and two more blank ones appear.</p>
+    </div>
+  </section>
+
+  <div class="cs-actions">
+    <%= f.submit submit, class: "cs-btn cs-btn-primary" %>
+  </div>
+<% end %>

@@ -1,12 +1,11 @@
-# A rooming context is one stay at an event: the main stay, a pre-event night,
-# a post-event night. Plans, rooms and assignments used to hang straight off the
-# event, which allowed exactly one stay and one room per person. They now each
-# belong to a context, and a person can hold one room per context.
+# A rooming context is one stay at an event: during the event, a pre-event
+# night, a post-event night. Plans, rooms and assignments used to hang straight
+# off the event, which allowed exactly one stay and one room per person. They
+# now each belong to a context, and a person can hold one room per context.
 #
-# Every event that already has a rooming plan or rooms gets a "Main stay"
-# context (enrollment "everyone", today's behaviour) and its rows are pointed at
-# it, so existing rooming carries on unchanged. Events without any rooming get
-# their main context lazily, the first time the wizard or MCP needs one.
+# Every event that already has a rooming plan or rooms gets a "During the
+# event" context (enrollment "everyone", today's behaviour) and its rows are
+# pointed at it, so existing rooming carries on unchanged.
 class CreateRoomingContexts < ActiveRecord::Migration[8.1]
   def up
     create_table :rooming_contexts, id: :uuid do |t|
@@ -16,7 +15,6 @@ class CreateRoomingContexts < ActiveRecord::Migration[8.1]
       t.string :enrollment, null: false, default: "eligible_only"
       t.date :starts_on
       t.date :ends_on
-      t.integer :position
       t.timestamps
     end
     add_index :rooming_contexts, :event_id, unique: true, where: "kind = 'main'", name: "index_rooming_contexts_one_main_per_event"
@@ -27,8 +25,8 @@ class CreateRoomingContexts < ActiveRecord::Migration[8.1]
     add_reference :room_assignments, :rooming_context, type: :uuid, foreign_key: true, index: false
 
     execute <<~SQL.squish
-      INSERT INTO rooming_contexts (id, event_id, name, kind, enrollment, position, created_at, updated_at)
-      SELECT gen_random_uuid(), events.id, 'Main stay', 'main', 'everyone', 0, NOW(), NOW()
+      INSERT INTO rooming_contexts (id, event_id, name, kind, enrollment, created_at, updated_at)
+      SELECT gen_random_uuid(), events.id, 'During the event', 'main', 'everyone', NOW(), NOW()
       FROM events
       WHERE (
         EXISTS (SELECT 1 FROM rooming_plans WHERE rooming_plans.event_id = events.id)

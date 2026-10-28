@@ -1,0 +1,156 @@
+<% content_for :title, "#{@stay.name}: who's staying – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Accommodation", admin_event_rooming_stays_path(@event.slug) ], [ @stay.name, nil ], event: @event) %>
+<% option_choices = @stay.eligibility_options.map { |o| [ o.display_label, o.id ] } %>
+<% waiting = @entries.count { |e| !@in_pool_ids.include?(e.participant_event_id) } %>
+
+<div class="cs-header">
+  <div class="cs-header-text">
+    <h1 class="cs-h1"><%= @stay.name %>: who's staying <span class="cs-counter">(<%= @entries.size %>)</span></h1>
+    <p class="cs-description">Only people on this list are roomed for <%= @stay.name %>. Taking someone off also frees any room they had in it.</p>
+  </div>
+  <div class="cs-actions">
+    <%= link_to "Edit stay", edit_admin_event_rooming_stay_path(@event.slug, @stay), class: "cs-btn cs-btn-normal" %>
+    <%= link_to "Room this stay", admin_event_rooming_wizard_path(@event.slug, stay_id: @stay.id), class: "cs-btn cs-btn-primary" %>
+  </div>
+</div>
+
+<div class="cs-stack">
+  <% if @result&.not_registered.present? %>
+    <div class="cs-alert cs-alert-warning" role="status">
+      <%= cs_status_icon(:warning) %>
+      <div>
+        <p class="cs-alert-title">
+          <%= [ ("#{@result.added.size} added" if @result.added.any?), ("#{@result.updated.size} already on the list" if @result.updated.any?) ].compact.join(", ").upcase_first.presence&.then { |s| "#{s}. " } %><%= pluralize(@result.not_registered.size, "email") %> didn't match anyone registered for this event
+        </p>
+        <p>Check the spelling, or invite them first.</p>
+        <ul class="mt-2 font-mono cs-small">
+          <% @result.not_registered.each do |email| %>
+            <li><%= email %></li>
+          <% end %>
+        </ul>
+      </div>
+    </div>
+  <% end %>
+
+  <% if waiting.positive? %>
+    <div class="cs-alert" role="status">
+      <%= cs_status_icon(:info) %>
+      <div>
+        <p class="cs-alert-title"><%= pluralize(waiting, "person") %> can't be roomed yet</p>
+        <p>Rooming needs a registration that's in progress or complete, with the accommodation form filled in. They join the pool as soon as theirs is.</p>
+      </div>
+    </div>
+  <% end %>
+
+  <section class="cs-container">
+    <% if @entries.any? %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Reason</th>
+              <th scope="col">Added</th>
+              <th scope="col">Reference</th>
+              <th scope="col">Rooming</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @entries.each do |entry| %>
+              <% pe = entry.participant_event %>
+              <tr>
+                <td class="whitespace-nowrap"><%= link_to pe.participant.full_name, admin_event_participant_path(@event.slug, pe), class: "cs-link" %></td>
+                <td><%= entry.eligibility_option&.display_label || tag.span("—", class: "cs-secondary") %></td>
+                <td class="whitespace-nowrap cs-secondary">
+                  <%= { "manual" => "By hand", "csv" => "Email list", "group" => "Group", "api" => "Shop/API" }.fetch(entry.source) %>
+                  <% if entry.added_by_user %> · <%= entry.added_by_user.name %><% end %>
+                </td>
+                <td class="whitespace-nowrap cs-secondary font-mono"><%= entry.external_reference.presence || "—" %></td>
+                <td class="whitespace-nowrap">
+                  <%= @in_pool_ids.include?(pe.id) ? cs_badge("Ready", "green") : cs_badge("Waiting on registration", "grey") %>
+                </td>
+                <td class="whitespace-nowrap">
+                  <%= button_to "Remove", admin_event_rooming_stay_roster_entry_path(@event.slug, @stay, entry), method: :delete, class: "cs-btn cs-btn-link",
+                        form: { class: "contents", data: { turbo_confirm: "Take #{pe.participant.full_name} off #{@stay.name}? Any room they have in it is freed." } } %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="cs-empty">
+        <p class="cs-empty-title">Nobody's on the list yet</p>
+        <p>Add people below, or have your shop add buyers through the API.</p>
+      </div>
+    <% end %>
+  </section>
+
+  <div class="cs-columns <%= @groups.any? ? "cs-columns-3" : "cs-columns-2" %>">
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Pick people</h2>
+          <p class="cs-container-description">Hold Ctrl or ⌘ to pick more than one.</p>
+        </div>
+      </div>
+      <div class="cs-container-body">
+        <%= form_with url: admin_event_rooming_stay_roster_entries_path(@event.slug, @stay), method: :post, class: "cs-stack" do %>
+          <%= hidden_field_tag :mode, "participants" %>
+          <%= cs_field id: "roster-pick", label: "People" do |aria| %>
+            <%= select_tag "participant_event_ids", options_for_select(@available.map { |pe| [ pe.participant.full_name, pe.id ] }), multiple: true, size: 8, id: "roster-pick", class: "cs-select", **aria %>
+          <% end %>
+          <%= cs_field id: "roster-pick-option", label: "Reason", optional: true do |aria| %>
+            <%= select_tag "eligibility_option_id", options_for_select(option_choices), include_blank: "No reason given", id: "roster-pick-option", class: "cs-select", **aria %>
+          <% end %>
+          <div><%= submit_tag "Add", class: "cs-btn cs-btn-primary" %></div>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Paste emails</h2>
+          <p class="cs-container-description">One per line, a spreadsheet column, or a whole CSV export from your shop. Anything that isn't an email is ignored.</p>
+        </div>
+      </div>
+      <div class="cs-container-body">
+        <%= form_with url: admin_event_rooming_stay_roster_entries_path(@event.slug, @stay), method: :post, class: "cs-stack", data: { turbo: false } do %>
+          <%= hidden_field_tag :mode, "emails" %>
+          <%= cs_field id: "roster-emails", label: "Emails" do |aria| %>
+            <%= text_area_tag "emails", nil, rows: 6, id: "roster-emails", class: "cs-input font-mono", **aria %>
+          <% end %>
+          <%= cs_field id: "roster-emails-option", label: "Reason", optional: true do |aria| %>
+            <%= select_tag "eligibility_option_id", options_for_select(option_choices), include_blank: "No reason given", id: "roster-emails-option", class: "cs-select", **aria %>
+          <% end %>
+          <div><%= submit_tag "Add", class: "cs-btn cs-btn-primary" %></div>
+        <% end %>
+      </div>
+    </section>
+
+    <% if @groups.any? %>
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <div>
+            <h2 class="cs-h2">Add a group</h2>
+            <p class="cs-container-description">Everyone currently in the group. People who join it later aren't added.</p>
+          </div>
+        </div>
+        <div class="cs-container-body">
+          <%= form_with url: admin_event_rooming_stay_roster_entries_path(@event.slug, @stay), method: :post, class: "cs-stack" do %>
+            <%= hidden_field_tag :mode, "group" %>
+            <%= cs_field id: "roster-group", label: "Group" do |aria| %>
+              <%= select_tag "group_id", options_from_collection_for_select(@groups, :id, :name), id: "roster-group", class: "cs-select", **aria %>
+            <% end %>
+            <%= cs_field id: "roster-group-option", label: "Reason", optional: true do |aria| %>
+              <%= select_tag "eligibility_option_id", options_for_select(option_choices), include_blank: "No reason given", id: "roster-group-option", class: "cs-select", **aria %>
+            <% end %>
+            <div><%= submit_tag "Add", class: "cs-btn cs-btn-primary" %></div>
+          <% end %>
+        </div>
+      </section>
+    <% end %>
+  </div>
+</div>

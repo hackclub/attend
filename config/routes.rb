@@ -355,29 +355,42 @@ Rails.application.routes.draw do
         post :dismiss_pickup
       end
       resource :airport_mode, only: [ :show ], controller: "airport_mode"
-      resource :rooming_wizard, only: [ :show ], controller: "rooming_wizard" do
-        get :setup
-        post :setup, action: :create_setup
-        get :preferences
-        post :link_preference
-        delete :unlink_preference
-        post :manual_assign
-        post :auto_assign
-        get :assignments
-        post :move_assignment
-        post :create_room
-        patch :update_room
-        post :reorder_rooms
-        delete :destroy_room
-        post :add_staff
-        delete :remove_staff
-        post :acknowledge_trans_nb
-        post :toggle_exempt
-        get :finalize
-        post :do_finalize
-        get :export_csv
-        post :lock
-        post :unlock
+      # Stays: during the event, the night before, the night after. Each is
+      # everyone with accommodation or a list of who's staying and why.
+      resources :rooming_stays, path: "stays", only: [ :index, :create, :edit, :update, :destroy ], controller: "rooming_stays" do
+        resources :roster_entries, path: "roster", only: [ :index, :create, :destroy ], controller: "rooming_roster_entries"
+      end
+      # The wizard works on one stay at a time. Without /stays/:stay_id it's
+      # the stay during the event, or the first stay if there's none.
+      # Declaring stay_id as a scope option (rather than a constraint) is what
+      # makes Rails reuse it from the current request, so every wizard link on
+      # a stay's page stays in that stay without passing it; pass
+      # `stay_id: nil` to drop it.
+      scope stay_id: /[0-9a-f-]{36}/ do
+        resource :rooming_wizard, only: [ :show ], controller: "rooming_wizard", path: "(/stays/:stay_id)/rooming_wizard" do
+          get :setup
+          post :setup, action: :create_setup
+          get :preferences
+          post :link_preference
+          delete :unlink_preference
+          post :manual_assign
+          post :auto_assign
+          get :assignments
+          post :move_assignment
+          post :create_room
+          patch :update_room
+          post :reorder_rooms
+          delete :destroy_room
+          post :add_staff
+          delete :remove_staff
+          post :acknowledge_trans_nb
+          post :toggle_exempt
+          get :finalize
+          post :do_finalize
+          get :export_csv
+          post :lock
+          post :unlock
+        end
       end
       resources :sibling_groups, only: [ :index, :create, :update, :destroy ], controller: "sibling_groups"
       resources :groups, except: [ :show ] do
@@ -505,6 +518,7 @@ Rails.application.routes.draw do
       patch "schedule", to: "event_setup#update_schedule"
       get "modules", to: "event_setup#modules", as: :event_setup_modules
       patch "modules", to: "event_setup#update_modules"
+      get "stays", to: "event_setup#stays", as: :event_setup_stays
       get "waivers", to: "event_setup#waivers", as: :event_setup_waivers
       patch "waivers", to: "event_setup#update_waivers"
       get "team", to: "event_setup#team", as: :event_setup_team
@@ -605,6 +619,11 @@ Rails.application.routes.draw do
         end
         resources :scan_contexts, only: [ :index ]
         resources :scans, only: [ :index, :create, :destroy ]
+        # Stays (during, before, after the event) and their rosters. A shop that
+        # sells a pre/post-event night adds buyers to the roster here.
+        resources :stays, only: [ :index ], controller: "rooming_stays" do
+          resources :roster, only: [ :index, :create, :destroy ], controller: "rooming_roster_entries"
+        end
         resource :travel, only: [ :show ], controller: "travel_calendar"
         resource :airport_mode, only: [ :show ], controller: "airport_mode"
         resources :slack_blasts, only: [ :index, :show, :create ]

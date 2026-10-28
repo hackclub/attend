@@ -5,7 +5,7 @@ module Admin
   class EventSetupController < BaseController
     before_action :set_event
 
-    STEPS = %w[basics schedule modules waivers team review].freeze
+    STEPS = %w[basics schedule modules stays waivers team review].freeze
 
     before_action :require_staff_management_access, only: [ :add_team_member, :remove_team_member ]
     # The waivers step edits the same DocuSeal templates as the integrations
@@ -32,10 +32,19 @@ module Admin
 
     def update_modules
       if @event.update(module_params)
-        redirect_to admin_event_setup_waivers_path(@event, return_to: params[:return_to].presence)
+        redirect_to admin_event_setup_stays_path(@event, return_to: params[:return_to].presence)
       else
         render :modules, status: :unprocessable_entity
       end
+    end
+
+    # The event's stays (during, before, after) are added here; the forms post
+    # to Admin::RoomingStaysController, which comes back to this step.
+    def stays
+      return unless @event.accommodation_enabled?
+
+      @stays, @roster_counts, @exempt_count = Admin::RoomingStaysController.stays_overview(@event)
+      @new_stay = Admin::RoomingStaysController.new_stay_for(@event)
     end
 
     def waivers

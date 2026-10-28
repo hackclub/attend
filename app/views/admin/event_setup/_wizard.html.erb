@@ -7,6 +7,7 @@
      { key: "basics", label: "Basics", path: persisted ? edit_admin_event_path(@event, return_to: "setup") : nil },
      { key: "schedule", label: "Schedule & location", path: persisted ? admin_event_setup_schedule_path(@event) : nil },
      { key: "modules", label: "Modules", path: persisted ? admin_event_setup_modules_path(@event) : nil },
+     { key: "stays", label: "Accommodation", path: persisted ? admin_event_setup_stays_path(@event) : nil },
      { key: "waivers", label: "Waivers", path: persisted ? admin_event_setup_waivers_path(@event) : nil },
      { key: "team", label: "Team", path: persisted ? admin_event_setup_team_path(@event) : nil },
      { key: "review", label: "Review and finish", path: persisted ? admin_event_setup_review_path(@event) : nil }

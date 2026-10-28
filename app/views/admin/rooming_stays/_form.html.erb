@@ -1,0 +1,79 @@
+<%# Add or edit a stay. locals: stay:, url:, method:, submit:, return_to: (optional) %>
+<% kinds = RoomingContext::KIND_LABELS.map { |value, label| [ label, value ] } %>
+<% input_class = "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+<%= form_with model: stay, scope: :rooming_context, url: url, method: method, local: true, class: "space-y-6", data: { controller: "wizard-reveal" } do |f| %>
+  <%= hidden_field_tag :return_to, local_assigns[:return_to] if local_assigns[:return_to] %>
+  <% if stay.errors.any? %>
+    <div class="bg-red-50 border border-red-200 rounded-md p-4">
+      <h3 class="text-sm font-medium text-red-800"><%= pluralize(stay.errors.count, "error") %> prohibited this stay from being saved:</h3>
+      <ul class="mt-2 text-sm text-red-700 list-disc list-inside space-y-1">
+        <% stay.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div>
+    <%= f.label :name, class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <%= f.text_field :name, class: input_class, placeholder: "e.g., Hotel, Night before, Night after" %>
+  </div>
+
+  <div>
+    <%= f.label :kind, "When", class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <%= f.select :kind, kinds, {}, class: input_class %>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div>
+      <%= f.label :starts_on, "First night (optional)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= f.date_field :starts_on, class: input_class %>
+    </div>
+    <div>
+      <%= f.label :ends_on, "Check-out day (optional)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= f.date_field :ends_on, class: input_class %>
+    </div>
+  </div>
+
+  <fieldset>
+    <legend class="block text-sm font-medium text-gray-700">Who's in it</legend>
+    <div class="mt-2 space-y-3">
+      <div class="flex items-start gap-3">
+        <%= f.radio_button :enrollment, "everyone", class: "mt-1", data: { wizard_reveal_target: "input", action: "change->wizard-reveal#update" } %>
+        <div>
+          <%= f.label :enrollment_everyone, "Everyone with accommodation", class: "text-sm font-medium text-gray-900" %>
+          <p class="text-sm text-gray-500">Everyone who fills in the accommodation form, except people you mark exempt in the rooming wizard, for example because they live locally.</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-3">
+        <%= f.radio_button :enrollment, "eligible_only", class: "mt-1", data: { wizard_reveal_target: "input", action: "change->wizard-reveal#update" } %>
+        <div>
+          <%= f.label :enrollment_eligible_only, "Only people on its list", class: "text-sm font-medium text-gray-900" %>
+          <p class="text-sm text-gray-500">You add people by hand, from a pasted email list or a group, or a shop adds buyers through the API.</p>
+        </div>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset data-wizard-reveal-target="panel" data-show-when="eligible_only">
+    <legend class="block text-sm font-medium text-gray-700">Eligibility options (optional)</legend>
+    <p class="mt-1 text-sm text-gray-500">Reasons you can tag people with when you add them to the list, and that a shop can send through the API, e.g. "Bought it in the shop", "Paying $40 for the night", "Other". Leave these blank if you don't need them. Save to get more blank rows.</p>
+    <div class="mt-3 space-y-2">
+      <%= f.fields_for :eligibility_options do |o| %>
+        <div class="flex flex-wrap items-center gap-2">
+          <%= o.label :label, "Option", class: "sr-only" %>
+          <%= o.text_field :label, class: "#{input_class} sm:flex-1", placeholder: "Option" %>
+          <%= o.label :price, "Price", class: "sr-only" %>
+          <%= o.text_field :price, value: (o.object.price && format("%.2f", o.object.price)), class: "#{input_class} sm:w-32", inputmode: "decimal", placeholder: "Price ($)" %>
+          <% if o.object.persisted? %>
+            <label class="text-sm text-gray-600"><%= o.check_box :_destroy %> Remove</label>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </fieldset>
+
+  <div>
+    <%= f.submit submit, class: "bg-[#d42f46] text-white px-4 py-2 rounded-md hover:bg-[#b82840] cursor-pointer" %>
+  </div>
+<% end %>

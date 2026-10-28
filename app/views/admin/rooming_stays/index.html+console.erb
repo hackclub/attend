@@ -1,0 +1,16 @@
+<% content_for :title, "Accommodation – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Accommodation", nil ], event: @event) %>
+<div class="cs-header">
+  <div class="cs-header-text">
+    <h1 class="cs-h1">Accommodation <span class="cs-counter">(<%= @stays.size %>)</span></h1>
+    <p class="cs-description">One stay for each stretch of accommodation you're providing, like a hotel during the event or the night before or after. Each is either everyone with accommodation or only the people on its list, and each is roomed separately.</p>
+  </div>
+</div>
+
+<div class="cs-stack">
+  <section class="cs-container">
+    <%= render "list", stays: @stays, roster_counts: @roster_counts, exempt_count: @exempt_count %>
+  </section>
+
+  <%= render "form", stay: @new_stay, url: admin_event_rooming_stays_path(@event.slug), method: :post, submit: "Add stay" %>
+</div>
