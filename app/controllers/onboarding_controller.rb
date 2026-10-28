@@ -451,18 +451,21 @@ class OnboardingController < ApplicationController
         skip_age_check: true
       )
 
-      # Apply any group memberships specified at invite time
-      pending_invitation = Invitation.where(event: current_event)
-                                     .for_email(current_user.email)
-                                     .where(accepted_at: nil)
-                                     .order(created_at: :desc)
-                                     .first
-      if pending_invitation&.group_ids.present? && current_event.groups_enabled?
-        valid_ids = current_event.groups.where(id: pending_invitation.group_ids).pluck(:id)
+      # Apply any group memberships specified at invite time. Arriving by the
+      # invitation link has already accepted it (#process_invitation), so the
+      # invitation can't be looked up as unaccepted: prefer the one the link
+      # carried, then the latest for this address.
+      invitation = (@invitation if @invitation&.event_id == current_event.id) ||
+        Invitation.where(event: current_event)
+                  .for_email(current_user.email)
+                  .order(created_at: :desc)
+                  .first
+      if invitation&.group_ids.present? && current_event.groups_enabled?
+        valid_ids = current_event.groups.where(id: invitation.group_ids).pluck(:id)
         valid_ids.each do |gid|
           GroupMembership.find_or_create_by!(group_id: gid, participant_event: @participant_event)
         end
-        pending_invitation.accept!
+        invitation.accept! unless invitation.accepted?
       end
     end
 

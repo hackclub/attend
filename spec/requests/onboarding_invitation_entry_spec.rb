@@ -103,6 +103,36 @@ RSpec.describe "onboarding invitation entry", type: :request do
     expect(response).to redirect_to(onboarding_welcome_path(event_id: event.id))
   end
 
+  describe "groups chosen at invite time" do
+    let(:mentors) { create(:group, event: event, name: "Mentors") }
+    let(:builders) { create(:group, event: event, name: "Builders") }
+    let(:elsewhere) { create(:group, name: "Another event's group") }
+
+    before do
+      event.update!(groups_enabled: true)
+      invitation.update!(group_ids: [ mentors.id, builders.id, elsewhere.id ])
+    end
+
+    it "puts someone who follows the link while signed in into those groups" do
+      sign_in create(:user, email: invitation.email)
+
+      get onboarding_path(invite: invitation.token)
+
+      expect(ParticipantEvent.find_by!(event: event).groups).to contain_exactly(mentors, builders)
+      expect(invitation.reload).to be_accepted
+    end
+
+    it "puts someone who signs in after following the link into those groups" do
+      get onboarding_path(invite: invitation.token)
+      sign_in create(:user, email: invitation.email)
+
+      get onboarding_path
+
+      expect(ParticipantEvent.find_by!(event: event).groups).to contain_exactly(mentors, builders)
+      expect(invitation.reload).to be_accepted
+    end
+  end
+
   it "does not use an already accepted invitation to create another registration" do
     invitation.update!(accepted_at: 1.day.ago)
     sign_in create(:user, email: invitation.email)
