@@ -374,4 +374,53 @@ RSpec.describe Message, type: :model do
       expect(message.reload).to be_completed
     end
   end
+
+  describe "#scheduled_at on the event's clock" do
+    let(:event) { create(:event, timezone: "Pacific Time (US & Canada)") }
+
+    def scheduled(value)
+      message_for("all_attendees").tap { |message| message.assign_attributes(body: "Hello", scheduled_at: value) }
+    end
+
+    it "reads a datetime-local value in the event's time zone" do
+      message = scheduled("2030-07-12T09:30")
+      message.validate
+
+      expect(message.scheduled_at).to eq(Time.utc(2030, 7, 12, 16, 30))
+      expect(message.scheduled_at_field_value).to eq("2030-07-12T09:30")
+    end
+
+    it "keeps a time that names its own offset" do
+      message = scheduled("2030-07-12T09:30:00Z")
+      message.validate
+
+      expect(message.scheduled_at).to eq(Time.utc(2030, 7, 12, 9, 30))
+    end
+
+    it "reads it as UTC for an event with no time zone set" do
+      event.update_column(:timezone, nil)
+      message = scheduled("2030-07-12T09:30")
+      message.validate
+
+      expect(message.scheduled_at).to eq(Time.utc(2030, 7, 12, 9, 30))
+    end
+
+    it "forgets a datetime-local value that was replaced before validation" do
+      message = scheduled("2030-07-12T09:30")
+      message.scheduled_at = nil
+      message.validate
+
+      expect(message.scheduled_at).to be_nil
+    end
+
+    it "leaves a saved time alone when autosave resubmits the same field value" do
+      message = scheduled("2030-07-12T09:30")
+      message.save!
+
+      message.update!(scheduled_at: message.scheduled_at_field_value)
+
+      expect(message.saved_changes).not_to have_key("scheduled_at")
+      expect(message.reload.scheduled_at).to eq(Time.utc(2030, 7, 12, 16, 30))
+    end
+  end
 end

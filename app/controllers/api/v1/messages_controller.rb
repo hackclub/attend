@@ -120,7 +120,7 @@ module Api
         if scheduled_in_future?
           @message.update!(status: :scheduled)
           audit_api_change!(:send_now, @message)
-          render json: { message: message_json(@message), notice: "Message scheduled for #{@message.scheduled_at.strftime("%B %d, %Y at %l:%M %p")}." }
+          render json: { message: message_json(@message), notice: "Message scheduled for #{@message.local_scheduled_at.strftime("%B %d, %Y at %l:%M %p %Z")}." }
         elsif @message.send!
           audit_api_change!(:send_now, @message)
           render json: { message: message_json(@message.reload), notice: "Message is being sent to #{@message.recipient_count} recipients." }

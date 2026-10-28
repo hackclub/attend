@@ -268,4 +268,43 @@ RSpec.describe "Admin::Messages", type: :request do
       end
     end
   end
+
+  describe "scheduling on the event's clock" do
+    let(:event) { create(:event, timezone: "Pacific Time (US & Canada)") }
+    let(:params) do
+      { message: { audience: "confirmed_attendees", channels: [ "email" ], body: "<p>Hello</p>",
+                   scheduled_at: "2030-07-12T09:30" } }
+    end
+
+    def page_text
+      Nokogiri::HTML(response.body).text.squish
+    end
+
+    [ false, true ].each do |console|
+      context(console ? "with the admin console beta" : "in the original admin") do
+        before { admin.update!(admin_console_beta: console) }
+
+        it "reads the send time in the event's time zone and shows it back that way" do
+          travel_to Time.utc(2030, 1, 1, 12, 0) do
+            post admin_event_messages_path(event_slug: event.slug), params: params
+            message = Message.last
+            expect(message.scheduled_at).to eq(Time.utc(2030, 7, 12, 16, 30))
+
+            get edit_admin_event_message_path(event_slug: event.slug, id: message)
+            field = Nokogiri::HTML(response.body).at_css("input[name='message[scheduled_at]']")
+            expect(field["value"]).to eq("2030-07-12T09:30")
+            expect(field["min"]).to eq("2030-01-01T04:00:00")
+            expect(page_text).to include("In the event's time zone: Pacific Time (US & Canada).")
+
+            get preview_admin_event_message_path(event_slug: event.slug, id: message)
+            expect(page_text).to include(console ? "July 12, 2030, 09:30 (UTC-7:00)" : "July 12, 2030 at 9:30 AM PDT")
+
+            post send_now_admin_event_message_path(event_slug: event.slug, id: message)
+            expect(message.reload).to be_scheduled
+            expect(flash[:notice].squish).to eq("Message scheduled for July 12, 2030 at 9:30 AM PDT.")
+          end
+        end
+      end
+    end
+  end
 end

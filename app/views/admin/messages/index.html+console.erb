@@ -80,7 +80,7 @@
                       <%= message.sent_count %>/<%= message.recipient_count %> delivered
                     </div>
                   <% elsif message.scheduled_at.present? %>
-                    <%= cs_status(:pending, safe_join([ "Scheduled for ", cs_absolute_time_tag(message.scheduled_at) ])) %>
+                    <%= cs_status(:pending, safe_join([ "Scheduled for ", cs_absolute_time_tag(message.scheduled_at, zone: current_event.event_time_zone) ])) %>
                   <% else %>
                     <span class="cs-muted">Draft</span>
                   <% end %>

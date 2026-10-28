@@ -4550,7 +4550,9 @@ components:
           type: string
           format: date-time
           nullable: true
-          description: When `send_now` should actually send. Omit to send immediately.
+          description: >-
+            When `send_now` should actually send. Omit to send immediately. A
+            time without a UTC offset is read in the event's time zone.
         participant_event_ids:
           type: array
           description: With `audience=specific_participants` only.
