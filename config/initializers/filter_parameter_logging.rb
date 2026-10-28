@@ -13,6 +13,9 @@ Rails.application.config.filter_parameters += [
   # Dates
   :date_of_birth, :birthdate,
 
+  # Visa letters (the verification code also unlocks the letter download)
+  :nationality, :place_of_birth, :verification_code,
+
   # Health & medical
   :allergies, :medical_conditions, :medications, :emergency_action_plan,
   :intolerances, :life_threatening_allergies,

@@ -127,7 +127,8 @@ module Privacy
     People = Data.define(
       :users, :participants, :participant_events, :guardians, :guardian_links,
       :emails, :phones, :emergency_contacts, :invitations, :email_logs,
-      :message_deliveries, :sms_logs, :tickets, :import_batches
+      :message_deliveries, :sms_logs, :tickets, :import_batches,
+      :visa_letter_applications, :visa_letter_invitations
     )
 
     # matches, then locks what it matched and matches again. If the match
@@ -139,7 +140,8 @@ module Privacy
       # so concurrent erasures acquire them in the same order.
       ActiveRecord::Base.connection.execute(<<~SQL)
         LOCK TABLE automated_sms_logs, email_logs, emergency_contacts,
-          invitations, message_deliveries, tickets IN SHARE ROW EXCLUSIVE MODE
+          invitations, message_deliveries, tickets, visa_letter_applications,
+          visa_letter_invitations IN SHARE ROW EXCLUSIVE MODE
       SQL
       3.times do
         people = match
@@ -160,7 +162,8 @@ module Privacy
       GuardianParticipantEvent.where(id: people.guardian_links).order(:id).lock.pluck(:id)
       ImportBatch.where(id: people.import_batches).order(:id).lock.pluck(:id)
       USER_RECORDS.each { |model| model.constantize.where(user_id: people.users).order(:id).lock.pluck(:id) }
-      Event.where(id: event_ids(people)).order(:id).lock("FOR SHARE").pluck(:id)
+      visa_events = VisaLetterApplication.where(id: people.visa_letter_applications).pluck(:event_id)
+      Event.where(id: event_ids(people) + visa_events).order(:id).lock("FOR SHARE").pluck(:id)
     end
 
     # Accounts are matched only on what Hack Club Auth vouches for: the
@@ -236,6 +239,16 @@ module Privacy
                       .or(Ticket.where(subject_type: "Guardian", subject_id: guardian_ids))
       tickets = tickets.or(Ticket.where(subject_id: nil, phone_number: phones)) if phones.any?
 
+      # visa letter applicants copy their account's email when they apply, and
+      # Envoy's imports have no account until claimed, so an application is
+      # matched by its account, the registration it led to, or that email.
+      # One with the email but someone else's account is someone else's. The
+      # email is deterministically encrypted, so it's compared through the model
+      visa_applications = VisaLetterApplication.where(email: all_emails)
+      conflict! if visa_applications.where.not(user_id: nil).where.not(user_id: user_ids).exists?
+      visa_application_ids = visa_applications.or(VisaLetterApplication.where(user_id: user_ids))
+                                              .or(VisaLetterApplication.where(participant_event_id: participant_event_ids)).pluck(:id)
+
       people = {
         users: user_ids,
         participants: participant_ids,
@@ -257,7 +270,9 @@ module Privacy
                                            .or(MessageDelivery.where(guardian_id: guardian_ids)).pluck(:id),
         sms_logs: phones.any? ? AutomatedSmsLog.where(phone_number: phones).pluck(:id) : [],
         tickets: tickets.pluck(:id),
-        import_batches: import_batch_ids(all_emails)
+        import_batches: import_batch_ids(all_emails),
+        visa_letter_applications: visa_application_ids,
+        visa_letter_invitations: email_in(VisaLetterInvitation, :email, all_emails).pluck(:id)
       }
       People.new(**people.transform_values(&:sort))
     end
@@ -282,6 +297,7 @@ module Privacy
     def check_review!
       raise ManualReviewRequired, "staff_account" if staff?
       raise ManualReviewRequired, "event_not_over" if open_registration?
+      raise ManualReviewRequired, "visa_letter_active" if visa_letter_active?
       raise ManualReviewRequired, "safeguarding_record" if safeguarding_record?
       raise ManualReviewRequired, "banned" if email_in(BanEmail, :email, people.emails).exists?
       # a running import would write its copy of their row back
@@ -308,6 +324,15 @@ module Privacy
     # organisers remove the registration first
     def open_registration?
       Event.where(id: event_ids(people)).where("ends_at IS NULL OR ends_at > ?", @now).exists?
+    end
+
+    # an application staff are still deciding on, or a letter for an event
+    # that hasn't ended, which an embassy may yet check against /verify.
+    # Staff reject the application, or the event ends, first
+    def visa_letter_active?
+      applications = VisaLetterApplication.where(id: people.visa_letter_applications)
+      applications.where(status: %w[pending approved]).exists? ||
+        applications.letter_sent.joins(:event).where("events.ends_at IS NULL OR events.ends_at > ?", @now).exists?
     end
 
     # every event the people being erased are registered for, guard, or are
@@ -377,6 +402,8 @@ module Privacy
       Ticket.where(merged_into_id: people.tickets).where.not(id: people.tickets).update_all(merged_into_id: nil)
       Ticket.where(id: people.tickets).destroy_all
       EmergencyContact.where(id: people.emergency_contacts).destroy_all
+      VisaLetterApplication.where(id: people.visa_letter_applications).destroy_all
+      VisaLetterInvitation.where(id: people.visa_letter_invitations).destroy_all
       Invitation.where(id: people.invitations).destroy_all
       EmailLog.where(id: people.email_logs).destroy_all
       MessageDelivery.where(id: people.message_deliveries).destroy_all
@@ -481,7 +508,8 @@ module Privacy
     def record_ids
       pes = people.participant_events
       ids = people.users + people.participants + pes + people.guardians + people.guardian_links +
-        people.emergency_contacts + people.invitations + people.tickets
+        people.emergency_contacts + people.invitations + people.tickets +
+        people.visa_letter_applications + people.visa_letter_invitations
       REGISTRATION_RECORDS.each { |model, column| ids.concat(model.constantize.where(column => pes).pluck(:id)) }
       USER_RECORDS.each { |model| ids.concat(model.constantize.where(user_id: people.users).pluck(:id)) }
       ids.concat(TravelLeg.where(travel_id: Travel.where(participant_event_id: pes).select(:id)).pluck(:id))

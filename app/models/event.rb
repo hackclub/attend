@@ -14,6 +14,9 @@ class Event < ApplicationRecord
     :travel_enabled,
     :visa_options_enabled,
     :visa_application_url,
+    :visa_letters,
+    :visa_letter_deadline,
+    :visa_letter_rejection_reasons,
     :accommodation_enabled,
     :roommate_preferences_enabled,
     :guardian_invites_locked,
@@ -83,6 +86,10 @@ class Event < ApplicationRecord
   has_one_attached :logo
   has_one_attached :banner
 
+  # Whether Attend issues this event's visa letters itself: not at all, only
+  # to people staff invite to apply, or to anyone through the public form.
+  VISA_LETTER_MODES = %w[off invite_only open].freeze
+
   ALLOWED_LOGO_CONTENT_TYPES = %w[image/jpeg image/png image/gif image/webp image/svg+xml].freeze
   MAX_LOGO_BYTE_SIZE = 5.megabytes
 
@@ -93,6 +100,8 @@ class Event < ApplicationRecord
   validate :acceptable_logo
   validate :acceptable_banner
   validate :hotel_scan_context_belongs_to_event, if: :will_save_change_to_hotel_scan_context_id?
+  validates :visa_letters, inclusion: { in: VISA_LETTER_MODES }, allow_blank: true
+  validate :visa_letter_deadline_is_a_date
 
   belongs_to :event_series, optional: true
 
@@ -105,6 +114,11 @@ class Event < ApplicationRecord
   has_many :notes, dependent: :destroy
   has_many :audit_logs, dependent: :delete_all
   has_many :invitations, dependent: :destroy
+  # Issued letters are what embassies verify against, so an event that has
+  # any can't be deleted out from under them.
+  has_many :visa_letter_applications, dependent: :restrict_with_error
+  has_many :visa_letter_invitations, dependent: :destroy
+  has_many :visa_letter_templates, dependent: :destroy
   has_many :event_api_tokens, dependent: :destroy
   has_many :slack_blasts, dependent: :destroy
   has_many :messages, dependent: :destroy
@@ -428,6 +442,33 @@ class Event < ApplicationRecord
     ActiveModel::Type::Boolean.new.cast(visa_options_enabled)
   end
 
+  def visa_letters_mode
+    VISA_LETTER_MODES.include?(visa_letters) ? visa_letters : "off"
+  end
+
+  def visa_letters_enabled?
+    visa_letters_mode != "off"
+  end
+
+  # The public form takes applications until the deadline, a date on the
+  # event's own clock. Invited applicants aren't held to either.
+  def accepting_visa_letter_applications?
+    return false unless visa_letters_mode == "open"
+
+    deadline = visa_letter_deadline_date
+    deadline.nil? || local_today <= deadline
+  end
+
+  def visa_letter_deadline_date
+    Date.iso8601(visa_letter_deadline.to_s) if visa_letter_deadline.present?
+  rescue Date::Error
+    nil
+  end
+
+  def visa_letter_rejection_reasons_list
+    Array(visa_letter_rejection_reasons).map(&:to_s).compact_blank
+  end
+
   # Finds or creates the stay during the event. Nothing in the app creates a
   # stay implicitly (organizers add them, and an event may have none), so
   # this is for callers that explicitly want that stay. Two requests racing
@@ -724,6 +765,12 @@ class Event < ApplicationRecord
 
   def travel_calendar_event_ids
     [ id ]
+  end
+
+  def visa_letter_deadline_is_a_date
+    return if visa_letter_deadline.blank? || visa_letter_deadline_date
+
+    errors.add(:visa_letter_deadline, "must be a date")
   end
 
   def interpret_naive_schedule_times_in_event_timezone

@@ -588,4 +588,60 @@ RSpec.describe Privacy::Eraser do
     expect(PaperTrail::Version.where(item_id: other.id)).to exist
     expect(AuditLog.where(record_id: other.id)).to exist
   end
+
+  describe "visa letters" do
+    let(:upcoming_event) { create(:event) }
+
+    before { create(:visa_letter_template, :default) }
+
+    def sent_letter(event:, **attributes)
+      create(:visa_letter_application, event:, **attributes).tap do |application|
+        application.approve!(by: create(:user))
+        application.issue_letter!
+      end
+    end
+
+    it "erases their applications, letters and invitations to apply" do
+      application = sent_letter(event: past_event, user:)
+      imported = create(:visa_letter_application, :imported, event: create(:event, starts_at: 1.year.ago, ends_at: 1.year.ago + 2.days),
+        email: "Attendee@Example.com", status: :rejected, rejection_type: :soft, rejection_reason: "Fictional reason")
+      invitation = create(:visa_letter_invitation, event: past_event, email: "attendee@example.com")
+      blob = application.letter_pdf.blob
+      eraser = described_class.new(subject_for(emails: [ "attendee@example.com" ]))
+
+      dry = eraser.call(dry_run: true)
+      expect(VisaLetterApplication.exists?(application.id)).to be(true)
+
+      real = eraser.call(dry_run: false)
+
+      expect(real.deleted).to eq(dry.deleted)
+      expect(real.deleted).to include("visa_letter_applications" => 2, "visa_letter_invitations" => 1)
+      expect(VisaLetterApplication.where(id: [ application.id, imported.id ])).not_to exist
+      expect(VisaLetterInvitation.exists?(invitation.id)).to be(false)
+      expect(ActiveStorage::Blob.exists?(blob.id)).to be(false)
+    end
+
+    it "waits while an application is under review or a letter is for an event still to come" do
+      eraser = described_class.new(subject_for(emails: [ "attendee@example.com" ]))
+      pending_application = create(:visa_letter_application, event: past_event, user:)
+
+      expect { eraser.call(dry_run: false) }
+        .to raise_error(described_class::ManualReviewRequired) { |error| expect(error.reason).to eq("visa_letter_active") }
+
+      pending_application.reject!(by: create(:user), reason: "Fictional reason")
+      sent_letter(event: upcoming_event, user: create(:user), email: "attendee@example.com").update_columns(user_id: nil, imported_at: Time.current)
+
+      expect { eraser.call(dry_run: false) }
+        .to raise_error(described_class::ManualReviewRequired) { |error| expect(error.reason).to eq("visa_letter_active") }
+      expect(eraser.call(dry_run: true, review: false).found).to be(true)
+    end
+
+    it "stops on an application with their email that belongs to someone else's account" do
+      someone_else = create(:user, email: "someone-else@example.com")
+      create(:visa_letter_application, event: past_event, user: someone_else, email: "attendee@example.com")
+
+      expect { described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false) }
+        .to raise_error(described_class::ManualReviewRequired) { |error| expect(error.reason).to eq("identity_conflict") }
+    end
+  end
 end

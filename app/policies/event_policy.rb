@@ -73,6 +73,14 @@ class EventPolicy < ApplicationPolicy
     user.ops_for?(record)
   end
 
+  # Visa letter applications carry passport-grade details (nationality,
+  # place of birth, home address) for people who may never get a place, so
+  # only event admins review them: not ops, limited or read-only staff.
+  # Series owners and organizers count as event admins (User#event_admin_for?).
+  def review_visa_letters?
+    user.global_admin? || user.event_admin_for?(record)
+  end
+
   def destroy?
     user.global_admin?
   end
