@@ -1,22 +1,20 @@
 import { Controller } from "@hotwired/stimulus"
 
-// The front door's map and country roll, wired together: every event with
-// coordinates is a pin, and hovering, focusing or pressing a country lights the
-// events its students went to. The counts and the pins come from the server
-// (LandingStats) so this controller places and highlights, and decides nothing.
+// The front door's map: every event with coordinates is a pin. The pins come
+// from the server (LandingStats) so this controller places them and decides
+// nothing.
 //
 // Leaflet is imported dynamically — controllers are eager-loaded everywhere and
-// only this page needs it. If it fails to load the roll still works on its own
-// and the frame says so instead of sitting empty.
+// only this page needs it. If it fails to load the sentence still stands on its
+// own and the frame says so instead of sitting empty.
 export default class extends Controller {
-  static targets = ["map", "country", "status"]
+  static targets = ["map"]
   static values = { pins: Array }
 
   static LOADING_DELAY_MS = 400
 
   async connect() {
     this.markers = []
-    this.selected = null
 
     if (this.pinsValue.length === 0) {
       this.renderMessage("No events on the map yet.")
@@ -177,48 +175,6 @@ export default class extends Controller {
       container.appendChild(span)
     }
     return container
-  }
-
-  // --- Country roll ---------------------------------------------------------
-
-  preview(event) {
-    if (this.selected) return
-    this.light(this.pinIndexes(event.currentTarget))
-  }
-
-  unpreview() {
-    if (this.selected) return
-    this.light(null)
-  }
-
-  // Pressing a country keeps its events lit until it is pressed again, so a
-  // keyboard or touch visitor gets the same reading a hover gives a mouse.
-  toggle(event) {
-    const button = event.currentTarget
-    if (this.selected === button) {
-      this.selected = null
-      button.setAttribute("aria-pressed", "false")
-      this.light(null)
-      return
-    }
-    this.selected?.setAttribute("aria-pressed", "false")
-    this.selected = button
-    button.setAttribute("aria-pressed", "true")
-    this.light(this.pinIndexes(button))
-  }
-
-  pinIndexes(button) {
-    const raw = button.dataset.pins
-    return raw ? raw.split(",").map(Number) : []
-  }
-
-  light(indexes) {
-    if (!this.map) return
-    const lit = new Set(indexes || [])
-    this.mapTarget.classList.toggle("is-dimmed", indexes !== null)
-    this.markers.forEach((marker, i) => {
-      marker.getElement()?.querySelector(".landing-pin")?.classList.toggle("is-lit", lit.has(i))
-    })
   }
 
   renderMessage(text) {

@@ -100,7 +100,7 @@
     <% if @total_pages > 1 %>
       <div class="cs-container-footer flex flex-wrap items-center justify-between gap-3">
         <span>
-          Showing <%= (@page - 1) * @per_page + 1 %> to <%= [ (@page * @per_page), @total_count ].min %> of <%= @total_count %> users
+          Showing <%= (@page - 1) * @per_page + 1 %> to <%= [ (@page * @per_page), @total_count ].min %> of <%= pluralize(@total_count, "user") %>
         </span>
         <nav class="cs-pagination" aria-label="Pagination">
           <% if @page > 1 %>

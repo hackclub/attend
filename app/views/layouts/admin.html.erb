@@ -159,6 +159,10 @@
           <%= render "layouts/waiver_dates_banner", event: current_event %>
         <% end %>
 
+        <% if current_event&.arrival_window_missing? %>
+          <%= render "layouts/arrival_window_banner", event: current_event %>
+        <% end %>
+
         <% if current_event %>
           <%= render "layouts/training_banner", event: current_event %>
         <% end %>

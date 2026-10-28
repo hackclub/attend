@@ -90,6 +90,10 @@ module Airtable
     # --- Legacy per-record push (used by PushRecordJob / resync button) ---
 
     def push_participant_event(participant_event)
+      # Withdrawn and rejected registrations are not synced: the full sync
+      # drops them from the CSV, so a one-off push must not put them back.
+      return nil unless participant_event.status.in?(ACTIVE_STATUSES)
+
       fields = serialize_participant_event(participant_event)
 
       if participant_event.airtable_record_id.present?
@@ -122,6 +126,7 @@ module Airtable
 
     def sync_all(event = @event)
       event.participant_events
+           .active
            .includes(*SYNC_INCLUDES)
            .find_each do |pe|
         push_participant_event(pe)
@@ -131,6 +136,8 @@ module Airtable
     end
 
     private
+
+    ACTIVE_STATUSES = (ParticipantEvent.statuses.keys - ParticipantEvent::INACTIVE_STATUSES).freeze
 
     SYNC_INCLUDES = [
       :participant,
@@ -144,6 +151,7 @@ module Airtable
 
     def load_participant_events
       @event.participant_events
+            .active
             .includes(*SYNC_INCLUDES)
             .to_a
     end

@@ -15,7 +15,7 @@
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
         <p class="text-blue-800">
           This will send a DM to <strong><%= @participant_count %></strong> participant<%= @participant_count == 1 ? "" : "s" %> 
-          who have completed onboarding and linked their Slack account.
+          who <%= @participant_count == 1 ? "has" : "have" %> completed onboarding and linked their Slack account.
         </p>
       </div>
 
@@ -33,7 +33,7 @@
           <%= link_to "Cancel", admin_event_dashboard_path(current_event.slug), class: "px-4 py-2 text-gray-700 hover:text-gray-900" %>
           <%= submit_tag "Send Blast", 
               class: "bg-[#d42f46] hover:bg-[#b82840] text-white font-semibold py-2 px-4 rounded-lg cursor-pointer",
-              data: { turbo_confirm: "Are you sure you want to send this message to #{@participant_count} participants?" } %>
+              data: { turbo_confirm: "Are you sure you want to send this message to #{pluralize(@participant_count, "participant")}?" } %>
         </div>
       <% end %>
     <% end %>

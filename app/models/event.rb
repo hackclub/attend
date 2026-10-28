@@ -188,7 +188,9 @@ class Event < ApplicationRecord
     end
   end
   before_update :flag_waiver_dates_stale, if: :local_event_dates_changed?
+  before_save :clear_stale_place_ids, if: :venue_identity_changing?
   after_save :geocode_location, if: :should_geocode?
+  after_save :queue_place_id_resolution, if: :should_resolve_place_ids?
   after_save :send_pending_guardian_invites, if: :guardian_invites_just_unlocked?
   after_save :send_held_onboarding_invites, if: :onboarding_invites_just_released?
   after_save :mark_hotel_scan_context_as_lodging, if: :saved_change_to_hotel_scan_context_id?
@@ -321,6 +323,13 @@ class Event < ApplicationRecord
   # event's timezone, so admins always see and edit event-local times.
   def schedule_time_field_value(attr)
     public_send(attr)&.in_time_zone(event_time_zone)&.strftime("%Y-%m-%dT%H:%M")
+  end
+
+  # Neither end of the arrival window is set, so attendees' dashboards fall
+  # back to "contact the team" copy. Staff get nagged about it on every admin
+  # page for the event until it's filled in or the event is over.
+  def arrival_window_missing?
+    arrival_opens_at.nil? && arrival_closes_at.nil? && !completed?
   end
 
   # One-line "when to arrive" summary for the participant dashboard, in the
@@ -618,6 +627,12 @@ class Event < ApplicationRecord
     { lat: location_latitude.to_f, lon: location_longitude.to_f }
   end
 
+  # Place ids are only looked up by venue name near the coordinates, so
+  # there's nothing to search for without both.
+  def venue_lookup_possible?
+    venue_name.present? && location_latitude.present? && location_longitude.present?
+  end
+
   def logo_displayable?
     return true if logo.attached? && logo.content_type == "image/svg+xml"
 
@@ -813,10 +828,19 @@ class Event < ApplicationRecord
   end
 
   def should_geocode?
-    return false if location_latitude.present? && !location_address_changed?
+    # Coordinates saved alongside the change (the form's autocomplete pick)
+    # are more precise than anything the geocoder would return.
+    return false if saved_change_to_location_latitude? || saved_change_to_location_longitude?
 
-    saved_change_to_venue_name? || saved_change_to_location_address? ||
-      saved_change_to_location_city? || saved_change_to_location_country?
+    if location_latitude.blank?
+      saved_change_to_venue_name? || saved_change_to_location_address? ||
+        saved_change_to_location_city? || saved_change_to_location_country?
+    else
+      # Already pinned: only a new address moves it. (This used to check
+      # location_address_changed?, which is always false after save, so a
+      # pinned event never re-geocoded at all.)
+      saved_change_to_location_address?
+    end
   end
 
   def geocode_location
@@ -838,6 +862,32 @@ class Event < ApplicationRecord
     else
       [ location_city, location_country ].compact.join(", ")
     end
+  end
+
+  def venue_identity_changing?
+    will_save_change_to_venue_name? || will_save_change_to_location_address?
+  end
+
+  # A renamed or moved venue is a different place; drop ids that described
+  # the old one. An id arriving in the same save (the form's autocomplete
+  # pick) is for the new venue and stays.
+  def clear_stale_place_ids
+    self.apple_place_id = nil unless will_save_change_to_apple_place_id?
+    self.google_place_id = nil unless will_save_change_to_google_place_id?
+  end
+
+  def should_resolve_place_ids?
+    return false unless venue_lookup_possible?
+    return false if apple_place_id.present? && google_place_id.present?
+
+    saved_change_to_venue_name? || saved_change_to_location_address? ||
+      saved_change_to_location_latitude? || saved_change_to_location_longitude?
+  end
+
+  # geocode_location runs first and writes coordinates with update_columns,
+  # so by the time this fires the job can read them off the fresh record.
+  def queue_place_id_resolution
+    ResolveVenuePlaceIdsJob.perform_later(id)
   end
 
   def guardian_invites_just_unlocked?

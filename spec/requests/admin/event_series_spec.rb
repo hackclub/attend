@@ -33,7 +33,7 @@ RSpec.describe "Admin::EventSeries", type: :request do
       get admin_series_path(series)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Needs chasing")
+      expect(response.body).to include("Participant funnel")
       expect(response.body).to include("How far participants have got")
       expect(response.body).to include("Venue locations")
       # The map duplicates the events list, so it must not claim the keyboard.
@@ -65,6 +65,29 @@ RSpec.describe "Admin::EventSeries", type: :request do
       expect(response.body).to include("cleared every stage")
       # The KPI strip that repeated all four of these figures is gone.
       expect(response.body).not_to include("fully cleared")
+    end
+
+    it "searches the events table by name or location" do
+      sub_event.update!(name: "Sunbeam Lisbon")
+      create(:event, event_series: series, name: "Sunbeam Oslo", location_city: "Oslo")
+      sign_in owner
+
+      get admin_series_path(series, events_search: "oslo")
+
+      expect(response.body).to include("Sunbeam Oslo")
+      expect(response.body).not_to include("series-event-#{sub_event.id}")
+    end
+
+    it "pages the events table" do
+      create_list(:event, 21, event_series: series)
+      sign_in owner
+
+      get admin_series_path(series)
+      expect(response.body).to include("Showing 1 to 20 of 22 events")
+
+      get admin_series_path(series, events_page: 2)
+      expect(response.body).to include("Showing 21 to 22 of 22 events")
+      expect(response.body.scan(/id="series-event-/).length).to eq(2)
     end
 
     it "says so plainly when nothing needs chasing" do

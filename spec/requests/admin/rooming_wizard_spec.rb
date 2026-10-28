@@ -230,4 +230,49 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
       expect(response.body).not_to include("Main 101")
     end
   end
+
+  describe "GET finalize" do
+    let(:stay) { event.main_rooming_context }
+    let(:room) { stay.rooms.create!(capacity: 3) }
+
+    def tokens
+      Nokogiri::HTML(response.body).css("span.rounded-full").to_h { |token| [ token.text[/\A\s*(\S+)/, 1], token[:class] ] }
+    end
+
+    def roomed(first_name)
+      create(:participant_event, event: event, participant: create(:participant, legal_first_name: first_name)).tap do |pe|
+        RoomAssignment.create!(room: room, participant_event: pe)
+      end
+    end
+
+    it "shows people scanned at the stay's own check-in point as arrived" do
+      other_hotel = event.scan_contexts.create!(name: "Other hotel", kind: "lodging")
+      arrived = roomed("Arrived")
+      elsewhere = roomed("Elsewhere")
+      Scan.create!(participant_event: arrived, scan_context: stay.scan_context, user: admin, scanned_at: Time.current)
+      Scan.create!(participant_event: elsewhere, scan_context: other_hotel, user: admin, scanned_at: Time.current)
+
+      get finalize_admin_event_rooming_wizard_path(event.slug)
+
+      expect(response).to have_http_status(:ok)
+      expect(tokens.fetch("Arrived")).to include("bg-green-100")
+      expect(tokens.fetch("Elsewhere")).not_to include("bg-green-100")
+    end
+
+    it "falls back to any Lodging point for a stay without its own" do
+      stay.scan_context.destroy!
+      lodging = event.scan_contexts.create!(name: "Hotel lobby", kind: "lodging")
+      lunch = event.scan_contexts.create!(name: "Lunch", kind: "tracking_only")
+      arrived = roomed("Arrived")
+      lunching = roomed("Lunching")
+      Scan.create!(participant_event: arrived, scan_context: lodging, user: admin, scanned_at: Time.current)
+      Scan.create!(participant_event: lunching, scan_context: lunch, user: admin, scanned_at: Time.current)
+
+      get finalize_admin_event_rooming_wizard_path(event.slug)
+
+      expect(response).to have_http_status(:ok)
+      expect(tokens.fetch("Arrived")).to include("bg-green-100")
+      expect(tokens.fetch("Lunching")).not_to include("bg-green-100")
+    end
+  end
 end

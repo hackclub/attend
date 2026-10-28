@@ -217,8 +217,20 @@ RSpec.describe "Onboarding invitations held", type: :request do
 
       get admin_series_path(series)
 
-      expect(response.body).to include("invitation haven't been accepted yet")
+      expect(response.body).to include("invitation hasn't been accepted yet")
       expect(response.body).not_to include("2 invitations haven't been accepted yet")
+    end
+
+    it "counts held invitations in the participant funnel and tucks the per-event list behind a toggle" do
+      create(:invitation, event: event, sent_at: nil)
+      create(:invitation, event: other_event, sent_at: nil)
+      sign_in owner
+
+      get admin_series_path(series)
+
+      expect(response.body).to include("invitations haven't been sent yet")
+      expect(response.body).to match(/<details[^>]*data-testid="series-held-invitations-list"/)
+      expect(response.body).not_to match(/<details[^>]*data-testid="series-held-invitations-list"[^>]*open/)
     end
 
     it "hides the panel from a series that doesn't use the hold" do

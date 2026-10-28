@@ -34,25 +34,11 @@
  * kit's `components` layer sits above preflight and below utilities. */
 @layer theme, base, components, utilities;
 
-@font-face {
-  font-family: "Open Sans";
-  src: url("/open-sans-normal.woff2") format("woff2");
-  font-weight: 300 800;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Open Sans";
-  src: url("/open-sans-italic.woff2") format("woff2");
-  font-weight: 300 800;
-  font-style: italic;
-  font-display: swap;
-}
-
 /* ---------- tokens: light ---------- */
 :root.cs-console {
-  --cs-font: "Open Sans", "Helvetica Neue", Roboto, Arial, sans-serif;
+  /* Same system stack as the rest of the app (Tailwind's default), so the
+   * console reads like the old admin and loads no webfont. */
+  --cs-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --cs-font-mono: Monaco, Menlo, Consolas, "Courier Prime", Courier, monospace;
 
   --cs-bg-page: #ffffff;
@@ -99,6 +85,16 @@
   --cs-badge-blue: #006ce0;
   --cs-badge-red: #db0000;
   --cs-badge-on: #f9f9fa;
+
+  /* tinted icon discs on the dashboard's quick actions */
+  --cs-tint-red-bg: #ffe5e9;    --cs-tint-red-fg: #c8283f;
+  --cs-tint-indigo-bg: #e0e7ff; --cs-tint-indigo-fg: #4338ca;
+  --cs-tint-sky-bg: #e0f2fe;    --cs-tint-sky-fg: #0369a1;
+  --cs-tint-teal-bg: #ccfbf1;   --cs-tint-teal-fg: #0f766e;
+  --cs-tint-amber-bg: #fef3c7;  --cs-tint-amber-fg: #b45309;
+  --cs-tint-purple-bg: #f3e8ff; --cs-tint-purple-fg: #7e22ce;
+  --cs-tint-green-bg: #d1fae5;  --cs-tint-green-fg: #047857;
+  --cs-tint-grey-bg: #ebebf0;   --cs-tint-grey-fg: #424650;
 
   /* the top navigation is dark in both modes */
   --cs-topnav-bg: #0f141a;
@@ -215,6 +211,15 @@
   --cs-inactive: #a4a4ad;
 
   --cs-badge-grey: #656871;
+
+  --cs-tint-red-bg: #3d121c;    --cs-tint-red-fg: #ff7a8a;
+  --cs-tint-indigo-bg: #1e1b4b; --cs-tint-indigo-fg: #a5b4fc;
+  --cs-tint-sky-bg: #0c2a45;    --cs-tint-sky-fg: #7dd3fc;
+  --cs-tint-teal-bg: #042f2e;   --cs-tint-teal-fg: #5eead4;
+  --cs-tint-amber-bg: #3b2305;  --cs-tint-amber-fg: #fcd34d;
+  --cs-tint-purple-bg: #2e1065; --cs-tint-purple-fg: #d8b4fe;
+  --cs-tint-green-bg: #052e16;  --cs-tint-green-fg: #6ee7b7;
+  --cs-tint-grey-bg: #232b37;   --cs-tint-grey-fg: #c6c6cd;
 
   --cs-topnav-bg: #0a0e12;
   --cs-topnav-border: #232b37;
@@ -2859,4 +2864,56 @@
   }
 
   .cs-inline-edit-row + .cs-field-error { white-space: normal; max-width: 280px; }
+}
+
+/* Quick actions: the old dashboard's grid of coloured icon tiles, redrawn
+ * on kit tokens so it reads the same in both modes. */
+@layer components {
+  .cs-quick-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
+  }
+
+  .cs-quick-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 8px;
+    border: 1px solid var(--cs-border-divider-secondary);
+    border-radius: var(--cs-radius-item);
+    background-color: var(--cs-bg-container);
+    color: var(--cs-text-body);
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 700;
+    text-align: center;
+    text-decoration: none;
+    transition: border-color 90ms linear, background-color 90ms linear;
+
+    &:hover { border-color: var(--cs-accent); background-color: var(--cs-bg-hover); color: var(--cs-accent); }
+  }
+
+  .cs-quick-action-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 9999px;
+    background-color: var(--cs-tint-bg, var(--cs-bg-shaded));
+    color: var(--cs-tint-fg, var(--cs-text-secondary));
+
+    > svg { width: 20px; height: 20px; }
+  }
+
+  .cs-tint-red { --cs-tint-bg: var(--cs-tint-red-bg); --cs-tint-fg: var(--cs-tint-red-fg); }
+  .cs-tint-indigo { --cs-tint-bg: var(--cs-tint-indigo-bg); --cs-tint-fg: var(--cs-tint-indigo-fg); }
+  .cs-tint-sky { --cs-tint-bg: var(--cs-tint-sky-bg); --cs-tint-fg: var(--cs-tint-sky-fg); }
+  .cs-tint-teal { --cs-tint-bg: var(--cs-tint-teal-bg); --cs-tint-fg: var(--cs-tint-teal-fg); }
+  .cs-tint-amber { --cs-tint-bg: var(--cs-tint-amber-bg); --cs-tint-fg: var(--cs-tint-amber-fg); }
+  .cs-tint-purple { --cs-tint-bg: var(--cs-tint-purple-bg); --cs-tint-fg: var(--cs-tint-purple-fg); }
+  .cs-tint-green { --cs-tint-bg: var(--cs-tint-green-bg); --cs-tint-fg: var(--cs-tint-green-fg); }
+  .cs-tint-grey { --cs-tint-bg: var(--cs-tint-grey-bg); --cs-tint-fg: var(--cs-tint-grey-fg); }
 }

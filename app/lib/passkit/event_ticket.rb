@@ -214,12 +214,60 @@ module Passkit
       ]
     end
 
+    # Trust & Safety line, also quoted in the emergency back field.
+    SAFETY_PHONE_URL = "tel://+18556254225".freeze
+
+    # Keys outside the passkit gem's vocabulary, merged into pass.json by
+    # PasskitGeneratorExtensions. Blank values are dropped there.
+    def additional_pass_keys
+      {
+        # Wallet validates schemes in order and renders the first that fits,
+        # so iOS 17 and anything missing artwork still gets the classic layout.
+        preferredStyleSchemes: %w[posterEventTicket eventTicket],
+        eventLogoText: event.name,
+        featuredActions: featured_actions,
+        directionsInformationURL: apple_maps_url,
+        contactVenueEmail: event.effective_support_email
+      }
+    end
+
+    # iOS 27 draws up to two of these as tiles under the pass, in array
+    # order. Directions comes first when we know the venue's Apple Maps
+    # place; the safety line is always there.
+    def featured_actions
+      actions = []
+      if event.apple_place_id.present?
+        actions << { identifier: "directions", type: "place", placeIdentifier: event.apple_place_id }
+      end
+      actions << { identifier: "safety-call", type: "call", url: SAFETY_PHONE_URL }
+      actions
+    end
+
+    # Most venues never get an Apple place id (Apple's POI coverage is patchy
+    # outside the US), so fall back to a coordinate link: the pass keeps a
+    # working directions link and only the iOS 27 tile needs the id.
+    def apple_maps_url
+      if event.apple_place_id.present?
+        "https://maps.apple.com/place?place-id=#{event.apple_place_id}"
+      elsif event.location_latitude.present? && event.location_longitude.present?
+        query = { ll: "#{event.location_latitude.to_f},#{event.location_longitude.to_f}", q: event.venue_name.presence || event.name }
+        "https://maps.apple.com/?#{query.to_query}"
+      end
+    end
+
     def semantics
       tags = {
         eventName: event.name,
         eventType: "PKEventTypeConvention",
         attendeeName: attendee_display_name
       }
+
+      if event.freedom_waivers_enabled?
+        # Staff read this at the door, so the negative is spelled out rather
+        # than implied by a generic level.
+        tags[:admissionLevel] = freedom_waiver_granted? ? "Freedom Waiver" : "No Freedom Waiver"
+        tags[:admissionLevelAbbreviation] = freedom_waiver_granted? ? "FW ✓" : "NO FW"
+      end
 
       if event.starts_at.present?
         tags[:eventStartDate] = event.starts_at.iso8601
@@ -247,22 +295,43 @@ module Passkit
       @file_name ||= SecureRandom.uuid
     end
 
-    # Replace the default strip images with the event's banner (falling back
-    # to its series' banner), if one is set.
-    # Sizes match the shipped strip.png/strip@2x.png in private/passkit/event_ticket.
-    def add_other_files(path)
-      banner = event.effective_banner
-      return unless banner
+    # Strip sizes are what Apple's Pass Designer validates event tickets
+    # against (375x144pt) and match the shipped defaults in
+    # private/passkit/event_ticket. Artwork and background are what the poster
+    # event ticket layout needs (480x340pt, as the designer exports them);
+    # without both, Wallet falls back to the classic layout.
+    BANNER_IMAGES = {
+      "strip.png" => [ 375, 144 ], "strip@2x.png" => [ 750, 288 ], "strip@3x.png" => [ 1125, 432 ],
+      "artwork@2x.png" => [ 960, 680 ], "artwork@3x.png" => [ 1440, 1020 ],
+      "background@2x.png" => [ 960, 680 ], "background@3x.png" => [ 1440, 1020 ]
+    }.freeze
+    # Poster layout logos: primaryLogo is the square mark next to
+    # eventLogoText (48x48pt), secondaryLogo the wide one in the footer
+    # (160x50pt, same bounds as the classic logo).
+    LOGO_IMAGES = {
+      "primaryLogo@2x.png" => [ 96, 96 ], "primaryLogo@3x.png" => [ 144, 144 ],
+      "secondaryLogo@2x.png" => [ 320, 100 ], "secondaryLogo@3x.png" => [ 480, 150 ]
+    }.freeze
 
-      { "strip.png" => [ 750, 246 ], "strip@2x.png" => [ 1500, 492 ] }.each do |name, size|
-        variant = banner.variant(resize_to_fill: size, format: :png).processed
-        File.binwrite(File.join(path, name), variant.download)
-      end
-    rescue StandardError => e
-      Rails.logger.error("Passkit: failed to render event banner strip, using default: #{e.message}")
+    # Render the event's banner and logo (falling back to its series') into
+    # the pass bundle. Any failure leaves the shipped defaults in place.
+    def add_other_files(path)
+      write_variants(path, event.effective_banner, BANNER_IMAGES, :resize_to_fill)
+      write_variants(path, event.effective_logo, LOGO_IMAGES, :resize_to_fit)
     end
 
     private
+
+    def write_variants(path, attachment, images, mode)
+      return unless attachment
+
+      images.each do |name, size|
+        variant = attachment.variant(mode => size, format: :png).processed
+        File.binwrite(File.join(path, name), variant.download)
+      end
+    rescue StandardError => e
+      Rails.logger.error("Passkit: failed to render #{images.keys.first.split('@').first} images, using defaults: #{e.message}")
+    end
 
     def folder_name
       "event_ticket"

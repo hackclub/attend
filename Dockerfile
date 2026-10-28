@@ -62,8 +62,12 @@ FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
 # Rails app lives here
 WORKDIR /rails
 
-# Install base packages
+# Install base packages. The upgrade pulls trixie-security fixes into packages
+# the pinned ruby image already ships (or that a cached layer froze), e.g.
+# libbrotli1 1.1.0-2 -> 1.1.0-2+deb13u1 for CVE-2026-111497, an out-of-bounds
+# write in the brotli decoder.
 RUN apt-get update -qq && \
+    apt-get upgrade -y --no-install-recommends && \
     apt-get install --no-install-recommends -y curl libjemalloc2 libvips libde265-0 libdav1d7 postgresql-client && \
     ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives

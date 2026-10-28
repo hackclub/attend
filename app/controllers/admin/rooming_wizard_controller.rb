@@ -126,7 +126,7 @@ module Admin
       @rooming_plan.update!(status: :auto_assigned)
 
       redirect_to assignments_admin_event_rooming_wizard_path(@event.slug),
-        notice: "Auto-assignment complete. #{result[:assigned]} participants assigned, #{result[:unassigned]} unassigned."
+        notice: "Auto-assignment complete. #{helpers.pluralize(result[:assigned], "participant")} assigned, #{result[:unassigned]} unassigned."
     end
 
     def manual_assign
@@ -332,8 +332,14 @@ module Admin
     def finalize
       @rooms = @rooming_context.rooms.includes(:event, room_assignments: { participant_event: [ :event, :participant, :accommodation, :scans ] }).order(:name, :created_at).load
       @stats = calculate_finalize_stats
-      # Arrivals for this stay are scanned at its own check-in point.
-      @hotel_scan_context = @rooming_context.scan_context
+      # Arrivals for this stay are scanned at its own check-in point, so a scan
+      # at another stay's hotel doesn't count. A stay without one falls back to
+      # any Lodging point.
+      @lodging_scan_context_ids = if @rooming_context.scan_context_id
+        Set[@rooming_context.scan_context_id]
+      else
+        @event.scan_contexts.lodging.ids.to_set
+      end
     end
 
     def do_finalize

@@ -163,6 +163,18 @@ RSpec.describe SeriesDashboard do
 
   # Ordering by starts_at alone buries the event that is running right now under
   # every future one, which is the last thing the person opening this page wants.
+  describe "Stage#chase_for" do
+    it "puts the opening verb in the singular for one participant" do
+      stages = SeriesDashboard::STAGES + [ SeriesDashboard::ARRIVAL_STAGE ]
+
+      stages.each do |stage|
+        expect(stage.chase_for(2)).to eq(stage.chase)
+        expect(stage.chase_for(1)).not_to match(/\A(haven't|have|are)\b/)
+      end
+      expect(SeriesDashboard::ARRIVAL_STAGE.chase_for(1)).to eq("has arrived but not been checked in")
+    end
+  end
+
   describe ".order_events" do
     it "puts live events first, then upcoming, then undated drafts, then the past" do
       live = create(:event, event_series: series, name: "Live", starts_at: 1.day.ago, ends_at: 2.days.from_now)

@@ -106,6 +106,7 @@
     </div>
     <%= f.hidden_field :location_latitude, id: "venue-latitude" %>
     <%= f.hidden_field :location_longitude, id: "venue-longitude" %>
+    <%= f.hidden_field :google_place_id, id: "venue-google-place-id" %>
   </div>
 
   <script nonce="<%= content_security_policy_nonce %>">
@@ -130,6 +131,9 @@
         if (place.geometry) {
           document.getElementById('venue-latitude').value = place.geometry.location.lat();
           document.getElementById('venue-longitude').value = place.geometry.location.lng();
+        }
+        if (place.place_id) {
+          document.getElementById('venue-google-place-id').value = place.place_id;
         }
         if (place.formatted_address) {
           input.value = place.formatted_address;
@@ -166,7 +170,7 @@
     </div>
   </div>
 
-  <div class="bg-white border border-gray-200 rounded-lg p-6">
+  <div id="arrival-window" class="bg-white border border-gray-200 rounded-lg p-6">
     <h2 class="text-lg font-semibold mb-4">Arrival Window</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div>
@@ -192,20 +196,6 @@
       </div>
     </div>
   </div>
-
-  <% if event.persisted? && event.scan_contexts.any? %>
-    <div class="bg-white border border-gray-200 rounded-lg p-6">
-      <h2 class="text-lg font-semibold mb-4">Rooming</h2>
-      <div>
-        <%= f.label :hotel_scan_context_id, "Hotel Scan Context", class: "block text-sm font-medium text-gray-700" %>
-        <%= f.select :hotel_scan_context_id, 
-            event.scan_contexts.map { |c| [c.name, c.id] },
-            { include_blank: "None", selected: event.hotel_scan_context_id },
-            class: "mt-1 block w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
-        <p class="mt-1 text-sm text-gray-500">Select the scanning context used for hotel check-in. Participants with this scan will show as green on the rooming finalize page.</p>
-      </div>
-    </div>
-  <% end %>
 
   <div class="bg-white border border-gray-200 rounded-lg p-6">
     <h2 class="text-lg font-semibold mb-4">Event Options</h2>

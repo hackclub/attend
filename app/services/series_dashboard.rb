@@ -13,7 +13,18 @@
 # preloaded pass over the series' participant_events; the controller wraps this
 # in a short-lived cache so a reload of an active series is cheap.
 class SeriesDashboard
-  Stage = Struct.new(:key, :label, :chase, :filter, keyword_init: true)
+  SINGULAR_VERBS = { "haven't" => "hasn't", "have" => "has", "are" => "is" }.freeze
+
+  Stage = Struct.new(:key, :label, :chase, :filter, keyword_init: true) do
+    # `chase` is written for "participants ..."; one participant needs the
+    # verb that opens it in the singular.
+    def chase_for(count)
+      return chase unless count == 1
+
+      verb, rest = chase.split(" ", 2)
+      [ SINGULAR_VERBS.fetch(verb, verb), rest ].join(" ")
+    end
+  end
 
   # The funnel spine, in the order a participant actually clears it. This
   # mirrors ParticipantEvent#compute_onboarding_progress; STEP_TO_STAGE maps its
@@ -81,7 +92,7 @@ class SeriesDashboard
   STAGE_INDEX = STAGES.each_with_index.to_h { |stage, i| [ stage.key, i ] }.freeze
 
   # Onboarding is done with these; they are not people anyone chases.
-  INACTIVE_STATUSES = %w[withdrawn rejected].freeze
+  INACTIVE_STATUSES = ParticipantEvent::INACTIVE_STATUSES
 
   # The order a series lead needs to read the events in: the one running right
   # now, then the one they are about to run, then undated drafts, then history

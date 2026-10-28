@@ -321,7 +321,7 @@
                       <% end %>
                     </div>
                   <% end %>
-                  <p class="text-sm text-gray-500"><%= @airtable_participant_count %> participant records will be synced</p>
+                  <p class="text-sm text-gray-500"><%= pluralize(@airtable_participant_count, "participant record") %> will be synced</p>
                   <p class="text-xs text-gray-400">
                     <% if @airtable_sync_paused %>
                       Automatic syncing is stopped until these settings are saved again

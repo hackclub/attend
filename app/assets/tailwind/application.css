@@ -240,7 +240,7 @@
    * utility back to --accent outside light; a CSS layer has no such escape.
    * Deriving from --accent instead lands on #d43248 in light — one or two
    * steps off the rule's #d42f46, indistinguishable — and clears AA (4.83:1)
-   * everywhere. Hover lands on the rule's --accent-deep (#b82840, 6.35:1). */
+   * everywhere. Hover lands on the rule's deepened #b82840 (6.35:1). */
   .portal-btn-primary {
     background-color: color-mix(in oklab, var(--accent) 90%, black);
     color: var(--accent-on);
@@ -820,7 +820,7 @@
 /* ------------------------------------------------------------------------
  * Landing page: the signed-out front door.
  *
- * One sentence of live numbers, a roll-call of countries, and a map. The map
+ * One sentence of live numbers and a map of every event. The map
  * sits on OpenStreetMap tiles, which are light under every app theme, so the
  * pins use fixed hex like the series map does; everything the app paints
  * around it resolves through theme tokens.
@@ -874,7 +874,7 @@
     min-height: 2.75rem;
     padding: 0.625rem 1.125rem;
     border-radius: 6px;
-    background-color: var(--accent-fill, var(--accent-strong));
+    background-color: var(--accent-fill, var(--accent));
     color: var(--accent-on);
     font-size: 0.875rem;
     font-weight: 700;
@@ -882,8 +882,14 @@
     transition: background-color 150ms ease;
   }
 
+  /* --accent-fill / --accent-fill-hover exist in light, dark and
+   * solarized-dark; the other themes clear AA on --accent itself and hover
+   * to --accent-strong, matching the .bg-[#d42f46] remap in themes.css.
+   * Never fall back to a token no theme declares (--accent-deep is a
+   * DESIGN.md name, not a CSS variable): an unresolved var() makes the
+   * whole declaration invalid and the fill goes transparent on hover. */
   .landing-cta:hover {
-    background-color: var(--accent-fill-hover, var(--accent-deep));
+    background-color: var(--accent-fill-hover, var(--accent-strong));
   }
 
   .landing-cta:focus-visible {
@@ -923,8 +929,7 @@
     .landing-grid {
       grid-template-columns: minmax(0, 1fr) minmax(24rem, 50%);
       grid-template-areas:
-        "copy map"
-        "roll map";
+        "copy map";
       column-gap: 3rem;
       row-gap: 2.5rem;
       align-items: start;
@@ -932,8 +937,7 @@
     }
 
     .landing-copy { grid-area: copy; }
-    .landing-map-column { grid-area: map; position: sticky; top: 1.5rem; }
-    .landing-roll-section { grid-area: roll; }
+    .landing-map-column { grid-area: map; }
   }
 
   .landing-sentence {
@@ -955,8 +959,7 @@
     margin-top: 2rem;
   }
 
-  /* Same voice as the roll's heading below, so the page has one kind of
-   * section title. */
+  /* The page's one kind of section title. */
   .landing-actions-label {
     margin-bottom: 0.75rem;
     font-size: 0.875rem;
@@ -1136,15 +1139,6 @@
     box-shadow: none;
   }
 
-  .landing-map.is-dimmed .landing-pin {
-    opacity: 0.22;
-  }
-
-  .landing-map.is-dimmed .landing-pin.is-lit {
-    opacity: 1;
-    transform: scale(1.5);
-  }
-
   /* The one authored moment: past events arrive in date order, so first paint
    * replays the history. Delays are set per pin by the controller. */
   @media (prefers-reduced-motion: no-preference) {
@@ -1169,109 +1163,6 @@
   @keyframes landing-pin-pulse {
     0% { box-shadow: 0 0 0 0 rgba(236, 55, 80, 0.55); }
     100% { box-shadow: 0 0 0 14px rgba(236, 55, 80, 0); }
-  }
-
-  /* --- country roll ----------------------------------------------------- */
-
-  .landing-roll-section {
-    border-top: 1px solid var(--border-card);
-    padding-top: 1.25rem;
-  }
-
-  .landing-roll-heading {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    column-gap: 0.75rem;
-    row-gap: 0.125rem;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--text-strong);
-    margin-bottom: 0.75rem;
-  }
-
-  .landing-roll-hint {
-    font-weight: 500;
-    color: var(--text-soft);
-  }
-
-  .landing-roll {
-    column-count: 2;
-    column-gap: 1.5rem;
-    column-rule: 1px solid var(--border-soft);
-  }
-
-  @media (min-width: 640px) {
-    .landing-roll { column-count: 3; column-gap: 2rem; }
-  }
-
-  /* Three columns is where "United Arab Emirates" still fits on one line
-   * beside the half-width map; the roll grows downward instead. */
-  @media (min-width: 1024px) {
-    .landing-roll { column-count: 3; }
-  }
-
-  .landing-roll li {
-    break-inside: avoid;
-  }
-
-  /* 44px tall on phones, where the roll is tapped; beside the map on a
-   * desktop it tightens back to the text. */
-  .landing-country {
-    display: flex;
-    width: 100%;
-    min-height: 2.75rem;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.4375rem 0.25rem;
-    border-bottom: 1px solid var(--border-soft);
-    border-radius: 4px;
-    font-size: 0.875rem;
-    line-height: 1.4;
-    text-align: left;
-    cursor: pointer;
-    transition: color 150ms ease, background-color 150ms ease;
-  }
-
-  @media (min-width: 1024px) {
-    .landing-country { min-height: 0; }
-  }
-
-  .landing-country-name {
-    min-width: 0;
-    overflow-wrap: anywhere;
-    font-weight: 600;
-    color: var(--text-strong);
-  }
-
-  .landing-country-count {
-    font-variant-numeric: tabular-nums;
-    color: var(--text-soft);
-  }
-
-  .landing-country:hover,
-  .landing-country[aria-pressed="true"] {
-    background-color: var(--accent-soft);
-  }
-
-  .landing-country:hover .landing-country-name,
-  .landing-country[aria-pressed="true"] .landing-country-name,
-  .landing-country[aria-pressed="true"] .landing-country-count {
-    color: var(--accent);
-  }
-
-  .landing-country:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
-  }
-  .landing-country--static,
-  .landing-country--static:hover {
-    cursor: default;
-    background-color: transparent;
-  }
-  .landing-country--static:hover .landing-country-name {
-    color: inherit;
   }
 
   .landing-dev {

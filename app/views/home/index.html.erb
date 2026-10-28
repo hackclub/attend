@@ -5,7 +5,7 @@
     <h1 class="text-2xl font-semibold mb-4">Welcome back</h1>
     <p class="text-(--text-soft) mb-8">You're signed in as <%= current_user.email %></p>
     <%= link_to "Go to Dashboard", dashboard_path,
-          class: "bg-(--accent-strong) hover:bg-(--accent-deep) text-[var(--accent-on)] font-medium py-2.5 px-6 rounded-md transition-colors" %>
+          class: "bg-[#d42f46] hover:bg-[#b82840] text-[var(--accent-on)] font-medium py-2.5 px-6 rounded-md transition-colors" %>
   </div>
 <% else %>
   <% content_for :full_bleed, true %>
@@ -84,35 +84,6 @@
           </div>
         </div>
       </aside>
-
-      <section class="landing-roll-section" aria-labelledby="landing-roll-heading">
-        <h2 id="landing-roll-heading" class="landing-roll-heading">
-          Students by country of residence
-          <span class="landing-roll-hint">Choose a country to see where its students went.</span>
-        </h2>
-        <ol class="landing-roll">
-          <% @landing[:roll].each do |row| %>
-            <li>
-              <% if row[:pins].any? %>
-                <button type="button"
-                        class="landing-country"
-                        aria-pressed="false"
-                        data-pins="<%= row[:pins].join(",") %>"
-                        data-action="mouseenter->landing-map#preview mouseleave->landing-map#unpreview focus->landing-map#preview blur->landing-map#unpreview click->landing-map#toggle">
-                  <span class="landing-country-name"><%= row[:name] %></span>
-                  <span class="landing-country-count"><%= number_with_delimiter(row[:students]) %></span>
-                </button>
-              <% else %>
-                <%# Too few students to point at their events (see LandingStats). %>
-                <div class="landing-country landing-country--static">
-                  <span class="landing-country-name"><%= row[:name] %></span>
-                  <span class="landing-country-count"><%= number_with_delimiter(row[:students]) %></span>
-                </div>
-              <% end %>
-            </li>
-          <% end %>
-        </ol>
-      </section>
     </div>
 
     <% if Rails.env.development? %>

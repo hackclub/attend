@@ -547,6 +547,10 @@ Rails.application.routes.draw do
   end
 
   namespace :api do
+    # GDPR deletion and export, called by the Hack Club privacy hub. See app/services/privacy/README.md.
+    post "privacy/delete", to: "privacy#delete"
+    post "privacy/export", to: "privacy#export"
+
     namespace :v1 do
       resources :webhooks, only: [] do
         collection do
@@ -576,6 +580,14 @@ Rails.application.routes.draw do
       end
 
       resources :events, only: [ :index ]
+
+      # Participant-facing: organizer messages delivered to the current user,
+      # keyed by message id. The organizer side is events/:id/messages.
+      resources :messages, only: [ :index, :show ], controller: "inbox_messages"
+
+      # The confidential report form (/incident) for a signed-in user.
+      get "incident_reports/options", to: "incident_reports#options"
+      post "incident_reports", to: "incident_reports#create"
 
       # Global-admin only: who someone is and which events they run, by Slack ID.
       get "users/lookup", to: "users#lookup"
@@ -617,6 +629,8 @@ Rails.application.routes.draw do
             get :roster
           end
           resources :notes, only: [ :index, :create ], controller: "notes"
+          # Global-admin only: the outcome of an on-device passport/ID card check.
+          resources :id_checks, only: [ :create ], controller: "id_checks"
         end
         resources :scan_contexts, only: [ :index ]
         resources :scans, only: [ :index, :create, :destroy ]
@@ -628,6 +642,30 @@ Rails.application.routes.draw do
         resource :travel, only: [ :show ], controller: "travel_calendar"
         resource :airport_mode, only: [ :show ], controller: "airport_mode"
         resources :slack_blasts, only: [ :index, :show, :create ]
+
+        resources :incidents, only: [ :index, :show, :create, :update ] do
+          collection do
+            get :options
+          end
+          member do
+            post :escalate
+          end
+          resources :comments, only: [ :create ], controller: "incident_comments"
+        end
+
+        resources :messages, only: [ :index, :show, :create, :update, :destroy ] do
+          collection do
+            get :options
+          end
+          member do
+            get :preview
+            post :send_now
+            post :cancel
+            post :retry_failed
+            post :retry_delivery
+            post :send_to_new_recipients
+          end
+        end
 
         resources :participant_events, only: [] do
           resource :nfc_badge, only: [], controller: "nfc_badges" do

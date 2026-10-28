@@ -153,7 +153,7 @@
     </div>
   </section>
 
-  <section class="cs-container">
+  <section id="arrival-window" class="cs-container">
     <div class="cs-container-header">
       <div>
         <h2 class="cs-h2">Arrival window</h2>
@@ -171,23 +171,6 @@
       </div>
     </div>
   </section>
-
-  <% if event.persisted? && event.scan_contexts.any? %>
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <h2 class="cs-h2">Rooming</h2>
-      </div>
-      <div class="cs-container-body">
-        <%= cs_form_field f, :hotel_scan_context_id, label: "Hotel scan context", optional: true, error_keys: [ :hotel_scan_context ],
-              constraint: "The scan context used for hotel check-in. Participants with this scan show as green on the rooming finalize page." do |aria| %>
-          <%= f.select :hotel_scan_context_id,
-              event.scan_contexts.map { |c| [c.name, c.id] },
-              { include_blank: "None", selected: event.hotel_scan_context_id },
-              class: "cs-select", **aria %>
-        <% end %>
-      </div>
-    </section>
-  <% end %>
 
   <section class="cs-container">
     <div class="cs-container-header">

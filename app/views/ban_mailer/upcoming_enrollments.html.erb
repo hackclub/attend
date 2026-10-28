@@ -1,5 +1,5 @@
 <p>
-  These people are on the Attend ban list but still enrolled in events that
+  <%= @by_participant.size == 1 ? "This person is" : "These people are" %> on the Attend ban list but still enrolled in events that
   haven't ended. The ban only blocks new adds, so review and withdraw them by hand.
 </p>
 

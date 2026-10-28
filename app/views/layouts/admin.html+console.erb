@@ -36,7 +36,6 @@
 
     <link rel="icon" href="/icon-32.png?v=3" type="image/png" sizes="32x32">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3">
-    <link rel="preload" href="<%= asset_path("open-sans-normal.woff2") %>" as="font" type="font/woff2" crossorigin>
 
     <%= stylesheet_link_tag "application", "console", "tailwind", "hackclub", "themes", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
@@ -84,9 +83,9 @@
         </div>
 
         <% if show_participant_dashboard_link? %>
-          <%= link_to dashboard_path, class: "cs-topnav-utility flex-shrink-0", aria: { label: "My dashboard" } do %>
+          <%= link_to dashboard_path, class: "cs-topnav-utility flex-shrink-0", aria: { label: "My events" } do %>
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-            <span class="hidden md:inline">My dashboard</span>
+            <span class="hidden md:inline">My events</span>
           <% end %>
         <% end %>
 
@@ -169,6 +168,9 @@
           <% end %>
 
           <main class="cs-main" id="main" data-controller="cs-date-picker">
+            <% if current_event&.arrival_window_missing? %>
+              <%= render "layouts/arrival_window_banner", event: current_event %>
+            <% end %>
             <% if current_event %>
               <%= render "layouts/training_banner", event: current_event %>
             <% end %>

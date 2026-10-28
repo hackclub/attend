@@ -210,4 +210,21 @@ RSpec.describe "Registration corrections", type: :request do
       expect(response).to have_http_status(:ok)
     end
   end
+
+  it "lets a participant add health details over a saved nothing to add" do
+    participant_event.create_medical!(section_response: :nothing_to_add)
+    participant_event.create_dietary!(section_response: :nothing_to_add)
+    participant_event.create_accessibility!(section_response: :nothing_to_add)
+
+    patch dashboard_event_correction_path(participant_event, section: "health"), params: {
+      medical: { has_anaphylaxis_risk: "1", requires_refrigeration: "0" },
+      dietary: { diet_type: "vegan" },
+      accessibility: { uses_wheelchair: "1" }
+    }
+
+    expect(response).to redirect_to(dashboard_event_path(participant_event))
+    expect(participant_event.medical.reload).to have_attributes(has_anaphylaxis_risk: true, section_response: "details")
+    expect(participant_event.dietary.reload).to have_attributes(diet_type: "vegan", section_response: "details")
+    expect(participant_event.accessibility.reload).to have_attributes(uses_wheelchair: true, section_response: "details")
+  end
 end

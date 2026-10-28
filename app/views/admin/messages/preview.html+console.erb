@@ -98,7 +98,7 @@
               <%= @message.body_as_plain %>
             </div>
             <p class="cs-small cs-muted mt-2 text-right">
-              <%= @message.body_as_plain.length %> characters
+              <%= pluralize(@message.body_as_plain.length, "character") %>
               <% if @message.body_as_plain.length > 160 %>
                 <%= cs_status(:warning, "(~#{(@message.body_as_plain.length / 160.0).ceil} segments)") %>
               <% end %>
@@ -129,7 +129,7 @@
       <% else %>
         <%= button_to "Send now", send_now_admin_event_message_path(current_event, @message),
             method: :post,
-            form: { data: { turbo_confirm: "Send this message to #{@total_count} recipients now?" } },
+            form: { data: { turbo_confirm: "Send this message to #{pluralize(@total_count, "recipient")} now?" } },
             class: "cs-btn cs-btn-primary",
             disabled: @total_count == 0 %>
       <% end %>

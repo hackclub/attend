@@ -91,7 +91,7 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
       <div class="lg:col-span-3 min-w-0">
-        <%= render "admin/event_series/events", event_rows: @event_rows %>
+        <%= render "admin/event_series/events", event_rows: @paged_event_rows, series: @series %>
       </div>
       <div class="lg:col-span-2 min-w-0">
         <%= render "admin/event_series/map", dashboard: @dashboard, event_rows: @event_rows %>

@@ -83,7 +83,7 @@ RSpec.describe "Admin::Messages", type: :request do
         .and change(message_send_logs, :count).by(1)
 
       expect(message.reload).to be_sending
-      expect(flash[:notice]).to eq("Message is being sent to 1 recipients.")
+      expect(flash[:notice]).to eq("Message is being sent to 1 recipient.")
     end
 
     it "refuses a message that was sent after it was loaded, without logging a second send" do

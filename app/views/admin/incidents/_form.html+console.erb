@@ -2,7 +2,7 @@
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg>
 <% end %>
 
-<%= form_with model: [:admin, current_event, incident], local: true, class: "cs-stack", html: { novalidate: true }, data: { controller: "cs-form-validation incident-escalation", action: "submit->incident-escalation#confirm" } do |f| %>
+<%= form_with model: [:admin, current_event, incident], local: true, class: "cs-stack", html: { novalidate: true }, data: { controller: "cs-form-validation incident-escalation incident-medical", action: "submit->incident-escalation#confirm" } do |f| %>
   <section class="cs-container">
     <div class="cs-container-header">
       <h2 class="cs-h2">Incident details</h2>
@@ -10,7 +10,7 @@
     <div class="cs-container-body">
       <div class="cs-field-grid">
         <%= cs_form_field f, :category, label: "Category", messages: { blank: "Category is required.", inclusion: "Select a valid category." } do |aria| %>
-          <%= f.select :category, Incident.categories.keys.map { |c| [c.humanize, c] }, { prompt: "Select category" }, class: "cs-select", required: true, **aria %>
+          <%= f.select :category, Incident.categories.keys.map { |c| [c.humanize, c] }, { prompt: "Select category" }, class: "cs-select", required: true, data: { incident_medical_target: "category", action: "change->incident-medical#update" }, **aria %>
         <% end %>
 
         <%= cs_form_field f, :severity, label: "Level", description: "S0 is the most urgent. The chart below has examples.", messages: { blank: "Level is required.", inclusion: "Select a valid level." } do |aria| %>
@@ -40,7 +40,7 @@
     </div>
     <div class="cs-container-body">
       <div class="cs-field" data-controller="multiselect">
-        <p class="cs-field-label">Participants involved</p>
+        <p class="cs-field-label">Participants involved<span class="cs-field-optional hidden" data-incident-medical-target="medicalOnly"> - required for medical incidents</span></p>
         <div class="border border-(--cs-border-input) rounded-(--cs-radius-item) overflow-hidden">
           <div class="p-3 border-b border-(--cs-border-divider-secondary)">
             <label class="cs-search">
@@ -86,7 +86,7 @@
 
       <% staff_users = current_event.event_role_assignments.includes(:user).map(&:user).uniq.sort_by { |u| u.display_name_or_fallback } %>
       <div class="cs-field" data-controller="multiselect">
-        <p class="cs-field-label">Staff who helped</p>
+        <p class="cs-field-label">Staff who helped<span class="cs-field-optional hidden" data-incident-medical-target="medicalOnly"> - required for medical incidents</span></p>
         <div class="border border-(--cs-border-input) rounded-(--cs-radius-item) overflow-hidden">
           <div class="p-3 border-b border-(--cs-border-divider-secondary)">
             <label class="cs-search">
@@ -151,6 +151,38 @@
       <%= cs_form_field f, :actions_taken, label: "Actions taken", optional: true, description: "What actions have been taken or are planned." do |aria| %>
         <%= f.text_area :actions_taken, rows: 4, class: "cs-input", **aria %>
       <% end %>
+    </div>
+  </section>
+
+  <% medications = incident.medications.to_a %>
+  <% medications << incident.medications.build if medications.none? %>
+  <section class="cs-container hidden" data-incident-medical-target="medicalOnly">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Medication</h2>
+    </div>
+    <div class="cs-container-body">
+      <label class="cs-option cursor-pointer">
+        <%= f.check_box :medication_dispensed, data: { incident_medical_target: "dispensed", action: "change->incident-medical#update" } %>
+        <span class="cs-option-label">Medication was dispensed</span>
+      </label>
+
+      <div class="mt-4 hidden" data-incident-medical-target="medications" data-controller="nested-form">
+        <div data-nested-form-target="container" class="space-y-3">
+          <% medications.each do |medication| %>
+            <%= f.fields_for :medications, medication do |mf| %>
+              <%= render "medication_fields", mf: mf %>
+            <% end %>
+          <% end %>
+        </div>
+
+        <template data-nested-form-target="template">
+          <%= f.fields_for :medications, IncidentMedication.new, child_index: "NEW_RECORD" do |mf| %>
+            <%= render "medication_fields", mf: mf %>
+          <% end %>
+        </template>
+
+        <button type="button" data-action="nested-form#add" class="cs-btn mt-2">Add another medication</button>
+      </div>
     </div>
   </section>
 

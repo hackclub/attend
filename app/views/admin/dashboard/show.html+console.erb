@@ -62,6 +62,37 @@
     </div>
   </section>
 
+  <%# Quick actions %>
+  <% quick_action = ->(label, path, icon_name, tint) do
+       link_to path, class: "cs-quick-action" do
+         tag.span(cs_icon(icon_name), class: "cs-quick-action-icon cs-tint-#{tint}") + tag.span(label)
+       end
+     end %>
+  <section class="cs-container" data-testid="quick-actions">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Quick actions</h2>
+    </div>
+    <div class="cs-container-body">
+      <nav class="cs-quick-actions" aria-label="Quick actions">
+        <%= quick_action.call("Check-ins", admin_event_scans_path(@event), :check_ins, :red) %>
+        <%= quick_action.call("Participants", admin_event_participants_path(@event), :participants, :indigo) %>
+        <% if @event.travel_enabled? %>
+          <%= quick_action.call("Travel calendar", admin_event_travel_path(@event), :travel, :sky) %>
+        <% end %>
+        <% if @event.accommodation_enabled? %>
+          <%= quick_action.call("Rooming", admin_event_rooming_wizard_path(@event), :rooming, :teal) %>
+        <% end %>
+        <%= quick_action.call("Incidents", admin_event_incidents_path(@event), :incidents, :amber) %>
+        <%= quick_action.call("Messages", admin_event_messages_path(@event), :messages, :purple) %>
+        <%= quick_action.call("Exports", admin_event_exports_path(@event), :exports, :green) %>
+        <%# Same gate as AuditLogsController#require_audit_access and the side nav. %>
+        <% if current_user.global_admin? || current_user.event_role_assignments.exists?(role: :event_admin) %>
+          <%= quick_action.call("Audit log", admin_audit_logs_path(event_id: @event.id), :event_audit, :grey) %>
+        <% end %>
+      </nav>
+    </div>
+  </section>
+
   <%# Overview counters %>
   <section class="cs-container">
     <div class="cs-container-header">
@@ -91,7 +122,7 @@
           <dt class="cs-kv-label">Pending consents</dt>
           <dd class="cs-kv-value-lg"><%= @consent_stats[:pending] %></dd>
           <dd class="cs-kv-value cs-small cs-secondary">
-            <%= @consent_stats[:signed] %> signed · <%= @consent_stats[:waivers_pending] %> waivers pending
+            <%= @consent_stats[:signed] %> signed · <%= pluralize(@consent_stats[:waivers_pending], "waiver") %> pending
           </dd>
         </div>
         <div>

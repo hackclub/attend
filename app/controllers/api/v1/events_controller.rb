@@ -47,6 +47,7 @@ module Api
           can_view_participant_pii: can_view_participant_pii?(event),
           can_view_participants: can_view_participants?(event),
           can_view_sensitive_data: can_view_sensitive_data?(event),
+          can_view_incidents: can_view_incidents?(event),
           # Whether the event runs travel at all, so a client can hide travel
           # screens for events that never collect it.
           travel_enabled: event.travel_enabled?
@@ -86,6 +87,14 @@ module Api
         return true if current_user.global_admin?
 
         roles_for(event).include?("safeguarding_lead")
+      end
+
+      # Mirrors IncidentPolicy#has_any_role?: a role on the event itself.
+      # Series membership alone doesn't open the incident log.
+      def can_view_incidents?(event)
+        return true if current_user.global_admin?
+
+        roles_for(event).any?
       end
 
       def series_member?(event)

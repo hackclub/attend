@@ -22,7 +22,7 @@
           <p class="cs-alert-title">Import failed</p>
           <p>
             The import encountered an error and could not complete.
-            <%= @import_batch.imported_count %> participants were imported before the failure.
+            <%= pluralize(@import_batch.imported_count, "participant was", plural: "participants were") %> imported before the failure.
           </p>
           <div class="mt-3">
             <%= link_to "Try again", new_admin_event_import_path(current_event), class: "cs-btn" %>

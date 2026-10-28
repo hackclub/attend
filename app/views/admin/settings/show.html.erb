@@ -186,7 +186,7 @@
               method: :post,
               disabled: @admin_help_slack_channel_id.blank?,
               class: "px-4 py-2 bg-[#d42f46] hover:bg-[#b82840] text-white rounded-md font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
-              data: { turbo_confirm: "Invite all #{@admin_help_member_count - @admin_help_members_without_slack} people with Slack accounts to the channel?" } %>
+              data: { turbo_confirm: "Invite #{pluralize(@admin_help_member_count - @admin_help_members_without_slack, "person", plural: "people")} with Slack accounts to the channel?" } %>
       </div>
     </div>
   </div>
@@ -235,7 +235,7 @@
               method: :post,
               disabled: @org_support_slack_channel_id.blank?,
               class: "px-4 py-2 bg-[#d42f46] hover:bg-[#b82840] text-white rounded-md font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
-              data: { turbo_confirm: "Invite all #{@org_support_member_count - @org_support_members_without_slack} people with Slack accounts to the channel, and remove anyone Attend added whose events ended over 7 days ago?" } %>
+              data: { turbo_confirm: "Invite #{pluralize(@org_support_member_count - @org_support_members_without_slack, "person", plural: "people")} with Slack accounts to the channel, and remove anyone Attend added whose events ended over 7 days ago?" } %>
       </div>
     </div>
   </div>

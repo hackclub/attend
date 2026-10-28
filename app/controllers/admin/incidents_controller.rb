@@ -114,7 +114,9 @@ module Admin
         :actions_taken,
         :location,
         :occurred_at,
+        :medication_dispensed,
         visible_to_roles: [],
+        medications_attributes: [ :id, :name, :dose, :notes, :_destroy ],
         participant_event_ids: [],
         helping_staff_ids: []
       )
