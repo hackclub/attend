@@ -30,7 +30,7 @@
             <svg class="series-chevron w-4 h-4 mt-0.5 text-(--text-muted) flex-shrink-0" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             <span class="text-sm font-bold text-(--text-strong) tabular-nums w-8 text-right flex-shrink-0"><%= row[:stalled] %></span>
             <span class="text-sm text-(--text) min-w-0">
-              <%= "participant".pluralize(row[:stalled]) %> <%= row[:stage].chase %>
+              <%= "participant".pluralize(row[:stalled]) %> <%= row[:stage].chase_for(row[:stalled]) %>
             </span>
             <span class="ml-auto text-xs text-(--text-soft) whitespace-nowrap pl-3 hidden sm:inline">
               <%= pluralize(row[:by_event].length, "event") %>

@@ -12,7 +12,7 @@
 <%# Each group is the same shape: a count, what it means, and one row per
     event linking to the list that clears it. %>
 <% groups = chase_rows.map do |row|
-     { count: row[:stalled], label: "#{"participant".pluralize(row[:stalled])} #{row[:stage].chase}",
+     { count: row[:stalled], label: "#{"participant".pluralize(row[:stalled])} #{row[:stage].chase_for(row[:stalled])}",
        entries: row[:by_event].map { |entry| [ entry[:event], entry[:count], series_chase_path(entry[:event], row[:stage]) ] } }
    end %>
 <%# Held invitations sit with the funnel's first step: these participants
