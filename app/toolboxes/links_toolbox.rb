@@ -40,7 +40,11 @@ class LinksToolbox < ApplicationToolbox
       notes: "List at /admin/events/{event_slug}/messages."
     },
     "event groups" => { template: "/admin/events/{event_slug}/groups", notes: nil },
-    "rooming wizard" => { template: "/admin/events/{event_slug}/rooming_wizard", notes: nil },
+    "rooming wizard" => {
+      template: "/admin/events/{event_slug}/rooming_wizard",
+      notes: "That's the stay during the event (or the only stay). Another stay is /admin/events/{event_slug}/stays/{stay_id}/rooming_wizard."
+    },
+    "accommodation stays" => { template: "/admin/events/{event_slug}/stays", notes: "Every stay, and who's in each." },
     "check-in scanner" => { template: "/admin/events/{event_slug}/scans/scanner", notes: nil },
     "travel calendar" => { template: "/admin/events/{event_slug}/travel", notes: nil },
     "support ticket" => { template: "/support/tickets/{ticket_id}", notes: "Not event-scoped." },

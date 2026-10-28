@@ -127,7 +127,7 @@ module Admin
           scans: [ :scan_context, :user ],
           groups: []
         )
-        .preload(room: { participant_events: :participant })
+        .preload(room_assignments: { room: [ :rooming_context, { participant_events: :participant } ] })
 
       @sort_field = params[:sort] || "legal_last_name"
       @sort_direction = params[:direction] == "desc" ? "desc" : "asc"
@@ -153,6 +153,7 @@ module Admin
       @travel_inbound = @participant_event.travel_inbound&.tap { |t| t.travel_legs.load }
       @travel_outbound = @participant_event.travel_outbound&.tap { |t| t.travel_legs.load }
       @accommodation = @participant_event.accommodation
+      @stays = Rooming::ParticipantStays.for(@participant_event)
       @medical = @participant_event.medical
       @dietary = @participant_event.dietary
       @accessibility = @participant_event.accessibility

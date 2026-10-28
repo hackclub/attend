@@ -137,7 +137,7 @@ module Airtable
       { travel_inbound: :travel_legs, travel_outbound: :travel_legs },
       :accommodation, :dietary, :medical,
       :accessibility, :safeguarding_info,
-      :room_assignment, :room,
+      { room_assignments: { room: :rooming_context } },
       { guardian_participant_events: :guardian },
       :emergency_contacts, :consents, { scans: :scan_context }
     ].freeze
@@ -194,7 +194,7 @@ module Airtable
         accommodation&.check_in_date&.iso8601,
         accommodation&.check_out_date&.iso8601,
         accommodation&.gender_identity,
-        pe.room&.display_name,
+        pe.room_summary,
         dietary&.diet_type,
         dietary&.cross_contamination_risk,
         dietary&.life_threatening_allergies,

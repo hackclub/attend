@@ -1,0 +1,17 @@
+<%# The stays a participant is part of, with their room in each once rooming
+    for that stay is finalized; until then rooms are still moving, so it says
+    so instead. locals: stays: (Rooming::ParticipantStays entries), item_class: %>
+<ul class="space-y-1">
+  <% stays.each do |entry| %>
+    <% stay = entry.stay %>
+    <% dates = [ stay.starts_on, stay.ends_on ].compact.map { |d| l(d, format: :short) }.join(" – ") %>
+    <li class="<%= item_class %>">
+      <span class="font-medium"><%= stay.name %></span><% if dates.present? %> (<%= dates %>)<% end %>:
+      <% if entry.room && entry.finalized? %>
+        Room <%= entry.room.display_name %>
+      <% else %>
+        room to be confirmed
+      <% end %>
+    </li>
+  <% end %>
+</ul>

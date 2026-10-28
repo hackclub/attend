@@ -36,7 +36,7 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
   describe "POST manual_assign" do
     it "continues to assignments without changing existing assignments" do
       participant_event = create(:participant_event, event: event)
-      room = event.rooms.create!(capacity: 2)
+      room = event.main_rooming_context.rooms.create!(capacity: 2)
       assignment = RoomAssignment.create!(room: room, participant_event: participant_event)
 
       expect do
@@ -62,7 +62,7 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
   # An `update` keeps the target and only swaps its contents.
   describe "assignments board turbo streams" do
     let(:turbo_headers) { { "Accept" => "text/vnd.turbo-stream.html" } }
-    let!(:room) { event.rooms.create!(capacity: 2) }
+    let!(:room) { event.main_rooming_context.rooms.create!(capacity: 2) }
     let!(:participant_event) do
       create(:participant_event, event: event).tap(&:create_accommodation!)
     end

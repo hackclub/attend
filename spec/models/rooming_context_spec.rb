@@ -27,22 +27,12 @@ RSpec.describe RoomingContext, type: :model do
     end
   end
 
-  describe "Event#rooming_plan" do
-    it "returns the main stay's plan without creating anything" do
-      expect(event.rooming_plan).to be_nil
-      expect(described_class.count).to eq(0)
-
-      plan = main_stay.create_rooming_plan!(event: event, room_capacity: 2)
-
-      expect(event.rooming_plan).to eq(plan)
-    end
-  end
-
   describe "rooms" do
-    it "default to the main stay when only the event is given" do
-      room = event.rooms.create!(capacity: 2)
+    it "need a stay, and never create one" do
+      room = event.rooms.build(capacity: 2)
 
-      expect(room.rooming_context).to eq(main_stay)
+      expect(room).not_to be_valid
+      expect(described_class.count).to eq(0)
     end
 
     it "can't belong to another event's stay" do

@@ -14,7 +14,7 @@ class Room < ApplicationRecord
   validates :name, uniqueness: { scope: :rooming_context_id, allow_nil: true }
   validate :rooming_context_matches_event
 
-  before_validation :default_to_main_stay
+  before_validation { self.event ||= rooming_context&.event }
 
   scope :with_availability, -> { includes(:room_assignments).where("(SELECT COUNT(*) FROM room_assignments WHERE room_assignments.room_id = rooms.id) < rooms.capacity") }
   scope :staff_rooms, -> { where(staff_only: true) }
@@ -95,13 +95,6 @@ class Room < ApplicationRecord
   end
 
   private
-
-  # Callers that only know the event (the MCP toolbox, older code paths) get
-  # the main stay, which is where every room lived before contexts existed.
-  def default_to_main_stay
-    self.event ||= rooming_context&.event
-    self.rooming_context ||= event&.main_rooming_context
-  end
 
   def rooming_context_matches_event
     return unless rooming_context && event_id

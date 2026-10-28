@@ -9,9 +9,11 @@ Toolchest.configure do |config|
     registered for an event; a participant_event is one person's registration for one
     event. Medical, safeguarding, and incident data is sensitive and only visible to users
     with the right event role — expect permission errors and relay them plainly rather than
-    retrying. Prefer the read tools to orient yourself before making any changes. To port a
-    rooming sheet, call rooming_overview first to map names to participant_event_ids and see
-    existing rooms, then rooming_bulk_assign (it can create rooms by name as it fills them).
+    retrying. Prefer the read tools to orient yourself before making any changes. Rooming is
+    per stay (during the event, the night before, the night after); an event may have none.
+    To port a rooming sheet, call rooming_overview first to see the event's stays, map names
+    to participant_event_ids and see existing rooms, then rooming_bulk_assign with the
+    stay_id (it can create rooms by name as it fills them).
     A connection can also be restricted by the user who created it: scoped to specific
     events, and/or anonymized so names arrive as initials with emails, phone numbers and
     addresses stripped and every write refused. Call me_show to see which restrictions

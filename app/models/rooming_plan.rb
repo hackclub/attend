@@ -18,7 +18,7 @@ class RoomingPlan < ApplicationRecord
   validates :room_capacity, presence: true, numericality: { greater_than: 0, less_than_or_equal_to: 10 }
   validates :rooming_context_id, uniqueness: true
 
-  before_validation :default_to_main_stay
+  before_validation { self.event ||= rooming_context&.event }
 
   def finalize!(user)
     update!(
@@ -42,12 +42,5 @@ class RoomingPlan < ApplicationRecord
 
   def unlock!
     update!(locked: false)
-  end
-
-  private
-
-  def default_to_main_stay
-    self.event ||= rooming_context&.event
-    self.rooming_context ||= event&.main_rooming_context
   end
 end

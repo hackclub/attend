@@ -60,6 +60,11 @@ class RoomingContext < ApplicationRecord
     KIND_LABELS.fetch(kind)
   end
 
+  # The same order as the ordered scope, for sorting stays already loaded.
+  def sort_key
+    [ KIND_LABELS.keys.index(kind), starts_on ? 0 : 1, starts_on.to_s, created_at.to_f ]
+  end
+
   # Everyone this stay is rooming, exempt or not. An eligible-only stay draws
   # from its roster. Either way, rooming needs the accommodation form (gender,
   # roommate preferences), so someone who hasn't filled it in isn't in the

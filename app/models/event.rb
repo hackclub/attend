@@ -419,21 +419,15 @@ class Event < ApplicationRecord
     ActiveModel::Type::Boolean.new.cast(visa_options_enabled)
   end
 
-  # The event's during-the-event stay, created if missing. Only callers that
-  # predate stays use this (the MCP toolbox, rooms created without a stay);
-  # the admin never creates a stay an organizer didn't add. Two requests
-  # racing to create it both land on the one row the partial unique index
-  # allows.
+  # Finds or creates the stay during the event. Nothing in the app creates a
+  # stay implicitly (organizers add them, and an event may have none), so
+  # this is for callers that explicitly want that stay. Two requests racing
+  # to create it both land on the one row the partial unique index allows.
   def main_rooming_context
     rooming_contexts.find_by(kind: :main) ||
       rooming_contexts.create!(kind: :main, name: RoomingContext::MAIN_NAME, enrollment: :everyone)
   rescue ActiveRecord::RecordNotUnique
     rooming_contexts.find_by!(kind: :main)
-  end
-
-  # The main stay's plan, if rooming has started. Never creates anything.
-  def rooming_plan
-    rooming_contexts.find_by(kind: :main)&.rooming_plan
   end
 
   def accommodation_enabled?
