@@ -73,7 +73,7 @@
     <% if @events_total_pages > 1 %>
       <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-t border-(--border) text-xs text-(--text-soft)">
         <span>
-          Showing <%= (@events_page - 1) * @events_per_page + 1 %> to <%= [ @events_page * @events_per_page, @events_total_count ].min %> of <%= @events_total_count %> events
+          Showing <%= (@events_page - 1) * @events_per_page + 1 %> to <%= [ @events_page * @events_per_page, @events_total_count ].min %> of <%= pluralize(@events_total_count, "event") %>
         </span>
         <nav class="flex items-center gap-3" aria-label="Events pagination">
           <% if @events_page > 1 %>

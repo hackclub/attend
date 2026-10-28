@@ -113,7 +113,7 @@
                   <%= link_to enrollment.user.display_name_or_fallback, admin_user_path(enrollment.user), class: "cs-link" %>
                   <div class="cs-small cs-secondary"><%= enrollment.user.email %></div>
                 </td>
-                <td class="whitespace-nowrap"><%= @completed_counts.fetch(enrollment.id, 0) %> of <%= @lessons.size %> lessons</td>
+                <td class="whitespace-nowrap"><%= @completed_counts.fetch(enrollment.id, 0) %> of <%= pluralize(@lessons.size, "lesson") %></td>
                 <td class="whitespace-nowrap"><%= cs_relative_time(enrollment.started_at) %></td>
                 <td class="whitespace-nowrap"><%= enrollment.completed_at ? cs_relative_time(enrollment.completed_at) : tag.span("—", class: "cs-muted") %></td>
               </tr>

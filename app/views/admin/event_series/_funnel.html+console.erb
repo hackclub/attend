@@ -82,7 +82,7 @@
                 <div class="cs-small cs-secondary mt-0.5">—</div>
               <% end %>
               <% if row[:partial_events] %>
-                <div class="cs-small cs-secondary mt-0.5"><%= row[:partial_events] %>/<%= totals[:events] %> events</div>
+                <div class="cs-small cs-secondary mt-0.5"><%= row[:partial_events] %>/<%= pluralize(totals[:events], "event") %></div>
               <% end %>
             </div>
           <% end %>

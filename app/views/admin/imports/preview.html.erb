@@ -138,7 +138,7 @@
           <p class="text-sm text-blue-700 mt-1">
             <%= pluralize(@valid_rows.count, "invitation email") %> will be sent after import completes.
             Emails are sent at a rate of ~1 per second to avoid rate limits.
-            <strong>Estimated time: ~<%= (@valid_rows.count / 60.0).ceil %> minutes</strong>
+            <strong>Estimated time: ~<%= pluralize((@valid_rows.count / 60.0).ceil, "minute") %></strong>
           </p>
         </div>
       </div>

@@ -120,7 +120,7 @@
                 <%= @message.body_as_plain %>
               </div>
               <p class="text-xs text-gray-400 mt-2 text-right">
-                <%= @message.body_as_plain.length %> characters
+                <%= pluralize(@message.body_as_plain.length, "character") %>
                 <% if @message.body_as_plain.length > 160 %>
                   <span class="text-amber-500">(~<%= (@message.body_as_plain.length / 160.0).ceil %> segments)</span>
                 <% end %>

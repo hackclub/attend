@@ -147,7 +147,7 @@
   <% if @total_pages > 1 %>
     <div class="mt-6 flex items-center justify-between">
       <div class="text-sm text-gray-500">
-        Showing <%= (@page - 1) * @per_page + 1 %> to <%= [ (@page * @per_page), @total_count ].min %> of <%= @total_count %> users
+        Showing <%= (@page - 1) * @per_page + 1 %> to <%= [ (@page * @per_page), @total_count ].min %> of <%= pluralize(@total_count, "user") %>
       </div>
       <div class="flex gap-2">
         <% if @page > 1 %>
