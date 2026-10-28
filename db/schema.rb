@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_28_120200) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_28_180200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1736,6 +1736,82 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_28_120200) do
     t.index ["item_type", "item_id"], name: "index_versions_on_item_type_and_item_id"
   end
 
+  create_table "visa_letter_applications", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.text "address"
+    t.text "admin_notes"
+    t.datetime "created_at", null: false
+    t.date "date_of_birth", null: false
+    t.string "email", null: false
+    t.uuid "event_id", null: false
+    t.string "full_name", null: false
+    t.datetime "imported_at"
+    t.uuid "invitation_id"
+    t.string "letter_address"
+    t.string "letter_city"
+    t.string "letter_country"
+    t.date "letter_ends_on"
+    t.string "letter_event_name"
+    t.date "letter_issued_on"
+    t.datetime "letter_sent_at"
+    t.date "letter_starts_on"
+    t.string "letter_venue"
+    t.string "nationality", null: false
+    t.uuid "participant_event_id"
+    t.string "phone"
+    t.string "place_of_birth"
+    t.string "reference_number", null: false
+    t.text "rejection_reason"
+    t.string "rejection_type"
+    t.datetime "reviewed_at"
+    t.uuid "reviewed_by_id"
+    t.string "status", default: "pending", null: false
+    t.datetime "submitted_at"
+    t.datetime "updated_at", null: false
+    t.uuid "user_id"
+    t.string "verification_code", null: false
+    t.uuid "visa_letter_invitation_id"
+    t.string "visa_outcome", default: "unknown", null: false
+    t.datetime "visa_outcome_recorded_at"
+    t.index ["email"], name: "index_visa_letter_applications_on_email"
+    t.index ["event_id", "status"], name: "index_visa_letter_applications_on_event_id_and_status"
+    t.index ["event_id", "user_id"], name: "index_visa_letter_applications_on_event_id_and_user_id", unique: true, where: "(user_id IS NOT NULL)"
+    t.index ["invitation_id"], name: "index_visa_letter_applications_on_invitation_id"
+    t.index ["participant_event_id"], name: "index_visa_letter_applications_on_participant_event_id"
+    t.index ["reference_number"], name: "index_visa_letter_applications_on_reference_number", unique: true
+    t.index ["reviewed_by_id"], name: "index_visa_letter_applications_on_reviewed_by_id"
+    t.index ["user_id"], name: "index_visa_letter_applications_on_user_id"
+    t.index ["verification_code"], name: "index_visa_letter_applications_on_verification_code", unique: true
+    t.index ["visa_letter_invitation_id"], name: "index_visa_letter_applications_on_visa_letter_invitation_id"
+  end
+
+  create_table "visa_letter_invitations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "claimed_at"
+    t.datetime "created_at", null: false
+    t.string "email", null: false
+    t.uuid "event_id", null: false
+    t.uuid "issued_by_id"
+    t.string "name"
+    t.string "token", null: false
+    t.datetime "updated_at", null: false
+    t.index ["event_id", "email"], name: "index_visa_letter_invitations_on_event_id_and_email"
+    t.index ["issued_by_id"], name: "index_visa_letter_invitations_on_issued_by_id"
+    t.index ["token"], name: "index_visa_letter_invitations_on_token", unique: true
+  end
+
+  create_table "visa_letter_templates", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.text "body", null: false
+    t.datetime "created_at", null: false
+    t.uuid "event_id"
+    t.boolean "is_default", default: false, null: false
+    t.string "name", null: false
+    t.string "signatory_name", null: false
+    t.string "signatory_title", null: false
+    t.datetime "updated_at", null: false
+    t.index ["event_id"], name: "index_visa_letter_templates_on_event_id"
+    t.index ["is_default"], name: "index_visa_letter_templates_one_global_default", unique: true, where: "(is_default AND (event_id IS NULL))"
+  end
+
   add_foreign_key "accessibilities", "participant_events"
   add_foreign_key "accommodations", "participant_events"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
@@ -1904,4 +1980,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_28_120200) do
   add_foreign_key "training_video_views", "training_lessons", on_delete: :cascade
   add_foreign_key "travel_legs", "travels"
   add_foreign_key "travels", "participant_events"
+  add_foreign_key "visa_letter_applications", "events"
+  add_foreign_key "visa_letter_applications", "invitations", on_delete: :nullify
+  add_foreign_key "visa_letter_applications", "participant_events", on_delete: :nullify
+  add_foreign_key "visa_letter_applications", "users", column: "reviewed_by_id", on_delete: :nullify
+  add_foreign_key "visa_letter_applications", "users", on_delete: :nullify
+  add_foreign_key "visa_letter_applications", "visa_letter_invitations", on_delete: :nullify
+  add_foreign_key "visa_letter_invitations", "events"
+  add_foreign_key "visa_letter_invitations", "users", column: "issued_by_id", on_delete: :nullify
+  add_foreign_key "visa_letter_templates", "events"
 end

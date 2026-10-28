@@ -76,6 +76,11 @@ claimed, like an imported one, is erased on its own email.
 - Automated SMS logs and support tickets, by the matched people's phone numbers.
   A number that anyone staying on file also has is never used, since children
   often give a parent's number. Tickets filed against another person always stay
+- Visa letter applications by matched account, the registration they led to,
+  or their email (copied from the applicant's account when they applied; Envoy
+  imports have no account until claimed). One with the email but linked to an
+  unmatched account is an `identity_conflict`. Visa letter invitations by
+  emails from the hub or matched HCA accounts
 - Import batches whose uploaded CSV rows or per-row errors hold emails from
   the hub or matched HCA accounts. CSV rows also match on the subject's Slack ID;
   a typed email on a Slack-matched row never expands the search to other rows
@@ -91,6 +96,7 @@ deal with the cause in Attend, then rerun the request from the hub.
 | --- | --- | --- |
 | `staff_account` | Global role, event or series role, or an API token | Staff authored incidents, notes, messages and audit history other records depend on, and their tokens may feed other services |
 | `event_not_over` | A registration, guardian link or emergency-contact entry for an event that hasn't ended, including one without an end time | Pulling someone out of an upcoming or running event changes organisers' headcount, rooming and medical lists, so organisers remove the registration first |
+| `visa_letter_active` | A visa letter application still pending or approved, or a sent letter for an event that hasn't ended | Embassies check letters against `/verify` until the trip is over, so staff reject the application or the event ends first |
 | `safeguarding_record` | Named in an incident, filed or commented on an incident report, or has a pending or upheld training disclosure | Safeguarding records have their own retention rules, and the safeguarding lead decides |
 | `banned` | One of their emails is on a ban list | Erasing would lift the ban |
 | `identity_conflict` | An editable email or Slack ID leads to an account the subject's verified identifiers don't (see above) | It may be someone else's account; a human works out whose it is |
@@ -111,8 +117,9 @@ mid-run waits for the erasure and then fails its foreign key, a role change or
 event date change waits, and an import can't be confirmed. Lock waits give up
 after 5 seconds with `503 database_busy`.
 
-Email logs, invitations, emergency contacts, message deliveries, SMS logs and
-tickets also match without an account foreign key. Before matching, their
+Email logs, invitations, emergency contacts, message deliveries, SMS logs,
+tickets, visa letter applications and visa letter invitations also match
+without an account foreign key. Before matching, their
 tables are locked `SHARE ROW EXCLUSIVE` for the transaction: reads continue,
 but writes wait, including inserts that row locks would miss. This briefly
 pauses unrelated writes to those tables too; it does not prevent new data
@@ -142,6 +149,7 @@ All in one transaction, with PaperTrail switched off:
   their row and loses only the erased links
 - support tickets with their messages and notes, invitations, email logs and
   automated SMS logs
+- visa letter applications with their letter PDF, and visa letter invitations
 - their rows in import batches. Their own rows are removed; where they're only
   the parent or emergency contact on someone else's row, those columns come off
   it. Per-row errors naming them go. Reported as `import_batches.rows_data` and
