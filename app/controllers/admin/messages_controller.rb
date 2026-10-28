@@ -136,7 +136,7 @@ module Admin
           notice: "Message scheduled for #{@message.scheduled_at.strftime("%B %d, %Y at %l:%M %p")}."
       elsif @message.send!
         redirect_to admin_event_message_path(current_event, @message),
-          notice: "Message is being sent to #{@message.recipient_count} recipients."
+          notice: "Message is being sent to #{helpers.pluralize(@message.recipient_count, "recipient")}."
       else
         # The lock inside send! found it already sent: a double-click or a
         # concurrent send beat us. Nothing changed, so nothing is audit-logged.
@@ -175,7 +175,7 @@ module Admin
       MessageDeliveryJob.perform_later(message_id: @message.id)
 
       redirect_to admin_event_message_path(current_event, @message),
-        notice: "Retrying #{failed_count} failed deliveries..."
+        notice: "Retrying #{helpers.pluralize(failed_count, "failed delivery", plural: "failed deliveries")}..."
     end
 
     def retry_delivery

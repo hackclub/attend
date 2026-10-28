@@ -19,7 +19,7 @@
         <%= cs_status_icon(:info) %>
         <p>
           This will send a DM to <strong><%= @participant_count %></strong> participant<%= @participant_count == 1 ? "" : "s" %>
-          who have completed onboarding and linked their Slack account.
+          who <%= @participant_count == 1 ? "has" : "have" %> completed onboarding and linked their Slack account.
         </p>
       </div>
 
@@ -47,7 +47,7 @@
             name: "commit",
             value: "Send Blast",
             class: "cs-btn cs-btn-primary",
-            data: { turbo_confirm: "Send this message to #{@participant_count} participants?" } %>
+            data: { turbo_confirm: "Send this message to #{pluralize(@participant_count, "participant")}?" } %>
       </div>
     <% end %>
   <% end %>

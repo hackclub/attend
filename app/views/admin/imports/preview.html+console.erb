@@ -145,9 +145,9 @@
         <div>
           <p class="cs-alert-title">Invitation emails will be sent</p>
           <p>
-            <%= @valid_rows.count %> invitation emails will be sent after import completes.
+            <%= pluralize(@valid_rows.count, "invitation email") %> will be sent after import completes.
             Emails are sent at a rate of ~1 per second to avoid rate limits.
-            <strong>Estimated time: ~<%= (@valid_rows.count / 60.0).ceil %> minutes</strong>
+            <strong>Estimated time: ~<%= pluralize((@valid_rows.count / 60.0).ceil, "minute") %></strong>
           </p>
         </div>
       </div>

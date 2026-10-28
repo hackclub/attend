@@ -75,7 +75,7 @@ module Admin
       SlackBlastJob.perform_later(slack_blast_id: slack_blast.id)
 
       redirect_to admin_event_slack_blast_path(current_event, slack_blast),
-        notice: "Slack blast queued! Sending to #{participant_events.count} participants."
+        notice: "Slack blast queued! Sending to #{helpers.pluralize(participant_events.count, "participant")}."
     end
 
     def retry_failed
@@ -96,7 +96,7 @@ module Admin
       SlackBlastJob.perform_later(slack_blast_id: @slack_blast.id)
 
       redirect_to admin_event_slack_blast_path(current_event, @slack_blast),
-        notice: "Retrying #{failed_count} failed recipients..."
+        notice: "Retrying #{helpers.pluralize(failed_count, "failed recipient")}..."
     end
 
     def retry_recipient

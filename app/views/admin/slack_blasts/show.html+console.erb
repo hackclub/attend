@@ -53,7 +53,7 @@
                 retry_failed_admin_event_slack_blast_path(current_event, @slack_blast),
                 method: :post,
                 class: "cs-btn",
-                form: { data: { turbo_confirm: "Retry sending to all #{@slack_blast.failed_count} failed recipients?" } } %>
+                form: { data: { turbo_confirm: "Retry sending to #{@slack_blast.failed_count == 1 ? "the" : "all"} #{pluralize(@slack_blast.failed_count, "failed recipient")}?" } } %>
           </div>
         <% end %>
       </div>

@@ -122,7 +122,7 @@
           <dt class="cs-kv-label">Pending consents</dt>
           <dd class="cs-kv-value-lg"><%= @consent_stats[:pending] %></dd>
           <dd class="cs-kv-value cs-small cs-secondary">
-            <%= @consent_stats[:signed] %> signed · <%= @consent_stats[:waivers_pending] %> waivers pending
+            <%= @consent_stats[:signed] %> signed · <%= pluralize(@consent_stats[:waivers_pending], "waiver") %> pending
           </dd>
         </div>
         <div>

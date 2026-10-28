@@ -167,7 +167,7 @@
       <div class="mt-3 text-xs text-gray-500">
         <span class="text-green-600 font-medium"><%= @consent_stats[:signed] %> signed</span>
         <span class="mx-1">•</span>
-        <span><%= @consent_stats[:waivers_pending] %> waivers pending</span>
+        <span><%= pluralize(@consent_stats[:waivers_pending], "waiver") %> pending</span>
       </div>
     </div>
 

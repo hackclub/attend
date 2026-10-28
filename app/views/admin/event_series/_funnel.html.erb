@@ -49,7 +49,7 @@
         <div class="relative">
           <svg class="series-ribbon w-full h-36 sm:h-44 block" viewBox="0 0 1000 180"
                preserveAspectRatio="none" role="img"
-               aria-label="<%= totals[:active] %> participants entered onboarding and <%= totals[:cleared] %> cleared every stage. The table that follows gives each stage's figures.">
+               aria-label="<%= pluralize(totals[:active], "participant") %> entered onboarding and <%= totals[:cleared] %> cleared every stage. The table that follows gives each stage's figures.">
             <path d="<%= ribbon[:path] %>" class="series-ribbon-fill" />
           </svg>
 
@@ -81,7 +81,7 @@
                 <div class="text-[11px] text-(--text-soft) mt-0.5">—</div>
               <% end %>
               <% if row[:partial_events] %>
-                <div class="text-[11px] text-(--text-soft) mt-0.5"><%= row[:partial_events] %>/<%= totals[:events] %> events</div>
+                <div class="text-[11px] text-(--text-soft) mt-0.5"><%= row[:partial_events] %>/<%= pluralize(totals[:events], "event") %></div>
               <% end %>
             </div>
           <% end %>

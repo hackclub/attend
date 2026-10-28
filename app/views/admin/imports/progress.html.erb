@@ -80,7 +80,7 @@
       <h3 class="font-semibold text-red-800">Import Failed</h3>
       <p class="text-sm text-red-700 mt-1">
         The import encountered an error and could not complete.
-        <%= @import_batch.imported_count %> participants were imported before the failure.
+        <%= pluralize(@import_batch.imported_count, "participant was", plural: "participants were") %> imported before the failure.
       </p>
       <div class="mt-4">
         <%= link_to "Try Again", new_admin_event_import_path(current_event), class: "px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700" %>

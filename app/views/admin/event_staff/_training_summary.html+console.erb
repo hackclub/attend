@@ -13,7 +13,7 @@
   <div class="cs-alert cs-alert-error">
     <%= cs_status_icon(:error) %>
     <div>
-      <p class="cs-alert-title"><%= summary[:untrained] %> of <%= summary[:required] %> people need to complete their training</p>
+      <p class="cs-alert-title"><%= summary[:untrained] %> of <%= pluralize(summary[:required], "person", plural: "people") %> <%= summary[:untrained] == 1 ? "needs" : "need" %> to complete their training</p>
       <p>They're marked "Not trained" below. Send them to <%= link_to training_url, training_url, class: "cs-link" %> to do it.</p>
     </div>
   </div>

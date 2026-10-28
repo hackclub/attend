@@ -48,7 +48,7 @@
         <% @enrollments.each do |enrollment| %>
           <tr>
             <td class="px-6 py-4"><%= link_to enrollment.user.display_name_or_fallback, admin_user_path(enrollment.user), class: "font-medium text-gray-900 hover:text-[#ec3750]" %><div class="text-gray-500"><%= enrollment.user.email %></div></td>
-            <td class="px-6 py-4 text-gray-600"><%= @completed_counts.fetch(enrollment.id, 0) %> of <%= @lessons.size %> lessons</td>
+            <td class="px-6 py-4 text-gray-600"><%= @completed_counts.fetch(enrollment.id, 0) %> of <%= pluralize(@lessons.size, "lesson") %></td>
             <td class="px-6 py-4 text-gray-600"><%= enrollment.completed_at ? "Completed #{l(enrollment.completed_at.to_date, format: :long)}" : "In progress" %></td>
           </tr>
         <% end %>
