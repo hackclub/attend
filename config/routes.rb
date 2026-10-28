@@ -606,6 +606,8 @@ Rails.application.routes.draw do
             get :roster
           end
           resources :notes, only: [ :index, :create ], controller: "notes"
+          # Global-admin only: the outcome of an on-device passport/ID card check.
+          resources :id_checks, only: [ :create ], controller: "id_checks"
         end
         resources :scan_contexts, only: [ :index ]
         resources :scans, only: [ :index, :create, :destroy ]

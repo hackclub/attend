@@ -36,6 +36,9 @@ Rails.application.config.filter_parameters += [
   :summary, :details, :actions_taken, :body,
   :staff_response, :requester_note, :requested_changes,
 
+  # ID documents (Api::V1::IdChecksController never accepts these; this is a backstop)
+  :document_number, :mrz, /\Acan\z/, :photo,
+
   # Legal
   :code_of_conduct_signature,
 
