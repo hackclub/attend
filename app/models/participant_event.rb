@@ -24,7 +24,11 @@ class ParticipantEvent < ApplicationRecord
 
   has_one :accommodation, dependent: :destroy
   has_one :medical, dependent: :destroy
-  has_one :room_assignment, dependent: :destroy
+  has_many :room_assignments, dependent: :destroy
+  has_many :rooming_roster_entries, dependent: :destroy
+  # The main-stay room. Pre/post-event stays live in room_assignments,
+  # one per rooming context.
+  has_one :room_assignment, -> { main_stay }
   has_one :room, through: :room_assignment
   has_many :roommate_preferences, dependent: :destroy
   has_many :roommate_exclusions, dependent: :destroy
@@ -239,7 +243,22 @@ class ParticipantEvent < ApplicationRecord
   end
 
   def assigned_to_room?
-    room_assignment.present?
+    room_assignments.any?
+  end
+
+  # Every room this person has, one per stay, in stay order. Reads the loaded
+  # association when it's preloaded (room_assignments: { room: :rooming_context }).
+  def rooms_by_stay
+    room_assignments.map(&:room).sort_by { |room| room.rooming_context.sort_key }
+  end
+
+  # "101", or with rooms in other stays "101, 204 (Night after)". A room in
+  # the stay during the event stays unlabelled, so events with only that
+  # stay read exactly as they did before stays existed.
+  def room_summary
+    rooms_by_stay.map do |room|
+      room.rooming_context.main? ? room.display_name : "#{room.display_name} (#{room.rooming_context.name})"
+    end.join(", ").presence
   end
 
   def waiver_signed?

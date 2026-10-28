@@ -75,7 +75,7 @@
       <%= f.button "Save waivers", class: "cs-btn cs-btn-primary" %>
     <% else %>
       <%= link_to "Exit setup", admin_event_dashboard_path(event.slug), class: "cs-btn cs-btn-link" %>
-      <%= link_to "Previous", admin_event_setup_modules_path(event), class: "cs-btn" %>
+      <%= link_to "Previous", admin_event_setup_stays_path(event), class: "cs-btn" %>
       <%= f.button "Next", class: "cs-btn cs-btn-primary" %>
     <% end %>
   </div>

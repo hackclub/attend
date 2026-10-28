@@ -147,7 +147,7 @@ RSpec.describe "Admin::EventSetup", type: :request do
   end
 
   describe "PATCH modules" do
-    it "updates config toggles and advances to waivers" do
+    it "updates config toggles and advances to extra nights" do
       patch admin_event_setup_modules_path(event), params: {
         event: { travel_enabled: "0", groups_enabled: "1", freedom_waivers_enabled: "0" }
       }
@@ -156,7 +156,7 @@ RSpec.describe "Admin::EventSetup", type: :request do
       expect(event.travel_enabled?).to be(false)
       expect(event.groups_enabled?).to be(true)
       expect(event.freedom_waivers_enabled?).to be(false)
-      expect(response).to redirect_to(admin_event_setup_waivers_path(event))
+      expect(response).to redirect_to(admin_event_setup_stays_path(event))
     end
   end
 

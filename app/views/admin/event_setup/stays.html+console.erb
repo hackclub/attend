@@ -1,0 +1,31 @@
+<% content_for :title, "Event Setup: Accommodation – Attend" %>
+
+<%= render layout: "wizard", locals: {
+      current_step: "stays",
+      title: "Accommodation",
+      description: "Add a stay for each stretch of accommodation you're providing, like a hotel during the event or the night before or after. Skip this if nobody needs a bed, for example everyone sleeps at the venue. You can add stays later."
+    } do %>
+  <div class="cs-stack">
+    <% if @event.accommodation_enabled? %>
+      <section class="cs-container">
+        <%= render "admin/rooming_stays/list", stays: @stays, roster_counts: @roster_counts, exempt_count: @exempt_count, return_to: "setup" %>
+      </section>
+
+      <%= render "admin/rooming_stays/form", stay: @new_stay, url: admin_event_rooming_stays_path(@event.slug), method: :post, submit: "Add stay", return_to: "setup" %>
+    <% else %>
+      <div class="cs-alert" role="status">
+        <%= cs_status_icon(:info) %>
+        <div>
+          <p class="cs-alert-title">Accommodation is off</p>
+          <p>Turn it on in <%= link_to "Modules", admin_event_setup_modules_path(@event), class: "cs-link" %> to set up stays and rooming.</p>
+        </div>
+      </div>
+    <% end %>
+
+    <div class="cs-wizard-actions">
+      <%= link_to "Exit setup", admin_event_dashboard_path(@event.slug), class: "cs-btn cs-btn-link" %>
+      <%= link_to "Previous", admin_event_setup_modules_path(@event), class: "cs-btn" %>
+      <%= link_to "Next", admin_event_setup_waivers_path(@event, return_to: params[:return_to].presence), class: "cs-btn cs-btn-primary" %>
+    </div>
+  </div>
+<% end %>

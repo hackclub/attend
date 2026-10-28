@@ -210,8 +210,10 @@ module Exports
     fields << Field.new(key: "accommodation.preferred_roommate_genders", label: "Preferred Roommate Genders",
                         category: "accommodation", type: :string, includes: :accommodation,
                         extractor: ->(pe) { pe.accommodation&.preferred_roommate_genders&.join(", ").presence })
+    # Every room, one per stay. Rooms in the stay during the event are
+    # unlabelled, so a single-stay event's export reads as it always did.
     fields << Field.new(key: "room.name", label: "Rooming Plan Room", category: "accommodation", type: :string,
-                        includes: :room, extractor: ->(pe) { pe.room&.name })
+                        includes: { room_assignments: { room: :rooming_context } }, extractor: ->(pe) { pe.room_summary })
 
     # --- dietary ---
     {

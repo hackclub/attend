@@ -31,6 +31,7 @@ RSpec.describe LinksToolbox do
         "event message/blast" => routes.admin_event_message_path(event_slug: "slug", id: "id"),
         "event groups" => routes.admin_event_groups_path(event_slug: "slug"),
         "rooming wizard" => routes.admin_event_rooming_wizard_path(event_slug: "slug"),
+        "accommodation stays" => routes.admin_event_rooming_stays_path(event_slug: "slug"),
         "check-in scanner" => routes.scanner_admin_event_scans_path(event_slug: "slug"),
         "travel calendar" => routes.admin_event_travel_path(event_slug: "slug"),
         "support ticket" => routes.support_ticket_path("id"),

@@ -1,0 +1,14 @@
+<% content_for :title, "Accommodation – Attend" %>
+<div class="w-full space-y-8">
+  <div>
+    <h1 class="text-2xl font-bold">Accommodation</h1>
+    <p class="text-sm text-gray-500 mt-1">One stay for each stretch of accommodation you're providing, like a hotel during the event or the night before or after. Each is either everyone with accommodation or only the people on its list, and each is roomed separately.</p>
+  </div>
+
+  <%= render "list", stays: @stays, roster_counts: @roster_counts, exempt_count: @exempt_count %>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-medium text-gray-900 mb-4">Add a stay</h2>
+    <%= render "form", stay: @new_stay, url: admin_event_rooming_stays_path(@event.slug), method: :post, submit: "Add stay" %>
+  </div>
+</div>

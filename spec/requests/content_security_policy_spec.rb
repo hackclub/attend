@@ -199,7 +199,8 @@ RSpec.describe "Content Security Policy", type: :request do
     # participant, so the counts here also pin that the delegated listeners
     # aren't being installed once per copy.
     describe "the rooming wizard in the #{ui}" do
-      let(:event) { create(:event) }
+      # The wizard needs a stay to room; one during the event is the usual.
+      let(:event) { create(:event).tap(&:main_rooming_context) }
       let(:admin) do
         User.create!(email: "csp-rooming@example.com", name: "CSP Rooming", global_role: "global_admin", admin_console_beta: console)
       end
@@ -223,8 +224,8 @@ RSpec.describe "Content Security Policy", type: :request do
       end
 
       it "the assignments step is clean, with one script per room partial" do
-        RoomingPlan.create!(event: event)
-        2.times { |i| Room.create!(event: event, name: "Room #{i}", capacity: 2) }
+        RoomingPlan.create!(rooming_context: event.main_rooming_context)
+        2.times { |i| Room.create!(rooming_context: event.main_rooming_context, name: "Room #{i}", capacity: 2) }
 
         expect_csp_clean(
           assignments_admin_event_rooming_wizard_path(event.slug),
@@ -233,7 +234,7 @@ RSpec.describe "Content Security Policy", type: :request do
       end
 
       it "the finalize step is clean" do
-        RoomingPlan.create!(event: event)
+        RoomingPlan.create!(rooming_context: event.main_rooming_context)
 
         expect_csp_clean(finalize_admin_event_rooming_wizard_path(event.slug), inline_scripts: admin_layout_inline_scripts + 1)
       end

@@ -116,6 +116,13 @@ tags:
     description: QR / NFC / manual scans and check-in.
   - name: Scan Contexts
     description: The scan stations configured for an event.
+  - name: Stays
+    description: >-
+      An event's stays — during the event, the night before, the night after —
+      and the roster of who's staying for each list-only stay. Built for a shop
+      that sells the night: add buyers to the roster on purchase, remove them
+      on refund. Accepts an event or series API key, or a global token scoped
+      to `rooming:write`.
   - name: Travel Calendar
     description: Chronological participant travel and pickup operations.
   - name: Slack Blasts
@@ -1944,6 +1951,171 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /events/{event_id}/stays:
+    get:
+      tags: [Stays]
+      summary: List stays
+      x-mint:
+        href: /api-reference/stays/list-stays
+      description: >-
+        Every stay at the event with its eligibility options, so an integration
+        can look up the stay and option ids the roster endpoints take. The main
+        stays with `enrollment: everyone` include everyone with accommodation
+        and have no roster.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: The event's stays, in order (before, during, after, other).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stays:
+                    type: array
+                    items: { $ref: "#/components/schemas/Stay" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/stays/{stay_id}/roster:
+    get:
+      tags: [Stays]
+      summary: List a stay's roster
+      x-mint:
+        href: /api-reference/stays/list-a-stays-roster
+      description: >-
+        Everyone on an eligible-only stay's roster. Filter by
+        `external_reference` to find the entry for an order.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/StayId"
+        - name: external_reference
+          in: query
+          required: false
+          schema: { type: string }
+          description: Only entries with this reference, e.g. a shop order id.
+        - name: participant_event_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+          description: Only this registration's entry.
+      responses:
+        "200":
+          description: The roster.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  roster:
+                    type: array
+                    items: { $ref: "#/components/schemas/StayRosterEntry" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: The stay includes everyone, so it has no roster.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    post:
+      tags: [Stays]
+      summary: Add someone to a stay's roster
+      x-mint:
+        href: /api-reference/stays/add-someone-to-a-stays-roster
+      description: >-
+        Puts a registered participant on an eligible-only stay's roster, which
+        makes them part of that stay's rooming pool. Identify them by
+        `participant_event_id` or by `email` (matched case-insensitively
+        against this event's registrations; Attend doesn't register anyone
+        here). Sending someone who's already on the roster updates their
+        entry and returns 200, so a retried webhook is safe. A blank option,
+        reference or note leaves the recorded one unchanged.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/StayId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: The buyer's email. Ignored when participant_event_id is sent.
+                participant_event_id:
+                  type: string
+                  format: uuid
+                eligibility_option_id:
+                  type: string
+                  format: uuid
+                  description: One of the stay's eligibility option ids.
+                eligibility_option:
+                  type: string
+                  description: >-
+                    An eligibility option's label, matched case-insensitively.
+                    Use this or eligibility_option_id.
+                  example: Bought it in the shop
+                external_reference:
+                  type: string
+                  description: Your own id for the purchase, e.g. an order number.
+                  example: order-1001
+                notes:
+                  type: string
+      responses:
+        "201":
+          description: Added to the roster.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StayRosterEntry" }
+        "200":
+          description: Already on the roster; entry updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StayRosterEntry" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: The stay, or a registration for that person at this event, wasn't found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: >-
+            Unknown eligibility option (the error lists the stay's options), or
+            the stay includes everyone and has no roster.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /events/{event_id}/stays/{stay_id}/roster/{id}:
+    delete:
+      tags: [Stays]
+      summary: Remove someone from a stay's roster
+      x-mint:
+        href: /api-reference/stays/remove-someone-from-a-stays-roster
+      description: >-
+        Takes someone off the roster, e.g. after a refund. Any room they had in
+        this stay is given up too; their other stays are untouched.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/StayId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+          description: The roster entry id.
+      responses:
+        "204":
+          description: Removed.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /events/{event_id}/travel:
     get:
       tags: [Travel Calendar]
@@ -3055,6 +3227,12 @@ components:
       required: true
       schema: { type: integer }
       description: The participant_event id — one person's registration for this event.
+    StayId:
+      name: stay_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+      description: A stay id from `GET /events/{event_id}/stays`.
     EventIdNumeric:
       name: event_id
       in: path
@@ -3145,6 +3323,56 @@ components:
       type: object
       properties:
         success: { type: boolean, example: true }
+
+    EligibilityOption:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string, example: Bought it in the shop }
+        price_cents: { type: integer, nullable: true, example: 4000 }
+
+    Stay:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, example: Post-event night }
+        kind:
+          type: string
+          enum: [pre_event, main, post_event, custom]
+          description: >-
+            When the stay is. `main` is the stay during the event (an event has
+            at most one); the others are before it, after it, or something else.
+        enrollment:
+          type: string
+          enum: [everyone, eligible_only]
+          description: >-
+            `everyone`: every registration with accommodation is in the pool
+            except anyone marked exempt. `eligible_only`: only people on the
+            roster.
+        starts_on: { type: string, format: date, nullable: true }
+        ends_on: { type: string, format: date, nullable: true }
+        eligibility_options:
+          type: array
+          items: { $ref: "#/components/schemas/EligibilityOption" }
+
+    StayRosterEntry:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        stay_id: { type: string, format: uuid }
+        participant_event_id: { type: string, format: uuid }
+        eligibility_option:
+          allOf: [{ $ref: "#/components/schemas/EligibilityOption" }]
+          nullable: true
+        source: { type: string, enum: [manual, csv, group, api] }
+        external_reference: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        in_rooming_pool:
+          type: boolean
+          description: >-
+            False until the registration is complete or in progress and has an
+            accommodation form, which rooming needs.
+        created_at: { type: string, format: date-time }
 
     ValidationError:
       type: object

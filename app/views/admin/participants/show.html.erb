@@ -163,10 +163,33 @@
               <dt class="text-gray-500">Preferred Roommate Genders</dt>
               <dd class="text-gray-900"><%= @accommodation.preferred_roommate_genders&.map(&:titleize)&.join(", ").presence || "—" %></dd>
             </div>
-            <div>
-              <dt class="text-gray-500">Assigned Room</dt>
-              <dd class="text-gray-900"><%= @accommodation.assigned_room || "Not assigned" %></dd>
+            <div class="sm:col-span-2">
+              <dt class="text-gray-500">Stays</dt>
+              <dd class="text-gray-900">
+                <% if @stays.any? %>
+                  <ul>
+                    <% @stays.each do |entry| %>
+                      <li>
+                        <%= entry.stay.name %>:
+                        <% if entry.room %>
+                          <%= link_to "Room #{entry.room.display_name}", assignments_admin_event_rooming_wizard_path(current_event, stay_id: (entry.stay.id unless entry.stay.main?)), class: "text-[#ec3750] hover:underline" %>
+                        <% else %>
+                          <span class="text-gray-500">no room yet</span>
+                        <% end %>
+                      </li>
+                    <% end %>
+                  </ul>
+                <% else %>
+                  <span class="text-gray-500">Not in any stay</span>
+                <% end %>
+              </dd>
             </div>
+            <% if @accommodation.assigned_room.present? %>
+              <div>
+                <dt class="text-gray-500">Room Note</dt>
+                <dd class="text-gray-900"><%= @accommodation.assigned_room %></dd>
+              </div>
+            <% end %>
             <% if @accommodation.roommate_preferences.present? %>
               <div class="col-span-2">
                 <dt class="text-gray-500">Roommate Preferences</dt>

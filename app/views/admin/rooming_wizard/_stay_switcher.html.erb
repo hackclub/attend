@@ -1,0 +1,26 @@
+<%# Which stay the wizard is working on. Each tab opens the same step for that
+    stay; the main stay's tab passes stay_id: nil so it drops the segment the
+    current request would otherwise carry over. %>
+<% stays = @event.rooming_contexts.ordered.to_a %>
+<div class="flex flex-wrap items-end justify-between gap-3 border-b border-gray-200">
+  <% if stays.size > 1 %>
+    <nav class="-mb-px flex gap-4" aria-label="Stays">
+      <% stays.each do |stay| %>
+        <% current = stay == @rooming_context %>
+        <%= link_to stay.name,
+            url_for(request.path_parameters.merge(stay_id: (stay.id unless stay.main?), only_path: true)),
+            class: "border-b-2 px-1 pb-2 text-sm font-medium #{current ? 'border-[#ec3750] text-[#ec3750]' : 'border-transparent text-gray-500 hover:text-gray-700'}",
+            "aria-current": ("page" if current) %>
+      <% end %>
+    </nav>
+  <% else %>
+    <span></span>
+  <% end %>
+  <div class="flex gap-4 pb-2 text-sm">
+    <% if @rooming_context.eligible_only? %>
+      <%= link_to "Who's staying (#{@rooming_context.roster_entries.size})",
+          admin_event_rooming_stay_roster_entries_path(@event.slug, @rooming_context), class: "font-medium text-[#ec3750] hover:underline" %>
+    <% end %>
+    <%= link_to "All stays", admin_event_rooming_stays_path(@event.slug, stay_id: nil), class: "text-gray-500 hover:text-gray-700" %>
+  </div>
+</div>

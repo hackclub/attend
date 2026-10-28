@@ -24,8 +24,15 @@ module Admin
       context_ids = @scan_contexts.map(&:id)
       today_by_context = today_scans.where(scan_context_id: context_ids).group(:scan_context_id).count
       total_by_context = all_scans.where(scan_context_id: context_ids).group(:scan_context_id).count
+      # A stay's arrival point is measured against the people with a room in
+      # that stay, so it reaches 100% when everyone expected has arrived.
+      stays = current_event.rooming_contexts.where(scan_context_id: context_ids).index_by(&:scan_context_id)
       @per_context_stats = @scan_contexts.map do |ctx|
-        { context: ctx, today: today_by_context[ctx.id] || 0, total: total_by_context[ctx.id] || 0 }
+        stay = stays[ctx.id]
+        {
+          context: ctx, today: today_by_context[ctx.id] || 0, total: total_by_context[ctx.id] || 0,
+          stay: stay, expected: stay&.expected_count, arrived: stay&.arrived_count
+        }
       end
 
       @recent_scans = all_scans
@@ -158,6 +165,10 @@ module Admin
       end
 
       participant = participant_event.participant
+      # At a stay's arrival point, the desk needs the room, and to know when
+      # someone has no room in that stay at all.
+      stay = scan_context.rooming_context
+      stay_room = stay && participant_event.room_assignments.find_by(rooming_context: stay)&.room
       # Flags only: the allergy free text stays on the medical page.
       food_safety = participant_event.food_safety_summary
 
@@ -173,6 +184,7 @@ module Admin
           checks_in: scan_context.checks_in,
           is_travel_pickup: scan_context.is_travel_pickup
         },
+        stay: stay && { name: stay.name, room: stay_room&.display_name },
         participant: {
           id: participant.id,
           participant_event_id: participant_event.id,

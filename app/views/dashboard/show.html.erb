@@ -500,7 +500,14 @@
       <% if @participant_event.accommodation.present? %>
         <div class="p-5">
           <h3 class="text-xs font-semibold text-(--text-muted) uppercase tracking-wide mb-3">Accommodation</h3>
+          <% stays = Rooming::ParticipantStays.for(@participant_event) %>
           <dl class="grid grid-cols-2 gap-4">
+            <% if stays.any? %>
+              <div class="col-span-2">
+                <dt class="text-xs text-(--text-muted)">Where you're staying</dt>
+                <dd class="text-(--text-strong)"><%= render "dashboard/stays", stays: stays, item_class: "text-sm" %></dd>
+              </div>
+            <% end %>
             <% if @participant_event.accommodation.gender_identity.present? %>
               <div>
                 <dt class="text-xs text-(--text-muted)">Gender identity</dt>
@@ -737,7 +744,14 @@
         <% if @participant_event.accommodation.present? %>
           <div class="rounded-xl bg-(--bg-elev-2) p-4">
             <h3 class="font-semibold text-(--text-strong) mb-3">Accommodation</h3>
+            <% stays = Rooming::ParticipantStays.for(@participant_event) %>
             <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              <% if stays.any? %>
+                <div class="md:col-span-2">
+                  <dt class="text-(--text-muted)">Where you're staying</dt>
+                  <dd class="text-(--text-strong)"><%= render "dashboard/stays", stays: stays, item_class: "" %></dd>
+                </div>
+              <% end %>
               <div>
                 <dt class="text-(--text-muted)">Gender identity</dt>
                 <dd class="font-medium text-(--text-strong)"><%= @participant_event.accommodation.gender_identity&.titleize || "—" %></dd>

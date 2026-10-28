@@ -99,6 +99,7 @@ class AuditLog < ApplicationRecord
     send_held_invitations: "send_held_invitations",
     destroy_avatar: "destroy_avatar",
     toggle_maintenance: "toggle_maintenance",
+    add_check_in_point: "add_check_in_point",
     toggle_twilio: "toggle_twilio",
     toggle_waiver_sending: "toggle_waiver_sending",
     update_twilio_from_number: "update_twilio_from_number",

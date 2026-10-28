@@ -168,10 +168,33 @@
                 <dt class="cs-kv-label">Preferred roommate genders</dt>
                 <dd class="cs-kv-value"><%= @accommodation.preferred_roommate_genders&.map(&:titleize)&.join(", ").presence || "—" %></dd>
               </div>
-              <div>
-                <dt class="cs-kv-label">Assigned room</dt>
-                <dd class="cs-kv-value"><%= @accommodation.assigned_room || "Not assigned" %></dd>
+              <div class="md:col-span-2">
+                <dt class="cs-kv-label">Stays</dt>
+                <dd class="cs-kv-value">
+                  <% if @stays.any? %>
+                    <ul>
+                      <% @stays.each do |entry| %>
+                        <li>
+                          <%= entry.stay.name %>:
+                          <% if entry.room %>
+                            <%= link_to "Room #{entry.room.display_name}", assignments_admin_event_rooming_wizard_path(current_event, stay_id: (entry.stay.id unless entry.stay.main?)), class: "cs-link" %>
+                          <% else %>
+                            <span class="cs-secondary">no room yet</span>
+                          <% end %>
+                        </li>
+                      <% end %>
+                    </ul>
+                  <% else %>
+                    <span class="cs-secondary">Not in any stay</span>
+                  <% end %>
+                </dd>
               </div>
+              <% if @accommodation.assigned_room.present? %>
+                <div>
+                  <dt class="cs-kv-label">Room note</dt>
+                  <dd class="cs-kv-value"><%= @accommodation.assigned_room %></dd>
+                </div>
+              <% end %>
               <% if @accommodation.roommate_preferences.present? %>
                 <div class="md:col-span-2">
                   <dt class="cs-kv-label">Roommate preferences</dt>

@@ -12,7 +12,8 @@
          "Your rooming preferences have been saved and are awaiting review by the rooming team."
        end %>
     <% show_privacy_note = !current_event.hide_privacy_notes? %>
-    <% if show_privacy_note || rooming_status %>
+    <% stays = Rooming::ParticipantStays.for(@participant_event) %>
+    <% if show_privacy_note || rooming_status || stays.any? %>
       <div class="portal-note portal-note-info mt-4">
         <% if show_privacy_note %>
           <p class="portal-body text-sm"><strong class="portal-heading">Who sees this?</strong> Rooming details are used by the event team to plan assignments and are visible to staff managing accommodation. Other attendees cannot see them. Your selections are recorded as requests, not confirmed placements.</p>
@@ -20,6 +21,10 @@
         <% end %>
         <% if rooming_status %>
           <p class="portal-body text-sm <%= "mt-2" if show_privacy_note %>"><%= rooming_status %></p>
+        <% end %>
+        <% if stays.any? %>
+          <p class="portal-body text-sm <%= "mt-2" if show_privacy_note || rooming_status %>"><strong class="portal-heading">Where you're staying</strong></p>
+          <%= render "dashboard/stays", stays: stays, item_class: "portal-body text-sm" %>
         <% end %>
       </div>
     <% end %>

@@ -127,7 +127,7 @@ module Admin
           scans: [ :scan_context, :user ],
           groups: []
         )
-        .preload(room: { participant_events: :participant })
+        .preload(room_assignments: { room: [ :rooming_context, { participant_events: :participant } ] })
 
       @sort_field = params[:sort] || "legal_last_name"
       @sort_direction = params[:direction] == "desc" ? "desc" : "asc"
@@ -153,6 +153,7 @@ module Admin
       @travel_inbound = @participant_event.travel_inbound&.tap { |t| t.travel_legs.load }
       @travel_outbound = @participant_event.travel_outbound&.tap { |t| t.travel_legs.load }
       @accommodation = @participant_event.accommodation
+      @stays = Rooming::ParticipantStays.for(@participant_event)
       @medical = @participant_event.medical
       @dietary = @participant_event.dietary
       @accessibility = @participant_event.accessibility
@@ -533,7 +534,7 @@ module Admin
       keys << [ "RegistrationChangeRequest", pe.registration_change_requests.pluck(:id) ]
       keys << [ "Note", policy_scope(pe.notes).pluck(:id) ]
       keys << [ "EmergencyContact", EmergencyContact.where(participant_event_id: pe.id).or(EmergencyContact.where(guardian_participant_event_id: gpe_ids)).pluck(:id) ]
-      keys << [ "RoomAssignment", Array(pe.room_assignment&.id) ]
+      keys << [ "RoomAssignment", pe.room_assignments.ids ]
       keys << [ "RoommatePreference", pe.roommate_preferences.pluck(:id) ]
       keys << [ "RoommateExclusion", pe.roommate_exclusions.pluck(:id) ]
 

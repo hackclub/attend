@@ -109,22 +109,35 @@
     <% end %>
   </td>
   <% end %>
+  <%# One line per stay they have a room in, so rooms and roommates line up.
+      A room in the stay during the event is unlabelled, as before stays. %>
+  <% rooms = pe.rooms_by_stay %>
   <td class="whitespace-nowrap" data-column="room">
-    <% if pe.room.present? %>
-      <%= link_to pe.room.display_name, finalize_admin_event_rooming_wizard_path(current_event), class: "cs-link" %>
+    <% if rooms.any? %>
+      <% rooms.each do |room| %>
+        <% stay = room.rooming_context %>
+        <div>
+          <%= link_to room.display_name, finalize_admin_event_rooming_wizard_path(current_event, stay_id: (stay.id unless stay.main?)), class: "cs-link" %>
+          <% unless stay.main? %><span class="cs-small cs-secondary"><%= stay.name %></span><% end %>
+        </div>
+      <% end %>
     <% else %>
       <span class="cs-muted">—</span>
     <% end %>
   </td>
   <td class="cs-secondary whitespace-nowrap" data-column="roommate">
-    <% if pe.room.present? %>
-      <% roommates = pe.room.participant_events.reject { |r| r.id == pe.id } %>
-      <% if roommates.any? %>
-        <% roommates.each_with_index do |r, i| %>
-          <%= link_to (r.participant.preferred_name.presence || r.participant.legal_first_name), admin_event_participant_path(current_event, r), class: "cs-link" %><%= ", " unless i == roommates.size - 1 %>
-        <% end %>
-      <% else %>
-        <span class="cs-muted">—</span>
+    <% if rooms.any? %>
+      <% rooms.each do |room| %>
+        <% roommates = room.participant_events.reject { |r| r.id == pe.id } %>
+        <div>
+          <% if roommates.any? %>
+            <% roommates.each_with_index do |r, i| %>
+              <%= link_to (r.participant.preferred_name.presence || r.participant.legal_first_name), admin_event_participant_path(current_event, r), class: "cs-link" %><%= ", " unless i == roommates.size - 1 %>
+            <% end %>
+          <% else %>
+            <span class="cs-muted">—</span>
+          <% end %>
+        </div>
       <% end %>
     <% else %>
       <span class="cs-muted">—</span>

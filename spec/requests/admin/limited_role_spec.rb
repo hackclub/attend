@@ -210,7 +210,7 @@ RSpec.describe "Limited event role", type: :request do
 
   describe "the rooming sheet" do
     it "leaves the date of birth column out of the CSV" do
-      room = event.rooms.create!(name: "101", capacity: 2)
+      room = event.main_rooming_context.rooms.create!(name: "101", capacity: 2)
       room.room_assignments.create!(participant_event: participant_event)
       sign_in_with_role("limited")
 

@@ -5,6 +5,7 @@ module Admin
     before_action :set_event
     before_action :require_event_selected
     before_action :authorize_rooming!
+    before_action :set_rooming_context
     before_action :set_rooming_plan
     before_action :require_unlocked!, only: %i[manual_assign auto_assign move_assignment create_room update_room destroy_room add_staff remove_staff toggle_exempt reorder_rooms]
 
@@ -35,7 +36,7 @@ module Admin
       ActiveRecord::Base.transaction do
         @rooming_plan.update!(room_capacity: default_capacity, status: :draft)
 
-        empty_rooms = @event.rooms
+        empty_rooms = @rooming_context.rooms
           .participant_rooms
           .left_joins(:room_assignments)
           .where(room_assignments: { id: nil })
@@ -50,7 +51,7 @@ module Admin
           existing_by_capacity[config[:capacity]] = available
 
           (config[:count] - reused.size).times do
-            @event.rooms.create!(capacity: config[:capacity])
+            @rooming_context.rooms.create!(capacity: config[:capacity])
           end
         end
 
@@ -61,15 +62,13 @@ module Admin
     end
 
     def preferences
-      @participant_events = scope_to_group(@event.participant_events)
+      @participant_events = scope_to_group(@rooming_context.participant_events)
         .includes(:event, :participant, :accommodation,
           roommate_preferences: { preferred_participant_event: :participant },
           roommate_exclusions: { excluded_participant_event: :participant })
-        .where(status: %w[complete in_progress])
-        .joins(:accommodation)
         .order("participants.legal_last_name ASC")
 
-      @unreviewed_count = @participant_events.joins(:accommodation).where(accommodations: { roommate_links_reviewed: false }).count
+      @unreviewed_count = @participant_events.where(accommodations: { roommate_links_reviewed: false }).count
     end
 
     def link_preference
@@ -122,7 +121,7 @@ module Admin
     end
 
     def auto_assign
-      result = Rooming::AutoAssignService.new(@event, group: selected_group).call
+      result = Rooming::AutoAssignService.new(@rooming_context, group: selected_group).call
 
       @rooming_plan.update!(status: :auto_assigned)
 
@@ -145,10 +144,10 @@ module Admin
       participant_event = @event.participant_events.find(params[:participant_event_id])
       room_id = params[:room_id]
 
-      participant_event.room_assignment&.destroy
+      assignment_in_context(participant_event)&.destroy
 
       if room_id.present?
-        room = @event.rooms.find(room_id)
+        room = @rooming_context.rooms.find(room_id)
 
         if room.has_staff?
           render json: { error: "Cannot assign participants to rooms with staff" }, status: :unprocessable_entity
@@ -183,7 +182,7 @@ module Admin
     end
 
     def create_room
-      room = @event.rooms.create!(
+      room = @rooming_context.rooms.create!(
         capacity: params[:capacity] || @rooming_plan.room_capacity,
         staff_only: params[:staff_only] == "true",
         name: params[:name].presence,
@@ -199,7 +198,7 @@ module Admin
     end
 
     def update_room
-      room = @event.rooms.find(params[:room_id])
+      room = @rooming_context.rooms.find(params[:room_id])
       room.update!(room_params)
 
       load_assignments_data
@@ -216,7 +215,7 @@ module Admin
     end
 
     def add_staff
-      room = @event.rooms.find(params[:room_id])
+      room = @rooming_context.rooms.find(params[:room_id])
       staff_name = params[:staff_name]&.strip
 
       if staff_name.blank?
@@ -252,7 +251,7 @@ module Admin
     end
 
     def remove_staff
-      room = @event.rooms.find(params[:room_id])
+      room = @rooming_context.rooms.find(params[:room_id])
       staff_name = params[:staff_name]
 
       current_staff = room.staff_names_list
@@ -273,7 +272,7 @@ module Admin
     end
 
     def destroy_room
-      room = @event.rooms.find(params[:room_id])
+      room = @rooming_context.rooms.find(params[:room_id])
 
       room.room_assignments.each do |assignment|
         assignment.destroy
@@ -294,7 +293,7 @@ module Admin
 
       ActiveRecord::Base.transaction do
         ids.each_with_index do |id, index|
-          @event.rooms.where(id: id).update_all(position: index)
+          @rooming_context.rooms.where(id: id).update_all(position: index)
         end
       end
 
@@ -302,7 +301,7 @@ module Admin
     end
 
     def acknowledge_trans_nb
-      assignment = RoomAssignment.joins(room: :event).where(events: { id: @event.id }).find(params[:assignment_id])
+      assignment = @rooming_context.room_assignments.find(params[:assignment_id])
       assignment.update!(trans_nb_acknowledged: true)
 
       head :ok
@@ -312,7 +311,7 @@ module Admin
       participant_event = @event.participant_events.find(params[:participant_event_id])
       accommodation = participant_event.accommodation
 
-      participant_event.room_assignment&.destroy if accommodation.rooming_exempt == false
+      assignment_in_context(participant_event)&.destroy if accommodation.rooming_exempt == false
 
       accommodation.update!(rooming_exempt: !accommodation.rooming_exempt)
 
@@ -331,10 +330,16 @@ module Admin
     end
 
     def finalize
-      @rooms = @event.rooms.includes(:event, room_assignments: { participant_event: [ :event, :participant, :accommodation, :scans ] }).order(:name, :created_at).load
+      @rooms = @rooming_context.rooms.includes(:event, room_assignments: { participant_event: [ :event, :participant, :accommodation, :scans ] }).order(:name, :created_at).load
       @stats = calculate_finalize_stats
-      # Anyone scanned at a Lodging point shows as arrived.
-      @lodging_scan_context_ids = @event.scan_contexts.lodging.ids.to_set
+      # Arrivals for this stay are scanned at its own check-in point, so a scan
+      # at another stay's hotel doesn't count. A stay without one falls back to
+      # any Lodging point.
+      @lodging_scan_context_ids = if @rooming_context.scan_context_id
+        Set[@rooming_context.scan_context_id]
+      else
+        @event.scan_contexts.lodging.ids.to_set
+      end
     end
 
     def do_finalize
@@ -347,7 +352,7 @@ module Admin
       respond_to do |format|
         format.html
         format.csv do
-          csv_data = Rooming::CsvExporter.new(@event, include_date_of_birth: can_view_participant_pii?).generate
+          csv_data = Rooming::CsvExporter.new(@event, rooming_context: @rooming_context, include_date_of_birth: can_view_participant_pii?).generate
           send_data csv_data,
             filename: "#{@event.slug}_rooming_#{Date.current.iso8601}.csv",
             type: "text/csv"
@@ -375,11 +380,30 @@ module Admin
       authorize @event, :manage_rooming?
     end
 
+    # The stay the URL names (/stays/:stay_id), else the during-the-event
+    # stay, else the first one. An event with no stays has nothing to room.
+    def set_rooming_context
+      @rooming_context = if params[:stay_id].present?
+        @event.rooming_contexts.find(params[:stay_id])
+      else
+        @event.rooming_contexts.find_by(kind: :main) || @event.rooming_contexts.ordered.first
+      end
+      return if @rooming_context
+
+      redirect_to admin_event_rooming_stays_path(@event.slug),
+        notice: "Add a stay first: who you're putting up, and when."
+    end
+
     def set_rooming_plan
-      @rooming_plan = @event.rooming_plan || @event.create_rooming_plan!(
+      @rooming_plan = @rooming_context.rooming_plan || @rooming_context.create_rooming_plan!(
+        event: @event,
         created_by_user: current_user,
         room_capacity: 2
       )
+    end
+
+    def assignment_in_context(participant_event)
+      participant_event.room_assignments.find_by(rooming_context: @rooming_context)
     end
 
     def room_params
@@ -405,7 +429,7 @@ module Admin
       when "preferences_linked"
         assignments_admin_event_rooming_wizard_path(@event.slug)
       else
-        if @event.rooms.any?
+        if @rooming_context.rooms.any?
           preferences_admin_event_rooming_wizard_path(@event.slug)
         else
           setup_admin_event_rooming_wizard_path(@event.slug)
@@ -414,38 +438,27 @@ module Admin
     end
 
     def load_assignments_data
-      @rooms = @event.rooms
+      @rooms = @rooming_context.rooms
         .includes(:event, room_assignments: { participant_event: [ :event, :accommodation, { participant: :sibling_groups } ] })
         .ordered
         .load
-      @unassigned = scope_to_group(@event.participant_events)
+      @unassigned = scope_to_group(@rooming_context.assignable_participant_events)
         .includes(:event, :accommodation, :roommate_preferences, participant: :sibling_groups)
-        .left_joins(:room_assignment)
-        .where(room_assignments: { id: nil })
-        .where(status: %w[complete in_progress])
-        .joins(:accommodation)
-        .where(accommodations: { rooming_exempt: false })
+        .where.not(id: @rooming_context.room_assignments.select(:participant_event_id))
         .load
 
-      @exempt = scope_to_group(@event.participant_events)
+      @exempt = scope_to_group(@rooming_context.exempt_participant_events)
         .includes(:event, :accommodation)
-        .where(status: %w[complete in_progress])
-        .joins(:accommodation)
-        .where(accommodations: { rooming_exempt: true })
         .load
 
-      @needs_acknowledgment = RoomAssignment
-        .joins(room: :event)
-        .where(events: { id: @event.id })
+      @needs_acknowledgment = @rooming_context.room_assignments
         .needing_acknowledgment
         .load
     end
 
     def calculate_participant_stats
-      participant_events = scope_to_group(@event.participant_events)
+      participant_events = scope_to_group(@rooming_context.participant_events)
         .includes(:participant, :accommodation)
-        .where(status: %w[complete in_progress])
-        .joins(:accommodation)
 
       event_date = @event.local_start_date || Date.current
 
@@ -531,9 +544,9 @@ module Admin
 
       {
         total_rooms: rooms.size,
-        assigned_participants: RoomAssignment.joins(room: :event).where(events: { id: @event.id }).count,
-        unassigned_participants: @event.participant_events.left_joins(:room_assignment).where(room_assignments: { id: nil }).where(status: %w[complete in_progress]).joins(:accommodation).count,
-        rooms_needing_acknowledgment: RoomAssignment.joins(room: :event).where(events: { id: @event.id }).needing_acknowledgment.select(:room_id).distinct.count,
+        assigned_participants: @rooming_context.room_assignments.count,
+        unassigned_participants: @rooming_context.participant_events.where.not(id: @rooming_context.room_assignments.select(:participant_event_id)).count,
+        rooms_needing_acknowledgment: @rooming_context.room_assignments.needing_acknowledgment.select(:room_id).distinct.count,
         rooms_with_age_gap: rooms.select { |r| r.age_gap > 2 }.count
       }
     end

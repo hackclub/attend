@@ -72,7 +72,9 @@ RSpec.describe "Admin console breadcrumbs", type: :request do
       expect_trail admin_event_scans_path(event), *e, "Check-ins"
       expect_trail admin_event_scan_contexts_path(event), *e, "Check-ins", "Scan contexts"
       expect_trail admin_event_travel_path(event), *e, "Travel calendar"
+      event.main_rooming_context
       expect_trail setup_admin_event_rooming_wizard_path(event.slug), *e, "Rooming"
+      expect_trail admin_event_rooming_stays_path(event.slug), *e, "Accommodation"
       expect_trail admin_event_groups_path(event), *e, "Groups"
       expect_trail admin_event_messages_path(event), *e, "Messages"
       expect_trail new_admin_event_message_path(event), *e, "Messages", "Compose message"

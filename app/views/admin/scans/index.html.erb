@@ -66,6 +66,12 @@
                   <% if row[:context].is_travel_pickup? %><span class="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">Travel pickup</span><% end %>
                   <% if row[:context].checks_in? %><span class="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium">Check-in</span><% end %>
                 </div>
+                <% if row[:stay] %>
+                  <% pct = row[:expected].positive? ? (100 * row[:arrived] / row[:expected]) : 0 %>
+                  <p class="text-xs text-gray-500 mt-0.5">
+                    <%= row[:arrived] %> of <%= pluralize(row[:expected], "person") %> with a room in <%= link_to row[:stay].name, admin_event_rooming_wizard_path(current_event.slug, stay_id: (row[:stay].id unless row[:stay].main?)), class: "text-[#ec3750] hover:underline" %> arrived<% if row[:expected].positive? %> · <span class="font-semibold text-[#1f2d3d]"><%= pct %>%</span><% end %>
+                  </p>
+                <% end %>
               </div>
               <div class="flex items-baseline gap-3 text-sm">
                 <span class="text-gray-500"><span class="font-semibold text-[#1f2d3d]"><%= row[:today] %></span> today</span>

@@ -44,7 +44,7 @@
       <%= nav_link.call("Travel calendar", admin_event_travel_path(current_event), request.path == admin_event_travel_path(current_event), :travel) %>
     <% end %>
     <% if current_event.accommodation_enabled? %>
-      <%= nav_link.call("Rooming", admin_event_rooming_wizard_path(current_event), request.path.include?("/rooming_wizard"), :rooming) %>
+      <%= nav_link.call("Rooming", admin_event_rooming_wizard_path(current_event), request.path.match?(%r{/rooming_wizard|/events/[^/]+/stays}), :rooming) %>
     <% end %>
     <% if current_event.groups_enabled? %>
       <%= nav_link.call("Groups", admin_event_groups_path(current_event), request.path.include?("/groups"), :groups) %>

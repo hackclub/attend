@@ -109,7 +109,9 @@ class Event < ApplicationRecord
   has_many :slack_blasts, dependent: :destroy
   has_many :messages, dependent: :destroy
   has_many :scan_contexts, dependent: :destroy
-  has_many :rooms, dependent: :destroy
+  has_many :rooming_contexts, dependent: :destroy
+  has_many :rooming_plans
+  has_many :rooms
   has_many :groups, dependent: :destroy
   has_many :export_templates, dependent: :destroy
   has_many :custom_documents, dependent: :destroy
@@ -117,7 +119,6 @@ class Event < ApplicationRecord
   has_many :email_logs, dependent: :nullify
   has_many :incident_reports, dependent: :nullify
   has_many :tickets, dependent: :nullify
-  has_one :rooming_plan, dependent: :destroy
   has_one :airtable_connection, dependent: :destroy
   belongs_to :hotel_scan_context, class_name: "ScanContext", optional: true
   belongs_to :airtable_config_updated_by, class_name: "User", optional: true
@@ -425,6 +426,17 @@ class Event < ApplicationRecord
 
   def visa_options_enabled?
     ActiveModel::Type::Boolean.new.cast(visa_options_enabled)
+  end
+
+  # Finds or creates the stay during the event. Nothing in the app creates a
+  # stay implicitly (organizers add them, and an event may have none), so
+  # this is for callers that explicitly want that stay. Two requests racing
+  # to create it both land on the one row the partial unique index allows.
+  def main_rooming_context
+    rooming_contexts.find_by(kind: :main) ||
+      rooming_contexts.create!(kind: :main, name: RoomingContext::MAIN_NAME, enrollment: :everyone)
+  rescue ActiveRecord::RecordNotUnique
+    rooming_contexts.find_by!(kind: :main)
   end
 
   def accommodation_enabled?

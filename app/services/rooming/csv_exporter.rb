@@ -3,13 +3,14 @@ module Rooming
     # `include_date_of_birth: false` drops the DOB column entirely, for the
     # PII-restricted roles that can run rooming but not see exact birthdays.
     # Age at Event is kept either way — it's what the sheet is actually for.
-    def initialize(event, include_date_of_birth: true)
+    def initialize(event, rooming_context:, include_date_of_birth: true)
       @event = event
+      @rooming_context = rooming_context
       @include_date_of_birth = include_date_of_birth
     end
 
     def generate
-      rooms = @event.rooms
+      rooms = @rooming_context.rooms
         .includes(room_assignments: { participant_event: :participant })
         .order(:name, :created_at)
 

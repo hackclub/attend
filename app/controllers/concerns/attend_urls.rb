@@ -36,7 +36,11 @@ module AttendUrls
 
   def event_groups_url(event) = attend_url(routes.admin_event_groups_path(event_slug: event.slug))
 
-  def event_rooming_url(event) = attend_url(routes.admin_event_rooming_wizard_path(event_slug: event.slug))
+  def event_rooming_url(event, stay: nil)
+    attend_url(routes.admin_event_rooming_wizard_path(event_slug: event.slug, stay_id: (stay.id if stay && !stay.main?)))
+  end
+
+  def event_stays_url(event) = attend_url(routes.admin_event_rooming_stays_path(event_slug: event.slug))
 
   def event_scanner_url(event) = attend_url(routes.scanner_admin_event_scans_path(event_slug: event.slug))
 

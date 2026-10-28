@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_27_210000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_28_120200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1132,12 +1132,40 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_27_210000) do
     t.jsonb "flags", default: {}, null: false
     t.uuid "participant_event_id", null: false
     t.uuid "room_id", null: false
+    t.uuid "rooming_context_id", null: false
     t.boolean "staff_override", default: false, null: false
     t.text "staff_override_notes"
     t.boolean "trans_nb_acknowledged", default: false, null: false
     t.datetime "updated_at", null: false
-    t.index ["participant_event_id"], name: "index_room_assignments_on_participant_event_id", unique: true
+    t.index ["participant_event_id", "rooming_context_id"], name: "index_room_assignments_one_per_person_per_context", unique: true
+    t.index ["participant_event_id"], name: "index_room_assignments_on_participant_event_id"
     t.index ["room_id"], name: "index_room_assignments_on_room_id"
+    t.index ["rooming_context_id"], name: "index_room_assignments_on_rooming_context_id"
+  end
+
+  create_table "rooming_contexts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.date "ends_on"
+    t.string "enrollment", default: "eligible_only", null: false
+    t.uuid "event_id", null: false
+    t.string "kind", default: "custom", null: false
+    t.string "name", null: false
+    t.uuid "scan_context_id"
+    t.date "starts_on"
+    t.datetime "updated_at", null: false
+    t.index ["event_id", "name"], name: "index_rooming_contexts_on_event_id_and_name", unique: true
+    t.index ["event_id"], name: "index_rooming_contexts_one_main_per_event", unique: true, where: "((kind)::text = 'main'::text)"
+    t.index ["scan_context_id"], name: "index_rooming_contexts_on_scan_context_id", unique: true
+  end
+
+  create_table "rooming_eligibility_options", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "label", null: false
+    t.integer "position"
+    t.integer "price_cents"
+    t.uuid "rooming_context_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["rooming_context_id", "label"], name: "idx_on_rooming_context_id_label_c9b2ad4987", unique: true
   end
 
   create_table "rooming_plans", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1148,10 +1176,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_27_210000) do
     t.uuid "finalized_by_user_id"
     t.boolean "locked", default: false, null: false
     t.integer "room_capacity", default: 2, null: false
+    t.uuid "rooming_context_id", null: false
     t.jsonb "settings", default: {}, null: false
     t.string "status", default: "draft", null: false
     t.datetime "updated_at", null: false
-    t.index ["event_id"], name: "index_rooming_plans_on_event_id", unique: true
+    t.index ["event_id"], name: "index_rooming_plans_on_event_id"
+    t.index ["rooming_context_id"], name: "index_rooming_plans_on_rooming_context_id", unique: true
+  end
+
+  create_table "rooming_roster_entries", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "added_by_user_id"
+    t.datetime "created_at", null: false
+    t.string "external_reference"
+    t.text "notes"
+    t.uuid "participant_event_id", null: false
+    t.uuid "rooming_context_id", null: false
+    t.uuid "rooming_eligibility_option_id"
+    t.string "source", default: "manual", null: false
+    t.datetime "updated_at", null: false
+    t.index ["added_by_user_id"], name: "index_rooming_roster_entries_on_added_by_user_id"
+    t.index ["participant_event_id"], name: "index_rooming_roster_entries_on_participant_event_id"
+    t.index ["rooming_context_id", "participant_event_id"], name: "index_rooming_roster_entries_one_per_person_per_context", unique: true
+    t.index ["rooming_eligibility_option_id"], name: "index_rooming_roster_entries_on_rooming_eligibility_option_id"
   end
 
   create_table "roommate_exclusions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1181,12 +1227,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_27_210000) do
     t.string "name"
     t.text "notes"
     t.integer "position"
+    t.uuid "rooming_context_id", null: false
     t.text "staff_names"
     t.boolean "staff_only", default: false, null: false
     t.datetime "updated_at", null: false
-    t.index ["event_id", "name"], name: "index_rooms_on_event_id_and_name", unique: true, where: "(name IS NOT NULL)"
     t.index ["event_id", "position"], name: "index_rooms_on_event_id_and_position"
     t.index ["event_id"], name: "index_rooms_on_event_id"
+    t.index ["rooming_context_id", "name"], name: "index_rooms_on_rooming_context_id_and_name", unique: true, where: "(name IS NOT NULL)"
+    t.index ["rooming_context_id"], name: "index_rooms_on_rooming_context_id"
   end
 
   create_table "safeguarding_infos", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1784,15 +1832,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_27_210000) do
   add_foreign_key "registration_change_requests", "users", column: "requested_by_id"
   add_foreign_key "registration_change_requests", "users", column: "resolved_by_id"
   add_foreign_key "room_assignments", "participant_events"
+  add_foreign_key "room_assignments", "rooming_contexts"
   add_foreign_key "room_assignments", "rooms"
+  add_foreign_key "rooming_contexts", "events"
+  add_foreign_key "rooming_contexts", "scan_contexts", on_delete: :nullify
+  add_foreign_key "rooming_eligibility_options", "rooming_contexts"
   add_foreign_key "rooming_plans", "events"
+  add_foreign_key "rooming_plans", "rooming_contexts"
   add_foreign_key "rooming_plans", "users", column: "created_by_user_id"
   add_foreign_key "rooming_plans", "users", column: "finalized_by_user_id"
+  add_foreign_key "rooming_roster_entries", "participant_events"
+  add_foreign_key "rooming_roster_entries", "rooming_contexts"
+  add_foreign_key "rooming_roster_entries", "rooming_eligibility_options", on_delete: :nullify
+  add_foreign_key "rooming_roster_entries", "users", column: "added_by_user_id", on_delete: :nullify
   add_foreign_key "roommate_exclusions", "participant_events"
   add_foreign_key "roommate_exclusions", "participant_events", column: "excluded_participant_event_id"
   add_foreign_key "roommate_preferences", "participant_events"
   add_foreign_key "roommate_preferences", "participant_events", column: "preferred_participant_event_id"
   add_foreign_key "rooms", "events"
+  add_foreign_key "rooms", "rooming_contexts"
   add_foreign_key "safeguarding_infos", "participant_events"
   add_foreign_key "scan_contexts", "events"
   add_foreign_key "scans", "participant_events"
