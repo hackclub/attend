@@ -672,6 +672,18 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(participant).to have_attributes(legal_first_name: "Daniel", preferred_name: "Dana")
     end
 
+    it "records an address sent with the invitation" do
+      invite(email: "addressed@example.com", address_line_1: " 742 Evergreen Terrace ", city: "Springfield",
+        state: "OR", postal_code: "97403", country: "US")
+
+      expect(response).to have_http_status(:created)
+      participant = Participant.find(JSON.parse(response.body)["participant_id"])
+      expect(participant).to have_attributes(
+        address_line_1: "742 Evergreen Terrace", address_line_2: nil, city: "Springfield",
+        state: "OR", postal_code: "97403", country_of_residence: "United States"
+      )
+    end
+
     it "accepts a country by name" do
       invite(email: "named-country@example.com", country: "united kingdom")
 
@@ -690,6 +702,16 @@ RSpec.describe "Api::V1::Participants", type: :request do
         legal_first_name: "Ada", legal_last_name: "Okafor",
         date_of_birth: Date.new(2008, 1, 31), phone: "+12025550100"
       )
+    end
+
+    it "leaves a returning person's partial address alone rather than completing it from the invitation" do
+      existing = create(:participant, email: "half-address@example.com", address_line_1: "742 Evergreen Terrace",
+        city: nil, postal_code: nil)
+
+      invite(email: "half-address@example.com", address_line_1: "1 Other Road", city: "Shelbyville", postal_code: "97000")
+
+      expect(response).to have_http_status(:created)
+      expect(existing.reload).to have_attributes(address_line_1: "742 Evergreen Terrace", city: nil, postal_code: nil)
     end
 
     it "logs what it fills in on a returning person's record" do
@@ -832,6 +854,38 @@ RSpec.describe "Api::V1::Participants", type: :request do
         expect(JSON.parse(response.body)["skipped_fields"]).to eq([ "legal_first_name" ])
         expect(participant.reload.legal_first_name).to eq("Robin")
       end
+
+      it "fills in an address when none is on file" do
+        patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+          params: {
+            fill_blanks: true,
+            participant: { address_line_1: "742 Evergreen Terrace", city: "Springfield", state: "OR", postal_code: "97403" }
+          },
+          headers: api_key_headers
+
+        expect(response).to have_http_status(:ok)
+        expect(JSON.parse(response.body)["skipped_fields"]).to eq([])
+        expect(participant.reload).to have_attributes(
+          address_line_1: "742 Evergreen Terrace", city: "Springfield", state: "OR", postal_code: "97403"
+        )
+      end
+
+      it "treats the address as one value, skipping all of it when any part is on file" do
+        participant.update!(address_line_1: "742 Evergreen Terrace", city: nil, state: nil, postal_code: nil)
+
+        patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+          params: {
+            fill_blanks: true,
+            participant: { address_line_1: "1 Other Road", city: "Shelbyville", postal_code: "97000", date_of_birth: "2008-06-01" }
+          },
+          headers: api_key_headers
+
+        expect(response).to have_http_status(:ok)
+        expect(JSON.parse(response.body)["skipped_fields"]).to contain_exactly("address_line_1", "city", "postal_code")
+        expect(participant.reload).to have_attributes(
+          address_line_1: "742 Evergreen Terrace", city: nil, postal_code: nil, date_of_birth: Date.new(2008, 6, 1)
+        )
+      end
     end
 
     it "rejects an empty request rather than reporting a no-op as success" do
@@ -862,6 +916,25 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(body["email"]).to eq(participant.email)
       log = AuditLog.find_by(action: "update", event: event)
       expect(log.metadata["source"]).to eq("event_api")
+    end
+
+    it "lets a series API key write an address it is not allowed to read back" do
+      series = create(:event_series)
+      event.update!(event_series: series)
+      owner = create(:user).tap { |user| SeriesRoleAssignment.create!(user: user, event_series: series, role: "owner") }
+      token = SeriesApiToken.generate_for(series, user: owner, name: "addresses")
+
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        params: { participant: { address_line_1: "742 Evergreen Terrace", address_line_2: "Apt 2", city: "Springfield" } },
+        headers: { "Authorization" => "Bearer #{token.token}" }
+
+      expect(response).to have_http_status(:ok)
+      expect(participant.reload).to have_attributes(
+        address_line_1: "742 Evergreen Terrace", address_line_2: "Apt 2", city: "Springfield"
+      )
+      expect(response.body).not_to include("Evergreen")
+      expect(AuditLog.record_update.find_by(record: participant).changed_fields.keys)
+        .to include("address_line_1", "address_line_2", "city")
     end
 
     it "redacts the encrypted phone from the audit log like the web path does" do
