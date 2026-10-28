@@ -60,6 +60,12 @@
                       <% if row[:context].is_travel_pickup? %><%= cs_badge("Travel pickup", "blue") %><% end %>
                       <% if row[:context].checks_in? %><%= cs_badge("Check-in", "green") %><% end %>
                     </div>
+                    <% if row[:stay] %>
+                      <% pct = row[:expected].positive? ? (100 * row[:arrived] / row[:expected]) : 0 %>
+                      <div class="cs-small cs-secondary mt-1">
+                        <%= row[:arrived] %> of <%= pluralize(row[:expected], "person") %> with a room in <%= link_to row[:stay].name, admin_event_rooming_wizard_path(current_event.slug, stay_id: (row[:stay].id unless row[:stay].main?)), class: "cs-link" %> arrived<% if row[:expected].positive? %> · <span class="tabular-nums font-bold"><%= pct %>%</span><% end %>
+                      </div>
+                    <% end %>
                   </td>
                   <td class="text-right tabular-nums"><%= row[:today] %></td>
                   <td class="text-right tabular-nums"><%= row[:total] %></td>

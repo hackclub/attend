@@ -442,10 +442,14 @@ function groupBadgeHtml(group, fallbackColor) {
     const status = formatStatus(data.participant);
     const at = data.scanned_at ? new Date(data.scanned_at) : new Date();
     const time = at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const detail = [status && `Status: ${status}`, data.scanned_by && `by ${data.scanned_by}`, time].filter(Boolean).join(' · ');
+    // At a stay's arrival point: their room, or a warning that they have none.
+    const stay = data.stay;
+    const notRoomed = stay && !stay.room;
+    if (notRoomed) message += ` · no room in ${stay.name}`;
+    const detail = [stay && stay.room && `Room ${stay.room}`, status && `Status: ${status}`, data.scanned_by && `by ${data.scanned_by}`, time].filter(Boolean).join(' · ');
 
     const flagged = ['Withdrawn', 'Rejected'].includes(data.participant.display_status);
-    showResult(message, flagged || !firstScan ? 'warning' : 'success', { detail });
+    showResult(message, flagged || notRoomed || !firstScan ? 'warning' : 'success', { detail });
   }
 
   // POSTs a scan and turns every way it can fail into something a person at

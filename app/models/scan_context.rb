@@ -5,6 +5,9 @@ class ScanContext < ApplicationRecord
 
   belongs_to :event
   has_many :scans, dependent: :destroy
+  # The stay this is the arrival point for, if any: its numbers count only
+  # people with a room in that stay.
+  has_one :rooming_context, dependent: nil
 
   # What a scan here says about where the participant is, with the one-line
   # meaning staff see wherever they choose one. The kind is the source of

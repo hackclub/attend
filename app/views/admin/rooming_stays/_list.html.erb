@@ -13,6 +13,7 @@
           <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">When</th>
           <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Who's in it</th>
           <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rooms</th>
+          <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Arrived</th>
           <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
         </tr>
       </thead>
@@ -42,6 +43,15 @@
               <% end %>
             </td>
             <td class="px-4 py-3 whitespace-nowrap"><%= stay.rooms.size %></td>
+            <td class="px-4 py-3 whitespace-nowrap">
+              <% if stay.scan_context %>
+                <% expected = stay.expected_count %>
+                <span><%= stay.arrived_count %> of <%= expected %></span>
+                <div class="text-xs text-gray-500">at <%= stay.scan_context.name %></div>
+              <% else %>
+                <%= button_to "Add check-in point", add_check_in_point_admin_event_rooming_stay_path(@event.slug, stay, return_to: local_assigns[:return_to]), class: "text-[#ec3750] hover:underline", form: { class: "contents" } %>
+              <% end %>
+            </td>
             <td class="px-4 py-3 whitespace-nowrap">
               <div class="flex items-center gap-3">
                 <%= link_to "Rooming", admin_event_rooming_wizard_path(@event.slug, stay_id: (stay.id unless stay.main?)), class: "text-[#ec3750] hover:underline" %>

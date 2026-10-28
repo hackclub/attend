@@ -8,7 +8,7 @@ module Admin
     before_action :set_event
     before_action :require_event_selected
     before_action :authorize_rooming!
-    before_action :set_stay, only: %i[edit update destroy]
+    before_action :set_stay, only: %i[edit update destroy add_check_in_point]
 
     BLANK_OPTION_ROWS = 2
 
@@ -44,6 +44,13 @@ module Admin
       end
     end
 
+    # For a stay that predates check-in points. New stays get theirs when
+    # they're created.
+    def add_check_in_point
+      @record = @stay.create_check_in_point!
+      redirect_to after_save_path, notice: "#{@record.name} added as a scan point."
+    end
+
     # Removing a stay takes its rooms, room assignments and list with it.
     def destroy
       @record = @stay
@@ -76,7 +83,7 @@ module Admin
     end
 
     def self.stays_overview(event)
-      stays = event.rooming_contexts.ordered.includes(:eligibility_options, :rooms).to_a
+      stays = event.rooming_contexts.ordered.includes(:eligibility_options, :rooms, :scan_context).to_a
       roster_counts = RoomingRosterEntry.where(rooming_context: stays).group(:rooming_context_id).count
       exempt_count = event.participant_events.where(status: %w[complete in_progress])
         .joins(:accommodation).where(accommodations: { rooming_exempt: true }).count

@@ -13,6 +13,7 @@
           <th scope="col">When</th>
           <th scope="col">Who's in it</th>
           <th scope="col">Rooms</th>
+          <th scope="col">Arrived</th>
           <th scope="col">Actions</th>
         </tr>
       </thead>
@@ -42,6 +43,15 @@
               <% end %>
             </td>
             <td class="whitespace-nowrap"><%= stay.rooms.size %></td>
+            <td class="whitespace-nowrap">
+              <% if stay.scan_context %>
+                <% expected = stay.expected_count %>
+                <span class="tabular-nums"><%= stay.arrived_count %> of <%= expected %></span>
+                <div class="cs-small cs-secondary">at <%= stay.scan_context.name %></div>
+              <% else %>
+                <%= button_to "Add check-in point", add_check_in_point_admin_event_rooming_stay_path(@event.slug, stay, return_to: local_assigns[:return_to]), class: "cs-btn cs-btn-link", form: { class: "contents" } %>
+              <% end %>
+            </td>
             <td class="whitespace-nowrap">
               <div class="flex items-center gap-1">
                 <%= link_to "Rooming", admin_event_rooming_wizard_path(@event.slug, stay_id: (stay.id unless stay.main?)), class: "cs-btn cs-btn-link" %>

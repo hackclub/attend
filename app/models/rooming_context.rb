@@ -19,6 +19,9 @@ class RoomingContext < ApplicationRecord
   }.freeze
 
   belongs_to :event
+  # The lodging scan point people are scanned at on arrival for this stay.
+  # Its arrival numbers count only people with a room in the stay.
+  belongs_to :scan_context, optional: true
   has_one :rooming_plan, dependent: :destroy
   has_many :rooms, dependent: :destroy
   has_many :room_assignments
@@ -45,6 +48,10 @@ class RoomingContext < ApplicationRecord
   validates :name, presence: true, uniqueness: { scope: :event_id }
   validates :kind, uniqueness: { scope: :event_id, message: "already has a during-the-event stay" }, if: :main?
   validate :ends_on_after_starts_on
+
+  after_create :create_check_in_point!
+  after_update :rename_check_in_point, if: :saved_change_to_name?
+  before_destroy :release_check_in_point
 
   # In the order they happen: before, during, after, then anything else.
   scope :ordered, -> { in_order_of(:kind, KIND_LABELS.keys).order(:starts_on, :created_at) }
@@ -79,7 +86,73 @@ class RoomingContext < ApplicationRecord
     participant_events.where(accommodations: { rooming_exempt: true })
   end
 
+  # Gives the stay a lodging scan point, unless it has one. A stay during the
+  # event adopts the event's hotel scan point when there's a free one, and
+  # becomes it when there isn't, so the existing hotel features keep working.
+  def create_check_in_point!
+    return scan_context if scan_context
+
+    point = adoptable_hotel_scan_context || event.scan_contexts.create!(
+      name: check_in_point_name,
+      kind: "lodging",
+      usage_note: "Arrivals for #{name}. Counts only people with a room in this stay."
+    )
+    # Columns, not update!: a failed update! inside after_create is swallowed
+    # by save and surfaces as a blank 422. The point is built for this event,
+    # so the validations update! would run hold already.
+    update_column(:scan_context_id, point.id)
+    self.scan_context = point
+    event.update_column(:hotel_scan_context_id, point.id) if main? && event.hotel_scan_context_id.nil?
+    point
+  end
+
+  # Everyone with a room in this stay: who the check-in point expects.
+  def expected_participant_event_ids
+    room_assignments.select(:participant_event_id)
+  end
+
+  def expected_count
+    room_assignments.count
+  end
+
+  # Expected people with at least one scan at the stay's check-in point.
+  def arrived_count
+    return 0 unless scan_context
+
+    room_assignments.where(participant_event_id: scan_context.scans.select(:participant_event_id)).count
+  end
+
   private
+
+  def check_in_point_name(stay_name = name)
+    "#{stay_name} arrivals"
+  end
+
+  def adoptable_hotel_scan_context
+    return unless main?
+
+    hotel = event.hotel_scan_context
+    hotel if hotel && !RoomingContext.where(scan_context: hotel).where.not(id: id).exists?
+  end
+
+  # Only renames a point that still has the name it was given, so one an
+  # organizer has renamed keeps their name.
+  def rename_check_in_point
+    return unless scan_context&.name == check_in_point_name(name_before_last_save)
+
+    scan_context.update!(name: check_in_point_name)
+  end
+
+  # A point nobody was scanned at goes with the stay. One with scans stays
+  # for the record, as does the event's hotel point, which may predate
+  # stays; the foreign key drops the link either way.
+  def release_check_in_point
+    point = scan_context
+    return if point.nil? || point.scans.exists? || event.hotel_scan_context_id == point.id
+
+    update_column(:scan_context_id, nil)
+    point.destroy!
+  end
 
   def ends_on_after_starts_on
     return unless starts_on && ends_on && ends_on < starts_on

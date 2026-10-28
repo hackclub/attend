@@ -332,7 +332,8 @@ module Admin
     def finalize
       @rooms = @rooming_context.rooms.includes(:event, room_assignments: { participant_event: [ :event, :participant, :accommodation, :scans ] }).order(:name, :created_at).load
       @stats = calculate_finalize_stats
-      @hotel_scan_context = @event.hotel_scan_context
+      # Arrivals for this stay are scanned at its own check-in point.
+      @hotel_scan_context = @rooming_context.scan_context
     end
 
     def do_finalize

@@ -358,6 +358,7 @@ Rails.application.routes.draw do
       # Stays: during the event, the night before, the night after. Each is
       # everyone with accommodation or a list of who's staying and why.
       resources :rooming_stays, path: "stays", only: [ :index, :create, :edit, :update, :destroy ], controller: "rooming_stays" do
+        post :add_check_in_point, on: :member
         resources :roster_entries, path: "roster", only: [ :index, :create, :destroy ], controller: "rooming_roster_entries"
       end
       # The wizard works on one stay at a time. Without /stays/:stay_id it's

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_25_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_25_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1132,10 +1132,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_25_140000) do
     t.uuid "event_id", null: false
     t.string "kind", default: "custom", null: false
     t.string "name", null: false
+    t.uuid "scan_context_id"
     t.date "starts_on"
     t.datetime "updated_at", null: false
     t.index ["event_id", "name"], name: "index_rooming_contexts_on_event_id_and_name", unique: true
     t.index ["event_id"], name: "index_rooming_contexts_one_main_per_event", unique: true, where: "((kind)::text = 'main'::text)"
+    t.index ["scan_context_id"], name: "index_rooming_contexts_on_scan_context_id", unique: true
   end
 
   create_table "rooming_eligibility_options", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1814,6 +1816,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_25_140000) do
   add_foreign_key "room_assignments", "rooming_contexts"
   add_foreign_key "room_assignments", "rooms"
   add_foreign_key "rooming_contexts", "events"
+  add_foreign_key "rooming_contexts", "scan_contexts", on_delete: :nullify
   add_foreign_key "rooming_eligibility_options", "rooming_contexts"
   add_foreign_key "rooming_plans", "events"
   add_foreign_key "rooming_plans", "rooming_contexts"
