@@ -602,7 +602,7 @@ paths:
                 event_choice: { type: string, description: "An event id, or `custom:<name>`, from the options endpoint." }
                 incident_report[reporter_name]: { type: string }
                 incident_report[reporter_email]: { type: string, format: email }
-                incident_report[reporter_phone]: { type: string, description: E.164 format, e.g. +14155550150 }
+                incident_report[reporter_phone]: { type: string, description: "E.164 format, e.g. +14155550150" }
                 incident_report[reporter_role]: { type: string, enum: [event_volunteer, event_point_of_contact, hq_employee, parent, participant] }
                 incident_report[incident_type]: { type: string, enum: [event_safety, medical_emergency, hq_staff, other] }
                 incident_report[priority]: { type: string, enum: [s0, s1, s2, s3] }
@@ -4208,7 +4208,7 @@ components:
         sent_at: { type: string, format: date-time, nullable: true }
         created_at: { type: string, format: date-time }
         sent_by: { type: string, nullable: true, description: Who composed it. }
-        preview_text: { type: string, description: The body as plain text, cut to 140 characters. }
+        preview_text: { type: string, description: "The body as plain text, cut to 140 characters." }
 
     Message:
       allOf:
@@ -4352,7 +4352,7 @@ components:
       properties:
         id: { type: string, format: uuid, description: The message id. }
         subject: { type: string, nullable: true }
-        preview_text: { type: string, description: Plain text, cut to 140 characters. }
+        preview_text: { type: string, description: "Plain text, cut to 140 characters." }
         event:
           type: object
           properties:
@@ -4405,7 +4405,7 @@ components:
       properties:
         reporter_name: { type: string }
         reporter_email: { type: string, format: email }
-        reporter_phone: { type: string, description: E.164 format, e.g. +14155550150 }
+        reporter_phone: { type: string, description: "E.164 format, e.g. +14155550150" }
         reporter_role: { type: string, enum: [event_volunteer, event_point_of_contact, hq_employee, parent, participant] }
         incident_type: { type: string, enum: [event_safety, medical_emergency, hq_staff, other] }
         priority: { type: string, enum: [s0, s1, s2, s3] }
