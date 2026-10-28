@@ -1368,12 +1368,14 @@ paths:
         legal names that are replaced from their account on first sign-in.
 
 
-        `date_of_birth`, `phone` and `country` are optional too. Everything sent
-        is stored on the participant and used to prefill the Hack Club Auth
-        signup form when they open the invitation and don't have an account
-        yet. If the email already belongs to someone Attend knows (from another
-        event), only the fields they have no value for are filled in; nothing
-        they entered is overwritten.
+        `date_of_birth`, `phone`, `country` and the address fields are optional
+        too. Everything sent is stored on the participant; the name, birthday,
+        phone and country also prefill the Hack Club Auth signup form when they
+        open the invitation and don't have an account yet. If the email already
+        belongs to someone Attend knows (from another event), only the fields
+        they have no value for are filled in; nothing they entered is
+        overwritten. The address counts as one value: if any part of one is on
+        file, none of the address fields sent are written.
 
 
         While the event is holding onboarding invitations
@@ -1402,6 +1404,11 @@ paths:
                 country:
                   type: string
                   description: ISO 3166-1 alpha-2 code (e.g. `US`) or the country's English name.
+                address_line_1: { type: string }
+                address_line_2: { type: string }
+                city: { type: string }
+                state: { type: string }
+                postal_code: { type: string }
       responses:
         "201":
           description: Invitation enqueued, or recorded as held.
@@ -1618,16 +1625,19 @@ paths:
         `withdrawn` withdraws them, `in_progress` reinstates them — after which
         the displayed status is recomputed from their onboarding progress.
 
-        Date of birth and phone number are writable by every caller that gets
-        this far, including API keys and PII-restricted roles, which cannot
-        read them back: the response is redacted exactly as a read would be.
+        Date of birth, phone number and address are writable by every caller
+        that gets this far, including API keys and PII-restricted roles, which
+        cannot read them back: the response is redacted exactly as a read
+        would be.
 
         To backfill details without overwriting anything the participant
         entered themselves, send `fill_blanks: true`. Only fields that are
         empty (or legal names still on the "Unknown" placeholder) are written,
         and the response lists the fields that were left alone in
-        `skipped_fields`. Find the registration id for an email with the
-        lookup endpoint.
+        `skipped_fields`. The address counts as one value: if any part of one
+        is on file, every address field sent is skipped, so a backfill never
+        mixes its address into the participant's. Find the registration id for
+        an email with the lookup endpoint.
       parameters:
         - $ref: "#/components/parameters/EventId"
         - $ref: "#/components/parameters/RegistrationId"
@@ -1661,6 +1671,11 @@ paths:
                     country_of_residence:
                       type: string
                       description: ISO 3166-1 alpha-2 code (e.g. `US`) or the country's English name.
+                    address_line_1: { type: string }
+                    address_line_2: { type: string }
+                    city: { type: string }
+                    state: { type: string }
+                    postal_code: { type: string }
       responses:
         "200":
           description: The updated participant.

@@ -117,13 +117,30 @@ class Participant < ApplicationRecord
     value.blank? || value == NAME_PLACEHOLDER
   end
 
+  # One postal address split across columns. Country isn't part of it:
+  # country_of_residence stands on its own (age rules, the HCA prefill).
+  ADDRESS_FIELDS = %i[address_line_1 address_line_2 city state postal_code].freeze
+
   # The subset of +attributes+ this participant has no real value for yet:
   # blank fields, and legal names still on the placeholder. Backfills use it
   # so they never overwrite something the person entered themselves.
+  #
+  # The address is all or nothing: with any part of one on file, every
+  # address field is left alone. A backfilled postcode on someone's own
+  # street makes a wrong address, not a fuller one.
   def blank_attributes_only(attributes)
+    address_on_file = ADDRESS_FIELDS.any? { |field| public_send(field).present? }
+
     attributes.select do |field, _value|
+      field = field.to_sym
       current = public_send(field)
-      field.to_sym.in?(%i[legal_first_name legal_last_name]) ? self.class.name_placeholder?(current) : current.blank?
+      if field.in?(ADDRESS_FIELDS)
+        !address_on_file
+      elsif field.in?(%i[legal_first_name legal_last_name])
+        self.class.name_placeholder?(current)
+      else
+        current.blank?
+      end
     end
   end
 

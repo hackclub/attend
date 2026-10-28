@@ -353,6 +353,9 @@ module Api
         details[:preferred_name] = params[:preferred_name].to_s.strip if params[:preferred_name].present?
         details[:date_of_birth] = Date.iso8601(params[:date_of_birth].to_s) if params[:date_of_birth].present?
         details[:phone] = params[:phone].to_s.strip if params[:phone].present?
+        Participant::ADDRESS_FIELDS.each do |field|
+          details[field] = params[field].to_s.strip if params[field].present?
+        end
 
         if params[:country].present?
           country = CountryCodes.normalize(params[:country])
@@ -377,9 +380,10 @@ module Api
       # keys alike: a series key is broader in reach, not in what it may read.
       #
       # update is on this list even though it *writes* fields a key can't read
-      # back: an integration that owns the source of truth for someone's name
-      # or phone number should be able to correct Attend, and the response is
-      # redacted for keys exactly as index/show would be (see include_pii?).
+      # back: an integration that owns the source of truth for someone's name,
+      # phone number or address should be able to correct Attend, and the
+      # response is redacted for keys exactly as index/show would be (see
+      # include_pii?).
       API_KEY_ALLOWED_ACTIONS = %w[create lookup roster update destroy].freeze
 
       def restrict_api_key_actions
@@ -393,13 +397,14 @@ module Api
       # headshot (a file upload has no place in a JSON API). Only the keys
       # actually sent are written, so a one-field PATCH stays a one-field PATCH.
       #
-      # Date of birth and phone are writable by every caller that gets this
-      # far, including PII-restricted roles and API keys, which cannot read
-      # them back — an integration correcting a record it owns doesn't need to
-      # see what was there before.
+      # Date of birth, phone and address are writable by every caller that
+      # gets this far, including PII-restricted roles and API keys, which
+      # cannot read them back — an integration correcting a record it owns
+      # doesn't need to see what was there before.
       PARTICIPANT_WRITABLE_FIELDS = %i[
         legal_first_name legal_last_name preferred_name email
         date_of_birth phone pronouns tshirt_size country_of_residence
+        address_line_1 address_line_2 city state postal_code
       ].freeze
 
       # Resolving a Slack ID to a registration is a support-bot capability, not
