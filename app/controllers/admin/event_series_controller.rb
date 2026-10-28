@@ -21,6 +21,7 @@ module Admin
 
       @dashboard = SeriesDashboard.new(@series, events: @events, user: current_user)
       @event_rows = @dashboard.event_rows
+      paginate_event_rows
     end
 
     # The series HQ button: every event that is holding onboarding
@@ -73,6 +74,29 @@ module Admin
     end
 
     private
+
+    EVENTS_PER_PAGE = 20
+
+    # The events table pages through the dashboard's rows in memory rather than
+    # querying: every row is already built for the map, chase list and funnel,
+    # so filtering them costs nothing extra.
+    def paginate_event_rows
+      @events_search = params[:events_search].to_s.strip
+      rows = @event_rows
+      if @events_search.present?
+        term = @events_search.downcase
+        rows = rows.select do |row|
+          event = row[:event]
+          [ event.name, event.location_city, event.location_country ].compact.any? { |value| value.downcase.include?(term) }
+        end
+      end
+
+      @events_total_count = rows.length
+      @events_total_pages = [ (@events_total_count.to_f / EVENTS_PER_PAGE).ceil, 1 ].max
+      @events_page = (params[:events_page] || 1).to_i.clamp(1, @events_total_pages)
+      @events_per_page = EVENTS_PER_PAGE
+      @paged_event_rows = rows.slice((@events_page - 1) * EVENTS_PER_PAGE, EVENTS_PER_PAGE) || []
+    end
 
     def set_series
       @series = EventSeries.find_by!(slug: params[:slug])

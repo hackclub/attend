@@ -1,7 +1,20 @@
-<section>
-  <h2 class="text-sm font-semibold text-(--text-strong) mb-2">Events</h2>
+<% pagination_params = { events_search: @events_search.presence }.compact %>
+<section id="series-events">
+  <h2 class="text-sm font-semibold text-(--text-strong) mb-2">Events <span class="text-(--text-soft) font-normal">(<%= @events_total_count %>)</span></h2>
+
+  <%= form_with url: admin_series_path(series, anchor: "series-events"), method: :get, class: "flex gap-2 mb-2" do |f| %>
+    <%= f.search_field :events_search, value: @events_search, placeholder: "Find events", "aria-label": "Find events by name or location",
+          class: "flex-1 min-w-0 border border-(--border-strong) bg-(--bg-elev) text-(--text) rounded-md px-3 py-2 text-sm" %>
+    <%= f.button "Search", name: nil, class: "cursor-pointer border border-(--border-strong) bg-(--bg-elev) text-(--text) hover:bg-(--bg-elev-3) text-sm font-medium py-2 px-4 rounded-md transition-colors" %>
+  <% end %>
 
   <div class="bg-(--bg-elev) border border-(--border-card) rounded-lg overflow-hidden">
+    <% if event_rows.empty? %>
+      <p class="px-4 py-4 text-sm text-(--text-soft)">
+        No event matches &ldquo;<%= @events_search %>&rdquo;.
+        <%= link_to "Show every event", admin_series_path(series, anchor: "series-events"), class: "text-(--text-link) hover:underline" %>
+      </p>
+    <% end %>
     <ul>
       <% event_rows.each do |row| %>
         <% event = row[:event] %>
@@ -56,5 +69,22 @@
         </li>
       <% end %>
     </ul>
+
+    <% if @events_total_pages > 1 %>
+      <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-t border-(--border) text-xs text-(--text-soft)">
+        <span>
+          Showing <%= (@events_page - 1) * @events_per_page + 1 %> to <%= [ @events_page * @events_per_page, @events_total_count ].min %> of <%= @events_total_count %> events
+        </span>
+        <nav class="flex items-center gap-3" aria-label="Events pagination">
+          <% if @events_page > 1 %>
+            <%= link_to "← Previous", admin_series_path(series, pagination_params.merge(events_page: @events_page - 1, anchor: "series-events")), class: "text-(--text-link) hover:underline" %>
+          <% end %>
+          <span>Page <%= @events_page %> of <%= @events_total_pages %></span>
+          <% if @events_page < @events_total_pages %>
+            <%= link_to "Next →", admin_series_path(series, pagination_params.merge(events_page: @events_page + 1, anchor: "series-events")), class: "text-(--text-link) hover:underline" %>
+          <% end %>
+        </nav>
+      </div>
+    <% end %>
   </div>
 </section>

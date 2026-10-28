@@ -1,6 +1,6 @@
-<%# Held onboarding invitations are HQ's own pending action, not something to
-    chase: nobody has been emailed, so nobody is late. Hence a callout of its
-    own above the chase list, with the one button that releases them. Rendered
+<%# Held onboarding invitations are HQ's own pending action: nobody has been
+    emailed, so nobody is late. The funnel counts them too, but the button that
+    releases them lives in a callout of its own above it. Rendered
     only when an event is holding or has something held, so a series that
     doesn't use the hold never sees it. %>
 <% held_rows = event_rows.select { |row| row[:held_invitations].positive? || row[:event].onboarding_invites_held? } %>
@@ -36,16 +36,23 @@
         <% end %>
       <% end %>
     </div>
-    <ul class="mt-2 space-y-1">
-      <% held_rows.sort_by { |row| -row[:held_invitations] }.each do |row| %>
-        <li class="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span class="font-bold tabular-nums w-8 text-right shrink-0"><%= row[:held_invitations] %></span>
-          <%= link_to row[:event].name, admin_event_participants_path(row[:event].slug, status: "pending_invitations"), class: "cs-link truncate" %>
-          <% if row[:event].onboarding_invites_held? %>
-            <%= cs_status(:pending, "Holding") %>
+    <%# Collapsed by default: a series holding on hundreds of events would
+        otherwise push the rest of the page off the first screen. %>
+    <details class="cs-expandable mt-2" data-testid="series-held-invitations-list">
+      <summary class="font-normal">Show <%= pluralize(held_rows.length, "event") %></summary>
+      <div class="cs-expandable-content">
+        <ul class="space-y-1">
+          <% held_rows.sort_by { |row| -row[:held_invitations] }.each do |row| %>
+            <li class="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span class="font-bold tabular-nums w-8 text-right shrink-0"><%= row[:held_invitations] %></span>
+              <%= link_to row[:event].name, admin_event_participants_path(row[:event].slug, status: "pending_invitations"), class: "cs-link truncate" %>
+              <% if row[:event].onboarding_invites_held? %>
+                <%= cs_status(:pending, "Holding") %>
+              <% end %>
+            </li>
           <% end %>
-        </li>
-      <% end %>
-    </ul>
+        </ul>
+      </div>
+    </details>
   </div>
 </section>
