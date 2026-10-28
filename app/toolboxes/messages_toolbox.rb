@@ -35,7 +35,7 @@ class MessagesToolbox < ApplicationToolbox
     param :subject, :string, "Subject (used for email)", optional: true
     param :participant_event_ids, [ :string ], "Specific registrations (when audience is specific_participants)", optional: true
     param :group_ids, [ :string ], "Group IDs (when audience is attendees_in_groups)", optional: true
-    param :scheduled_at, :string, "Schedule for later (ISO8601)", optional: true
+    param :scheduled_at, :string, "Schedule for later (ISO8601; a time without an offset is read in the event's time zone)", optional: true
   end
   def create
     require_event!

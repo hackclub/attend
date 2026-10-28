@@ -24,7 +24,7 @@
         <% if @message.sent_at.present? %>
           Sent <%= cs_relative_time(@message.sent_at) %> by <%= @message.sent_by_user.display_name_or_fallback %>
         <% elsif @message.scheduled_at.present? %>
-          Scheduled for <%= cs_absolute_time_tag(@message.scheduled_at) %> by <%= @message.sent_by_user.display_name_or_fallback %>
+          Scheduled for <%= cs_absolute_time_tag(@message.scheduled_at, zone: current_event.event_time_zone) %> by <%= @message.sent_by_user.display_name_or_fallback %>
         <% else %>
           Sent by <%= @message.sent_by_user.display_name_or_fallback %>
           · Draft

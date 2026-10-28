@@ -19,7 +19,7 @@
           <% if @message.sent_at.present? %>
             on <%= @message.sent_at.strftime("%B %d, %Y at %l:%M %p") %>
           <% elsif @message.scheduled_at.present? %>
-            · Scheduled for <%= @message.scheduled_at.strftime("%B %d, %Y at %l:%M %p") %>
+            · Scheduled for <%= @message.local_scheduled_at.strftime("%B %d, %Y at %l:%M %p %Z") %>
           <% else %>
             · Draft
           <% end %>

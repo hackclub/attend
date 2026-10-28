@@ -85,7 +85,7 @@
                     <%= message.sent_count %>/<%= message.recipient_count %> delivered
                   </div>
                 <% elsif message.scheduled_at.present? %>
-                  <span class="text-yellow-600">Scheduled: <%= message.scheduled_at.strftime("%b %d, %H:%M") %></span>
+                  <span class="text-yellow-600">Scheduled: <%= message.scheduled_at.in_time_zone(current_event.event_time_zone).strftime("%b %d, %H:%M %Z") %></span>
                 <% else %>
                   <span class="text-gray-400">Draft</span>
                 <% end %>

@@ -177,10 +177,12 @@
           </div>
         </div>
         <div id="schedule-fields" class="mt-4 max-w-xs <%= @message.scheduled_at.present? ? '' : 'hidden' %>">
-          <%= cs_form_field f, :scheduled_at, label: "Send at", optional: true do |aria| %>
+          <%= cs_form_field f, :scheduled_at, label: "Send at", optional: true,
+                description: "In the event's time zone: #{current_event.event_time_zone.name}." do |aria| %>
             <%= f.datetime_local_field :scheduled_at,
+                value: @message.scheduled_at_field_value,
                 class: "cs-input",
-                min: Time.current.strftime("%Y-%m-%dT%H:%M"),
+                min: Time.current.in_time_zone(current_event.event_time_zone).strftime("%Y-%m-%dT%H:%M"),
                 data: { action: "change->autosave#save", cs_range_message: "Enter a time in the future." },
                 **aria %>
           <% end %>

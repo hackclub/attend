@@ -133,7 +133,7 @@ module Admin
       if @message.scheduled_at.present? && @message.scheduled_at > Time.current
         @message.update!(status: :scheduled)
         redirect_to admin_event_message_path(current_event, @message),
-          notice: "Message scheduled for #{@message.scheduled_at.strftime("%B %d, %Y at %l:%M %p")}."
+          notice: "Message scheduled for #{@message.local_scheduled_at.strftime("%B %d, %Y at %l:%M %p %Z")}."
       elsif @message.send!
         redirect_to admin_event_message_path(current_event, @message),
           notice: "Message is being sent to #{helpers.pluralize(@message.recipient_count, "recipient")}."

@@ -136,7 +136,7 @@
       <div class="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
         <p class="text-yellow-800">
           <strong>Scheduled:</strong> This message will be sent on 
-          <strong><%= @message.scheduled_at.strftime("%B %d, %Y at %l:%M %p") %></strong>
+          <strong><%= @message.local_scheduled_at.strftime("%B %d, %Y at %l:%M %p %Z") %></strong>
         </p>
       </div>
     <% end %>
@@ -150,7 +150,7 @@
         <% if @message.scheduled_at.present? && @message.scheduled_at > Time.current %>
           <%= button_to "Schedule Message", send_now_admin_event_message_path(current_event, @message), 
               method: :post,
-              form: { data: { turbo_confirm: "Schedule this message to be sent on #{@message.scheduled_at.strftime("%B %d at %l:%M %p")}?" } },
+              form: { data: { turbo_confirm: "Schedule this message to be sent on #{@message.local_scheduled_at.strftime("%B %d at %l:%M %p %Z")}?" } },
               class: "bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-6 rounded-lg",
               disabled: @total_count == 0 %>
         <% else %>
