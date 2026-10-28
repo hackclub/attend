@@ -29,7 +29,7 @@
       <% if policy(series).send_held_invitations? %>
         <%= button_to send_held_invitations_admin_series_path(series),
             method: :post,
-            data: { turbo_confirm: held_total.positive? ? "Email #{pluralize(held_total, 'held invitation')} across #{pluralize(held_rows.length, 'event')} now? Those events will email new participants as they're added from here on." : "Stop holding onboarding invitations on #{pluralize(holding_events, 'event')}? They will email new participants as they're added." },
+            data: { turbo_confirm: held_total.positive? ? "Email #{pluralize(held_total, 'held invitation')} across #{pluralize(held_rows.length, 'event')} now? #{held_rows.one? ? "That event" : "Those events"} will email new participants as they're added from here on." : "Stop holding onboarding invitations on #{pluralize(holding_events, 'event')}? #{holding_events == 1 ? "It" : "They"} will email new participants as they're added." },
             class: "shrink-0 inline-flex items-center gap-2 cursor-pointer bg-[#d42f46] hover:bg-[#b82840] text-white text-sm font-medium py-2 px-4 rounded-md transition-colors" do %>
           <svg class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
           <%= held_total.positive? ? "Send #{pluralize(held_total, 'held invitation')}" : "Stop holding invitations" %>

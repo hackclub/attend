@@ -48,7 +48,7 @@
             <div>
               <p class="cs-alert-title">Warning</p>
               <p>
-                There are <%= @stats[:unassigned_participants] %> unassigned participants.
+                There <%= @stats[:unassigned_participants] == 1 ? "is" : "are" %> <%= pluralize(@stats[:unassigned_participants], "unassigned participant") %>.
                 <%= link_to "Go back to fix", assignments_admin_event_rooming_wizard_path(@event.slug), class: "cs-link cs-link-strong" %>
               </p>
             </div>
@@ -60,7 +60,7 @@
             <%= cs_status_icon(:warning) %>
             <div>
               <p class="cs-alert-title">Note</p>
-              <p>There are <%= @stats[:rooms_needing_acknowledgment] %> rooms with trans/NB pairings that need acknowledgment.</p>
+              <p><% if @stats[:rooms_needing_acknowledgment] == 1 %>There is 1 room with a trans/NB pairing that needs acknowledgment.<% else %>There are <%= @stats[:rooms_needing_acknowledgment] %> rooms with trans/NB pairings that need acknowledgment.<% end %></p>
             </div>
           </div>
         <% end %>

@@ -127,7 +127,7 @@ module Admin
       @rooming_plan.update!(status: :auto_assigned)
 
       redirect_to assignments_admin_event_rooming_wizard_path(@event.slug),
-        notice: "Auto-assignment complete. #{result[:assigned]} participants assigned, #{result[:unassigned]} unassigned."
+        notice: "Auto-assignment complete. #{helpers.pluralize(result[:assigned], "participant")} assigned, #{result[:unassigned]} unassigned."
     end
 
     def manual_assign

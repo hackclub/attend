@@ -136,7 +136,7 @@
         <div>
           <h3 class="font-semibold text-blue-800">Invitation emails will be sent</h3>
           <p class="text-sm text-blue-700 mt-1">
-            <%= @valid_rows.count %> invitation emails will be sent after import completes.
+            <%= pluralize(@valid_rows.count, "invitation email") %> will be sent after import completes.
             Emails are sent at a rate of ~1 per second to avoid rate limits.
             <strong>Estimated time: ~<%= (@valid_rows.count / 60.0).ceil %> minutes</strong>
           </p>

@@ -297,7 +297,7 @@
               <% end %>
               <div>
                 <dt class="cs-kv-label">Participant records</dt>
-                <dd class="cs-kv-value"><%= @airtable_participant_count %> participant records will be synced</dd>
+                <dd class="cs-kv-value"><%= pluralize(@airtable_participant_count, "participant record") %> will be synced</dd>
               </div>
               <div>
                 <dt class="cs-kv-label">Schedule</dt>

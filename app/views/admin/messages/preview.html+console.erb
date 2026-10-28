@@ -129,7 +129,7 @@
       <% else %>
         <%= button_to "Send now", send_now_admin_event_message_path(current_event, @message),
             method: :post,
-            form: { data: { turbo_confirm: "Send this message to #{@total_count} recipients now?" } },
+            form: { data: { turbo_confirm: "Send this message to #{pluralize(@total_count, "recipient")} now?" } },
             class: "cs-btn cs-btn-primary",
             disabled: @total_count == 0 %>
       <% end %>
