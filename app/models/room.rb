@@ -6,11 +6,15 @@ class Room < ApplicationRecord
   has_paper_trail
 
   belongs_to :event
+  belongs_to :rooming_context
   has_many :room_assignments, dependent: :destroy
   has_many :participant_events, through: :room_assignments
 
   validates :capacity, presence: true, numericality: { greater_than: 0 }
-  validates :name, uniqueness: { scope: :event_id, allow_nil: true }
+  validates :name, uniqueness: { scope: :rooming_context_id, allow_nil: true }
+  validate :rooming_context_matches_event
+
+  before_validation :default_to_main_stay
 
   scope :with_availability, -> { includes(:room_assignments).where("(SELECT COUNT(*) FROM room_assignments WHERE room_assignments.room_id = rooms.id) < rooms.capacity") }
   scope :staff_rooms, -> { where(staff_only: true) }
@@ -91,6 +95,19 @@ class Room < ApplicationRecord
   end
 
   private
+
+  # Callers that only know the event (the MCP toolbox, older code paths) get
+  # the main stay, which is where every room lived before contexts existed.
+  def default_to_main_stay
+    self.event ||= rooming_context&.event
+    self.rooming_context ||= event&.main_rooming_context
+  end
+
+  def rooming_context_matches_event
+    return unless rooming_context && event_id
+
+    errors.add(:rooming_context, "belongs to a different event") if rooming_context.event_id != event_id
+  end
 
   def occupant_ages
     event_date = event.local_start_date || Date.current

@@ -1,9 +1,12 @@
 module Rooming
   class AutoAssignService
-    def initialize(event, group: nil)
-      @event = event
+    # Assigns one stay at a time; other stays' rooms and assignments are
+    # never touched.
+    def initialize(rooming_context, group: nil)
+      @rooming_context = rooming_context
+      @event = rooming_context.event
       @group = group
-      @rooming_plan = event.rooming_plan
+      @rooming_plan = rooming_context.rooming_plan
       @room_capacity = @rooming_plan&.room_capacity || 2
       @assigned = []
       @unassigned = []
@@ -28,19 +31,14 @@ module Rooming
     private
 
     def clear_non_staff_assignments
-      RoomAssignment
-        .joins(room: :event)
-        .where(events: { id: @event.id })
+      @rooming_context.room_assignments
         .where(staff_override: false)
         .destroy_all
     end
 
     def load_participants
-      scope = @event.participant_events
+      scope = @rooming_context.assignable_participant_events
         .includes(:participant, :accommodation, :roommate_preferences, :roommate_exclusions)
-        .where(status: %w[complete in_progress])
-        .joins(:accommodation)
-        .where(accommodations: { rooming_exempt: false })
 
       scope = scope.where(id: GroupMembership.where(group_id: @group.id).select(:participant_event_id)) if @group
 
@@ -179,7 +177,7 @@ module Rooming
         room = find_compatible_room(pe_data)
 
         unless room
-          room = @event.rooms.create!(capacity: @room_capacity)
+          room = @rooming_context.rooms.create!(capacity: @room_capacity)
         end
 
         assign_to_room(pe, room)
@@ -244,17 +242,17 @@ module Rooming
     end
 
     def find_compatible_room(participant_data)
-      @event.rooms.participant_rooms.includes(:room_assignments).find do |room|
+      @rooming_context.rooms.participant_rooms.includes(:room_assignments).find do |room|
         room.can_add_participants? && room_compatible_with_participant?(room, participant_data)
       end
     end
 
     def find_or_create_room_for_group(participants)
-      room = @event.rooms.participant_rooms.includes(:room_assignments).find do |r|
+      room = @rooming_context.rooms.participant_rooms.includes(:room_assignments).find do |r|
         r.can_add_participants? && r.remaining_capacity >= participants.size
       end
 
-      room || @event.rooms.create!(capacity: @room_capacity)
+      room || @rooming_context.rooms.create!(capacity: @room_capacity)
     end
 
     def assign_to_room(pe, room, sibling_group: false)
@@ -294,7 +292,7 @@ module Rooming
     end
 
     def flag_special_pairings
-      @event.rooms.includes(room_assignments: { participant_event: [ :participant, :accommodation ] }).each do |room|
+      @rooming_context.rooms.includes(room_assignments: { participant_event: [ :participant, :accommodation ] }).each do |room|
         next if room.room_assignments.empty?
 
         ages = room.room_assignments.map { |ra| @participant_data[ra.participant_event_id]&.[](:age) }.compact

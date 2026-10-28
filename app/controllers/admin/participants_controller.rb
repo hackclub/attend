@@ -533,7 +533,7 @@ module Admin
       keys << [ "RegistrationChangeRequest", pe.registration_change_requests.pluck(:id) ]
       keys << [ "Note", policy_scope(pe.notes).pluck(:id) ]
       keys << [ "EmergencyContact", EmergencyContact.where(participant_event_id: pe.id).or(EmergencyContact.where(guardian_participant_event_id: gpe_ids)).pluck(:id) ]
-      keys << [ "RoomAssignment", Array(pe.room_assignment&.id) ]
+      keys << [ "RoomAssignment", pe.room_assignments.ids ]
       keys << [ "RoommatePreference", pe.roommate_preferences.pluck(:id) ]
       keys << [ "RoommateExclusion", pe.roommate_exclusions.pluck(:id) ]
 

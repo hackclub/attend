@@ -19,7 +19,7 @@ class RoomingToolbox < ApplicationToolbox
       event: current_event.name,
       url: event_rooming_url(current_event),
       plan: plan && { status: plan.status, locked: plan.locked?, default_capacity: plan.room_capacity },
-      rooms: current_event.rooms.ordered.map { |r| serialize_room(r) },
+      rooms: main_stay_rooms.ordered.map { |r| serialize_room(r) },
       unassigned: unassigned_registrations.map { |pe| serialize_person(pe) }
     }
   end
@@ -35,7 +35,7 @@ class RoomingToolbox < ApplicationToolbox
   end
   def create_room
     require_rooming!
-    @room = current_event.rooms.create!(
+    @room = current_event.main_rooming_context.rooms.create!(
       name: params[:name].presence,
       capacity: params[:capacity].presence || current_event.rooming_plan&.room_capacity || 2,
       staff_only: params[:staff_only] || false,
@@ -57,7 +57,7 @@ class RoomingToolbox < ApplicationToolbox
   end
   def update_room
     require_rooming!
-    @room = current_event.rooms.find(params[:room_id])
+    @room = main_stay_rooms.find(params[:room_id])
     @room.update!(params.permit(:name, :capacity, :staff_only, :gender_label, :notes).to_h.compact)
     render json: serialize_room(@room)
   end
@@ -69,7 +69,7 @@ class RoomingToolbox < ApplicationToolbox
   end
   def delete_room
     require_rooming!
-    @room = current_event.rooms.find(params[:room_id])
+    @room = main_stay_rooms.find(params[:room_id])
     @room.destroy!
     render json: { deleted: true, room_id: params[:room_id] }
   end
@@ -145,11 +145,17 @@ class RoomingToolbox < ApplicationToolbox
     end
   end
 
+  # Everything here works on the main stay. Reads never create it, so an
+  # event that hasn't started rooming just has no rooms.
+  def main_stay_rooms
+    current_event.rooming_contexts.find_by(kind: :main)&.rooms || Room.none
+  end
+
   def resolve_room!(room_id, room_name)
-    return current_event.rooms.find(room_id) if room_id.present?
+    return main_stay_rooms.find(room_id) if room_id.present?
 
     if room_name.present?
-      room = current_event.rooms.find_by(name: room_name)
+      room = main_stay_rooms.find_by(name: room_name)
       return room if room
 
       halt error: "No room named #{room_name.inspect} in #{current_event.name}."
@@ -170,11 +176,11 @@ class RoomingToolbox < ApplicationToolbox
   end
 
   def process_bulk_entry(entry, create_missing)
-    room = entry[:room_id].present? ? current_event.rooms.find_by(id: entry[:room_id]) : nil
+    room = entry[:room_id].present? ? main_stay_rooms.find_by(id: entry[:room_id]) : nil
     if room.nil? && entry[:room_name].present?
-      room = current_event.rooms.find_by(name: entry[:room_name])
+      room = main_stay_rooms.find_by(name: entry[:room_name])
       if room.nil? && create_missing
-        room = current_event.rooms.create!(
+        room = current_event.main_rooming_context.rooms.create!(
           name: entry[:room_name],
           capacity: entry[:capacity].presence || current_event.rooming_plan&.room_capacity || 2
         )
@@ -209,7 +215,7 @@ class RoomingToolbox < ApplicationToolbox
   def unassigned_registrations
     current_event.participant_events
       .where.not(status: %w[withdrawn rejected])
-      .left_joins(:room_assignment).where(room_assignments: { id: nil })
+      .where.not(id: RoomAssignment.where(room: main_stay_rooms).select(:participant_event_id))
       .includes(:participant)
   end
 

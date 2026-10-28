@@ -4,6 +4,7 @@ class RoomingPlan < ApplicationRecord
   has_paper_trail
 
   belongs_to :event
+  belongs_to :rooming_context
   belongs_to :created_by_user, class_name: "User", optional: true
   belongs_to :finalized_by_user, class_name: "User", optional: true
 
@@ -15,7 +16,9 @@ class RoomingPlan < ApplicationRecord
   }
 
   validates :room_capacity, presence: true, numericality: { greater_than: 0, less_than_or_equal_to: 10 }
-  validates :event_id, uniqueness: true
+  validates :rooming_context_id, uniqueness: true
+
+  before_validation :default_to_main_stay
 
   def finalize!(user)
     update!(
@@ -39,5 +42,12 @@ class RoomingPlan < ApplicationRecord
 
   def unlock!
     update!(locked: false)
+  end
+
+  private
+
+  def default_to_main_stay
+    self.event ||= rooming_context&.event
+    self.rooming_context ||= event&.main_rooming_context
   end
 end

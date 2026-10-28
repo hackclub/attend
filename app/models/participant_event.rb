@@ -24,7 +24,10 @@ class ParticipantEvent < ApplicationRecord
 
   has_one :accommodation, dependent: :destroy
   has_one :medical, dependent: :destroy
-  has_one :room_assignment, dependent: :destroy
+  has_many :room_assignments, dependent: :destroy
+  # The main-stay room. Pre/post-event stays live in room_assignments,
+  # one per rooming context.
+  has_one :room_assignment, -> { main_stay }
   has_one :room, through: :room_assignment
   has_many :roommate_preferences, dependent: :destroy
   has_many :roommate_exclusions, dependent: :destroy

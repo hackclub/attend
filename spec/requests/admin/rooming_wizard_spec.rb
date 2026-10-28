@@ -6,7 +6,7 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
   let(:admin) { User.create!(email: "admin-rooming@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
   let(:event) { create(:event) }
   let!(:rooming_plan) do
-    event.create_rooming_plan!(created_by_user: admin, room_capacity: 2, status: :draft)
+    event.main_rooming_context.create_rooming_plan!(event: event, created_by_user: admin, room_capacity: 2, status: :draft)
   end
 
   before { sign_in admin }
@@ -161,6 +161,61 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
           expect(stream["action"]).to eq("update")
         end
       end
+    end
+  end
+
+  # A post-event stay sits alongside the main stay. Until the wizard has a
+  # stay switcher it's reached with ?context=, and nothing done in one stay
+  # may touch the other's rooms.
+  describe "with a post-event stay" do
+    let(:post_event) { event.rooming_contexts.create!(name: "Post-event night", kind: :post_event, enrollment: :everyone) }
+    let!(:participant_event) do
+      create(:participant_event, event: event, status: "complete").tap { |pe| pe.create_accommodation!(gender_identity: "female") }
+    end
+    let!(:main_room) { event.main_rooming_context.rooms.create!(capacity: 2) }
+    let!(:post_room) { post_event.rooms.create!(capacity: 2) }
+
+    it "moves someone into a post-event room without taking their main-stay room" do
+      main_assignment = RoomAssignment.create!(room: main_room, participant_event: participant_event)
+
+      post move_assignment_admin_event_rooming_wizard_path(event.slug, context: post_event.id),
+        params: { participant_event_id: participant_event.id, room_id: post_room.id },
+        headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+      expect(response).to have_http_status(:ok)
+      expect(main_assignment.reload.room).to eq(main_room)
+      expect(participant_event.room_assignments.find_by(rooming_context: post_event).room).to eq(post_room)
+    end
+
+    it "won't put someone in another stay's room" do
+      post move_assignment_admin_event_rooming_wizard_path(event.slug),
+        params: { participant_event_id: participant_event.id, room_id: post_room.id },
+        headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+      # Not-found is handled app-wide with a redirect.
+      expect(response).to have_http_status(:redirect)
+      expect(RoomAssignment.count).to eq(0)
+    end
+
+    it "auto-assigns the main stay without clearing post-event assignments" do
+      post_assignment = RoomAssignment.create!(room: post_room, participant_event: participant_event)
+
+      post auto_assign_admin_event_rooming_wizard_path(event.slug)
+
+      expect(post_assignment.reload.room).to eq(post_room)
+      expect(participant_event.reload.room_assignment.rooming_context).to be_main
+      expect(post_event.rooms.reload).to contain_exactly(post_room)
+    end
+
+    it "exports only the requested stay's rooms" do
+      main_room.update!(name: "Main 101")
+      post_room.update!(name: "Post 201")
+      RoomAssignment.create!(room: post_room, participant_event: participant_event)
+
+      get export_csv_admin_event_rooming_wizard_path(event.slug, context: post_event.id, format: :csv)
+
+      expect(response.body).to include("Post 201")
+      expect(response.body).not_to include("Main 101")
     end
   end
 end

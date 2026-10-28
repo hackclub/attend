@@ -5,14 +5,20 @@ class RoomAssignment < ApplicationRecord
 
   belongs_to :room
   belongs_to :participant_event
+  belongs_to :rooming_context
 
   has_one :participant, through: :participant_event
   has_one :event, through: :room
   has_one :accommodation, through: :participant_event
 
-  validates :participant_event_id, uniqueness: { message: "is already assigned to a room" }
+  validates :participant_event_id, uniqueness: { scope: :rooming_context_id, message: "is already assigned to a room for this stay" }
   validate :room_not_full, on: :create
 
+  # Copied from the room so "one room per person per stay" can be a unique
+  # index rather than a check that races.
+  before_validation { self.rooming_context_id = room&.rooming_context_id }
+
+  scope :main_stay, -> { where(rooming_context_id: RoomingContext.main.select(:id)) }
   scope :staff_overrides, -> { where(staff_override: true) }
   scope :needing_acknowledgment, -> {
     joins(:room)
