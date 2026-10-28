@@ -69,6 +69,13 @@ RSpec.describe "Api::V1::Events", type: :request do
       )
     end
 
+    it "opens the incident log to any role on the event" do
+      event = create(:event)
+      EventRoleAssignment.create!(user: user, event: event, role: "read_only")
+
+      expect(event_payload(event)["can_view_incidents"]).to be(true)
+    end
+
     it "reports whether the event runs travel" do
       with_travel = create(:event)
       without_travel = create(:event)

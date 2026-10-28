@@ -59,6 +59,9 @@ info:
     | `GET /events/{id}/travel` | ✅ any event in the series | ✅ its own event |
     | `GET /events/{id}/participants` (full payload) | ❌ `403` | ❌ `403` |
     | Notes, scans, scan contexts, Slack blasts, NFC badges | ❌ `403` | ❌ `403` |
+    | `/events/{id}/messages/…` and `/events/{id}/incidents/…` | ❌ `403` | ❌ `403` |
+    | `GET /incident_reports/options` and `POST /incident_reports` | ❌ `403` | ❌ `403` |
+    | `GET /messages` and `GET /messages/{id}` (inbox) | ❌ `403` | ❌ `403` |
 
     Either key can be revoked without credentials by POSTing its own secret to
     `POST /tokens/revoke`; Attend emails the key's owner (or, if their account
@@ -117,10 +120,22 @@ tags:
     description: Chronological participant travel and pickup operations.
   - name: Slack Blasts
     description: Broadcast Slack messages to an event's participants.
+  - name: Messages
+    description: >-
+      Compose, preview, schedule and send an organizer broadcast over Slack,
+      email, SMS and push, and follow its deliveries.
+  - name: Incidents
+    description: >-
+      An event's incident log — logging, sharing, commenting on and escalating
+      incidents to Hack Club HQ.
   - name: NFC Badges
     description: Provision and manage participant NFC badges.
   - name: Push Tokens
     description: Register device push-notification tokens.
+  - name: Inbox
+    description: The organizer messages delivered to the signed-in participant.
+  - name: Incident Reports
+    description: File a confidential incident report straight to Hack Club HQ.
   - name: Bans
     description: The app-wide ban list. Global admins only.
   - name: Travel
@@ -384,6 +399,269 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+
+  /messages:
+    get:
+      tags: [Inbox]
+      summary: List inbox messages
+      x-mint:
+        href: /api-reference/inbox/list-inbox-messages
+      description: >-
+        Organizer messages delivered to the signed-in user's registrations,
+        across all their events, newest first — one entry per message however
+        many channels it arrived on. Only deliveries that actually arrived are
+        listed. Needs only a signed-in person; the account must have a
+        participant profile. This is the participant side: the organizer's
+        view of an event's messages is `GET /events/{event_id}/messages`.
+      parameters:
+        - name: event_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+          description: Only messages from this event (UUID; slugs aren't accepted here).
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+          description: Case-insensitive search of subject and body.
+      responses:
+        "200":
+          description: The inbox.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items: { $ref: "#/components/schemas/InboxMessageSummary" }
+                  unread_count:
+                    type: integer
+                    description: Messages with at least one unread delivery. Ignores the filters.
+                  events:
+                    type: array
+                    description: Every event the user has messages from, by name — for a filter picker.
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: An API key (`API key is not authorized for the inbox`).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: >-
+            The account has no participant profile (`No participant profile for
+            this account`).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /messages/{id}:
+    get:
+      tags: [Inbox]
+      summary: Get an inbox message
+      x-mint:
+        href: /api-reference/inbox/get-an-inbox-message
+      description: >-
+        One delivered message, keyed by **message** id — the id a push
+        notification carries — not a delivery id. Opening it marks every
+        delivery of the message to this user read, as on the web. A message
+        that was never delivered to the user is a `404`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+          description: The message id.
+      responses:
+        "200":
+          description: The message.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { $ref: "#/components/schemas/InboxMessage" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: >-
+            No such message delivered to this user, or the account has no
+            participant profile.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /incident_reports/options:
+    get:
+      tags: [Incident Reports]
+      summary: Report form options
+      x-mint:
+        href: /api-reference/incident-reports/report-form-options
+      description: >-
+        What the confidential report form offers, prefilled from the caller's
+        account the way the web form prefills a signed-in reporter. `events`
+        are the Attend events a report can be about (running, or ended within
+        the last six months); `emergency_allowed` is false for events that
+        ended over a month ago, where an S0 is filed as S1 instead.
+        `custom_events` are listed past events that aren't on Attend.
+        `organizer_events` are up to three of those events the caller helps
+        run — point them at that event's incident log, which can escalate to HQ
+        itself. Needs only a signed-in person.
+      responses:
+        "200":
+          description: Form options.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  roles:
+                    type: array
+                    items: { $ref: "#/components/schemas/LabelledOption" }
+                  incident_types:
+                    type: array
+                    items: { $ref: "#/components/schemas/LabelledOption" }
+                  levels:
+                    type: array
+                    items: { $ref: "#/components/schemas/IncidentLevel" }
+                  emergency_level: { type: string, example: s0 }
+                  default_level: { type: string, example: s2 }
+                  events:
+                    type: array
+                    items: { $ref: "#/components/schemas/IncidentReportEventChoice" }
+                  custom_events:
+                    type: array
+                    items: { $ref: "#/components/schemas/IncidentReportEventChoice" }
+                  organizer_events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                  max_attachment_count: { type: integer, example: 10 }
+                  max_attachment_bytes: { type: integer, example: 26214400 }
+                  prefill:
+                    type: object
+                    properties:
+                      reporter_name: { type: string }
+                      reporter_email: { type: string, format: email }
+                      reporter_phone: { type: string, nullable: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: API keys are refused — a report comes from a person.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /incident_reports:
+    post:
+      tags: [Incident Reports]
+      summary: File an incident report
+      x-mint:
+        href: /api-reference/incident-reports/file-an-incident-report
+      description: |
+        Files a confidential report to Hack Club HQ, linked to the caller's
+        account — the app's version of the public `/incident` form. A bearer
+        token is a signed-in person, so there is no Turnstile challenge. Filing
+        sends the same notifications as the web: an email and Slack post to HQ,
+        a confirmation text to the reporter, and phone calls for an S0.
+
+        Send it as `multipart/form-data` to attach files (`incident_report[attachments][]`,
+        up to 10, 25 MB each); without attachments a JSON body works too.
+
+        - `emergency_services_called` forces the priority to S0.
+        - An S0 on an event that ended more than a month ago, or on a custom
+          event, is filed as S1.
+        - `event_choice` must be one of the `value`s from the options endpoint;
+          any other event id fails with `Please choose an event`.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              description: >-
+                The same fields as the JSON body, as bracketed form keys — the
+                shape the web form posts.
+              required:
+                - event_choice
+                - incident_report[reporter_name]
+                - incident_report[reporter_email]
+                - incident_report[reporter_phone]
+                - incident_report[reporter_role]
+                - incident_report[incident_type]
+                - incident_report[priority]
+                - incident_report[summary]
+                - incident_report[details]
+              properties:
+                event_choice: { type: string, description: "An event id, or `custom:<name>`, from the options endpoint." }
+                incident_report[reporter_name]: { type: string }
+                incident_report[reporter_email]: { type: string, format: email }
+                incident_report[reporter_phone]: { type: string, description: "E.164 format, e.g. +14155550150" }
+                incident_report[reporter_role]: { type: string, enum: [event_volunteer, event_point_of_contact, hq_employee, parent, participant] }
+                incident_report[incident_type]: { type: string, enum: [event_safety, medical_emergency, hq_staff, other] }
+                incident_report[priority]: { type: string, enum: [s0, s1, s2, s3] }
+                incident_report[emergency_services_called]: { type: boolean }
+                incident_report[summary]: { type: string }
+                incident_report[details]: { type: string }
+                incident_report[attachments][]:
+                  type: array
+                  description: Up to 10 files, 25 MB each.
+                  items: { type: string, format: binary }
+          application/json:
+            schema:
+              type: object
+              required: [incident_report, event_choice]
+              properties:
+                incident_report: { $ref: "#/components/schemas/IncidentReportAttributes" }
+                event_choice:
+                  type: string
+                  description: >-
+                    An event id, or `custom:<name>` for a listed event that
+                    isn't on Attend — one of the `value`s from the options
+                    endpoint.
+            examples:
+              report:
+                value:
+                  incident_report:
+                    reporter_name: Sam Reporter
+                    reporter_email: sam@example.com
+                    reporter_phone: "+14155550150"
+                    reporter_role: participant
+                    incident_type: event_safety
+                    priority: s2
+                    summary: Someone was rude
+                    details: At lunch.
+                  event_choice: 3f0c1a52-1d55-4f43-9a0b-6b3b8e0f2b11
+      responses:
+        "201":
+          description: Report filed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  incident_report:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      priority:
+                        type: string
+                        enum: [s0, s1, s2, s3]
+                        description: As filed, after the emergency rules above.
+                      created_at: { type: string, format: date-time }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: API keys are refused — a report comes from a person.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
 
   /bans:
     post:
@@ -1792,6 +2070,786 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /events/{event_id}/messages:
+    get:
+      tags: [Messages]
+      summary: List messages
+      x-mint:
+        href: /api-reference/messages/list-messages
+      description: >-
+        Every broadcast on the event, drafts included, newest first. Open to
+        anyone with access to the event (any event role, a series role on its
+        series, or a global admin) — the same rule as the web composer. API
+        keys are refused: a message is attributed to the person who sends it.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: The event's messages.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items: { $ref: "#/components/schemas/MessageSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/MessagesForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Messages]
+      summary: Create a draft message
+      x-mint:
+        href: /api-reference/messages/create-a-draft-message
+      description: >-
+        Saves a draft attributed to the caller. Nothing is sent: preview it,
+        then call `send_now`. `participant_event_ids` only counts when
+        `audience` is `specific_participants`; `group_ids` narrows any
+        attendee audience. Both are folded into the message's audience filters
+        and read back as top-level arrays.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { $ref: "#/components/schemas/MessageWritableAttributes" }
+            examples:
+              specific_people:
+                summary: Email two people
+                value:
+                  message:
+                    audience: specific_participants
+                    channels: [email]
+                    subject: Your bus leaves at 9
+                    body: "<p>Meet at the front entrance.</p>"
+                    participant_event_ids:
+                      - 3f0c1a52-1d55-4f43-9a0b-6b3b8e0f2b11
+                      - 8a7d2e90-5c3b-4c55-8f0e-2e9d1c4b7a66
+      responses:
+        "201":
+          description: Draft saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { $ref: "#/components/schemas/Message" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/MessagesForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /events/{event_id}/messages/options:
+    get:
+      tags: [Messages]
+      summary: Composer options
+      x-mint:
+        href: /api-reference/messages/composer-options
+      description: >-
+        The composer's pick lists: audiences (the groups audience only when the
+        event has groups enabled), channels (SMS is flagged `disabled` when
+        Twilio is switched off in settings), the event's groups and
+        participants, and the defaults a new message starts from.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Composer options.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  audiences:
+                    type: array
+                    items: { $ref: "#/components/schemas/LabelledOption" }
+                  channels:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        value: { type: string, enum: [slack, email, sms, push] }
+                        label: { type: string, example: Slack DM }
+                        disabled: { type: boolean }
+                        description:
+                          type: string
+                          nullable: true
+                          example: Attendees only
+                  groups:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        color: { type: string, nullable: true }
+                  participants:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          description: The participant_event id — what `participant_event_ids` takes.
+                        name: { type: string }
+                        email: { type: string, format: email }
+                        status: { $ref: "#/components/schemas/ParticipantStatus" }
+                  defaults:
+                    type: object
+                    properties:
+                      audience: { type: string, example: confirmed_attendees }
+                      channels:
+                        type: array
+                        items: { type: string }
+                        example: [slack]
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/MessagesForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/messages/{id}:
+    get:
+      tags: [Messages]
+      summary: Get a message
+      x-mint:
+        href: /api-reference/messages/get-a-message
+      description: >-
+        The message with its deliveries grouped per recipient, and what the
+        caller can do with it next. For callers in a PII-restricted role
+        (`limited`), an SMS delivery's `recipient_identifier` — a phone number
+        — is `null`; email addresses and Slack IDs are still shown.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/MessageId"
+      responses:
+        "200":
+          description: The message.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { $ref: "#/components/schemas/Message" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/MessagesForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Messages]
+      summary: Update a message
+      x-mint:
+        href: /api-reference/messages/update-a-message
+      description: >-
+        Edits a draft or scheduled message. Send the whole set of picks:
+        audience filters are rebuilt from `participant_event_ids` and
+        `group_ids` on every update, so omitting them clears them. A message
+        that has started sending can't be edited.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/MessageId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { $ref: "#/components/schemas/MessageWritableAttributes" }
+      responses:
+        "200":
+          description: Message updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { $ref: "#/components/schemas/Message" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/MessagesForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: >-
+            The message has already been sent (`Cannot edit a message that has
+            already been sent.`), or it failed validation.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ValidationError" }
+    delete:
+      tags: [Messages]
+      summary: Delete a message
+      x-mint:
+        href: /api-reference/messages/delete-a-message
+      description: >-
+        Deletes any message that isn't `sending` or `completed` — drafts,
+        scheduled and cancelled messages, and failed sends. A message that is
+        sending or has completed is kept.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/MessageId"
+      responses:
+        "200":
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notice: { type: string, example: Draft deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/MessagesForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: The message is sending or has been sent.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /events/{event_id}/messages/{id}/preview:
+    get:
+      tags: [Messages]
+      summary: Preview a message
+      x-mint:
+        href: /api-reference/messages/preview-a-message
+      description: >-
+        Step two of the composer: how many people the message would reach (and
+        up to 20 of their names), and how it renders on each channel it uses.
+        Channel renderings are `null` for channels the message doesn't use.
+        Only drafts and scheduled messages can be previewed.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/MessageId"
+      responses:
+        "200":
+          description: The preview.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  preview: { $ref: "#/components/schemas/MessagePreview" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/MessagesForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: The message has already been sent.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /events/{event_id}/messages/{id}/send_now:
+    post:
+      tags: [Messages]
+      summary: Send a message
+      x-mint:
+        href: /api-reference/messages/send-a-message
+      description: >-
+        Sends a draft or scheduled message now — unless its `scheduled_at` is
+        still in the future, in which case it is marked `scheduled` and goes out
+        at that time. Safe against a double tap: a second call after the send
+        has started is a `422` and changes nothing.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/MessageId"
+      responses:
+        "200":
+          description: Sending, or scheduled.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageActionResponse" }
+              examples:
+                sending:
+                  value: { notice: Message is being sent to 42 recipients. }
+                scheduled:
+                  value: { notice: "Message scheduled for July 12, 2027 at  9:00 AM." }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/MessagesForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: >-
+            Already sent (`This message has already been sent.`), or the body is
+            empty.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /events/{event_id}/messages/{id}/cancel:
+    post:
+      tags: [Messages]
+      summary: Cancel a scheduled message
+      x-mint:
+        href: /api-reference/messages/cancel-a-scheduled-message
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/MessageId"
+      responses:
+        "200":
+          description: Cancelled.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageActionResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/MessagesForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: The message isn't scheduled.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /events/{event_id}/messages/{id}/retry_failed:
+    post:
+      tags: [Messages]
+      summary: Retry failed deliveries
+      x-mint:
+        href: /api-reference/messages/retry-failed-deliveries
+      description: >-
+        Puts every failed delivery back in the queue and sets the message to
+        `sending`.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/MessageId"
+      responses:
+        "200":
+          description: Retrying.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageActionResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/MessagesForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: No failed deliveries to retry.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /events/{event_id}/messages/{id}/retry_delivery:
+    post:
+      tags: [Messages]
+      summary: Retry one delivery
+      x-mint:
+        href: /api-reference/messages/retry-one-delivery
+      description: Puts a single failed delivery back in the queue.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/MessageId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [delivery_id]
+              properties:
+                delivery_id:
+                  type: string
+                  format: uuid
+                  description: A delivery id from the message's `recipients[].deliveries[]`.
+      responses:
+        "200":
+          description: Retrying.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageActionResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/MessagesForbidden" }
+        "404":
+          description: No such message on this event, or no such delivery on this message.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: The delivery hasn't failed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /events/{event_id}/messages/{id}/send_to_new_recipients:
+    post:
+      tags: [Messages]
+      summary: Send to new recipients
+      x-mint:
+        href: /api-reference/messages/send-to-new-recipients
+      description: >-
+        Sends an already-sent message to everyone who has joined its audience
+        since, as catch-up deliveries. `new_recipient_count` on the message says
+        how many that would be. Only for a message that has finished sending
+        (`completed` or `failed`); a match of nobody new is a `200` with a
+        notice saying so.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/MessageId"
+      responses:
+        "200":
+          description: Sending to the new recipients, or nobody new matched.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageActionResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/MessagesForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: The message hasn't been sent yet, or is still sending.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /events/{event_id}/incidents:
+    get:
+      tags: [Incidents]
+      summary: List incidents
+      x-mint:
+        href: /api-reference/incidents/list-incidents
+      description: >-
+        The event's incident log, newest first, limited to what the caller may
+        see: incidents shared with one of their roles on this event, plus the
+        ones they reported. Requires a role on the event itself (or global
+        admin) — series membership alone does not open the incident log; the
+        event's `can_view_incidents` flag in `GET /events` says whether it is
+        open to the caller. API keys are refused: an incident is attributed to
+        the person who logs it.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Incidents the caller can see.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  incidents:
+                    type: array
+                    items: { $ref: "#/components/schemas/IncidentSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/IncidentsForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Incidents]
+      summary: Log an incident
+      x-mint:
+        href: /api-reference/incidents/log-an-incident
+      description: |
+        Logs an incident reported by the caller. Anyone with a role on the event
+        can log one.
+
+        Send `escalate: true` with an `escalation` object to also file a
+        confidential report to Hack Club HQ in the same call. Both halves are
+        validated before anything is saved, so a failed escalation (a missing
+        callback number, say) leaves no log entry behind; its errors come back
+        prefixed `Escalation:`. Behavior, safeguarding and other incidents that
+        are escalated are also posted to the Fire Dept Slack channel; medical
+        incidents stay HQ-only.
+
+        A medical incident must name at least one participant and one helping
+        staff member, and list the medication when `medication_dispensed` is
+        true.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [incident]
+              properties:
+                incident: { $ref: "#/components/schemas/IncidentWritableAttributes" }
+                escalate:
+                  type: boolean
+                  default: false
+                  description: Also escalate to Hack Club HQ.
+                escalation: { $ref: "#/components/schemas/IncidentEscalationAttributes" }
+            examples:
+              log_only:
+                summary: Log without involving HQ
+                value:
+                  incident:
+                    category: behavior
+                    severity: s2
+                    summary: Shoving in the queue
+                    details: Two attendees shoved each other.
+                    visible_to_roles: [event_admin]
+              log_and_escalate:
+                summary: Log and escalate to HQ
+                value:
+                  incident:
+                    category: behavior
+                    severity: s1
+                    summary: Harassment at lunch
+                    details: Reported by two attendees.
+                    visible_to_roles: [event_admin, safeguarding_lead]
+                  escalate: true
+                  escalation:
+                    reporter_phone: "+14155550177"
+                    emergency_services_called: false
+      responses:
+        "201":
+          description: Incident logged (and escalated, if asked).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  incident: { $ref: "#/components/schemas/Incident" }
+                  notice:
+                    type: string
+                    description: >-
+                      Says whether the escalation went through. An incident can
+                      be logged while the HQ report fails to file; retry with
+                      `POST /events/{event_id}/incidents/{id}/escalate`.
+                    example: Incident logged and escalated to Hack Club HQ.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/IncidentsForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /events/{event_id}/incidents/options:
+    get:
+      tags: [Incidents]
+      summary: Incident form options
+      x-mint:
+        href: /api-reference/incidents/incident-form-options
+      description: >-
+        What the log and edit forms offer: categories, the S0–S3 incident
+        scale, statuses, the roles an incident can be shared with and the
+        default share, plus the participants and staff on this event an
+        incident can name. `reporter_phone` prefills the escalation callback
+        number from the caller's Hack Club account.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: Form options.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items: { $ref: "#/components/schemas/LabelledOption" }
+                  levels:
+                    type: array
+                    items: { $ref: "#/components/schemas/IncidentLevel" }
+                  statuses:
+                    type: array
+                    items: { $ref: "#/components/schemas/LabelledOption" }
+                  roles:
+                    type: array
+                    items: { $ref: "#/components/schemas/LabelledOption" }
+                  default_visible_to_roles:
+                    type: array
+                    items: { $ref: "#/components/schemas/EventRole" }
+                    example: [event_admin, safeguarding_lead]
+                  default_severity: { type: string, example: s2 }
+                  emergency_level:
+                    type: string
+                    example: s0
+                    description: The level that pages HQ by phone.
+                  participants:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          description: The participant_event id — what `participant_event_ids` takes.
+                        name: { type: string }
+                        email: { type: string, format: email }
+                  staff:
+                    type: array
+                    items: { $ref: "#/components/schemas/IncidentPerson" }
+                  reporter_phone: { type: string, nullable: true, example: "+14155550177" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/IncidentsForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/incidents/{id}:
+    get:
+      tags: [Incidents]
+      summary: Get an incident
+      x-mint:
+        href: /api-reference/incidents/get-an-incident
+      description: >-
+        One incident, for someone it is shared with by role or who reported it.
+        A reporter who holds none of its roles gets a receipt: what they
+        submitted and where it stands, with `actions_taken` `null` and an empty
+        `timeline` — the casework belongs to the people handling it.
+        `permissions` says what the caller can do next.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/IncidentId"
+      responses:
+        "200":
+          description: The incident.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  incident: { $ref: "#/components/schemas/Incident" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/IncidentsForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Incidents]
+      summary: Update an incident
+      x-mint:
+        href: /api-reference/incidents/update-an-incident
+      description: >-
+        Edits the incident, including who it is shared with. Needs a role the
+        incident is shared with — reporting it is not enough. Send only the
+        fields you want to change. If the incident was posted to Slack, the
+        change is posted to its thread.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/IncidentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [incident]
+              properties:
+                incident: { $ref: "#/components/schemas/IncidentWritableAttributes" }
+            examples:
+              move_to_review:
+                value:
+                  incident: { status: in_review }
+      responses:
+        "200":
+          description: Incident updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  incident: { $ref: "#/components/schemas/Incident" }
+                  notice: { type: string, example: Incident was successfully updated. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/IncidentsForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /events/{event_id}/incidents/{id}/escalate:
+    post:
+      tags: [Incidents]
+      summary: Escalate an incident to HQ
+      x-mint:
+        href: /api-reference/incidents/escalate-an-incident-to-hq
+      description: >-
+        Files a confidential report to Hack Club HQ from this incident, with the
+        same notifications a report from the public form triggers (email,
+        Slack, a confirmation text, and phone calls for an S0). Anyone who can
+        see the incident, its reporter included, can escalate it. Idempotent:
+        escalating an incident that already has an HQ report is a `200` with a
+        notice saying so, and files nothing.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/IncidentId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                escalation: { $ref: "#/components/schemas/IncidentEscalationAttributes" }
+      responses:
+        "200":
+          description: Escalated, or already escalated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  incident: { $ref: "#/components/schemas/Incident" }
+                  notice:
+                    type: string
+                    example: Escalated to Hack Club HQ. Their safeguarding team has been notified.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/IncidentsForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: The HQ report failed validation, e.g. no callback number.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ValidationError" }
+
+  /events/{event_id}/incidents/{incident_id}/comments:
+    post:
+      tags: [Incidents]
+      summary: Comment on an incident
+      x-mint:
+        href: /api-reference/incidents/comment-on-an-incident
+      description: >-
+        Adds a comment to the incident's timeline, for anyone who can see the
+        incident. A `new_status` sent with the comment is applied only when the
+        caller may update the incident; from a reporter who holds none of its
+        roles it is silently dropped and the comment is still saved. If the
+        incident was posted to Slack, the comment is posted to its thread.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: incident_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+          description: The incident id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comment]
+              properties:
+                comment:
+                  type: object
+                  required: [body]
+                  properties:
+                    body: { type: string, example: Spoke to both attendees. }
+                    new_status:
+                      allOf: [{ $ref: "#/components/schemas/IncidentStatus" }]
+                      description: Optional. Changes the incident's status along with the comment.
+      responses:
+        "201":
+          description: Comment added.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comment:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      body: { type: string }
+                      new_status:
+                        allOf: [{ $ref: "#/components/schemas/IncidentStatus" }]
+                        nullable: true
+                      created_at: { type: string, format: date-time }
+                  incident_status:
+                    allOf: [{ $ref: "#/components/schemas/IncidentStatus" }]
+                    description: The incident's status after the comment.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/IncidentsForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: >-
+            A blank body, or an unknown `new_status` (refused before anything is
+            written; that error carries no `errors` array).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ValidationError" }
+
   /events/{event_id}/participant_events/{participant_event_id}/nfc_badge/ensure:
     post:
       tags: [NFC Badges]
@@ -2020,6 +3078,18 @@ components:
       in: path
       required: true
       schema: { type: integer }
+    IncidentId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+      description: The incident id. Must belong to the event in the path.
+    MessageId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+      description: The message id. Must belong to the event in the path.
 
   responses:
     Unauthorized:
@@ -2042,6 +3112,28 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
+    ValidationFailed:
+      description: >-
+        The record failed validation. `error` is every message as one sentence;
+        `errors` lists them one by one.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ValidationError" }
+    MessagesForbidden:
+      description: >-
+        The caller has no access to this event, or is an API key (`API key is
+        not authorized for messages`).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    IncidentsForbidden:
+      description: >-
+        The caller's roles on this event don't allow this (see the operation's
+        description), or the caller is an API key (`API key is not authorized
+        for incidents`).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
 
   schemas:
     Error:
@@ -2053,6 +3145,22 @@ components:
       type: object
       properties:
         success: { type: boolean, example: true }
+
+    ValidationError:
+      type: object
+      properties:
+        error: { type: string, example: "Category can't be blank" }
+        errors:
+          type: array
+          items: { type: string }
+          example: ["Category can't be blank"]
+
+    LabelledOption:
+      type: object
+      description: One choice in a pick list.
+      properties:
+        value: { type: string }
+        label: { type: string }
 
     EventRole:
       type: string
@@ -2165,6 +3273,12 @@ components:
         location_city: { type: string, nullable: true, example: New York }
         logo_url: { type: string, nullable: true }
         banner_url: { type: string, nullable: true }
+        can_view_incidents:
+          type: boolean
+          description: >-
+            Whether the caller can open this event's incident log (`GET
+            /events/{event_id}/incidents`): true for a global admin or anyone
+            with a role on the event itself. A series role alone doesn't count.
 
     Series:
       type: object
@@ -2865,3 +3979,438 @@ components:
               id: { type: string, format: uuid }
               name: { type: string }
               color: { type: string, nullable: true }
+
+    IncidentStatus:
+      type: string
+      enum: [open, in_review, closed]
+
+    IncidentLevel:
+      type: object
+      description: >-
+        One step of the S0–S3 incident scale shared by incident severities and
+        HQ report priorities.
+      properties:
+        value: { type: string, enum: [s0, s1, s2, s3] }
+        code: { type: string, example: S1 }
+        name: { type: string, example: Moderate priority }
+        target:
+          type: string
+          description: HQ's target response time.
+          example: ≈ 1 hour
+        label: { type: string, example: S1 · Moderate priority · ≈ 1 hour }
+        color: { type: string, enum: [red, amber, green, blue] }
+        examples:
+          type: array
+          items: { type: string }
+          example: [Disclosure of a safeguarding incident]
+
+    IncidentPerson:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+
+    IncidentSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        category: { type: string, enum: [safeguarding, medical, behavior, other] }
+        severity: { type: string, enum: [s0, s1, s2, s3] }
+        status: { $ref: "#/components/schemas/IncidentStatus" }
+        summary: { type: string, nullable: true, example: Shoving in the queue }
+        location: { type: string, nullable: true }
+        occurred_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        reported_by: { $ref: "#/components/schemas/IncidentPerson" }
+        participant_names:
+          type: array
+          description: Preferred (or legal first) names of the participants involved.
+          items: { type: string }
+        hq_report:
+          type: object
+          nullable: true
+          description: The confidential HQ report, once the incident has been escalated.
+          properties:
+            id: { type: string, format: uuid }
+            status: { type: string, enum: [open, in_review, resolved] }
+            created_at: { type: string, format: date-time }
+
+    Incident:
+      description: >-
+        The full incident. For a reporter who holds none of the roles it is
+        shared with, `actions_taken` is `null` and `timeline` is empty.
+      allOf:
+        - $ref: "#/components/schemas/IncidentSummary"
+        - type: object
+          properties:
+            details: { type: string, nullable: true }
+            actions_taken:
+              type: string
+              nullable: true
+              description: Casework — `null` for a reporter outside the shared roles.
+            visible_to_roles:
+              type: array
+              description: The event roles this incident is shared with.
+              items: { $ref: "#/components/schemas/EventRole" }
+            medication_dispensed: { type: boolean }
+            medications:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  name: { type: string }
+                  dose: { type: string, nullable: true }
+                  notes: { type: string, nullable: true }
+            participants:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    description: The participant_event id.
+                  name: { type: string, example: Jane Doe }
+                  email: { type: string, format: email }
+            helping_staff:
+              type: array
+              items: { $ref: "#/components/schemas/IncidentPerson" }
+            timeline:
+              type: array
+              description: >-
+                Comments and changes, newest first. Empty for a reporter outside
+                the shared roles.
+              items: { $ref: "#/components/schemas/IncidentTimelineEntry" }
+            permissions:
+              type: object
+              description: What the caller can do with this incident.
+              properties:
+                update: { type: boolean }
+                comment: { type: boolean }
+                change_status:
+                  type: boolean
+                  description: Whether a `new_status` sent with a comment will be applied.
+                view_casework: { type: boolean }
+                escalate:
+                  type: boolean
+                  description: False once the incident has been escalated.
+
+    IncidentTimelineEntry:
+      type: object
+      description: >-
+        A comment (`type: comment`) or a recorded change (`type: change`). The
+        change a status-picking comment caused is folded into that comment.
+      properties:
+        type: { type: string, enum: [comment, change] }
+        id: { type: string }
+        created_at: { type: string, format: date-time }
+        body: { type: string, description: Comments only. }
+        new_status:
+          allOf: [{ $ref: "#/components/schemas/IncidentStatus" }]
+          nullable: true
+          description: Comments only.
+        author_name:
+          type: string
+          nullable: true
+          description: >-
+            Comments only. Comments made from the Slack thread read `Fire Dept
+            (<Slack name>)`.
+        source: { type: string, nullable: true, description: "Comments only, e.g. `slack`." }
+        slack_url:
+          type: string
+          format: uri
+          nullable: true
+          description: Comments only — the Slack message, for comments made in Slack.
+        action: { type: string, enum: [created, updated], description: Changes only. }
+        actor_name: { type: string, description: "Changes only. `System` when no person made it." }
+        fields:
+          type: array
+          description: Changes only — the humanized names of the fields that changed.
+          items: { type: string }
+
+    IncidentWritableAttributes:
+      type: object
+      description: >-
+        Every incident field the API can write. On create, `category` and
+        `severity` are required; on update send only what changes.
+      properties:
+        category: { type: string, enum: [safeguarding, medical, behavior, other] }
+        severity: { type: string, enum: [s0, s1, s2, s3] }
+        status: { $ref: "#/components/schemas/IncidentStatus" }
+        summary: { type: string }
+        details: { type: string }
+        actions_taken: { type: string }
+        location: { type: string }
+        occurred_at: { type: string, format: date-time }
+        visible_to_roles:
+          type: array
+          description: >-
+            Event roles that can see and handle the incident. The options
+            endpoint returns the default (`event_admin`, `safeguarding_lead`).
+          items: { $ref: "#/components/schemas/EventRole" }
+        participant_event_ids:
+          type: array
+          description: Participants involved, by participant_event id. Required (non-empty) for a medical incident.
+          items: { type: string, format: uuid }
+        helping_staff_ids:
+          type: array
+          description: Staff who helped, by user id. Required (non-empty) for a medical incident.
+          items: { type: string, format: uuid }
+        medication_dispensed:
+          type: boolean
+          description: Medical incidents only; ignored (and medications dropped) otherwise.
+        medications_attributes:
+          type: array
+          description: >-
+            Medication given. Send `id` to edit an existing row, and `_destroy:
+            true` with it to remove one.
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              dose: { type: string }
+              notes: { type: string }
+              _destroy: { type: boolean }
+
+    IncidentEscalationAttributes:
+      type: object
+      description: What the HQ report needs beyond the incident itself.
+      properties:
+        reporter_phone:
+          type: string
+          description: >-
+            Callback number, E.164. Defaults to the phone on the caller's Hack
+            Club account; the report can't be filed without one.
+          example: "+14155550177"
+        emergency_services_called:
+          type: boolean
+          default: false
+          description: True files the report as S0.
+
+    MessageSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        subject: { type: string, nullable: true }
+        status: { type: string, enum: [draft, scheduled, sending, completed, failed, cancelled] }
+        audience: { type: string, example: confirmed_attendees }
+        audience_label: { type: string, example: Confirmed Attendees }
+        channels:
+          type: array
+          items: { type: string, enum: [slack, email, sms, push] }
+        recipient_count: { type: integer }
+        sent_count: { type: integer }
+        failed_count: { type: integer }
+        scheduled_at: { type: string, format: date-time, nullable: true }
+        sent_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        sent_by: { type: string, nullable: true, description: Who composed it. }
+        preview_text: { type: string, description: "The body as plain text, cut to 140 characters." }
+
+    Message:
+      allOf:
+        - $ref: "#/components/schemas/MessageSummary"
+        - type: object
+          properties:
+            body: { type: string, description: The body as stored (HTML). }
+            body_html: { type: string, description: The body as rendered for email. }
+            participant_event_ids:
+              type: array
+              items: { type: string, format: uuid }
+            group_ids:
+              type: array
+              items: { type: string, format: uuid }
+            opened_count:
+              type: integer
+              nullable: true
+              description: Email deliveries opened. `null` when email isn't a channel.
+            pending_count: { type: integer }
+            new_recipient_count:
+              type: integer
+              description: >-
+                People who joined the audience since it was sent — what `send_to_new_recipients`
+                would reach. 0 until the message has finished sending.
+            recipients:
+              type: array
+              description: One entry per person, with a delivery per channel.
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    description: The participant_event id, or the guardian id for guardian audiences.
+                  name: { type: string }
+                  kind: { type: string, enum: [attendee, guardian] }
+                  catch_up:
+                    type: boolean
+                    description: Added by `send_to_new_recipients` rather than the original send.
+                  deliveries:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        channel: { type: string, enum: [slack, email, sms, push] }
+                        status: { type: string, enum: [pending, sending, delivered, failed] }
+                        recipient_identifier:
+                          type: string
+                          nullable: true
+                          description: >-
+                            The email address, Slack ID or phone number it went
+                            to. An SMS identifier is `null` for PII-restricted
+                            roles.
+                        error_message: { type: string, nullable: true }
+                        delivered_at: { type: string, format: date-time, nullable: true }
+                        read_at: { type: string, format: date-time, nullable: true }
+            permissions:
+              type: object
+              description: Which actions the message's state allows.
+              properties:
+                edit: { type: boolean }
+                send_now: { type: boolean }
+                destroy: { type: boolean }
+                cancel: { type: boolean }
+                retry_failed: { type: boolean }
+                send_to_new_recipients: { type: boolean }
+
+    MessageWritableAttributes:
+      type: object
+      properties:
+        subject:
+          type: string
+          description: Email subject. Defaults to "You have a new message from <event>".
+        body:
+          type: string
+          description: HTML. Converted to Slack markup and plain text (for SMS) per channel.
+        audience:
+          type: string
+          enum:
+            - all_attendees
+            - all_attendees_and_held
+            - confirmed_attendees
+            - attendees_with_flights
+            - attendees_incomplete
+            - specific_participants
+            - attendees_in_groups
+            - all_guardians
+            - guardians_of_confirmed
+            - guardians_pending
+        channels:
+          type: array
+          description: At least one. Slack reaches attendees only.
+          items: { type: string, enum: [slack, email, sms, push] }
+        scheduled_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When `send_now` should actually send. Omit to send immediately.
+        participant_event_ids:
+          type: array
+          description: With `audience=specific_participants` only.
+          items: { type: string, format: uuid }
+        group_ids:
+          type: array
+          description: Narrows an attendee audience to these groups.
+          items: { type: string, format: uuid }
+
+    MessagePreview:
+      type: object
+      properties:
+        total_count: { type: integer, description: Estimated number of recipients. }
+        recipient_names:
+          type: array
+          description: Up to 20 of them.
+          items: { type: string }
+        audience_label: { type: string }
+        channel_labels: { type: string, example: "Email, SMS (Twilio)" }
+        channels:
+          type: array
+          items: { type: string }
+        slack_text: { type: string, nullable: true }
+        email_subject: { type: string, nullable: true }
+        body_html: { type: string }
+        sms_text: { type: string, nullable: true }
+        sms_length: { type: integer }
+        sms_segments: { type: integer, description: 160-character SMS segments. }
+        scheduled_at: { type: string, format: date-time, nullable: true }
+        scheduled_in_future:
+          type: boolean
+          description: True when `send_now` would schedule rather than send.
+
+    MessageActionResponse:
+      type: object
+      properties:
+        message: { $ref: "#/components/schemas/Message" }
+        notice: { type: string }
+
+    InboxMessageSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid, description: The message id. }
+        subject: { type: string, nullable: true }
+        preview_text: { type: string, description: "Plain text, cut to 140 characters." }
+        event:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+        ticket_id:
+          type: string
+          format: uuid
+          description: The participant_event (registration) it was delivered to.
+        channels:
+          type: array
+          description: Every channel it arrived on.
+          items: { type: string, enum: [slack, email, sms, push] }
+        delivered_at: { type: string, format: date-time, nullable: true }
+        sender_name: { type: string, nullable: true }
+        unread: { type: boolean, description: True while any of its deliveries is unread. }
+
+    InboxMessage:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        subject: { type: string, nullable: true }
+        body_html: { type: string }
+        event:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+        ticket_id: { type: string, format: uuid }
+        channels:
+          type: array
+          items: { type: string, enum: [slack, email, sms, push] }
+        delivered_at: { type: string, format: date-time, nullable: true }
+        sender_name: { type: string, nullable: true }
+
+    IncidentReportEventChoice:
+      type: object
+      properties:
+        value:
+          type: string
+          description: What to send as `event_choice` — an event id, or `custom:<name>`.
+        label: { type: string }
+        emergency_allowed:
+          type: boolean
+          description: False when an S0 would be filed as S1 (old or custom events).
+
+    IncidentReportAttributes:
+      type: object
+      required: [reporter_name, reporter_email, reporter_phone, reporter_role, incident_type, priority, summary, details]
+      properties:
+        reporter_name: { type: string }
+        reporter_email: { type: string, format: email }
+        reporter_phone: { type: string, description: "E.164 format, e.g. +14155550150" }
+        reporter_role: { type: string, enum: [event_volunteer, event_point_of_contact, hq_employee, parent, participant] }
+        incident_type: { type: string, enum: [event_safety, medical_emergency, hq_staff, other] }
+        priority: { type: string, enum: [s0, s1, s2, s3] }
+        emergency_services_called:
+          type: boolean
+          description: Forces the priority to S0.
+        summary: { type: string }
+        details: { type: string }
