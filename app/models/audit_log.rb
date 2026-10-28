@@ -46,6 +46,7 @@ class AuditLog < ApplicationRecord
     reset_nfc_badge: "reset_nfc_badge",
     passport_pair: "passport_pair",
     passport_revoke: "passport_revoke",
+    id_check: "id_check",
     regenerate_api_key: "regenerate_api_key",
     clear_waiver_dates_warning: "clear_waiver_dates_warning",
     attach_image: "attach_image",
