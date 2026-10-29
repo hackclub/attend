@@ -115,10 +115,10 @@ RSpec.describe "The visas.hackclub.com host", type: :request do
       expect(response.headers["Location"]).to eq(attend(visas_application_path(application)))
     end
 
-    it "sends an event's page and form to its form in Attend, carrying an invitation across" do
+    it "sends an event's page and form to its form in Attend, carrying an invitation across, temporarily" do
       event
       get "/events/fictional-hack-2027"
-      expect(response).to have_http_status(:moved_permanently)
+      expect(response).to have_http_status(:found)
       expect(response.headers["Location"]).to eq(attend(visas_apply_path("fictional-hackathon")))
 
       get "/events/fictional-hack-2027/apply", params: { invitation: "tok3n" }
@@ -145,6 +145,7 @@ RSpec.describe "The visas.hackclub.com host", type: :request do
     it "sends an application's admin page to Attend's" do
       get "/admin/visa_letter_applications/#{application.id}"
 
+      expect(response).to have_http_status(:found)
       expect(response.headers["Location"]).to eq(attend(admin_event_visa_letter_path(event, application)))
     end
 

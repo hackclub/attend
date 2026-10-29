@@ -67,12 +67,13 @@ class VisasHostController < ActionController::Base
 
   # An event's page and form, and the links in Envoy's invitation and
   # rejection emails. The import records each event's Envoy slug, and an
-  # invitation's token carries over.
+  # invitation's token carries over. Temporary, since the answer depends on
+  # what's been imported or mapped: a browser keeps a 301 for good.
   def event_page
     event = Event.find_by("config->>'legacy_envoy_slug' = ?", params[:slug])
-    return redirect_to_attend(visas_path) if event.nil?
+    return redirect_to_attend(visas_path, status: :found) if event.nil?
 
-    redirect_to_attend visas_apply_path(event.slug, invite: params[:invitation].presence)
+    redirect_to_attend visas_apply_path(event.slug, invite: params[:invitation].presence), status: :found
   end
 
   def lookup
@@ -84,11 +85,12 @@ class VisasHostController < ActionController::Base
   end
 
   # Envoy's admin emails linked here. Attend checks who may see it.
+  # Temporary too: an application missing now may be imported later.
   def admin_application
     application = VisaLetterApplication.find_by(id: params[:id])
-    return redirect_to_attend(admin_root_path) if application.nil?
+    return redirect_to_attend(admin_root_path, status: :found) if application.nil?
 
-    redirect_to_attend admin_event_visa_letter_path(application.event, application)
+    redirect_to_attend admin_event_visa_letter_path(application.event, application), status: :found
   end
 
   def admin
@@ -104,7 +106,7 @@ class VisasHostController < ActionController::Base
 
   private
 
-  def redirect_to_attend(path)
-    redirect_to AttendUrls.attend_url(path), allow_other_host: true, status: :moved_permanently
+  def redirect_to_attend(path, status: :moved_permanently)
+    redirect_to AttendUrls.attend_url(path), allow_other_host: true, status: status
   end
 end
