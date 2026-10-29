@@ -112,6 +112,91 @@ class VisaLetterApplication < ApplicationRecord
     save!
   end
 
+  # Applying again after a rejection: the same application goes back to
+  # review with the corrected details. Only a soft rejection allows it, unless
+  # staff have since invited them to apply (`overriding_hard_rejection`).
+  # An Envoy import sent again through Attend's form is Attend's from then on,
+  # so it gets Attend's checks rather than Envoy's.
+  def resubmit!(attributes, overriding_hard_rejection: false)
+    unless soft_rejected? || (hard_rejected? && overriding_hard_rejection)
+      raise InvalidTransition, "only a rejected application can be submitted again"
+    end
+
+    update!(attributes.merge(status: :pending, rejection_type: nil, rejection_reason: nil,
+      reviewed_by: nil, reviewed_at: nil, submitted_at: Time.current, imported_at: nil))
+  end
+
+  # What a new application can start with: the legal details Hack Club Auth
+  # holds for the account, then anything their Attend profile has that HCA
+  # doesn't. The applicant checks all of it against their passport.
+  def self.prefill_for(user)
+    claims = (user.oidc_claims || {}).to_h.stringify_keys
+    participant = user.participant
+    name = [ claims["legal_first_name"].presence || claims["given_name"], claims["legal_last_name"].presence || claims["family_name"] ].compact_blank.join(" ")
+    name = participant&.full_name if name.blank? || name.include?(Participant::NAME_PLACEHOLDER)
+
+    {
+      full_name: name.presence,
+      date_of_birth: participant&.date_of_birth,
+      phone: claims["phone_number"].presence || participant&.phone,
+      address: participant_address(participant),
+      nationality: CountryCodes.normalize(claims.dig("address", "country")) || participant&.country_of_residence.presence
+    }.compact.merge(locked_by_hack_club_auth(user))
+  end
+
+  # The birthday and mailing address Hack Club Auth holds for the account.
+  # Where it has them, the letter uses them as they are: the applicant can't
+  # type different ones, and changes them in Hack Club Auth instead.
+  def self.locked_by_hack_club_auth(user)
+    claims = (user.oidc_claims || {}).to_h.stringify_keys
+    {
+      date_of_birth: parse_date(claims["birthdate"]),
+      address: address_from_claims(claims["address"])
+    }.compact
+  end
+
+  # Envoy's applications have no account until their owner signs in. A Hack
+  # Club account with the same verified email claims them, except where it
+  # already has an application for that event.
+  def self.claim_imported_for(user)
+    return if user.email.blank? || user.hack_club_account_id.blank?
+
+    where(user_id: nil, email: user.email).where.not(imported_at: nil).find_each do |application|
+      next if where(event_id: application.event_id, user_id: user.id).exists?
+
+      application.update_columns(user_id: user.id, updated_at: Time.current)
+    end
+  end
+
+  def self.parse_date(value)
+    Date.iso8601(value.to_s) if value.present?
+  rescue Date::Error
+    nil
+  end
+
+  # HCA sends its own address shape, OIDC's standard one, or nothing.
+  def self.address_from_claims(address)
+    return if address.blank?
+
+    address = address.to_h.stringify_keys
+    lines = [
+      address["line_1"] || address["street_address"],
+      address["line_2"],
+      [ address["city"] || address["locality"], address["state"] || address["region"], address["postal_code"] ].compact_blank.join(", "),
+      CountryCodes.normalize(address["country"]) || address["country"]
+    ]
+    lines.compact_blank.join("\n").presence
+  end
+
+  def self.participant_address(participant)
+    return if participant.nil?
+
+    [ participant.address_line_1, participant.address_line_2,
+      [ participant.city, participant.state, participant.postal_code ].compact_blank.join(", "),
+      participant.country_of_residence ].compact_blank.join("\n").presence
+  end
+  private_class_method :parse_date, :address_from_claims, :participant_address
+
   def record_visa_outcome!(outcome)
     raise InvalidTransition, "the visa outcome can only be recorded once the letter is sent" unless letter_sent?
 
@@ -162,10 +247,15 @@ class VisaLetterApplication < ApplicationRecord
     end
   end
 
+  # Envoy's rule and wording. Imported letters keep whatever Envoy accepted.
   def date_of_birth_in_past
     return if date_of_birth.blank?
 
-    errors.add(:date_of_birth, "must be in the past") unless date_of_birth < Date.current
+    if date_of_birth >= Date.current
+      errors.add(:date_of_birth, "must be in the past")
+    elsif !imported? && date_of_birth > 13.years.ago.to_date
+      errors.add(:date_of_birth, "must be at least 13 years old")
+    end
   end
 
   def applicant_not_banned

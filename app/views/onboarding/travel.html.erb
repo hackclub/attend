@@ -24,14 +24,14 @@
             <option value="denied" <%= "selected" if @travel_inbound&.denied? %>>My visa application was denied</option>
           </select>
         </div>
-        <% if current_event.visa_application_url.present? %>
+        <% if (visa_letter_link = visa_letter_request_path_for(current_event)) %>
           <div class="portal-note portal-note-info mt-4">
             <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.852l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/>
             </svg>
             <div class="text-sm">
               <p class="portal-body mb-2">If you need a visa letter to support your application, request one through our visa letter system.</p>
-              <%= link_to "Request a visa letter →", current_event.visa_application_url, target: "_blank", rel: "noopener noreferrer", class: "portal-btn portal-btn-secondary" %>
+              <%= link_to "Request a visa letter →", visa_letter_link, target: "_blank", rel: "noopener noreferrer", class: "portal-btn portal-btn-secondary" %>
             </div>
           </div>
         <% end %>

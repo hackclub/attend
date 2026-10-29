@@ -459,6 +459,20 @@ class Event < ApplicationRecord
     deadline.nil? || local_today <= deadline
   end
 
+  # Events whose public form is taking visa letter applications today,
+  # soonest first. Only announced, dated events: the list is public, and a
+  # draft's venue isn't (see LandingStats). The deadline is a date on each
+  # event's own clock, so it's checked per event rather than in SQL. The home
+  # page and dashboard show this on every load, so the ids are cached briefly;
+  # the form itself checks the event live.
+  def self.open_for_visa_letters
+    ids = Rails.cache.fetch("events/open_for_visa_letters", expires_in: 5.minutes) do
+      where("config->>'visa_letters' = 'open'").where.not(setup_completed_at: nil)
+        .where(ends_at: Time.current..).select(&:accepting_visa_letter_applications?).map(&:id)
+    end
+    where(id: ids).order(:starts_at).to_a
+  end
+
   def visa_letter_deadline_date
     Date.iso8601(visa_letter_deadline.to_s) if visa_letter_deadline.present?
   rescue Date::Error

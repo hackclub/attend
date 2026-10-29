@@ -20,7 +20,7 @@ module Admin
 
       if @template.save
         @record = @template
-        redirect_to admin_visa_letter_templates_path, notice: "#{@template.name} added."
+        redirect_to admin_visa_letter_templates_path, notice: "Letter template was successfully created."
       else
         render :new, status: :unprocessable_entity
       end
@@ -32,7 +32,7 @@ module Admin
     def update
       if @template.update(template_params)
         @record = @template
-        redirect_to admin_visa_letter_templates_path, notice: "#{@template.name} saved."
+        redirect_to admin_visa_letter_templates_path, notice: "Letter template was successfully updated."
       else
         render :edit, status: :unprocessable_entity
       end
@@ -41,7 +41,7 @@ module Admin
     def destroy
       @record = @template
       @template.destroy!
-      redirect_to admin_visa_letter_templates_path, notice: "#{@template.name} removed."
+      redirect_to admin_visa_letter_templates_path, notice: "Letter template was successfully deleted."
     end
 
     # The letter for a made-up applicant, opened in the browser.

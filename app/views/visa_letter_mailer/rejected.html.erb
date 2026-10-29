@@ -1,11 +1,22 @@
-<p>Hi <%= @first_name %>,</p>
+<h1>Update on Your Visa Letter Application</h1>
 
-<p>We can't issue a visa invitation letter for <strong><%= @event.name %></strong> on this request.</p>
+<p>Hello <%= @application.full_name %>,</p>
 
-<p><strong>Reason:</strong> <%= @reason %></p>
+<p>Thank you for your interest in attending <strong><%= @event.name %></strong>.</p>
 
-<% if @can_reapply %>
-  <p>You're welcome to apply again once you've sorted this out.</p>
+<p>Unfortunately, we are unable to provide a visa invitation letter for your application at this time.</p>
+
+<% if @reason.present? %>
+  <h2>Reason</h2>
+  <p><%= @reason %></p>
 <% end %>
 
-<p>Reference number: <%= @application.reference_number %>. If you have questions, reply to this email or write to <%= mail_to @support_email %>.</p>
+<% if @can_reapply %>
+  <h2>You Can Reapply</h2>
+  <p>If you have addressed the issues mentioned above or have additional information to provide, you are welcome to submit a new application.</p>
+  <p style="margin: 24px 0;"><%= mail_button "Reapply Now", @apply_url %></p>
+<% else %>
+  <p>If you believe this decision was made in error, please contact us at <%= mail_to @support_email %>.</p>
+<% end %>
+
+<p>We appreciate your understanding.</p>

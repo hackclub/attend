@@ -1,17 +1,31 @@
 module VisaLettersHelper
+  # The admin list's status filters, in Envoy's words.
+  VISA_LETTER_FILTER_LABELS = {
+    "pending" => "Pending Approval", "approved" => "Approved", "letter_sent" => "Letter Sent",
+    "rejected" => "Rejected", "all" => "All Statuses"
+  }.freeze
+
   VISA_LETTER_MODE_LABELS = {
     "off" => [ "Off", "Attend doesn't take visa letter applications for this event." ],
     "invite_only" => [ "Invited people only", "Only people your team invites to apply can ask for a letter." ],
     "open" => [ "Open form", "Anyone can apply through the public form until the deadline. Your team reviews every application." ]
   }.freeze
 
-  # [status type, label] for cs_status and the legacy badges.
+  # Where a participant asks for a visa letter: Attend's own form, when the
+  # event issues letters here. Nil otherwise. An event's old Envoy URL
+  # (visa_application_url) isn't offered: the event forms no longer show it,
+  # so nobody could correct or clear it, and Envoy's host is Attend's now.
+  def visa_letter_request_path_for(event)
+    visas_apply_path(event.slug) if event.visa_letters_enabled?
+  end
+
+  # [status type, label] for cs_status and the legacy badges. Envoy's labels.
   def visa_letter_status(application)
     case application.status
-    when "pending" then [ :pending, "Awaiting review" ]
-    when "approved" then [ :in_progress, "Generating letter" ]
-    when "letter_sent" then [ :success, "Letter sent" ]
-    when "rejected" then application.hard_rejected? ? [ :error, "Rejected" ] : [ :warning, "Rejected, can reapply" ]
+    when "pending" then [ :pending, "Pending Approval" ]
+    when "approved" then [ :in_progress, "Approved" ]
+    when "letter_sent" then [ :success, "Letter Sent" ]
+    when "rejected" then application.hard_rejected? ? [ :error, "Rejected" ] : [ :warning, "Rejected" ]
     end
   end
 
@@ -23,6 +37,16 @@ module VisaLettersHelper
     when "granted" then [ :success, "Visa granted" ]
     when "denied" then [ :error, "Visa refused" ]
     else [ :pending, "Waiting on the embassy" ]
+    end
+  end
+
+  # [portal badge modifier, label] for the applicant's own pages. Envoy's labels.
+  def applicant_visa_letter_status(application)
+    case application.status
+    when "pending" then [ "pending", "Pending Approval" ]
+    when "approved" then [ "waiting", "Approved" ]
+    when "letter_sent" then [ "done", "Letter Sent" ]
+    when "rejected" then [ "neutral", "Rejected" ]
     end
   end
 

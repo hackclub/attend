@@ -1,0 +1,17 @@
+<h1>Application Submitted</h1>
+
+<p>Hello <%= @application.full_name %>,</p>
+
+<p>Your visa letter application for <strong><%= @event.name %></strong> has been successfully submitted and is now pending review.</p>
+
+<h2>Application Details</h2>
+<ul>
+  <li><strong>Reference Number:</strong> <%= @application.reference_number %></li>
+  <li><strong>Event:</strong> <%= @event.name %></li>
+  <li><strong>Event Dates:</strong> <%= @event.formatted_date_range %></li>
+  <li><strong>Location:</strong> <%= @location %></li>
+</ul>
+
+<p>You will receive an email notification once your application has been reviewed. You can also check on it at <%= link_to @application_url, @application_url %>.</p>
+
+<p>If you have any questions, please contact us at <%= mail_to @support_email %>.</p>

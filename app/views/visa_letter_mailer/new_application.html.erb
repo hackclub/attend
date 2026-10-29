@@ -1,0 +1,14 @@
+<h1>New Visa Letter Application</h1>
+
+<p>A new visa letter application has been submitted and is pending review.</p>
+
+<h2>Application Details</h2>
+<ul>
+  <li><strong>Reference Number:</strong> <%= @application.reference_number %></li>
+  <li><strong>Event:</strong> <%= @event.name %></li>
+  <li><strong>Submitted:</strong> <%= @application.submitted_at&.strftime("%B %d, %Y at %I:%M %p") %></li>
+</ul>
+
+<p style="margin: 24px 0;"><%= mail_button "Review Application", @review_url %></p>
+
+<p>The applicant's details are in Attend, not in this email.</p>

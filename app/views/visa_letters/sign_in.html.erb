@@ -1,0 +1,19 @@
+<% content_for :title, "Apply for Visa Letter – Attend" %>
+
+<div class="w-full max-w-lg mx-auto">
+  <%= render "shared/portal_masthead", subtitle: @event&.name %>
+
+  <h1 class="portal-title text-2xl mb-3">Apply for Visa Letter</h1>
+  <% if @event %>
+    <p class="portal-body mb-3"><strong>Event Details:</strong> <%= [ @event.name, @event.formatted_date_range, [ @event.location_city, @event.location_country ].compact_blank.join(", ") ].compact_blank.join(" · ") %></p>
+  <% end %>
+  <p class="portal-body mb-6">Sign in with your Hack Club account to apply for a visa letter or check on your application. Please email <%= mail_to "visas@hackclub.com", class: "portal-link" %> if you need any assistance with your visa application.</p>
+
+  <div class="portal-card p-5 sm:p-6 mb-6">
+    <%= button_to user_hack_club_omniauth_authorize_path, method: :post, data: { turbo: false },
+          class: "portal-btn portal-btn-primary w-full sm:w-auto" do %>
+      Continue with Hack Club
+    <% end %>
+    <p class="portal-hint text-sm mt-3">If you don't have a Hack Club account yet, you can make one on the next screen.</p>
+  </div>
+</div>

@@ -24,9 +24,13 @@ module Admin
       end
     end
 
+    # The event's own settings page selects it, like every page under
+    # /admin/events/:event_slug does (BaseController#switch_event_if_needed).
+    # This route's param is :slug, so that doesn't happen on its own.
     def edit
       @event = Event.find_by!(slug: params[:slug])
       authorize @event
+      set_current_event(@event) unless current_event&.id == @event.id
     end
 
     # Where a save from the setup wizard's Basics step goes back to. It rides
