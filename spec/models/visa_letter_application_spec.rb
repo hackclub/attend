@@ -276,6 +276,18 @@ RSpec.describe VisaLetterApplication do
 
       expect(travel.reload).to have_attributes(visa_status: "applied", mode: "plane")
     end
+
+    it "still issues the letter when the travel row fails a rule about its other details" do
+      travel = Travel.create!(participant_event: registration, direction: :inbound, mode: :plane, arrangement_status: :provisional)
+      travel.update_columns(arrangement_status: "confirmed")
+      expect(travel.reload).not_to be_valid
+
+      application.approve!(by: reviewer)
+      application.issue_letter!
+
+      expect(application.reload).to be_letter_sent
+      expect(travel.reload.visa_status).to eq("applied")
+    end
   end
 
   describe "#letter_date_range" do

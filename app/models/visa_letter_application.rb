@@ -270,12 +270,17 @@ class VisaLetterApplication < ApplicationRecord
   # Kept in step with the application, so travel staff see where the visa is
   # without opening the visa letter pages. Overwrites whatever the participant
   # chose, since this is what happened.
+  #
+  # Saved without validation: only the visa fields change here, and a travel
+  # row that fails a newer rule about its other details mustn't stop a letter
+  # being issued or an outcome being recorded.
   def write_visa_status_to_travel
     status = travel_visa_status
     return if status.nil?
 
     travel = participant_event.travel_inbound || participant_event.travels.build(direction: :inbound)
-    travel.update!(visa_status: status, visa_required: true)
+    travel.assign_attributes(visa_status: status, visa_required: true)
+    travel.save!(validate: false)
   end
 
   # How their Hack Club account splits the name, when the letter still uses
