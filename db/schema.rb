@@ -907,7 +907,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_200000) do
     t.uuid "participant_id", null: false
     t.string "slack_user_id"
     t.string "status", default: "invited", null: false
-    t.string "totp_secret"
     t.datetime "um_guardian_confirmed_at"
     t.datetime "um_review_requested_at"
     t.string "um_status", default: "none", null: false
@@ -919,7 +918,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_200000) do
     t.index ["participant_id", "event_id"], name: "index_participant_events_on_participant_id_and_event_id", unique: true
     t.index ["participant_id"], name: "index_participant_events_on_participant_id"
     t.index ["status"], name: "index_participant_events_on_status"
-    t.index ["totp_secret"], name: "index_participant_events_on_totp_secret", unique: true
     t.index ["um_status"], name: "index_participant_events_on_um_status"
     t.index ["um_verified_by_id"], name: "index_participant_events_on_um_verified_by_id"
   end
@@ -1185,7 +1183,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_200000) do
     t.datetime "created_at", null: false
     t.datetime "ends_at"
     t.uuid "event_id", null: false
-    t.boolean "is_airport", default: false, null: false
     t.boolean "is_travel_pickup", default: false, null: false
     t.string "kind"
     t.string "name", null: false

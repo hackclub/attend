@@ -102,6 +102,17 @@ jobs:
       - name: Create placeholder passkit certificates
         run: mkdir -p tmp/ci-certs && touch tmp/ci-certs/certificate.p12 tmp/ci-certs/WWDR.cer
 
+      # Production is built by running db/migrate, but the test database comes
+      # from schema.rb, so a table or column that's only in schema.rb passes
+      # every test and then fails in production. Build a database from the
+      # migrations alone and check its dump is the schema.rb the tests will use.
+      - name: Check schema.rb matches the migrations
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/attend_migrations_only
+        run: |
+          bin/rails db:create db:migrate
+          git diff --exit-code -- db/schema.rb
+
       - name: Prepare the test database
         run: bin/rails db:test:prepare
 

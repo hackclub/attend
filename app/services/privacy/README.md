@@ -133,8 +133,8 @@ held off.
 
 All in one transaction, with PaperTrail switched off:
 
-- the user account, with its mobile and push tokens, passports, NFC tokens,
-  badge redirect, and MCP OAuth grants, tokens and connection settings
+- the user account, with its mobile and push tokens, passports, badge
+  redirect, and MCP OAuth grants, tokens and connection settings
 - training enrollments, progress, badge awards, course invitations, nonblocking
   safety disclosures and volunteer records, including their versions and audit logs
 - the participant, with sibling-group memberships, headshot and public-profile photo

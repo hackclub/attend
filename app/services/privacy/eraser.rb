@@ -391,6 +391,14 @@ module Privacy
 
       # these hang off a registration or account without a dependent: :destroy
       Note.where(participant_event_id: pes).or(Note.where(ticket_id: people.tickets)).delete_all
+      # hospitality and nfc_tokens are tables from features removed before the
+      # open-source cutover, with no models left. Production never had them, but
+      # a database loaded from an older schema.rb can keep them (see
+      # DropCutoverLeftovers), so they're cleared wherever they're still there
+      if leftover?("hospitality_acts")
+        execute([ "DELETE FROM hospitality_acts WHERE participant_event_id IN (?) OR user_id IN (?)", pes.presence || [ nil ], users.presence || [ nil ] ])
+      end
+      execute([ "DELETE FROM hospitality_redemptions WHERE user_id IN (?)", users.presence || [ nil ] ]) if leftover?("hospitality_redemptions")
       passes = Passkit::Pass.where(generator_type: "ParticipantEvent", generator_id: pes)
       Passkit::Registration.where(passkit_pass_id: passes.select(:id)).delete_all
       passes.delete_all
@@ -409,6 +417,7 @@ module Privacy
       Guardian.where(id: people.guardians).destroy_all
 
       BadgeRedirect.where(user_id: users).delete_all
+      execute([ "DELETE FROM nfc_tokens WHERE user_id IN (?)", users.presence || [ nil ] ]) if leftover?("nfc_tokens")
       # MCP grants and tokens name their owner as a string, with no foreign key
       owners = users.map(&:to_s).presence || [ nil ]
       %w[toolchest_oauth_access_grants toolchest_oauth_access_tokens].each do |table|
@@ -543,6 +552,10 @@ module Privacy
 
     def execute(statement)
       ActiveRecord::Base.connection.exec_delete(ActiveRecord::Base.sanitize_sql(statement))
+    end
+
+    def leftover?(table)
+      ActiveRecord::Base.connection.table_exists?(table)
     end
 
     def delete_counters
