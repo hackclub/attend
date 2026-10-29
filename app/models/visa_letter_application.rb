@@ -1,8 +1,9 @@
 # Someone asking for a visa invitation letter to an event, moved here from
 # Envoy. The letter comes before a place at the event: staff review the
 # application, the letter is issued, and the applicant takes it to their
-# embassy. So this belongs to the event, and links to a registration only once
-# there is one (`participant_event`).
+# embassy. A place comes from the event's own invitations, so this belongs to
+# the event, and finds the person's registration (#registration) once they
+# have one, whichever came first.
 #
 # Applicants sign in with Hack Club Auth, so a new application always has a
 # user. Applications imported from Envoy don't until their owner signs in and
@@ -30,8 +31,6 @@ class VisaLetterApplication < ApplicationRecord
 
   belongs_to :event
   belongs_to :user, optional: true
-  belongs_to :participant_event, optional: true
-  belongs_to :invitation, optional: true
   belongs_to :visa_letter_invitation, optional: true
   belongs_to :reviewed_by, class_name: "User", optional: true
   has_one_attached :letter_pdf
@@ -195,6 +194,19 @@ class VisaLetterApplication < ApplicationRecord
       participant.country_of_residence ].compact_blank.join("\n").presence
   end
   private_class_method :parse_date, :address_from_claims, :participant_address
+
+  # Their registration for the event, if they have one: the one on their Hack
+  # Club account's participant, otherwise one under their email, unless that
+  # participant is someone else's account (the privacy hub's rule). Someone
+  # invited hasn't signed in yet, so their participant has no account.
+  # ParticipantEvent#visa_letter_application is the same match the other way.
+  def registration
+    registrations = event.participant_events.joins(:participant).order(:created_at)
+    return registrations.find_by("LOWER(participants.email) = ?", email) if user_id.nil?
+
+    registrations.find_by(participants: { user_id: user_id }) ||
+      registrations.where(participants: { user_id: [ nil, user_id ] }).find_by("LOWER(participants.email) = ?", email)
+  end
 
   def letter_date_range
     return if letter_starts_on.nil?

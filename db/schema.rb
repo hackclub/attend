@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_29_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_29_170100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1745,7 +1745,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_170000) do
     t.uuid "event_id", null: false
     t.string "full_name", null: false
     t.datetime "imported_at"
-    t.uuid "invitation_id"
     t.string "letter_address"
     t.string "letter_city"
     t.string "letter_country"
@@ -1756,7 +1755,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_170000) do
     t.date "letter_starts_on"
     t.string "letter_venue"
     t.string "nationality", null: false
-    t.uuid "participant_event_id"
     t.string "phone"
     t.string "place_of_birth"
     t.string "reference_number", null: false
@@ -1773,8 +1771,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_170000) do
     t.index ["email"], name: "index_visa_letter_applications_on_email"
     t.index ["event_id", "status"], name: "index_visa_letter_applications_on_event_id_and_status"
     t.index ["event_id", "user_id"], name: "index_visa_letter_applications_on_event_id_and_user_id", unique: true, where: "(user_id IS NOT NULL)"
-    t.index ["invitation_id"], name: "index_visa_letter_applications_on_invitation_id"
-    t.index ["participant_event_id"], name: "index_visa_letter_applications_on_participant_event_id"
     t.index ["reference_number"], name: "index_visa_letter_applications_on_reference_number", unique: true
     t.index ["reviewed_by_id"], name: "index_visa_letter_applications_on_reviewed_by_id"
     t.index ["user_id"], name: "index_visa_letter_applications_on_user_id"
@@ -1979,8 +1975,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_170000) do
   add_foreign_key "travel_legs", "travels"
   add_foreign_key "travels", "participant_events"
   add_foreign_key "visa_letter_applications", "events"
-  add_foreign_key "visa_letter_applications", "invitations", on_delete: :nullify
-  add_foreign_key "visa_letter_applications", "participant_events", on_delete: :nullify
   add_foreign_key "visa_letter_applications", "users", column: "reviewed_by_id", on_delete: :nullify
   add_foreign_key "visa_letter_applications", "users", on_delete: :nullify
   add_foreign_key "visa_letter_applications", "visa_letter_invitations", on_delete: :nullify

@@ -241,13 +241,12 @@ module Privacy
 
       # visa letter applicants copy their account's email when they apply, and
       # Envoy's imports have no account until claimed, so an application is
-      # matched by its account, the registration it led to, or that email.
+      # matched by its account or that email, as it finds their registration.
       # One with the email but someone else's account is someone else's. The
       # email is deterministically encrypted, so it's compared through the model
       visa_applications = VisaLetterApplication.where(email: all_emails)
       conflict! if visa_applications.where.not(user_id: nil).where.not(user_id: user_ids).exists?
-      visa_application_ids = visa_applications.or(VisaLetterApplication.where(user_id: user_ids))
-                                              .or(VisaLetterApplication.where(participant_event_id: participant_event_ids)).pluck(:id)
+      visa_application_ids = visa_applications.or(VisaLetterApplication.where(user_id: user_ids)).pluck(:id)
 
       people = {
         users: user_ids,

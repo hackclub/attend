@@ -99,6 +99,22 @@ RSpec.describe "Admin visa letters", type: :request do
         end
       end
 
+      it "shows their registration once they're invited, and their letter on their participant page" do
+        get admin_event_visa_letter_path(event, application)
+        expect(response.body).to include("Not registered")
+
+        participant = create(:participant, user: application.user, email: application.email)
+        registration = create(:participant_event, event: event, participant: participant, status: :invited)
+
+        get admin_event_visa_letter_path(event, application)
+        expect(response.body).to include(admin_event_participant_path(event, registration))
+        expect(response.body).to include("Invited")
+
+        get admin_event_participant_path(event, registration)
+        expect(response.body).to include(application.reference_number)
+        expect(response.body).to include(admin_event_visa_letter_path(event, application))
+      end
+
       it "saves the team's notes" do
         patch admin_event_visa_letter_path(event, application), params: { visa_letter_application: { admin_notes: "Called to confirm" } }
 
@@ -126,6 +142,18 @@ RSpec.describe "Admin visa letters", type: :request do
         expect(response.body).to include(admin_event_visa_letters_path(event))
       end
     end
+  end
+
+  it "shows staff who can't review letters the letter's status, without a link to it" do
+    ops = create(:user).tap { |user| create(:event_role_assignment, user: user, event: event, role: "ops") }
+    registration = create(:participant_event, event: event, participant: create(:participant, user: application.user, email: application.email))
+    sign_in ops
+
+    get admin_event_participant_path(event, registration)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include(application.reference_number)
+    expect(response.body).not_to include(admin_event_visa_letter_path(event, application))
   end
 
   it "keeps staff who aren't event admins out" do

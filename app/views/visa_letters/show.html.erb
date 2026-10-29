@@ -46,7 +46,7 @@
     </dl>
   </div>
 
-  <% if @application.participant_event %>
+  <% if (registration = @application.registration) && ParticipantEvent::INACTIVE_STATUSES.exclude?(registration.status) %>
     <p class="portal-panel p-5 portal-body text-sm mb-6">You're registered for <%= @event.name %>. <%= link_to "Go to your dashboard", dashboard_path, class: "portal-link" %>.</p>
   <% end %>
 

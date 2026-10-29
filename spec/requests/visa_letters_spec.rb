@@ -126,12 +126,14 @@ RSpec.describe "Asking for a visa letter", type: :request do
         expect(response.body).to include("The email address must match the invitation email (someone-else@example.com).")
       end
 
-      it "lets someone already registered for the event apply, and links their registration" do
+      it "lets someone already registered for the event apply, and finds their registration" do
         registration = create(:participant_event, event: event, participant: create(:participant, email: applicant.email, user: applicant))
 
         apply
 
-        expect(VisaLetterApplication.last.participant_event).to eq(registration)
+        expect(VisaLetterApplication.last.registration).to eq(registration)
+        get visas_application_path(VisaLetterApplication.last)
+        expect(response.body).to include("You're registered for")
       end
     end
 

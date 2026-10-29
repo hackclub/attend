@@ -151,6 +151,44 @@ RSpec.describe VisaLetterApplication do
     end
   end
 
+  describe "its registration" do
+    let(:user) { create(:user, email: "ada.example@example.com") }
+    let(:application) { create(:visa_letter_application, event: event, user: user) }
+
+    it "is the one on their Hack Club account, whichever came first" do
+      expect(application.registration).to be_nil
+
+      registration = create(:participant_event, event: event, participant: create(:participant, user: user, email: "ada.personal@example.com"))
+      create(:participant_event, participant: registration.participant)
+
+      expect(application.reload.registration).to eq(registration)
+      expect(registration.reload.visa_letter_application).to eq(application)
+    end
+
+    it "is one under their email, in any case, unless it's someone else's account" do
+      registration = create(:participant_event, event: event, participant: create(:participant, email: "Ada.Example@example.com"))
+      expect(application.registration).to eq(registration)
+      expect(registration.visa_letter_application).to eq(application)
+
+      registration.participant.update!(user: create(:user))
+      expect(application.reload.registration).to be_nil
+      expect(registration.reload.visa_letter_application).to be_nil
+    end
+
+    it "finds an unclaimed Envoy import by email" do
+      imported = create(:visa_letter_application, :imported, event: event, email: "imported@example.com")
+      registration = create(:participant_event, event: event, participant: create(:participant, email: "imported@example.com"))
+
+      expect(imported.registration).to eq(registration)
+      expect(registration.visa_letter_application).to eq(imported)
+
+      # Still theirs once they've signed in, before they claim the import.
+      registration.participant.update!(user: create(:user, email: "imported@example.com"))
+      expect(imported.registration).to eq(registration)
+      expect(registration.reload.visa_letter_application).to eq(imported)
+    end
+  end
+
   describe "#letter_date_range" do
     def range(starts, ends)
       described_class.new(letter_starts_on: Date.parse(starts), letter_ends_on: ends && Date.parse(ends)).letter_date_range

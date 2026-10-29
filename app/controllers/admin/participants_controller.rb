@@ -162,6 +162,7 @@ module Admin
       @guardian_participant_events = @participant_event.guardian_participant_events.includes(:guardian)
       @scans = @participant_event.scans.includes(:user, :scan_context).recent.limit(3)
       @emergency_contacts = emergency_contacts_for_profile
+      @visa_letter_application = @participant_event.visa_letter_application
     end
 
     def link_guardian

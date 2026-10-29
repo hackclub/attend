@@ -70,10 +70,11 @@
         <div>
           <dt class="cs-kv-label">Place at the event</dt>
           <dd class="cs-kv-value">
-            <% if @application.participant_event %>
-              <%= link_to "Registered", admin_event_participant_path(@event, @application.participant_event), class: "cs-link" %>
+            <% if (registration = @application.registration) %>
+              <%= link_to "Registered", admin_event_participant_path(@event, registration), class: "cs-link" %>
+              <span class="cs-secondary">· <%= registration.status.humanize %></span>
             <% else %>
-              <span class="cs-muted">Not offered a place</span>
+              <span class="cs-muted">Not registered</span>
             <% end %>
           </dd>
         </div>

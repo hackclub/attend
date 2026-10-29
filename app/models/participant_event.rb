@@ -136,6 +136,19 @@ class ParticipantEvent < ApplicationRecord
     end
   end
 
+  # Their visa letter application for this event, if they made one: the one
+  # on their Hack Club account, otherwise one under their email, unless it's
+  # someone else's account. VisaLetterApplication#registration is the same
+  # match the other way.
+  def visa_letter_application
+    applications = event.visa_letter_applications
+    email = participant.email.to_s.strip.downcase
+    user_id = participant.user_id
+    return applications.find_by(email: email) if user_id.nil?
+
+    applications.find_by(user_id: user_id) || applications.where(user_id: [ nil, user_id ]).find_by(email: email)
+  end
+
   def onboarding_complete?
     (travel_inbound.present? || !event.travel_enabled?) &&
       (travel_outbound.present? || !event.travel_enabled?) &&

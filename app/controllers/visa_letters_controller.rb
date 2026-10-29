@@ -47,8 +47,7 @@ class VisaLettersController < ApplicationController
         overriding_hard_rejection: reinvited_after_rejection?)
     else
       @application = @event.visa_letter_applications.new(attributes.merge(
-        user: current_user, email: current_user.email, visa_letter_invitation: @invitation,
-        participant_event: registration
+        user: current_user, email: current_user.email, visa_letter_invitation: @invitation
       ))
       unless @application.save
         render :new, status: :unprocessable_entity
