@@ -1,5 +1,6 @@
 module Admin
   class ImpersonationsController < BaseController
+    global_page
     before_action :require_global_admin
     before_action :set_user, only: :create
 
@@ -26,7 +27,6 @@ module Admin
         action: "impersonate",
         record: @user,
         actor: User.find(impersonator_id),
-        event: current_event,
         changed_fields: {},
         metadata: {
           ip: request.remote_ip,

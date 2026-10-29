@@ -24,6 +24,24 @@ RSpec.describe "Missing arrival window banner", type: :request do
     end
   end
 
+  [ true, false ].each do |console|
+    it "stays off pages that aren't about any one event (#{console ? "console" : "original"})" do
+      admin.update!(admin_console_beta: console)
+
+      [ admin_root_path, admin_new_event_path, admin_users_path, admin_visa_letter_templates_path, admin_audit_logs_path ].each do |path|
+        get path
+        expect(response).to have_http_status(:ok)
+        expect(response.body).not_to include('data-testid="arrival-window-banner"'), "expected no banner on #{path}"
+      end
+    end
+  end
+
+  it "shows on the event's own audit log" do
+    get admin_audit_logs_path(event_id: event.id)
+
+    expect(response.body).to include('data-testid="arrival-window-banner"')
+  end
+
   it "goes away once either end of the window is set" do
     event.update!(arrival_closes_at: event.starts_at)
 

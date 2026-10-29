@@ -1,5 +1,6 @@
 module Admin
   class SettingsController < BaseController
+    global_page
     before_action :require_global_admin
 
     SLACK_CHANNEL_ID = /\A[CG][A-Z0-9]+\z/

@@ -13,7 +13,7 @@
   <svg class="cs-sidenav-chevron" fill="none" stroke="currentColor" viewBox="0 0 12 12" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 2l4 4-4 4"/></svg>
 <% end %>
 
-<% if current_event %>
+<% if event_page? %>
   <%= link_to admin_event_dashboard_path(current_event.slug), class: "cs-sidenav-header", data: link_data do %>
     <%= current_event.name %>
     <span class="cs-sidenav-header-meta"><%= cs_event_date_range(current_event) %></span>
@@ -31,8 +31,7 @@
 
 <% if current_event %>
   <div class="cs-sidenav-divider"></div>
-  <%# No section title: the header above already names the event. %>
-  <div class="cs-sidenav-section">
+  <% event_links = capture do %>
     <%= nav_link.call("Overview", admin_event_dashboard_path(current_event.slug), request.path == admin_event_dashboard_path(current_event.slug), :overview) %>
     <%= nav_link.call("Participants", admin_event_participants_path(current_event), request.path.include?("/participants"), :participants) %>
     <% if current_user.global_admin? || current_user.event_admin_for?(current_event) || current_user.ops_for?(current_event) || current_user.safeguarding_lead_for?(current_event) %>
@@ -59,6 +58,19 @@
     <%# Same gate as AuditLogsController#require_audit_access, so the link never dead-ends. %>
     <% if current_user.global_admin? || current_user.event_role_assignments.exists?(role: :event_admin) %>
       <%= nav_link.call("Event audit log", admin_audit_logs_path(event_id: current_event.id), request.path.start_with?("/admin/audit_logs") && params[:event_id] == current_event.id.to_s, :event_audit) %>
+    <% end %>
+  <% end %>
+  <div class="cs-sidenav-section">
+    <% if event_page? %>
+      <%# No section title: the header above already names the event. %>
+      <%= event_links %>
+    <% else %>
+      <%# This page isn't about the picked event, so its links fold away
+          under its name, one click from getting back to it. %>
+      <details class="cs-sidenav-group">
+        <summary><%= chevron %><%= icon.call(:overview) %><span class="cs-sidenav-label"><%= current_event.name %></span></summary>
+        <%= event_links %>
+      </details>
     <% end %>
   </div>
 <% end %>

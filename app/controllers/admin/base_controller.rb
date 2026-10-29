@@ -11,7 +11,24 @@ module Admin
     layout "admin"
 
     helper_method :current_event, :available_events, :can_view_participant_pii?,
-      :registration_change_request_pending_count
+      :registration_change_request_pending_count, :event_page?
+
+    class_attribute :global_page_actions, instance_writer: false, default: [].freeze
+
+    # Declares the pages that aren't about any one event (users, bans, the visa
+    # letter templates), or with `only:` just those actions. The event picked
+    # in the session stays folded away in the side nav, one click away, but
+    # its banners (no arrival window, stale waiver dates, training needed)
+    # stay off these pages and nothing done on them is audit-logged against it.
+    def self.global_page(only: :all)
+      self.global_page_actions = only == :all ? :all : Array(only).map(&:to_s).freeze
+    end
+
+    def event_page?
+      return false unless current_event
+
+      global_page_actions != :all && !global_page_actions.include?(action_name)
+    end
 
     # Views that render an exact date of birth or a home address gate on this;
     # PII-restricted roles (Limited) get age and no address instead.
@@ -145,7 +162,7 @@ module Admin
       end
       changed_fields = redact_encrypted_audit_fields(record, changed_fields)
 
-      event_for_log = current_event unless current_event&.destroyed?
+      event_for_log = current_event if event_page? && !current_event.destroyed?
 
       AuditLog.log!(
         action: action_name,

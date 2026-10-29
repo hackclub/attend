@@ -1,5 +1,6 @@
 module Admin
   class UsersController < BaseController
+    global_page
     before_action :require_global_admin
     before_action :set_user, only: [ :show, :edit, :update ]
 

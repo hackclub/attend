@@ -1,5 +1,6 @@
 module Admin
   class BansController < BaseController
+    global_page
     before_action :require_global_admin
     before_action :set_ban, only: [ :show, :edit, :update, :destroy, :revoke, :reinstate ]
 

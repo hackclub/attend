@@ -1,5 +1,6 @@
 module Admin
   class IncidentSettingsController < BaseController
+    global_page
     before_action { authorize IncidentReport, :manage_settings? }
 
     def show

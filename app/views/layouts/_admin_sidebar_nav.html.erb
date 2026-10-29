@@ -56,9 +56,7 @@
 </div>
 
 <% if current_event %>
-  <div class="pt-5">
-    <p class="nav-section-label">Event</p>
-    <div class="mt-1 space-y-0.5">
+  <% event_links = capture do %>
       <%= link_to admin_event_dashboard_path(current_event.slug), class: "nav-item #{request.path == admin_event_dashboard_path(current_event.slug) ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
@@ -136,7 +134,28 @@
         </svg>
         Messages
       <% end %>
-    </div>
+  <% end %>
+  <div class="pt-5">
+    <p class="nav-section-label">Event</p>
+    <% if event_page? %>
+      <div class="mt-1 space-y-0.5"><%= event_links %></div>
+    <% else %>
+      <%# This page isn't about the picked event, so its links fold away
+          under its name, one click from getting back to it. %>
+      <details class="group mt-1">
+        <summary class="nav-item w-full cursor-pointer list-none">
+          <%= cs_icon(:events, class: "h-4 w-4") %>
+          <span class="truncate"><%= current_event.name %></span>
+          <svg class="h-4 w-4 ml-auto !mr-0 flex-shrink-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </summary>
+
+        <div class="mt-0.5 ml-3 space-y-0.5 border-l border-[#e5e7eb] pl-2">
+          <%= event_links %>
+        </div>
+      </details>
+    <% end %>
   </div>
 <% end %>
 

@@ -163,15 +163,15 @@
             </div>
           <% end %>
 
-          <% if current_event&.waiver_dates_stale? %>
+          <% if event_page? && current_event.waiver_dates_stale? %>
             <%= render "layouts/waiver_dates_banner", event: current_event %>
           <% end %>
 
           <main class="cs-main" id="main" data-controller="cs-date-picker">
-            <% if current_event&.arrival_window_missing? %>
+            <% if event_page? && current_event.arrival_window_missing? %>
               <%= render "layouts/arrival_window_banner", event: current_event %>
             <% end %>
-            <% if current_event %>
+            <% if event_page? %>
               <%= render "layouts/training_banner", event: current_event %>
             <% end %>
             <%= yield %>
