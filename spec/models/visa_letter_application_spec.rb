@@ -55,6 +55,9 @@ RSpec.describe VisaLetterApplication do
     application = build(:visa_letter_application, event: event, user: user)
     expect(application).not_to be_valid
     expect(application.errors[:email]).to include("is banned from events")
+
+    # A letter Envoy already issued still has to verify.
+    expect(build(:visa_letter_application, :imported, event: event, email: "banned-applicant@example.com")).to be_valid
   end
 
   describe "review" do

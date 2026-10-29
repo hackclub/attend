@@ -170,7 +170,7 @@ class Event < ApplicationRecord
 
   normalizes :support_email, with: ->(v) { v.strip.downcase.presence }
 
-  validates :support_email, presence: true, on: :create
+  validates :support_email, presence: true, on: :create, unless: :imported?
   validates :support_email, presence: true, on: :update, if: :support_email_changed?
   validates :support_email,
             format: {
@@ -252,6 +252,9 @@ class Event < ApplicationRecord
   end
 
   scope :drafts, -> { where(setup_completed_at: nil) }
+  # Events brought in by an import to hold another app's records (Envoy's
+  # past events, for their visa letters), rather than ones Attend ran.
+  scope :not_imported, -> { where("events.config->>'imported_from' IS NULL") }
   # Events whose staff may still work the shared support inbox: anytime before
   # the event through 7 days after it ends.
   scope :within_support_window, -> { where(ends_at: 7.days.ago..) }
@@ -447,6 +450,10 @@ class Event < ApplicationRecord
 
   def visa_letters_mode
     VISA_LETTER_MODES.include?(visa_letters) ? visa_letters : "off"
+  end
+
+  def imported?
+    config.to_h["imported_from"].present?
   end
 
   def visa_letters_enabled?

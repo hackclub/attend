@@ -57,7 +57,8 @@ class VisaLetterApplication < ApplicationRecord
   validates :reference_number, :verification_code, presence: true, uniqueness: true
   validates :rejection_type, :rejection_reason, presence: true, if: :rejected?
   validate :date_of_birth_in_past
-  validate :applicant_not_banned, on: :create
+  # Envoy's letters were issued already, and embassies still check them.
+  validate :applicant_not_banned, on: :create, unless: :imported?
   validate :letter_unchanged, on: :update
 
   normalizes_phone_number :phone
