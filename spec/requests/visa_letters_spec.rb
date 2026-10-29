@@ -149,6 +149,18 @@ RSpec.describe "Asking for a visa letter", type: :request do
         expect(application.rejection_reason).to be_nil
       end
 
+      it "doesn't let the invitation they applied with undo a hard rejection" do
+        invitation = create(:visa_letter_invitation, event: event, email: applicant.email)
+        application.update!(visa_letter_invitation: invitation)
+        invitation.claim!
+        application.reject!(by: create(:user), reason: "Not eligible.", type: :hard)
+
+        apply(invite: invitation.token)
+
+        expect(response).to have_http_status(:forbidden)
+        expect(application.reload).to be_hard_rejected
+      end
+
       it "keeps a hard rejection closed, unless staff invite them again" do
         application.reject!(by: create(:user), reason: "Not eligible.", type: :hard)
 

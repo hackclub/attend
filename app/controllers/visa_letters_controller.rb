@@ -42,7 +42,7 @@ class VisaLettersController < ApplicationController
     if @existing
       @application = @existing
       @application.resubmit!(attributes.merge(visa_letter_invitation: @invitation || @existing.visa_letter_invitation),
-        overriding_hard_rejection: @invitation.present?)
+        overriding_hard_rejection: reinvited_after_rejection?)
     else
       @application = @event.visa_letter_applications.new(attributes.merge(
         user: current_user, email: current_user.email, visa_letter_invitation: @invitation,
@@ -131,6 +131,13 @@ class VisaLettersController < ApplicationController
     invitation
   end
 
+  # Staff inviting someone again after a hard rejection is what reopens it.
+  # The invitation they first applied with, or any other from before the
+  # rejection, doesn't: otherwise following the old link would undo it.
+  def reinvited_after_rejection?
+    @invitation.present? && @existing&.reviewed_at.present? && @invitation.created_at > @existing.reviewed_at
+  end
+
   # Their place at the event, if they already have one.
   def registration
     return @registration if defined?(@registration)
@@ -163,7 +170,7 @@ class VisaLettersController < ApplicationController
 
   def refusal_reason
     return :off unless @event.visa_letters_enabled?
-    return :hard_rejected if @existing&.hard_rejected? && @invitation.nil?
+    return :hard_rejected if @existing&.hard_rejected? && !reinvited_after_rejection?
     return nil if @invitation || registration || @event.accepting_visa_letter_applications?
 
     @invitation_for ? :wrong_account : :not_open
