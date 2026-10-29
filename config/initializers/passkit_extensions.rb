@@ -76,10 +76,45 @@ module PasskitGeneratorExtensions
 end
 
 module PasskitPassesControllerExtensions
+  # Wallet asks with If-Modified-Since whenever it checks a pass for changes,
+  # but the gem builds, signs and zips the whole bundle (images and all)
+  # before comparing, so an unchanged pass cost as much as a new one: a 304
+  # once took 36s while it rendered that event's images.
   def show
+    return head(:not_modified) if pass_unchanged_since_request?
+
     super
   rescue ActiveRecord::RecordNotFound
     head :gone
+  end
+
+  private
+
+  # The gem's own lookup and comparison from #show, done before building.
+  # Anything this doesn't answer (no header, a bad token, a pass whose
+  # participant event is gone) falls through to the gem unchanged.
+  def pass_unchanged_since_request?
+    since = request.if_modified_since
+    token = request.headers["Authorization"]&.split(" ")&.last
+    return false if since.nil? || token.blank?
+
+    pass = Passkit::Pass.find_by(serial_number: params[:serial_number], authentication_token: token)
+    return false unless pass&.generator
+
+    last_update = pass.last_update
+    response.headers["last-modified"] = last_update.httpdate
+    last_update.to_i <= since.to_i
+  end
+end
+
+# The gem dates a pass by its generator (the participant event) alone, but
+# WalletPassUpdateService touches the pass itself when the event or the
+# participant changes. Ignoring that touch meant Wallet was pushed an update,
+# asked for the pass and got 304 ("Server requested update ... but the pass
+# was unchanged"), so those edits never reached the device.
+module PasskitPassExtensions
+  def last_update
+    [ super, updated_at ].compact.max
   end
 end
 
@@ -104,6 +139,7 @@ Rails.application.config.after_initialize do
   next if ENV["SECRET_KEY_BASE_DUMMY"]
 
   Passkit::Generator.prepend(PasskitGeneratorExtensions)
+  Passkit::Pass.prepend(PasskitPassExtensions)
   Passkit::Api::V1::PassesController.prepend(PasskitPassesControllerExtensions)
   Passkit::Api::V1::RegistrationsController.prepend(PasskitRegistrationsControllerExtensions)
 end
