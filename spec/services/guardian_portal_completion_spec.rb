@@ -19,10 +19,11 @@ RSpec.describe GuardianPortalCompletion do
     # the link before the other completed it.
     it "does nothing for a copy loaded before another request completed the link" do
       stale_copy = GuardianParticipantEvent.find(gpe.id)
-      gpe.update!(status: :completed, completed_at: 1.hour.ago)
+      completed_at = 1.hour.ago.change(usec: 0)
+      gpe.update!(status: :completed, completed_at: completed_at)
 
       expect(described_class.new(stale_copy).complete!).to be(false)
-      expect(gpe.reload.completed_at).to be_within(1.second).of(1.hour.ago)
+      expect(gpe.reload.completed_at).to eq(completed_at)
     end
 
     # Completion locks the guardian out of the portal, so it waits for every

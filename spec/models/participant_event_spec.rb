@@ -461,11 +461,12 @@ RSpec.describe ParticipantEvent, type: :model do
     end
 
     it "returns the earliest check-in scan, ignoring non-check-in contexts" do
+      earliest = 3.hours.ago.change(usec: 0)
       pe.scans.create!(scan_context: dinner, user: user, scanned_at: 5.hours.ago)
       pe.scans.create!(scan_context: check_in, user: user, scanned_at: 1.hour.ago)
-      pe.scans.create!(scan_context: check_in, user: user, scanned_at: 3.hours.ago)
+      pe.scans.create!(scan_context: check_in, user: user, scanned_at: earliest)
 
-      expect(pe.check_in_time).to be_within(1.second).of(3.hours.ago)
+      expect(pe.check_in_time).to eq(earliest)
     end
 
     it "goes back to nil when the check-in scans are undone" do
@@ -482,8 +483,9 @@ RSpec.describe ParticipantEvent, type: :model do
     # mobile API, MCP tools) all eager-load `scans: :scan_context` and rely on
     # this staying query-free.
     it "works off loaded scans without extra queries" do
+      checked_in_at = 1.hour.ago.change(usec: 0)
       pe.scans.create!(scan_context: dinner, user: user, scanned_at: 5.hours.ago)
-      pe.scans.create!(scan_context: check_in, user: user, scanned_at: 1.hour.ago)
+      pe.scans.create!(scan_context: check_in, user: user, scanned_at: checked_in_at)
       loaded = ParticipantEvent.includes(scans: :scan_context).find(pe.id)
 
       queries = 0
@@ -491,7 +493,7 @@ RSpec.describe ParticipantEvent, type: :model do
         queries += 1 unless payload[:name].to_s.in?([ "SCHEMA", "TRANSACTION" ])
       end
       begin
-        expect(loaded.check_in_time).to be_within(1.second).of(1.hour.ago)
+        expect(loaded.check_in_time).to eq(checked_in_at)
       ensure
         ActiveSupport::Notifications.unsubscribe(subscriber)
       end
