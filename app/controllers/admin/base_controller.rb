@@ -17,8 +17,9 @@ module Admin
 
     # Declares the pages that aren't about any one event (users, bans, the visa
     # letter templates), or with `only:` just those actions. The event picked
-    # in the session stays in the side nav, one click away, but its banners
-    # (no arrival window, stale waiver dates, training needed) stay off them.
+    # in the session stays folded away in the side nav, one click away, but
+    # its banners (no arrival window, stale waiver dates, training needed)
+    # stay off these pages and nothing done on them is audit-logged against it.
     def self.global_page(only: :all)
       self.global_page_actions = only == :all ? :all : Array(only).map(&:to_s).freeze
     end
@@ -161,7 +162,7 @@ module Admin
       end
       changed_fields = redact_encrypted_audit_fields(record, changed_fields)
 
-      event_for_log = current_event unless current_event&.destroyed?
+      event_for_log = current_event if event_page? && !current_event.destroyed?
 
       AuditLog.log!(
         action: action_name,

@@ -1,6 +1,6 @@
 module Admin
   class EventsController < BaseController
-    global_page only: [ :new, :create ]
+    global_page only: :new
     skip_before_action :set_current_event_from_session, only: [ :select ]
 
     def new
@@ -15,6 +15,9 @@ module Admin
 
       if @event.save
         ensure_creator_has_admin_role
+        # As the setup wizard it lands on does, so the audit row is the new
+        # event's rather than whichever one was picked.
+        set_current_event(@event)
         redirect_to admin_event_setup_schedule_path(@event), notice: "#{@event.name} created! Let's finish setting it up."
       else
         render :new, status: :unprocessable_entity
@@ -116,6 +119,12 @@ module Admin
     end
 
     private
+
+    # A create that failed re-renders the new event form, which isn't about
+    # the picked event any more than #new is.
+    def event_page?
+      super && !(action_name == "create" && @event.new_record?)
+    end
 
     def after_update_path
       case params[:return_to]

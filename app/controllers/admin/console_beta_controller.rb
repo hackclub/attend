@@ -7,6 +7,7 @@ module Admin
   # policy to check. BaseController#log_admin_action audit-logs the flip as an
   # update on that user.
   class ConsoleBetaController < BaseController
+    global_page
     def update
       @record = current_user
       # A UI preference shouldn't fail on some unrelated invalid attribute
