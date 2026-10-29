@@ -112,7 +112,10 @@ RSpec.describe "Admin console timestamps", type: :request do
     expect(expect_compliant(preview_admin_event_message_path(event, scheduled))).not_to be_empty
     expect_compliant(admin_settings_path)
     expect(expect_compliant(admin_series_index_path)).to be_empty
-    expect(response.body).to include(event.starts_at.strftime("%B"))
+
+    # The side nav heads the event's own pages with its dates, months in full.
+    get admin_event_slack_blasts_path(event)
+    expect(Nokogiri::HTML(response.body).at_css(".cs-sidenav-header").text).to include(event.starts_at.strftime("%B"))
   end
 
   it "shows relative times with the absolute time on hover" do
