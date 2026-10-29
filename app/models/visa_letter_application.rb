@@ -1,8 +1,9 @@
 # Someone asking for a visa invitation letter to an event, moved here from
 # Envoy. The letter comes before a place at the event: staff review the
-# application, the letter is issued, the embassy decides, and only someone
-# whose visa is granted is offered a place. So this belongs to the event, and
-# links to a registration only once there is one (`participant_event`).
+# application, the letter is issued, and the applicant takes it to their
+# embassy. A place comes from the event's own invitations, so this belongs to
+# the event, and finds the person's registration (#registration) once they
+# have one, whichever came first.
 #
 # Applicants sign in with Hack Club Auth, so a new application always has a
 # user. Applications imported from Envoy don't until their owner signs in and
@@ -20,6 +21,10 @@ class VisaLetterApplication < ApplicationRecord
   has_paper_trail skip: %i[full_name email nationality place_of_birth phone address]
 
   self.implicit_order_column = "created_at"
+  # Gone from the model: the visa outcome, and the stored registration and
+  # invitation links (#registration finds them now). The columns are dropped
+  # in a later release, once no running pod still reads or writes them.
+  self.ignored_columns += %w[visa_outcome visa_outcome_recorded_at participant_event_id invitation_id]
 
   # Deterministic so the privacy hub can find an applicant by email.
   encrypts :email, deterministic: true
@@ -30,15 +35,12 @@ class VisaLetterApplication < ApplicationRecord
 
   belongs_to :event
   belongs_to :user, optional: true
-  belongs_to :participant_event, optional: true
-  belongs_to :invitation, optional: true
   belongs_to :visa_letter_invitation, optional: true
   belongs_to :reviewed_by, class_name: "User", optional: true
   has_one_attached :letter_pdf
 
   enum :status, { pending: "pending", approved: "approved", rejected: "rejected", letter_sent: "letter_sent" }
   enum :rejection_type, { soft: "soft", hard: "hard" }, prefix: :rejection
-  enum :visa_outcome, { unknown: "unknown", granted: "granted", denied: "denied" }, prefix: :visa
 
   FROZEN_ONCE_SENT = %w[
     event_id full_name email date_of_birth nationality place_of_birth phone address
@@ -197,10 +199,23 @@ class VisaLetterApplication < ApplicationRecord
   end
   private_class_method :parse_date, :address_from_claims, :participant_address
 
-  def record_visa_outcome!(outcome)
-    raise InvalidTransition, "the visa outcome can only be recorded once the letter is sent" unless letter_sent?
+  # Their registration for the event, if they have one: the one on their Hack
+  # Club account's participant, otherwise one under their email, unless that
+  # participant is someone else's account (the privacy hub's rule). Someone
+  # invited hasn't signed in yet, so their participant has no account.
+  # ParticipantEvent#visa_letter_application is the same match the other way.
+  def registration
+    self.class.registration_for(event, user_id: user_id, email: email)
+  end
 
-    update!(visa_outcome: outcome, visa_outcome_recorded_at: Time.current)
+  # The same match for someone who hasn't applied yet (VisaLettersController).
+  def self.registration_for(event, user_id:, email:)
+    registrations = event.participant_events.joins(:participant).order(:created_at)
+    email = email.to_s.strip.downcase
+    return registrations.find_by("LOWER(participants.email) = ?", email) if user_id.nil?
+
+    registrations.find_by(participants: { user_id: user_id }) ||
+      registrations.where(participants: { user_id: [ nil, user_id ] }).find_by("LOWER(participants.email) = ?", email)
   end
 
   def letter_date_range

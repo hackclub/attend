@@ -29,17 +29,6 @@ module VisaLettersHelper
     end
   end
 
-  # Nil until there's a letter for the embassy to decide on.
-  def visa_outcome_status(application)
-    return unless application.letter_sent?
-
-    case application.visa_outcome
-    when "granted" then [ :success, "Visa granted" ]
-    when "denied" then [ :error, "Visa refused" ]
-    else [ :pending, "Waiting on the embassy" ]
-    end
-  end
-
   # [portal badge modifier, label] for the applicant's own pages. Envoy's labels.
   def applicant_visa_letter_status(application)
     case application.status

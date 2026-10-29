@@ -55,7 +55,6 @@
               <th scope="col">Reference</th>
               <th scope="col">Submitted</th>
               <th scope="col">Status</th>
-              <th scope="col">Visa</th>
             </tr>
           </thead>
           <tbody>
@@ -68,9 +67,6 @@
                 <td class="whitespace-nowrap font-mono"><%= application.reference_number %></td>
                 <td class="whitespace-nowrap"><%= cs_relative_time(application.submitted_at || application.created_at) %></td>
                 <td class="whitespace-nowrap"><%= cs_status(*visa_letter_status(application)) %></td>
-                <td class="whitespace-nowrap">
-                  <% if (outcome = visa_outcome_status(application)) %><%= cs_status(*outcome) %><% else %><span class="cs-muted">–</span><% end %>
-                </td>
               </tr>
             <% end %>
           </tbody>

@@ -1,7 +1,7 @@
 module Admin
   # An event's visa letter applications, for its admins to review: approve
   # (the letter is generated and emailed), reject soft or hard, soften a
-  # hard rejection, resend a letter, and record what the embassy decided.
+  # hard rejection, and resend a letter.
   # Applicants' details are passport-grade, so opening one is audit-logged.
   class VisaLettersController < BaseController
     before_action :set_event
@@ -10,7 +10,6 @@ module Admin
     before_action :set_application, except: :index
 
     FILTERS = %w[pending approved letter_sent rejected all].freeze
-    OUTCOMES = VisaLetterApplication.visa_outcomes.keys.freeze
 
     def index
       @filter = FILTERS.include?(params[:status]) ? params[:status] : "pending"
@@ -80,20 +79,6 @@ module Admin
 
       VisaLetterMailer.letter_ready(application: @application).deliver_later
       redirect_to admin_event_visa_letter_path(@event, @application), notice: "Visa letter has been resent to #{@application.email}."
-    end
-
-    def record_visa_outcome
-      @record = @application
-      outcome = params[:visa_outcome].to_s
-      unless OUTCOMES.include?(outcome)
-        redirect_to admin_event_visa_letter_path(@event, @application), alert: "Choose what the embassy decided."
-        return
-      end
-
-      @application.record_visa_outcome!(outcome)
-      redirect_to admin_event_visa_letter_path(@event, @application), notice: "Visa outcome saved."
-    rescue VisaLetterApplication::InvalidTransition => e
-      redirect_to admin_event_visa_letter_path(@event, @application), alert: e.message.upcase_first
     end
 
     def letter

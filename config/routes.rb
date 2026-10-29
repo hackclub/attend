@@ -229,7 +229,6 @@ Rails.application.routes.draw do
     get "faq", to: "visa_letters#faq", as: :faq
     get "applications/:id", to: "visa_letters#show", as: :application
     get "applications/:id/letter", to: "visa_letters#letter", as: :application_letter
-    post "applications/:id/outcome", to: "visa_letters#record_outcome", as: :application_outcome
     get ":event_slug/apply", to: "visa_letters#new", as: :apply
     post ":event_slug/apply", to: "visa_letters#create"
   end
@@ -380,7 +379,6 @@ Rails.application.routes.draw do
           post :reject, action: :reject_letter
           post :downgrade_rejection
           post :resend, action: :resend_letter
-          post :record_visa_outcome
           get :letter
         end
       end

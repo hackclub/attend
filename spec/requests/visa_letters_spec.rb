@@ -126,12 +126,14 @@ RSpec.describe "Asking for a visa letter", type: :request do
         expect(response.body).to include("The email address must match the invitation email (someone-else@example.com).")
       end
 
-      it "lets someone already registered for the event apply, and links their registration" do
+      it "lets someone already registered for the event apply, and finds their registration" do
         registration = create(:participant_event, event: event, participant: create(:participant, email: applicant.email, user: applicant))
 
         apply
 
-        expect(VisaLetterApplication.last.participant_event).to eq(registration)
+        expect(VisaLetterApplication.last.registration).to eq(registration)
+        get visas_application_path(VisaLetterApplication.last)
+        expect(response.body).to include("You're registered for")
       end
     end
 
@@ -205,7 +207,7 @@ RSpec.describe "Asking for a visa letter", type: :request do
       expect(response).to redirect_to(root_path)
     end
 
-    it "lets them download the letter and say what the embassy decided" do
+    it "lets them download the letter" do
       application = create(:visa_letter_application, event: event, user: applicant)
       application.approve!(by: create(:user))
       application.issue_letter!
@@ -213,8 +215,8 @@ RSpec.describe "Asking for a visa letter", type: :request do
       get visas_application_letter_path(application)
       expect(response.media_type).to eq("application/pdf")
 
-      post visas_application_outcome_path(application), params: { visa_outcome: "granted" }
-      expect(application.reload).to be_visa_granted
+      get visas_application_path(application)
+      expect(response.body).not_to include("What did the embassy decide?")
     end
 
     it "claims a letter imported from Envoy under their email" do

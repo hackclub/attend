@@ -1,7 +1,6 @@
 # Asking for a visa invitation letter, and following it up. Applicants sign in
-# with their Hack Club account, but have no place at the event yet: a letter
-# comes first, and staff offer a place once the visa is granted (see
-# VisaLetterApplication).
+# with their Hack Club account, and may have no place at the event yet: a
+# place comes from the event's own invitations (see VisaLetterApplication).
 #
 # Who can apply for an event's letter: anyone, through its open form until
 # the deadline; someone staff invited to apply (an invitation also overrides a
@@ -17,7 +16,7 @@ class VisaLettersController < ApplicationController
   # page, so its emailed links and the apply form find them, not just the list.
   before_action :claim_imported_applications, except: :faq
   before_action :set_event, only: %i[new create]
-  before_action :set_application, only: %i[show letter record_outcome]
+  before_action :set_application, only: %i[show letter]
 
   rate_limit to: 10, within: 1.hour, only: :create, by: -> { current_user&.id || request.remote_ip },
     with: -> { redirect_to visas_path, alert: "Too many applications at once. Try again in an hour." }
@@ -47,8 +46,7 @@ class VisaLettersController < ApplicationController
         overriding_hard_rejection: reinvited_after_rejection?)
     else
       @application = @event.visa_letter_applications.new(attributes.merge(
-        user: current_user, email: current_user.email, visa_letter_invitation: @invitation,
-        participant_event: registration
+        user: current_user, email: current_user.email, visa_letter_invitation: @invitation
       ))
       unless @application.save
         render :new, status: :unprocessable_entity
@@ -79,18 +77,6 @@ class VisaLettersController < ApplicationController
 
     send_data @application.letter_pdf.download, filename: @application.letter_pdf.filename.to_s,
       type: "application/pdf", disposition: "attachment"
-  end
-
-  # The applicant tells us what the embassy decided, so staff know who can be
-  # offered a place.
-  def record_outcome
-    outcome = params[:visa_outcome].to_s
-    if VisaLetterApplication.visa_outcomes.key?(outcome) && @application.letter_sent?
-      @application.record_visa_outcome!(outcome)
-      redirect_to visas_application_path(@application), notice: "Thanks for letting us know."
-    else
-      redirect_to visas_application_path(@application), alert: "Choose what the embassy decided."
-    end
   end
 
   private
@@ -148,13 +134,13 @@ class VisaLettersController < ApplicationController
     @invitation.present? && rejected_at.present? && @invitation.updated_at > rejected_at
   end
 
-  # Their place at the event, if they already have one.
+  # Their place at the event, if they already have one: the same match as an
+  # application's (VisaLetterApplication.registration_for), still active.
   def registration
     return @registration if defined?(@registration)
 
-    participant = current_user.participant
-    @registration = participant && participant.participant_events
-      .where(event: @event).where.not(status: %w[withdrawn rejected]).first
+    found = VisaLetterApplication.registration_for(@event, user_id: current_user.id, email: current_user.email)
+    @registration = (found if found && ParticipantEvent::INACTIVE_STATUSES.exclude?(found.status))
   end
 
   # An application under review or with its letter has a page of its own.

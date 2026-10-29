@@ -53,6 +53,33 @@
         </dl>
       </section>
 
+      <% if @visa_letter_application %>
+      <section class="bg-white rounded-lg border border-gray-200 p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-semibold">Visa Letter</h2>
+          <% if policy(current_event).review_visa_letters? %>
+            <%= link_to "Open", admin_event_visa_letter_path(current_event, @visa_letter_application), class: "text-sm text-[#ec3750] hover:text-blue-800" %>
+          <% end %>
+        </div>
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <dt class="text-sm text-gray-500">Status</dt>
+            <dd class="text-gray-900"><%= legacy_visa_status_badge(visa_letter_status(@visa_letter_application)) %></dd>
+          </div>
+          <div>
+            <dt class="text-sm text-gray-500">Reference</dt>
+            <dd class="text-gray-900 font-mono"><%= @visa_letter_application.reference_number %></dd>
+          </div>
+          <% if @visa_letter_application.letter_sent? && @visa_letter_application.letter_sent_at %>
+            <div>
+              <dt class="text-sm text-gray-500">Sent</dt>
+              <dd class="text-gray-900"><%= l(@visa_letter_application.letter_sent_at, format: :long) %></dd>
+            </div>
+          <% end %>
+        </dl>
+      </section>
+      <% end %>
+
       <% if current_event.travel_enabled? %>
       <section class="bg-white rounded-lg border border-gray-200 p-6">
         <div class="flex justify-between items-center mb-4">

@@ -42,7 +42,7 @@
     <% else %>
       <table class="min-w-full divide-y divide-gray-200 text-sm">
         <thead class="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
-          <tr><th class="px-4 py-3">Applicant</th><th class="px-4 py-3">Reference</th><th class="px-4 py-3">Submitted</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Visa</th></tr>
+          <tr><th class="px-4 py-3">Applicant</th><th class="px-4 py-3">Reference</th><th class="px-4 py-3">Submitted</th><th class="px-4 py-3">Status</th></tr>
         </thead>
         <tbody class="divide-y divide-gray-200">
           <% @applications.each do |application| %>
@@ -54,7 +54,6 @@
               <td class="px-4 py-3 font-mono whitespace-nowrap"><%= application.reference_number %></td>
               <td class="px-4 py-3 whitespace-nowrap"><%= time_ago_in_words(application.submitted_at || application.created_at) %> ago</td>
               <td class="px-4 py-3 whitespace-nowrap"><%= legacy_visa_status_badge(visa_letter_status(application)) %></td>
-              <td class="px-4 py-3 whitespace-nowrap"><% if (outcome = visa_outcome_status(application)) %><%= legacy_visa_status_badge(outcome) %><% else %>–<% end %></td>
             </tr>
           <% end %>
         </tbody>

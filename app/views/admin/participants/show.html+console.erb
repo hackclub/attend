@@ -55,6 +55,37 @@
         </div>
       </section>
 
+      <% if @visa_letter_application %>
+        <section class="cs-container">
+          <div class="cs-container-header">
+            <h2 class="cs-h2">Visa letter</h2>
+            <% if policy(current_event).review_visa_letters? %>
+              <div class="cs-actions">
+                <%= link_to "Open", admin_event_visa_letter_path(current_event, @visa_letter_application), class: "cs-btn" %>
+              </div>
+            <% end %>
+          </div>
+          <div class="cs-container-body">
+            <dl class="cs-kv cs-kv-2">
+              <div>
+                <dt class="cs-kv-label">Status</dt>
+                <dd class="cs-kv-value"><%= cs_status(*visa_letter_status(@visa_letter_application)) %></dd>
+              </div>
+              <div>
+                <dt class="cs-kv-label">Reference</dt>
+                <dd class="cs-kv-value font-mono"><%= @visa_letter_application.reference_number %></dd>
+              </div>
+              <% if @visa_letter_application.letter_sent? && @visa_letter_application.letter_sent_at %>
+                <div>
+                  <dt class="cs-kv-label">Sent</dt>
+                  <dd class="cs-kv-value"><%= cs_absolute_time(@visa_letter_application.letter_sent_at) %></dd>
+                </div>
+              <% end %>
+            </dl>
+          </div>
+        </section>
+      <% end %>
+
       <% if current_event.travel_enabled? %>
       <section class="cs-container">
         <div class="cs-container-header">
