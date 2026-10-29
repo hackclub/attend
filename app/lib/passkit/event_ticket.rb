@@ -313,24 +313,54 @@ module Passkit
       "secondaryLogo@2x.png" => [ 320, 100 ], "secondaryLogo@3x.png" => [ 480, 150 ]
     }.freeze
 
+    # Rendered pass images, kept on local disk per original blob, so a pod
+    # renders an event's images once rather than for every pass it builds.
+    IMAGE_CACHE = Rails.root.join("tmp/passkit_images").freeze
+
     # Render the event's banner and logo (falling back to its series') into
     # the pass bundle. Any failure leaves the shipped defaults in place.
     def add_other_files(path)
-      write_variants(path, event.effective_banner, BANNER_IMAGES, :resize_to_fill)
-      write_variants(path, event.effective_logo, LOGO_IMAGES, :resize_to_fit)
+      write_images(path, event.effective_banner, BANNER_IMAGES, :resize_to_fill)
+      write_images(path, event.effective_logo, LOGO_IMAGES, :resize_to_fit)
     end
 
     private
 
-    def write_variants(path, attachment, images, mode)
-      return unless attachment
+    def write_images(path, attachment, images, mode)
+      return unless attachment&.variable?
 
+      render_missing_images(attachment.blob, images.values.uniq, mode)
       images.each do |name, size|
-        variant = attachment.variant(mode => size, format: :png).processed
-        File.binwrite(File.join(path, name), variant.download)
+        FileUtils.cp(rendered_image_path(attachment.blob, mode, size), File.join(path, name))
       end
     rescue StandardError => e
       Rails.logger.error("Passkit: failed to render #{images.keys.first.split('@').first} images, using defaults: #{e.message}")
+    end
+
+    # Renders from one download of the original instead of through
+    # ActiveStorage variants, which download the original, upload the result
+    # and download that again for every size: eleven sizes made a pass for an
+    # event with new artwork take over 30 seconds to build.
+    def render_missing_images(blob, sizes, mode)
+      missing = sizes.reject { |size| rendered_image_path(blob, mode, size).exist? }
+      return if missing.empty?
+
+      FileUtils.mkdir_p(IMAGE_CACHE.join(blob.key))
+      blob.open do |original|
+        missing.each do |size|
+          target = rendered_image_path(blob, mode, size)
+          ActiveStorage::Variation.wrap(mode => size, format: :png).transform(original) do |output|
+            # Rename into place so a concurrent build never copies half a file
+            partial = "#{target}.#{SecureRandom.hex(4)}"
+            FileUtils.cp(output.path, partial)
+            File.rename(partial, target)
+          end
+        end
+      end
+    end
+
+    def rendered_image_path(blob, mode, size)
+      IMAGE_CACHE.join(blob.key, "#{mode}-#{size.join('x')}.png")
     end
 
     def folder_name

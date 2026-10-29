@@ -6,7 +6,10 @@ RSpec.describe Passkit::EventTicket do
   let(:pass) { described_class.new(participant_event) }
   let(:tmp_path) { Dir.mktmpdir }
 
-  after { FileUtils.remove_entry(tmp_path) }
+  after do
+    FileUtils.remove_entry(tmp_path)
+    FileUtils.rm_rf(described_class::IMAGE_CACHE)
+  end
 
   # Smallest valid PNG (1x1 transparent pixel)
   ONE_PIXEL_PNG = Base64.decode64(
@@ -47,6 +50,35 @@ RSpec.describe Passkit::EventTicket do
       pass.add_other_files(tmp_path)
 
       expect(Dir.children(tmp_path)).to contain_exactly("primaryLogo@2x.png", "primaryLogo@3x.png", "secondaryLogo@2x.png", "secondaryLogo@3x.png")
+    end
+
+    it "renders images at the sizes Wallet validates" do
+      event.banner.attach(io: StringIO.new(ONE_PIXEL_PNG), filename: "banner.png", content_type: "image/png")
+
+      pass.add_other_files(tmp_path)
+
+      strip = Vips::Image.new_from_file(File.join(tmp_path, "strip@2x.png"))
+      expect([ strip.width, strip.height ]).to eq([ 750, 288 ])
+    end
+
+    it "renders each banner size once and reuses it for the next pass" do
+      event.banner.attach(io: StringIO.new(ONE_PIXEL_PNG), filename: "banner.png", content_type: "image/png")
+      allow(ActiveStorage::Variation).to receive(:wrap).and_call_original
+
+      2.times { described_class.new(participant_event).add_other_files(tmp_path) }
+
+      # artwork and background share sizes, so five renders cover seven files
+      expect(ActiveStorage::Variation).to have_received(:wrap).exactly(5).times
+      expect(Dir.children(tmp_path).size).to eq(7)
+      expect(ActiveStorage::VariantRecord.count).to be_zero
+    end
+
+    it "keeps the default logos for an SVG logo" do
+      event.logo.attach(io: StringIO.new(%(<svg xmlns="http://www.w3.org/2000/svg"/>)), filename: "logo.svg", content_type: "image/svg+xml")
+
+      pass.add_other_files(tmp_path)
+
+      expect(Dir.children(tmp_path)).to be_empty
     end
 
     it "falls back to the series banner when the event has none" do
