@@ -91,22 +91,6 @@
     </div>
   <% end %>
 
-  <% if @application.participant_event.nil? %>
-    <% warning = visa_letter_offer_warning(@application) %>
-    <div class="<%= box %> space-y-3">
-      <h2 class="text-lg font-medium text-gray-900">Offer a place</h2>
-      <p class="text-sm text-gray-500">
-        <%= visa_letter_offer_description(@event) %>
-        <% if warning %><%= warning %> A place is usually offered once the visa is granted.<% end %>
-      </p>
-      <div class="flex justify-end">
-        <%= button_to warning ? "Offer a place anyway" : "Offer a place", letter_path.call(:offer_place),
-              params: warning ? { override: "1" } : {}, class: warning ? button : primary,
-              form: { data: { turbo_confirm: visa_letter_offer_confirmation(@application, warning) } } %>
-      </div>
-    </div>
-  <% end %>
-
   <%= form_with model: @application, url: admin_event_visa_letter_path(@event, @application), method: :patch, class: "#{box} space-y-3" do |f| %>
     <h2 class="text-lg font-medium text-gray-900">Admin Notes</h2>
     <%= f.label :admin_notes, "For your team only. The applicant never sees these.", class: "block text-sm text-gray-500" %>

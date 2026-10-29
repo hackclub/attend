@@ -23,7 +23,7 @@ class HackClubAuthPrefill
   end
 
   def params
-    # Oldest first, like ParticipantRegistration.register_invitee!.
+    # Oldest first, like Api::V1::ParticipantsController#register_invitee.
     participant = Participant.where("LOWER(email) = ?", @invitation.email.downcase).order(:created_at).first
 
     {

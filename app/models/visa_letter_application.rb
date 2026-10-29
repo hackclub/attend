@@ -62,8 +62,6 @@ class VisaLetterApplication < ApplicationRecord
 
   before_validation :assign_reference_number, :assign_verification_code, on: :create
   before_validation(on: :create) { self.submitted_at ||= Time.current }
-  after_save :write_visa_status_to_travel,
-    if: -> { participant_event_id.present? && (saved_change_to_participant_event_id? || saved_change_to_status? || saved_change_to_visa_outcome?) }
 
   def imported?
     imported_at.present?
@@ -205,38 +203,6 @@ class VisaLetterApplication < ApplicationRecord
     update!(visa_outcome: outcome, visa_outcome_recorded_at: Time.current)
   end
 
-  # The usual point to offer a place. Staff can offer one sooner, but say so.
-  def place_offerable?
-    letter_sent? && visa_granted?
-  end
-
-  # Gives the applicant a place at the event: registers them as `invited`
-  # with what they applied with, and issues their onboarding invitation,
-  # which the caller sends once this has committed (Invitation#deliver_later
-  # explains why, and holds it while the event holds invitations). Someone
-  # who registered another way since applying is linked to that registration
-  # and not invited again; then this returns nil.
-  #
-  # Yields the participant if their existing record was filled in, as
-  # ParticipantRegistration does.
-  def offer_place!(override: false, &)
-    raise InvalidTransition, "they already have a place at the event" if participant_event_id.present?
-    raise InvalidTransition, "a place is offered once the letter is sent and the visa is granted" unless place_offerable? || override
-    raise InvalidTransition, "the applicant is banned from events" if Ban.banned?(email)
-
-    first_name, last_name = legal_name_parts
-    transaction do
-      registration = ParticipantRegistration.register_invitee!(
-        event: event, email: email, first_name: first_name, last_name: last_name,
-        details: { date_of_birth: date_of_birth, phone: PhoneNormalizer.normalize(phone) }.compact,
-        participant: user&.participant, &
-      )
-      onboarding = Invitation.issue!(event: event, email: email, name: full_name, send: false) if registration.previously_new_record?
-      update!(participant_event: registration, invitation: onboarding)
-      onboarding
-    end
-  end
-
   def letter_date_range
     return if letter_starts_on.nil?
 
@@ -254,46 +220,6 @@ class VisaLetterApplication < ApplicationRecord
   end
 
   private
-
-  # The visa status the registration's travel shows for where this application
-  # has got to. Before the letter goes there's nothing to say.
-  def travel_visa_status
-    if visa_granted?
-      :approved
-    elsif visa_denied?
-      :denied
-    elsif letter_sent?
-      :applied
-    end
-  end
-
-  # Kept in step with the application, so travel staff see where the visa is
-  # without opening the visa letter pages. Overwrites whatever the participant
-  # chose, since this is what happened.
-  #
-  # Saved without validation: only the visa fields change here, and a travel
-  # row that fails a newer rule about its other details mustn't stop a letter
-  # being issued or an outcome being recorded.
-  def write_visa_status_to_travel
-    status = travel_visa_status
-    return if status.nil?
-
-    travel = participant_event.travel_inbound || participant_event.travels.build(direction: :inbound)
-    travel.assign_attributes(visa_status: status, visa_required: true)
-    travel.save!(validate: false)
-  end
-
-  # How their Hack Club account splits the name, when the letter still uses
-  # it; otherwise the first word is the first name. The address isn't copied:
-  # it's one free-text block here, and onboarding fills the registration's
-  # from Hack Club Auth on their first sign-in.
-  def legal_name_parts
-    claims = (user&.oidc_claims || {}).to_h.stringify_keys
-    first, last = claims["legal_first_name"].presence, claims["legal_last_name"].presence
-    return [ first, last ] if first && last && "#{first} #{last}".squish.casecmp?(full_name.squish)
-
-    full_name.squish.split(" ", 2)
-  end
 
   def snapshot_letter_details(issued_on)
     self.letter_event_name = event.name

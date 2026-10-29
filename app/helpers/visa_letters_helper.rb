@@ -40,36 +40,6 @@ module VisaLettersHelper
     end
   end
 
-  # Why it's early to offer this applicant a place, for the confirmation staff
-  # see before overriding. Nil once the letter is sent and the visa granted.
-  def visa_letter_offer_warning(application)
-    return if application.place_offerable?
-
-    if !application.letter_sent?
-      "Their letter hasn't been sent yet."
-    elsif application.visa_denied?
-      "Their visa was refused."
-    else
-      "We don't know yet whether their visa was granted."
-    end
-  end
-
-  def visa_letter_offer_description(event)
-    if event.onboarding_invites_held?
-      "Registers them for #{event.name} with the details above. Their invitation to onboard goes out when you release the event's invitations."
-    else
-      "Registers them for #{event.name} with the details above, and emails them an invitation to onboard."
-    end
-  end
-
-  def visa_letter_offer_confirmation(application, warning)
-    if warning
-      "#{warning} Offer #{application.full_name} a place at #{application.event.name} anyway?"
-    else
-      "Offer #{application.full_name} a place at #{application.event.name}?"
-    end
-  end
-
   # [portal badge modifier, label] for the applicant's own pages. Envoy's labels.
   def applicant_visa_letter_status(application)
     case application.status

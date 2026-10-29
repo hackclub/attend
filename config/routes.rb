@@ -381,7 +381,6 @@ Rails.application.routes.draw do
           post :downgrade_rejection
           post :resend, action: :resend_letter
           post :record_visa_outcome
-          post :offer_place
           get :letter
         end
       end
