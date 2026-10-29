@@ -32,6 +32,7 @@ class DashboardController < ApplicationController
     @completion_presenters = @participant_events.index_with do |participant_event|
       RegistrationCompletionPresenter.new(participant_event, viewer: :participant)
     end
+    load_visa_letter_events
   end
 
   def profile
@@ -453,6 +454,14 @@ class DashboardController < ApplicationController
   end
 
   private
+
+  # Events taking visa letter applications, offered on the dashboard, with
+  # the participant's own application to each where they already have one.
+  def load_visa_letter_events
+    @visa_letter_events = Event.open_for_visa_letters
+    @visa_letter_applications = current_user.visa_letter_applications
+      .where(event_id: @visa_letter_events.map(&:id)).index_by(&:event_id)
+  end
 
   def public_profile_params
     params.require(:participant).permit(

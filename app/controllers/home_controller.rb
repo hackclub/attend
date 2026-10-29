@@ -4,6 +4,7 @@ class HomeController < ApplicationController
 
     unless user_signed_in?
       @landing = LandingStats.fetch
+      @visa_letter_events = Event.open_for_visa_letters
       return
     end
 

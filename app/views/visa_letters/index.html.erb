@@ -1,0 +1,75 @@
+<% content_for :title, "Visa letters – Attend" %>
+
+<div class="w-full max-w-2xl mx-auto">
+  <% unless user_signed_in? %>
+    <%= render "shared/portal_masthead" %>
+  <% end %>
+
+  <h1 class="portal-title text-2xl mb-3">Attending a Hack Club event, and require a visa?</h1>
+  <p class="portal-body text-lg mb-3">Apply for an official visa invitation letter for Hack Club events. These letters support your visa application to attend our events in the United States.</p>
+  <p class="portal-body mb-6">Please check the specific program / YSWS website to learn more about the requirements to apply for a visa letter. Your request for a visa letter will be sent to your YSWS / program for approval.</p>
+
+  <p class="portal-body mb-6"><%= link_to "Read the visa FAQ", visas_faq_path, class: "portal-link" %> for the visa type, the DS-160 and what to bring to your interview.</p>
+
+  <div class="portal-note portal-note-info mb-8">
+    <p class="text-sm portal-body"><strong>Important:</strong> A visa invitation letter does not guarantee visa approval. It is one of several supporting documents you may need for your visa application. Please consult your local U.S. Embassy or Consulate for complete visa requirements.</p>
+  </div>
+
+  <% if user_signed_in? %>
+    <% if @applications.any? %>
+      <h2 class="portal-heading text-lg mb-3">Your Applications</h2>
+      <ul class="space-y-3 mb-10">
+        <% @applications.each do |application| %>
+          <% modifier, label = applicant_visa_letter_status(application) %>
+          <li>
+            <%= link_to visas_application_path(application), class: "portal-card p-4 sm:p-5 flex items-center justify-between gap-4 hover:opacity-90" do %>
+              <div class="min-w-0">
+                <p class="portal-heading truncate"><%= application.letter_event_name.presence || application.event.name %></p>
+                <p class="portal-meta text-sm"><%= application.reference_number %></p>
+              </div>
+              <span class="portal-badge portal-badge-<%= modifier %> shrink-0"><%= label %></span>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  <% else %>
+    <div class="portal-card p-5 sm:p-6 mb-10">
+      <p class="portal-body mb-4">Sign in with your Hack Club account to apply for a visa letter or check on your application.</p>
+      <%= button_to user_hack_club_omniauth_authorize_path, method: :post, data: { turbo: false }, class: "portal-btn portal-btn-primary" do %>
+        Continue with Hack Club
+      <% end %>
+    </div>
+  <% end %>
+
+  <h2 class="portal-heading text-lg mb-3">Available Events</h2>
+  <% if @open_events.empty? %>
+    <div class="portal-panel p-5">
+      <h3 class="portal-heading text-sm mb-1">No Events Available</h3>
+      <p class="portal-hint text-sm">There are currently no events accepting visa letter applications. Please check back later for upcoming events.</p>
+    </div>
+  <% else %>
+    <ul class="space-y-3">
+      <% @open_events.each do |event| %>
+        <li class="portal-card p-4 sm:p-5">
+          <h3 class="portal-heading text-lg mb-2"><%= event.name %></h3>
+          <dl class="portal-body text-sm space-y-1 mb-4">
+            <div><dt class="inline font-semibold">Event Dates:</dt> <dd class="inline"><%= event.formatted_date_range %></dd></div>
+            <div><dt class="inline font-semibold">Location:</dt> <dd class="inline"><%= [ event.location_city, event.location_country ].compact_blank.join(", ") %></dd></div>
+            <% if event.venue_name.present? %>
+              <div><dt class="inline font-semibold">Venue:</dt> <dd class="inline"><%= event.venue_name %></dd></div>
+            <% end %>
+            <% if (deadline = event.visa_letter_deadline_date) %>
+              <div><dt class="inline font-semibold">Application Deadline:</dt> <dd class="inline"><%= deadline.strftime("%B %d, %Y") %></dd></div>
+            <% end %>
+          </dl>
+          <% if (mine = @applications&.find { |application| application.event_id == event.id }) %>
+            <%= link_to "View Your Application", visas_application_path(mine), class: "portal-btn portal-btn-secondary" %>
+          <% else %>
+            <%= link_to "Apply Now →", visas_apply_path(event.slug), class: "portal-btn portal-btn-primary" %>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</div>

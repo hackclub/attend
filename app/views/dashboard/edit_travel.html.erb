@@ -25,10 +25,10 @@
             <option value="denied" <%= "selected" if @travel_inbound&.denied? %>>My visa application was denied</option>
           </select>
         </div>
-        <% if @event.visa_application_url.present? %>
+        <% if (visa_letter_link = visa_letter_request_path_for(@event)) %>
           <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-900">
             <p class="mb-2">If you need a visa letter to support your application, request one through our visa letter system.</p>
-            <%= link_to "Request a visa letter →", @event.visa_application_url, target: "_blank", rel: "noopener noreferrer", class: "inline-flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium" %>
+            <%= link_to "Request a visa letter →", visa_letter_link, target: "_blank", rel: "noopener noreferrer", class: "inline-flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium" %>
           </div>
         <% end %>
       </section>

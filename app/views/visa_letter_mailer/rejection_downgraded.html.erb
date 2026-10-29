@@ -1,0 +1,17 @@
+<h1>You Can Now Reapply for Your Visa Letter</h1>
+
+<p>Hello <%= @application.full_name %>,</p>
+
+<p>Good news! Your visa letter application for <strong><%= @event.name %></strong> has been reviewed again, and you are now eligible to submit a new application.</p>
+
+<% if @application.rejection_reason.present? %>
+  <h2>Previous Rejection Reason</h2>
+  <p><%= @application.rejection_reason %></p>
+  <p>Please address the above concerns in your new application.</p>
+<% end %>
+
+<h2>Reapply Now</h2>
+<p>Click the button below to submit a new visa letter application:</p>
+<p style="margin: 24px 0;"><%= mail_button "Apply for Visa Letter", @apply_url %></p>
+
+<p>If you have any questions, please contact us at <%= mail_to @support_email %>.</p>

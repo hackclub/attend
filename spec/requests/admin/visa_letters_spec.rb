@@ -39,7 +39,7 @@ RSpec.describe "Admin visa letters", type: :request do
 
         expect(response).to have_http_status(:ok)
         expect(response.body).to include("Exampleland")
-        expect(response.body).to include("Approve and send letter")
+        expect(response.body).to include("Approve Application")
         expect(response.body).to include("The name doesn&#39;t match your passport.")
       end
 
@@ -67,7 +67,7 @@ RSpec.describe "Admin visa letters", type: :request do
         post reject_admin_event_visa_letter_path(event, application), params: { rejection_reason: "" }
 
         expect(application.reload).to be_pending
-        expect(flash[:alert]).to eq("Give a reason for the rejection.")
+        expect(flash[:alert]).to eq("Rejection reason is required.")
       end
 
       it "softens a hard rejection" do

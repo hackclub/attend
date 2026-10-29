@@ -196,10 +196,6 @@
         <div class="w-full">
           <%= f.label :visa_options_enabled, "Enable visa options", class: "cs-option-label" %>
           <p class="cs-option-description">Show visa requirement fields in travel information for international participants</p>
-          <%= cs_form_field f, :visa_application_url, label: "Visa letter application URL", optional: true, class: "mt-3",
-                constraint: "The Envoy application form participants are pointed to when they need a visa letter. For example: https://visas.hackclub.com/…" do |aria| %>
-            <%= f.url_field :visa_application_url, class: "cs-input", data: { cs_example: "https://visas.hackclub.com/…" }, **aria %>
-          <% end %>
         </div>
       </div>
       <% if policy(f.object).review_visa_letters? %>

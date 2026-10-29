@@ -1,0 +1,17 @@
+Visa Letter Invitation
+
+Hello,
+
+You have been invited to apply for a visa invitation letter for <%= @event.name %>.
+
+Event Details
+- Event: <%= @event.name %>
+- Dates: <%= @event.formatted_date_range %>
+- Location: <%= @location %>
+
+Please click the link below to fill out your visa letter application:
+<%= @apply_url %>
+
+You'll sign in with your Hack Club account, using this email address (<%= @emailable.email %>).
+
+If you have any questions, please contact us at <%= @support_email %>.

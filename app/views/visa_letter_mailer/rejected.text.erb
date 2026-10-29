@@ -1,9 +1,20 @@
-Hi <%= @first_name %>,
+Update on Your Visa Letter Application
 
-We can't issue a visa invitation letter for <%= @event.name %> on this request.
+Hello <%= @application.full_name %>,
 
-Reason: <%= @reason %>
-<% if @can_reapply %>
-You're welcome to apply again once you've sorted this out.
+Thank you for your interest in attending <%= @event.name %>.
+
+Unfortunately, we are unable to provide a visa invitation letter for your application at this time.
+<% if @reason.present? %>
+Reason
+<%= @reason %>
 <% end %>
-Reference number: <%= @application.reference_number %>. If you have questions, reply to this email or write to <%= @support_email %>.
+<% if @can_reapply %>
+You Can Reapply
+If you have addressed the issues mentioned above or have additional information to provide, you are welcome to submit a new application.
+
+Reapply Now: <%= @apply_url %>
+<% else %>
+If you believe this decision was made in error, please contact us at <%= @support_email %>.
+<% end %>
+We appreciate your understanding.

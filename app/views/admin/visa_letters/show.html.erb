@@ -16,14 +16,14 @@
   </div>
 
   <div class="<%= box %> space-y-2 text-sm">
-    <h2 class="text-lg font-medium text-gray-900">Applicant</h2>
-    <p><span class="text-gray-500">Name, as on their passport:</span> <%= @application.full_name %></p>
+    <h2 class="text-lg font-medium text-gray-900">Participant Information</h2>
+    <p><span class="text-gray-500">Full Name:</span> <%= @application.full_name %></p>
     <p><span class="text-gray-500">Email:</span> <%= mail_to @application.email %></p>
-    <p><span class="text-gray-500">Date of birth:</span> <%= @application.date_of_birth.strftime("%B %-d, %Y") %></p>
-    <p><span class="text-gray-500">Nationality:</span> <%= @application.nationality %></p>
-    <p><span class="text-gray-500">Place of birth:</span> <%= @application.place_of_birth.presence || "Not given" %></p>
-    <p><span class="text-gray-500">Phone:</span> <%= @application.phone.presence || "Not given" %></p>
-    <p class="whitespace-pre-line"><span class="text-gray-500">Home address:</span> <%= @application.address.presence || "Not given" %></p>
+    <p><span class="text-gray-500">Date of Birth:</span> <%= @application.date_of_birth.strftime("%B %-d, %Y") %></p>
+    <p><span class="text-gray-500">Country of Citizenship:</span> <%= @application.nationality %></p>
+    <p><span class="text-gray-500">Place of Birth:</span> <%= @application.place_of_birth.presence || "Not given" %></p>
+    <p><span class="text-gray-500">Phone Number:</span> <%= @application.phone.presence || "Not given" %></p>
+    <p class="whitespace-pre-line"><span class="text-gray-500">Address:</span> <%= @application.address.presence || "Not given" %></p>
     <p><span class="text-gray-500">Hack Club account:</span> <%= @application.user&.email || (@application.imported? ? "Imported from Envoy, not yet claimed" : "None") %></p>
     <p><span class="text-gray-500">Place at the event:</span>
       <% if @application.participant_event %><%= link_to "Registered", admin_event_participant_path(@event, @application.participant_event), class: "underline" %><% else %>Not offered a place<% end %></p>
@@ -34,7 +34,7 @@
     <p><span class="text-gray-500">Applied:</span> <%= l(@application.submitted_at || @application.created_at, format: :long) %></p>
     <p><span class="text-gray-500">Reviewed:</span> <%= @application.reviewed_at ? "#{@application.reviewed_by&.display_name_or_fallback || "An admin"}, #{time_ago_in_words(@application.reviewed_at)} ago" : "Not yet" %></p>
     <% if @application.rejected? %>
-      <p class="whitespace-pre-line"><span class="text-gray-500"><%= @application.hard_rejected? ? "Rejected (can't reapply):" : "Rejected (can reapply):" %></span> <%= @application.rejection_reason %></p>
+      <p class="whitespace-pre-line"><span class="text-gray-500"><%= @application.hard_rejected? ? "Rejection Reason · Hard Reject (Permanent):" : "Rejection Reason · Soft Reject (Can Reapply):" %></span> <%= @application.rejection_reason %></p>
     <% end %>
     <% if @application.letter_sent? %>
       <p><span class="text-gray-500">Sent:</span> <%= l(@application.letter_sent_at, format: :long) %></p>
@@ -45,34 +45,34 @@
 
   <% if @application.pending? %>
     <div class="<%= box %> space-y-3">
-      <h2 class="text-lg font-medium text-gray-900">Approve</h2>
+      <h2 class="text-lg font-medium text-gray-900">Review Application</h2>
       <p class="text-sm text-gray-500">Generates the letter from the event's template and emails it to <%= @application.email %>. Check the name matches their passport first: it can't change once the letter is sent.</p>
       <%= form_with url: letter_path.call(:approve), method: :post, class: "flex justify-end" do %>
-        <%= button_tag "Approve and send letter", class: primary, data: { turbo_confirm: "Send #{@application.full_name} a visa invitation letter for #{@event.name}?" } %>
+        <%= button_tag "Approve Application", class: primary, data: { turbo_confirm: "Are you sure you want to approve this application?" } %>
       <% end %>
     </div>
 
     <%= form_with url: letter_path.call(:reject), method: :post, class: "#{box} space-y-4" do %>
-      <h2 class="text-lg font-medium text-gray-900">Reject</h2>
+      <h2 class="text-lg font-medium text-gray-900">Reject Application</h2>
       <p class="text-sm text-gray-500">They're emailed the reason. A soft rejection lets them apply again; a hard one doesn't.</p>
       <% if (reasons = @event.visa_letter_rejection_reasons_list).any? %>
-        <%= label_tag :rejection_reason_preset, "Saved reason", class: "block text-sm font-medium text-gray-700" %>
-        <%= select_tag :rejection_reason_preset, options_for_select(reasons), include_blank: "Choose one, or write your own below", class: "w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %>
+        <%= label_tag :rejection_reason_preset, "Template", class: "block text-sm font-medium text-gray-700" %>
+        <%= select_tag :rejection_reason_preset, options_for_select(reasons), include_blank: "-- Select a template or write custom --", class: "w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %>
       <% end %>
-      <%= label_tag :rejection_reason, "Reason", class: "block text-sm font-medium text-gray-700" %>
+      <%= label_tag :rejection_reason, "Rejection Reason (required)", class: "block text-sm font-medium text-gray-700" %>
       <%= text_area_tag :rejection_reason, nil, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %>
       <fieldset class="space-y-2 text-sm">
-        <legend class="font-medium text-gray-700">Can they apply again?</legend>
-        <label class="flex items-center gap-2"><%= radio_button_tag :rejection_type, "soft", true %> Yes, a soft rejection</label>
-        <label class="flex items-center gap-2"><%= radio_button_tag :rejection_type, "hard", false %> No, a hard rejection</label>
+        <legend class="font-medium text-gray-700">Rejection Type</legend>
+        <label class="flex items-center gap-2"><%= radio_button_tag :rejection_type, "soft", true %> Soft Reject: applicant can resubmit their application</label>
+        <label class="flex items-center gap-2"><%= radio_button_tag :rejection_type, "hard", false %> Hard Reject: applicant cannot reapply for this event (permanent)</label>
       </fieldset>
-      <div class="flex justify-end"><%= button_tag "Reject", class: button %></div>
+      <div class="flex justify-end"><%= button_tag "Reject Application", class: button, data: { turbo_confirm: "Are you sure you want to reject this application?" } %></div>
     <% end %>
   <% end %>
 
   <% if @application.hard_rejected? %>
     <div class="flex justify-end">
-      <%= button_to "Change to a soft rejection", letter_path.call(:downgrade_rejection), class: button, form: { data: { turbo_confirm: "Let #{@application.full_name} apply again?" } } %>
+      <%= button_to "Downgrade to Soft Reject", letter_path.call(:downgrade_rejection), class: button, form: { data: { turbo_confirm: "This will allow the applicant to resubmit their application. They will be notified. Continue?" } } %>
     </div>
   <% end %>
 
@@ -87,12 +87,12 @@
       </div>
     <% end %>
     <div class="flex justify-end">
-      <%= button_to "Resend letter", letter_path.call(:resend), class: button, form: { data: { turbo_confirm: "Email the letter to #{@application.email} again?" } } %>
+      <%= button_to "Resend Email", letter_path.call(:resend), class: button, form: { data: { turbo_confirm: "Resend the visa letter to #{@application.email}?" } } %>
     </div>
   <% end %>
 
   <%= form_with model: @application, url: admin_event_visa_letter_path(@event, @application), method: :patch, class: "#{box} space-y-3" do |f| %>
-    <h2 class="text-lg font-medium text-gray-900">Notes</h2>
+    <h2 class="text-lg font-medium text-gray-900">Admin Notes</h2>
     <%= f.label :admin_notes, "For your team only. The applicant never sees these.", class: "block text-sm text-gray-500" %>
     <%= f.text_area :admin_notes, rows: 3, class: "w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %>
     <div class="flex justify-end"><%= f.button "Save notes", class: button %></div>

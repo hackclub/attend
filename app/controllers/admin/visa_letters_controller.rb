@@ -43,7 +43,7 @@ module Admin
       @application.approve!(by: current_user, notes: params[:admin_notes])
       GenerateVisaLetterJob.perform_later(@application)
       redirect_to admin_event_visa_letter_path(@event, @application),
-        notice: "Approved. The letter is being generated and emailed to #{@application.email}."
+        notice: "Application approved successfully. The visa letter will be generated and sent."
     rescue VisaLetterApplication::InvalidTransition => e
       redirect_to admin_event_visa_letter_path(@event, @application), alert: e.message.upcase_first
     end
@@ -54,17 +54,19 @@ module Admin
       type = params[:rejection_type] == "hard" ? :hard : :soft
       @application.reject!(by: current_user, reason: reason, type: type, notes: params[:admin_notes])
       VisaLetterMailer.rejected(application: @application).deliver_later
-      redirect_to admin_event_visa_letter_path(@event, @application), notice: "Rejected. #{@application.email} has been told why."
+      label = @application.hard_rejected? ? "permanently rejected" : "rejected (can reapply)"
+      redirect_to admin_event_visa_letter_path(@event, @application), notice: "Application #{label}. The applicant will be notified."
     rescue VisaLetterApplication::InvalidTransition => e
       redirect_to admin_event_visa_letter_path(@event, @application), alert: e.message.upcase_first
     rescue ActiveRecord::RecordInvalid
-      redirect_to admin_event_visa_letter_path(@event, @application), alert: "Give a reason for the rejection."
+      redirect_to admin_event_visa_letter_path(@event, @application), alert: "Rejection reason is required."
     end
 
     def downgrade_rejection
       @record = @application
       @application.downgrade_rejection!
-      redirect_to admin_event_visa_letter_path(@event, @application), notice: "Changed to a soft rejection. They can apply again."
+      VisaLetterMailer.rejection_downgraded(application: @application).deliver_later
+      redirect_to admin_event_visa_letter_path(@event, @application), notice: "Rejection downgraded. The applicant can now reapply and will be notified."
     rescue VisaLetterApplication::InvalidTransition => e
       redirect_to admin_event_visa_letter_path(@event, @application), alert: e.message.upcase_first
     end
@@ -72,12 +74,12 @@ module Admin
     def resend_letter
       @record = @application
       unless @application.letter_sent? && @application.letter_pdf.attached?
-        redirect_to admin_event_visa_letter_path(@event, @application), alert: "There's no letter to resend yet."
+        redirect_to admin_event_visa_letter_path(@event, @application), alert: "Letter has not been sent yet."
         return
       end
 
       VisaLetterMailer.letter_ready(application: @application).deliver_later
-      redirect_to admin_event_visa_letter_path(@event, @application), notice: "Letter resent to #{@application.email}."
+      redirect_to admin_event_visa_letter_path(@event, @application), notice: "Visa letter has been resent to #{@application.email}."
     end
 
     def record_visa_outcome

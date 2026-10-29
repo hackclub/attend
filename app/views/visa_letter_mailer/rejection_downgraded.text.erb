@@ -1,0 +1,16 @@
+You Can Now Reapply for Your Visa Letter
+
+Hello <%= @application.full_name %>,
+
+Good news! Your visa letter application for <%= @event.name %> has been reviewed again, and you are now eligible to submit a new application.
+<% if @application.rejection_reason.present? %>
+Previous Rejection Reason
+<%= @application.rejection_reason %>
+
+Please address the above concerns in your new application.
+<% end %>
+Reapply Now
+Click the link below to submit a new visa letter application:
+<%= @apply_url %>
+
+If you have any questions, please contact us at <%= @support_email %>.

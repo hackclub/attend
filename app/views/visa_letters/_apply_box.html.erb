@@ -1,0 +1,22 @@
+<%# Events taking visa letter applications, for people who might need one.
+    Locals: events:, applications: (by event id; optional) %>
+<% applications = local_assigns[:applications] || {} %>
+<section class="portal-card p-5 sm:p-6 mt-8" aria-labelledby="visa-letters-box-heading">
+  <h2 id="visa-letters-box-heading" class="portal-heading text-lg mb-1">Attending a Hack Club event, and require a visa?</h2>
+  <p class="portal-body text-sm mb-4">Apply for an official visa invitation letter for these events. <%= link_to "Learn more", visas_faq_path, class: "portal-link" %></p>
+  <ul class="divide-y" style="border-color: var(--border-card);">
+    <% events.each do |event| %>
+      <li class="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between" style="border-color: var(--border-card);">
+        <div class="min-w-0">
+          <p class="portal-heading truncate"><%= event.name %></p>
+          <p class="portal-meta text-sm"><%= [ event.formatted_date_range, [ event.location_city, event.location_country ].compact_blank.join(", ") ].compact_blank.join(" · ") %></p>
+        </div>
+        <% if (application = applications[event.id]) %>
+          <%= link_to "View Your Application", visas_application_path(application), class: "portal-btn portal-btn-secondary shrink-0" %>
+        <% else %>
+          <%= link_to "Apply Now →", visas_apply_path(event.slug), class: "portal-btn portal-btn-secondary shrink-0" %>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+</section>
