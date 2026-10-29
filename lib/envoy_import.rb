@@ -16,8 +16,10 @@
 #   Ones whose email was never verified are left behind. A sent letter's PDF
 #   is copied from Envoy's bucket byte for byte, never regenerated.
 # - Unclaimed invitations to apply, keeping their tokens.
-# - Envoy's event owners and collaborators become event admins where Attend
-#   has an account with their email.
+# - Envoy's event owners and collaborators become event admins of the past
+#   events the import creates, where Attend has an account with their email.
+#   On a mapped event, Attend's own, that role would open every participant's
+#   details to them, so they're only listed for someone to add by hand.
 #
 # Idempotent: anything already in Attend under the same id (or reference
 # number, verification code or token) is left as it is, apart from attaching
@@ -302,12 +304,22 @@ class EnvoyImport
     if status == "letter_sent"
       # What Envoy printed: the event as it stands, and the day it rendered
       # the letter (Envoy ran in UTC).
+      rendered_at = row.letter_generated_at || row.letter_sent_at || row.updated_at
       application.assign_attributes(
         letter_event_name: envoy_event.name, letter_venue: envoy_event.venue_name,
         letter_address: envoy_event.venue_address, letter_city: envoy_event.city, letter_country: envoy_event.country,
         letter_starts_on: envoy_event.start_date, letter_ends_on: envoy_event.end_date,
-        letter_issued_on: (row.letter_generated_at || row.letter_sent_at || row.updated_at).utc.to_date
+        letter_issued_on: rendered_at.utc.to_date
       )
+      # Envoy's participant is shared between their applications, so a later
+      # one can change it after this letter printed. /verify shows these
+      # details and they freeze once sent, so someone checks them first.
+      if participant.updated_at > rendered_at
+        @notes << "Application #{reference}: Envoy's participant changed after its letter was generated, so check the name and details against the PDF"
+      end
+    end
+    if row.pending_participant_attributes.present?
+      @notes << "Application #{reference}: Envoy held details for it that it hadn't applied yet (pending_participant_attributes); they aren't carried over"
     end
     @counts[:reviewers_unmatched] += 1 if reviewer_email.present? && application.reviewed_by.nil?
     return @notes << "Application #{reference}: #{application.errors.full_messages.to_sentence}" unless application.valid?
@@ -391,7 +403,9 @@ class EnvoyImport
     end
   end
 
-  # Envoy's owner and collaborators for each event.
+  # Envoy's owner and collaborators for each event. Only the past events the
+  # import creates get them as event admins: on Attend's own (mapped) events
+  # that role reaches every participant's details, so it's left to a person.
   def import_people
     admins = @envoy[:admins].pluck(:id, :email).to_h
     @envoy[:events].order(:created_at).each do |envoy_event|
@@ -408,6 +422,11 @@ class EnvoyImport
         if existing
           @counts[:people_existing] += 1
           @notes << "#{email} is already #{existing.role.humanize.downcase} on #{event.slug}, so is left as that" unless existing.event_admin?
+          next
+        end
+        unless event.imported?
+          @counts[:people_not_granted] += 1
+          @notes << "#{email} reviewed letters for #{envoy_event.slug} in Envoy, but isn't made an event admin of #{event.slug}, Attend's own event. Add them by hand if they should be."
           next
         end
 
@@ -432,8 +451,8 @@ class EnvoyImport
       say "  #{@counts[:approved_without_letter]} approved in Envoy without a letter: Attend won't generate one for them, so check them by hand."
     end
     say "Invitations: #{verb.downcase} #{@counts[:invitations]} unclaimed, #{@counts[:invitations_existing]} already imported."
-    say "People: #{verb.downcase} #{@counts[:people]} event admin(s); #{@counts[:people_existing]} already on the event, " \
-      "#{@counts[:people_global_admin]} global admin(s) skipped."
+    say "People: #{verb.downcase} #{@counts[:people]} event admin(s) on imported events; #{@counts[:people_existing]} already on the event, " \
+      "#{@counts[:people_global_admin]} global admin(s) skipped, #{@counts[:people_not_granted]} on Attend's own events left to add by hand (see notes)."
 
     if @unmatched_people.any?
       say "\nNo Attend account for #{@unmatched_people.size} of Envoy's event admins:"

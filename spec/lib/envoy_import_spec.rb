@@ -123,7 +123,8 @@ module EnvoyImportSpec
     attach(envoy, record_type: "LetterTemplate", record_id: event_template.id, name: "signature_image", key: "signature-key", bytes: SIGNATURE, content_type: "image/png", filename: "signature.png")
 
     ada = envoy[:participants].create!(full_name: "Ada Example", email: "Ada.Example@example.com", date_of_birth: Date.new(2007, 2, 3),
-      country_of_birth: "Exampleland", place_of_birth: "Example Town", phone_number: "+1 202 555 0123", full_street_address: "1 Sample Road\nExample City")
+      country_of_birth: "Exampleland", place_of_birth: "Example Town", phone_number: "+1 202 555 0123", full_street_address: "1 Sample Road\nExample City",
+      created_at: Time.utc(2025, 4, 1, 12), updated_at: Time.utc(2025, 4, 1, 12))
     others = %w[grace kim lee].map do |name|
       envoy[:participants].create!(full_name: "#{name.capitalize} Sample", email: "#{name}@example.com", date_of_birth: Date.new(2006, 5, 6),
         country_of_birth: "Exampleland", phone_number: "not a number", full_street_address: "5 Sample Road")
@@ -268,13 +269,25 @@ RSpec.describe EnvoyImport do
     expect(VisaLetterInvitation.where(token: "claimed-invitation-token")).to be_empty
   end
 
-  it "makes Envoy's event admins Attend's where they have an account, and reports the rest" do
+  it "makes Envoy's event admins admins of the events it imports, but only lists them for Attend's own" do
     run_import(apply: true)
 
     imported_event = Event.find_by!(slug: "fictional-fest-2025")
     expect(EventRoleAssignment.find_by!(user: organiser, event: imported_event)).to be_event_admin
-    expect(EventRoleAssignment.find_by!(user: organiser, event: attend_event)).to be_event_admin
+    expect(EventRoleAssignment.find_by(user: organiser, event: attend_event)).to be_nil
+    expect(log.string).to include("Organiser@example.com reviewed letters for sample-summit in Envoy, but isn't made an event admin of sample-summit-2026")
     expect(log.string).to include("helper@example.com (fictional-fest-2025)")
+  end
+
+  it "flags a sent letter whose Envoy participant changed after it was generated" do
+    participant_id = @tables[:applications].find(EnvoyImportSpec::LETTER_SENT_ID).participant_id
+    @tables[:participants].where(id: participant_id).update_all(updated_at: Time.utc(2025, 5, 1))
+
+    run_import(apply: false)
+
+    expect(log.string).to include("Application HC-FICT0001: Envoy's participant changed after its letter was generated")
+  ensure
+    @tables[:participants].where(id: participant_id).update_all(updated_at: Time.utc(2025, 4, 1, 12))
   end
 
   it "can run again without duplicating anything, attaching a letter it couldn't copy before" do
