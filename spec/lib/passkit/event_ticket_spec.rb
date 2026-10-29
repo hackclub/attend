@@ -143,4 +143,34 @@ RSpec.describe Passkit::EventTicket do
       expect(json["eventTicket"]).to include("primaryFields", "backFields")
     end
   end
+
+  describe "building the .pkpass" do
+    let(:record) { Passkit::Pass.create!(klass: "Passkit::EventTicket", generator: participant_event) }
+    let(:generator) { Passkit::Generator.new(record) }
+
+    before do
+      stub_const("Passkit::Generator::TMP_FOLDER", Pathname.new(tmp_path))
+      # Real signing needs the Apple certificates, which the test env lacks.
+      allow(generator).to receive(:sign_manifest)
+    end
+
+    it "returns the zipped pass and leaves nothing in tmp/passkit" do
+      pkpass = generator.generate_and_sign
+
+      entries = Zip::File.open_buffer(pkpass.data).map(&:name)
+      expect(entries).to include("pass.json", "manifest.json", "icon.png")
+      expect(pkpass.filename).to end_with(".pkpass")
+      expect(Dir.children(tmp_path)).to be_empty
+    end
+
+    it "leaves nothing in tmp/passkit when the build fails partway" do
+      allow(generator).to receive(:compress_pass_file).and_wrap_original do |original|
+        original.call
+        raise Errno::ENOSPC
+      end
+
+      expect { generator.generate_and_sign }.to raise_error(Errno::ENOSPC)
+      expect(Dir.children(tmp_path)).to be_empty
+    end
+  end
 end
