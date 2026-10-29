@@ -1,7 +1,6 @@
 # Asking for a visa invitation letter, and following it up. Applicants sign in
-# with their Hack Club account, but have no place at the event yet: a letter
-# comes first, and staff offer a place once the visa is granted (see
-# VisaLetterApplication).
+# with their Hack Club account, and may have no place at the event yet: a
+# place comes from the event's own invitations (see VisaLetterApplication).
 #
 # Who can apply for an event's letter: anyone, through its open form until
 # the deadline; someone staff invited to apply (an invitation also overrides a
@@ -135,13 +134,13 @@ class VisaLettersController < ApplicationController
     @invitation.present? && rejected_at.present? && @invitation.updated_at > rejected_at
   end
 
-  # Their place at the event, if they already have one.
+  # Their place at the event, if they already have one: the same match as an
+  # application's (VisaLetterApplication.registration_for), still active.
   def registration
     return @registration if defined?(@registration)
 
-    participant = current_user.participant
-    @registration = participant && participant.participant_events
-      .where(event: @event).where.not(status: %w[withdrawn rejected]).first
+    found = VisaLetterApplication.registration_for(@event, user_id: current_user.id, email: current_user.email)
+    @registration = (found if found && ParticipantEvent::INACTIVE_STATUSES.exclude?(found.status))
   end
 
   # An application under review or with its letter has a page of its own.
