@@ -178,6 +178,11 @@ module Admin
       unless action_name == "create" || current_user.global_admin?
         permitted = permitted.except(:event_series_id)
       end
+      # Who can apply for visa letters is an event admin's call, as on the
+      # visa letter settings page. Whoever creates an event is one.
+      unless action_name == "create" || policy(@event).review_visa_letters?
+        permitted = permitted.except(:visa_letters)
+      end
       permitted
     end
   end

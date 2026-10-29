@@ -143,4 +143,21 @@ RSpec.describe "Admin visa letters", type: :request do
       expect(application.reload).to be_pending
     end
   end
+
+  it "only lets event admins choose who can apply, from the event form and setup wizard too" do
+    event.update!(visa_letters: "off")
+    ops = create(:user).tap { |user| create(:event_role_assignment, user: user, event: event, role: "ops") }
+    sign_in ops
+
+    patch admin_event_path(event), params: { event: { visa_letters: "open", name: "Renamed by ops" } }
+    patch admin_event_setup_modules_path(event), params: { event: { visa_letters: "open", groups_enabled: "1" } }
+    event.reload
+    expect(event.name).to eq("Renamed by ops")
+    expect(event.groups_enabled).to eq("1")
+    expect(event.visa_letters_mode).to eq("off")
+
+    sign_in admin
+    patch admin_event_setup_modules_path(event), params: { event: { visa_letters: "open" } }
+    expect(event.reload.visa_letters_mode).to eq("open")
+  end
 end
