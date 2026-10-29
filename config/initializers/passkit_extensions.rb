@@ -1,8 +1,28 @@
 # Extend Passkit::Generator with pass.json keys the gem doesn't know about:
 # relevantDates (iOS 18), poster event ticket keys (iOS 18) and
-# featuredActions (iOS 27).
+# featuredActions (iOS 27), and stop it leaving every build on disk.
 
 module PasskitGeneratorExtensions
+  # A built pass, held in memory. See generate_and_sign.
+  Pkpass = Data.define(:filename, :data)
+
+  # The gem builds each pass in tmp/passkit/<uuid>/, zips it to
+  # tmp/passkit/<uuid>.pkpass and deletes neither (file_name is a fresh UUID
+  # per pass, so its own rm_rf never matches an earlier build). Return the
+  # zip's bytes rather than its path, and delete both here, so no build
+  # leaves anything behind however it ends: a send_file'd path is only read
+  # after the action returns, too late for the controller to delete it.
+  # PasskitPassesControllerExtensions#send_file sends the bytes.
+  def generate_and_sign
+    path = super
+    Pkpass.new(filename: File.basename(path), data: File.binread(path))
+  ensure
+    if @temporary_path
+      FileUtils.rm_rf(@temporary_path)
+      FileUtils.rm_f("#{@temporary_path}.pkpass")
+    end
+  end
+
   def generate_json_pass
     pass = {
       formatVersion: @pass.format_version,
@@ -104,6 +124,12 @@ module PasskitPassesControllerExtensions
     last_update = pass.last_update
     response.headers["last-modified"] = last_update.httpdate
     last_update.to_i <= since.to_i
+  end
+
+  # Both actions send_file whatever Passkit::Generator#generate_and_sign
+  # returned, which PasskitGeneratorExtensions makes the pass itself.
+  def send_file(pkpass, options = {})
+    send_data(pkpass.data, options.reverse_merge(filename: pkpass.filename))
   end
 end
 

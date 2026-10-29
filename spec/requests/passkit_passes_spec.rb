@@ -12,11 +12,10 @@ RSpec.describe "Passkit pass updates", type: :request do
       authentication_token: SecureRandom.hex(16)
     )
   end
-  let(:pkpass) { Tempfile.new([ "pass", ".pkpass" ]) }
-  let(:generator) { instance_double(Passkit::Generator, generate_and_sign: pkpass.path) }
+  let(:pkpass) { PasskitGeneratorExtensions::Pkpass.new(filename: "pass.pkpass", data: "") }
+  let(:generator) { instance_double(Passkit::Generator, generate_and_sign: pkpass) }
 
   before { allow(Passkit::Generator).to receive(:new).and_return(generator) }
-  after { pkpass.close! }
 
   def fetch(since: nil, token: pass.authentication_token)
     headers = { "Authorization" => "ApplePass #{token}" }
