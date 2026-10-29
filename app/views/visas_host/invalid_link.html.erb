@@ -1,0 +1,6 @@
+<% content_for :title, "Download Letter – Hack Club" %>
+<div class="card center">
+  <h1><%= @problem %></h1>
+  <p class="muted">You can download your letter from your application once you've signed in with your Hack Club account.</p>
+  <%= link_to "View Your Application", AttendUrls.attend_url(visas_path), class: "button" %>
+</div>

@@ -1,0 +1,16 @@
+<% content_for :title, "Letter Pending – Hack Club" %>
+<div class="card">
+  <div class="center">
+    <div class="icon icon-wait" aria-hidden="true">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+    </div>
+    <h1 class="title-wait">Letter Pending</h1>
+    <p class="muted">This verification code is associated with an application that has not yet been fully processed.</p>
+  </div>
+
+  <div class="notice">
+    <p style="margin: 0;">The visa invitation letter for this application is still being processed. Please check back later or contact the event organizers for more information.</p>
+  </div>
+
+  <p class="center" style="margin: 1.5rem 0 0;"><%= link_to "Verify Another Letter", visas_host_verify_path %></p>
+</div>
