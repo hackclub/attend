@@ -97,7 +97,8 @@ class VisaLettersController < ApplicationController
   def require_sign_in
     return if user_signed_in?
 
-    store_location_for(:user, request.fullpath) if request.get?
+    # Only a page to come back to, never a form submission to replay.
+    store_location_for(:user, request.fullpath) if request.get? || request.head?
     @event = Event.find_by(slug: params[:event_slug]) if params[:event_slug]
     render :sign_in, status: :unauthorized
   end
