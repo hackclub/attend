@@ -1,0 +1,10 @@
+Hi <%= @first_name %>,
+
+Your visa invitation letter for <%= @event.name %> is attached. Bring it to your visa appointment along with anything else your embassy or consulate asks for.
+
+Reference number: <%= @application.reference_number %>
+Event dates: <%= @application.letter_date_range %>
+
+Embassy staff can check the letter is genuine at hack.club/visa-verify, using the code printed at the bottom of the letter.
+
+If anything on the letter is wrong, reply to this email or write to <%= @support_email %> and we'll fix it.

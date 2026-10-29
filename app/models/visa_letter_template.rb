@@ -37,6 +37,38 @@ class VisaLetterTemplate < ApplicationRecord
 
   SIGNATURE_CONTENT_TYPES = %w[image/png image/jpeg].freeze
 
+  # Where a new template starts: Envoy's default wording, without the
+  # sign-off block it repeated after the signature.
+  STARTER_BODY = <<~BODY.freeze
+    To Whom It May Concern,
+
+    The Hack Foundation, doing business as Hack Club, is pleased to confirm that {{participant_full_name}} has been invited to attend {{event_name}}.
+
+    Participant Information:
+    Full Name: {{participant_full_name}}
+    Date of Birth: {{participant_date_of_birth}}
+    Country of Citizenship: {{participant_country_of_birth}}
+    Email: {{participant_email}}
+    Phone: {{participant_phone_number}}
+    Address: {{participant_address}}
+
+    Event Details:
+    Event Name: {{event_name}}
+    Event Dates: {{event_date_range}}
+    Venue: {{event_venue}}
+    Address: {{event_address}}, {{event_city}}, {{event_country}}
+
+    Hack Club is a 501(c)(3) nonprofit organization (EIN: 81-2908499) that supports a global community of high school hackers and makers. We organize events, hackathons, and educational programs to help young people learn to code and build technology.
+
+    {{participant_full_name}} is invited to participate in this event as an attendee. The participant is responsible for their own travel, accommodation, and living expenses during the event. Hack Club will not be financially responsible for the participant during their stay.
+
+    This letter is issued solely for the purpose of supporting a visa application.
+
+    Reference Number: {{reference_number}}
+
+    Sincerely,
+  BODY
+
   validates :name, :signatory_name, :signatory_title, presence: true
   validates :body, presence: true, length: { minimum: 100 }
   validate :one_global_default, if: -> { is_default? && event_id.nil? }
@@ -52,6 +84,28 @@ class VisaLetterTemplate < ApplicationRecord
   # global default. Nil when neither exists.
   def self.for_event(event)
     active.where(event: event).order(created_at: :desc).first || default_template
+  end
+
+  # The letter for a made-up applicant, so admins can check wording and
+  # layout before anyone receives it. Uses the template's event when it has
+  # one, otherwise an example event.
+  def preview_pdf
+    event = self.event
+    application = VisaLetterApplication.new(
+      full_name: "Ada Example", email: "ada@example.com", date_of_birth: Date.new(2008, 4, 1),
+      nationality: "Exampleland", place_of_birth: "Example City", phone: "+12025550123",
+      address: "2 Sample Road, Example City, Exampleland",
+      reference_number: "HC-PREVIEW", verification_code: "0" * 32,
+      letter_event_name: event&.name || "Example Hackathon",
+      letter_venue: event&.venue_name || "Example Hall",
+      letter_address: event&.location_address || "1 Example Street",
+      letter_city: event&.location_city || "Boston",
+      letter_country: event&.location_country || "United States",
+      letter_starts_on: event&.local_start_date || 2.months.from_now.to_date,
+      letter_ends_on: event&.local_end_date || (2.months.from_now + 2.days).to_date,
+      letter_issued_on: Date.current
+    )
+    VisaLetterPdfService.new(application, template: self).generate
   end
 
   # The body with every placeholder filled in from the application's frozen

@@ -162,6 +162,7 @@ module Admin
         :travel_enabled,
         :visa_options_enabled,
         :visa_application_url,
+        :visa_letters,
         :accommodation_enabled,
         :roommate_preferences_enabled,
         :guardian_invites_locked,

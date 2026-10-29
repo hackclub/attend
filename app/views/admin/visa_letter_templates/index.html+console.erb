@@ -1,0 +1,65 @@
+<% content_for :title, "Visa letter templates – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Visa letter templates", nil ]) %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Visa letter templates <span class="cs-counter">(<%= @templates.size %>)</span></h1>
+      <p class="cs-description">The wording of visa invitation letters. Every event uses the default unless it has an active template of its own.</p>
+    </div>
+    <div class="cs-actions">
+      <%= link_to "Add template", new_admin_visa_letter_template_path, class: "cs-btn cs-btn-primary" %>
+    </div>
+  </div>
+
+  <% if @templates.none? { |template| template.is_default? && template.event_id.nil? && template.active? } %>
+    <div class="cs-alert cs-alert-warning" role="status">
+      <%= cs_status_icon(:warning) %>
+      <div>There's no active default template, so events without their own can't issue letters.</div>
+    </div>
+  <% end %>
+
+  <section class="cs-container">
+    <% if @templates.empty? %>
+      <div class="cs-empty"><p class="cs-empty-title">No templates</p></div>
+    <% else %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Template</th>
+              <th scope="col">Used for</th>
+              <th scope="col">Signed by</th>
+              <th scope="col">Status</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @templates.each do |template| %>
+              <tr>
+                <td><%= link_to template.name, edit_admin_visa_letter_template_path(template), class: "cs-link" %></td>
+                <td>
+                  <% if template.event %>
+                    <%= template.event.name %>
+                  <% elsif template.is_default? %>
+                    Every event without its own
+                  <% else %>
+                    <span class="cs-muted">Nothing (not the default)</span>
+                  <% end %>
+                </td>
+                <td><%= template.signatory_name %><div class="cs-small cs-secondary"><%= template.signatory_title %></div></td>
+                <td class="whitespace-nowrap"><%= template.active? ? cs_status(:success, "Active") : cs_status(:stopped, "Inactive") %></td>
+                <td class="whitespace-nowrap">
+                  <div class="flex items-center gap-1">
+                    <%= link_to "Preview", preview_admin_visa_letter_template_path(template), class: "cs-btn cs-btn-link", target: "_blank", rel: "noopener" %>
+                    <%= link_to "Edit", edit_admin_visa_letter_template_path(template), class: "cs-btn cs-btn-link" %>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </section>
+</div>

@@ -1,0 +1,35 @@
+<%# locals: template: %>
+<% input = "w-full border border-gray-300 rounded-md px-3 py-2 text-sm" %>
+<% label = "block text-sm font-medium text-gray-700 mb-1" %>
+<%= form_with model: [ :admin, template ], local: true, html: { multipart: true }, class: "bg-white border border-gray-200 rounded-lg p-6 space-y-5" do |f| %>
+  <% if template.errors.any? %>
+    <div class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-4 py-3"><%= template.errors.full_messages.to_sentence %></div>
+  <% end %>
+  <div>
+    <%= f.label :name, class: label %>
+    <%= f.text_field :name, class: input %>
+  </div>
+  <div>
+    <%= f.label :event_id, "Event (leave empty for a template every event can use)", class: label %>
+    <%= f.collection_select :event_id, Event.order(starts_at: :desc), :id, :name, { include_blank: "Every event" }, class: input %>
+  </div>
+  <label class="flex items-center gap-2 text-sm"><%= f.check_box :is_default %> Default for every event without its own</label>
+  <label class="flex items-center gap-2 text-sm"><%= f.check_box :active %> Active</label>
+  <div>
+    <%= f.label :body, "Letter body", class: label %>
+    <p class="text-xs text-gray-500 mb-1">Plain text. Leave a blank line between paragraphs; &lt;b&gt;, &lt;i&gt; and &lt;u&gt; work. Placeholders: <%= VisaLetterTemplate::PLACEHOLDERS.map { |p| "{{#{p}}}" }.join(", ") %></p>
+    <%= f.text_area :body, rows: 22, class: "#{input} font-mono" %>
+  </div>
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div><%= f.label :signatory_name, "Signed by", class: label %><%= f.text_field :signatory_name, class: input %></div>
+    <div><%= f.label :signatory_title, "Their title", class: label %><%= f.text_field :signatory_title, class: input %></div>
+  </div>
+  <div>
+    <%= f.label :signature_image, "Signature image (optional, PNG or JPEG)", class: label %>
+    <%= f.file_field :signature_image, accept: "image/png,image/jpeg", class: "text-sm" %>
+  </div>
+  <div class="flex justify-end gap-2">
+    <%= link_to "Cancel", admin_visa_letter_templates_path, class: "px-4 py-2 text-sm text-gray-600" %>
+    <%= f.button template.persisted? ? "Save template" : "Add template", class: "px-4 py-2 bg-[#d42f46] text-white rounded-md text-sm" %>
+  </div>
+<% end %>

@@ -357,6 +357,20 @@ Rails.application.routes.draw do
       resource :airport_mode, only: [ :show ], controller: "airport_mode"
       # Stays: during the event, the night before, the night after. Each is
       # everyone with accommodation or a list of who's staying and why.
+      # Visa letter applications, reviewed by the event's admins. The action
+      # names are the audit log's, so approving a letter doesn't read as
+      # approving a registration change.
+      resources :visa_letters, only: [ :index, :show, :update ], controller: "visa_letters" do
+        member do
+          post :approve, action: :approve_letter
+          post :reject, action: :reject_letter
+          post :downgrade_rejection
+          post :resend, action: :resend_letter
+          post :record_visa_outcome
+          get :letter
+        end
+      end
+      resource :visa_letter_settings, only: [ :edit, :update ], controller: "visa_letter_settings"
       resources :rooming_stays, path: "stays", only: [ :index, :create, :edit, :update, :destroy ], controller: "rooming_stays" do
         post :add_check_in_point, on: :member
         resources :roster_entries, path: "roster", only: [ :index, :create, :destroy ], controller: "rooming_roster_entries"
@@ -448,6 +462,11 @@ Rails.application.routes.draw do
           patch :revoke, on: :member
         end
       end
+    end
+
+    # The wording of visa invitation letters, for every event or one of them.
+    resources :visa_letter_templates, except: :show do
+      get :preview, on: :member
     end
 
     resources :bans do

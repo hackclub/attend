@@ -1,0 +1,16 @@
+<% content_for :title, "#{@template.name_was || @template.name} – Visa letter templates – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Visa letter templates", admin_visa_letter_templates_path ], [ @template.name_was || @template.name, nil ]) %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1"><%= @template.name_was || @template.name %></h1>
+      <p class="cs-description">Changes apply to letters issued from now on. Letters already sent keep their wording.</p>
+    </div>
+    <div class="cs-actions">
+      <%= button_to "Remove template", admin_visa_letter_template_path(@template), method: :delete, class: "cs-btn",
+            form: { data: { turbo_confirm: @template.is_default? && @template.event_id.nil? ? "Remove the default template? Events without their own won't be able to issue letters until there's a new default." : "Remove #{@template.name}?" } } %>
+    </div>
+  </div>
+  <%= render "form", template: @template %>
+</div>

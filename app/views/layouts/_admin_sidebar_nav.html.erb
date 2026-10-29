@@ -105,6 +105,13 @@
         <% end %>
       <% end %>
 
+      <% if (current_event.visa_letters_enabled? || current_event.visa_letter_applications.exists?) && policy(current_event).review_visa_letters? %>
+        <%= link_to admin_event_visa_letters_path(current_event), class: "nav-item #{request.path.match?(%r{/events/[^/]+/visa_letter}) ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+          <%= cs_icon(:visas, class: "h-4 w-4") %>
+          Visa Letters
+        <% end %>
+      <% end %>
+
       <% if current_event.accommodation_enabled? %>
         <%= link_to admin_event_rooming_wizard_path(current_event), class: "nav-item #{request.path.match?(%r{/rooming_wizard|/events/[^/]+/stays}) ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -185,6 +192,11 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
           </svg>
           Conduct Bans
+        <% end %>
+
+        <%= link_to admin_visa_letter_templates_path, class: "nav-item #{request.path.start_with?('/admin/visa_letter_templates') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+          <%= cs_icon(:visas, class: "h-4 w-4") %>
+          Visa Letter Templates
         <% end %>
 
         <% logs_active = request.path.start_with?('/admin/audit_logs') || request.path.start_with?('/admin/email_logs') %>

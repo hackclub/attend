@@ -9,6 +9,10 @@ class VisaLetterTemplatePolicy < ApplicationPolicy
     user.global_admin?
   end
 
+  def preview?
+    show?
+  end
+
   def create?
     user.global_admin?
   end

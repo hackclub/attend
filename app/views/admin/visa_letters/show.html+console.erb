@@ -1,0 +1,225 @@
+<% content_for :title, "#{@application.full_name} – Visa letters – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Visa letters", admin_event_visa_letters_path(@event) ], [ @application.reference_number, nil ], event: @event) %>
+<% letter_path = ->(action) { public_send("#{action}_admin_event_visa_letter_path", @event, @application) } %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1"><%= @application.full_name %></h1>
+      <p class="cs-description"><%= cs_status(*visa_letter_status(@application)) %> <span class="cs-secondary">· <%= @application.reference_number %> · Opening an application is recorded in the audit log.</span></p>
+    </div>
+    <div class="cs-actions">
+      <% if @application.hard_rejected? %>
+        <%= button_to "Change to a soft rejection", letter_path.call(:downgrade_rejection), class: "cs-btn",
+              form: { class: "contents", data: { turbo_confirm: "Let #{@application.full_name} apply again?" } } %>
+      <% end %>
+      <% if @application.letter_sent? %>
+        <%= button_to "Resend letter", letter_path.call(:resend), class: "cs-btn",
+              form: { class: "contents", data: { turbo_confirm: "Email the letter to #{@application.email} again?" } } %>
+      <% end %>
+      <% if @application.letter_pdf.attached? %>
+        <%= link_to "Download letter", letter_path.call(:letter), class: "cs-btn" %>
+      <% end %>
+    </div>
+  </div>
+
+  <section class="cs-container">
+    <div class="cs-container-header"><h2 class="cs-h2">Applicant</h2></div>
+    <div class="cs-container-body">
+      <dl class="cs-kv cs-kv-2">
+        <div>
+          <dt class="cs-kv-label">Name, as on their passport</dt>
+          <dd class="cs-kv-value"><%= @application.full_name %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Email</dt>
+          <dd class="cs-kv-value"><%= mail_to @application.email, class: "cs-link" %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Date of birth</dt>
+          <dd class="cs-kv-value"><%= @application.date_of_birth.strftime("%B %-d, %Y") %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Nationality</dt>
+          <dd class="cs-kv-value"><%= @application.nationality %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Place of birth</dt>
+          <dd class="cs-kv-value"><%= @application.place_of_birth.presence || tag.span("Not given", class: "cs-muted") %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Phone</dt>
+          <dd class="cs-kv-value"><%= @application.phone.presence || tag.span("Not given", class: "cs-muted") %></dd>
+        </div>
+        <div class="col-span-full">
+          <dt class="cs-kv-label">Home address</dt>
+          <dd class="cs-kv-value whitespace-pre-line"><%= @application.address.presence || tag.span("Not given", class: "cs-muted") %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Hack Club account</dt>
+          <dd class="cs-kv-value">
+            <% if @application.user %>
+              <%= @application.user.email %>
+            <% elsif @application.imported? %>
+              <span class="cs-muted">Imported from Envoy, not yet claimed</span>
+            <% else %>
+              <span class="cs-muted">None</span>
+            <% end %>
+          </dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Place at the event</dt>
+          <dd class="cs-kv-value">
+            <% if @application.participant_event %>
+              <%= link_to "Registered", admin_event_participant_path(@event, @application.participant_event), class: "cs-link" %>
+            <% else %>
+              <span class="cs-muted">Not offered a place</span>
+            <% end %>
+          </dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header"><h2 class="cs-h2">Letter</h2></div>
+    <div class="cs-container-body">
+      <dl class="cs-kv cs-kv-2">
+        <div>
+          <dt class="cs-kv-label">Applied</dt>
+          <dd class="cs-kv-value"><%= cs_absolute_time(@application.submitted_at || @application.created_at) %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Reviewed</dt>
+          <dd class="cs-kv-value">
+            <% if @application.reviewed_at %>
+              <%= @application.reviewed_by&.display_name_or_fallback || "An admin" %>, <%= cs_relative_time(@application.reviewed_at, inline: true) %>
+            <% else %>
+              <span class="cs-muted">Not yet</span>
+            <% end %>
+          </dd>
+        </div>
+        <% if @application.rejected? %>
+          <div class="col-span-full">
+            <dt class="cs-kv-label"><%= @application.hard_rejected? ? "Rejected (can't reapply)" : "Rejected (can reapply)" %></dt>
+            <dd class="cs-kv-value whitespace-pre-line"><%= @application.rejection_reason %></dd>
+          </div>
+        <% end %>
+        <% if @application.letter_sent? %>
+          <div>
+            <dt class="cs-kv-label">Sent</dt>
+            <dd class="cs-kv-value"><%= cs_absolute_time(@application.letter_sent_at) %></dd>
+          </div>
+          <div>
+            <dt class="cs-kv-label">Verification code</dt>
+            <dd class="cs-kv-value font-mono break-all"><%= @application.verification_code %></dd>
+          </div>
+          <div class="col-span-full">
+            <dt class="cs-kv-label">The letter says</dt>
+            <dd class="cs-kv-value">
+              <%= @application.letter_event_name %>, <%= @application.letter_date_range %>,
+              <%= [ @application.letter_venue, @application.letter_city, @application.letter_country ].compact_blank.join(", ") %>.
+              Issued <%= @application.letter_issued_on.strftime("%B %-d, %Y") %>.
+            </dd>
+          </div>
+        <% end %>
+      </dl>
+    </div>
+  </section>
+
+  <% if @application.pending? %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Approve</h2>
+          <p class="cs-container-description">Generates the letter from the event's template and emails it to <%= @application.email %>. Check the name matches their passport first: it can't change once the letter is sent.</p>
+        </div>
+      </div>
+      <div class="cs-container-body">
+        <%= form_with url: letter_path.call(:approve), method: :post, class: "flex justify-end" do %>
+          <%= button_tag "Approve and send letter", class: "cs-btn cs-btn-primary cs-btn-full",
+                data: { turbo_confirm: "Send #{@application.full_name} a visa invitation letter for #{@event.name}?" } %>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Reject</h2>
+          <p class="cs-container-description">They're emailed the reason. A soft rejection lets them apply again; a hard one doesn't.</p>
+        </div>
+      </div>
+      <%= form_with url: letter_path.call(:reject), method: :post do %>
+        <div class="cs-container-body space-y-5">
+          <% if (reasons = @event.visa_letter_rejection_reasons_list).any? %>
+            <%= cs_field id: "rejection_reason_preset", label: "Saved reason", optional: true do |aria| %>
+              <%= select_tag :rejection_reason_preset, options_for_select(reasons), include_blank: "Choose one, or write your own below", class: "cs-select", **aria %>
+            <% end %>
+          <% end %>
+          <%= cs_field id: "rejection_reason", label: "Reason", optional: reasons.any?, description: "Shown to the applicant in the email." do |aria| %>
+            <%= text_area_tag :rejection_reason, nil, rows: 3, class: "cs-input", **aria %>
+          <% end %>
+          <%= cs_field id: "rejection_type", label: "Can they apply again?", group: true do %>
+            <div class="space-y-3">
+              <div class="cs-option">
+                <%= radio_button_tag :rejection_type, "soft", true %>
+                <div>
+                  <%= label_tag :rejection_type_soft, "Yes, a soft rejection", class: "cs-option-label" %>
+                  <p class="cs-option-description">For something they can fix, like a name that doesn't match their passport.</p>
+                </div>
+              </div>
+              <div class="cs-option">
+                <%= radio_button_tag :rejection_type, "hard", false %>
+                <div>
+                  <%= label_tag :rejection_type_hard, "No, a hard rejection", class: "cs-option-label" %>
+                  <p class="cs-option-description">They can't apply for this event again unless someone softens it.</p>
+                </div>
+              </div>
+            </div>
+          <% end %>
+          <div class="flex justify-end">
+            <%= button_tag "Reject", class: "cs-btn cs-btn-full" %>
+          </div>
+        </div>
+      <% end %>
+    </section>
+  <% end %>
+
+  <% if @application.letter_sent? %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Visa outcome</h2>
+          <p class="cs-container-description">What the embassy decided. Someone whose visa is granted can be offered a place.</p>
+        </div>
+      </div>
+      <%= form_with url: letter_path.call(:record_visa_outcome), method: :post do %>
+        <div class="cs-container-body flex flex-col gap-3 sm:flex-row sm:items-end">
+          <%= cs_field id: "visa_outcome", label: "Outcome", class: "sm:flex-1" do |aria| %>
+            <%= select_tag :visa_outcome, options_for_select([ [ "Waiting on the embassy", "unknown" ], [ "Granted", "granted" ], [ "Refused", "denied" ] ], @application.visa_outcome), class: "cs-select", **aria %>
+          <% end %>
+          <%= button_tag "Save outcome", class: "cs-btn cs-btn-full" %>
+        </div>
+      <% end %>
+    </section>
+
+  <% end %>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2">Notes</h2>
+        <p class="cs-container-description">For your team only. The applicant never sees these.</p>
+      </div>
+    </div>
+    <%= form_with model: @application, url: admin_event_visa_letter_path(@event, @application), method: :patch do |f| %>
+      <div class="cs-container-body space-y-3">
+        <%= cs_form_field f, :admin_notes, label: "Notes", optional: true do |aria| %>
+          <%= f.text_area :admin_notes, rows: 3, class: "cs-input", **aria %>
+        <% end %>
+        <div class="flex justify-end"><%= f.button "Save notes", class: "cs-btn cs-btn-full" %></div>
+      </div>
+    <% end %>
+  </section>
+</div>
