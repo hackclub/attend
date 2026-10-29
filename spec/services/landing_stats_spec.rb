@@ -60,6 +60,19 @@ RSpec.describe LandingStats do
     expect(stats[:pins].sole[:state]).to eq("live")
   end
 
+  it "leaves out events an import brought in, past or upcoming" do
+    imported = create(:event, name: "Mock Imported", starts_at: now - 30.days, ends_at: now - 28.days,
+                      location_latitude: 10, location_longitude: 10, config: { "imported_from" => "envoy" })
+    create(:event, name: "Mock Imported Upcoming", starts_at: now + 30.days, ends_at: now + 31.days,
+           location_latitude: 20, location_longitude: 20, config: { "imported_from" => "envoy" })
+    register(imported, country: "Canada")
+
+    stats = described_class.new(now: now).to_h
+
+    expect(stats.slice(:events, :students, :countries)).to eq(events: 0, students: 0, countries: 0)
+    expect(stats[:pins]).to be_empty
+  end
+
   it "caches the computed hash for an hour" do
     allow(Rails.cache).to receive(:fetch).with(described_class::CACHE_KEY, expires_in: 1.hour).and_return({ events: 1 })
 

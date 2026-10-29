@@ -11,7 +11,8 @@
 #   scanned in at a check-in point. Draft flags are ignored for the headline (organisers forget
 #   to tick "setup complete" on events that plainly happened), but only events
 #   that finished setup are placed on the map: a draft was never announced, so
-#   its venue is not public either.
+#   its venue is not public either. Events an import brought in (Envoy's, for
+#   their visa letters) never count: Attend didn't run them.
 # - A student is a distinct participant who was scanned in at a check-in point
 #   on a counted event. A registration nobody scanned is someone who signed up,
 #   not someone who turned up, so it stays out of every number on the page.
@@ -82,7 +83,7 @@ class LandingStats
   private
 
   def counted_registrations
-    ParticipantEvent.joins(:event)
+    ParticipantEvent.joins(:event).merge(Event.not_imported)
       .where(events: { starts_at: ..@now })
       .where(id: Scan.for_check_in.select(:participant_event_id))
   end
@@ -103,7 +104,7 @@ class LandingStats
 
   def build_pins
     counted = Event.where(id: counted_event_ids)
-    announced = Event.where("starts_at > ?", @now)
+    announced = Event.not_imported.where("starts_at > ?", @now)
     headcounts = counted_registrations.group(:event_id).distinct.count(:participant_id)
 
     counted.or(announced)
