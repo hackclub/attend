@@ -1,0 +1,27 @@
+<% content_for :title, "Apply for Visa Letter – #{@event.name} – Attend" %>
+<% contact = @event.effective_support_email %>
+
+<div class="w-full max-w-lg mx-auto">
+  <h1 class="portal-title text-2xl mb-3">Apply for Visa Letter</h1>
+
+  <div class="portal-card p-5 sm:p-6 mb-6 portal-body">
+    <% case @refusal %>
+    <% when :off %>
+      <p>This event is no longer accepting applications.</p>
+    <% when :not_open %>
+      <% if @event.visa_letters_mode == "invite_only" %>
+        <p>Applications for <%= @event.name %> are by invitation only. If you've been invited to apply, please use the link in your invitation email.</p>
+      <% else %>
+        <p>This event is no longer accepting applications.</p>
+      <% end %>
+    <% when :hard_rejected %>
+      <p>This email address is not eligible to apply for this event. If you believe this is an error, please contact <%= mail_to contact, class: "portal-link" %>.</p>
+    <% when :wrong_account %>
+      <p class="mb-4">The email address must match the invitation email (<%= @invitation_for %>). You're signed in as <%= current_user.email %>.</p>
+      <%= button_to "Switch Hack Club account", destroy_user_session_path, method: :delete, class: "portal-btn portal-btn-secondary" %>
+    <% end %>
+    <p class="portal-hint text-sm mt-4">Questions? Contact us at <%= mail_to contact, class: "portal-link" %></p>
+  </div>
+
+  <%= link_to "← Visa letters", visas_path, class: "portal-link text-sm" %>
+</div>

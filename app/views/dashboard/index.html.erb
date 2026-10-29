@@ -207,6 +207,11 @@
     </section>
   <% end %>
 
+  <!-- Visa letters for events taking applications -->
+  <% if @visa_letter_events.present? %>
+    <%= render "visa_letters/apply_box", events: @visa_letter_events, applications: @visa_letter_applications %>
+  <% end %>
+
   <!-- Mobile app -->
   <section class="mt-8">
     <div class="rounded-2xl border border-(--border-card) bg-(--bg-elev) p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

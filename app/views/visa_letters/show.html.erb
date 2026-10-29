@@ -1,0 +1,66 @@
+<% content_for :title, "Application #{@application.reference_number} – Attend" %>
+<% modifier, label = applicant_visa_letter_status(@application) %>
+<% contact = @event.effective_support_email %>
+<% sent = @application.letter_sent? %>
+
+<div class="w-full max-w-lg mx-auto">
+  <%= link_to "← Visa letters", visas_path, class: "portal-link text-sm" %>
+
+  <div class="portal-card p-5 sm:p-6 mt-4 mb-6 portal-body">
+    <span class="portal-badge portal-badge-<%= modifier %>"><%= label %></span>
+    <% case @application.status %>
+    <% when "pending" %>
+      <h1 class="portal-title text-2xl mt-3 mb-2">Application Under Review</h1>
+      <p>Your application is being reviewed. You'll receive an email once a decision is made.</p>
+    <% when "approved" %>
+      <h1 class="portal-title text-2xl mt-3 mb-2">Application Approved!</h1>
+      <p>Your visa letter is being generated and will be sent to your email shortly.</p>
+    <% when "letter_sent" %>
+      <h1 class="portal-title text-2xl mt-3 mb-2">Visa Letter Sent!</h1>
+      <p class="mb-4">Your visa invitation letter has been sent to <%= @application.email %>.</p>
+      <%= link_to "Download Your Visa Letter (PDF)", visas_application_letter_path(@application), class: "portal-btn portal-btn-primary" %>
+    <% when "rejected" %>
+      <h1 class="portal-title text-2xl mt-3 mb-2">Application Not Approved</h1>
+      <% if @application.rejection_reason.present? %>
+        <p class="whitespace-pre-line mb-4"><%= @application.rejection_reason %></p>
+      <% end %>
+      <% if @application.soft_rejected? %>
+        <h2 class="portal-heading text-lg mb-1">You Can Reapply</h2>
+        <p class="mb-4">If you have addressed the issues mentioned above or have additional information to provide, you are welcome to submit a new application.</p>
+        <%= link_to "Reapply Now", visas_apply_path(@event.slug), class: "portal-btn portal-btn-primary" %>
+      <% else %>
+        <p>If you believe this decision was made in error, please contact us at <%= mail_to contact, class: "portal-link" %>.</p>
+      <% end %>
+    <% end %>
+  </div>
+
+  <% if sent %>
+    <%= form_with url: visas_application_outcome_path(@application), method: :post, class: "portal-card p-5 sm:p-6 mb-6 space-y-3" do %>
+      <h2 class="portal-heading text-lg">What did the embassy decide?</h2>
+      <p class="portal-hint text-sm">Let us know once you hear back, so the <%= @event.name %> team knows who can come.</p>
+      <%= label_tag :visa_outcome, "Visa decision", class: "sr-only" %>
+      <div class="flex flex-col gap-3 sm:flex-row">
+        <%= select_tag :visa_outcome, options_for_select([ [ "Still waiting", "unknown" ], [ "My visa was granted", "granted" ], [ "My visa was refused", "denied" ] ], @application.visa_outcome), class: "portal-select sm:flex-1" %>
+        <%= button_tag "Save", class: "portal-btn portal-btn-secondary" %>
+      </div>
+    <% end %>
+  <% end %>
+
+  <div class="portal-card p-5 sm:p-6 mb-6">
+    <h2 class="portal-heading text-lg mb-3">Application Details</h2>
+    <dl class="portal-body text-sm grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div><dt class="portal-meta">Reference Number</dt><dd><%= @application.reference_number %></dd></div>
+      <div><dt class="portal-meta">Event</dt><dd><%= sent ? @application.letter_event_name : @event.name %></dd></div>
+      <div><dt class="portal-meta">Event Dates</dt><dd><%= sent ? @application.letter_date_range : @event.formatted_date_range %></dd></div>
+      <div><dt class="portal-meta">Location</dt><dd><%= (sent ? [ @application.letter_city, @application.letter_country ] : [ @event.location_city, @event.location_country ]).compact_blank.join(", ") %></dd></div>
+      <div><dt class="portal-meta">Applicant</dt><dd><%= @application.full_name %></dd></div>
+      <div><dt class="portal-meta">Email</dt><dd class="break-all"><%= @application.email %></dd></div>
+    </dl>
+  </div>
+
+  <% if @application.participant_event %>
+    <p class="portal-panel p-5 portal-body text-sm mb-6">You're registered for <%= @event.name %>. <%= link_to "Go to your dashboard", dashboard_path, class: "portal-link" %>.</p>
+  <% end %>
+
+  <p class="portal-hint text-sm">Questions? Contact us at <%= mail_to contact, class: "portal-link" %></p>
+</div>

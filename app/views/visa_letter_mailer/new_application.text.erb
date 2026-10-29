@@ -1,0 +1,12 @@
+New Visa Letter Application
+
+A new visa letter application has been submitted and is pending review.
+
+Application Details
+- Reference Number: <%= @application.reference_number %>
+- Event: <%= @event.name %>
+- Submitted: <%= @application.submitted_at&.strftime("%B %d, %Y at %I:%M %p") %>
+
+Review Application: <%= @review_url %>
+
+The applicant's details are in Attend, not in this email.

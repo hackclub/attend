@@ -112,13 +112,13 @@ RSpec.describe "Admin console form validation", type: :request do
 
   describe "edit event" do
     it "shows errors inline on the full settings form" do
-      patch admin_event_path(event), params: { event: { name: "", support_email: "team@example.org", visa_application_url: "not a url" } }
+      patch admin_event_path(event), params: { event: { name: "", support_email: "team@example.org" } }
 
       expect(response).to have_http_status(:unprocessable_entity)
       expect(validated_form?).to be(true)
       expect(inline_error("event_name")).to eq("Event name is required.")
       expect(inline_error("event_support_email")).to start_with("Enter an email address ending in @hackclub.com")
-      expect(page.at_css("label[for=event_visa_application_url] .cs-field-optional")).to be_present
+      expect(page.at_css("label[for=event_venue_name] .cs-field-optional")).to be_present
       expect_no_top_summary
     end
   end

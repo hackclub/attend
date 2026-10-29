@@ -1,10 +1,21 @@
-Hi <%= @first_name %>,
+<% location = [ @application.letter_venue, @application.letter_address, @application.letter_city, @application.letter_country ].compact_blank.uniq.join(", ") %>
+Your Visa Letter is Ready!
 
-Your visa invitation letter for <%= @event.name %> is attached. Bring it to your visa appointment along with anything else your embassy or consulate asks for.
+Hello <%= @application.full_name %>,
 
-Reference number: <%= @application.reference_number %>
-Event dates: <%= @application.letter_date_range %>
+Great news! Your visa letter application for <%= @application.letter_event_name %> has been approved. Your letter is attached to this email.
 
-Embassy staff can check the letter is genuine at hack.club/visa-verify, using the code printed at the bottom of the letter.
+Download Your Visa Letter (PDF): <%= @download_url %>
 
-If anything on the letter is wrong, reply to this email or write to <%= @support_email %> and we'll fix it.
+Event Details
+- Event: <%= @application.letter_event_name %>
+- Dates: <%= @application.letter_date_range %>
+- Location: <%= location %>
+- Reference Number: <%= @application.reference_number %>
+
+Next Steps
+Please print this letter and include it with your visa application. If you have any questions or need additional documentation, please contact us at <%= @support_email %>.
+
+Once you hear back from the embassy, please let us know on your application page, using the link above.
+
+We look forward to seeing you at <%= @application.letter_event_name %>!

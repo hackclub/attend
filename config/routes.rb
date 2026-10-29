@@ -222,6 +222,18 @@ Rails.application.routes.draw do
     delete "/portals/session", to: "guardian_portal_center#destroy", as: :guardian_portal_center_session
   end
 
+  # Visa invitation letters. Someone asks for one before they have a place at
+  # the event, signed in with their Hack Club account.
+  get "visas", to: "visa_letters#index", as: :visas
+  scope "visas", as: "visas" do
+    get "faq", to: "visa_letters#faq", as: :faq
+    get "applications/:id", to: "visa_letters#show", as: :application
+    get "applications/:id/letter", to: "visa_letters#letter", as: :application_letter
+    post "applications/:id/outcome", to: "visa_letters#record_outcome", as: :application_outcome
+    get ":event_slug/apply", to: "visa_letters#new", as: :apply
+    post ":event_slug/apply", to: "visa_letters#create"
+  end
+
   namespace :admin do
     root "dashboard#index"
 
@@ -360,6 +372,8 @@ Rails.application.routes.draw do
       # Visa letter applications, reviewed by the event's admins. The action
       # names are the audit log's, so approving a letter doesn't read as
       # approving a registration change.
+      # Declared first, so /visa_letters/invitations isn't read as an application id.
+      resources :visa_letter_invitations, path: "visa_letters/invitations", only: [ :index, :create, :destroy ]
       resources :visa_letters, only: [ :index, :show, :update ], controller: "visa_letters" do
         member do
           post :approve, action: :approve_letter

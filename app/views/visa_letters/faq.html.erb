@@ -1,0 +1,150 @@
+<% content_for :title, "Visa FAQ – Attend" %>
+
+<div class="w-full max-w-2xl mx-auto">
+  <% unless user_signed_in? %>
+    <%= render "shared/portal_masthead", back_to: { label: "Visa letters", path: visas_path } %>
+  <% else %>
+    <%= link_to "← Visa letters", visas_path, class: "portal-link text-sm" %>
+  <% end %>
+
+  <h1 class="portal-title text-2xl mt-4 mb-2">Frequently Asked Questions</h1>
+  <p class="portal-body text-lg mb-8">Everything you need to know about visa applications for Hack Club events.</p>
+
+  <section class="portal-card p-5 sm:p-6 mb-6">
+    <h2 class="portal-heading text-lg mb-4">General Questions</h2>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">What type of visa do I need to attend a Hack Club hackathon in the USA?</h3>
+      <div class="portal-body">
+      <p>Most attendees apply for a B1/B2 visitor visa. The B1 category covers business activities like attending conferences and events, while B2 covers tourism. A combined B1/B2 visa gives you flexibility for both purposes during your trip.</p>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">What is a visa invitation letter and why do I need one?</h3>
+      <div class="portal-body">
+      <p>A visa invitation letter is an official document from the event organizer confirming your participation in the hackathon. It includes details about the event (dates, location, purpose) and your role as an attendee. Many embassies require or strongly recommend this letter as part of your visa application to demonstrate the legitimate purpose of your trip.</p>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">How far in advance should I apply for my visa?</h3>
+      <div class="portal-body">
+      <p>We recommend starting the visa application process at least 2-3 months before the event. Appointment wait times vary significantly by country and can sometimes exceed several weeks. Check your local U.S. embassy's website for current wait times.</p>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">What documents should I bring to my visa interview?</h3>
+      <div class="portal-body">
+      <p>Typically you should bring your visa invitation letter from Hack Club, proof of event registration, evidence of ties to your home country (school enrollment letter, family connections, property), proof of financial support for the trip, and your passport valid for at least six months beyond your intended stay.</p>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">Can I receive prize money or compensation at the hackathon on a B1/B2 visa?</h3>
+      <div class="portal-body">
+      <p>You cannot be employed or receive payment for work on a B1/B2 visa. However, you may accept prizes or awards that are incidental to the event, as long as the primary purpose of your trip is attending the hackathon rather than earning income.</p>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">What if my visa application is denied?</h3>
+      <div class="portal-body">
+      <p>If your visa is denied, you'll receive a letter explaining the reason. Common issues include insufficient ties to your home country or incomplete documentation. You can reapply with stronger supporting documents. Let us know if this happens—we may be able to provide additional documentation to support a new application.</p>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">How long can I stay in the USA on a B1/B2 visa?</h3>
+      <div class="portal-body">
+      <p>The immigration officer at the port of entry determines your allowed stay, typically up to 6 months. However, you should only stay as long as needed for the hackathon and any reasonable travel around it. Overstaying can result in future visa denials.</p>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">I'm under 18. Are there any additional requirements?</h3>
+      <div class="portal-body">
+      <p>Minors may need a notarized letter of consent from parents or guardians authorizing travel. Some embassies have specific requirements for unaccompanied minors, so check with your local U.S. embassy for their specific policies.</p>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">Do I need travel insurance?</h3>
+      <div class="portal-body">
+      <p>While not a visa requirement, we strongly recommend purchasing travel insurance that covers medical emergencies, as healthcare in the USA can be very expensive without insurance.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="portal-card p-5 sm:p-6 mb-6">
+    <h2 class="portal-heading text-lg mb-4">Information about the DS-160 Application Process</h2>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">What is the DS-160?</h3>
+      <div class="portal-body">
+      <p>The DS-160 is the online nonimmigrant visa application form required for all B1/B2 visa applicants. You must complete it before scheduling your visa interview. The form collects biographical information, travel plans, and background details that the consular officer uses to evaluate your application.</p>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">Where do I fill out the DS-160?</h3>
+      <div class="portal-body">
+      <p>The DS-160 is completed online at the official U.S. Department of State website: <%= link_to "ceac.state.gov/genniv", "https://ceac.state.gov/genniv", class: "portal-link", target: "_blank", rel: "noopener" %>. Be cautious of third-party websites that charge fees to fill out the form—the official DS-160 itself has no filing fee (though you'll pay a separate visa application fee).</p>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">How long does it take to complete the DS-160?</h3>
+      <div class="portal-body">
+      <p>Plan for 60-90 minutes, though it can take longer if you need to gather information. The form times out after 20 minutes of inactivity, so have all your documents ready before starting. You can save your progress and return later using your application ID.</p>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">What information do I need to complete the DS-160?</h3>
+      <div class="portal-body">
+      <p>You'll need your passport, travel itinerary, details about the hackathon (dates, address, purpose), your educational and employment history for the past five years, addresses where you've lived, social media handles, and contact information for someone in the USA (you can use the Hack Club contact provided in your invitation letter).</p>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">What should I put for "Purpose of Trip"?</h3>
+      <div class="portal-body">
+      <p>Select "Business/Conference" or "Temp. Business Pleasure Visitor (B1/B2)" depending on how the options appear. In the description, clearly state you're attending a hackathon—a technology and coding event for students—organized by Hack Club.</p>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">What address should I use for "Address Where You Will Stay"?</h3>
+      <div class="portal-body">
+      <p>Use the event venue or hotel address where you'll be staying during the hackathon. This information should be included in your visa invitation letter.</p>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">What do I put for "Person/Entity Paying for Your Trip"?</h3>
+      <div class="portal-body">
+      <p>If you're paying your own way, select "Self." If Hack Club is covering travel costs through a grant or sponsorship, select "Other Organization" and provide Hack Club's details. If a parent is funding your trip, select "Other Person" and provide their information.</p>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="portal-heading text-base mb-1">What organization name and address should I use on the DS-160?</h3>
+      <div class="portal-body">
+      <p class="mb-2">When the form asks for details about the organization hosting the event or your point of contact in the USA, use the following information:</p>
+      <ul class="list-disc pl-5 mb-2">
+        <li><strong>Organization Name:</strong> The Hack Foundation D.B.A. Hack Club</li>
+        <li><strong>Address:</strong> 212 Battery St, Ste 3, Burlington, VT 05401</li>
+        <li><strong>Email:</strong> visas@hackclub.com</li>
+        <li><strong>Phone:</strong> 1-855-625-4225</li>
+      </ul>
+      <p>This is Hack Club's official registered nonprofit organization. Use these details for fields asking about the event sponsor, inviting organization, or U.S. point of contact.</p>
+      </div>
+    </div>
+  </section>
+
+  <p class="portal-panel p-5 portal-body text-sm">
+    <strong>Need Help?</strong> If you have questions not covered here, please contact <%= mail_to "visas@hackclub.com", class: "portal-link" %>.
+  </p>
+</div>

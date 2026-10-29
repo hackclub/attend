@@ -11,6 +11,7 @@
       <% if current_user.global_admin? %>
         <%= link_to "Letter templates", admin_visa_letter_templates_path, class: "cs-btn" %>
       <% end %>
+      <%= link_to "Manual Invitations", admin_event_visa_letter_invitations_path(@event), class: "cs-btn" %>
       <%= link_to "Settings", edit_admin_event_visa_letter_settings_path(@event), class: "cs-btn" %>
     </div>
   </div>
@@ -27,7 +28,7 @@
       <nav class="flex flex-wrap gap-2" aria-label="Filter by status">
         <% Admin::VisaLettersController::FILTERS.each do |filter| %>
           <% count = filter == "all" ? @counts.values.sum : @counts.fetch(filter, 0) %>
-          <% label = { "pending" => "Awaiting review", "approved" => "Generating", "letter_sent" => "Letter sent", "rejected" => "Rejected", "all" => "All" }.fetch(filter) %>
+          <% label = VisaLettersHelper::VISA_LETTER_FILTER_LABELS.fetch(filter) %>
           <%= link_to "#{label} (#{count})", admin_event_visa_letters_path(@event, status: filter, q: @query.presence),
                 class: "cs-btn #{"cs-btn-primary" if filter == @filter}", "aria-current": (filter == @filter ? "true" : nil) %>
         <% end %>
@@ -52,7 +53,7 @@
             <tr>
               <th scope="col">Applicant</th>
               <th scope="col">Reference</th>
-              <th scope="col">Applied</th>
+              <th scope="col">Submitted</th>
               <th scope="col">Status</th>
               <th scope="col">Visa</th>
             </tr>

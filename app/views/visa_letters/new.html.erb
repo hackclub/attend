@@ -1,0 +1,100 @@
+<% content_for :title, "Apply for Visa Letter – #{@event.name} – Attend" %>
+<% location = [ @event.location_city, @event.location_country ].compact_blank.join(", ") %>
+
+<div class="w-full max-w-lg mx-auto">
+  <%= link_to "← Visa letters", visas_path, class: "portal-link text-sm" %>
+
+  <h1 class="portal-title text-2xl mt-4 mb-3">Apply for Visa Letter</h1>
+  <p class="portal-body mb-6">Please email <%= mail_to "visas@hackclub.com", class: "portal-link" %> if you need any assistance with your visa application.</p>
+
+  <% if @invitation %>
+    <div class="portal-note portal-note-success mb-4">
+      <p class="text-sm portal-body"><strong>You've been invited to apply.</strong> Please fill out the form below to complete your visa letter application for <strong><%= @event.name %></strong>.</p>
+    </div>
+  <% end %>
+
+  <div class="portal-note portal-note-info mb-6">
+    <p class="text-sm portal-body"><strong>Event Details:</strong> <%= [ @event.name, @event.formatted_date_range, location ].compact_blank.join(" · ") %></p>
+  </div>
+
+  <% if @existing&.rejected? %>
+    <div class="portal-note portal-note-warn mb-6">
+      <div class="text-sm portal-body">
+        <p class="font-semibold mb-1">Previous Rejection Reason</p>
+        <p class="whitespace-pre-line mb-1"><%= @existing.rejection_reason %></p>
+        <p>Please address the above concerns in your new application.</p>
+      </div>
+    </div>
+  <% end %>
+
+  <%= form_with model: @application, url: visas_apply_path(@event.slug), method: :post, class: "portal-card p-5 sm:p-6 space-y-5" do |f| %>
+    <h2 class="portal-heading text-lg">Personal Information</h2>
+    <%= hidden_field_tag :invite, params[:invite] if params[:invite].present? %>
+
+    <% if @application.errors.any? %>
+      <div class="portal-note portal-note-warn" role="alert">
+        <div class="text-sm portal-body">
+          <p class="font-semibold mb-1">Please correct the following errors:</p>
+          <ul class="list-disc pl-5">
+            <% @application.errors.full_messages.each do |message| %>
+              <li><%= message %></li>
+            <% end %>
+          </ul>
+        </div>
+      </div>
+    <% end %>
+
+    <div>
+      <%= label_tag :applicant_email, "Email Address", class: "portal-label" %>
+      <%= email_field_tag :applicant_email, current_user.email, readonly: true, class: "portal-input", "aria-describedby": "applicant_email_hint" %>
+      <p class="portal-hint text-sm mt-1" id="applicant_email_hint">This is the email on your Hack Club account and cannot be changed</p>
+    </div>
+
+    <div>
+      <%= f.label :full_name, "Full Legal Name (as on passport)", class: "portal-label" %>
+      <%= f.text_field :full_name, class: "portal-input", required: true, autocomplete: "name" %>
+    </div>
+
+    <div>
+      <%= f.label :date_of_birth, "Date of Birth", class: "portal-label" %>
+      <% if @locked.key?(:date_of_birth) %>
+        <%= f.date_field :date_of_birth, class: "portal-input", readonly: true, "aria-describedby": "date_of_birth_hint" %>
+        <p class="portal-hint text-sm mt-1" id="date_of_birth_hint">From your Hack Club account. If it's wrong, update it at <%= link_to "auth.hackclub.com", "https://auth.hackclub.com", class: "portal-link", target: "_blank", rel: "noopener" %>, then sign out of Attend and back in.</p>
+      <% else %>
+        <%= f.date_field :date_of_birth, class: "portal-input", required: true, max: 13.years.ago.to_date, autocomplete: "bday" %>
+      <% end %>
+    </div>
+
+    <div>
+      <%= f.label :place_of_birth, "Place of Birth", class: "portal-label" %>
+      <%= f.text_field :place_of_birth, class: "portal-input", required: true, placeholder: "City, Country", "aria-describedby": "place_of_birth_hint" %>
+      <p class="portal-hint text-sm mt-1" id="place_of_birth_hint">Enter city and country (e.g., New Delhi, India)</p>
+    </div>
+
+    <div>
+      <%= f.label :nationality, "Country of Citizenship", class: "portal-label" %>
+      <%= f.select :nationality, country_options_for_select(@application.nationality), {}, class: "portal-select", required: true, "aria-describedby": "nationality_hint" %>
+      <p class="portal-hint text-sm mt-1" id="nationality_hint">If the country issuing your passport is different from your country of citizenship, please email <%= mail_to "visas@hackclub.com", class: "portal-link" %></p>
+    </div>
+
+    <div>
+      <%= f.label :phone, "Phone Number", class: "portal-label" %>
+      <%= f.telephone_field :phone, class: "portal-input", required: true, placeholder: "+1 555 123 4567", autocomplete: "tel", "aria-describedby": "phone_hint" %>
+      <p class="portal-hint text-sm mt-1" id="phone_hint">Country code required (e.g., +1 for US, +44 for UK)</p>
+    </div>
+
+    <div>
+      <%= f.label :address, "Full Mailing Address", class: "portal-label" %>
+      <% if @locked.key?(:address) %>
+        <%= f.text_area :address, rows: 4, class: "portal-textarea", readonly: true, "aria-describedby": "address_hint" %>
+        <p class="portal-hint text-sm mt-1" id="address_hint">From your Hack Club account. If it's wrong, update it at <%= link_to "auth.hackclub.com", "https://auth.hackclub.com", class: "portal-link", target: "_blank", rel: "noopener" %>, then sign out of Attend and back in.</p>
+      <% else %>
+        <%= f.text_area :address, rows: 4, class: "portal-textarea", required: true, autocomplete: "street-address",
+              placeholder: "Street address, City, State/Province, Postal Code, Country" %>
+      <% end %>
+    </div>
+
+    <%= f.submit "Submit Application", class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+    <p class="portal-hint text-sm">By submitting this form, you agree to provide accurate information for your visa invitation letter.</p>
+  <% end %>
+</div>

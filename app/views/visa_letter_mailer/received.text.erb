@@ -1,0 +1,15 @@
+Application Submitted
+
+Hello <%= @application.full_name %>,
+
+Your visa letter application for <%= @event.name %> has been successfully submitted and is now pending review.
+
+Application Details
+- Reference Number: <%= @application.reference_number %>
+- Event: <%= @event.name %>
+- Event Dates: <%= @event.formatted_date_range %>
+- Location: <%= @location %>
+
+You will receive an email notification once your application has been reviewed. You can also check on it at <%= @application_url %>
+
+If you have any questions, please contact us at <%= @support_email %>.

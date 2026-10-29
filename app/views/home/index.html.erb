@@ -84,6 +84,33 @@
           </div>
         </div>
       </aside>
+
+      <% if @visa_letter_events.present? %>
+        <section class="landing-visas" aria-labelledby="landing-visas-heading">
+          <h2 id="landing-visas-heading" class="landing-actions-label">Need a visa letter?</h2>
+          <p class="landing-visas-intro">Apply for an official visa invitation letter for these Hack Club events. <%= link_to "Read the visa FAQ", visas_faq_path %></p>
+          <ul class="landing-visas-list">
+            <% @visa_letter_events.first(6).each do |event| %>
+              <li>
+                <%= link_to visas_apply_path(event.slug), class: "landing-action" do %>
+                  <span class="landing-action-title"><%= event.name %></span>
+                  <span class="landing-action-hint"><%= [ event.formatted_date_range, [ event.location_city, event.location_country ].compact_blank.join(", ") ].compact_blank.join(" · ") %></span>
+                  <span class="landing-action-arrow" aria-hidden="true">→</span>
+                <% end %>
+              </li>
+            <% end %>
+            <% if @visa_letter_events.size > 6 %>
+              <li>
+                <%= link_to visas_path, class: "landing-action" do %>
+                  <span class="landing-action-title">All events taking applications</span>
+                  <span class="landing-action-hint"><%= @visa_letter_events.size %> events</span>
+                  <span class="landing-action-arrow" aria-hidden="true">→</span>
+                <% end %>
+              </li>
+            <% end %>
+          </ul>
+        </section>
+      <% end %>
     </div>
 
     <% if Rails.env.development? %>

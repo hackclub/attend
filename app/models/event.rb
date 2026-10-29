@@ -459,6 +459,14 @@ class Event < ApplicationRecord
     deadline.nil? || local_today <= deadline
   end
 
+  # Events whose public form is taking visa letter applications today,
+  # soonest first. The deadline is a date on each event's own clock, so it's
+  # checked per event rather than in SQL.
+  def self.open_for_visa_letters
+    where("config->>'visa_letters' = 'open'").not_ended.order(:starts_at)
+      .select(&:accepting_visa_letter_applications?)
+  end
+
   def visa_letter_deadline_date
     Date.iso8601(visa_letter_deadline.to_s) if visa_letter_deadline.present?
   rescue Date::Error
