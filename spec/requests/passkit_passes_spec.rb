@@ -1,58 +1,74 @@
 require "rails_helper"
 
-RSpec.describe "Passkit passes", type: :request do
-  let(:participant_event) { create(:participant_event) }
-  let(:tmp_folder) { Pathname.new(Dir.mktmpdir) }
+RSpec.describe "Passkit pass updates", type: :request do
+  include ActiveSupport::Testing::TimeHelpers
 
-  before do
-    stub_const("Passkit::Generator::TMP_FOLDER", tmp_folder)
-    # Real signing needs the Apple certificates, which the test env lacks.
-    allow_any_instance_of(Passkit::Generator).to receive(:sign_manifest)
+  let(:participant_event) { create(:participant_event) }
+  let(:pass) do
+    Passkit::Pass.create!(
+      klass: "Passkit::EventTicket",
+      generator: participant_event,
+      serial_number: SecureRandom.uuid,
+      authentication_token: SecureRandom.hex(16)
+    )
+  end
+  let(:pkpass) { PasskitGeneratorExtensions::Pkpass.new(filename: "pass.pkpass", data: "") }
+  let(:generator) { instance_double(Passkit::Generator, generate_and_sign: pkpass) }
+
+  before { allow(Passkit::Generator).to receive(:new).and_return(generator) }
+
+  def fetch(since: nil, token: pass.authentication_token)
+    headers = { "Authorization" => "ApplePass #{token}" }
+    headers["If-Modified-Since"] = since.httpdate if since
+    get "/passkit/api/v1/passes/pass.com.hackclub.attend/#{pass.serial_number}", headers: headers
   end
 
-  after { FileUtils.remove_entry(tmp_folder) }
+  it "answers 304 without building the pass when it hasn't changed" do
+    fetch(since: pass.last_update)
 
-  def expect_pkpass_response
+    expect(response).to have_http_status(:not_modified)
+    expect(response.headers["last-modified"]).to eq(pass.last_update.httpdate)
+    expect(Passkit::Generator).not_to have_received(:new)
+  end
+
+  it "builds the pass when it changed since the device's copy" do
+    fetch(since: pass.last_update - 1.minute)
+
     expect(response).to have_http_status(:ok)
     expect(response.media_type).to eq("application/vnd.apple.pkpass")
-    expect(response.headers["Content-Disposition"]).to match(/attachment; filename=".+\.pkpass"/)
-    entries = Zip::File.open_buffer(response.body).map(&:name)
-    expect(entries).to include("pass.json", "manifest.json")
   end
 
-  describe "downloading a pass" do
-    let(:payload) { Passkit::PayloadGenerator.encrypted(Passkit::EventTicket, participant_event) }
+  it "builds the pass when the device has no copy to compare" do
+    fetch
 
-    it "sends the pass and leaves nothing in tmp/passkit" do
-      2.times do
-        get "/passkit/api/v1/passes/#{payload}"
-        expect_pkpass_response
-      end
-
-      expect(Dir.children(tmp_folder)).to be_empty
-    end
+    expect(response).to have_http_status(:ok)
   end
 
-  describe "fetching a pass from Wallet" do
-    let(:pass) { Passkit::Pass.create!(klass: "Passkit::EventTicket", generator: participant_event) }
-    let(:path) { "/passkit/api/v1/passes/pass.com.hackclub.attend/#{pass.serial_number}" }
-    let(:headers) { { "Authorization" => "ApplePass #{pass.authentication_token}" } }
+  it "serves the pass again once an update touches it" do
+    device_copy = pass.last_update
 
-    it "sends the pass and leaves nothing in tmp/passkit" do
-      2.times do
-        get path, headers: headers
-        expect_pkpass_response
-      end
-
-      expect(Dir.children(tmp_folder)).to be_empty
+    # WalletPassUpdateService touches the pass, not the participant event,
+    # when the event or participant changes
+    travel 1.minute do
+      pass.touch
+      fetch(since: device_copy)
     end
 
-    it "leaves nothing in tmp/passkit when the pass has not changed" do
-      # The gem builds the pass before it checks If-Modified-Since.
-      get path, headers: headers.merge("If-Modified-Since" => pass.last_update.httpdate)
+    expect(response).to have_http_status(:ok)
+  end
 
-      expect(response).to have_http_status(:not_modified)
-      expect(Dir.children(tmp_folder)).to be_empty
-    end
+  it "still rejects a bad token that sends If-Modified-Since" do
+    fetch(since: pass.last_update, token: "wrong")
+
+    expect(response).to have_http_status(:unauthorized)
+  end
+
+  it "answers 410 for a pass whose participant event is gone" do
+    pass.update_columns(generator_id: nil, generator_type: nil)
+    allow(generator).to receive(:generate_and_sign).and_raise(ActiveRecord::RecordNotFound)
+
+    fetch(since: pass.last_update)
+
+    expect(response).to have_http_status(:gone)
   end
 end

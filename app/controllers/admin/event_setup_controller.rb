@@ -208,11 +208,12 @@ module Admin
     end
 
     def module_params
-      params.require(:event).permit(
+      permitted = params.require(:event).permit(
         :freedom_waivers_enabled,
         :travel_enabled,
         :visa_options_enabled,
         :visa_application_url,
+        :visa_letters,
         :accommodation_enabled,
         :roommate_preferences_enabled,
         :guardian_invites_locked,
@@ -221,6 +222,9 @@ module Admin
         :nfc_badge_write_on_checkin_enabled,
         :groups_enabled
       )
+      # Who can apply for visa letters is an event admin's call, as on the
+      # visa letter settings page.
+      policy(@event).review_visa_letters? ? permitted : permitted.except(:visa_letters)
     end
 
     def manual_waiver_params

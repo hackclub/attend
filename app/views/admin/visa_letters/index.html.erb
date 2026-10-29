@@ -1,0 +1,63 @@
+<% content_for :title, "Visa letters – Attend" %>
+<% labels = { "pending" => "Awaiting review", "approved" => "Generating", "letter_sent" => "Letter sent", "rejected" => "Rejected", "all" => "All" } %>
+<div class="w-full space-y-6">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <h1 class="text-2xl font-bold">Visa letters</h1>
+      <p class="text-sm text-gray-500 mt-1">People asking for a visa invitation letter. A letter comes before a place at the event: approving one sends the letter, and nobody here is a participant until your team offers them a place.</p>
+    </div>
+    <div class="flex gap-2 shrink-0">
+      <% if current_user.global_admin? %>
+        <%= link_to "Letter templates", admin_visa_letter_templates_path, class: "px-3 py-2 border border-gray-300 rounded-md text-sm" %>
+      <% end %>
+      <%= link_to "Settings", edit_admin_event_visa_letter_settings_path(@event), class: "px-3 py-2 border border-gray-300 rounded-md text-sm" %>
+    </div>
+  </div>
+
+  <% if @event.visa_letters_mode == "off" %>
+    <p class="text-sm bg-blue-50 border border-blue-200 rounded-md px-4 py-3">Visa letters are off for this event, so nobody can apply. <%= link_to "Change this in settings", edit_admin_event_visa_letter_settings_path(@event), class: "underline" %>.</p>
+  <% end %>
+
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <nav class="flex flex-wrap gap-2" aria-label="Filter by status">
+      <% Admin::VisaLettersController::FILTERS.each do |filter| %>
+        <% count = filter == "all" ? @counts.values.sum : @counts.fetch(filter, 0) %>
+        <%= link_to "#{labels.fetch(filter)} (#{count})", admin_event_visa_letters_path(@event, status: filter, q: @query.presence),
+              class: "px-3 py-1.5 rounded-md text-sm border #{filter == @filter ? "bg-[#ec3750] text-white border-[#ec3750]" : "border-gray-300"}",
+              "aria-current": (filter == @filter ? "true" : nil) %>
+      <% end %>
+    </nav>
+    <%= form_with url: admin_event_visa_letters_path(@event), method: :get, class: "flex gap-2", role: "search" do %>
+      <%= hidden_field_tag :status, @filter %>
+      <%= label_tag :q, "Reference number or email", class: "sr-only" %>
+      <%= search_field_tag :q, @query, placeholder: "Reference or exact email", class: "border border-gray-300 rounded-md px-3 py-1.5 text-sm" %>
+      <%= button_tag "Find", name: nil, class: "px-3 py-1.5 border border-gray-300 rounded-md text-sm" %>
+    <% end %>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+    <% if @applications.empty? %>
+      <p class="p-6 text-sm text-gray-500"><%= @query.present? ? "No application matches #{@query}." : "No applications here." %></p>
+    <% else %>
+      <table class="min-w-full divide-y divide-gray-200 text-sm">
+        <thead class="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+          <tr><th class="px-4 py-3">Applicant</th><th class="px-4 py-3">Reference</th><th class="px-4 py-3">Applied</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Visa</th></tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          <% @applications.each do |application| %>
+            <tr>
+              <td class="px-4 py-3">
+                <%= link_to application.full_name, admin_event_visa_letter_path(@event, application), class: "font-medium text-[#ec3750] hover:underline" %>
+                <div class="text-xs text-gray-500"><%= application.email %></div>
+              </td>
+              <td class="px-4 py-3 font-mono whitespace-nowrap"><%= application.reference_number %></td>
+              <td class="px-4 py-3 whitespace-nowrap"><%= time_ago_in_words(application.submitted_at || application.created_at) %> ago</td>
+              <td class="px-4 py-3 whitespace-nowrap"><%= legacy_visa_status_badge(visa_letter_status(application)) %></td>
+              <td class="px-4 py-3 whitespace-nowrap"><% if (outcome = visa_outcome_status(application)) %><%= legacy_visa_status_badge(outcome) %><% else %>–<% end %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </div>
+</div>

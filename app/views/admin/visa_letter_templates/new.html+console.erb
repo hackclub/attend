@@ -1,0 +1,9 @@
+<% content_for :title, "New visa letter template – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Visa letter templates", admin_visa_letter_templates_path ], [ "New template", nil ]) %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text"><h1 class="cs-h1">New visa letter template</h1></div>
+  </div>
+  <%= render "form", template: @template %>
+</div>

@@ -9,10 +9,10 @@ module PasskitGeneratorExtensions
   # The gem builds each pass in tmp/passkit/<uuid>/, zips it to
   # tmp/passkit/<uuid>.pkpass and deletes neither (file_name is a fresh UUID
   # per pass, so its own rm_rf never matches an earlier build). Return the
-  # zip's bytes rather than its path, and delete both, so no build leaves
-  # anything behind: passes#show builds before it checks If-Modified-Since
-  # and drops the pass on a 304, and a send_file'd path is only read after
-  # the action returns. PasskitPassesControllerExtensions#send_file sends it.
+  # zip's bytes rather than its path, and delete both here, so no build
+  # leaves anything behind however it ends: a send_file'd path is only read
+  # after the action returns, too late for the controller to delete it.
+  # PasskitPassesControllerExtensions#send_file sends the bytes.
   def generate_and_sign
     path = super
     Pkpass.new(filename: File.basename(path), data: File.binread(path))
@@ -96,7 +96,13 @@ module PasskitGeneratorExtensions
 end
 
 module PasskitPassesControllerExtensions
+  # Wallet asks with If-Modified-Since whenever it checks a pass for changes,
+  # but the gem builds, signs and zips the whole bundle (images and all)
+  # before comparing, so an unchanged pass cost as much as a new one: a 304
+  # once took 36s while it rendered that event's images.
   def show
+    return head(:not_modified) if pass_unchanged_since_request?
+
     super
   rescue ActiveRecord::RecordNotFound
     head :gone
@@ -104,10 +110,37 @@ module PasskitPassesControllerExtensions
 
   private
 
+  # The gem's own lookup and comparison from #show, done before building.
+  # Anything this doesn't answer (no header, a bad token, a pass whose
+  # participant event is gone) falls through to the gem unchanged.
+  def pass_unchanged_since_request?
+    since = request.if_modified_since
+    token = request.headers["Authorization"]&.split(" ")&.last
+    return false if since.nil? || token.blank?
+
+    pass = Passkit::Pass.find_by(serial_number: params[:serial_number], authentication_token: token)
+    return false unless pass&.generator
+
+    last_update = pass.last_update
+    response.headers["last-modified"] = last_update.httpdate
+    last_update.to_i <= since.to_i
+  end
+
   # Both actions send_file whatever Passkit::Generator#generate_and_sign
   # returned, which PasskitGeneratorExtensions makes the pass itself.
   def send_file(pkpass, options = {})
     send_data(pkpass.data, options.reverse_merge(filename: pkpass.filename))
+  end
+end
+
+# The gem dates a pass by its generator (the participant event) alone, but
+# WalletPassUpdateService touches the pass itself when the event or the
+# participant changes. Ignoring that touch meant Wallet was pushed an update,
+# asked for the pass and got 304 ("Server requested update ... but the pass
+# was unchanged"), so those edits never reached the device.
+module PasskitPassExtensions
+  def last_update
+    [ super, updated_at ].compact.max
   end
 end
 
@@ -132,6 +165,7 @@ Rails.application.config.after_initialize do
   next if ENV["SECRET_KEY_BASE_DUMMY"]
 
   Passkit::Generator.prepend(PasskitGeneratorExtensions)
+  Passkit::Pass.prepend(PasskitPassExtensions)
   Passkit::Api::V1::PassesController.prepend(PasskitPassesControllerExtensions)
   Passkit::Api::V1::RegistrationsController.prepend(PasskitRegistrationsControllerExtensions)
 end
