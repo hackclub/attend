@@ -1,6 +1,7 @@
 class Admin::DashboardController < Admin::BaseController
   include IncidentAuditVisibility
 
+  global_page only: :index
   skip_before_action :set_current_event_from_session, only: [ :show, :integrations, :update_integrations, :trigger_airtable_sync, :create_vote_event ]
 
   def index

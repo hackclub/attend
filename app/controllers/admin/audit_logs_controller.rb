@@ -93,6 +93,12 @@ module Admin
 
     private
 
+    # The whole log isn't about any one event; filtered to the picked event,
+    # it's that event's audit log (the link in its side nav).
+    def event_page?
+      super && params[:event_id] == current_event.id.to_s
+    end
+
     def set_audit_log
       @audit_log = AuditLog.find(params[:id])
 

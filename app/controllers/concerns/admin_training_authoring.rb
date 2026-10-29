@@ -4,6 +4,7 @@ module AdminTrainingAuthoring
   extend ActiveSupport::Concern
 
   included do
+    global_page
     before_action :require_global_admin
   end
 

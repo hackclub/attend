@@ -1,5 +1,6 @@
 module Admin
   class EventSeriesController < BaseController
+    global_page
     before_action :set_series, only: [ :show, :edit, :update, :send_held_invitations ]
 
     def index

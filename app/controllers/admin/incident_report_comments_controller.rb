@@ -1,5 +1,6 @@
 module Admin
   class IncidentReportCommentsController < BaseController
+    global_page
     before_action :set_incident_report
 
     def create

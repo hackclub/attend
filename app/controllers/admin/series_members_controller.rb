@@ -1,5 +1,6 @@
 module Admin
   class SeriesMembersController < BaseController
+    global_page
     before_action :set_series
     before_action :require_series_owner_access
 

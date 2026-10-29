@@ -3,6 +3,7 @@ module Admin
   # event's own where it needs different wording. Global admins only, since
   # letters go out under the Hack Foundation's name and signature.
   class VisaLetterTemplatesController < BaseController
+    global_page
     before_action :set_template, only: %i[edit update destroy preview]
     before_action { authorize(@template || VisaLetterTemplate) }
 

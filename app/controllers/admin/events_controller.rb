@@ -1,5 +1,6 @@
 module Admin
   class EventsController < BaseController
+    global_page only: [ :new, :create ]
     skip_before_action :set_current_event_from_session, only: [ :select ]
 
     def new

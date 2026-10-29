@@ -3,6 +3,7 @@ module Admin
   # reports to HQ (the public /incident form plus organizer escalations) and
   # every event's incident log. Global admins only.
   class IncidentReportsController < BaseController
+    global_page
     VIEWS = %w[all reports logs].freeze
     # The inbox is a triage view, not an archive: show the newest rows and
     # say when there are more, rather than decrypting every summary ever.

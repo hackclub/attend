@@ -1,5 +1,6 @@
 module Admin
   class EmailLogsController < Admin::BaseController
+    global_page
     before_action :require_global_admin
 
     def index
