@@ -97,4 +97,7 @@ Rails.application.configure do
   # The badge redirect host, so /t/:slack_id can be exercised locally with a
   # Host header (see BadgeRedirect and the badge block in config/routes.rb).
   config.hosts << ENV.fetch("BADGE_HOST", "badge.hackclub.com")
+  # Envoy's old host, for /verify and its redirects (see VisaLetter and the
+  # visas block in config/routes.rb).
+  config.hosts << ENV.fetch("VISAS_HOST", "visas.hackclub.com")
 end

@@ -1,0 +1,18 @@
+<% content_for :title, "Verify Visa Letter – Hack Club" %>
+<div class="card">
+  <div class="center">
+    <h1>Verify Visa Letter</h1>
+    <p class="muted">Enter the verification code from your visa invitation letter to confirm its authenticity.</p>
+  </div>
+
+  <%= form_with url: visas_host_verify_path, method: :post, local: true do %>
+    <%= label_tag :code, "Verification Code" %>
+    <%= text_field_tag :code, @verification_code, placeholder: "Enter 32-character code", autofocus: true,
+          autocomplete: "off", autocapitalize: "characters", spellcheck: false %>
+    <%= submit_tag "Verify Letter →", class: "button", name: nil %>
+  <% end %>
+
+  <div class="divider center small muted">
+    <p>This verification system confirms that a visa invitation letter was officially issued by The Hack Foundation.</p>
+  </div>
+</div>

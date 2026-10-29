@@ -12,6 +12,25 @@ Rails.application.routes.draw do
     match "(*path)", to: "badge_redirects#elsewhere", via: :all, format: false
   end
 
+  # visas.hackclub.com, Envoy's old domain. It keeps answering what's printed
+  # on letters and in Envoy's emails: embassies verifying a letter (/verify,
+  # where hack.club/visa-verify forwards) and the emailed download links.
+  # Every other Envoy page moves to its place in Attend. Before the engines
+  # and the rest of the app for the same reason as the badge host.
+  constraints(->(request) { VisaLetter.visas_host?(request.host) }) do
+    get "up", to: "rails/health#show", as: :visas_host_up
+    get "verify", to: "visas_host#verify_form", as: :visas_host_verify
+    post "verify", to: "visas_host#verify"
+    get "visa_letter_applications/:id/download_letter", to: "visas_host#download_letter", as: :visas_host_download_letter
+    get "visa_letter_applications/:id", to: "visas_host#show_application", as: :visas_host_application
+    get "events/:slug(/apply)", to: "visas_host#event_page", as: :visas_host_event
+    get "lookup", to: "visas_host#lookup", as: :visas_host_lookup
+    get "documentation", to: "visas_host#documentation", as: :visas_host_documentation
+    get "admin/visa_letter_applications/:id", to: "visas_host#admin_application", as: :visas_host_admin_application
+    get "admin(/*path)", to: "visas_host#admin", format: false, as: :visas_host_admin
+    match "(*path)", to: "visas_host#elsewhere", via: :all, format: false
+  end
+
   toolchest_oauth
   mount Toolchest::Engine => "/mcp"
   mount ActionCable.server => "/cable"

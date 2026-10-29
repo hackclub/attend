@@ -17,6 +17,9 @@ class Event < ApplicationRecord
     :visa_letters,
     :visa_letter_deadline,
     :visa_letter_rejection_reasons,
+    # The event's slug in Envoy, set by the import, so visas.hackclub.com's
+    # old /events/:slug links find it (see VisasHostController).
+    :legacy_envoy_slug,
     :accommodation_enabled,
     :roommate_preferences_enabled,
     :guardian_invites_locked,

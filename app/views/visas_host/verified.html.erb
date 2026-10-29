@@ -1,0 +1,46 @@
+<% content_for :title, "Letter Verified – Hack Club" %>
+<div class="card">
+  <div class="center">
+    <div class="icon icon-ok" aria-hidden="true">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+    </div>
+    <h1 class="title-ok">Letter Verified</h1>
+    <p class="muted">This visa invitation letter is authentic and was officially issued by The Hack Foundation.</p>
+  </div>
+
+  <div class="details">
+    <h2>Letter Details</h2>
+    <dl>
+      <div>
+        <dt>Reference Number:</dt>
+        <dd><%= @application.reference_number %></dd>
+      </div>
+      <div>
+        <dt>Issue Date:</dt>
+        <dd><%= @application.letter_issued_on&.strftime("%B %-d, %Y") %></dd>
+      </div>
+      <div>
+        <dt>Participant:</dt>
+        <dd><%= @application.full_name %></dd>
+      </div>
+      <div>
+        <dt>Event:</dt>
+        <dd><%= @application.letter_event_name %></dd>
+      </div>
+      <div>
+        <dt>Event Dates:</dt>
+        <dd><%= @application.letter_date_range %></dd>
+      </div>
+      <div>
+        <dt>Event Location:</dt>
+        <dd><%= [ @application.letter_city, @application.letter_country ].compact_blank.join(", ") %></dd>
+      </div>
+    </dl>
+  </div>
+
+  <p class="center" style="margin-top: 1.5rem;"><%= link_to "Verify Another Letter", visas_host_verify_path %></p>
+
+  <div class="divider center small muted">
+    <p>Hack Club is a 501(c)(3) public charity. EIN: 81-2908499</p>
+  </div>
+</div>
