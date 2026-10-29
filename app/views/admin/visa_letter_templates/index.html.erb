@@ -1,0 +1,37 @@
+<% content_for :title, "Visa letter templates – Attend" %>
+<div class="w-full space-y-6">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <h1 class="text-2xl font-bold">Visa letter templates</h1>
+      <p class="text-sm text-gray-500 mt-1">The wording of visa invitation letters. Every event uses the default unless it has an active template of its own.</p>
+    </div>
+    <%= link_to "Add template", new_admin_visa_letter_template_path, class: "px-4 py-2 bg-[#d42f46] text-white rounded-md text-sm shrink-0" %>
+  </div>
+
+  <% if @templates.none? { |template| template.is_default? && template.event_id.nil? && template.active? } %>
+    <p class="text-sm bg-yellow-50 border border-yellow-200 rounded-md px-4 py-3">There's no active default template, so events without their own can't issue letters.</p>
+  <% end %>
+
+  <div class="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+    <% if @templates.empty? %>
+      <p class="p-6 text-sm text-gray-500">No templates.</p>
+    <% else %>
+      <table class="min-w-full divide-y divide-gray-200 text-sm">
+        <thead class="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+          <tr><th class="px-4 py-3">Template</th><th class="px-4 py-3">Used for</th><th class="px-4 py-3">Signed by</th><th class="px-4 py-3">Status</th><th class="px-4 py-3"></th></tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          <% @templates.each do |template| %>
+            <tr>
+              <td class="px-4 py-3"><%= link_to template.name, edit_admin_visa_letter_template_path(template), class: "font-medium text-[#ec3750] hover:underline" %></td>
+              <td class="px-4 py-3"><%= template.event&.name || (template.is_default? ? "Every event without its own" : "Nothing (not the default)") %></td>
+              <td class="px-4 py-3"><%= template.signatory_name %>, <%= template.signatory_title %></td>
+              <td class="px-4 py-3"><%= template.active? ? "Active" : "Inactive" %></td>
+              <td class="px-4 py-3 whitespace-nowrap"><%= link_to "Preview", preview_admin_visa_letter_template_path(template), class: "underline", target: "_blank", rel: "noopener" %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </div>
+</div>

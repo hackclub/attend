@@ -106,7 +106,12 @@ class AuditLog < ApplicationRecord
     update_admin_help_slack_channel: "update_admin_help_slack_channel",
     sync_admin_help_slack_channel: "sync_admin_help_slack_channel",
     update_org_support_slack_channel: "update_org_support_slack_channel",
-    sync_org_support_slack_channel: "sync_org_support_slack_channel"
+    sync_org_support_slack_channel: "sync_org_support_slack_channel",
+    approve_visa_letter: "approve_letter",
+    reject_visa_letter: "reject_letter",
+    downgrade_visa_letter_rejection: "downgrade_rejection",
+    resend_visa_letter: "resend_letter",
+    record_visa_outcome: "record_visa_outcome"
   }
 
   validates :record_type, presence: true

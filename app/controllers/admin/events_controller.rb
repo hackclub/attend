@@ -162,6 +162,7 @@ module Admin
         :travel_enabled,
         :visa_options_enabled,
         :visa_application_url,
+        :visa_letters,
         :accommodation_enabled,
         :roommate_preferences_enabled,
         :guardian_invites_locked,
@@ -176,6 +177,11 @@ module Admin
       )
       unless action_name == "create" || current_user.global_admin?
         permitted = permitted.except(:event_series_id)
+      end
+      # Who can apply for visa letters is an event admin's call, as on the
+      # visa letter settings page. Whoever creates an event is one.
+      unless action_name == "create" || policy(@event).review_visa_letters?
+        permitted = permitted.except(:visa_letters)
       end
       permitted
     end

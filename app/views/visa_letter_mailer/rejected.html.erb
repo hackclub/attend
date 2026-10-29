@@ -1,0 +1,11 @@
+<p>Hi <%= @first_name %>,</p>
+
+<p>We can't issue a visa invitation letter for <strong><%= @event.name %></strong> on this request.</p>
+
+<p><strong>Reason:</strong> <%= @reason %></p>
+
+<% if @can_reapply %>
+  <p>You're welcome to apply again once you've sorted this out.</p>
+<% end %>
+
+<p>Reference number: <%= @application.reference_number %>. If you have questions, reply to this email or write to <%= mail_to @support_email %>.</p>

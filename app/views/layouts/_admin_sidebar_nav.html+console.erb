@@ -43,6 +43,10 @@
     <% if current_event.travel_enabled? %>
       <%= nav_link.call("Travel calendar", admin_event_travel_path(current_event), request.path == admin_event_travel_path(current_event), :travel) %>
     <% end %>
+    <%# Shown while the module is on, and afterwards for as long as there are applications to look back at. %>
+    <% if (current_event.visa_letters_enabled? || current_event.visa_letter_applications.exists?) && policy(current_event).review_visa_letters? %>
+      <%= nav_link.call("Visa letters", admin_event_visa_letters_path(current_event), request.path.match?(%r{/events/[^/]+/visa_letter}), :visas) %>
+    <% end %>
     <% if current_event.accommodation_enabled? %>
       <%= nav_link.call("Rooming", admin_event_rooming_wizard_path(current_event), request.path.match?(%r{/rooming_wizard|/events/[^/]+/stays}), :rooming) %>
     <% end %>
@@ -79,6 +83,7 @@
 
       <%= nav_link.call("Incidents", admin_incident_reports_path, request.path.start_with?("/admin/incidents"), :incident_reports) %>
       <%= nav_link.call("Conduct bans", admin_bans_path, request.path.start_with?("/admin/bans"), :bans) %>
+      <%= nav_link.call("Visa letter templates", admin_visa_letter_templates_path, request.path.start_with?("/admin/visa_letter_templates"), :visas) %>
 
       <% logs_active = request.path.start_with?("/admin/audit_logs") || request.path.start_with?("/admin/email_logs") %>
       <details class="cs-sidenav-group" <%= "open" if logs_active %>>

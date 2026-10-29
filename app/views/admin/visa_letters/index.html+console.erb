@@ -1,0 +1,80 @@
+<% content_for :title, "Visa letters – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Visa letters", nil ], event: @event) %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Visa letters <span class="cs-counter">(<%= @counts.values.sum %>)</span></h1>
+      <p class="cs-description">People asking for a visa invitation letter. A letter comes before a place at the event: approving one sends the letter, and nobody here is a participant until your team offers them a place.</p>
+    </div>
+    <div class="cs-actions">
+      <% if current_user.global_admin? %>
+        <%= link_to "Letter templates", admin_visa_letter_templates_path, class: "cs-btn" %>
+      <% end %>
+      <%= link_to "Settings", edit_admin_event_visa_letter_settings_path(@event), class: "cs-btn" %>
+    </div>
+  </div>
+
+  <% if @event.visa_letters_mode == "off" %>
+    <div class="cs-alert" role="status">
+      <%= cs_status_icon(:info) %>
+      <div>Visa letters are off for this event, so nobody can apply. <%= link_to "Change this in settings", edit_admin_event_visa_letter_settings_path(@event), class: "cs-link" %>.</div>
+    </div>
+  <% end %>
+
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+      <nav class="flex flex-wrap gap-2" aria-label="Filter by status">
+        <% Admin::VisaLettersController::FILTERS.each do |filter| %>
+          <% count = filter == "all" ? @counts.values.sum : @counts.fetch(filter, 0) %>
+          <% label = { "pending" => "Awaiting review", "approved" => "Generating", "letter_sent" => "Letter sent", "rejected" => "Rejected", "all" => "All" }.fetch(filter) %>
+          <%= link_to "#{label} (#{count})", admin_event_visa_letters_path(@event, status: filter, q: @query.presence),
+                class: "cs-btn #{"cs-btn-primary" if filter == @filter}", "aria-current": (filter == @filter ? "true" : nil) %>
+        <% end %>
+      </nav>
+      <%= form_with url: admin_event_visa_letters_path(@event), method: :get, class: "flex gap-2 w-full xl:w-auto xl:max-w-sm", role: "search" do %>
+        <%= hidden_field_tag :status, @filter %>
+        <%= label_tag :q, "Reference number or email", class: "sr-only" %>
+        <%= search_field_tag :q, @query, class: "cs-input flex-1 min-w-0", placeholder: "Reference or exact email" %>
+        <%= button_tag "Find", class: "cs-btn", name: nil %>
+      <% end %>
+    </div>
+
+    <% if @applications.empty? %>
+      <div class="cs-empty">
+        <p class="cs-empty-title"><%= @query.present? ? "No application matches #{@query}" : "No applications here" %></p>
+        <% if @filter == "pending" && @query.blank? %><p>Nothing is waiting for review.</p><% end %>
+      </div>
+    <% else %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Applicant</th>
+              <th scope="col">Reference</th>
+              <th scope="col">Applied</th>
+              <th scope="col">Status</th>
+              <th scope="col">Visa</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @applications.each do |application| %>
+              <tr>
+                <td>
+                  <%= link_to application.full_name, admin_event_visa_letter_path(@event, application), class: "cs-link" %>
+                  <div class="cs-small cs-secondary"><%= application.email %></div>
+                </td>
+                <td class="whitespace-nowrap font-mono"><%= application.reference_number %></td>
+                <td class="whitespace-nowrap"><%= cs_relative_time(application.submitted_at || application.created_at) %></td>
+                <td class="whitespace-nowrap"><%= cs_status(*visa_letter_status(application)) %></td>
+                <td class="whitespace-nowrap">
+                  <% if (outcome = visa_outcome_status(application)) %><%= cs_status(*outcome) %><% else %><span class="cs-muted">–</span><% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </section>
+</div>

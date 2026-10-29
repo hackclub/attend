@@ -36,6 +36,12 @@
             <% end %>
           </div>
         </div>
+        <% if policy(f.object).review_visa_letters? %>
+          <%= cs_form_field f, :visa_letters, label: "Visa invitation letters",
+                description: "Issue visa invitation letters from Attend. Your event admins review applications under Visa letters." do |aria| %>
+            <%= f.select :visa_letters, VisaLettersHelper::VISA_LETTER_MODE_LABELS.map { |mode, (label, _)| [ label, mode ] }, { selected: f.object.visa_letters_mode }, class: "cs-select", **aria %>
+          <% end %>
+        <% end %>
         <div class="cs-option">
           <%= f.check_box :accommodation_enabled, { checked: f.object.accommodation_enabled? } %>
           <div>
