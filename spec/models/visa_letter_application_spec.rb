@@ -151,20 +151,6 @@ RSpec.describe VisaLetterApplication do
     end
   end
 
-  describe "#record_visa_outcome!" do
-    it "records the embassy's decision once the letter is out" do
-      application = create(:visa_letter_application, event: event)
-      expect { application.record_visa_outcome!(:granted) }.to raise_error(described_class::InvalidTransition)
-
-      application.approve!(by: reviewer)
-      application.issue_letter!
-      application.record_visa_outcome!(:granted)
-
-      expect(application.reload).to be_visa_granted
-      expect(application.visa_outcome_recorded_at).to be_present
-    end
-  end
-
   describe "#letter_date_range" do
     def range(starts, ends)
       described_class.new(letter_starts_on: Date.parse(starts), letter_ends_on: ends && Date.parse(ends)).letter_date_range

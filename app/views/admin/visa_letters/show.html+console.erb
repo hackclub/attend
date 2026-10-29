@@ -186,25 +186,6 @@
     </section>
   <% end %>
 
-  <% if @application.letter_sent? %>
-    <section class="cs-container">
-      <div class="cs-container-header">
-        <div>
-          <h2 class="cs-h2">Visa outcome</h2>
-          <p class="cs-container-description">What the embassy decided. Someone whose visa is granted can be offered a place.</p>
-        </div>
-      </div>
-      <%= form_with url: letter_path.call(:record_visa_outcome), method: :post do %>
-        <div class="cs-container-body flex flex-col gap-3 sm:flex-row sm:items-end">
-          <%= cs_field id: "visa_outcome", label: "Outcome", class: "sm:flex-1" do |aria| %>
-            <%= select_tag :visa_outcome, options_for_select([ [ "Waiting on the embassy", "unknown" ], [ "Granted", "granted" ], [ "Refused", "denied" ] ], @application.visa_outcome), class: "cs-select", **aria %>
-          <% end %>
-          <%= button_tag "Save outcome", class: "cs-btn cs-btn-full" %>
-        </div>
-      <% end %>
-    </section>
-
-  <% end %>
 
   <section class="cs-container">
     <div class="cs-container-header">

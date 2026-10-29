@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_28_180200) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_29_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1770,8 +1770,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_28_180200) do
     t.uuid "user_id"
     t.string "verification_code", null: false
     t.uuid "visa_letter_invitation_id"
-    t.string "visa_outcome", default: "unknown", null: false
-    t.datetime "visa_outcome_recorded_at"
     t.index ["email"], name: "index_visa_letter_applications_on_email"
     t.index ["event_id", "status"], name: "index_visa_letter_applications_on_event_id_and_status"
     t.index ["event_id", "user_id"], name: "index_visa_letter_applications_on_event_id_and_user_id", unique: true, where: "(user_id IS NOT NULL)"

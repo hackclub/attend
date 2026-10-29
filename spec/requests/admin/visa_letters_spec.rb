@@ -84,7 +84,7 @@ RSpec.describe "Admin visa letters", type: :request do
           application.issue_letter!
         end
 
-        it "downloads it, resends it and records the visa outcome" do
+        it "downloads it and resends it" do
           get letter_admin_event_visa_letter_path(event, application)
           expect(response.media_type).to eq("application/pdf")
           expect(response.body).to start_with("%PDF")
@@ -93,12 +93,9 @@ RSpec.describe "Admin visa letters", type: :request do
             post resend_admin_event_visa_letter_path(event, application)
           }.to have_enqueued_mail(VisaLetterMailer, :letter_ready)
 
-          post record_visa_outcome_admin_event_visa_letter_path(event, application), params: { visa_outcome: "granted" }
-          expect(application.reload).to be_visa_granted
-
           get admin_event_visa_letter_path(event, application)
-          expect(response.body).to include("Visa outcome")
           expect(response.body).to include(application.verification_code)
+          expect(response.body).not_to include("Visa outcome")
         end
       end
 

@@ -17,7 +17,7 @@ class VisaLettersController < ApplicationController
   # page, so its emailed links and the apply form find them, not just the list.
   before_action :claim_imported_applications, except: :faq
   before_action :set_event, only: %i[new create]
-  before_action :set_application, only: %i[show letter record_outcome]
+  before_action :set_application, only: %i[show letter]
 
   rate_limit to: 10, within: 1.hour, only: :create, by: -> { current_user&.id || request.remote_ip },
     with: -> { redirect_to visas_path, alert: "Too many applications at once. Try again in an hour." }
@@ -79,18 +79,6 @@ class VisaLettersController < ApplicationController
 
     send_data @application.letter_pdf.download, filename: @application.letter_pdf.filename.to_s,
       type: "application/pdf", disposition: "attachment"
-  end
-
-  # The applicant tells us what the embassy decided, so staff know who can be
-  # offered a place.
-  def record_outcome
-    outcome = params[:visa_outcome].to_s
-    if VisaLetterApplication.visa_outcomes.key?(outcome) && @application.letter_sent?
-      @application.record_visa_outcome!(outcome)
-      redirect_to visas_application_path(@application), notice: "Thanks for letting us know."
-    else
-      redirect_to visas_application_path(@application), alert: "Choose what the embassy decided."
-    end
   end
 
   private

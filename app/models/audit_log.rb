@@ -111,6 +111,7 @@ class AuditLog < ApplicationRecord
     reject_visa_letter: "reject_letter",
     downgrade_visa_letter_rejection: "downgrade_rejection",
     resend_visa_letter: "resend_letter",
+    # No longer recorded: the visa outcome went. Kept so earlier entries read.
     record_visa_outcome: "record_visa_outcome"
   }
 

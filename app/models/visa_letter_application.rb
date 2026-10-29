@@ -1,8 +1,8 @@
 # Someone asking for a visa invitation letter to an event, moved here from
 # Envoy. The letter comes before a place at the event: staff review the
-# application, the letter is issued, the embassy decides, and only someone
-# whose visa is granted is offered a place. So this belongs to the event, and
-# links to a registration only once there is one (`participant_event`).
+# application, the letter is issued, and the applicant takes it to their
+# embassy. So this belongs to the event, and links to a registration only once
+# there is one (`participant_event`).
 #
 # Applicants sign in with Hack Club Auth, so a new application always has a
 # user. Applications imported from Envoy don't until their owner signs in and
@@ -38,7 +38,6 @@ class VisaLetterApplication < ApplicationRecord
 
   enum :status, { pending: "pending", approved: "approved", rejected: "rejected", letter_sent: "letter_sent" }
   enum :rejection_type, { soft: "soft", hard: "hard" }, prefix: :rejection
-  enum :visa_outcome, { unknown: "unknown", granted: "granted", denied: "denied" }, prefix: :visa
 
   FROZEN_ONCE_SENT = %w[
     event_id full_name email date_of_birth nationality place_of_birth phone address
@@ -196,12 +195,6 @@ class VisaLetterApplication < ApplicationRecord
       participant.country_of_residence ].compact_blank.join("\n").presence
   end
   private_class_method :parse_date, :address_from_claims, :participant_address
-
-  def record_visa_outcome!(outcome)
-    raise InvalidTransition, "the visa outcome can only be recorded once the letter is sent" unless letter_sent?
-
-    update!(visa_outcome: outcome, visa_outcome_recorded_at: Time.current)
-  end
 
   def letter_date_range
     return if letter_starts_on.nil?

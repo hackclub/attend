@@ -205,7 +205,7 @@ RSpec.describe "Asking for a visa letter", type: :request do
       expect(response).to redirect_to(root_path)
     end
 
-    it "lets them download the letter and say what the embassy decided" do
+    it "lets them download the letter" do
       application = create(:visa_letter_application, event: event, user: applicant)
       application.approve!(by: create(:user))
       application.issue_letter!
@@ -213,8 +213,8 @@ RSpec.describe "Asking for a visa letter", type: :request do
       get visas_application_letter_path(application)
       expect(response.media_type).to eq("application/pdf")
 
-      post visas_application_outcome_path(application), params: { visa_outcome: "granted" }
-      expect(application.reload).to be_visa_granted
+      get visas_application_path(application)
+      expect(response.body).not_to include("What did the embassy decide?")
     end
 
     it "claims a letter imported from Envoy under their email" do

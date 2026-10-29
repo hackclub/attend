@@ -34,18 +34,6 @@
     <% end %>
   </div>
 
-  <% if sent %>
-    <%= form_with url: visas_application_outcome_path(@application), method: :post, class: "portal-card p-5 sm:p-6 mb-6 space-y-3" do %>
-      <h2 class="portal-heading text-lg">What did the embassy decide?</h2>
-      <p class="portal-hint text-sm">Let us know once you hear back, so the <%= @event.name %> team knows who can come.</p>
-      <%= label_tag :visa_outcome, "Visa decision", class: "sr-only" %>
-      <div class="flex flex-col gap-3 sm:flex-row">
-        <%= select_tag :visa_outcome, options_for_select([ [ "Still waiting", "unknown" ], [ "My visa was granted", "granted" ], [ "My visa was refused", "denied" ] ], @application.visa_outcome), class: "portal-select sm:flex-1" %>
-        <%= button_tag "Save", class: "portal-btn portal-btn-secondary" %>
-      </div>
-    <% end %>
-  <% end %>
-
   <div class="portal-card p-5 sm:p-6 mb-6">
     <h2 class="portal-heading text-lg mb-3">Application Details</h2>
     <dl class="portal-body text-sm grid grid-cols-1 gap-3 sm:grid-cols-2">

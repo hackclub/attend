@@ -77,15 +77,6 @@
   <% end %>
 
   <% if @application.letter_sent? %>
-    <%= form_with url: letter_path.call(:record_visa_outcome), method: :post, class: "#{box} space-y-3" do %>
-      <h2 class="text-lg font-medium text-gray-900">Visa outcome</h2>
-      <p class="text-sm text-gray-500">What the embassy decided. Someone whose visa is granted can be offered a place.</p>
-      <%= label_tag :visa_outcome, "Outcome", class: "sr-only" %>
-      <div class="flex gap-2">
-        <%= select_tag :visa_outcome, options_for_select([ [ "Waiting on the embassy", "unknown" ], [ "Granted", "granted" ], [ "Refused", "denied" ] ], @application.visa_outcome), class: "flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm" %>
-        <%= button_tag "Save outcome", class: button %>
-      </div>
-    <% end %>
     <div class="flex justify-end">
       <%= button_to "Resend Email", letter_path.call(:resend), class: button, form: { data: { turbo_confirm: "Resend the visa letter to #{@application.email}?" } } %>
     </div>
