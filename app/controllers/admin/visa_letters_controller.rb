@@ -1,7 +1,8 @@
 module Admin
   # An event's visa letter applications, for its admins to review: approve
   # (the letter is generated and emailed), reject soft or hard, soften a
-  # hard rejection, resend a letter, and record what the embassy decided.
+  # hard rejection, resend a letter, record what the embassy decided, and
+  # offer a place at the event.
   # Applicants' details are passport-grade, so opening one is audit-logged.
   class VisaLettersController < BaseController
     before_action :set_event
@@ -94,6 +95,35 @@ module Admin
       redirect_to admin_event_visa_letter_path(@event, @application), notice: "Visa outcome saved."
     rescue VisaLetterApplication::InvalidTransition => e
       redirect_to admin_event_visa_letter_path(@event, @application), alert: e.message.upcase_first
+    end
+
+    # Registers them for the event and invites them to onboard. Usually once
+    # the visa is granted; earlier needs `override`, which the page only sends
+    # after a confirmation saying why it's early.
+    def offer_place
+      @record = @application
+      authorize @event, :invite_participants?
+      onboarding = @application.offer_place!(override: params[:override] == "1") do |participant|
+        # Another event's records may rely on these (age checks use the
+        # birthday), so it's logged like any other edit to them.
+        AuditLog.log!(action: :record_update, record: participant, actor: current_user, event: @event,
+          changed_fields: AuditLog.redact_encrypted_fields(participant, participant.previous_changes.except("created_at", "updated_at")))
+      end
+      # Only once it's committed: see Invitation#deliver_later.
+      onboarding&.deliver_later
+
+      notice = if onboarding.nil?
+        "They were already registered, so the application is now linked to their registration."
+      elsif @event.onboarding_invites_held?
+        "Place offered. Their invitation is held until you release the event's invitations."
+      else
+        "Place offered. They've been emailed an invitation to onboard."
+      end
+      redirect_to admin_event_visa_letter_path(@event, @application), notice: notice
+    rescue VisaLetterApplication::InvalidTransition => e
+      redirect_to admin_event_visa_letter_path(@event, @application), alert: e.message.upcase_first
+    rescue ActiveRecord::RecordInvalid => e
+      redirect_to admin_event_visa_letter_path(@event, @application), alert: "Couldn't offer a place: #{e.record.errors.full_messages.to_sentence}."
     end
 
     def letter

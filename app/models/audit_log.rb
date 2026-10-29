@@ -111,7 +111,8 @@ class AuditLog < ApplicationRecord
     reject_visa_letter: "reject_letter",
     downgrade_visa_letter_rejection: "downgrade_rejection",
     resend_visa_letter: "resend_letter",
-    record_visa_outcome: "record_visa_outcome"
+    record_visa_outcome: "record_visa_outcome",
+    offer_visa_letter_place: "offer_place"
   }
 
   validates :record_type, presence: true

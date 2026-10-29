@@ -108,8 +108,9 @@ module Api
           return render json: { success: false, error: error }, status: :conflict
         end
 
-        # LOWER() to match how register_invitee finds people: an attendee who
-        # self-registered in another case is still already registered.
+        # LOWER() to match how ParticipantRegistration finds people: an
+        # attendee who self-registered in another case is still already
+        # registered.
         if @event.participants.where("LOWER(participants.email) = ?", email).exists?
           return render json: { success: false, error: "This email is already registered for this event" }, status: :conflict
         end
@@ -122,7 +123,13 @@ module Api
           # entry nobody was invited to, are both worse than neither.
           ActiveRecord::Base.transaction do
             invitation = Invitation.issue!(event: @event, email: email, name: name, send: false)
-            participant_event = register_invitee(email: email, first_name: first_name, last_name: last_name, details: details)
+            participant_event = ParticipantRegistration.register_invitee!(
+              event: @event, email: email, first_name: first_name, last_name: last_name, details: details
+            ) do |participant|
+              # Another event's records may rely on these (age checks use the
+              # birthday), so log it the way `update` does.
+              audit_api_change!(:record_update, participant)
+            end
           end
 
           # Only once both rows are committed. The mail job is enqueued
@@ -293,56 +300,6 @@ module Api
       end
 
       private
-
-      # Puts the invitee on the roster immediately, in the same `invited` state
-      # a CSV import leaves them in, so staff can see them and the "Incomplete
-      # Onboarding" message audience can reach them before they ever sign in.
-      # Onboarding links the person to their account by email and moves them to
-      # `in_progress` the moment they open the wizard.
-      #
-      # `invited` specifically, never `in_progress`: ParticipantEvent#onboarding_held?
-      # keys off that status, and it is what keeps the wizard shut for someone
-      # whose invitation is still held by the event.
-      def register_invitee(email:, first_name:, last_name:, details: {})
-        # LOWER() rather than an exact match: participant emails are not
-        # normalized on write, so an existing person may be stored in another
-        # case. Missing them here would fork the same human into two records.
-        # Oldest first: duplicate rows for one address exist in production,
-        # and without an order the pick would vary between invitations.
-        participant = Participant.where("LOWER(participants.email) = ?", email).order(:created_at).first
-
-        if participant
-          # Someone Attend already knows (from another event): only fill in
-          # what's missing, never overwrite what they entered themselves.
-          # Skip the save when there's nothing to fill in: an older record
-          # may not pass today's validations, and that shouldn't fail an
-          # invite that changes nothing.
-          known = { legal_first_name: first_name.presence, legal_last_name: last_name.presence, **details }.compact
-          fills = participant.blank_attributes_only(known)
-          if fills.any?
-            participant.update!(fills)
-            # Another event's records may rely on these (age checks use the
-            # birthday), so log it the way `update` does.
-            audit_api_change!(:record_update, participant)
-          end
-        else
-          participant = Participant.create!(
-            email: email,
-            # Legal names are validated on every save, but an invitation may
-            # only carry an address. "Unknown" is the placeholder the
-            # onboarding OIDC backfill looks for, so the real name lands on
-            # first sign-in.
-            legal_first_name: first_name.presence || "Unknown",
-            legal_last_name: last_name.presence || "Unknown",
-            **details
-          )
-        end
-
-        # The birthday is kept even if it ages them out; onboarding holds them
-        # until staff sort it out (see ParticipantEvent#skip_age_check).
-        ParticipantEvent.create_with(status: :invited, skip_age_check: true)
-                        .find_or_create_by!(participant: participant, event: @event)
-      end
 
       # Optional details an integration can send with an invitation, so the
       # participant's record (and the Hack Club Auth signup form they're sent

@@ -203,7 +203,26 @@
         </div>
       <% end %>
     </section>
+  <% end %>
 
+  <% if @application.participant_event.nil? %>
+    <% warning = visa_letter_offer_warning(@application) %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <div>
+          <h2 class="cs-h2">Offer a place</h2>
+          <p class="cs-container-description">
+            <%= visa_letter_offer_description(@event) %>
+            <% if warning %><%= warning %> A place is usually offered once the visa is granted.<% end %>
+          </p>
+        </div>
+      </div>
+      <div class="cs-container-body">
+        <%= button_to warning ? "Offer a place anyway" : "Offer a place", letter_path.call(:offer_place),
+              params: warning ? { override: "1" } : {}, class: class_names("cs-btn cs-btn-full", "cs-btn-primary": warning.nil?),
+              form: { class: "flex justify-end", data: { turbo_confirm: visa_letter_offer_confirmation(@application, warning) } } %>
+      </div>
+    </section>
   <% end %>
 
   <section class="cs-container">

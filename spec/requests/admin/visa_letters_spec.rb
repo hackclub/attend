@@ -102,6 +102,61 @@ RSpec.describe "Admin visa letters", type: :request do
         end
       end
 
+      context "offering a place" do
+        before do
+          application.approve!(by: admin)
+          application.issue_letter!
+        end
+
+        it "registers someone whose visa was granted and emails their invitation" do
+          application.record_visa_outcome!(:granted)
+          get admin_event_visa_letter_path(event, application)
+          expect(response.body).to include("Offer a place")
+          expect(response.body).not_to include("Offer a place anyway")
+
+          expect {
+            post offer_place_admin_event_visa_letter_path(event, application)
+          }.to have_enqueued_mail(ParticipantMailer, :invitation)
+
+          registration = application.reload.participant_event
+          expect(registration).to have_attributes(event: event, status: "invited")
+          expect(registration.travel_inbound.visa_status).to eq("approved")
+          expect(application.invitation.email).to eq(application.email)
+          expect(flash[:notice]).to eq("Place offered. They've been emailed an invitation to onboard.")
+          expect(AuditLog.where(action: "offer_place", record_id: application.id)).to exist
+
+          get admin_event_visa_letter_path(event, application)
+          expect(response.body).to include(admin_event_participant_path(event, registration))
+          expect(response.body).not_to include("Offer a place")
+        end
+
+        it "holds the invitation while the event holds invitations" do
+          event.update!(onboarding_invites_held: true)
+          application.record_visa_outcome!(:granted)
+
+          expect {
+            post offer_place_admin_event_visa_letter_path(event, application)
+          }.not_to have_enqueued_mail(ParticipantMailer, :invitation)
+
+          expect(application.reload.invitation).to have_attributes(sent_at: nil)
+          expect(flash[:notice]).to include("held")
+        end
+
+        it "needs an explicit override before the visa is granted" do
+          get admin_event_visa_letter_path(event, application)
+          expect(response.body).to include("Offer a place anyway")
+          expect(response.body).to include("We don&#39;t know yet whether their visa was granted.")
+
+          post offer_place_admin_event_visa_letter_path(event, application)
+          expect(application.reload.participant_event).to be_nil
+          expect(flash[:alert]).to eq("A place is offered once the letter is sent and the visa is granted")
+
+          post offer_place_admin_event_visa_letter_path(event, application), params: { override: "1" }
+          expect(application.reload.participant_event).to be_present
+          expect(application.participant_event.travel_inbound.visa_status).to eq("applied")
+        end
+      end
+
       it "saves the team's notes" do
         patch admin_event_visa_letter_path(event, application), params: { visa_letter_application: { admin_notes: "Called to confirm" } }
 
@@ -141,6 +196,9 @@ RSpec.describe "Admin visa letters", type: :request do
 
       post approve_admin_event_visa_letter_path(event, application)
       expect(application.reload).to be_pending
+
+      post offer_place_admin_event_visa_letter_path(event, application), params: { override: "1" }
+      expect(application.reload.participant_event).to be_nil
     end
   end
 
