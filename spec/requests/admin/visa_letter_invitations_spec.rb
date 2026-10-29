@@ -22,18 +22,21 @@ RSpec.describe "Admin visa letter invitations", type: :request do
 
         expect(event.visa_letter_invitations.pluck(:email)).to contain_exactly("first@example.com", "second@example.com")
         expect(flash[:alert]).to include("not-an-email", "banned-invitee@example.com")
+        expect(AuditLog.where(record_type: "VisaLetterInvitation", action: "create").pluck(:record_id))
+          .to match_array(event.visa_letter_invitations.ids)
 
         get admin_event_visa_letter_invitations_path(event)
         expect(response.body).to include("first@example.com", "Pending")
       end
 
-      it "sends the same invitation again rather than a second one" do
-        invitation = create(:visa_letter_invitation, event: event, email: "again@example.com")
+      it "sends the same invitation again rather than a second one, as of now" do
+        invitation = create(:visa_letter_invitation, event: event, email: "again@example.com", updated_at: 1.day.ago)
 
         expect {
           post admin_event_visa_letter_invitations_path(event), params: { emails: "again@example.com" }
         }.not_to change(VisaLetterInvitation, :count)
         expect(VisaLetterInvitation.last).to eq(invitation)
+        expect(invitation.reload.updated_at).to be > 1.minute.ago
       end
 
       it "withdraws an unused invitation, but not one that's been used" do

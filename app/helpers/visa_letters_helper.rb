@@ -11,13 +11,12 @@ module VisaLettersHelper
     "open" => [ "Open form", "Anyone can apply through the public form until the deadline. Your team reviews every application." ]
   }.freeze
 
-  # Where a participant asks for a visa letter: Attend's own form when the
-  # event issues letters here, otherwise the external form it links to.
-  # Nil when there's neither.
+  # Where a participant asks for a visa letter: Attend's own form, when the
+  # event issues letters here. Nil otherwise. An event's old Envoy URL
+  # (visa_application_url) isn't offered: the event forms no longer show it,
+  # so nobody could correct or clear it, and Envoy's host is Attend's now.
   def visa_letter_request_path_for(event)
-    return visas_apply_path(event.slug) if event.visa_letters_enabled?
-
-    event.visa_application_url.presence
+    visas_apply_path(event.slug) if event.visa_letters_enabled?
   end
 
   # [status type, label] for cs_status and the legacy badges. Envoy's labels.

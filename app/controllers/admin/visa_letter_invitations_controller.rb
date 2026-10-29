@@ -14,6 +14,8 @@ module Admin
 
     # One address per line, or separated by commas. Someone already invited
     # and yet to apply gets the same invitation again rather than a new one.
+    # Sending it again touches it, so it counts as inviting them now
+    # (VisaLettersController#reinvited_after_rejection?).
     def create
       emails = params[:emails].to_s.split(/[\s,;]+/).map { |email| email.strip.downcase }.compact_blank.uniq
       sent = []
@@ -22,6 +24,7 @@ module Admin
       emails.each do |email|
         invitation = @event.visa_letter_invitations.unclaimed.for_email(email).first ||
           @event.visa_letter_invitations.new(email: email, issued_by: current_user)
+        invitation.updated_at = Time.current if invitation.persisted?
         if invitation.save
           sent << invitation
         else
@@ -30,7 +33,12 @@ module Admin
       end
 
       sent.each { |invitation| VisaLetterMailer.invitation_to_apply(invitation: invitation).deliver_later }
+      # The after_action logs the first; every other invitation gets its own entry.
       @record = sent.first
+      sent.drop(1).each do |invitation|
+        AuditLog.log!(action: action_name, record: invitation, actor: current_user, event: @event,
+          metadata: { controller: controller_name, ip: request.remote_ip })
+      end
 
       notice = if sent.one?
         "Invitation sent to #{sent.first.email} for #{@event.name}."

@@ -149,6 +149,25 @@ RSpec.describe "Asking for a visa letter", type: :request do
         expect(application.rejection_reason).to be_nil
       end
 
+      it "lets a soft-rejected applicant reapply from the email's link once the form is invite-only" do
+        event.update!(visa_letters: "invite_only")
+        application.reject!(by: create(:user), reason: "Use the name on your passport.")
+
+        apply
+
+        expect(application.reload).to be_pending
+      end
+
+      it "reopens a hard rejection when staff send an older, unused invitation again" do
+        invitation = create(:visa_letter_invitation, event: event, email: applicant.email)
+        application.reject!(by: create(:user), reason: "Not eligible.", type: :hard)
+        invitation.update!(updated_at: Time.current) # what re-sending it from Manual Invitations does
+
+        apply(invite: invitation.token)
+
+        expect(application.reload).to be_pending
+      end
+
       it "doesn't let the invitation they applied with undo a hard rejection" do
         invitation = create(:visa_letter_invitation, event: event, email: applicant.email)
         application.update!(visa_letter_invitation: invitation)
@@ -206,6 +225,36 @@ RSpec.describe "Asking for a visa letter", type: :request do
       expect(imported.reload.user).to eq(applicant)
       expect(response.body).to include(imported.reference_number)
     end
+
+    it "claims an Envoy import from its emailed link or the apply form, without a second application" do
+      imported = create(:visa_letter_application, :imported, event: event, email: "ada@example.com")
+
+      get visas_application_path(imported)
+      expect(response).to have_http_status(:ok)
+
+      imported.update_columns(user_id: nil)
+      get visas_apply_path(event.slug)
+      expect(response).to redirect_to(visas_application_path(imported))
+      expect(VisaLetterApplication.count).to eq(1)
+    end
+
+    it "holds a resubmitted Envoy import to Attend's checks" do
+      imported = create(:visa_letter_application, :imported, event: event, email: "ada@example.com", user: applicant)
+      imported.reject!(by: create(:user), reason: "Use the name on your passport.")
+
+      post visas_apply_path(event.slug), params: { visa_letter_application: details.merge(phone: "not a phone") }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(imported.reload).to be_soft_rejected
+    end
+  end
+
+  it "doesn't list a draft that takes applications" do
+    create(:event, :draft, name: "Unannounced Hackathon", visa_letters: "open")
+
+    get visas_path
+
+    expect(response.body).not_to include("Unannounced Hackathon")
   end
 
   it "shows Envoy's visa FAQ to anyone" do

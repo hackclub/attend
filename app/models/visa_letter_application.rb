@@ -115,13 +115,15 @@ class VisaLetterApplication < ApplicationRecord
   # Applying again after a rejection: the same application goes back to
   # review with the corrected details. Only a soft rejection allows it, unless
   # staff have since invited them to apply (`overriding_hard_rejection`).
+  # An Envoy import sent again through Attend's form is Attend's from then on,
+  # so it gets Attend's checks rather than Envoy's.
   def resubmit!(attributes, overriding_hard_rejection: false)
     unless soft_rejected? || (hard_rejected? && overriding_hard_rejection)
       raise InvalidTransition, "only a rejected application can be submitted again"
     end
 
     update!(attributes.merge(status: :pending, rejection_type: nil, rejection_reason: nil,
-      reviewed_by: nil, reviewed_at: nil, submitted_at: Time.current))
+      reviewed_by: nil, reviewed_at: nil, submitted_at: Time.current, imported_at: nil))
   end
 
   # What a new application can start with: the legal details Hack Club Auth

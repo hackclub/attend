@@ -5,14 +5,17 @@
 #
 # Who can apply for an event's letter: anyone, through its open form until
 # the deadline; someone staff invited to apply (an invitation also overrides a
-# hard rejection); and anyone already registered for the event. Nobody, once
-# the event has visa letters off.
+# hard rejection); someone whose application was soft-rejected; and anyone
+# already registered for the event. Nobody, once the event has visa letters off.
 class VisaLettersController < ApplicationController
   include RestrictsBannedUsers
 
   APPLICANT_FIELDS = %i[full_name date_of_birth nationality place_of_birth phone address].freeze
 
   before_action :require_sign_in, except: %i[index faq]
+  # Envoy's applications move to the account with their email on any visa
+  # page, so its emailed links and the apply form find them, not just the list.
+  before_action :claim_imported_applications, except: :faq
   before_action :set_event, only: %i[new create]
   before_action :set_application, only: %i[show letter record_outcome]
 
@@ -23,7 +26,6 @@ class VisaLettersController < ApplicationController
     @open_events = Event.open_for_visa_letters
     return unless user_signed_in?
 
-    VisaLetterApplication.claim_imported_for(current_user)
     @applications = current_user.visa_letter_applications.includes(:event).order(created_at: :desc)
   end
 
@@ -103,6 +105,10 @@ class VisaLettersController < ApplicationController
     render :sign_in, status: :unauthorized
   end
 
+  def claim_imported_applications
+    VisaLetterApplication.claim_imported_for(current_user) if user_signed_in?
+  end
+
   def set_event
     @event = Event.find_by!(slug: params[:event_slug])
     @existing = @event.visa_letter_applications.find_by(user: current_user)
@@ -133,10 +139,13 @@ class VisaLettersController < ApplicationController
   end
 
   # Staff inviting someone again after a hard rejection is what reopens it.
-  # The invitation they first applied with, or any other from before the
+  # The invitation they first applied with, or any other last sent before the
   # rejection, doesn't: otherwise following the old link would undo it.
+  # Re-sending an invitation touches it (Admin::VisaLetterInvitationsController).
+  # Envoy's rejections may have no review time, so their submission stands in.
   def reinvited_after_rejection?
-    @invitation.present? && @existing&.reviewed_at.present? && @invitation.created_at > @existing.reviewed_at
+    rejected_at = @existing&.reviewed_at || @existing&.submitted_at
+    @invitation.present? && rejected_at.present? && @invitation.updated_at > rejected_at
   end
 
   # Their place at the event, if they already have one.
@@ -172,7 +181,8 @@ class VisaLettersController < ApplicationController
   def refusal_reason
     return :off unless @event.visa_letters_enabled?
     return :hard_rejected if @existing&.hard_rejected? && !reinvited_after_rejection?
-    return nil if @invitation || registration || @event.accepting_visa_letter_applications?
+    # A soft rejection told them to apply again, so the form's state doesn't matter.
+    return nil if @existing&.soft_rejected? || @invitation || registration || @event.accepting_visa_letter_applications?
 
     @invitation_for ? :wrong_account : :not_open
   end
