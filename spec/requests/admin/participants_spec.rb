@@ -289,6 +289,60 @@ RSpec.describe "Admin::Participants", type: :request do
     end
   end
 
+  describe "signed DocuSeal documents" do
+    let(:participant_event) { create(:participant_event, event: event) }
+    let(:client) { instance_double(Docuseal::Client) }
+    let!(:consent) do
+      create(:consent, :signed, participant_event: participant_event, docuseal_envelope_id: "sub_1",
+        document_url: "https://docuseal.test/waiver.pdf",
+        documents: [
+          { "name" => "Waiver", "url" => "https://docuseal.test/waiver.pdf" },
+          { "name" => "Photo Release", "url" => "https://docuseal.test/photo.pdf" }
+        ])
+    end
+
+    before do
+      sign_in global_admin
+      allow(Docuseal::Client).to receive(:for).and_return(client)
+    end
+
+    it "links every document on the consents page" do
+      get consents_admin_event_participant_path(event, participant_event)
+
+      expect(response.body).to include("Waiver", "Photo Release")
+      expect(response.body).to include(consent_document_admin_event_participant_path(event, participant_event, consent_id: consent.id, index: 1))
+    end
+
+    it "redirects to a freshly fetched URL for the chosen document" do
+      allow(client).to receive(:get_submission_documents).with("sub_1").and_return(
+        "documents" => [
+          { "name" => "Waiver", "url" => "https://docuseal.test/fresh-waiver.pdf" },
+          { "name" => "Photo Release", "url" => "https://docuseal.test/fresh-photo.pdf" }
+        ]
+      )
+
+      get consent_document_admin_event_participant_path(event, participant_event, consent_id: consent.id, index: 1)
+
+      expect(response).to redirect_to("https://docuseal.test/fresh-photo.pdf")
+    end
+
+    it "falls back to the stored URL when DocuSeal can't be reached" do
+      allow(client).to receive(:get_submission_documents).and_raise(Docuseal::Error, "down")
+
+      get consent_document_admin_event_participant_path(event, participant_event, consent_id: consent.id, index: 1)
+
+      expect(response).to redirect_to("https://docuseal.test/photo.pdf")
+    end
+
+    it "sends the admin back when there is no such document" do
+      allow(client).to receive(:get_submission_documents).and_return("documents" => [])
+
+      get consent_document_admin_event_participant_path(event, participant_event, consent_id: consent.id, index: 5)
+
+      expect(response).to redirect_to(consents_admin_event_participant_path(event, participant_event))
+    end
+  end
+
   describe "POST resend_invitation" do
     before { sign_in global_admin }
 

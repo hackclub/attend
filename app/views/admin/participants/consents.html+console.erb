@@ -157,8 +157,16 @@
                       </div>
                     <% end %>
                   </div>
-                <% elsif consent.document_url.present? %>
-                  <%= link_to "View document", consent.document_url, target: "_blank", class: "cs-link" %>
+                <% elsif signed_document_labels(consent, "View document").any? %>
+                  <div class="space-y-1">
+                    <% signed_document_labels(consent, "View document").each_with_index do |document_label, i| %>
+                      <div>
+                        <%= link_to document_label,
+                            consent_document_admin_event_participant_path(current_event, @participant_event, consent_id: consent.id, index: i),
+                            target: "_blank", class: "cs-link" %>
+                      </div>
+                    <% end %>
+                  </div>
                 <% elsif consent.docuseal_envelope_id.present? %>
                   <span class="cs-muted">DocuSeal: <%= consent.docuseal_envelope_id %></span>
                 <% else %>
@@ -267,8 +275,16 @@
                       </div>
                     <% end %>
                   </div>
-                <% elsif consent&.document_url.present? %>
-                  <%= link_to "View document", consent.document_url, target: "_blank", class: "cs-link" %>
+                <% elsif consent && signed_document_labels(consent, "View document").any? %>
+                  <div class="space-y-1">
+                    <% signed_document_labels(consent, "View document").each_with_index do |document_label, i| %>
+                      <div>
+                        <%= link_to document_label,
+                            consent_document_admin_event_participant_path(current_event, @participant_event, consent_id: consent.id, index: i),
+                            target: "_blank", class: "cs-link" %>
+                      </div>
+                    <% end %>
+                  </div>
                 <% elsif consent&.docuseal_envelope_id.present? %>
                   <span class="cs-muted">DocuSeal: <%= consent.docuseal_envelope_id %></span>
                 <% else %>

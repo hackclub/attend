@@ -164,8 +164,16 @@
                       </div>
                     <% end %>
                   </div>
-                <% elsif consent.document_url.present? %>
-                  <%= link_to "View Document", consent.document_url, target: "_blank", class: "text-[#ec3750] hover:text-blue-800" %>
+                <% elsif signed_document_labels(consent, "View Document").any? %>
+                  <div class="space-y-1">
+                    <% signed_document_labels(consent, "View Document").each_with_index do |document_label, i| %>
+                      <div>
+                        <%= link_to document_label,
+                            consent_document_admin_event_participant_path(current_event, @participant_event, consent_id: consent.id, index: i),
+                            target: "_blank", class: "text-[#ec3750] hover:text-blue-800" %>
+                      </div>
+                    <% end %>
+                  </div>
                 <% elsif consent.docuseal_envelope_id.present? %>
                   <span class="text-gray-400">DocuSeal: <%= consent.docuseal_envelope_id %></span>
                 <% else %>
@@ -271,8 +279,16 @@
                       </div>
                     <% end %>
                   </div>
-                <% elsif consent&.document_url.present? %>
-                  <%= link_to "View Document", consent.document_url, target: "_blank", class: "text-[#ec3750] hover:text-blue-800" %>
+                <% elsif consent && signed_document_labels(consent, "View Document").any? %>
+                  <div class="space-y-1">
+                    <% signed_document_labels(consent, "View Document").each_with_index do |document_label, i| %>
+                      <div>
+                        <%= link_to document_label,
+                            consent_document_admin_event_participant_path(current_event, @participant_event, consent_id: consent.id, index: i),
+                            target: "_blank", class: "text-[#ec3750] hover:text-blue-800" %>
+                      </div>
+                    <% end %>
+                  </div>
                 <% elsif consent&.docuseal_envelope_id.present? %>
                   <span class="text-gray-400">DocuSeal: <%= consent.docuseal_envelope_id %></span>
                 <% else %>

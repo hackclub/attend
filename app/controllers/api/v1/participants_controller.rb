@@ -683,6 +683,7 @@ module Api
           guardian_signed_at: consent.guardian_signed_at&.iso8601,
           signed_at: consent.signed_at&.iso8601,
           document_url: consent.document_url,
+          documents: consent.signed_documents,
           failure_reason: consent.failure_reason
         }
       end

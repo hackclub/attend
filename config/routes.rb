@@ -302,6 +302,7 @@ Rails.application.routes.draw do
           get :safeguarding
           patch :safeguarding, action: :update_safeguarding
           get :consents
+          get "consents/:consent_id/documents/:index", action: :consent_document, as: :consent_document, constraints: { index: /\d+/ }
           delete :reset_waiver
           delete :reset_freedom_waiver
           post :resend_waiver_completion_email
