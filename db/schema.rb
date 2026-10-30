@@ -535,22 +535,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_233000) do
     t.index ["event_id"], name: "index_export_templates_on_event_id"
   end
 
-  create_table "flipper_features", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.string "key", null: false
-    t.datetime "updated_at", null: false
-    t.index ["key"], name: "index_flipper_features_on_key", unique: true
-  end
-
-  create_table "flipper_gates", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.string "feature_key", null: false
-    t.string "key", null: false
-    t.datetime "updated_at", null: false
-    t.text "value"
-    t.index ["feature_key", "key", "value"], name: "index_flipper_gates_on_feature_key_and_key_and_value", unique: true
-  end
-
   create_table "global_api_tokens", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "expires_at"
@@ -641,45 +625,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_233000) do
     t.index ["email"], name: "index_guardians_on_email"
     t.index ["phone"], name: "index_guardians_on_phone", where: "(phone IS NOT NULL)"
     t.index ["user_id"], name: "index_guardians_on_user_id"
-  end
-
-  create_table "hospitality_acts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.text "description", null: false
-    t.uuid "event_id", null: false
-    t.uuid "participant_event_id"
-    t.integer "points", default: 1, null: false
-    t.string "source", default: "self_report", null: false
-    t.string "status", default: "pending", null: false
-    t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
-    t.index ["event_id"], name: "index_hospitality_acts_on_event_id"
-    t.index ["participant_event_id"], name: "index_hospitality_acts_on_participant_event_id"
-    t.index ["user_id"], name: "index_hospitality_acts_on_user_id"
-  end
-
-  create_table "hospitality_redemptions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.datetime "fulfilled_at"
-    t.uuid "fulfilled_by_user_id"
-    t.uuid "hospitality_reward_id", null: false
-    t.text "notes"
-    t.integer "points_spent", null: false
-    t.string "status", default: "pending", null: false
-    t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
-    t.index ["hospitality_reward_id"], name: "index_hospitality_redemptions_on_hospitality_reward_id"
-    t.index ["user_id"], name: "index_hospitality_redemptions_on_user_id"
-  end
-
-  create_table "hospitality_rewards", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.boolean "active", default: true, null: false
-    t.datetime "created_at", null: false
-    t.text "description"
-    t.string "name", null: false
-    t.integer "point_cost", null: false
-    t.integer "stock"
-    t.datetime "updated_at", null: false
   end
 
   create_table "import_batches", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -928,21 +873,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_233000) do
     t.index ["user_id"], name: "index_mobile_tokens_on_user_id"
   end
 
-  create_table "nfc_tokens", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.datetime "paired_at"
-    t.uuid "paired_by_id"
-    t.datetime "revoked_at"
-    t.uuid "revoked_by_id"
-    t.uuid "token", default: -> { "gen_random_uuid()" }, null: false
-    t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
-    t.index ["paired_by_id"], name: "index_nfc_tokens_on_paired_by_id"
-    t.index ["revoked_by_id"], name: "index_nfc_tokens_on_revoked_by_id"
-    t.index ["token"], name: "index_nfc_tokens_on_token", unique: true
-    t.index ["user_id"], name: "index_nfc_tokens_on_user_id"
-  end
-
   create_table "notes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "author_user_id", null: false
     t.text "body"
@@ -977,7 +907,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_233000) do
     t.uuid "participant_id", null: false
     t.string "slack_user_id"
     t.string "status", default: "invited", null: false
-    t.string "totp_secret"
     t.datetime "um_guardian_confirmed_at"
     t.datetime "um_review_requested_at"
     t.string "um_status", default: "none", null: false
@@ -989,7 +918,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_233000) do
     t.index ["participant_id", "event_id"], name: "index_participant_events_on_participant_id_and_event_id", unique: true
     t.index ["participant_id"], name: "index_participant_events_on_participant_id"
     t.index ["status"], name: "index_participant_events_on_status"
-    t.index ["totp_secret"], name: "index_participant_events_on_totp_secret", unique: true
     t.index ["um_status"], name: "index_participant_events_on_um_status"
     t.index ["um_verified_by_id"], name: "index_participant_events_on_um_verified_by_id"
   end
@@ -1255,7 +1183,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_233000) do
     t.datetime "created_at", null: false
     t.datetime "ends_at"
     t.uuid "event_id", null: false
-    t.boolean "is_airport", default: false, null: false
     t.boolean "is_travel_pickup", default: false, null: false
     t.string "kind"
     t.string "name", null: false
@@ -1848,12 +1775,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_233000) do
   add_foreign_key "guardian_participant_events", "guardians"
   add_foreign_key "guardian_participant_events", "participant_events"
   add_foreign_key "guardians", "users"
-  add_foreign_key "hospitality_acts", "events"
-  add_foreign_key "hospitality_acts", "participant_events"
-  add_foreign_key "hospitality_acts", "users"
-  add_foreign_key "hospitality_redemptions", "hospitality_rewards"
-  add_foreign_key "hospitality_redemptions", "users"
-  add_foreign_key "hospitality_redemptions", "users", column: "fulfilled_by_user_id"
   add_foreign_key "import_batches", "events"
   add_foreign_key "incident_comments", "incidents"
   add_foreign_key "incident_comments", "users"
@@ -1882,9 +1803,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_233000) do
   add_foreign_key "messages", "events"
   add_foreign_key "messages", "users", column: "sent_by_user_id"
   add_foreign_key "mobile_tokens", "users"
-  add_foreign_key "nfc_tokens", "users"
-  add_foreign_key "nfc_tokens", "users", column: "paired_by_id"
-  add_foreign_key "nfc_tokens", "users", column: "revoked_by_id"
   add_foreign_key "notes", "events"
   add_foreign_key "notes", "participant_events"
   add_foreign_key "notes", "tickets"

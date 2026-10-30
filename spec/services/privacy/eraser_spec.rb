@@ -117,6 +117,33 @@ RSpec.describe Privacy::Eraser do
     expect(User.exists?(user.id)).to be(false)
   end
 
+  # schema.rb no longer has these, but a database loaded from an older one can
+  it "erases their rows in the leftover hospitality and NFC token tables where those are still there" do
+    connection = ActiveRecord::Base.connection
+    %i[hospitality_acts hospitality_redemptions nfc_tokens].each do |table|
+      connection.create_table(table, id: :uuid) do |t|
+        t.uuid :user_id
+        t.uuid :participant_event_id if table == :hospitality_acts
+      end
+    end
+    other_user = create(:user)
+    insert = ->(sql, *binds) { connection.execute(ActiveRecord::Base.sanitize_sql([ sql, *binds ])) }
+    insert.("INSERT INTO hospitality_acts (participant_event_id) VALUES (?)", registration.id)
+    insert.("INSERT INTO hospitality_acts (user_id) VALUES (?), (?)", user.id, other_user.id)
+    insert.("INSERT INTO hospitality_redemptions (user_id) VALUES (?), (?)", user.id, other_user.id)
+    insert.("INSERT INTO nfc_tokens (user_id) VALUES (?), (?)", user.id, other_user.id)
+
+    eraser = described_class.new(subject_for(emails: [ "attendee@example.com" ]))
+    dry = eraser.call(dry_run: true)
+    result = eraser.call(dry_run: false)
+
+    expect(result.deleted).to eq(dry.deleted)
+    expect(result.deleted).to include("hospitality_acts" => 2, "hospitality_redemptions" => 1, "nfc_tokens" => 1)
+    %w[hospitality_acts hospitality_redemptions nfc_tokens].each do |table|
+      expect(connection.select_values("SELECT user_id FROM #{table}")).to eq([ other_user.id ])
+    end
+  end
+
   describe "attachment files" do
     let(:blob) { participant.headshot.blob }
 
