@@ -29,13 +29,15 @@ RSpec.describe "Api::V1::Bans", type: :request do
   end
 
   it "honours an expiry" do
+    # ISO 8601 drops sub-second precision, so pin the value before sending it.
+    expires_at = 3.days.from_now.change(usec: 0)
     post api_v1_bans_path,
-      params: { email: "temporary@example.com", expires_at: 3.days.from_now.iso8601 },
+      params: { email: "temporary@example.com", expires_at: expires_at.iso8601 },
       headers: headers
 
     expect(response).to have_http_status(:created)
     expect(json["ban"]["status"]).to eq("Active")
-    expect(Ban.last.expires_at).to be_within(1.second).of(3.days.from_now)
+    expect(Ban.last.expires_at).to eq(expires_at)
   end
 
   # A typo here would otherwise be dropped and quietly create a permanent ban.
