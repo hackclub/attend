@@ -239,6 +239,7 @@
     </section>
     <% end %>
 
+    <% if current_event.accommodation_enabled? %>
     <section class="portal-card p-5 sm:p-6">
       <div class="flex justify-between items-center mb-4">
         <h2 class="portal-heading text-lg">Accommodation</h2>
@@ -259,6 +260,7 @@
         </div>
       </dl>
     </section>
+    <% end %>
 
     <section class="portal-card p-5 sm:p-6">
       <div class="flex justify-between items-center mb-4">
