@@ -194,6 +194,11 @@
         <p class="mt-1 text-sm text-red-600 hidden" data-email-domain-target="message"></p>
         <p class="mt-1 text-sm text-gray-500">Used as the from and reply-to address on participant and guardian emails. Must be a <%= Event::SUPPORT_EMAIL_DOMAINS_SENTENCE %> address.</p>
       </div>
+      <div class="md:col-span-2">
+        <%= f.label :invitation_letter_costs, "What Hack Club covers (optional)", class: "block text-sm font-medium text-gray-700" %>
+        <%= f.text_area :invitation_letter_costs, rows: 2, class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2", placeholder: "Hack Club provides accommodation and meals during the event." %>
+        <p class="mt-1 text-sm text-gray-500">One sentence printed on the invitation letter participants download for border crossings. Leave it empty to say nothing about costs.</p>
+      </div>
     </div>
   </div>
 

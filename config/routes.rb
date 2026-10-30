@@ -139,6 +139,7 @@ Rails.application.routes.draw do
   get "dashboard/events/:id/google_wallet", to: "dashboard#google_wallet", as: :dashboard_google_wallet
   get "dashboard/events/:id/download_ticket", to: "dashboard#download_ticket", as: :dashboard_download_ticket
   get "dashboard/events/:id/download_excuse_letter", to: "dashboard#download_excuse_letter", as: :dashboard_download_excuse_letter
+  get "dashboard/events/:id/download_invitation_letter", to: "dashboard#download_invitation_letter", as: :dashboard_download_invitation_letter
   get "dashboard/events/:id/documents/:custom_document_id", to: "dashboard#sign_document", as: :dashboard_sign_document
   post "dashboard/events/:id/documents/:custom_document_id/add", to: "dashboard#add_optional_document", as: :dashboard_add_optional_document
   delete "dashboard/events/:id/documents/:custom_document_id/add", to: "dashboard#withdraw_optional_document", as: :dashboard_withdraw_optional_document

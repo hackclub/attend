@@ -19,3 +19,8 @@
   <%= f.email_field :support_email, required: true, class: "cs-input", autocomplete: "off",
         data: { cs_allowed_domains: Event::SUPPORT_EMAIL_DOMAINS.to_json, cs_domain_message: "Enter an email address ending in #{Event::SUPPORT_EMAIL_DOMAINS_SENTENCE}." }, **aria %>
 <% end %>
+<%= cs_form_field f, :invitation_letter_costs, label: "What Hack Club covers", optional: true,
+      description: "One sentence printed on the invitation letter participants download for border crossings. Leave it empty to say nothing about costs.",
+      constraint: "For example: Hack Club provides accommodation and meals during the event." do |aria| %>
+  <%= f.text_area :invitation_letter_costs, rows: 2, class: "cs-input", **aria %>
+<% end %>

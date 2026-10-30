@@ -12,14 +12,8 @@ RSpec.describe VisaLetterPdfService do
     end
   end
 
-  # Line by line in the order they're drawn, squished: the watermark and
-  # footer overlap the body, which scrambles the reader's page layout.
-  def text_of(pdf)
-    PDF::Reader.new(StringIO.new(pdf)).pages.flat_map { |page| page.runs(merge: true).map(&:text) }.join(" ").squish
-  end
-
   it "prints the letter, the signatory and the footer embassies check" do
-    text = text_of(described_class.new(application, template: template).generate)
+    text = letter_text(described_class.new(application, template: template).generate)
 
     expect(text).to include("October 28, 2026")
     expect(text).to include("Ada Example has been invited to attend Fictional Hackathon from March 5–7, 2027 in Boston, United States.")
