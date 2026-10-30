@@ -27,7 +27,7 @@ class TicketPdfService
 
     header_section(pdf)
     pdf.move_down 30
-    boarding_pass_section(pdf)
+    ticket_section(pdf)
     pdf.move_down 30
     personal_info_section(pdf)
     pdf.move_down 25
@@ -66,152 +66,66 @@ class TicketPdfService
     names.join(" • ")
   end
 
-  def boarding_pass_section(pdf)
-    pass_height = 220
-    stub_width = 120
-    main_width = pdf.bounds.width - stub_width
-    footer_height = 25
+  def ticket_section(pdf)
+    pass_height = 165
+    header_height = 35
+    qr_box = 90
 
     pdf.bounding_box([ 0, pdf.cursor ], width: pdf.bounds.width, height: pass_height) do
       # Red header bar
       pdf.fill_color HACK_CLUB_RED
-      pdf.fill_rectangle [ 0, pdf.bounds.height ], pdf.bounds.width, 35
+      pdf.fill_rectangle [ 0, pdf.bounds.height ], pdf.bounds.width, header_height
       pdf.fill_color "FFFFFF"
-      pdf.draw_text "BOARDING PASS", at: [ 15, pdf.bounds.height - 23 ], size: 14, style: :bold
+      pdf.draw_text "ENTRY TICKET", at: [ 15, pdf.bounds.height - 23 ], size: 14, style: :bold
 
       # Hack Club logo placeholder (text fallback)
       pdf.draw_text "HACK CLUB", at: [ pdf.bounds.width - 85, pdf.bounds.height - 23 ], size: 10, style: :bold
 
-      # Main content area background
-      content_top = pdf.bounds.height - 35
-      content_height = pass_height - 35 - footer_height
+      # Name, event, date and city down the left
+      content_top = pdf.bounds.height - header_height - 15
+      text_width = pdf.bounds.width - qr_box - 45
 
-      # Passenger and Status row
-      pdf.fill_color LIGHT_TEXT
-      pdf.draw_text "PASSENGER", at: [ 15, content_top - 20 ], size: 8
       pdf.fill_color DARK_TEXT
-      pdf.draw_text @participant.display_name.upcase, at: [ 15, content_top - 35 ], size: 16, style: :bold
-
+      pdf.text_box @participant.display_name, at: [ 15, content_top ], width: text_width, height: 22,
+        size: 16, style: :bold, overflow: :shrink_to_fit
+      pdf.text_box @event.name, at: [ 15, content_top - 26 ], width: text_width, height: 16,
+        size: 12, overflow: :shrink_to_fit
       pdf.fill_color LIGHT_TEXT
-      pdf.draw_text "STATUS", at: [ 200, content_top - 20 ], size: 8
-      pdf.fill_color HACK_CLUB_GREEN
-      pdf.draw_text "CONFIRMED", at: [ 200, content_top - 35 ], size: 12, style: :bold
-
-      # FROM / TO section
-      from_y = content_top - 70
-      pdf.fill_color LIGHT_TEXT
-      pdf.draw_text "FROM", at: [ 40, from_y ], size: 8
-      pdf.fill_color DARK_TEXT
-      pdf.draw_text origin_code, at: [ 15, from_y - 22 ], size: 24, style: :bold
-      pdf.fill_color LIGHT_TEXT
-      pdf.draw_text @participant.city.presence || "Your City", at: [ 15, from_y - 38 ], size: 8
-
-      # Dashed line with airplane
-      line_y = from_y - 15
-      pdf.stroke_color BORDER_COLOR
-      pdf.dash(3, space: 2)
-      pdf.stroke_line [ 100, line_y ], [ 180, line_y ]
-      pdf.undash
-
-      # Airplane icon (simple triangle representation)
-      pdf.fill_color HACK_CLUB_RED
-      airplane_x = 190
-      pdf.fill_polygon [ airplane_x, line_y + 5 ], [ airplane_x + 15, line_y ], [ airplane_x, line_y - 5 ]
-
-      pdf.dash(3, space: 2)
-      pdf.stroke_color BORDER_COLOR
-      pdf.stroke_line [ 210, line_y ], [ 270, line_y ]
-      pdf.undash
-
-      pdf.fill_color LIGHT_TEXT
-      pdf.draw_text "TO", at: [ 305, from_y ], size: 8
-      pdf.fill_color HACK_CLUB_RED
-      pdf.draw_text destination_code, at: [ 285, from_y - 22 ], size: 24, style: :bold
-      pdf.fill_color LIGHT_TEXT
-      pdf.draw_text @event.location_city.presence || "Event Location", at: [ 285, from_y - 38 ], size: 8
-
-      # Bottom info row (Event, Date, T-Shirt, Freedom)
-      info_y = footer_height + 35
-      col_width = 80
-
-      pdf.stroke_color BORDER_COLOR
-      pdf.stroke_line [ 15, info_y + 15 ], [ main_width - 15, info_y + 15 ]
-
-      pdf.fill_color LIGHT_TEXT
-      pdf.draw_text "EVENT", at: [ 15, info_y ], size: 8
-      pdf.fill_color DARK_TEXT
-      event_name = @event.name.truncate(12, omission: "")
-      pdf.draw_text event_name, at: [ 15, info_y - 15 ], size: 11, style: :bold
-
-      pdf.fill_color LIGHT_TEXT
-      pdf.draw_text "DATE", at: [ 15 + col_width, info_y ], size: 8
-      pdf.fill_color DARK_TEXT
-      pdf.draw_text @event.local_starts_at&.strftime("%b %d") || "TBD", at: [ 15 + col_width, info_y - 15 ], size: 11, style: :bold
-
-      pdf.fill_color LIGHT_TEXT
-      pdf.draw_text "T-SHIRT", at: [ 15 + col_width * 2, info_y ], size: 8
-      pdf.fill_color DARK_TEXT
-      pdf.draw_text @participant.tshirt_size&.upcase || "—", at: [ 15 + col_width * 2, info_y - 15 ], size: 11, style: :bold
+      pdf.text_box date_and_city, at: [ 15, content_top - 46 ], width: text_width, height: 14, size: 10
 
       if @event.freedom_waivers_enabled?
-        pdf.fill_color LIGHT_TEXT
-        pdf.draw_text "FREEDOM", at: [ 15 + col_width * 3, info_y ], size: 8
         if @participant_event.safeguarding_info&.freedom_waiver_granted?
           pdf.fill_color HACK_CLUB_GREEN
-          pdf.draw_text "✓ YES", at: [ 15 + col_width * 3, info_y - 15 ], size: 11, style: :bold
+          freedom_label = "✓ Freedom waiver"
         else
           pdf.fill_color HACK_CLUB_RED
-          pdf.draw_text "✗ NO", at: [ 15 + col_width * 3, info_y - 15 ], size: 11, style: :bold
+          freedom_label = "✗ No freedom waiver"
         end
+        pdf.text_box freedom_label, at: [ 15, content_top - 68 ], width: text_width, height: 14, size: 10, style: :bold
       end
-
-      # QR Code stub section (right side with gray background)
-      stub_x = main_width
-      pdf.fill_color "F9FAFC"
-      pdf.fill_rectangle [ stub_x, pdf.bounds.height - 35 ], stub_width, content_height
-
-      # Perforated edge circles
-      circle_spacing = 28
-      circle_count = 5
-      start_y = pdf.bounds.height - 50
-      pdf.fill_color "FFFFFF"
-      circle_count.times do |i|
-        pdf.fill_circle [ stub_x, start_y - (i * circle_spacing) ], 6
-      end
-
-      # QR section content
-      stub_center = stub_x + (stub_width / 2)
-
-      pdf.fill_color LIGHT_TEXT
-      pdf.draw_text "SCAN TO CHECK IN", at: [ stub_x + 10, content_top - 20 ], size: 7
 
       # QR code with white background box
-      qr_y = content_top - 35
-      qr_size = 80
+      qr_x = pdf.bounds.width - qr_box - 15
       pdf.fill_color "FFFFFF"
       pdf.stroke_color BORDER_COLOR
-      pdf.fill_and_stroke_rounded_rectangle [ stub_center - 45, qr_y ], 90, 90, 6
+      pdf.fill_and_stroke_rounded_rectangle [ qr_x, content_top ], qr_box, qr_box, 6
 
       qr_code = RQRCode::QRCode.new(attend_deep_link(@participant.id))
       qr_png = qr_code.as_png(size: 200, border_modules: 0)
       qr_image = StringIO.new(qr_png.to_s)
-      pdf.image qr_image, at: [ stub_center - 40, qr_y - 5 ], width: qr_size
+      pdf.image qr_image, at: [ qr_x + 5, content_top - 5 ], width: qr_box - 10
 
       pdf.fill_color LIGHT_TEXT
-      pdf.draw_text @participant_event.participant_id[0..7].upcase, at: [ stub_center - 28, qr_y - 100 ], size: 9
-
-      # Black footer bar
-      pdf.fill_color "17171D"
-      pdf.fill_rectangle [ 0, footer_height ], pdf.bounds.width, footer_height
-      pdf.fill_color LIGHT_TEXT
-      pdf.draw_text "Please present this pass at registration", at: [ 15, 8 ], size: 8
-      pdf.fill_color "FFFFFF"
-      pdf.draw_text @event.slug.upcase, at: [ pdf.bounds.width - 80, 8 ], size: 9, style: :bold
+      pdf.draw_text "Show this QR code when you arrive", at: [ 15, 12 ], size: 8
 
       # Outer border
       pdf.stroke_color BORDER_COLOR
       pdf.stroke_rectangle [ 0, pdf.bounds.height ], pdf.bounds.width, pdf.bounds.height
     end
+  end
+
+  def date_and_city
+    [ @event.local_starts_at&.strftime("%b %-d"), @event.location_city.presence ].compact.join(" · ")
   end
 
   def personal_info_section(pdf)
@@ -306,19 +220,6 @@ class TicketPdfService
     else
       @event.local_starts_at.strftime("%B %d, %Y")
     end
-  end
-
-  def origin_code
-    @participant_event.origin_airport_code.presence || "HOME"
-  end
-
-  def destination_code
-    @participant_event.destination_airport_code.presence || fallback_destination_code
-  end
-
-  def fallback_destination_code
-    city = @event.location_city.to_s.upcase
-    city.length >= 3 ? city[0..2] : "EVT"
   end
 
   def attend_deep_link(participant_id)

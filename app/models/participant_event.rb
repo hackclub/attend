@@ -544,18 +544,6 @@ class ParticipantEvent < ApplicationRecord
     update!(um_status: :rejected, um_verified_at: Time.current, um_verified_by: user)
   end
 
-  def origin_airport_code
-    return nil unless travel_inbound&.plane?
-
-    travel_inbound.travel_legs.first&.departure_airport
-  end
-
-  def destination_airport_code
-    return nil unless travel_inbound&.plane?
-
-    travel_inbound.travel_legs.last&.arrival_airport
-  end
-
   # Whether the person behind this registration is banned, matched on the
   # participant's email and every Slack ID we know for them, including the
   # one recorded on the registration itself. A ban can land long after the
