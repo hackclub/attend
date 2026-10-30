@@ -172,6 +172,7 @@ module Admin
         :google_place_id,
         :timezone,
         :support_email,
+        :invitation_letter_costs,
         :freedom_waivers_enabled,
         :travel_enabled,
         :visa_options_enabled,

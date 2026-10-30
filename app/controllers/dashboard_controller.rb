@@ -391,6 +391,23 @@ class DashboardController < ApplicationController
     send_data pdf, filename: filename, type: "application/pdf", disposition: "attachment"
   end
 
+  # For a border crossed without a visa. It says they've been invited, so
+  # only once their registration is complete, as the entry ticket is.
+  def download_invitation_letter
+    @participant_event = @participant.participant_events.includes(:event).find(params[:id])
+    authorize @participant_event, :show?
+
+    unless RegistrationCompletionPresenter.new(@participant_event, viewer: :participant).confirmed?
+      redirect_to dashboard_path, alert: "Your invitation letter is available once your registration is complete."
+      return
+    end
+
+    pdf = InvitationLetterService.new(@participant_event).generate
+    filename = "#{@participant_event.event.name.parameterize}-invitation-letter.pdf"
+
+    send_data pdf, filename: filename, type: "application/pdf", disposition: "attachment"
+  end
+
   def google_wallet
     @participant_event = @participant.participant_events.find(params[:id])
     authorize @participant_event, :show?

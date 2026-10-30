@@ -20,6 +20,9 @@ class Event < ApplicationRecord
     # The event's slug in Envoy, set by the import, so visas.hackclub.com's
     # old /events/:slug links find it (see VisasHostController).
     :legacy_envoy_slug,
+    # A sentence on what Hack Club covers, printed on the invitation letter
+    # participants download for border crossings (InvitationLetterService).
+    :invitation_letter_costs,
     :accommodation_enabled,
     :roommate_preferences_enabled,
     :guardian_invites_locked,
