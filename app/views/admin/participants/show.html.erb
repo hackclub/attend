@@ -320,6 +320,16 @@
                       <% end %>
                       <% if gpe.guardian.email_undeliverable? %>
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800" title="This address hard-bounced and is suppressed — emails to it will not be delivered. Correct the email to clear this.">⚠ Email bouncing</span>
+                        <% if policy(@participant_event).clear_email_bounce? %>
+                          <span class="inline-block border-2 border-dashed border-orange-400 rounded px-1">
+                            <%= button_to "Clear bounce flag",
+                                clear_guardian_email_bounce_admin_event_participant_path(current_event, @participant_event, guardian_participant_event_id: gpe.id),
+                                method: :post,
+                                form_class: "inline",
+                                data: { turbo_confirm: "Clear the bounce flag on #{gpe.guardian.email}? Check Postmark's suppression list first: if the address is still on it, the next email will flag it again." },
+                                class: "text-xs text-[#ec3750] hover:text-blue-800 font-medium cursor-pointer" %>
+                          </span>
+                        <% end %>
                       <% end %>
                     </div>
                     <% if can_view_participant_pii? %>
