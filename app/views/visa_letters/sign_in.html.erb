@@ -10,7 +10,8 @@
   <p class="portal-body mb-6">Sign in with your Hack Club account to apply for a visa letter or check on your application. Please email <%= mail_to "visas@hackclub.com", class: "portal-link" %> if you need any assistance with your visa application.</p>
 
   <div class="portal-card p-5 sm:p-6 mb-6">
-    <%= button_to user_hack_club_omniauth_authorize_path, method: :post, data: { turbo: false },
+    <%# Also asks for the addresses and legal names the letter needs (`extra_scopes` in config/initializers/devise.rb). %>
+    <%= button_to user_hack_club_omniauth_authorize_path, method: :post, params: { extra_scopes: "visa_letter" }, data: { turbo: false },
           class: "portal-btn portal-btn-primary w-full sm:w-auto" do %>
       Continue with Hack Club
     <% end %>

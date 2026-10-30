@@ -126,7 +126,7 @@ RSpec.describe "Asking for a visa letter", type: :request do
       it "goes through Hack Club Auth and back to the form, with the new address to pick" do
         OmniAuth.config.mock_auth[:hack_club] = OmniAuth::AuthHash.new(
           provider: "hack_club", uid: "ident!ada", info: { email: "ada@example.com", name: "Ada Example" },
-          extra: { raw_info: { "identity" => { "id" => "ident!ada", "primary_email" => "ada@example.com", "addresses" => [
+          extra: { scope: "openid profile email address legal_name", raw_info: { "identity" => { "id" => "ident!ada", "primary_email" => "ada@example.com", "addresses" => [
             { "id" => "addr!new", "line_1" => "4 Fictional Way", "city" => "Sample Town", "country" => "GB", "primary" => true }
           ] } } }
         )
@@ -134,7 +134,7 @@ RSpec.describe "Asking for a visa letter", type: :request do
         get visas_apply_path(event.slug)
         expect(response.body).to include('form="refresh_from_hack_club_auth"', %(value="#{visas_apply_path(event.slug)}"))
 
-        post user_hack_club_omniauth_authorize_path, params: { origin: visas_apply_path(event.slug) }
+        post user_hack_club_omniauth_authorize_path, params: { refresh: visas_apply_path(event.slug), extra_scopes: "visa_letter" }
         follow_redirect!
         expect(response).to redirect_to(visas_apply_path(event.slug))
         expect(flash[:notice]).to eq("Updated from your Hack Club account.")

@@ -172,7 +172,7 @@ class User < ApplicationRecord
       attrs = {
         hack_club_account_id: auth.uid,
         name: display_name || user.name,
-        oidc_claims: oidc_claims
+        oidc_claims: keep_claims_not_granted(oidc_claims, user.oidc_claims, auth)
       }
       if email && user.claim_email!(email)
         attrs[:email] = email
@@ -205,6 +205,24 @@ class User < ApplicationRecord
     user.sync_email_to_participant
     user.backfill_contact_from_claims!
     user
+  end
+
+  # The claims behind the scopes only the visa letter pages ask for (see
+  # `extra_scopes` in config/initializers/devise.rb). "address" is the one
+  # address older sign-ins kept.
+  CLAIMS_BY_EXTRA_SCOPE = {
+    "address" => %w[addresses address],
+    "legal_name" => %w[legal_first_name legal_last_name]
+  }.freeze
+
+  # A sign-in that wasn't granted one of those scopes keeps what an earlier
+  # one brought in for it. This goes by the scopes HCA granted, not by which
+  # claims came back: HCA leaves out an empty list of addresses, so someone
+  # who has deleted them all mustn't keep the old ones.
+  def self.keep_claims_not_granted(claims, previous, auth)
+    granted = auth.extra&.scope.to_s.split
+    kept = CLAIMS_BY_EXTRA_SCOPE.reject { |scope, _| granted.include?(scope) }.values.flatten
+    claims.merge((previous || {}).to_h.stringify_keys.slice(*kept))
   end
 
   # A row created by an admin adding someone by email (staff, series member,

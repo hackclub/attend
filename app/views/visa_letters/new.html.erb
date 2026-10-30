@@ -27,7 +27,10 @@
     </div>
   <% end %>
 
-  <%= form_with model: @application, url: visas_apply_path(@event.slug), method: :post, class: "portal-card p-5 sm:p-6 space-y-5" do |f| %>
+  <%= form_with model: @application, url: visas_apply_path(@event.slug), method: :post, class: "portal-card p-5 sm:p-6 space-y-5",
+        data: { controller: "refresh-draft", action: "submit@document->refresh-draft#stash",
+                refresh_draft_key_value: "visa_letter #{@event.slug} #{current_user.id}", refresh_draft_form_value: "refresh_from_hack_club_auth",
+                refresh_draft_from_hack_club_value: [ "visa_letter_application[address_id]" ], refresh_draft_submitted_value: request.post? } do |f| %>
     <h2 class="portal-heading text-lg">Personal Information</h2>
     <%= hidden_field_tag :invite, params[:invite] if params[:invite].present? %>
 
@@ -104,7 +107,9 @@
   <% end %>
 
   <%# Its own form, outside the application form: the hints' buttons submit it with form=. %>
+  <%# It asks for the visa letter's extra scopes, and `refresh` is where to come back to (OmniAuth::Strategies::HackClub#remember_refresh). %>
   <%= form_tag user_hack_club_omniauth_authorize_path, id: "refresh_from_hack_club_auth", data: { turbo: false } do %>
-    <%= hidden_field_tag :origin, visas_apply_path(@event.slug, invite: params[:invite].presence), id: nil %>
+    <%= hidden_field_tag :refresh, visas_apply_path(@event.slug, invite: params[:invite].presence), id: nil %>
+    <%= hidden_field_tag :extra_scopes, "visa_letter", id: nil %>
   <% end %>
 </div>

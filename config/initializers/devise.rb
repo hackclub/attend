@@ -280,12 +280,17 @@ Devise.setup do |config|
       # `openid profile phone birthdate` are the scopes HCA advertises in its
       # discovery document; `email`, `slack_id` and `verification_status` are
       # extras HCA honours. `profile` is what gets us the name claims and
-      # `birthdate` the date of birth, both read from /oauth/userinfo.
-      # `address` gets every mailing address on the account and `legal_name`
-      # the legal names, both for the visa letter form. HCA refuses a sign-in
-      # that asks for a scope the app isn't allowed, so check Attend's app in
-      # HCA has a scope before adding it here.
-      scope: "openid profile email slack_id phone birthdate verification_status address legal_name",
+      # `birthdate` the date of birth, both read from /oauth/userinfo. HCA
+      # refuses a sign-in that asks for a scope the app isn't allowed, so
+      # check Attend's app in HCA has a scope before adding it here or below.
+      scope: "openid profile email slack_id phone birthdate verification_status",
+      # The visa letter pages' sign-in and refresh buttons send
+      # `extra_scopes=visa_letter`: `address` gets every mailing address on
+      # the account and `legal_name` the legal names, for the letter. Nobody
+      # else is asked to share them, and where Attend's app in HCA isn't
+      # allowed them (staging, review apps) only those buttons fail.
+      # User.from_omniauth keeps them through later sign-ins that don't ask.
+      extra_scopes: { "visa_letter" => "address legal_name" },
       # Someone arriving from an invitation gets HCA's signup form started
       # with what the invitation already knows about them.
       prefill: ->(env) { HackClubAuthPrefill.from_session(env["rack.session"]) }
