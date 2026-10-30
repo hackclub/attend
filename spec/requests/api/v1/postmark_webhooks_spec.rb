@@ -142,7 +142,9 @@ RSpec.describe "Api::V1::PostmarkWebhooks", type: :request do
           Type: "HardBounce",
           TypeCode: 1,
           Description: "The email account does not exist",
-          Details: "smtp;550 5.1.1 User unknown"
+          Details: "smtp;550 5.1.1 User unknown",
+          Email: "recipient@example.com",
+          Inactive: true
         }
       end
 
@@ -168,9 +170,9 @@ RSpec.describe "Api::V1::PostmarkWebhooks", type: :request do
         expect(event.metadata["description"]).to eq("The email account does not exist")
       end
 
-      it "flags matching participants and guardians as undeliverable on hard bounces" do
-        participant = create(:participant, email: email_log.to_address)
-        guardian = create(:guardian, email: email_log.to_address)
+      it "flags matching participants and guardians as undeliverable when Postmark suppresses the address" do
+        participant = create(:participant, email: "Recipient@Example.com")
+        guardian = create(:guardian, email: "recipient@example.com")
 
         post api_v1_postmark_webhooks_path, params: payload.to_json, headers: headers
 
@@ -178,14 +180,47 @@ RSpec.describe "Api::V1::PostmarkWebhooks", type: :request do
         expect(guardian.reload.email_undeliverable_at).to be_present
       end
 
-      it "does not flag recipients on soft bounces" do
-        participant = create(:participant, email: email_log.to_address)
+      it "does not flag recipients when Postmark leaves the address active" do
+        participant = create(:participant, email: "recipient@example.com")
 
         post api_v1_postmark_webhooks_path,
-          params: payload.merge(Type: "SoftBounce").to_json,
+          params: payload.merge(Type: "SoftBounce", Inactive: false).to_json,
           headers: headers
 
         expect(participant.reload.email_undeliverable_at).to be_nil
+      end
+
+      it "does not flag a hard bounce Postmark didn't suppress" do
+        participant = create(:participant, email: "recipient@example.com")
+
+        post api_v1_postmark_webhooks_path,
+          params: payload.merge(Inactive: false).to_json,
+          headers: headers
+
+        expect(participant.reload.email_undeliverable_at).to be_nil
+      end
+
+      it "flags only the address that bounced, not the message's other recipients" do
+        email_log.update!(to_address: "gone@example.com, staff@example.com")
+        gone = create(:participant, email: "gone@example.com")
+        staff = create(:participant, email: "staff@example.com")
+
+        post api_v1_postmark_webhooks_path,
+          params: payload.merge(Email: "gone@example.com").to_json,
+          headers: headers
+
+        expect(gone.reload.email_undeliverable_at).to be_present
+        expect(staff.reload.email_undeliverable_at).to be_nil
+      end
+
+      it "flags a cc'd recipient that bounced, even though it isn't in the log's to_address" do
+        cced = create(:participant, email: "cced@example.com")
+
+        post api_v1_postmark_webhooks_path,
+          params: payload.merge(Email: "cced@example.com").to_json,
+          headers: headers
+
+        expect(cced.reload.email_undeliverable_at).to be_present
       end
     end
 
@@ -196,7 +231,9 @@ RSpec.describe "Api::V1::PostmarkWebhooks", type: :request do
           MessageID: "msg-12345",
           BouncedAt: "2024-12-22T10:30:00Z",
           TypeCode: 512,
-          Description: "The subscriber explicitly marked this message as spam."
+          Description: "The subscriber explicitly marked this message as spam.",
+          Email: "recipient@example.com",
+          Inactive: true
         }
       end
 
@@ -210,12 +247,21 @@ RSpec.describe "Api::V1::PostmarkWebhooks", type: :request do
         expect(email_log.email_log_events.last.event_type).to eq("spam_complaint")
       end
 
-      it "flags matching recipients as undeliverable" do
-        participant = create(:participant, email: email_log.to_address)
+      it "flags the complaining recipient as undeliverable" do
+        participant = create(:participant, email: "recipient@example.com")
 
         post api_v1_postmark_webhooks_path, params: payload.to_json, headers: headers
 
         expect(participant.reload.email_undeliverable_at).to be_present
+      end
+
+      it "leaves the message's other recipients alone" do
+        email_log.update!(to_address: "recipient@example.com, staff@example.com")
+        staff = create(:participant, email: "staff@example.com")
+
+        post api_v1_postmark_webhooks_path, params: payload.to_json, headers: headers
+
+        expect(staff.reload.email_undeliverable_at).to be_nil
       end
     end
 

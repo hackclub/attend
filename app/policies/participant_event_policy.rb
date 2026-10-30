@@ -43,6 +43,13 @@ class ParticipantEventPolicy < ApplicationPolicy
     user.global_admin?
   end
 
+  # Clearing a bounce flag sends mail to an address Postmark said was dead.
+  # Whoever clears it should have checked Postmark's suppression list first,
+  # so it stays global-admin-only.
+  def clear_email_bounce?
+    user.global_admin?
+  end
+
   def view_travel?
     return true if user.global_admin?
     return false unless record.event == Current.event

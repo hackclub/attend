@@ -1,7 +1,9 @@
 # Tracks whether a record's email address is known-undeliverable. Postmark
 # suppresses an address after a hard bounce or spam complaint and rejects all
 # later sends to it (Postmark::InactiveRecipientError), so once flagged the
-# only remedy is correcting the address — which clears the flag automatically.
+# usual remedy is correcting the address, which clears the flag automatically.
+# Global admins can also clear it by hand (Admin::ParticipantsController
+# #clear_email_bounce) for a flag that's wrong or stale.
 module EmailDeliverability
   extend ActiveSupport::Concern
 

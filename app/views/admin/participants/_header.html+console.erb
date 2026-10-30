@@ -53,12 +53,22 @@
     <% if @participant.preferred_name.present? %>
       <p class="cs-description">Legal name: <%= participant_name(@participant, legal: true) %></p>
     <% end %>
-    <p class="cs-description flex flex-wrap items-center gap-2">
+    <%# A div, not a p: the clear button's form would close a p early. %>
+    <div class="cs-description flex flex-wrap items-center gap-2">
       <%= @participant.email %>
       <% if @participant.email_undeliverable? %>
         <span title="This address hard-bounced and is suppressed. Emails to it will not be delivered. Correct the email to clear this."><%= cs_status(:error, "Email bouncing") %></span>
+        <% if participant_policy.clear_email_bounce? %>
+          <span class="border-2 border-dashed border-orange-400 rounded">
+            <%= button_to "Clear bounce flag", clear_email_bounce_admin_event_participant_path(current_event, @participant_event),
+                method: :post,
+                form_class: "inline",
+                data: { turbo_confirm: "Clear the bounce flag on #{@participant.email}? Check Postmark's suppression list first: if the address is still on it, the next email will flag it again." },
+                class: "cs-btn cs-btn-link" %>
+          </span>
+        <% end %>
       <% end %>
-    </p>
+    </div>
   </div>
   <div class="cs-actions">
     <%= link_to "Edit", edit_admin_event_participant_path(current_event, @participant_event), class: "cs-btn" %>

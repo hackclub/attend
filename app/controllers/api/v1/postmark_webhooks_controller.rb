@@ -107,9 +107,9 @@ module Api
           )
         end
 
-        # Postmark suppresses the address after a hard bounce; further sends
-        # would raise InactiveRecipientError, so flag the owner now.
-        mark_recipients_undeliverable(email_log) if params[:Type] == "HardBounce"
+        # Once Postmark suppresses the address, further sends would raise
+        # InactiveRecipientError, so flag the owner now.
+        mark_recipient_undeliverable
 
         Rails.logger.info("[Postmark Webhook] Bounce recorded for #{message_id}: #{params[:Type]}")
       rescue => e
@@ -143,7 +143,7 @@ module Api
         end
 
         # A spam complaint also lands the address on Postmark's suppression list.
-        mark_recipients_undeliverable(email_log)
+        mark_recipient_undeliverable
 
         Rails.logger.info("[Postmark Webhook] Spam complaint recorded for #{message_id}")
       rescue => e
@@ -151,10 +151,19 @@ module Api
         Sentry.capture_exception(e) if defined?(Sentry)
       end
 
-      def mark_recipients_undeliverable(email_log)
-        addresses = email_log.to_address.to_s.split(",").map(&:strip)
-        Participant.mark_email_undeliverable!(addresses)
-        Guardian.mark_email_undeliverable!(addresses)
+      # Bounce and spam complaint payloads name the one address involved
+      # (Email) and whether Postmark has now suppressed it (Inactive). Flag only
+      # that address, and only when it's suppressed: a message can go to several
+      # people (staff alert lists, a cc'd participant), and one dead address on
+      # it says nothing about the others.
+      def mark_recipient_undeliverable
+        return unless ActiveModel::Type::Boolean.new.cast(params[:Inactive])
+
+        address = params[:Email].to_s.presence
+        return unless address
+
+        Participant.mark_email_undeliverable!(address)
+        Guardian.mark_email_undeliverable!(address)
       end
 
       def handle_open

@@ -739,6 +739,21 @@ module Admin
         notice: "Invitation #{was_held ? 'sent' : 'resent'} to #{participant.email}."
     end
 
+    # Escape hatch for a bounce flag that's wrong, or stale because the address
+    # was reactivated in Postmark. If Postmark still suppresses it, the next
+    # send is refused and MailDeliveryJob flags it again, so a mistaken clear
+    # costs one dropped email.
+    def clear_email_bounce
+      authorize @participant_event, :clear_email_bounce?
+      clear_bounce_flag(@participant_event.participant)
+    end
+
+    def clear_guardian_email_bounce
+      authorize @participant_event, :clear_email_bounce?
+      gpe = @participant_event.guardian_participant_events.find(params[:guardian_participant_event_id])
+      clear_bounce_flag(gpe.guardian)
+    end
+
     def update_groups
       authorize @participant_event, :update?
       raise ActionController::RoutingError, "Not Found" unless current_event.groups_enabled?
@@ -1629,6 +1644,21 @@ module Admin
       return "#{participant.email} is banned from events and cannot be invited." if Ban.banned?(participant.email, slack_ids: Ban.slack_ids_for(participant))
 
       nil
+    end
+
+    def clear_bounce_flag(record)
+      unless record.email_undeliverable?
+        redirect_to admin_event_participant_path(current_event, @participant_event),
+          alert: "#{record.email} isn't flagged as bouncing."
+        return
+      end
+
+      @record = record # audit-log against the participant or guardian
+      # update_attribute skips validations: an old row failing some unrelated
+      # check shouldn't stop the flag from clearing.
+      record.update_attribute(:email_undeliverable_at, nil)
+      redirect_to admin_event_participant_path(current_event, @participant_event),
+        notice: "Cleared the bounce flag on #{record.email}. If Postmark still has it suppressed, the next email will flag it again."
     end
 
     # Why there's nothing to invite them to, in the words of the status badge
