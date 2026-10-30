@@ -251,12 +251,16 @@ export default class extends Controller {
     const reasons = []
     const hasFile = Array.from(this.element.querySelectorAll('input[type="file"]'))
       .some((input) => input.files?.length > 0)
+    // A photo uploaded ahead of submit (headshot_upload_controller) is only
+    // attached by Save & Continue.
+    const hasStagedUpload = Array.from(this.element.querySelectorAll("input[data-autosave-pending-upload]"))
+      .some((input) => input.value)
     const hasNewFlightLeg = Array.from(this.element.querySelectorAll("[data-autosave-skip]"))
       .some((container) => this.isNewFlightLeg(container) &&
         (container.dataset.autosaveNew === "true" || this.flightLegHasContent(container)))
     const hasRemovedFlightLeg = this.element.querySelectorAll("input[data-autosave-pending-deletion]").length > 0
 
-    if (hasFile) reasons.push("photo or file")
+    if (hasFile || hasStagedUpload) reasons.push("photo or file")
     if (hasNewFlightLeg) reasons.push("new flight details")
     if (hasRemovedFlightLeg) reasons.push("removed flight details")
     return reasons
@@ -299,7 +303,7 @@ export default class extends Controller {
 
   pendingMessage(reasons) {
     const description = reasons.join(" and ")
-    return `${description.charAt(0).toUpperCase()}${description.slice(1)} must be uploaded with Save & Continue.`
+    return `${description.charAt(0).toUpperCase()}${description.slice(1)} must be saved with Save & Continue.`
   }
 
   showFailure(errors = []) {

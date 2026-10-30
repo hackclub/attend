@@ -14,7 +14,7 @@ class OnboardingController < ApplicationController
   before_action :apply_event_brand
   before_action :redirect_if_withdrawn
   before_action :redirect_if_locked, except: [ :index, :waiver, :waiver_complete, :done ]
-  before_action :hold_at_profile_if_too_old, except: [ :welcome, :start, :done ]
+  before_action :hold_at_profile_if_too_old, except: [ :welcome, :start, :done, :stage_headshot ]
 
   BASE_STEPS = %w[profile travel accommodation health].freeze
   GUARDIAN_STEP = "guardian"
@@ -22,6 +22,9 @@ class OnboardingController < ApplicationController
   WAIVER_STEP = "waiver"
   DOCUMENTS_STEP = "documents"
   REVIEW_STEP = "review"
+  # How long a headshot uploaded ahead of submit (#stage_headshot) waits to be
+  # attached before it's purged.
+  STAGED_HEADSHOT_TTL = 1.day
 
   def index
     # If all regular onboarding steps are done and participant still needs to sign
@@ -314,6 +317,37 @@ class OnboardingController < ApplicationController
     redirect_to onboarding_step_path(step: DOCUMENTS_STEP, event_id: current_event.id), notice: "Upload removed."
   end
 
+  # Fired by the profile step as soon as a headshot is picked, so the photo
+  # uploads while the participant fills in the rest of the form. It's checked
+  # against the same rules as a submitted photo, but only staged: the signed id
+  # goes back into the form, and the photo replaces the current headshot when
+  # the profile is submitted (see #assign_staged_headshot).
+  def stage_headshot
+    file = params[:headshot]
+    unless file.is_a?(ActionDispatch::Http::UploadedFile)
+      render json: { success: false, error: "Please choose a photo." }, status: :unprocessable_content
+      return
+    end
+
+    # A throwaway participant runs the model's headshot checks (type, size,
+    # whether it decodes) without touching the real record. Only the first
+    # problem is shown: a text file is both the wrong type and unreadable.
+    error = Participant.new(headshot: file).tap(&:validate).errors.full_messages_for(:headshot).first
+    if error
+      render json: { success: false, error: error }, status: :unprocessable_content
+      return
+    end
+
+    # Validation read the file, so upload it from the start.
+    file.tempfile.rewind
+    blob = ActiveStorage::Blob.create_and_upload!(io: file.tempfile, filename: file.original_filename, content_type: file.content_type)
+    # Cleans up a photo that's never submitted. Blob#purge leaves one that's
+    # been attached by then alone.
+    ActiveStorage::PurgeJob.set(wait: STAGED_HEADSHOT_TTL).perform_later(blob)
+
+    render json: { success: true, signed_id: blob.signed_id(purpose: staged_headshot_purpose, expires_in: STAGED_HEADSHOT_TTL) }
+  end
+
   def complete
     unless all_steps_complete?
       redirect_to onboarding_path(event_id: current_event.id), alert: "Please complete all steps before submitting."
@@ -531,6 +565,10 @@ class OnboardingController < ApplicationController
       load_identity_correction
       birthday_locked = @participant_event.too_old_for_event?
       @participant = assign_profile_attributes(profile_params)
+      unless assign_staged_headshot(@participant)
+        flash.now[:alert] = "Your new headshot expired before it was saved. Please choose it again."
+        return false
+      end
       if profile_params[:tshirt_size].blank?
         flash.now[:alert] = "Please select a t-shirt size"
         return false
@@ -1138,6 +1176,27 @@ class OnboardingController < ApplicationController
     participant.assign_attributes(attributes)
     participant.restore_attributes([ :date_of_birth ]) if locked
     participant
+  end
+
+  # Attaches a headshot uploaded ahead of submit by #stage_headshot. A photo
+  # sent with the form itself (the early upload failed, or there's no
+  # JavaScript) wins. Returns false when the staged photo has expired.
+  def assign_staged_headshot(participant)
+    return true if params[:staged_headshot].blank? || profile_params[:headshot].present?
+
+    blob = ActiveStorage::Blob.find_signed(params[:staged_headshot], purpose: staged_headshot_purpose)
+    return false unless blob
+
+    participant.headshot = blob
+    # Carried back into the form if something else stops the save, so the
+    # photo doesn't have to be picked again.
+    @staged_headshot_id = params[:staged_headshot]
+    true
+  end
+
+  # Ties a staged headshot to the participant who uploaded it.
+  def staged_headshot_purpose
+    "onboarding_headshot:#{@participant_event.participant_id}"
   end
 
   # Someone 19 or older by the end of the event can't attend. Their birthday
