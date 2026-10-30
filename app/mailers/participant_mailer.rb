@@ -59,6 +59,15 @@ class ParticipantMailer < ApplicationMailer
     @emailable = @participant
 
     waiver_consent = @participant_event.consents.waiver.first
+
+    # CreateMinorWaiverJob delays this so a participant signing on the waiver
+    # page isn't told to sign mid-flow. Returning without calling mail()
+    # yields a NullMail, so delivery is a no-op.
+    if waiver_consent&.participant_portion_signed?
+      Rails.logger.info("[ParticipantMailer] waiver_ready skipped for PE #{participant_event.id}: participant already signed")
+      return
+    end
+
     @waiver_link = waiver_consent&.participant_signing_url || waiver_page_url
     completion = RegistrationCompletionPresenter.new(@participant_event, viewer: :participant)
     @waiver_is_final_task = completion.outstanding_tasks.none? do |task|

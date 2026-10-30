@@ -28,6 +28,24 @@ RSpec.describe SendPendingGuardianInvitesJob do
         .and have_enqueued_job(DocusealJobs::CreateMinorWaiverJob)
     end
 
+    # CreateMinorWaiverJob emails the teen itself once the submission exists.
+    it "leaves the minor's waiver email to CreateMinorWaiverJob" do
+      pe = submitted_minor_pe
+      create(:guardian_participant_event, participant_event: pe)
+
+      expect {
+        described_class.perform_now(event.id)
+      }.not_to have_enqueued_mail(ParticipantMailer, :waiver_ready)
+    end
+
+    it "emails adults their waiver directly" do
+      submitted_adult_pe
+
+      expect {
+        described_class.perform_now(event.id)
+      }.to have_enqueued_mail(ParticipantMailer, :waiver_ready)
+    end
+
     it "creates and triggers waivers for adults who submitted while locked (stuck in_progress)" do
       pe = submitted_adult_pe
 

@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe DocusealJobs::CreateMinorWaiverJob, type: :job do
+  include ActiveSupport::Testing::TimeHelpers
+
   let(:participant_event) { create(:participant_event) }
   let!(:guardian_participant_event) { create(:guardian_participant_event, participant_event: participant_event) }
   let(:consent) { create(:consent, participant_event: participant_event, status: :pending) }
@@ -24,6 +26,16 @@ RSpec.describe DocusealJobs::CreateMinorWaiverJob, type: :job do
     }.to have_enqueued_mail(ParticipantMailer, :waiver_ready)
 
     expect(consent.reload.docuseal_participant_slug).to eq("teen-slug")
+  end
+
+  # The teen is usually on the waiver page signing in the embed, so the email
+  # waits long enough for the mailer to see they've signed and skip it.
+  it "delays the signing link email" do
+    freeze_time do
+      expect {
+        described_class.perform_now(consent.id)
+      }.to have_enqueued_mail(ParticipantMailer, :waiver_ready).at(10.minutes.from_now)
+    end
   end
 
   it "explains the new dates when it replaces a waiver voided by a date change" do

@@ -84,10 +84,11 @@ class SendPendingGuardianInvitesJob < ApplicationJob
         c.guardian_participant_event = guardian_participant_event
       end
 
+      # CreateMinorWaiverJob emails the teen once the submission exists, so
+      # sending waiver_ready here as well would reach them twice.
       unless consent.signed? || consent.sent? || consent.docuseal_participant_slug.present?
         DocusealJobs::CreateMinorWaiverJob.perform_later(consent.id)
-        ParticipantMailer.waiver_ready(participant_event: participant_event).deliver_later(wait: 30.seconds)
-        Rails.logger.info("[SendPendingGuardianInvitesJob] Created minor waiver and sent notification for PE #{participant_event.id}")
+        Rails.logger.info("[SendPendingGuardianInvitesJob] Created minor waiver for PE #{participant_event.id}")
       end
     else
       consent = participant_event.find_or_create_consent!(:waiver) do |c|
