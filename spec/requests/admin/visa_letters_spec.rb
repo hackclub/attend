@@ -122,8 +122,10 @@ RSpec.describe "Admin visa letters", type: :request do
       end
 
       it "saves the event's visa letter settings" do
+        event.update!(starts_at: Time.utc(2027, 3, 5, 17), ends_at: Time.utc(2027, 3, 7, 22))
         get edit_admin_event_visa_letter_settings_path(event)
         expect(response).to have_http_status(:ok)
+        expect(response.body).to include("a week before the event starts (February 26, 2027)")
 
         patch admin_event_visa_letter_settings_path(event), params: { event: {
           visa_letters: "invite_only", visa_letter_deadline: "2027-01-31",

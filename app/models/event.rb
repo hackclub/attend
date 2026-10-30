@@ -465,7 +465,7 @@ class Event < ApplicationRecord
   def accepting_visa_letter_applications?
     return false unless visa_letters_mode == "open"
 
-    deadline = visa_letter_deadline_date
+    deadline = visa_letter_closes_on
     deadline.nil? || local_today <= deadline
   end
 
@@ -483,10 +483,21 @@ class Event < ApplicationRecord
     where(id: ids).order(:starts_at).to_a
   end
 
+  # The deadline staff set, if they set one.
   def visa_letter_deadline_date
     Date.iso8601(visa_letter_deadline.to_s) if visa_letter_deadline.present?
   rescue Date::Error
     nil
+  end
+
+  # The last day the public form takes applications: the deadline staff set,
+  # otherwise a week before the event starts, so it moves with the event.
+  def visa_letter_closes_on
+    visa_letter_deadline_date || visa_letter_default_deadline
+  end
+
+  def visa_letter_default_deadline
+    local_start_date&.-(7)
   end
 
   def visa_letter_rejection_reasons_list

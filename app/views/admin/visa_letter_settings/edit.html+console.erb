@@ -28,7 +28,7 @@
           <% end %>
 
           <%= cs_form_field f, :visa_letter_deadline, label: "Application deadline", optional: true,
-                description: "The public form closes at the end of this day, on the event's clock. Leave it empty to keep it open until you turn it off." do |aria| %>
+                description: "The public form closes at the end of this day, on the event's clock. #{visa_letter_default_deadline_hint(@event)}" do |aria| %>
             <%= f.date_field :visa_letter_deadline, value: @event.visa_letter_deadline_date, class: "cs-input w-48!", **aria %>
           <% end %>
 

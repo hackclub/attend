@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Asking for a visa letter", type: :request do
   include Devise::Test::IntegrationHelpers
 
-  let(:event) { create(:event, name: "Fictional Hackathon", visa_letters: "open") }
+  let(:event) { create(:event, name: "Fictional Hackathon", visa_letters: "open", starts_at: 1.month.from_now, ends_at: 1.month.from_now + 2.days) }
   let(:applicant) do
     create(:user, email: "ada@example.com", hack_club_account_id: "ident!ada",
       oidc_claims: { "legal_first_name" => "Ada", "legal_last_name" => "Example", "birthdate" => "2008-04-01",
@@ -34,7 +34,7 @@ RSpec.describe "Asking for a visa letter", type: :request do
 
     get visas_path
 
-    expect(response.body).to include("Fictional Hackathon")
+    expect(response.body).to include("Fictional Hackathon", "Application Deadline:", event.visa_letter_closes_on.strftime("%B %d, %Y"))
     expect(response.body).not_to include("Invite Only Hackathon")
   end
 
@@ -92,6 +92,14 @@ RSpec.describe "Asking for a visa letter", type: :request do
       expect(response.body).to include("This event is no longer accepting applications.")
 
       event.update!(visa_letters: "open", visa_letter_deadline: 1.week.ago.to_date.iso8601)
+      apply
+      expect(response).to have_http_status(:forbidden)
+      expect(VisaLetterApplication.count).to eq(0)
+    end
+
+    it "closes a week before the event starts when no deadline is set" do
+      event.update!(starts_at: 3.days.from_now, ends_at: 5.days.from_now)
+
       apply
       expect(response).to have_http_status(:forbidden)
       expect(VisaLetterApplication.count).to eq(0)
