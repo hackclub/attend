@@ -13,6 +13,28 @@ RSpec.describe Consent do
     end
   end
 
+  describe "wallet pass updates" do
+    let(:consent) { create(:consent) }
+
+    it "skips the pass push when only the signed documents changed" do
+      expect {
+        consent.update!(documents: [ { "name" => "Waiver", "url" => "https://example.com/w.pdf" } ],
+          document_url: "https://example.com/w.pdf")
+      }.not_to have_enqueued_job(WalletPassUpdateJob)
+    end
+
+    it "still pushes when the signature state changes" do
+      expect { consent.update!(status: :signed) }.to have_enqueued_job(WalletPassUpdateJob).with(consent.participant_event_id)
+    end
+  end
+
+  describe ".documents_from_docuseal" do
+    it "trims stray whitespace from DocuSeal's document names" do
+      expect(described_class.documents_from_docuseal([ { "name" => " Guardian", "url" => "u" } ]))
+        .to eq([ { "name" => "Guardian", "url" => "u" } ])
+    end
+  end
+
   describe "#refresh_documents_from_docuseal!" do
     let(:client) { instance_double(Docuseal::Client) }
     let(:consent) do
