@@ -75,8 +75,8 @@ RSpec.describe "Refreshing the visa letter form from Hack Club Auth", type: :req
         expect(form["data-refresh-draft-form-value"]).to eq("refresh_from_hack_club_auth")
         expect(JSON.parse(form["data-refresh-draft-from-hack-club-value"])).to eq([ "visa_letter_application[address_id]" ])
         expect(form["data-refresh-draft-submitted-value"]).to eq("false")
-        # The draft leaves read-only fields alone, such as the locked birthday.
-        expect(form.at_css("input[name='visa_letter_application[date_of_birth]']")["readonly"]).to be_present
+        # The draft leaves disabled fields alone, such as the locked birthday.
+        expect(form.at_css("input[name='visa_letter_application[date_of_birth]']")["disabled"]).to be_present
 
         refresh_form = page.at_css("form#refresh_from_hack_club_auth")
         expect(refresh_form["action"]).to eq(user_hack_club_omniauth_authorize_path)

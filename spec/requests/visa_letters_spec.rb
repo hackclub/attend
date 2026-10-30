@@ -47,6 +47,8 @@ RSpec.describe "Asking for a visa letter", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include('value="Ada Example"', 'value="2008-04-01"', "2 Sample Road",
         "It must match your passport exactly, including any middle names.")
+      # Locked to Hack Club Auth's, and not just readonly, which iOS Safari's date picker ignores.
+      expect(response.body).to match(/<input[^>]*disabled="disabled"[^>]*name="visa_letter_application\[date_of_birth\]"/)
     end
 
     it "leaves their citizenship for them to choose, whatever country they live in" do

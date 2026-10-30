@@ -123,6 +123,25 @@
     resize: vertical;
   }
 
+  /* iOS Safari sizes its native date and time controls to their content and
+     ignores width: 100%, so they spill out of the card. Without the native
+     appearance they take the box they're given; the min-height keeps an
+     empty one as tall as a text field, and the value sits on the left like
+     every other field's. */
+  .portal-input[type="date"],
+  .portal-input[type="time"],
+  .portal-input[type="datetime-local"],
+  .portal-input[type="month"] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+    min-height: 2.25rem;
+  }
+
+  .portal-input::-webkit-date-and-time-value {
+    text-align: left;
+  }
+
   .portal-input::placeholder,
   .portal-textarea::placeholder {
     color: var(--text-faint);

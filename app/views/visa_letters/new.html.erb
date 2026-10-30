@@ -62,7 +62,8 @@
     <div>
       <%= f.label :date_of_birth, "Date of Birth", class: "portal-label" %>
       <% if @locked.key?(:date_of_birth) %>
-        <%= f.date_field :date_of_birth, class: "portal-input", readonly: true, "aria-describedby": "date_of_birth_hint" %>
+        <%# Disabled, not readonly: iOS Safari still opens its date picker on a readonly date field. The value comes from Hack Club Auth either way (VisaLettersController#create). %>
+        <%= f.date_field :date_of_birth, class: "portal-input", disabled: true, "aria-describedby": "date_of_birth_hint" %>
         <p class="portal-hint text-sm mt-1" id="date_of_birth_hint">From your Hack Club account. If it's wrong, update it at <%= link_to "auth.hackclub.com", "https://auth.hackclub.com", class: "portal-link", target: "_blank", rel: "noopener" %>, then <%= render "refresh_from_hack_club_auth" %>.</p>
       <% else %>
         <%= f.date_field :date_of_birth, class: "portal-input", required: true, max: 13.years.ago.to_date, autocomplete: "bday" %>
