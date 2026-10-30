@@ -9,7 +9,7 @@
 
   <h1 class="portal-title text-2xl mb-4"><%= @custom_document.name %></h1>
 
-  <% if @consent.signed? %>
+  <% if @consent.guardian_portion_signed? %>
     <div class="portal-note portal-note-success">
       <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
@@ -123,6 +123,13 @@
       <strong class="portal-heading"><%= @event.name %></strong>.
     </p>
 
+    <%# The "completed" callback below is the fast path off this page, but it
+        isn't guaranteed to reach us (signed in the new-tab fallback, a
+        dropped postMessage). Poll alongside it so a signature that lands
+        some other way still moves the page on. %>
+    <div data-controller="document-status"
+         data-document-status-url-value="<%= guardian_portal_signing_status_path(token: @token, consent_id: @consent.id) %>"
+         data-document-status-signed-ids-value="[]"></div>
     <%= render "shared/docuseal_form",
         signing_url: @signing_url,
         host: @consent.docuseal_host,

@@ -225,6 +225,7 @@ Rails.application.routes.draw do
     post "/invite/:token/freedom_waiver/complete", to: "guardian_portal#freedom_waiver_complete", as: :guardian_portal_freedom_waiver_complete
     get "/invite/:token/documents/:custom_document_id", to: "guardian_portal#custom_document", as: :guardian_portal_custom_document
     post "/invite/:token/documents/:custom_document_id/complete", to: "guardian_portal#custom_document_complete", as: :guardian_portal_custom_document_complete
+    get "/invite/:token/consents/:consent_id/status", to: "guardian_portal#signing_status", as: :guardian_portal_signing_status
     post "/invite/:token/documents/:custom_document_id/verify", to: "guardian_portal#verify_physical_document", as: :guardian_portal_verify_physical_document
     post "/invite/:token/documents/:custom_document_id/upload", to: "guardian_portal#upload_physical_document", as: :guardian_portal_upload_physical_document
     delete "/invite/:token/documents/:custom_document_id/uploads/:upload_id", to: "guardian_portal#remove_physical_upload", as: :guardian_portal_remove_physical_upload

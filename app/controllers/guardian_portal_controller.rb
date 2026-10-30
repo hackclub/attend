@@ -1,6 +1,7 @@
 class GuardianPortalController < ApplicationController
   include TravelLegDateMerging
   include PhysicalDocumentUploads
+  include DocusealStatusPolling
 
   skip_before_action :set_current_attributes
 
@@ -111,6 +112,11 @@ class GuardianPortalController < ApplicationController
       return
     end
 
+    if guardian_already_signed?(@consent)
+      redirect_after_signing(@consent, "Thank you for signing the waiver!")
+      return
+    end
+
     @signing_url = Docuseal.signing_url(@consent.docuseal_guardian_slug, host: @consent.docuseal_host)
   end
 
@@ -128,6 +134,11 @@ class GuardianPortalController < ApplicationController
 
     unless @consent&.docuseal_guardian_slug.present?
       render :waiver_loading
+      return
+    end
+
+    if guardian_already_signed?(@consent)
+      redirect_after_signing(@consent, "Thank you for completing the Freedom Waiver!")
       return
     end
 
@@ -169,7 +180,7 @@ class GuardianPortalController < ApplicationController
       DocusealJobs::CreateCustomDocumentJob.perform_later(@consent.id, "guardian")
     end
 
-    return if @consent.signed?
+    return if guardian_already_signed?(@consent)
 
     # Submission created before this guardian existed (participant-only) —
     # there is no guardian slot on it, so don't spin on the loading screen.
@@ -190,6 +201,18 @@ class GuardianPortalController < ApplicationController
 
   def custom_document_complete
     redirect_to guardian_portal_confirmed_path(token: @token), notice: "Thank you for signing!"
+  end
+
+  # Polled by the signing pages while the guardian's part is outstanding, the
+  # same safety net the participant's documents step has
+  # (OnboardingController#documents_status). Answers with the consent's id
+  # once the guardian's portion is signed; the page then reloads, and the
+  # signing action moves them on.
+  def signing_status
+    consent = @participant_event.consents.find(params[:consent_id])
+    sync_from_docuseal_throttled(consent) unless consent.guardian_portion_signed?
+
+    render json: { signed_consent_ids: consent.guardian_portion_signed? ? [ consent.id.to_s ] : [] }
   end
 
   # The guardian reviewed the photo of the physically signed document and
@@ -288,6 +311,16 @@ class GuardianPortalController < ApplicationController
 
   delegate :waivers_paused?, :participant_info_complete?, :details_complete?, :consents_complete?,
     :ensure_waiver_exists_and_triggered, to: :guardian_completion, private: true
+
+  # Signed in the new-tab fallback, or the embed's "completed" event never
+  # reached us: opening the signing page again would only show DocuSeal's
+  # "Document has been signed!" screen, with nothing to press. Pull the
+  # signature from the API (the webhook may not have landed) so the page can
+  # move them on instead.
+  def guardian_already_signed?(consent)
+    consent.sync_from_docuseal! unless consent.guardian_portion_signed?
+    consent.guardian_portion_signed?
+  end
 
   # DocuSeal sends guardians back here after they sign. Signing was often the
   # last thing left, so finish their part before sending them on. The webhook

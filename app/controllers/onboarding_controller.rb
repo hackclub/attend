@@ -4,6 +4,7 @@ class OnboardingController < ApplicationController
   include PhysicalDocumentUploads
   include OptionalDocumentEnrolment
   include OnboardingAccountsStep
+  include DocusealStatusPolling
 
   before_action :force_html_format, except: [ :documents_status ]
   before_action :store_invitation_token
@@ -226,7 +227,7 @@ class OnboardingController < ApplicationController
   # telling the open page about it. This lets the page find out on its own.
   def documents_status
     consents = pollable_document_consents
-    consents.each { |c| sync_from_docuseal_throttled(c) }
+    consents.each { |c| sync_from_docuseal_throttled(c) unless c.participant_portion_signed? }
 
     render json: {
       signed_consent_ids: consents.select(&:participant_portion_signed?).map { |c| c.id.to_s }.sort
@@ -1462,24 +1463,6 @@ class OnboardingController < ApplicationController
       consents.find { |c| c.consent_type == "waiver" },
       *document_ids.map { |id| consents.find { |c| c.custom_document_id == id } }
     ].compact
-  end
-
-  # Poll interval is a few seconds; hitting the DocuSeal API that often for
-  # every outstanding document would be rude, and the webhook usually gets
-  # there first anyway. Sync at most once per consent per window — the plain
-  # DB read on every poll is what actually carries the webhook's update
-  # through to the page.
-  DOCUSEAL_POLL_THROTTLE = 15.seconds
-
-  def sync_from_docuseal_throttled(consent)
-    return if consent.participant_portion_signed?
-    return if consent.docuseal_envelope_id.blank?
-
-    key = "docuseal_status_poll/#{consent.id}"
-    return if Rails.cache.read(key)
-    Rails.cache.write(key, true, expires_in: DOCUSEAL_POLL_THROTTLE)
-
-    consent.sync_from_docuseal!
   end
 
   def load_documents_step_data
