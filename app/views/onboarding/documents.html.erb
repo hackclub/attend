@@ -94,35 +94,14 @@
            data-document-status-url-value="<%= onboarding_documents_status_path(event_id: current_event.id) %>"
            data-document-status-signed-ids-value="<%= @documents.filter_map { |d| d[:consent]&.id.to_s if d[:consent]&.participant_portion_signed? }.sort.to_json %>"></div>
       <h2 class="portal-heading text-lg mb-3">Now signing: <%= @current_document[:name] %></h2>
-      <div class="portal-card overflow-hidden mb-4">
-        <docuseal-form
-          id="docusealForm"
-          data-src="<%= signing_url %>"
-          style="height: 500px; overflow: auto;">
-        </docuseal-form>
-      </div>
+      <%= render "shared/docuseal_form",
+          signing_url: signing_url,
+          host: consent.docuseal_host,
+          complete_url: onboarding_document_signed_path(consent_id: consent.id, event_id: current_event.id),
+          card_class: "portal-card mb-4" %>
       <div class="text-center text-sm portal-hint mb-6">
         <p>Having trouble? <a href="<%= signing_url %>" target="_blank" class="portal-link">Open in a new tab</a></p>
       </div>
-
-      <script src="https://<%= consent.docuseal_host %>/js/form.js"></script>
-      <script nonce="<%= content_security_policy_nonce %>">
-        document.getElementById('docusealForm').addEventListener('completed', function(e) {
-          var form = document.createElement('form');
-          form.method = 'POST';
-          form.action = '<%= onboarding_document_signed_path(consent_id: consent.id, event_id: current_event.id) %>';
-
-          var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-          var csrfInput = document.createElement('input');
-          csrfInput.type = 'hidden';
-          csrfInput.name = 'authenticity_token';
-          csrfInput.value = csrfToken;
-          form.appendChild(csrfInput);
-
-          document.body.appendChild(form);
-          form.submit();
-        });
-      </script>
     <% elsif @documents_preparing %>
       <% content_for :head do %>
         <meta http-equiv="refresh" content="3">

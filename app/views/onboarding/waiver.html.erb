@@ -39,13 +39,10 @@
       </p>
     <% end %>
 
-    <div class="portal-card overflow-hidden mb-6">
-      <docuseal-form
-        id="docusealForm"
-        data-src="<%= @signing_url %>"
-        style="height: 500px; overflow: auto;">
-      </docuseal-form>
-    </div>
+    <%= render "shared/docuseal_form",
+        signing_url: @signing_url,
+        host: @consent.docuseal_host,
+        complete_url: onboarding_waiver_complete_path %>
 
     <div class="text-center text-sm portal-hint">
       <p>Having trouble? <a href="<%= @signing_url %>" target="_blank" class="portal-link">Open in a new tab</a></p>
@@ -67,25 +64,3 @@
     <% end %>
   <% end %>
 </div>
-
-<% unless @waiver_paused || @waiver_preparing %>
-<script src="https://<%= @consent.docuseal_host %>/js/form.js"></script>
-<script nonce="<%= content_security_policy_nonce %>">
-  document.getElementById('docusealForm').addEventListener('completed', function(e) {
-    console.log('Waiver signed:', e.detail);
-    var form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '<%= onboarding_waiver_complete_path %>';
-
-    var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-    var csrfInput = document.createElement('input');
-    csrfInput.type = 'hidden';
-    csrfInput.name = 'authenticity_token';
-    csrfInput.value = csrfToken;
-    form.appendChild(csrfInput);
-
-    document.body.appendChild(form);
-    form.submit();
-  });
-</script>
-<% end %>

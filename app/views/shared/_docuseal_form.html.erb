@@ -1,0 +1,52 @@
+<%# locals: (signing_url:, host:, complete_url:, complete_method: :post, card_class: "portal-card mb-6") %>
+<%# DocuSeal signing form, plus the hand-off once the signer finishes.
+    complete_method :post submits a CSRF-protected form to complete_url;
+    :get just navigates there.
+
+    Never wrap the form in a fixed-height scroll box: the signer ends up with
+    two scrollbars and the field panel out of view. host decides what
+    form.js renders:
+    - signatures.hackclub.com serves a small shim that puts the signing page
+      in an iframe sized by data-height / data-min-height. One screen tall
+      means the iframe is the only scroller and its bottom field panel stays
+      visible once the card is in view.
+    - docuseal.com (older records) renders inline with sticky header and
+      field panel, and ignores data-height. It keeps its natural height and
+      the page scrolls; the card is overflow-clip rather than
+      overflow-hidden so those sticky parts pin to the viewport, not the
+      card. %>
+<div id="docusealSigning"
+     class="<%= card_class %> overflow-clip"
+     data-complete-url="<%= complete_url %>"
+     data-complete-method="<%= complete_method %>">
+  <docuseal-form id="docusealForm"
+                 class="block"
+                 data-src="<%= signing_url %>"
+                 data-height="calc(100dvh - 2rem)"
+                 data-min-height="480px"></docuseal-form>
+</div>
+
+<script src="https://<%= host %>/js/form.js"></script>
+<script nonce="<%= content_security_policy_nonce %>">
+  document.getElementById('docusealForm').addEventListener('completed', function() {
+    var signing = document.getElementById('docusealSigning').dataset;
+
+    if (signing.completeMethod === 'get') {
+      window.location.href = signing.completeUrl;
+      return;
+    }
+
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = signing.completeUrl;
+
+    var csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'authenticity_token';
+    csrfInput.value = document.querySelector('meta[name="csrf-token"]').content;
+    form.appendChild(csrfInput);
+
+    document.body.appendChild(form);
+    form.submit();
+  });
+</script>
