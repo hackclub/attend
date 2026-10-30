@@ -21,10 +21,6 @@ class VisaLetterApplication < ApplicationRecord
   has_paper_trail skip: %i[full_name email nationality place_of_birth phone address]
 
   self.implicit_order_column = "created_at"
-  # Gone from the model: the visa outcome, and the stored registration and
-  # invitation links (#registration finds them now). The columns are dropped
-  # in a later release, once no running pod still reads or writes them.
-  self.ignored_columns += %w[visa_outcome visa_outcome_recorded_at participant_event_id invitation_id]
 
   # Deterministic so the privacy hub can find an applicant by email.
   encrypts :email, deterministic: true
