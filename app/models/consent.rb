@@ -81,6 +81,12 @@ class Consent < ApplicationRecord
     signed? || participant_signed?
   end
 
+  # The guardian's own part is done — either they've signed their portion of
+  # a dual-signer document, or the document is fully signed.
+  def guardian_portion_signed?
+    signed? || guardian_signed?
+  end
+
   # Pull signature state straight from the DocuSeal API. Normally webhooks
   # keep consents up to date; this covers the gap right after an embedded
   # form fires "completed" (and environments webhooks can't reach).
@@ -111,8 +117,10 @@ class Consent < ApplicationRecord
 
     update!(updates) if updates.any?
     participant_event&.mark_complete_if_eligible! if signed?
-  rescue Docuseal::Error, ArgumentError => e
-    # ArgumentError covers environments with no DocuSeal credentials configured
+  rescue Docuseal::Error, ArgumentError, Faraday::Error => e
+    # ArgumentError covers environments with no DocuSeal credentials configured,
+    # Faraday::Error a DocuSeal that timed out or couldn't be reached. Signing
+    # pages sync on open, so either would otherwise fail the page.
     Rails.logger.warn("[Docuseal] sync_from_docuseal! failed for consent #{id}: #{e.message}")
   end
 

@@ -1,14 +1,15 @@
 import { Controller } from "@hotwired/stimulus"
 
-// Safety net for the documents step. The embedded DocuSeal form fires a
-// "completed" event that posts back and re-renders the page, but that event
-// is the only thing moving the participant forward — and it doesn't always
-// arrive (signed in the "open in a new tab" window, a dropped postMessage, a
-// backgrounded tab). When it doesn't, the page sits on "0 of N signed" with a
-// disabled Continue button until they reload by hand.
+// Safety net for the participant's documents step and the guardian portal's
+// signing pages. The embedded DocuSeal form fires a "completed" event that
+// posts back and moves the signer on, but that event is the only thing doing
+// so — and it doesn't always arrive (signed in the "open in a new tab"
+// window, a dropped postMessage, a backgrounded tab). When it doesn't, the
+// page sits on "0 of N signed" with a disabled Continue button, or on
+// DocuSeal's own "Document has been signed!" screen, until they reload by hand.
 //
 // So ask the server periodically instead. It answers with the set of consents
-// whose participant portion is signed; the moment that differs from what this
+// whose signer's portion is signed; the moment that differs from what this
 // page was rendered with, reload and let the server decide what comes next.
 // We only reload on a *change*, so a page rendered mid-signing stays put and
 // nobody loses a partly-filled form.

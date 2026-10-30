@@ -38,6 +38,13 @@
       participation in <strong class="portal-heading"><%= @event.name %></strong>.
     </p>
 
+    <%# The "completed" callback below is the fast path off this page, but it
+        isn't guaranteed to reach us (signed in the new-tab fallback, a
+        dropped postMessage). Poll alongside it so a signature that lands
+        some other way still moves the page on. %>
+    <div data-controller="document-status"
+         data-document-status-url-value="<%= guardian_portal_signing_status_path(token: @token, consent_id: @consent.id) %>"
+         data-document-status-signed-ids-value="[]"></div>
     <div class="portal-card overflow-hidden mb-6">
       <docuseal-form
         id="docusealForm"

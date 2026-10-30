@@ -13,6 +13,35 @@ RSpec.describe Consent do
     end
   end
 
+  describe "#guardian_portion_signed?" do
+    it "is true once the guardian has signed, even while the participant hasn't" do
+      expect(build(:consent, status: :sent, guardian_signed_at: Time.current)).to be_guardian_portion_signed
+    end
+
+    it "is true for a fully signed document" do
+      expect(build(:consent, :signed)).to be_guardian_portion_signed
+    end
+
+    it "is false while only the participant has signed" do
+      expect(build(:consent, status: :sent, participant_signed_at: Time.current)).not_to be_guardian_portion_signed
+    end
+  end
+
+  describe "#sync_from_docuseal!" do
+    let(:client) { instance_double(Docuseal::Client) }
+    let(:consent) { create(:consent, status: :sent, docuseal_envelope_id: "sub_1", docuseal_guardian_slug: "g") }
+
+    before { allow(Docuseal::Client).to receive(:for).and_return(client) }
+
+    # Signing pages sync when they open; a DocuSeal blip mustn't fail them.
+    it "leaves the consent as it was when DocuSeal times out" do
+      allow(client).to receive(:get_submission).and_raise(Faraday::TimeoutError)
+
+      expect { consent.sync_from_docuseal! }.not_to raise_error
+      expect(consent.reload.status).to eq("sent")
+    end
+  end
+
   describe "wallet pass updates" do
     let(:consent) { create(:consent) }
 
