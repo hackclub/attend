@@ -65,6 +65,12 @@ RSpec.describe Consent do
       expect(consent.refresh_documents_from_docuseal!).to eq([ { "name" => nil, "url" => "https://example.com/stale.pdf" } ])
       expect(consent.reload.documents).to eq([])
     end
+
+    it "keeps what is on file when the connection to DocuSeal fails" do
+      allow(client).to receive(:get_submission_documents).and_raise(Faraday::ConnectionFailed, "execution expired")
+
+      expect(consent.refresh_documents_from_docuseal!).to eq([ { "name" => nil, "url" => "https://example.com/stale.pdf" } ])
+    end
   end
 
   describe "#reset_for_reissue!" do

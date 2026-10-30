@@ -146,8 +146,10 @@ class Consent < ApplicationRecord
 
     update!(documents: fetched, document_url: fetched.first["url"])
     fetched
-  rescue Docuseal::Error, ArgumentError => e
-    # ArgumentError covers environments with no DocuSeal credentials configured
+  rescue Docuseal::Error, Faraday::Error, ArgumentError => e
+    # Faraday::Error covers DocuSeal being unreachable (timeouts, refused
+    # connections); ArgumentError covers environments with no DocuSeal
+    # credentials configured
     Rails.logger.warn("[Docuseal] refresh_documents_from_docuseal! failed for consent #{id}: #{e.message}")
     signed_documents
   end
