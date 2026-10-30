@@ -128,7 +128,9 @@ class VisaLetterTemplate < ApplicationRecord
       "participant_country_of_birth" => application.nationality,
       "participant_place_of_birth" => application.place_of_birth,
       "participant_phone_number" => application.phone,
-      "participant_address" => application.address,
+      # One line, as Envoy's letters printed it: an address from Hack Club
+      # Auth is several.
+      "participant_address" => application.address.to_s.split(/\r?\n/).map(&:strip).compact_blank.join(", "),
       "participant_email" => application.email,
       "event_name" => application.letter_event_name,
       "event_venue" => application.letter_venue,
