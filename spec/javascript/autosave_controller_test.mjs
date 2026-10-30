@@ -44,7 +44,7 @@ function classList() {
 
 let documentStatus = null
 
-function buildController({ files = [], skippedLegs = [], pendingDeletions = [], notifyOnly = false, statusInside = true } = {}) {
+function buildController({ files = [], stagedUploads = [], skippedLegs = [], pendingDeletions = [], notifyOnly = false, statusInside = true } = {}) {
   const status = { textContent: "", classList: classList() }
   const retry = { hidden: true }
   const listeners = new Map()
@@ -57,6 +57,7 @@ function buildController({ files = [], skippedLegs = [], pendingDeletions = [], 
     },
     querySelectorAll(selector) {
       if (selector === 'input[type="file"]') return files
+      if (selector === "input[data-autosave-pending-upload]") return stagedUploads
       if (selector === 'input[type="tel"]') return []
       if (selector === "input[data-autosave-pending-deletion]") return pendingDeletions
       if (selector === "[data-autosave-skip]") return skippedLegs
@@ -164,6 +165,26 @@ test("a selected file stays visibly pending after text autosaves and warns befor
   assert.match(status.textContent, /Text saved/)
   assert.match(status.textContent, /photo.*Save & Continue/i)
   assert.equal(controller.hasUnsavedChanges(), true)
+  controller.disconnect()
+})
+
+test("a photo uploaded ahead of submit stays pending until Save & Continue", async () => {
+  const staged = { name: "staged_headshot", value: "signed-123" }
+  const { controller, status } = buildController({ stagedUploads: [ staged ] })
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({ success: true, saved_at: "2026-09-10T08:00:00Z" })
+  })
+
+  controller.change({ target: { type: undefined } })
+  await controller.save()
+
+  assert.match(status.textContent, /Text saved/)
+  assert.match(status.textContent, /photo.*saved with Save & Continue/i)
+  assert.equal(controller.hasUnsavedChanges(), true)
+
+  staged.value = ""
+  assert.equal(controller.hasUnsavedChanges(), false)
   controller.disconnect()
 })
 

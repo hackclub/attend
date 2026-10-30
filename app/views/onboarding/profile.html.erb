@@ -71,15 +71,18 @@
         <% end %>
       </div>
 
-      <div>
+      <div data-controller="headshot-upload" data-headshot-upload-url-value="<%= onboarding_stage_headshot_path(event_id: current_event.id) %>">
         <%= f.label :headshot, label_text("Headshot Photo", required: !@participant.headshot.attached?), class: "portal-label" %>
-        <% if @participant.headshot.attached? && @participant.headshot.blob.persisted? %>
-          <div class="mb-3 flex items-center gap-4">
-            <%= image_tag @participant.headshot, class: "w-24 h-24 rounded-full object-cover", style: "border: 1px solid var(--border-strong);" %>
-            <span class="portal-hint text-sm">Current headshot</span>
-          </div>
-        <% end %>
-        <%= f.file_field :headshot, accept: "image/jpeg,image/png,image/webp", class: "portal-file", required: !@participant.headshot.attached? %>
+        <% headshot_shown = @participant.headshot.attached? && @participant.headshot.blob.persisted? %>
+        <div class="mb-3 flex items-center gap-4" data-headshot-upload-target="preview" <%= "hidden" unless headshot_shown %>>
+          <% image_options = { alt: "", class: "w-24 h-24 rounded-full object-cover", style: "border: 1px solid var(--border-strong);", data: { headshot_upload_target: "image" } } %>
+          <%= headshot_shown ? image_tag(@participant.headshot, **image_options) : tag.img(**image_options) %>
+          <span class="portal-hint text-sm" data-headshot-upload-target="caption"><%= @staged_headshot_id ? "New headshot" : "Current headshot" %></span>
+        </div>
+        <%= f.file_field :headshot, accept: "image/jpeg,image/png,image/webp", class: "portal-file", required: !@participant.headshot.attached?,
+              data: { headshot_upload_target: "input", action: "change->headshot-upload#upload" } %>
+        <%= hidden_field_tag :staged_headshot, @staged_headshot_id, id: nil, data: { headshot_upload_target: "staged", autosave_pending_upload: true } %>
+        <p class="mt-1 portal-hint text-sm" data-headshot-upload-target="status" aria-live="polite"><%= "Uploaded. It's saved as your headshot when you press Save & Continue." if @staged_headshot_id %></p>
         <div class="portal-note portal-note-info mt-2">
           <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.852l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/>
