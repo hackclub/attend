@@ -78,24 +78,16 @@
         </p>
       <% end %>
 
-      <div class="border rounded-lg overflow-hidden bg-white shadow-sm mb-6">
-        <docuseal-form
-          id="docusealForm"
-          data-src="<%= @signing_url %>"
-          style="height: 500px; overflow: auto;">
-        </docuseal-form>
-      </div>
+      <%= render "shared/docuseal_form",
+          signing_url: @signing_url,
+          host: @consent.docuseal_host,
+          complete_url: dashboard_event_path(@participant_event),
+          complete_method: :get,
+          card_class: "border rounded-lg bg-white shadow-sm mb-6" %>
 
       <div class="text-center text-sm text-gray-500">
         <p>Having trouble? <a href="<%= @signing_url %>" target="_blank" class="text-blue-600 hover:underline">Open in a new tab</a></p>
       </div>
-
-      <script src="https://<%= @consent.docuseal_host %>/js/form.js"></script>
-      <script nonce="<%= content_security_policy_nonce %>">
-        document.getElementById('docusealForm').addEventListener('completed', function(e) {
-          window.location.href = '<%= dashboard_event_path(@participant_event) %>';
-        });
-      </script>
     <% end %>
   <% else %>
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">

@@ -38,36 +38,13 @@
       participation in <strong class="portal-heading"><%= @event.name %></strong>.
     </p>
 
-    <div class="portal-card overflow-hidden mb-6">
-      <docuseal-form
-        id="docusealForm"
-        data-src="<%= @signing_url %>"
-        style="height: 70vh; min-height: 480px; overflow: auto;">
-      </docuseal-form>
-    </div>
+    <%= render "shared/docuseal_form",
+        signing_url: @signing_url,
+        host: @consent.docuseal_host,
+        complete_url: guardian_portal_freedom_waiver_complete_path(token: @token) %>
 
     <p class="portal-hint text-sm text-center">
       Having trouble? <%= link_to "Open the waiver in a new tab", @signing_url, target: "_blank", rel: "noopener", class: "portal-link" %>.
     </p>
   <% end %>
 </div>
-
-<% unless @waiver_paused %>
-  <script src="https://<%= @consent.docuseal_host %>/js/form.js"></script>
-  <script nonce="<%= content_security_policy_nonce %>">
-    document.getElementById('docusealForm').addEventListener('completed', function() {
-      var form = document.createElement('form');
-      form.method = 'POST';
-      form.action = '<%= guardian_portal_freedom_waiver_complete_path(token: @token) %>';
-
-      var csrfInput = document.createElement('input');
-      csrfInput.type = 'hidden';
-      csrfInput.name = 'authenticity_token';
-      csrfInput.value = document.querySelector('meta[name="csrf-token"]').content;
-      form.appendChild(csrfInput);
-
-      document.body.appendChild(form);
-      form.submit();
-    });
-  </script>
-<% end %>

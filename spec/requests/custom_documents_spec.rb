@@ -423,6 +423,8 @@ RSpec.describe "Custom documents", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("docuseal-form")
       expect(response.body).to include("abc123")
+      expect(response.body).to include(%(data-complete-url="#{dashboard_event_path(participant_event)}"))
+      expect(response.body).to include(%(data-complete-method="get"))
     end
 
     it "rejects documents that don't apply to the participant" do
@@ -463,6 +465,8 @@ RSpec.describe "Custom documents", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("docuseal-form")
       expect(response.body).to include("gslug123")
+      expect(response.body).to include(%(data-complete-url="#{guardian_portal_custom_document_complete_path(token: token, custom_document_id: doc.id)}"))
+      expect(response.body).to include(%(data-complete-method="post"))
     end
 
     it "redirects instead of spinning when the submission has no guardian slot" do
