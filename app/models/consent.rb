@@ -130,7 +130,7 @@ class Consent < ApplicationRecord
     # Webhook payloads arrive as unpermitted ActionController::Parameters, so
     # read keys rather than calling to_h.
     Array(list).filter_map do |document|
-      { "name" => document["name"], "url" => document["url"] } if document["url"].present?
+      { "name" => document["name"]&.strip, "url" => document["url"] } if document["url"].present?
     end
   end
 
@@ -146,8 +146,10 @@ class Consent < ApplicationRecord
 
     update!(documents: fetched, document_url: fetched.first["url"])
     fetched
-  rescue Docuseal::Error, ArgumentError => e
-    # ArgumentError covers environments with no DocuSeal credentials configured
+  rescue Docuseal::Error, Faraday::Error, ArgumentError => e
+    # Faraday::Error covers DocuSeal being unreachable (timeouts, refused
+    # connections); ArgumentError covers environments with no DocuSeal
+    # credentials configured
     Rails.logger.warn("[Docuseal] refresh_documents_from_docuseal! failed for consent #{id}: #{e.message}")
     signed_documents
   end
@@ -293,6 +295,12 @@ class Consent < ApplicationRecord
 
   def participant_events_to_update
     [ participant_event ].compact
+  end
+
+  # The pass never shows signed documents, so refreshing their URLs (which
+  # admins do on every click) shouldn't push to anyone's wallet.
+  def wallet_pass_relevant_change?
+    (saved_changes.keys - %w[documents document_url updated_at]).any?
   end
 
   def inherit_docuseal_host_from_event
