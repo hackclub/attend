@@ -474,6 +474,98 @@ RSpec.describe "Admin::Participants", type: :request do
       }.to change { AuditLog.where(action: "resend_invitation").count }.by(1)
     end
   end
+
+  describe "clearing a bounce flag" do
+    let(:participant) { create(:participant, email: "flagged@example.com", email_undeliverable_at: 1.day.ago) }
+    let(:participant_event) { create(:participant_event, event: event, participant: participant) }
+    let(:guardian) { create(:guardian, email: "flagged-guardian@example.com", email_undeliverable_at: 1.day.ago) }
+    let(:gpe) { create(:guardian_participant_event, participant_event: participant_event, guardian: guardian) }
+    let(:event_admin) do
+      User.create!(email: "ea-bounce@example.com", name: "Event Admin", admin_console_beta: false).tap do |user|
+        EventRoleAssignment.create!(user: user, event: event, role: "event_admin")
+      end
+    end
+
+    context "as a global admin" do
+      before { sign_in global_admin }
+
+      it "clears the participant's flag and audit-logs it" do
+        expect {
+          post clear_email_bounce_admin_event_participant_path(event, participant_event)
+        }.to change { AuditLog.where(action: "clear_email_bounce", record: participant).count }.by(1)
+
+        expect(participant.reload.email_undeliverable_at).to be_nil
+        expect(flash[:notice]).to include("Cleared the bounce flag on flagged@example.com")
+      end
+
+      it "lets the invitation go out once cleared" do
+        participant_event.update!(status: :invited)
+        post clear_email_bounce_admin_event_participant_path(event, participant_event)
+
+        expect {
+          post resend_invitation_admin_event_participant_path(event, participant_event)
+        }.to have_enqueued_mail(ParticipantMailer, :invitation)
+      end
+
+      it "says so when there's no flag to clear" do
+        participant.update!(email_undeliverable_at: nil)
+
+        post clear_email_bounce_admin_event_participant_path(event, participant_event)
+
+        expect(flash[:alert]).to include("isn't flagged as bouncing")
+      end
+
+      it "clears a guardian's flag" do
+        post clear_guardian_email_bounce_admin_event_participant_path(event, participant_event, guardian_participant_event_id: gpe.id)
+
+        expect(guardian.reload.email_undeliverable_at).to be_nil
+        expect(participant.reload.email_undeliverable_at).to be_present
+      end
+
+      [ false, true ].each do |console|
+        it "offers the clear buttons on the participant page#{' in the console' if console}" do
+          global_admin.update!(admin_console_beta: console)
+          gpe
+
+          get admin_event_participant_path(event, participant_event)
+
+          expect(response.body).to include(clear_email_bounce_admin_event_participant_path(event, participant_event))
+          expect(response.body).to include(clear_guardian_email_bounce_admin_event_participant_path(event, participant_event, guardian_participant_event_id: gpe.id))
+        end
+      end
+    end
+
+    context "as an event admin" do
+      before { sign_in event_admin }
+
+      it "refuses to clear the participant's flag" do
+        post clear_email_bounce_admin_event_participant_path(event, participant_event)
+
+        expect(participant.reload.email_undeliverable_at).to be_present
+        expect(flash[:alert]).to include("not authorized")
+      end
+
+      it "refuses to clear a guardian's flag" do
+        post clear_guardian_email_bounce_admin_event_participant_path(event, participant_event, guardian_participant_event_id: gpe.id)
+
+        expect(guardian.reload.email_undeliverable_at).to be_present
+      end
+
+      [ false, true ].each do |console|
+        it "doesn't show the clear buttons#{' in the console' if console}" do
+          event_admin.update!(admin_console_beta: console)
+          gpe
+
+          get admin_event_participant_path(event, participant_event)
+
+          expect(response).to have_http_status(:ok)
+          expect(response.body).to include("Email bouncing")
+          expect(response.body).not_to include("Clear bounce flag")
+        end
+      end
+    end
+  end
+
   describe "DELETE destroy" do
     it "revokes the invitation so the removal cannot be undone by the old link" do
       participant = create(:participant, email: "removed@example.com")
