@@ -28,6 +28,22 @@ RSpec.describe Event, "visa letters" do
     end
   end
 
+  it "closes the public form a week before the event starts unless a deadline is set" do
+    event.update!(visa_letters: "open", starts_at: Time.utc(2027, 3, 5, 17), ends_at: Time.utc(2027, 3, 7, 22))
+    expect(event.visa_letter_deadline_date).to be_nil
+    expect(event.visa_letter_closes_on).to eq(Date.new(2027, 2, 26))
+
+    travel_to Time.utc(2027, 2, 27, 7, 59) do # still the 26th in California
+      expect(event).to be_accepting_visa_letter_applications
+    end
+    travel_to Time.utc(2027, 2, 27, 8, 1) do
+      expect(event).not_to be_accepting_visa_letter_applications
+    end
+
+    event.update!(visa_letter_deadline: "2027-03-01")
+    expect(event.visa_letter_closes_on).to eq(Date.new(2027, 3, 1))
+  end
+
   it "rejects a deadline that isn't a date" do
     event.visa_letter_deadline = "next friday"
 

@@ -172,7 +172,7 @@ class User < ApplicationRecord
       attrs = {
         hack_club_account_id: auth.uid,
         name: display_name || user.name,
-        oidc_claims: oidc_claims
+        oidc_claims: keep_claims_not_granted(oidc_claims, user.oidc_claims, auth)
       }
       if email && user.claim_email!(email)
         attrs[:email] = email
@@ -205,6 +205,24 @@ class User < ApplicationRecord
     user.sync_email_to_participant
     user.backfill_contact_from_claims!
     user
+  end
+
+  # The claims behind the scopes only the visa letter pages ask for (see
+  # `extra_scopes` in config/initializers/devise.rb). "address" is the one
+  # address older sign-ins kept.
+  CLAIMS_BY_EXTRA_SCOPE = {
+    "address" => %w[addresses address],
+    "legal_name" => %w[legal_first_name legal_last_name]
+  }.freeze
+
+  # A sign-in that wasn't granted one of those scopes keeps what an earlier
+  # one brought in for it. This goes by the scopes HCA granted, not by which
+  # claims came back: HCA leaves out an empty list of addresses, so someone
+  # who has deleted them all mustn't keep the old ones.
+  def self.keep_claims_not_granted(claims, previous, auth)
+    granted = auth.extra&.scope.to_s.split
+    kept = CLAIMS_BY_EXTRA_SCOPE.reject { |scope, _| granted.include?(scope) }.values.flatten
+    claims.merge((previous || {}).to_h.stringify_keys.slice(*kept))
   end
 
   # A row created by an admin adding someone by email (staff, series member,
@@ -359,7 +377,6 @@ class User < ApplicationRecord
     if raw["identity"]
       # HCA API format
       identity = raw["identity"].with_indifferent_access
-      primary_address = identity["addresses"]&.find { |a| a["primary"] } || identity["addresses"]&.first
       {
         given_name: identity["first_name"] || raw["given_name"] || auth.info.first_name,
         family_name: identity["last_name"] || raw["family_name"] || auth.info.last_name,
@@ -369,7 +386,9 @@ class User < ApplicationRecord
         email: identity["primary_email"] || raw["email"] || auth.info.email,
         phone_number: raw["phone"] || raw["phone_number"] || identity["phone"] || identity["phone_number"] || auth.info.phone,
         birthdate: identity["birthday"] || raw["birthdate"],
-        address: primary_address&.slice("line_1", "line_2", "city", "state", "postal_code", "country") || oidc_address(raw["address"]),
+        # Every address, as HCA lists them: #hack_club_auth_addresses puts the primary first.
+        addresses: identity["addresses"]&.map { |address| address.slice("id", "line_1", "line_2", "city", "state", "postal_code", "country", "primary") } ||
+          oidc_addresses(raw["address"]),
         slack_id: identity["slack_id"],
         verification_status: identity["verification_status"],
         ysws_eligible: identity["ysws_eligible"]
@@ -383,7 +402,7 @@ class User < ApplicationRecord
         email: raw["email"] || auth.info.email,
         phone_number: raw["phone"] || raw["phone_number"] || auth.info.phone,
         birthdate: raw["birthdate"],
-        address: oidc_address(raw["address"]),
+        addresses: oidc_addresses(raw["address"]),
         slack_id: raw["slack_id"],
         verification_status: raw["verification_status"],
         ysws_eligible: raw["ysws_eligible"]
@@ -391,10 +410,27 @@ class User < ApplicationRecord
     end
   end
 
-  def self.oidc_address(address)
+  # OIDC's standard address claim, as a list of one in HCA's shape, so
+  # "addresses" holds one kind of address whichever format signed them in.
+  def self.oidc_addresses(address)
     return nil unless address.is_a?(Hash)
 
-    address.slice("street_address", "locality", "region", "postal_code", "country").presence
+    address = { "line_1" => address["street_address"], "city" => address["locality"], "state" => address["region"],
+      "postal_code" => address["postal_code"], "country" => address["country"] }.compact_blank
+    [ address ] if address.any?
+  end
+
+  # The mailing addresses on the account in Hack Club Auth, primary first: the
+  # one place that decides the order, so the visa letter form and onboarding
+  # agree on which is primary. Sign-ins from before Attend kept every address
+  # have only the primary one, as "address", in HCA's shape or OIDC's
+  # (street_address, locality, region). Once a sign-in has the list, it's the
+  # list, even empty: the old one may since have been removed.
+  def hack_club_auth_addresses
+    claims = (oidc_claims || {}).to_h.stringify_keys
+    addresses = Array.wrap(claims.key?("addresses") ? claims["addresses"] : claims["address"].presence)
+    primary, others = addresses.map { |address| address.to_h.stringify_keys }.partition { |address| address["primary"] }
+    primary + others
   end
 
   # Identity-verified through Hack Club Auth (same signal the admin UI shows).

@@ -36,7 +36,8 @@
   <% else %>
     <div class="portal-card p-5 sm:p-6 mb-10">
       <p class="portal-body mb-4">Sign in with your Hack Club account to apply for a visa letter or check on your application.</p>
-      <%= button_to user_hack_club_omniauth_authorize_path, method: :post, data: { turbo: false }, class: "portal-btn portal-btn-primary" do %>
+      <%# Also asks for the addresses and legal names the letter needs (`extra_scopes` in config/initializers/devise.rb). %>
+      <%= button_to user_hack_club_omniauth_authorize_path, method: :post, params: { extra_scopes: "visa_letter" }, data: { turbo: false }, class: "portal-btn portal-btn-primary" do %>
         Continue with Hack Club
       <% end %>
     </div>
@@ -59,7 +60,7 @@
             <% if event.venue_name.present? %>
               <div><dt class="inline font-semibold">Venue:</dt> <dd class="inline"><%= event.venue_name %></dd></div>
             <% end %>
-            <% if (deadline = event.visa_letter_deadline_date) %>
+            <% if (deadline = event.visa_letter_closes_on) %>
               <div><dt class="inline font-semibold">Application Deadline:</dt> <dd class="inline"><%= deadline.strftime("%B %d, %Y") %></dd></div>
             <% end %>
           </dl>

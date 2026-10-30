@@ -176,7 +176,7 @@ RSpec.describe User, type: :model do
   describe ".from_omniauth" do
     # Mirrors what OmniAuth::Strategies::HackClub#info builds, so this covers
     # the model half of the flow (see spec/lib/omniauth/strategies for the rest).
-    def auth_hash(raw_info)
+    def auth_hash(raw_info, scope = nil)
       identity = raw_info["identity"] || {}
       email = raw_info["email"] || identity["primary_email"]
       first_name = raw_info["given_name"] || identity["first_name"]
@@ -192,7 +192,7 @@ RSpec.describe User, type: :model do
             [ first_name, last_name ].compact.join(" ").presence ||
             email&.split("@")&.first
         },
-        extra: { raw_info: raw_info }
+        extra: { raw_info: raw_info, scope: scope }.compact
       )
     end
 
@@ -223,7 +223,66 @@ RSpec.describe User, type: :model do
         "birthdate" => "2008-04-02",
         "slack_id" => "U07BLJ1MBEE"
       )
-      expect(user.oidc_claims["address"]).to include("locality" => "Shelburne")
+      # OIDC's address, in the shape of Hack Club Auth's own.
+      expect(user.oidc_claims["addresses"]).to eq([
+        { "line_1" => "15 Falls Rd", "city" => "Shelburne", "state" => "VT", "postal_code" => "05482", "country" => "US" }
+      ])
+      expect(user.oidc_claims).not_to have_key("address")
+    end
+
+    it "keeps every mailing address on the account, and nothing else about the address" do
+      user = User.from_omniauth(auth_hash("identity" => identity.merge("addresses" => [
+        { "id" => "addr!a", "first_name" => "Ada", "line_1" => "3 Example Lane", "city" => "Sample Town", "country" => "GB" },
+        { "id" => "addr!b", "line_1" => "2 Sample Road", "city" => "Example City", "country" => "GB", "phone_number" => "+12025550123", "primary" => true }
+      ])))
+
+      expect(user.oidc_claims["addresses"]).to eq([
+        { "id" => "addr!a", "line_1" => "3 Example Lane", "city" => "Sample Town", "country" => "GB" },
+        { "id" => "addr!b", "line_1" => "2 Sample Road", "city" => "Example City", "country" => "GB", "primary" => true }
+      ])
+      expect(user.oidc_claims).not_to have_key("address")
+      expect(user.hack_club_auth_addresses.first).to include("id" => "addr!b")
+    end
+
+    describe "addresses and legal names, which only the visa letter pages ask for" do
+      let(:usual_scope) { "openid profile email slack_id phone birthdate verification_status" }
+      let(:visa_scope) { "#{usual_scope} address legal_name" }
+      let(:home) { { "id" => "addr!home", "line_1" => "2 Sample Road", "city" => "Example City", "country" => "GB", "primary" => true } }
+      let(:visa_identity) { identity.merge("legal_first_name" => "Ada", "legal_last_name" => "Example", "addresses" => [ home ]) }
+
+      it "keeps them through a later sign-in that wasn't granted them" do
+        User.from_omniauth(auth_hash({ "identity" => visa_identity }, visa_scope))
+        user = User.from_omniauth(auth_hash({ "identity" => identity.merge("slack_id" => "U0EXAMPLE2") }, usual_scope))
+
+        expect(user.oidc_claims).to include("legal_first_name" => "Ada", "legal_last_name" => "Example", "addresses" => [ home ],
+          "slack_id" => "U0EXAMPLE2")
+      end
+
+      # HCA leaves out an empty list of addresses, so a sign-in that was
+      # granted them and got none means there are none.
+      it "drops what's gone from the account when a sign-in was granted them" do
+        User.from_omniauth(auth_hash({ "identity" => visa_identity }, visa_scope))
+        user = User.from_omniauth(auth_hash({ "identity" => identity }, visa_scope))
+
+        expect(user.oidc_claims.keys).not_to include("addresses", "address", "legal_first_name", "legal_last_name")
+      end
+
+      it "keeps only what goes with the scopes a sign-in wasn't granted" do
+        User.from_omniauth(auth_hash({ "identity" => visa_identity }, visa_scope))
+        user = User.from_omniauth(auth_hash({ "identity" => identity.merge("legal_first_name" => "Adaline", "legal_last_name" => "Example") },
+          "#{usual_scope} legal_name"))
+
+        expect(user.oidc_claims).to include("legal_first_name" => "Adaline", "addresses" => [ home ])
+      end
+
+      it "keeps the single address older sign-ins kept" do
+        older = { "line_1" => "2 Sample Road", "city" => "Example City", "country" => "GB" }
+        user = create(:user, email: identity["primary_email"], hack_club_account_id: identity["id"], oidc_claims: { "address" => older })
+
+        User.from_omniauth(auth_hash({ "identity" => identity }, usual_scope))
+
+        expect(user.reload.oidc_claims["address"]).to eq(older)
+      end
     end
 
     it "repairs a stale verified_slack_id on sign-in when the claims haven't changed" do
@@ -404,6 +463,28 @@ RSpec.describe User, type: :model do
           expect(User.exists?(placeholder.id)).to be(true)
         end
       end
+    end
+  end
+
+  describe "#hack_club_auth_addresses" do
+    let(:home) { { "id" => "addr!home", "line_1" => "2 Sample Road", "city" => "Example City", "country" => "GB", "primary" => true } }
+    let(:school) { { "id" => "addr!school", "line_1" => "3 Example Lane", "city" => "Sample Town", "country" => "GB" } }
+
+    it "lists the account's addresses with the primary one first" do
+      expect(build(:user, oidc_claims: { "addresses" => [ school, home ] }).hack_club_auth_addresses).to eq([ home, school ])
+      expect(build(:user, oidc_claims: { "addresses" => [ school.merge("primary" => false) ] }).hack_club_auth_addresses).to eq([ school.merge("primary" => false) ])
+    end
+
+    it "falls back to the one address a sign-in from before kept, in either shape" do
+      oidc = { "street_address" => "15 Example Rd", "locality" => "Sample Town", "country" => "US" }
+
+      expect(build(:user, oidc_claims: { "address" => home.except("id", "primary") }).hack_club_auth_addresses).to eq([ home.except("id", "primary") ])
+      expect(build(:user, oidc_claims: { "address" => oidc }).hack_club_auth_addresses).to eq([ oidc ])
+      expect(build(:user, oidc_claims: {}).hack_club_auth_addresses).to eq([])
+    end
+
+    it "goes by the list once a sign-in has one, even when it's empty" do
+      expect(build(:user, oidc_claims: { "addresses" => [], "address" => home.except("id", "primary") }).hack_club_auth_addresses).to eq([])
     end
   end
 

@@ -3,15 +3,15 @@ require "rails_helper"
 RSpec.describe "Asking for a visa letter", type: :request do
   include Devise::Test::IntegrationHelpers
 
-  let(:event) { create(:event, name: "Fictional Hackathon", visa_letters: "open") }
+  let(:event) { create(:event, name: "Fictional Hackathon", visa_letters: "open", starts_at: 1.month.from_now, ends_at: 1.month.from_now + 2.days) }
   let(:applicant) do
     create(:user, email: "ada@example.com", hack_club_account_id: "ident!ada",
-      oidc_claims: { "legal_first_name" => "Ada", "legal_last_name" => "Example", "birthdate" => "2008-04-01",
-                     "phone_number" => "+12025550123", "address" => { "line_1" => "2 Sample Road", "city" => "Example City", "country" => "GB" } })
+      oidc_claims: { "legal_first_name" => "Ada", "legal_last_name" => "Example", "birthdate" => "2008-04-01", "phone_number" => "+12025550123",
+                     "addresses" => [ { "id" => "addr!home", "line_1" => "2 Sample Road", "city" => "Example City", "country" => "GB", "primary" => true } ] })
   end
   let(:details) do
     { full_name: "Ada Example", date_of_birth: "2008-04-01", nationality: "United Kingdom",
-      place_of_birth: "Example City", phone: "+12025550123", address: "2 Sample Road\nExample City" }
+      place_of_birth: "Example City", phone: "+12025550123", address: "2 Sample Road\nExample City", address_id: "addr!home" }
   end
 
   before { create(:visa_letter_template, :default) }
@@ -34,7 +34,7 @@ RSpec.describe "Asking for a visa letter", type: :request do
 
     get visas_path
 
-    expect(response.body).to include("Fictional Hackathon")
+    expect(response.body).to include("Fictional Hackathon", "Application Deadline:", event.visa_letter_closes_on.strftime("%B %d, %Y"))
     expect(response.body).not_to include("Invite Only Hackathon")
   end
 
@@ -45,7 +45,20 @@ RSpec.describe "Asking for a visa letter", type: :request do
       get visas_apply_path(event.slug)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include('value="Ada Example"', 'value="2008-04-01"', "2 Sample Road")
+      expect(response.body).to include('value="Ada Example"', 'value="2008-04-01"', "2 Sample Road",
+        "It must match your passport exactly, including any middle names.")
+    end
+
+    it "leaves their citizenship for them to choose, whatever country they live in" do
+      applicant.update!(oidc_claims: applicant.oidc_claims.merge("addresses" => [
+        { "id" => "addr!home", "line_1" => "2 Sample Road", "city" => "Example City", "country" => "AE", "primary" => true }
+      ]))
+      create(:participant, user: applicant, email: applicant.email, country_of_residence: "United Arab Emirates")
+
+      get visas_apply_path(event.slug)
+
+      expect(response.body).to include("2 Sample Road, Example City, United Arab Emirates")
+      expect(response.body).not_to include('<option selected="selected" value="United Arab Emirates">')
     end
 
     it "uses the birthday and mailing address on their Hack Club account, whatever the form sends" do
@@ -54,6 +67,81 @@ RSpec.describe "Asking for a visa letter", type: :request do
       application = VisaLetterApplication.last
       expect(application.date_of_birth).to eq(Date.new(2008, 4, 1))
       expect(application.address).to eq("2 Sample Road\nExample City\nUnited Kingdom")
+    end
+
+    it "offers every address on their Hack Club account, primary first, and uses the one they pick" do
+      applicant.update!(oidc_claims: applicant.oidc_claims.merge("addresses" => [
+        { "id" => "addr!school", "line_1" => "3 Example Lane", "city" => "Sample Town", "country" => "GB" },
+        { "id" => "addr!home", "line_1" => "2 Sample Road", "city" => "Example City", "country" => "GB", "primary" => true }
+      ]))
+
+      get visas_apply_path(event.slug)
+      expect(response.body).to include("2 Sample Road, Example City, United Kingdom", "3 Example Lane, Sample Town, United Kingdom",
+        "To use a different address, add it at", "refresh from your Hack Club account")
+      expect(response.body.index("2 Sample Road")).to be < response.body.index("3 Example Lane")
+      expect(response.body).to include('<option selected="selected" value="addr!home">')
+
+      post visas_apply_path(event.slug), params: { visa_letter_application: details.merge(address_id: "addr!school", address: "Somewhere else") }
+      expect(VisaLetterApplication.last.address).to eq("3 Example Lane\nSample Town\nUnited Kingdom")
+    end
+
+    it "says when the address they picked isn't on their Hack Club account any more" do
+      post visas_apply_path(event.slug), params: { visa_letter_application: details.merge(address_id: "addr!removed") }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.body).to include("Address is no longer on your Hack Club account. Please pick one below.",
+        '<option selected="selected" value="addr!home">')
+      expect(response.body).not_to include("Address can&#39;t be blank")
+      expect(VisaLetterApplication.count).to eq(0)
+
+      # A form from before their account had any addresses sends a typed one.
+      post visas_apply_path(event.slug), params: { visa_letter_application: details.except(:address_id) }
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.body).to include("Address needs to be one from your Hack Club account. Please pick one below.")
+    end
+
+    it "offers the one address an older sign-in kept, under a key that doesn't depend on its place in the list" do
+      applicant.update!(oidc_claims: applicant.oidc_claims.except("addresses").merge(
+        "address" => { "street_address" => "15 Example Rd", "locality" => "Sample Town", "region" => "VT", "country" => "US" }
+      ))
+      key = VisaLetterApplication.hack_club_auth_addresses(applicant).keys.sole
+
+      get visas_apply_path(event.slug)
+      expect(response.body).to include(%(<option selected="selected" value="#{key}">15 Example Rd, Sample Town, VT, United States</option>))
+      expect(key).not_to eq("0")
+
+      post visas_apply_path(event.slug), params: { visa_letter_application: details.merge(address_id: key) }
+      expect(VisaLetterApplication.last.address).to eq("15 Example Rd\nSample Town, VT\nUnited States")
+    end
+
+    context "refreshing from Hack Club Auth after adding an address there" do
+      around do |example|
+        OmniAuth.config.test_mode = true
+        example.run
+      ensure
+        OmniAuth.config.mock_auth[:hack_club] = nil
+        OmniAuth.config.test_mode = false
+      end
+
+      it "goes through Hack Club Auth and back to the form, with the new address to pick" do
+        OmniAuth.config.mock_auth[:hack_club] = OmniAuth::AuthHash.new(
+          provider: "hack_club", uid: "ident!ada", info: { email: "ada@example.com", name: "Ada Example" },
+          extra: { scope: "openid profile email address legal_name", raw_info: { "identity" => { "id" => "ident!ada", "primary_email" => "ada@example.com", "addresses" => [
+            { "id" => "addr!new", "line_1" => "4 Fictional Way", "city" => "Sample Town", "country" => "GB", "primary" => true }
+          ] } } }
+        )
+
+        get visas_apply_path(event.slug)
+        expect(response.body).to include('form="refresh_from_hack_club_auth"', %(value="#{visas_apply_path(event.slug)}"))
+
+        post user_hack_club_omniauth_authorize_path, params: { refresh: visas_apply_path(event.slug), extra_scopes: "visa_letter" }
+        follow_redirect!
+        expect(response).to redirect_to(visas_apply_path(event.slug))
+        expect(flash[:notice]).to eq("Updated from your Hack Club account.")
+
+        follow_redirect!
+        expect(response.body).to include("4 Fictional Way, Sample Town, United Kingdom")
+      end
     end
 
     it "lets them type a birthday and address their Hack Club account doesn't have" do
@@ -92,6 +180,14 @@ RSpec.describe "Asking for a visa letter", type: :request do
       expect(response.body).to include("This event is no longer accepting applications.")
 
       event.update!(visa_letters: "open", visa_letter_deadline: 1.week.ago.to_date.iso8601)
+      apply
+      expect(response).to have_http_status(:forbidden)
+      expect(VisaLetterApplication.count).to eq(0)
+    end
+
+    it "closes a week before the event starts when no deadline is set" do
+      event.update!(starts_at: 3.days.from_now, ends_at: 5.days.from_now)
+
       apply
       expect(response).to have_http_status(:forbidden)
       expect(VisaLetterApplication.count).to eq(0)
@@ -149,6 +245,32 @@ RSpec.describe "Asking for a visa letter", type: :request do
         expect { apply }.not_to change(VisaLetterApplication, :count)
         expect(application.reload).to be_pending
         expect(application.rejection_reason).to be_nil
+      end
+
+      it "doesn't say the name they're correcting came from their Hack Club account" do
+        application.update!(full_name: "Ada Exampel")
+        application.reject!(by: create(:user), reason: "The name doesn't match your passport.")
+
+        get visas_apply_path(event.slug)
+
+        expect(response.body).to include('value="Ada Exampel"', "It must match your passport exactly, including any middle names.")
+        expect(response.body).not_to include("Filled in from your Hack Club account")
+      end
+
+      it "still shows the rejection reason when a resubmission has something to fix" do
+        application.reject!(by: create(:user), reason: "Name mismatch")
+
+        post visas_apply_path(event.slug), params: { visa_letter_application: details.merge(full_name: "Ada Quinn Example", phone: "not a phone") }
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.body).to include("Previous Rejection Reason", "Name mismatch", 'value="Ada Quinn Example"')
+
+        post visas_apply_path(event.slug), params: { visa_letter_application: details.merge(address_id: "addr!removed") }
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.body).to include("Previous Rejection Reason", "Name mismatch",
+          "Address is no longer on your Hack Club account. Please pick one below.")
+        expect(response.body).not_to include("Address can&#39;t be blank")
+
+        expect(application.reload).to have_attributes(status: "rejected", rejection_reason: "Name mismatch")
       end
 
       it "lets a soft-rejected applicant reapply from the email's link once the form is invite-only" do

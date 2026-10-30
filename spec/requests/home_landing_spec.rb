@@ -100,5 +100,21 @@ RSpec.describe "Landing after sign-in", type: :request do
       get "/users/auth/hack_club/callback"
       expect(response).to redirect_to(admin_root_path)
     end
+
+    # Only a refresh goes back where it came from (see
+    # spec/requests/visa_letter_hack_club_refresh_spec.rb). OmniAuth's origin
+    # is the Referer, or whatever a request sent, and lingers in the session.
+    it "lands where signing in does, whatever origin it came from" do
+      create(:user, email: "returning@example.com", hack_club_account_id: "hca-example-2")
+      OmniAuth.config.mock_auth[:hack_club] = OmniAuth::AuthHash.new(
+        provider: "hack_club", uid: "hca-example-2", info: { email: "returning@example.com", name: "Example Person" }
+      )
+
+      post user_hack_club_omniauth_authorize_path, params: { origin: "/visas" }
+      follow_redirect!
+
+      expect(response).to redirect_to(root_path)
+      expect(flash[:notice]).to eq("Successfully authenticated from Hack Club Auth account.")
+    end
   end
 end

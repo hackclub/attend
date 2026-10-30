@@ -32,14 +32,16 @@ class VisaLettersController < ApplicationController
     return if redirected_to_existing_application? || refused?
 
     @application = @existing&.tap { |existing| existing.assign_attributes(@locked) } ||
-      @event.visa_letter_applications.new(VisaLetterApplication.prefill_for(current_user))
+      @event.visa_letter_applications.new(VisaLetterApplication.prefill_for(current_user, locked: @locked, addresses: @addresses))
   end
 
   def create
     return if redirected_to_existing_application? || refused?
 
-    # What Hack Club Auth holds wins over anything typed into a locked field.
+    # What Hack Club Auth holds wins over anything typed into a locked field,
+    # and the address is one of the account's there when it has any.
     attributes = applicant_params.merge(@locked)
+    attributes[:address] = @addresses[picked_address_id] if @addresses.any?
     if @existing
       @application = @existing
       @application.resubmit!(attributes.merge(visa_letter_invitation: @invitation || @existing.visa_letter_invitation),
@@ -49,7 +51,7 @@ class VisaLettersController < ApplicationController
         user: current_user, email: current_user.email, visa_letter_invitation: @invitation
       ))
       unless @application.save
-        render :new, status: :unprocessable_entity
+        render_form_again
         return
       end
     end
@@ -59,7 +61,7 @@ class VisaLettersController < ApplicationController
     VisaLetterMailer.new_application(application: @application).deliver_later
     redirect_to visas_application_path(@application), notice: "Your application has been submitted!"
   rescue ActiveRecord::RecordInvalid
-    render :new, status: :unprocessable_entity
+    render_form_again
   end
 
   def show
@@ -100,6 +102,7 @@ class VisaLettersController < ApplicationController
     @existing = @event.visa_letter_applications.find_by(user: current_user)
     @invitation = invitation_for_this_person
     @locked = VisaLetterApplication.locked_by_hack_club_auth(current_user)
+    @addresses = VisaLetterApplication.hack_club_auth_addresses(current_user)
   end
 
   def set_application
@@ -175,5 +178,26 @@ class VisaLettersController < ApplicationController
 
   def applicant_params
     params.require(:visa_letter_application).permit(*APPLICANT_FIELDS)
+  end
+
+  # Which of @addresses the form's list says, by its key.
+  def picked_address_id
+    params.dig(:visa_letter_application, :address_id).to_s
+  end
+
+  # The form again, with what to fix. When the account has addresses in Hack
+  # Club Auth but the one sent isn't among them (removed there since the form
+  # loaded, or the form had no list then), that's what they're told, rather
+  # than that the address is blank beside a list they've filled in.
+  def render_form_again
+    if @addresses.any? && !@addresses.key?(picked_address_id)
+      @application.errors.delete(:address)
+      if picked_address_id.blank?
+        @application.errors.add(:address_id, "needs to be one from your Hack Club account. Please pick one below.")
+      else
+        @application.errors.add(:address_id, "is no longer on your Hack Club account. Please pick one below.")
+      end
+    end
+    render :new, status: :unprocessable_entity
   end
 end

@@ -19,6 +19,14 @@ module VisaLettersHelper
     visas_apply_path(event.slug) if event.visa_letters_enabled?
   end
 
+  # What leaving the deadline empty does, for the settings form.
+  def visa_letter_default_deadline_hint(event)
+    default = event.visa_letter_default_deadline
+    return "Leave it empty to keep it open until you turn it off." if default.nil?
+
+    "Leave it empty to close it a week before the event starts (#{default.strftime("%B %-d, %Y")})."
+  end
+
   # [status type, label] for cs_status and the legacy badges. Envoy's labels.
   def visa_letter_status(application)
     case application.status

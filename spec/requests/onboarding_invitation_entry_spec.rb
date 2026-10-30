@@ -63,6 +63,33 @@ RSpec.describe "onboarding invitation entry", type: :request do
     expect(response).to redirect_to(root_path)
   end
 
+  it "starts a new registrant's profile from their Hack Club account, with its primary address" do
+    sign_in create(:user, email: invitation.email, oidc_claims: {
+      "legal_first_name" => "Dana", "legal_last_name" => "Lee", "addresses" => [
+        { "id" => "addr!school", "line_1" => "3 Example Lane", "city" => "Sample Town", "country" => "US" },
+        { "id" => "addr!home", "line_1" => "2 Sample Road", "line_2" => "Unit 1", "city" => "Example City", "state" => "VT",
+          "postal_code" => "05401", "country" => "US", "primary" => true }
+      ]
+    })
+
+    get onboarding_path(invite: invitation.token)
+
+    expect(Participant.find_by!(email: invitation.email)).to have_attributes(legal_first_name: "Dana", address_line_1: "2 Sample Road",
+      address_line_2: "Unit 1", city: "Example City", state: "VT", postal_code: "05401", country_of_residence: "US")
+  end
+
+  it "fills a registrant's missing address from the one address an older sign-in kept" do
+    user = create(:user, email: invitation.email, oidc_claims: {
+      "address" => { "street_address" => "15 Example Rd", "locality" => "Sample Town", "region" => "VT", "country" => "US" }
+    })
+    participant = create(:participant, email: invitation.email, user: user)
+    sign_in user
+
+    get onboarding_path(invite: invitation.token)
+
+    expect(participant.reload).to have_attributes(address_line_1: "15 Example Rd", city: "Sample Town", state: "VT")
+  end
+
   it "explains an account mismatch before linking or creating records" do
     user = create(:user, email: "wrong@example.com")
     sign_in user
