@@ -96,11 +96,13 @@ module DocusealJobs
         sent_at: Time.current
       )
 
-      # Send email to teen with their signing link
+      # Send email to teen with their signing link. waiver_ready is delayed
+      # because the teen is usually on the waiver page signing right now; the
+      # mailer skips it if they've signed by the time it goes out.
       if dates_changed
         ParticipantMailer.waiver_dates_changed(participant_event: participant_event).deliver_later
       else
-        ParticipantMailer.waiver_ready(participant_event: participant_event).deliver_later
+        ParticipantMailer.waiver_ready(participant_event: participant_event).deliver_later(wait: 10.minutes)
       end
     rescue Docuseal::RateLimitError => e
       Rails.logger.warn("Docuseal rate limit hit, retrying in 30 seconds")

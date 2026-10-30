@@ -20,6 +20,26 @@ RSpec.describe ParticipantMailer, type: :mailer do
         expect(body).not_to include("to complete your registration")
       end
     end
+
+    it "sends nothing once the participant has signed their portion" do
+      participant_event = create(:participant_event, participant: create(:participant, date_of_birth: 16.years.ago))
+      create(:consent, participant_event: participant_event, status: :sent,
+        docuseal_participant_slug: "participant", participant_signed_at: 1.minute.ago)
+
+      mail = described_class.waiver_ready(participant_event: participant_event)
+
+      expect(mail.message).to be_a(ActionMailer::Base::NullMail)
+    end
+
+    it "still sends while the participant's portion is unsigned" do
+      participant_event = create(:participant_event, participant: create(:participant, date_of_birth: 16.years.ago))
+      create(:consent, participant_event: participant_event, status: :sent,
+        docuseal_participant_slug: "participant")
+
+      mail = described_class.waiver_ready(participant_event: participant_event)
+
+      expect(mail.subject).to start_with("Sign your waiver for")
+    end
   end
 
   it "greets a participant with no name on file as 'there'" do
