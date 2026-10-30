@@ -121,14 +121,24 @@ class VisaLetterApplication < ApplicationRecord
       raise InvalidTransition, "only a rejected application can be submitted again"
     end
 
-    update!(attributes.merge(status: :pending, rejection_type: nil, rejection_reason: nil,
-      reviewed_by: nil, reviewed_at: nil, submitted_at: Time.current, imported_at: nil))
+    review = { status: :pending, rejection_type: nil, rejection_reason: nil,
+      reviewed_by_id: nil, reviewed_at: nil, submitted_at: Time.current, imported_at: nil }
+    begin
+      update!(attributes.merge(review))
+    rescue ActiveRecord::RecordInvalid
+      # Until they fix what's wrong it's still rejected, with the reason
+      # they're answering. Their new details stay, for the form to show again.
+      restore_attributes(review.keys)
+      raise
+    end
   end
 
   # What a new application can start with: the details Hack Club Auth holds
   # for the account, then anything their Attend profile has that HCA doesn't.
-  # The applicant checks all of it against their passport.
-  def self.prefill_for(user)
+  # The applicant checks all of it against their passport. Not citizenship:
+  # Attend holds nothing that says it, and the country they live in isn't it.
+  # The form passes in the locked fields and addresses it has worked out.
+  def self.prefill_for(user, locked: locked_by_hack_club_auth(user), addresses: hack_club_auth_addresses(user))
     claims = (user.oidc_claims || {}).to_h.stringify_keys
     participant = user.participant
     name = [ claims["legal_first_name"].presence || claims["given_name"], claims["legal_last_name"].presence || claims["family_name"] ].compact_blank.join(" ")
@@ -138,9 +148,8 @@ class VisaLetterApplication < ApplicationRecord
       full_name: name.presence,
       date_of_birth: participant&.date_of_birth,
       phone: claims["phone_number"].presence || participant&.phone,
-      address: hack_club_auth_addresses(user).values.first || participant_address(participant),
-      nationality: CountryCodes.normalize(claims.dig("address", "country")) || participant&.country_of_residence.presence
-    }.compact.merge(locked_by_hack_club_auth(user))
+      address: addresses.values.first || participant_address(participant)
+    }.compact.merge(locked)
   end
 
   # The birthday Hack Club Auth holds for the account. Where it has one, the
@@ -151,15 +160,20 @@ class VisaLetterApplication < ApplicationRecord
     { date_of_birth: parse_date(claims["birthdate"]) }.compact
   end
 
-  # The mailing addresses on the account in Hack Club Auth, primary first, as
-  # { id => address }. Where there are any, the letter uses one of them: the
-  # applicant picks which, and adds a different one in Hack Club Auth.
+  # The mailing addresses on the account in Hack Club Auth, primary first
+  # (User#hack_club_auth_addresses), as { key => address }. Where there are
+  # any, the letter uses one of them: the applicant picks which, and adds a
+  # different one in Hack Club Auth.
+  #
+  # The form sends the key back, so it's a string, and points at the same
+  # address however the list changes in between: HCA's id, or for the address
+  # an older sign-in kept, which has none, one made from what it says.
   def self.hack_club_auth_addresses(user)
-    claims = (user.oidc_claims || {}).to_h.stringify_keys
-    # Sign-ins from before Attend asked for every address kept the primary one.
-    addresses = (Array(claims["addresses"]).presence || Array.wrap(claims["address"].presence)).map { |address| address.to_h.stringify_keys }
-    primary, others = addresses.partition { |address| address["primary"] }
-    (primary + others).each_with_index.to_h { |address, index| [ address["id"].presence || index.to_s, address_from_claims(address) ] }.compact
+    addresses = user.hack_club_auth_addresses.filter_map do |address|
+      formatted = address_from_claims(address)
+      [ address["id"].to_s.presence || Digest::SHA256.hexdigest(formatted).first(16), formatted ] if formatted
+    end
+    addresses.to_h
   end
 
   # Envoy's applications have no account until their owner signs in. A Hack

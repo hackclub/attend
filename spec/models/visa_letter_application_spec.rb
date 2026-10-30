@@ -217,6 +217,16 @@ RSpec.describe VisaLetterApplication do
       expect(application.reload).to have_attributes(status: "pending", full_name: "Ada Q. Example", rejection_reason: nil, reviewed_by: nil)
     end
 
+    it "leaves it rejected, with its reason, while the corrected details have something wrong" do
+      application.reject!(by: reviewer, reason: "Wrong name")
+
+      expect { application.resubmit!({ full_name: "Ada Q. Example", phone: "not a phone" }) }.to raise_error(ActiveRecord::RecordInvalid)
+
+      expect(application).to have_attributes(status: "rejected", rejection_reason: "Wrong name", full_name: "Ada Q. Example")
+      expect(application.errors[:phone]).to be_present
+      expect(application.reload).to have_attributes(status: "rejected", rejection_reason: "Wrong name")
+    end
+
     it "only reopens a hard rejection when staff have invited them again" do
       application.reject!(by: reviewer, reason: "Not eligible", type: :hard)
 
@@ -229,14 +239,30 @@ RSpec.describe VisaLetterApplication do
   describe ".prefill_for" do
     it "starts from the legal details Hack Club Auth holds, then the Attend profile" do
       user = create(:user, oidc_claims: { "legal_first_name" => "Ada", "legal_last_name" => "Example", "birthdate" => "2008-04-01",
-        "address" => { "line_1" => "2 Sample Road", "city" => "Example City", "postal_code" => "EX1 2AB", "country" => "GB" } })
+        "addresses" => [ { "id" => "addr!a", "line_1" => "2 Sample Road", "city" => "Example City", "postal_code" => "EX1 2AB", "country" => "GB" } ] })
       create(:participant, user: user, email: user.email, phone: "+12025550123")
 
       expect(described_class.locked_by_hack_club_auth(user).keys).to contain_exactly(:date_of_birth)
       expect(described_class.prefill_for(user)).to include(
         full_name: "Ada Example", date_of_birth: Date.new(2008, 4, 1), phone: "+12025550123",
-        address: "2 Sample Road\nExample City, EX1 2AB\nUnited Kingdom", nationality: "United Kingdom"
+        address: "2 Sample Road\nExample City, EX1 2AB\nUnited Kingdom"
       )
+    end
+
+    it "leaves citizenship out: the country they live in needn't be it" do
+      user = create(:user, oidc_claims: { "addresses" => [ { "id" => "addr!a", "line_1" => "2 Sample Road", "city" => "Example City", "country" => "AE" } ] })
+      create(:participant, user: user, email: user.email, country_of_residence: "United Arab Emirates")
+
+      expect(described_class.prefill_for(user)).not_to have_key(:nationality)
+    end
+
+    it "uses the locked fields and addresses it's given rather than working them out again" do
+      user = create(:user, oidc_claims: { "birthdate" => "2008-04-01" })
+
+      prefill = described_class.prefill_for(user, locked: {}, addresses: { "addr!a" => "2 Sample Road" })
+
+      expect(prefill).to include(address: "2 Sample Road")
+      expect(prefill).not_to have_key(:date_of_birth)
     end
   end
 
@@ -253,10 +279,25 @@ RSpec.describe VisaLetterApplication do
       )
 
       user.update!(oidc_claims: { "address" => { "line_1" => "2 Sample Road", "city" => "Example City", "country" => "GB" } })
-      expect(described_class.hack_club_auth_addresses(user)).to eq("0" => "2 Sample Road\nExample City\nUnited Kingdom")
+      expect(described_class.hack_club_auth_addresses(user).values).to eq([ "2 Sample Road\nExample City\nUnited Kingdom" ])
 
       user.update!(oidc_claims: {})
       expect(described_class.hack_club_auth_addresses(user)).to eq({})
+    end
+
+    it "keys them by strings the form sends back, each staying with its address however the list changes" do
+      user = create(:user, oidc_claims: { "addresses" => [ { "id" => 42, "line_1" => "2 Sample Road", "city" => "Example City" } ] })
+      expect(described_class.hack_club_auth_addresses(user).keys).to eq([ "42" ])
+
+      home = { "line_1" => "2 Sample Road", "city" => "Example City" }
+      school = { "line_1" => "3 Example Lane", "city" => "Sample Town" }
+      user.update!(oidc_claims: { "addresses" => [ home, school ] })
+      keys_by_address = described_class.hack_club_auth_addresses(user).invert
+
+      user.update!(oidc_claims: { "addresses" => [ school, home ] })
+      expect(described_class.hack_club_auth_addresses(user).invert).to eq(keys_by_address)
+      expect(keys_by_address.values).to all(be_a(String))
+      expect(keys_by_address.values).not_to include("0", "1")
     end
   end
 

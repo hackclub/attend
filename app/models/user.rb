@@ -359,7 +359,6 @@ class User < ApplicationRecord
     if raw["identity"]
       # HCA API format
       identity = raw["identity"].with_indifferent_access
-      primary_address = identity["addresses"]&.find { |a| a["primary"] } || identity["addresses"]&.first
       {
         given_name: identity["first_name"] || raw["given_name"] || auth.info.first_name,
         family_name: identity["last_name"] || raw["family_name"] || auth.info.last_name,
@@ -369,8 +368,9 @@ class User < ApplicationRecord
         email: identity["primary_email"] || raw["email"] || auth.info.email,
         phone_number: raw["phone"] || raw["phone_number"] || identity["phone"] || identity["phone_number"] || auth.info.phone,
         birthdate: identity["birthday"] || raw["birthdate"],
-        address: primary_address&.slice("line_1", "line_2", "city", "state", "postal_code", "country") || oidc_address(raw["address"]),
-        addresses: identity["addresses"]&.map { |address| address.slice("id", "line_1", "line_2", "city", "state", "postal_code", "country", "primary") },
+        # Every address, as HCA lists them: #hack_club_auth_addresses puts the primary first.
+        addresses: identity["addresses"]&.map { |address| address.slice("id", "line_1", "line_2", "city", "state", "postal_code", "country", "primary") } ||
+          oidc_addresses(raw["address"]),
         slack_id: identity["slack_id"],
         verification_status: identity["verification_status"],
         ysws_eligible: identity["ysws_eligible"]
@@ -384,7 +384,7 @@ class User < ApplicationRecord
         email: raw["email"] || auth.info.email,
         phone_number: raw["phone"] || raw["phone_number"] || auth.info.phone,
         birthdate: raw["birthdate"],
-        address: oidc_address(raw["address"]),
+        addresses: oidc_addresses(raw["address"]),
         slack_id: raw["slack_id"],
         verification_status: raw["verification_status"],
         ysws_eligible: raw["ysws_eligible"]
@@ -392,10 +392,27 @@ class User < ApplicationRecord
     end
   end
 
-  def self.oidc_address(address)
+  # OIDC's standard address claim, as a list of one in HCA's shape, so
+  # "addresses" holds one kind of address whichever format signed them in.
+  def self.oidc_addresses(address)
     return nil unless address.is_a?(Hash)
 
-    address.slice("street_address", "locality", "region", "postal_code", "country").presence
+    address = { "line_1" => address["street_address"], "city" => address["locality"], "state" => address["region"],
+      "postal_code" => address["postal_code"], "country" => address["country"] }.compact_blank
+    [ address ] if address.any?
+  end
+
+  # The mailing addresses on the account in Hack Club Auth, primary first: the
+  # one place that decides the order, so the visa letter form and onboarding
+  # agree on which is primary. Sign-ins from before Attend kept every address
+  # have only the primary one, as "address", in HCA's shape or OIDC's
+  # (street_address, locality, region). Once a sign-in has the list, it's the
+  # list, even empty: the old one may since have been removed.
+  def hack_club_auth_addresses
+    claims = (oidc_claims || {}).to_h.stringify_keys
+    addresses = Array.wrap(claims.key?("addresses") ? claims["addresses"] : claims["address"].presence)
+    primary, others = addresses.map { |address| address.to_h.stringify_keys }.partition { |address| address["primary"] }
+    primary + others
   end
 
   # Identity-verified through Hack Club Auth (same signal the admin UI shows).

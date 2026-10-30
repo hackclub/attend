@@ -1683,7 +1683,7 @@ class OnboardingController < ApplicationController
 
   def participant_attrs_from_oidc
     claims = current_user.oidc_claims || {}
-    address = claims["address"] || {}
+    address = current_user.hack_club_auth_addresses.first || {}
 
     # Prefer legal names from HCA API, fall back to given/family name
     first_name = claims["legal_first_name"].presence || claims["given_name"].presence
@@ -1699,7 +1699,8 @@ class OnboardingController < ApplicationController
     attrs[:phone] = claims["phone_number"] if claims["phone_number"].present?
     attrs[:date_of_birth] = Date.parse(claims["birthdate"]) if claims["birthdate"].present?
 
-    # Handle both HCA API format (line_1) and OIDC format (street_address)
+    # Handle both HCA API format (line_1) and OIDC format (street_address),
+    # which an older sign-in's address can still be in
     attrs[:address_line_1] = address["line_1"] || address["street_address"] if (address["line_1"] || address["street_address"]).present?
     attrs[:address_line_2] = address["line_2"] if address["line_2"].present?
     attrs[:city] = address["city"] || address["locality"] if (address["city"] || address["locality"]).present?
