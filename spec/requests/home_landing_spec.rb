@@ -100,5 +100,22 @@ RSpec.describe "Landing after sign-in", type: :request do
       get "/users/auth/hack_club/callback"
       expect(response).to redirect_to(admin_root_path)
     end
+
+    it "only goes back to an origin that's a path on Attend" do
+      create(:user, email: "returning@example.com", hack_club_account_id: "hca-example-2")
+      OmniAuth.config.mock_auth[:hack_club] = OmniAuth::AuthHash.new(
+        provider: "hack_club", uid: "hca-example-2", info: { email: "returning@example.com", name: "Example Person" }
+      )
+
+      [ "https://elsewhere.example/visas", "//elsewhere.example/visas", "/\\elsewhere.example" ].each do |origin|
+        post user_hack_club_omniauth_authorize_path, params: { origin: origin }
+        follow_redirect!
+        expect(response.location).not_to include("elsewhere.example"), origin
+      end
+
+      post user_hack_club_omniauth_authorize_path, params: { origin: "/visas" }
+      follow_redirect!
+      expect(response).to redirect_to("/visas")
+    end
   end
 end

@@ -281,7 +281,11 @@ Devise.setup do |config|
       # discovery document; `email`, `slack_id` and `verification_status` are
       # extras HCA honours. `profile` is what gets us the name claims and
       # `birthdate` the date of birth, both read from /oauth/userinfo.
-      scope: "openid profile email slack_id phone birthdate verification_status",
+      # `address` gets every mailing address on the account and `legal_name`
+      # the legal names, both for the visa letter form. HCA refuses a sign-in
+      # that asks for a scope the app isn't allowed, so check Attend's app in
+      # HCA has a scope before adding it here.
+      scope: "openid profile email slack_id phone birthdate verification_status address legal_name",
       # Someone arriving from an invitation gets HCA's signup form started
       # with what the invitation already knows about them.
       prefill: ->(env) { HackClubAuthPrefill.from_session(env["rack.session"]) }

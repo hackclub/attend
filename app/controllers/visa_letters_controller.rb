@@ -38,8 +38,10 @@ class VisaLettersController < ApplicationController
   def create
     return if redirected_to_existing_application? || refused?
 
-    # What Hack Club Auth holds wins over anything typed into a locked field.
+    # What Hack Club Auth holds wins over anything typed into a locked field,
+    # and the address is one of the account's there when it has any.
     attributes = applicant_params.merge(@locked)
+    attributes[:address] = @addresses[params.dig(:visa_letter_application, :address_id).to_s] if @addresses.any?
     if @existing
       @application = @existing
       @application.resubmit!(attributes.merge(visa_letter_invitation: @invitation || @existing.visa_letter_invitation),
@@ -100,6 +102,7 @@ class VisaLettersController < ApplicationController
     @existing = @event.visa_letter_applications.find_by(user: current_user)
     @invitation = invitation_for_this_person
     @locked = VisaLetterApplication.locked_by_hack_club_auth(current_user)
+    @addresses = VisaLetterApplication.hack_club_auth_addresses(current_user)
   end
 
   def set_application

@@ -232,11 +232,31 @@ RSpec.describe VisaLetterApplication do
         "address" => { "line_1" => "2 Sample Road", "city" => "Example City", "postal_code" => "EX1 2AB", "country" => "GB" } })
       create(:participant, user: user, email: user.email, phone: "+12025550123")
 
-      expect(described_class.locked_by_hack_club_auth(user).keys).to contain_exactly(:date_of_birth, :address)
+      expect(described_class.locked_by_hack_club_auth(user).keys).to contain_exactly(:date_of_birth)
       expect(described_class.prefill_for(user)).to include(
         full_name: "Ada Example", date_of_birth: Date.new(2008, 4, 1), phone: "+12025550123",
         address: "2 Sample Road\nExample City, EX1 2AB\nUnited Kingdom", nationality: "United Kingdom"
       )
+    end
+  end
+
+  describe ".hack_club_auth_addresses" do
+    it "lists every address on the account, primary first, or the one an older sign-in kept" do
+      user = create(:user, oidc_claims: { "addresses" => [
+        { "id" => "addr!b", "line_1" => "3 Example Lane", "city" => "Sample Town", "country" => "GB" },
+        { "id" => "addr!a", "line_1" => "2 Sample Road", "line_2" => "Flat 1", "city" => "Example City", "postal_code" => "EX1 2AB", "country" => "GB", "primary" => true }
+      ] })
+
+      expect(described_class.hack_club_auth_addresses(user)).to eq(
+        "addr!a" => "2 Sample Road\nFlat 1\nExample City, EX1 2AB\nUnited Kingdom",
+        "addr!b" => "3 Example Lane\nSample Town\nUnited Kingdom"
+      )
+
+      user.update!(oidc_claims: { "address" => { "line_1" => "2 Sample Road", "city" => "Example City", "country" => "GB" } })
+      expect(described_class.hack_club_auth_addresses(user)).to eq("0" => "2 Sample Road\nExample City\nUnited Kingdom")
+
+      user.update!(oidc_claims: {})
+      expect(described_class.hack_club_auth_addresses(user)).to eq({})
     end
   end
 

@@ -370,6 +370,7 @@ class User < ApplicationRecord
         phone_number: raw["phone"] || raw["phone_number"] || identity["phone"] || identity["phone_number"] || auth.info.phone,
         birthdate: identity["birthday"] || raw["birthdate"],
         address: primary_address&.slice("line_1", "line_2", "city", "state", "postal_code", "country") || oidc_address(raw["address"]),
+        addresses: identity["addresses"]&.map { |address| address.slice("id", "line_1", "line_2", "city", "state", "postal_code", "country", "primary") },
         slack_id: identity["slack_id"],
         verification_status: identity["verification_status"],
         ysws_eligible: identity["ysws_eligible"]

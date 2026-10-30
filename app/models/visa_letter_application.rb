@@ -125,9 +125,9 @@ class VisaLetterApplication < ApplicationRecord
       reviewed_by: nil, reviewed_at: nil, submitted_at: Time.current, imported_at: nil))
   end
 
-  # What a new application can start with: the legal details Hack Club Auth
-  # holds for the account, then anything their Attend profile has that HCA
-  # doesn't. The applicant checks all of it against their passport.
+  # What a new application can start with: the details Hack Club Auth holds
+  # for the account, then anything their Attend profile has that HCA doesn't.
+  # The applicant checks all of it against their passport.
   def self.prefill_for(user)
     claims = (user.oidc_claims || {}).to_h.stringify_keys
     participant = user.participant
@@ -138,20 +138,28 @@ class VisaLetterApplication < ApplicationRecord
       full_name: name.presence,
       date_of_birth: participant&.date_of_birth,
       phone: claims["phone_number"].presence || participant&.phone,
-      address: participant_address(participant),
+      address: hack_club_auth_addresses(user).values.first || participant_address(participant),
       nationality: CountryCodes.normalize(claims.dig("address", "country")) || participant&.country_of_residence.presence
     }.compact.merge(locked_by_hack_club_auth(user))
   end
 
-  # The birthday and mailing address Hack Club Auth holds for the account.
-  # Where it has them, the letter uses them as they are: the applicant can't
-  # type different ones, and changes them in Hack Club Auth instead.
+  # The birthday Hack Club Auth holds for the account. Where it has one, the
+  # letter uses it as it is: the applicant can't type a different one, and
+  # changes it in Hack Club Auth instead.
   def self.locked_by_hack_club_auth(user)
     claims = (user.oidc_claims || {}).to_h.stringify_keys
-    {
-      date_of_birth: parse_date(claims["birthdate"]),
-      address: address_from_claims(claims["address"])
-    }.compact
+    { date_of_birth: parse_date(claims["birthdate"]) }.compact
+  end
+
+  # The mailing addresses on the account in Hack Club Auth, primary first, as
+  # { id => address }. Where there are any, the letter uses one of them: the
+  # applicant picks which, and adds a different one in Hack Club Auth.
+  def self.hack_club_auth_addresses(user)
+    claims = (user.oidc_claims || {}).to_h.stringify_keys
+    # Sign-ins from before Attend asked for every address kept the primary one.
+    addresses = (Array(claims["addresses"]).presence || Array.wrap(claims["address"].presence)).map { |address| address.to_h.stringify_keys }
+    primary, others = addresses.partition { |address| address["primary"] }
+    (primary + others).each_with_index.to_h { |address, index| [ address["id"].presence || index.to_s, address_from_claims(address) ] }.compact
   end
 
   # Envoy's applications have no account until their owner signs in. A Hack

@@ -226,6 +226,19 @@ RSpec.describe User, type: :model do
       expect(user.oidc_claims["address"]).to include("locality" => "Shelburne")
     end
 
+    it "keeps every mailing address on the account, with the primary one as the address" do
+      user = User.from_omniauth(auth_hash("identity" => identity.merge("addresses" => [
+        { "id" => "addr!a", "first_name" => "Ada", "line_1" => "3 Example Lane", "city" => "Sample Town", "country" => "GB" },
+        { "id" => "addr!b", "line_1" => "2 Sample Road", "city" => "Example City", "country" => "GB", "phone_number" => "+12025550123", "primary" => true }
+      ])))
+
+      expect(user.oidc_claims["address"]).to eq("line_1" => "2 Sample Road", "city" => "Example City", "country" => "GB")
+      expect(user.oidc_claims["addresses"]).to eq([
+        { "id" => "addr!a", "line_1" => "3 Example Lane", "city" => "Sample Town", "country" => "GB" },
+        { "id" => "addr!b", "line_1" => "2 Sample Road", "city" => "Example City", "country" => "GB", "primary" => true }
+      ])
+    end
+
     it "repairs a stale verified_slack_id on sign-in when the claims haven't changed" do
       user = User.from_omniauth(auth_hash("identity" => identity))
       expect(user.verified_slack_id).to eq("U07BLJ1MBEE")

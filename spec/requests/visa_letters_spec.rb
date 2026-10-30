@@ -11,7 +11,7 @@ RSpec.describe "Asking for a visa letter", type: :request do
   end
   let(:details) do
     { full_name: "Ada Example", date_of_birth: "2008-04-01", nationality: "United Kingdom",
-      place_of_birth: "Example City", phone: "+12025550123", address: "2 Sample Road\nExample City" }
+      place_of_birth: "Example City", phone: "+12025550123", address: "2 Sample Road\nExample City", address_id: "0" }
   end
 
   before { create(:visa_letter_template, :default) }
@@ -54,6 +54,55 @@ RSpec.describe "Asking for a visa letter", type: :request do
       application = VisaLetterApplication.last
       expect(application.date_of_birth).to eq(Date.new(2008, 4, 1))
       expect(application.address).to eq("2 Sample Road\nExample City\nUnited Kingdom")
+    end
+
+    it "offers every address on their Hack Club account, primary first, and uses the one they pick" do
+      applicant.update!(oidc_claims: applicant.oidc_claims.merge("addresses" => [
+        { "id" => "addr!school", "line_1" => "3 Example Lane", "city" => "Sample Town", "country" => "GB" },
+        { "id" => "addr!home", "line_1" => "2 Sample Road", "city" => "Example City", "country" => "GB", "primary" => true }
+      ]))
+
+      get visas_apply_path(event.slug)
+      expect(response.body).to include("2 Sample Road, Example City, United Kingdom", "3 Example Lane, Sample Town, United Kingdom",
+        "To use a different address, add it at", "refresh from your Hack Club account")
+      expect(response.body.index("2 Sample Road")).to be < response.body.index("3 Example Lane")
+      expect(response.body).to include('<option selected="selected" value="addr!home">')
+
+      post visas_apply_path(event.slug), params: { visa_letter_application: details.merge(address_id: "addr!somebody-elses") }
+      expect(response).to have_http_status(:unprocessable_entity)
+
+      post visas_apply_path(event.slug), params: { visa_letter_application: details.merge(address_id: "addr!school", address: "Somewhere else") }
+      expect(VisaLetterApplication.last.address).to eq("3 Example Lane\nSample Town\nUnited Kingdom")
+    end
+
+    context "refreshing from Hack Club Auth after adding an address there" do
+      around do |example|
+        OmniAuth.config.test_mode = true
+        example.run
+      ensure
+        OmniAuth.config.mock_auth[:hack_club] = nil
+        OmniAuth.config.test_mode = false
+      end
+
+      it "goes through Hack Club Auth and back to the form, with the new address to pick" do
+        OmniAuth.config.mock_auth[:hack_club] = OmniAuth::AuthHash.new(
+          provider: "hack_club", uid: "ident!ada", info: { email: "ada@example.com", name: "Ada Example" },
+          extra: { raw_info: { "identity" => { "id" => "ident!ada", "primary_email" => "ada@example.com", "addresses" => [
+            { "id" => "addr!new", "line_1" => "4 Fictional Way", "city" => "Sample Town", "country" => "GB", "primary" => true }
+          ] } } }
+        )
+
+        get visas_apply_path(event.slug)
+        expect(response.body).to include('form="refresh_from_hack_club_auth"', %(value="#{visas_apply_path(event.slug)}"))
+
+        post user_hack_club_omniauth_authorize_path, params: { origin: visas_apply_path(event.slug) }
+        follow_redirect!
+        expect(response).to redirect_to(visas_apply_path(event.slug))
+        expect(flash[:notice]).to eq("Updated from your Hack Club account.")
+
+        follow_redirect!
+        expect(response.body).to include("4 Fictional Way, Sample Town, United Kingdom")
+      end
     end
 
     it "lets them type a birthday and address their Hack Club account doesn't have" do

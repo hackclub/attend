@@ -12,6 +12,10 @@ class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
           current_email: @user.email
         }
       end
+      if (path = requested_return_path)
+        redirect_to path, notice: "Updated from your Hack Club account."
+        return
+      end
       set_flash_message(:notice, :success, kind: "Hack Club Auth") if is_navigational_format?
       redirect_to after_sign_in_path
     else
@@ -32,6 +36,16 @@ class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
   end
 
   private
+
+  # Where a button that goes through Hack Club Auth to pick up someone's
+  # latest details asked to come back to (its `origin`), such as the visa
+  # letter form after they add an address there. OmniAuth fills the origin
+  # from the Referer otherwise, which is a full URL, so only a local path
+  # counts.
+  def requested_return_path
+    origin = request.env["omniauth.origin"].to_s
+    origin if origin.match?(%r{\A/(?![/\\])})
+  end
 
   def after_sign_in_path
     # If there's a pending invitation, redirect to onboarding with the invite token

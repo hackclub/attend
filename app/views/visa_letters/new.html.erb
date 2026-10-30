@@ -52,14 +52,15 @@
 
     <div>
       <%= f.label :full_name, "Full Legal Name (as on passport)", class: "portal-label" %>
-      <%= f.text_field :full_name, class: "portal-input", required: true, autocomplete: "name" %>
+      <%= f.text_field :full_name, class: "portal-input", required: true, autocomplete: "name", "aria-describedby": "full_name_hint" %>
+      <p class="portal-hint text-sm mt-1" id="full_name_hint">Filled in from your Hack Club account. Add any middle names so it matches your passport exactly.</p>
     </div>
 
     <div>
       <%= f.label :date_of_birth, "Date of Birth", class: "portal-label" %>
       <% if @locked.key?(:date_of_birth) %>
         <%= f.date_field :date_of_birth, class: "portal-input", readonly: true, "aria-describedby": "date_of_birth_hint" %>
-        <p class="portal-hint text-sm mt-1" id="date_of_birth_hint">From your Hack Club account. If it's wrong, update it at <%= link_to "auth.hackclub.com", "https://auth.hackclub.com", class: "portal-link", target: "_blank", rel: "noopener" %>, then sign out of Attend and back in.</p>
+        <p class="portal-hint text-sm mt-1" id="date_of_birth_hint">From your Hack Club account. If it's wrong, update it at <%= link_to "auth.hackclub.com", "https://auth.hackclub.com", class: "portal-link", target: "_blank", rel: "noopener" %>, then <%= render "refresh_from_hack_club_auth" %>.</p>
       <% else %>
         <%= f.date_field :date_of_birth, class: "portal-input", required: true, max: 13.years.ago.to_date, autocomplete: "bday" %>
       <% end %>
@@ -84,17 +85,26 @@
     </div>
 
     <div>
-      <%= f.label :address, "Full Mailing Address", class: "portal-label" %>
-      <% if @locked.key?(:address) %>
-        <%= f.text_area :address, rows: 4, class: "portal-textarea", readonly: true, "aria-describedby": "address_hint" %>
-        <p class="portal-hint text-sm mt-1" id="address_hint">From your Hack Club account. If it's wrong, update it at <%= link_to "auth.hackclub.com", "https://auth.hackclub.com", class: "portal-link", target: "_blank", rel: "noopener" %>, then sign out of Attend and back in.</p>
+      <% if @addresses.any? %>
+        <%= f.label :address_id, "Full Mailing Address", class: "portal-label" %>
+        <%= f.select :address_id, @addresses.map { |id, address| [ address.gsub("\n", ", "), id ] },
+              { selected: @addresses.key(@application.address) || @addresses.keys.first },
+              class: "portal-select", "aria-describedby": "address_hint" %>
+        <p class="portal-hint text-sm mt-1" id="address_hint">From your Hack Club account. To use a different address, add it at <%= link_to "auth.hackclub.com", "https://auth.hackclub.com/addresses", class: "portal-link", target: "_blank", rel: "noopener" %>, then <%= render "refresh_from_hack_club_auth" %>.</p>
       <% else %>
+        <%= f.label :address, "Full Mailing Address", class: "portal-label" %>
         <%= f.text_area :address, rows: 4, class: "portal-textarea", required: true, autocomplete: "street-address",
-              placeholder: "Street address, City, State/Province, Postal Code, Country" %>
+              placeholder: "Street address, City, State/Province, Postal Code, Country", "aria-describedby": "address_hint" %>
+        <p class="portal-hint text-sm mt-1" id="address_hint">Or add it at <%= link_to "auth.hackclub.com", "https://auth.hackclub.com/addresses", class: "portal-link", target: "_blank", rel: "noopener" %>, then <%= render "refresh_from_hack_club_auth" %> to pick it from your Hack Club account.</p>
       <% end %>
     </div>
 
     <%= f.submit "Submit Application", class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
     <p class="portal-hint text-sm">By submitting this form, you agree to provide accurate information for your visa invitation letter.</p>
+  <% end %>
+
+  <%# Its own form, outside the application form: the hints' buttons submit it with form=. %>
+  <%= form_tag user_hack_club_omniauth_authorize_path, id: "refresh_from_hack_club_auth", data: { turbo: false } do %>
+    <%= hidden_field_tag :origin, visas_apply_path(@event.slug, invite: params[:invite].presence), id: nil %>
   <% end %>
 </div>
