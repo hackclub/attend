@@ -116,6 +116,42 @@ class Consent < ApplicationRecord
     Rails.logger.warn("[Docuseal] sync_from_docuseal! failed for consent #{id}: #{e.message}")
   end
 
+  # Every signed PDF DocuSeal produced for this submission, as
+  # [{ "name" => ..., "url" => ... }]. A template with several documents signs
+  # into several PDFs. Consents signed before `documents` existed only stored
+  # the first one in document_url.
+  def signed_documents
+    return documents if documents.present?
+
+    document_url.present? ? [ { "name" => nil, "url" => document_url } ] : []
+  end
+
+  def self.documents_from_docuseal(list)
+    # Webhook payloads arrive as unpermitted ActionController::Parameters, so
+    # read keys rather than calling to_h.
+    Array(list).filter_map do |document|
+      { "name" => document["name"], "url" => document["url"] } if document["url"].present?
+    end
+  end
+
+  # Fetch the signed documents again from the DocuSeal API. Their URLs can be
+  # expiring links, and older consents never stored any but the first.
+  # Returns the stored list if DocuSeal can't be reached.
+  def refresh_documents_from_docuseal!
+    return signed_documents if docuseal_envelope_id.blank?
+
+    response = Docuseal::Client.for(self).get_submission_documents(docuseal_envelope_id)
+    fetched = Consent.documents_from_docuseal(response["documents"])
+    return signed_documents if fetched.empty?
+
+    update!(documents: fetched, document_url: fetched.first["url"])
+    fetched
+  rescue Docuseal::Error, ArgumentError => e
+    # ArgumentError covers environments with no DocuSeal credentials configured
+    Rails.logger.warn("[Docuseal] refresh_documents_from_docuseal! failed for consent #{id}: #{e.message}")
+    signed_documents
+  end
+
   def participant_signed?
     participant_signed_at.present?
   end
@@ -143,6 +179,7 @@ class Consent < ApplicationRecord
       participant_signed_at: nil,
       signed_at: nil,
       document_url: nil,
+      documents: [],
       failure_reason: nil,
       pending_on: nil,
       sent_at: nil

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_29_233000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_30_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -277,6 +277,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_29_233000) do
     t.datetime "created_at", null: false
     t.uuid "custom_document_id"
     t.string "document_url"
+    t.jsonb "documents", default: [], null: false
     t.string "docuseal_envelope_id"
     t.string "docuseal_guardian_slug"
     t.string "docuseal_host"

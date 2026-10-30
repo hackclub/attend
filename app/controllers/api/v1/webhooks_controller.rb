@@ -62,11 +62,13 @@ module Api
         consent = find_consent(data)
         return unless consent
 
+        documents = Consent.documents_from_docuseal(data["documents"])
         consent.update!(
           status: :signed,
           signed_at: Time.current,
           pending_on: nil,
-          document_url: data["documents"]&.first&.dig("url")
+          documents: documents,
+          document_url: documents.first&.dig("url")
         )
 
         complete_ready_guardians(consent)

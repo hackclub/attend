@@ -12,6 +12,7 @@ module RegistrationChangeRequests
       guardian_signed_at: nil,
       signed_at: nil,
       document_url: nil,
+      documents: [],
       failure_reason: nil,
       pending_on: nil,
       sent_at: nil

@@ -387,6 +387,22 @@ module Admin
       @unadded_optional_documents = @participant_event.available_optional_custom_documents
     end
 
+    # Opens one signed DocuSeal document. The URL is fetched fresh because
+    # DocuSeal's links can expire, and consents signed before every document
+    # was stored only have the first one on file.
+    def consent_document
+      authorize @participant_event, :view_consents?
+      consent = @participant_event.consents.find(params[:consent_id])
+
+      document = consent.refresh_documents_from_docuseal![params[:index].to_i]
+      if document
+        redirect_to document["url"], allow_other_host: true
+      else
+        redirect_to consents_admin_event_participant_path(current_event, @participant_event),
+          alert: "That document isn't available from DocuSeal."
+      end
+    end
+
     def reset_waiver
       authorize @participant_event, :reset_waiver?
 
@@ -1576,6 +1592,7 @@ module Admin
           guardian_signed_at: nil,
           signed_at: nil,
           document_url: nil,
+          documents: [],
           failure_reason: nil,
           pending_on: nil,
           sent_at: nil

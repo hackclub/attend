@@ -41,6 +41,29 @@ RSpec.describe "Api::V1::Webhooks", type: :request do
         expect(consent.document_url).to eq("https://example.com/doc.pdf")
       end
 
+      it "keeps every document of a multi-document submission" do
+        payload = {
+          "event_type" => "submission.completed",
+          "data" => {
+            "id" => "12345",
+            "metadata" => { "consent_id" => consent.id.to_s },
+            "documents" => [
+              { "name" => "Waiver", "url" => "https://example.com/waiver.pdf" },
+              { "name" => "Photo Release", "url" => "https://example.com/photo.pdf" }
+            ]
+          }
+        }
+
+        post docuseal_api_v1_webhooks_path, params: payload.to_json, headers: headers
+
+        consent.reload
+        expect(consent.documents).to eq([
+          { "name" => "Waiver", "url" => "https://example.com/waiver.pdf" },
+          { "name" => "Photo Release", "url" => "https://example.com/photo.pdf" }
+        ])
+        expect(consent.document_url).to eq("https://example.com/waiver.pdf")
+      end
+
       it "handles form.completed event for participant (teen signs first)" do
         consent.update!(pending_on: "participant")
 

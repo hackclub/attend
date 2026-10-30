@@ -177,4 +177,19 @@ module Admin::ParticipantsHelper
 
     current_direction == "asc" ? "ascending" : "descending"
   end
+
+  # Link text for each signed DocuSeal document on a consent, in DocuSeal's
+  # order (links go to consent_document by index). Several documents are told
+  # apart by the name DocuSeal gave each one.
+  def signed_document_labels(consent, label)
+    documents = consent.signed_documents
+    if documents.empty?
+      # Marked signed by an API sync rather than the webhook, so nothing is
+      # stored yet; opening the link fetches it.
+      return consent.signed? && consent.docuseal_envelope_id.present? ? [ label ] : []
+    end
+    return [ label ] if documents.one?
+
+    documents.each_with_index.map { |document, i| document["name"].presence || "#{label} #{i + 1}" }
+  end
 end
