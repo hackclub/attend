@@ -9,94 +9,33 @@
     Your entry ticket
   </h2>
 
-  <div class="max-w-md bg-white rounded-2xl shadow-lg overflow-hidden border border-[#e0e6ed]">
+  <div class="max-w-md rounded-lg overflow-hidden border border-(--border-card) bg-(--bg-elev)">
     <div class="entry-ticket-header bg-[#d42f46] text-white px-4 py-3 flex justify-between items-center">
       <span class="font-bold tracking-wider text-sm">ENTRY TICKET</span>
       <img src="/flag.png" alt="Hack Club" class="h-5 opacity-90">
     </div>
 
-    <div class="flex flex-col md:flex-row">
-      <div class="flex-1 p-4 border-b md:border-b-0 md:border-r border-dashed border-[#e0e6ed]">
-        <div class="flex justify-between items-start mb-4">
-          <div>
-            <p class="text-xs text-[#8492a6] uppercase tracking-wide">Passenger</p>
-            <p class="font-bold text-lg text-[#1f2d3d]"><%= participant.display_name.upcase %></p>
-          </div>
-          <div class="text-right">
-            <p class="text-xs text-[#8492a6] uppercase tracking-wide">Status</p>
-            <p class="text-[#33d6a6] font-semibold text-sm">CONFIRMED</p>
-          </div>
-        </div>
-
-        <div class="flex items-center justify-between mb-4">
-          <div class="text-center">
-            <p class="text-xs text-[#8492a6]">FROM</p>
-            <p class="text-2xl font-bold text-[#1f2d3d]"><%= participant_event.origin_airport_code.presence || "HOME" %></p>
-            <p class="text-xs text-[#8492a6]"><%= participant.city.presence || "Your City" %></p>
-          </div>
-          <div class="flex-1 px-4">
-            <div class="relative">
-              <div class="border-t-2 border-[#e0e6ed] border-dashed"></div>
-              <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white px-2">
-                <svg class="size-6 text-[#ec3750]" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-                </svg>
-              </div>
-            </div>
-          </div>
-          <div class="text-center">
-            <p class="text-xs text-[#8492a6]">TO</p>
-            <p class="text-2xl font-bold text-[#ec3750]"><%= participant_event.destination_airport_code.presence || event.location_city&.first(3)&.upcase || "EVT" %></p>
-            <p class="text-xs text-[#8492a6]"><%= event.location_city.presence || "Event Location" %></p>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-4 gap-2 text-center border-t border-[#e0e6ed] pt-3">
-          <div>
-            <p class="text-xs text-[#8492a6] uppercase">Event</p>
-            <p class="font-semibold text-sm text-[#1f2d3d] truncate"><%= event.name %></p>
-          </div>
-          <div>
-            <p class="text-xs text-[#8492a6] uppercase">Date</p>
-            <p class="font-semibold text-sm text-[#1f2d3d]"><%= event.local_starts_at&.strftime("%b %d") %></p>
-          </div>
-          <div>
-            <p class="text-xs text-[#8492a6] uppercase">T-Shirt</p>
-            <p class="font-semibold text-sm text-[#1f2d3d]"><%= participant.tshirt_size&.upcase || "—" %></p>
-          </div>
-          <% if event.freedom_waivers_enabled? %>
-            <div>
-              <p class="text-xs text-[#8492a6] uppercase">Freedom</p>
-              <% if participant_event.safeguarding_info&.freedom_waiver_granted? %>
-                <p class="font-bold text-sm text-[#33d6a6]">✓ YES</p>
-              <% else %>
-                <p class="font-bold text-sm text-[#ec3750]">✗ NO</p>
-              <% end %>
-            </div>
+    <div class="p-4 flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <p class="font-bold text-lg text-(--text-strong) break-words"><%= participant.display_name %></p>
+        <p class="text-sm font-medium text-(--text) break-words"><%= event.name %></p>
+        <p class="text-sm text-(--text-muted)"><%= [ event.local_starts_at&.strftime("%b %-d"), event.location_city.presence ].compact.join(" · ") %></p>
+        <% if event.freedom_waivers_enabled? %>
+          <% if participant_event.safeguarding_info&.freedom_waiver_granted? %>
+            <p class="mt-2 text-sm font-semibold text-(--success-text)">✓ Freedom waiver</p>
+          <% else %>
+            <p class="mt-2 text-sm font-semibold text-(--danger-strong)">✗ No freedom waiver</p>
           <% end %>
-        </div>
+        <% end %>
       </div>
-
-      <div class="w-full md:w-36 bg-[#f9fafc] p-3 flex flex-col items-center justify-center relative">
-        <div class="absolute left-0 top-0 bottom-0 hidden md:flex flex-col justify-around -ml-2">
-          <% 6.times do %>
-            <div class="size-4 bg-white rounded-full border border-[#e0e6ed]"></div>
-          <% end %>
-        </div>
-        <p class="text-xs text-[#8492a6] uppercase tracking-wide mb-2">Entry QR code</p>
-        <%# literal white, not bg-white — themes.css remaps --color-white to the theme
+      <%# literal white, not bg-white — themes.css remaps --color-white to the theme
 surface, which would put black QR modules on a dark tile %>
-        <div class="bg-[#ffffff] p-2 rounded-lg shadow-sm border border-[#e0e6ed]">
-          <%= qr_code_svg(attend_deep_link(participant_event.participant_id), size: 100) %>
-        </div>
-        <p class="text-xs text-[#8492a6] mt-2 font-mono"><%= participant_event.participant_id[0..7].upcase %></p>
+      <div class="shrink-0 bg-[#ffffff] p-2 rounded-lg border border-(--border-card)">
+        <%= qr_code_svg(attend_deep_link(participant_event.participant_id), size: 100) %>
       </div>
     </div>
 
-    <div class="bg-[#17171d] px-4 py-2 text-xs text-[#8492a6] flex justify-between">
-      <span>Show this entry ticket and QR code when you arrive</span>
-      <span class="font-mono text-white"><%= event.slug.upcase %></span>
-    </div>
+    <p class="px-4 pb-4 text-xs text-(--text-muted)">Show this QR code when you arrive</p>
   </div>
 
   <!-- Add to Wallet -->
