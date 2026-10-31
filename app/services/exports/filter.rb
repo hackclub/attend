@@ -2,6 +2,10 @@ module Exports
   # One row filter: a registry field, an operator valid for the field's type,
   # and (for most operators) a comparison value. Matching happens in Ruby on
   # the extracted value so computed fields filter identically to columns.
+  #
+  # Date and time values are read on `time_zone`, the exported event's clock:
+  # a datetime-local value like "2026-07-12T09:30" is that wall-clock time
+  # there, and a bare date is that calendar day there.
   class Filter
     OPERATORS_BY_TYPE = {
       string: %w[contains not_contains equals present blank],
@@ -28,19 +32,20 @@ module Exports
       "after" => "is after"
     }.freeze
 
-    attr_reader :field, :operator, :value
+    attr_reader :field, :operator, :value, :time_zone
 
-    def self.build(params)
+    def self.build(params, time_zone: nil)
       field = FieldRegistry.fetch(params["field"].to_s)
       return nil unless field
 
-      new(field: field, operator: params["operator"].to_s, value: params["value"])
+      new(field: field, operator: params["operator"].to_s, value: params["value"], time_zone: time_zone)
     end
 
-    def initialize(field:, operator:, value: nil)
+    def initialize(field:, operator:, value: nil, time_zone: nil)
       @field = field
       @operator = operator
       @value = value
+      @time_zone = time_zone || Time.zone
     end
 
     def valid?
@@ -68,9 +73,9 @@ module Exports
       when "equals" then actual.to_s.downcase == value.to_s.downcase
       when "in" then enum_values.include?(actual.to_s)
       when "not_in" then !enum_values.include?(actual.to_s)
-      when "on" then actual.present? && actual.to_date == parsed_time.to_date
-      when "before" then actual.present? && actual.to_time < comparison_time(end_of_day: false)
-      when "after" then actual.present? && actual.to_time > comparison_time(end_of_day: true)
+      when "on" then actual.present? && local_date(actual) == parsed_time.to_date
+      when "before" then actual.present? && (by_day? ? local_date(actual) < parsed_time.to_date : actual.to_time < parsed_time)
+      when "after" then actual.present? && (by_day? ? local_date(actual) > parsed_time.to_date : actual.to_time > parsed_time)
       else false
       end
     end
@@ -86,18 +91,21 @@ module Exports
     end
 
     def parsed_time
-      @parsed_time ||= Time.zone.parse(value.to_s)
+      @parsed_time ||= time_zone.parse(value.to_s)
     rescue ArgumentError
       nil
     end
 
     # "before 2026-07-01" means before that day starts; "after 2026-07-01"
-    # means after that day ends, so a bare date behaves intuitively.
-    def comparison_time(end_of_day:)
-      time = parsed_time
-      return time unless field.type == :date || date_only_value?
+    # means after that day ends, so a bare date behaves intuitively. Those
+    # compare calendar days on the event's clock.
+    def by_day?
+      field.type == :date || date_only_value?
+    end
 
-      end_of_day ? time.end_of_day : time.beginning_of_day
+    # The calendar day a value falls on at the event; a plain date is its own day.
+    def local_date(actual)
+      actual.in_time_zone(time_zone).to_date
     end
 
     def date_only_value?

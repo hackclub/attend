@@ -67,7 +67,8 @@
 
     <label class="w-full sm:w-auto">
       <span class="sr-only">Date</span>
-      <%= date_field_tag :date, params[:date], class: "cs-input" %>
+      <%= date_field_tag :date, params[:date], class: "cs-input",
+            title: "In the event's time zone: #{current_event.event_time_zone.name}." %>
     </label>
 
     <% if current_event.groups_enabled? && current_event.groups.any? %>

@@ -131,5 +131,30 @@ RSpec.describe ScanContext, type: :model do
       context.ends_at = context.starts_at
       expect(context).not_to be_valid
     end
+
+    context "with typed times" do
+      # Los Angeles: UTC-7 in July.
+      let(:event) { create(:event, timezone: "Pacific Time (US & Canada)") }
+
+      it "compares them on the event's clock" do
+        context = event.scan_contexts.new(name: "Dinner", starts_at: "2030-07-12T18:00", ends_at: "2030-07-12T20:00")
+
+        expect(context).to be_valid
+        expect(context.starts_at).to eq(Time.utc(2030, 7, 13, 1, 0))
+      end
+
+      # A point saved before times were zoned holds the typed wall-clock as
+      # UTC. Typing a new end moves its start onto the event's clock too, so
+      # the two are compared as the times staff see.
+      it "checks a new end against an older point's start as staff read it" do
+        context = event.scan_contexts.create!(name: "Dinner", starts_at: Time.utc(2030, 7, 12, 9, 30))
+        context.update_column(:times_in_event_zone, false)
+
+        context.ends_at = "2030-07-12T07:00"
+
+        expect(context).not_to be_valid
+        expect(context.errors[:ends_at]).to include("must be after the start time")
+      end
+    end
   end
 end

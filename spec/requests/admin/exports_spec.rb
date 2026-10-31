@@ -99,6 +99,46 @@ RSpec.describe "Admin::Exports", type: :request do
       expect(flash[:alert]).to include("Unknown export fields")
     end
 
+    context "with a time filter" do
+      # Los Angeles: UTC-7 in July.
+      let(:event) { create(:event, timezone: "Pacific Time (US & Canada)") }
+      let(:time_filter) { { "field" => "participant_event.onboarding_completed_at", "operator" => "before", "value" => "2030-07-11T20:30" } }
+
+      # July 11, 20:00 in Los Angeles, already July 12 in UTC.
+      before { pe.update_columns(onboarding_completed_at: Time.utc(2030, 7, 12, 3, 0)) }
+
+      it "reads the typed time on the event's clock" do
+        post admin_event_exports_path(event_slug: event.slug),
+          params: { columns: [ "participant.email" ], filters: { "0" => time_filter } }
+
+        expect(CSV.parse(response.body)).to eq([ [ "Email" ], [ pe.participant.email ] ])
+      end
+
+      it "reads a saved template's time on the event's clock" do
+        template = create(:export_template, event: event, created_by: admin, columns: [ "participant.email" ], filters: [ time_filter ])
+
+        post admin_event_exports_path(event_slug: event.slug), params: { template_id: template.id }
+
+        expect(CSV.parse(response.body)).to eq([ [ "Email" ], [ pe.participant.email ] ])
+      end
+
+      it "shows the time field as 24-hour, in the event's time zone" do
+        template = create(:export_template, event: event, created_by: admin, columns: [ "participant.email" ], filters: [ time_filter ])
+
+        [ true, false ].each do |console|
+          admin.update!(admin_console_beta: console)
+
+          get admin_event_exports_path(event_slug: event.slug, template_id: template.id)
+
+          input = Nokogiri::HTML5(response.body).at_css('input[name="filters[0][value]"]')
+          expect(input.attributes.transform_values(&:value)).to include(
+            "type" => "datetime-local", "value" => "2030-07-11T20:30", "lang" => "en-GB",
+            "title" => "In the event's time zone: Pacific Time (US & Canada)."
+          )
+        end
+      end
+    end
+
     it "rejects invalid filters" do
       post admin_event_exports_path(event_slug: event.slug),
         params: {
