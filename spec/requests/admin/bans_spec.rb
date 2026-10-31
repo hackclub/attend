@@ -114,6 +114,31 @@ RSpec.describe "Admin::Bans", type: :request do
     end
   end
 
+  # Bans are global, not tied to an event, so the expiry is typed and shown
+  # in UTC (the app's zone), as a 24-hour time.
+  describe "the expiry field" do
+    [ true, false ].each do |console_variant|
+      context "console=#{console_variant}" do
+        let(:console) { console_variant }
+
+        it "reads a typed expiry as UTC and prefills it back in UTC" do
+          post admin_bans_path, params: {
+            ban: { reason: "Expiry", expires_at: "2030-07-12T21:30", ban_emails_attributes: { "0" => { email: "expiry@example.com" } } }
+          }
+          ban = Ban.order(:created_at).last
+          expect(ban.expires_at).to eq(Time.utc(2030, 7, 12, 21, 30))
+
+          get edit_admin_ban_path(ban)
+
+          field = Nokogiri::HTML(response.body).at_css("input[name='ban[expires_at]']")
+          expect(field["value"]).to eq("2030-07-12T21:30")
+          expect(field["lang"]).to eq("en-GB")
+          expect(Nokogiri::HTML(response.body).text.squish).to include("In UTC. Leave blank for an indefinite ban.")
+        end
+      end
+    end
+  end
+
   describe "GET index (console)" do
     let(:console) { true }
 

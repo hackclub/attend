@@ -183,7 +183,7 @@ class TicketPdfService
     else
       mode = travel.mode.to_s.capitalize
       route = [ travel.departure_city, travel.arrival_city ].compact.join(" → ")
-      time = travel.departure_time&.strftime("%b %d, %Y at %H:%M")
+      time = travel.local_time(:departure_time)&.strftime("%b %d, %Y at %H:%M")
       parts << [ mode, route.presence, time ].compact.join("  ")
     end
 

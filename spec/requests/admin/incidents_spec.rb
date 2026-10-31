@@ -137,6 +137,107 @@ RSpec.describe "Admin::Incidents", type: :request do
     end
   end
 
+  describe "occurred_at on the event's clock" do
+    let(:event) { create(:event, starts_at: 1.day.ago, ends_at: 1.day.from_now, timezone: "Eastern Time (US & Canada)") }
+
+    def log_incident(occurred_at)
+      create(:incident, event: event, reported_by: event_admin, visible_to_roles: %w[event_admin], occurred_at: occurred_at)
+    end
+
+    it "reads a typed time in the event's time zone" do
+      post admin_event_incidents_path(event), params: { incident: incident_params.merge(occurred_at: "2026-07-12T21:30") }
+
+      incident = Incident.last
+      expect(incident.occurred_at).to eq(Time.utc(2026, 7, 13, 1, 30))
+      expect(incident.times_in_event_zone).to be(true)
+    end
+
+    it "gives HQ the event-local time when escalating in the same go" do
+      post admin_event_incidents_path(event), params: {
+        incident: incident_params.merge(occurred_at: "2026-07-12T21:30"), escalate: "1", escalation: escalation_params
+      }
+
+      expect(Incident.last.hq_report.details).to include("Occurred at: 2026-07-12 21:30 EDT")
+    end
+
+    it "updates the time on the event's clock" do
+      incident = log_incident("2026-07-12T21:30")
+
+      patch admin_event_incident_path(event, incident), params: { incident: { occurred_at: "2026-07-12T22:15" } }
+
+      expect(response).to redirect_to(admin_event_incident_path(event, incident))
+      expect(incident.reload.occurred_at).to eq(Time.utc(2026, 7, 13, 2, 15))
+    end
+
+    it "moves a legacy row onto the event's clock when its form is saved" do
+      incident = log_incident(nil)
+      incident.update_columns(occurred_at: Time.utc(2026, 7, 12, 21, 30), times_in_event_zone: false)
+
+      get edit_admin_event_incident_path(event, incident)
+      prefill = Nokogiri::HTML(response.body).at_css("input[name='incident[occurred_at]']")["value"]
+      expect(prefill).to eq("2026-07-12T21:30")
+
+      patch admin_event_incident_path(event, incident), params: { incident: { occurred_at: prefill } }
+
+      incident.reload
+      expect(incident.times_in_event_zone).to be(true)
+      expect(incident.local_time(:occurred_at).strftime("%Y-%m-%d %H:%M %Z")).to eq("2026-07-12 21:30 EDT")
+    end
+
+    it "does not tell Slack an untouched time was edited" do
+      incident = log_incident("2026-07-12T21:30")
+      incident.update_columns(slack_message_ts: "1700000000.000100")
+
+      expect {
+        patch admin_event_incident_path(event, incident), params: {
+          incident: { occurred_at: incident.local_time_field_value(:occurred_at), summary: "Pushing in the queue" }
+        }
+      }.to have_enqueued_job(SendIncidentUpdateToSlackJob).with { |_incident_id, _user_id, changes|
+        expect(changes.keys).to include("summary")
+        expect(changes.keys).not_to include("occurred_at", "times_in_event_zone")
+      }
+    end
+
+    {
+      "the original UI" => { console: false, show: "July 12, 2026 at 21:30", index: "Jul 12, 2026 21:30" },
+      "the console" => { console: true, show: "July 12, 2026, 21:30 (UTC-4:00)", index: "July 12, 2026, 21:30 (UTC-4:00)" }
+    }.each do |ui, expected|
+      context "in #{ui}" do
+        before { event_admin.update!(admin_console_beta: expected[:console]) }
+
+        it "prefills and labels the field on the event's clock, in 24-hour time" do
+          incident = log_incident("2026-07-12T21:30")
+
+          get edit_admin_event_incident_path(event, incident)
+
+          page = Nokogiri::HTML(response.body)
+          field = page.at_css("input[name='incident[occurred_at]']")
+          expect(field["value"]).to eq("2026-07-12T21:30")
+          expect(field["lang"]).to eq("en-GB")
+          expect(page.text).to include("In the event's time zone: Eastern Time (US & Canada).")
+        end
+
+        it "shows the time on the event's clock" do
+          incident = log_incident("2026-07-12T21:30")
+
+          get admin_event_incident_path(event, incident)
+          expect(response.body).to include(expected[:show])
+
+          get admin_event_incidents_path(event)
+          expect(response.body).to include(expected[:index])
+        end
+
+        it "keeps showing a legacy row on UTC" do
+          incident = log_incident(nil)
+          incident.update_columns(occurred_at: Time.utc(2026, 7, 12, 21, 30), times_in_event_zone: false)
+
+          get admin_event_incident_path(event, incident)
+          expect(response.body).to include(expected[:show].sub("UTC-4:00", "UTC+0:00"))
+        end
+      end
+    end
+  end
+
   describe "GET new" do
     it "pre-ticks the default roles" do
       get new_admin_event_incident_path(event)

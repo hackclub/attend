@@ -1,4 +1,6 @@
 class Incident < ApplicationRecord
+  include EventLocalTimes
+
   has_paper_trail skip: [ :summary, :details, :actions_taken ]
 
   self.implicit_order_column = "created_at"
@@ -10,6 +12,8 @@ class Incident < ApplicationRecord
   belongs_to :reported_by, class_name: "User", foreign_key: "reported_by_user_id"
 
   has_one :participant, through: :participant_event
+
+  event_local_times :occurred_at, flag: :times_in_event_zone
 
   has_many :incident_participants, dependent: :destroy
   has_many :participant_events, through: :incident_participants

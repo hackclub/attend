@@ -21,8 +21,13 @@
           <%= f.select :status, Incident.statuses.keys.map { |s| [s.humanize.titleize, s] }, {}, class: "cs-select", **aria %>
         <% end %>
 
-        <%= cs_form_field f, :occurred_at, label: "Date and time of incident", optional: true do |aria| %>
-          <%= f.datetime_local_field :occurred_at, class: "cs-input", **aria %>
+        <%= cs_form_field f, :occurred_at, label: "Date and time of incident", optional: true,
+              description: "In the event's time zone: #{incident.event_local_time_zone.name}." do |aria| %>
+          <%= f.datetime_local_field :occurred_at,
+              value: f.object.local_time_field_value(:occurred_at),
+              lang: "en-GB",
+              class: "cs-input",
+              **aria %>
         <% end %>
 
         <%= cs_form_field f, :location, label: "Location", optional: true, constraint: "For example: Main Hall, Room 204" %>

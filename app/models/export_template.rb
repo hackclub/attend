@@ -10,8 +10,9 @@ class ExportTemplate < ApplicationRecord
   validate :columns_exist_in_registry
   validate :filters_are_valid
 
+  # Dates and times in the filters are read on the event's clock.
   def filter_objects
-    Array(filters).filter_map { |f| Exports::Filter.build(f.to_h.stringify_keys) }
+    Array(filters).filter_map { |f| Exports::Filter.build(f.to_h.stringify_keys, time_zone: event&.event_time_zone) }
   end
 
   private

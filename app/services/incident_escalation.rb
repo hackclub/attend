@@ -80,7 +80,7 @@ class IncidentEscalation
   def details
     parts = [ incident.details.presence || "(no details recorded)" ]
     parts << "Location: #{incident.location}" if incident.location.present?
-    parts << "Occurred at: #{incident.occurred_at.strftime('%Y-%m-%d %H:%M %Z')}" if incident.occurred_at.present?
+    parts << "Occurred at: #{incident.local_time(:occurred_at).strftime('%Y-%m-%d %H:%M %Z')}" if incident.occurred_at.present?
     parts << "Actions taken so far:\n#{incident.actions_taken}" if incident.actions_taken.present?
     parts << "Level logged by the organizer: #{IncidentLevel.label(incident.severity)}"
     parts.join("\n\n")

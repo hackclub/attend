@@ -108,7 +108,7 @@
               <h3 class="cs-h3 mb-3">Flight legs</h3>
               <div data-travel-form-target="inboundLegs" class="space-y-4">
                 <% @travel_inbound.travel_legs.order(:position).each_with_index do |leg, index| %>
-                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "inbound", show_remove: leg.persisted?, default_date: current_event.local_starts_at&.strftime('%Y-%m-%d'), refresh_url: refresh_flight_leg_admin_event_participant_path(current_event, @participant_event, leg_id: leg.id) %>
+                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "inbound", show_remove: leg.persisted?, default_date: current_event.local_starts_at&.strftime('%Y-%m-%d'), refresh_url: refresh_flight_leg_admin_event_participant_path(current_event, @participant_event, leg_id: leg.id), time_input_lang: "en-GB" %>
                 <% end %>
               </div>
               <button type="button" data-action="click->travel-form#addLeg" data-direction="inbound" class="cs-btn mt-4">
@@ -123,7 +123,9 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
               <%= cs_form_field f, :train_departure_station, label: "Departure station" %>
               <%= cs_form_field f, :train_arrival_station, label: "Arrival station" %>
-              <%= cs_form_field f, :arrival_time, label: "Arrival time", as: :datetime_local_field %>
+              <%= cs_form_field f, :arrival_time, label: "Arrival time", as: :datetime_local_field,
+                    description: "In the event's time zone: #{f.object.event_local_time_zone.name}.",
+                    input: { value: f.object.local_time_field_value(:arrival_time), lang: "en-GB" } %>
             </div>
           <% end %>
 
@@ -132,8 +134,12 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
               <%= cs_form_field f, :bus_departure_location, label: "Departure location" %>
               <%= cs_form_field f, :bus_arrival_location, label: "Arrival location" %>
-              <%= cs_form_field f, :departure_time, label: "Departure time", as: :datetime_local_field %>
-              <%= cs_form_field f, :arrival_time, label: "Arrival time", as: :datetime_local_field %>
+              <%= cs_form_field f, :departure_time, label: "Departure time", as: :datetime_local_field,
+                    description: "In the event's time zone: #{f.object.event_local_time_zone.name}.",
+                    input: { value: f.object.local_time_field_value(:departure_time), lang: "en-GB" } %>
+              <%= cs_form_field f, :arrival_time, label: "Arrival time", as: :datetime_local_field,
+                    description: "In the event's time zone: #{f.object.event_local_time_zone.name}.",
+                    input: { value: f.object.local_time_field_value(:arrival_time), lang: "en-GB" } %>
             </div>
           <% end %>
 
@@ -145,7 +151,9 @@
                   <%= f.text_field :origin_address, class: "cs-input", id: f.field_id(:origin_address), data: { address_autocomplete_target: "input" }, **aria %>
                 <% end %>
               <% end %>
-              <%= cs_form_field f, :expected_arrival_time, label: "Expected arrival time", as: :datetime_local_field %>
+              <%= cs_form_field f, :expected_arrival_time, label: "Expected arrival time", as: :datetime_local_field,
+                    description: "In the event's time zone: #{f.object.event_local_time_zone.name}.",
+                    input: { value: f.object.local_time_field_value(:expected_arrival_time), lang: "en-GB" } %>
             </div>
           <% end %>
 
@@ -194,7 +202,7 @@
               <h3 class="cs-h3 mb-3">Flight legs</h3>
               <div data-travel-form-target="outboundLegs" class="space-y-4">
                 <% @travel_outbound.travel_legs.order(:position).each_with_index do |leg, index| %>
-                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "outbound", show_remove: leg.persisted?, default_date: current_event.local_ends_at&.strftime('%Y-%m-%d'), refresh_url: refresh_flight_leg_admin_event_participant_path(current_event, @participant_event, leg_id: leg.id) %>
+                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "outbound", show_remove: leg.persisted?, default_date: current_event.local_ends_at&.strftime('%Y-%m-%d'), refresh_url: refresh_flight_leg_admin_event_participant_path(current_event, @participant_event, leg_id: leg.id), time_input_lang: "en-GB" %>
                 <% end %>
               </div>
               <button type="button" data-action="click->travel-form#addLeg" data-direction="outbound" class="cs-btn mt-4">
@@ -209,7 +217,9 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
               <%= cs_form_field f, :train_departure_station, label: "Departure station" %>
               <%= cs_form_field f, :train_arrival_station, label: "Arrival station" %>
-              <%= cs_form_field f, :departure_time, label: "Departure time", as: :datetime_local_field %>
+              <%= cs_form_field f, :departure_time, label: "Departure time", as: :datetime_local_field,
+                    description: "In the event's time zone: #{f.object.event_local_time_zone.name}.",
+                    input: { value: f.object.local_time_field_value(:departure_time), lang: "en-GB" } %>
             </div>
           <% end %>
 
@@ -218,8 +228,12 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-(--cs-border-divider-secondary) pt-4 mt-4">
               <%= cs_form_field f, :bus_departure_location, label: "Departure location" %>
               <%= cs_form_field f, :bus_arrival_location, label: "Arrival location" %>
-              <%= cs_form_field f, :departure_time, label: "Departure time", as: :datetime_local_field %>
-              <%= cs_form_field f, :arrival_time, label: "Arrival time", as: :datetime_local_field %>
+              <%= cs_form_field f, :departure_time, label: "Departure time", as: :datetime_local_field,
+                    description: "In the event's time zone: #{f.object.event_local_time_zone.name}.",
+                    input: { value: f.object.local_time_field_value(:departure_time), lang: "en-GB" } %>
+              <%= cs_form_field f, :arrival_time, label: "Arrival time", as: :datetime_local_field,
+                    description: "In the event's time zone: #{f.object.event_local_time_zone.name}.",
+                    input: { value: f.object.local_time_field_value(:arrival_time), lang: "en-GB" } %>
             </div>
           <% end %>
 
@@ -231,7 +245,9 @@
                   <%= f.text_field :origin_address, class: "cs-input", id: f.field_id(:origin_address), data: { address_autocomplete_target: "input" }, **aria %>
                 <% end %>
               <% end %>
-              <%= cs_form_field f, :departure_time, label: "Departure time", as: :datetime_local_field %>
+              <%= cs_form_field f, :departure_time, label: "Departure time", as: :datetime_local_field,
+                    description: "In the event's time zone: #{f.object.event_local_time_zone.name}.",
+                    input: { value: f.object.local_time_field_value(:departure_time), lang: "en-GB" } %>
             </div>
           <% end %>
 
@@ -320,13 +336,13 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div data-cs-field data-cs-label="Departure time">
         <label class="cs-field-label">Departure time</label>
-        <input type="datetime-local" class="leg-departure-time cs-input" name="" required>
+        <input type="datetime-local" lang="en-GB" class="leg-departure-time cs-input" name="" required>
         <select class="leg-departure-tz mt-1 cs-select" name="" aria-label="Departure time zone" data-cs-validate="false"><%= travel_leg_time_zone_options %></select>
         <p class="cs-field-hint">Local time at the departure airport.</p>
       </div>
       <div data-cs-field data-cs-label="Arrival time">
         <label class="cs-field-label">Arrival time</label>
-        <input type="datetime-local" class="leg-arrival-time cs-input" name="" required>
+        <input type="datetime-local" lang="en-GB" class="leg-arrival-time cs-input" name="" required>
         <select class="leg-arrival-tz mt-1 cs-select" name="" aria-label="Arrival time zone" data-cs-validate="false"><%= travel_leg_time_zone_options %></select>
         <p class="cs-field-hint">Local time at the arrival airport.</p>
       </div>

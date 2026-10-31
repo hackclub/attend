@@ -415,11 +415,11 @@
               <p class="text-(--text-soft) capitalize"><%= travel.mode %></p>
               <% if travel.arrival_time.present? %>
                 <p class="text-sm text-(--text-muted) mt-1">
-                  Arriving <%= travel.arrival_time.strftime("%b %d · %H:%M") %>
+                  Arriving <%= travel.local_time(:arrival_time).strftime("%b %d · %H:%M") %>
                 </p>
               <% elsif travel.departure_time.present? %>
                 <p class="text-sm text-(--text-muted) mt-1">
-                  Departing <%= travel.departure_time.strftime("%b %d · %H:%M") %>
+                  Departing <%= travel.local_time(:departure_time).strftime("%b %d · %H:%M") %>
                 </p>
               <% end %>
             <% end %>
@@ -704,7 +704,7 @@
                       </div>
                       <div>
                         <dt class="text-(--text-muted)"><%= label == "Arrival" ? "Arrival time" : "Departure time" %></dt>
-                        <dd class="font-medium text-(--text-strong)"><%= (label == "Arrival" ? travel.arrival_time : travel.departure_time)&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                        <dd class="font-medium text-(--text-strong)"><%= travel.local_time(label == "Arrival" ? :arrival_time : :departure_time)&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
                       </div>
                     <% elsif travel.bus? %>
                       <div>
@@ -713,7 +713,7 @@
                       </div>
                       <div>
                         <dt class="text-(--text-muted)">Times</dt>
-                        <dd class="font-medium text-(--text-strong)">Depart: <%= travel.departure_time&.strftime("%b %d, %Y %H:%M") %> · Arrive: <%= travel.arrival_time&.strftime("%b %d, %Y %H:%M") %></dd>
+                        <dd class="font-medium text-(--text-strong)">Depart: <%= travel.local_time(:departure_time)&.strftime("%b %d, %Y %H:%M") %> · Arrive: <%= travel.local_time(:arrival_time)&.strftime("%b %d, %Y %H:%M") %></dd>
                       </div>
                     <% elsif travel.car? %>
                       <div>
@@ -722,7 +722,7 @@
                       </div>
                       <div>
                         <dt class="text-(--text-muted)"><%= label == "Arrival" ? "Expected arrival" : "Departure time" %></dt>
-                        <dd class="font-medium text-(--text-strong)"><%= (label == "Arrival" ? travel.expected_arrival_time : travel.departure_time)&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                        <dd class="font-medium text-(--text-strong)"><%= travel.local_time(label == "Arrival" ? :expected_arrival_time : :departure_time)&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
                       </div>
                     <% elsif travel.other? %>
                       <div class="md:col-span-2">

@@ -1,4 +1,5 @@
 class Message < ApplicationRecord
+  include EventLocalTimes
   self.implicit_order_column = "created_at"
 
   has_paper_trail
@@ -51,28 +52,14 @@ class Message < ApplicationRecord
   validates :channels, presence: true
   validate :channels_are_valid
 
-  before_validation :interpret_naive_scheduled_at_in_event_timezone
+  # Typed on the event's clock (see EventLocalTimes).
+  event_local_times :scheduled_at
 
   scope :recent, -> { order(created_at: :desc) }
   scope :pending_scheduled, -> { scheduled.where("scheduled_at <= ?", Time.current) }
 
-  # The compose form's datetime-local field submits a zone-less string like
-  # "2026-07-12T09:30", which Rails would cast in the app default zone (UTC).
-  # Keep the raw string and re-parse it on the event's clock once validation
-  # runs, the same way Event reads its own schedule times.
-  def scheduled_at=(value)
-    @naive_scheduled_at = value.is_a?(String) && value.match?(Event::NAIVE_DATETIME_PATTERN) ? value : nil
-    super
-  end
-
   def local_scheduled_at
-    scheduled_at&.in_time_zone(event.event_time_zone)
-  end
-
-  # Value for the datetime-local field: the stored time on the event's clock,
-  # so admins see and edit event-local times.
-  def scheduled_at_field_value
-    local_scheduled_at&.strftime("%Y-%m-%dT%H:%M")
+    local_time(:scheduled_at)
   end
 
   def audience_label
@@ -466,18 +453,6 @@ class Message < ApplicationRecord
       tags: %w[p br strong b em i u s strike a ul ol li blockquote code pre],
       attributes: %w[href target]
     )
-  end
-
-  def interpret_naive_scheduled_at_in_event_timezone
-    return if @naive_scheduled_at.blank? || event.nil?
-
-    parsed = begin
-      event.event_time_zone.parse(@naive_scheduled_at)
-    rescue ArgumentError
-      nil
-    end
-    self[:scheduled_at] = parsed if parsed
-    @naive_scheduled_at = nil
   end
 
   def channels_are_valid

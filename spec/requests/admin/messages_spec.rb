@@ -293,6 +293,7 @@ RSpec.describe "Admin::Messages", type: :request do
             get edit_admin_event_message_path(event_slug: event.slug, id: message)
             field = Nokogiri::HTML(response.body).at_css("input[name='message[scheduled_at]']")
             expect(field["value"]).to eq("2030-07-12T09:30")
+            expect(field["lang"]).to eq("en-GB")
             expect(field["min"]).to eq("2030-01-01T04:00:00")
             expect(page_text).to include("In the event's time zone: Pacific Time (US & Canada).")
 

@@ -51,17 +51,20 @@
     <%= f.text_area :usage_note, rows: 2, maxlength: 200, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-(--accent)" %>
   </div>
 
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-    <div>
-      <%= f.label :starts_at, "Starts At", class: "block text-sm font-medium text-gray-700 mb-1" %>
-      <%= f.datetime_local_field :starts_at, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
-      <p class="mt-1 text-sm text-gray-500">Optional — when scanning at this location opens</p>
+  <div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <%= f.label :starts_at, "Starts At", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.datetime_local_field :starts_at, value: f.object.local_time_field_value(:starts_at), lang: "en-GB", class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+        <p class="mt-1 text-sm text-gray-500">Optional — when scanning at this location opens</p>
+      </div>
+      <div>
+        <%= f.label :ends_at, "Ends At", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.datetime_local_field :ends_at, value: f.object.local_time_field_value(:ends_at), lang: "en-GB", class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+        <p class="mt-1 text-sm text-gray-500">Optional — when scanning at this location closes</p>
+      </div>
     </div>
-    <div>
-      <%= f.label :ends_at, "Ends At", class: "block text-sm font-medium text-gray-700 mb-1" %>
-      <%= f.datetime_local_field :ends_at, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
-      <p class="mt-1 text-sm text-gray-500">Optional — when scanning at this location closes</p>
-    </div>
+    <p class="mt-1 text-sm text-gray-500">In the event's time zone: <%= scan_context.event_local_time_zone.name %>.</p>
   </div>
 
   <div>

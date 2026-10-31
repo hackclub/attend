@@ -168,6 +168,13 @@ export default class extends Controller {
       input.type = meta.type === "date" ? "date" : meta.type === "datetime" ? "datetime-local" : "text"
       input.className = "w-full rounded-md border-gray-300 text-sm"
       input.placeholder = "value"
+      // Times are read on the event's clock and typed as 24-hour time, as on
+      // the server-rendered row (_filter_row).
+      if (input.type === "datetime-local") {
+        input.lang = "en-GB"
+        const timeZone = row.dataset.exportTimeZone
+        if (timeZone) input.title = `In the event's time zone: ${timeZone}.`
+      }
       wrapper.appendChild(input)
     }
   }

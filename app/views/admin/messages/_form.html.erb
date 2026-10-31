@@ -181,7 +181,8 @@
         <div id="schedule-fields" class="<%= @message.scheduled_at.present? ? '' : 'hidden' %>">
           <%= f.label :scheduled_at, "Send at", class: "block text-sm font-medium text-gray-700 mb-1" %>
           <%= f.datetime_local_field :scheduled_at,
-              value: @message.scheduled_at_field_value,
+              value: @message.local_time_field_value(:scheduled_at),
+              lang: "en-GB",
               class: "rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750]",
               min: Time.current.in_time_zone(current_event.event_time_zone).strftime("%Y-%m-%dT%H:%M"),
               data: { action: "change->autosave#save" } %>

@@ -54,8 +54,8 @@
       <% end %>
 
       <%= cs_form_field f, :expires_at, label: "Expires at", optional: true,
-            constraint: "Leave blank for an indefinite ban." do |aria| %>
-        <%= f.datetime_local_field :expires_at, value: ban.expires_at&.strftime("%Y-%m-%dT%H:%M"), class: "cs-input", **aria %>
+            constraint: "In UTC. Leave blank for an indefinite ban." do |aria| %>
+        <%= f.datetime_local_field :expires_at, value: ban.expires_at&.utc&.strftime("%Y-%m-%dT%H:%M"), lang: "en-GB", class: "cs-input", **aria %>
       <% end %>
 
       <%= cs_form_field f, :reason, label: "Reason", optional: true do |aria| %>

@@ -32,14 +32,15 @@
           <%= f.text_area :usage_note, class: "cs-input", rows: 2, maxlength: 200, **aria %>
         <% end %>
 
+        <% zone_hint = "In the event's time zone: #{scan_context.event_local_time_zone.name}." %>
         <div class="cs-field-grid">
-          <%= cs_form_field f, :starts_at, label: "Starts at", optional: true,
+          <%= cs_form_field f, :starts_at, label: "Starts at", optional: true, description: zone_hint,
                 constraint: "When scanning at this location opens." do |aria| %>
-            <%= f.datetime_local_field :starts_at, class: "cs-input", **aria %>
+            <%= f.datetime_local_field :starts_at, value: f.object.local_time_field_value(:starts_at), lang: "en-GB", class: "cs-input", **aria %>
           <% end %>
-          <%= cs_form_field f, :ends_at, label: "Ends at", optional: true,
+          <%= cs_form_field f, :ends_at, label: "Ends at", optional: true, description: zone_hint,
                 constraint: "When scanning at this location closes. Must be after the start time." do |aria| %>
-            <%= f.datetime_local_field :ends_at, class: "cs-input",
+            <%= f.datetime_local_field :ends_at, value: f.object.local_time_field_value(:ends_at), lang: "en-GB", class: "cs-input",
                   data: { cs_after: f.field_id(:starts_at), cs_after_message: "Enter an end time after the start time." }, **aria %>
           <% end %>
         </div>

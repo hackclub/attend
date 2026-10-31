@@ -44,7 +44,7 @@
               <% participant_names = incident.participants.map { |p| p.preferred_name || p.legal_first_name } %>
               <tr data-name="<%= [ incident.category.humanize, incident.severity.humanize, incident.status.humanize, *participant_names, incident.reported_by.display_name_or_fallback ].join(" ").downcase %>">
                 <td class="whitespace-nowrap">
-                  <%= cs_absolute_time_tag(incident.occurred_at || incident.created_at) %>
+                  <%= cs_absolute_time_tag(incident.occurred_at || incident.created_at, zone: incident.time_display_zone) %>
                 </td>
                 <td><%= render_category_badge(incident.category) %></td>
                 <td><%= incident_level_badge(incident.severity) %></td>

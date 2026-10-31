@@ -173,6 +173,47 @@ RSpec.describe "Admin::Scans", type: :request do
     end
   end
 
+  # Scan times are instants; "today" and the history's date filter are days
+  # on the event's clock, not UTC days.
+  describe "event-local days" do
+    # Los Angeles: UTC-7 in July.
+    let(:event) { create(:event, nfc_badges_enabled: false, timezone: "Pacific Time (US & Canada)") }
+
+    def scan_at(time)
+      participant_event.scans.create!(scan_context: scan_context, user: admin, scanned_at: time)
+    end
+
+    it "filters the history to the chosen day on the event's clock" do
+      evening_before = scan_at(Time.utc(2030, 7, 12, 3, 0)) # July 11, 20:00 in Los Angeles
+      morning = scan_at(Time.utc(2030, 7, 12, 16, 0))       # July 12, 09:00
+      late_evening = scan_at(Time.utc(2030, 7, 13, 5, 0))   # July 12, 22:00
+
+      [ true, false ].each do |console|
+        admin.update!(admin_console_beta: console)
+
+        get history_admin_event_scans_path(event, date: "2030-07-12")
+
+        expect(response.body).to include("scan-row-#{morning.id}", "scan-row-#{late_evening.id}")
+        expect(response.body).not_to include("scan-row-#{evening_before.id}")
+        expect(response.body).to include("In the event&#39;s time zone: Pacific Time (US &amp; Canada).")
+      end
+    end
+
+    it "counts today's scans by the event's day" do
+      travel_to Time.utc(2030, 7, 12, 5, 0) do # July 11, 22:00 in Los Angeles
+        scan_at(Time.utc(2030, 7, 11, 16, 0)) # July 11, 09:00: today at the event, yesterday in UTC
+        scan_at(Time.utc(2030, 7, 12, 4, 0))  # July 11, 21:00
+        scan_at(Time.utc(2030, 7, 11, 6, 0))  # July 10, 23:00: yesterday at the event
+
+        get admin_event_scans_path(event)
+        expect(response.body).to match(%r{Scans today</dt><dd[^>]*>2</dd>})
+
+        get scanner_admin_event_scans_path(event)
+        expect(response.body).to match(%r{data-event-scans-target="count">2</span> scans today})
+      end
+    end
+  end
+
   it "renders the NFC write flag as false when NFC badges were never set up" do
     event.update!(nfc_badges_enabled: nil)
 

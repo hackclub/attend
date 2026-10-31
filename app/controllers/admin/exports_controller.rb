@@ -144,7 +144,7 @@ module Admin
       raw_filters.filter_map do |raw|
         next if raw["field"].blank?
 
-        filter = Exports::Filter.build(raw)
+        filter = Exports::Filter.build(raw, time_zone: current_event.event_time_zone)
         unless filter&.valid?
           redirect_to(admin_event_exports_path(current_event), alert: "Invalid filter on #{raw['field']}.")
           return []
