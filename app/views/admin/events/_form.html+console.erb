@@ -123,15 +123,18 @@
 
   <section class="cs-container">
     <div class="cs-container-header">
-      <h2 class="cs-h2">Event dates</h2>
+      <div>
+        <h2 class="cs-h2">Event dates</h2>
+        <p class="cs-container-description">Times are in the event's time zone, set under Location and time above.</p>
+      </div>
     </div>
     <div class="cs-container-body">
       <div class="cs-field-grid">
         <%= cs_form_field f, :starts_at, label: "Starts at", optional: true do |aria| %>
-          <%= f.datetime_local_field :starts_at, value: f.object.local_time_field_value(:starts_at), class: "cs-input", **aria %>
+          <%= f.datetime_local_field :starts_at, value: f.object.local_time_field_value(:starts_at), lang: "en-GB", class: "cs-input", **aria %>
         <% end %>
         <%= cs_form_field f, :ends_at, label: "Ends at", optional: true do |aria| %>
-          <%= f.datetime_local_field :ends_at, value: f.object.local_time_field_value(:ends_at), class: "cs-input", **aria %>
+          <%= f.datetime_local_field :ends_at, value: f.object.local_time_field_value(:ends_at), lang: "en-GB", class: "cs-input", **aria %>
         <% end %>
       </div>
     </div>
@@ -139,15 +142,18 @@
 
   <section class="cs-container">
     <div class="cs-container-header">
-      <h2 class="cs-h2">Registration period</h2>
+      <div>
+        <h2 class="cs-h2">Registration period</h2>
+        <p class="cs-container-description">Times are in the event's time zone, set under Location and time above.</p>
+      </div>
     </div>
     <div class="cs-container-body">
       <div class="cs-field-grid">
         <%= cs_form_field f, :registration_open_at, label: "Registration opens at", optional: true do |aria| %>
-          <%= f.datetime_local_field :registration_open_at, value: f.object.local_time_field_value(:registration_open_at), class: "cs-input", **aria %>
+          <%= f.datetime_local_field :registration_open_at, value: f.object.local_time_field_value(:registration_open_at), lang: "en-GB", class: "cs-input", **aria %>
         <% end %>
         <%= cs_form_field f, :registration_close_at, label: "Registration closes at", optional: true do |aria| %>
-          <%= f.datetime_local_field :registration_close_at, value: f.object.local_time_field_value(:registration_close_at), class: "cs-input", **aria %>
+          <%= f.datetime_local_field :registration_close_at, value: f.object.local_time_field_value(:registration_close_at), lang: "en-GB", class: "cs-input", **aria %>
         <% end %>
       </div>
     </div>
@@ -157,16 +163,16 @@
     <div class="cs-container-header">
       <div>
         <h2 class="cs-h2">Arrival window</h2>
-        <p class="cs-container-description">Shown to attendees as "when to arrive" on their dashboard.</p>
+        <p class="cs-container-description">Shown to attendees as "when to arrive" on their dashboard. Times are in the event's time zone, set under Location and time above.</p>
       </div>
     </div>
     <div class="cs-container-body">
       <div class="cs-field-grid">
         <%= cs_form_field f, :arrival_opens_at, label: "Arrival opens at", optional: true do |aria| %>
-          <%= f.datetime_local_field :arrival_opens_at, value: f.object.local_time_field_value(:arrival_opens_at), class: "cs-input", **aria %>
+          <%= f.datetime_local_field :arrival_opens_at, value: f.object.local_time_field_value(:arrival_opens_at), lang: "en-GB", class: "cs-input", **aria %>
         <% end %>
         <%= cs_form_field f, :arrival_closes_at, label: "Arrival closes at", optional: true do |aria| %>
-          <%= f.datetime_local_field :arrival_closes_at, value: f.object.local_time_field_value(:arrival_closes_at), class: "cs-input", **aria %>
+          <%= f.datetime_local_field :arrival_closes_at, value: f.object.local_time_field_value(:arrival_closes_at), lang: "en-GB", class: "cs-input", **aria %>
         <% end %>
       </div>
     </div>

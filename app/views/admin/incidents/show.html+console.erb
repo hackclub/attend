@@ -34,7 +34,7 @@
         </div>
         <div>
           <dt class="cs-kv-label">Occurred</dt>
-          <dd class="cs-kv-value"><%= cs_absolute_time_tag(@incident.occurred_at) || "Not specified" %></dd>
+          <dd class="cs-kv-value"><%= cs_absolute_time_tag(@incident.occurred_at, zone: @incident.time_display_zone) || "Not specified" %></dd>
         </div>
         <div>
           <dt class="cs-kv-label">Location</dt>

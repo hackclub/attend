@@ -34,7 +34,7 @@
         <div>
           <h3 class="text-sm font-medium text-gray-500">Date/Time</h3>
           <p class="mt-1 text-sm text-gray-900">
-            <%= @incident.occurred_at&.strftime("%B %d, %Y at %H:%M") || "Not specified" %>
+            <%= @incident.local_time(:occurred_at)&.strftime("%B %d, %Y at %H:%M") || "Not specified" %>
           </p>
         </div>
 

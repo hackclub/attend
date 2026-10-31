@@ -126,7 +126,7 @@
             <tbody class="bg-white divide-y divide-gray-100 text-sm">
               <% @incidents.each do |incident| %>
                 <tr class="hover:bg-gray-50">
-                  <td class="px-4 py-3 whitespace-nowrap text-gray-900"><%= (incident.occurred_at || incident.created_at).strftime("%b %d, %Y %H:%M") %></td>
+                  <td class="px-4 py-3 whitespace-nowrap text-gray-900"><%= (incident.local_time(:occurred_at) || incident.created_at.in_time_zone(incident.time_display_zone)).strftime("%b %d, %Y %H:%M") %></td>
                   <td class="px-4 py-3 whitespace-nowrap text-gray-700"><%= incident.event.name %></td>
                   <td class="px-4 py-3 text-gray-700 max-w-xs">
                     <span class="block truncate" title="<%= incident.summary %>"><%= incident.summary.presence || "No summary" %></span>

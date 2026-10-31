@@ -85,6 +85,13 @@ RSpec.describe EventLocalTimes do
       expect(context.local_time_field_value(:ends_at)).to eq("2030-07-12T17:00")
     end
 
+    it "stays on UTC when its own instant is assigned back unchanged" do
+      context.update!(starts_at: context.starts_at.iso8601)
+
+      expect(context.reload.times_in_event_zone).to be(false)
+      expect(context.ends_at).to eq(Time.utc(2030, 7, 12, 17, 0))
+    end
+
     it "keeps an assigned instant as given while moving the rest" do
       context.update!(starts_at: Time.utc(2030, 7, 12, 12, 0))
       context.reload

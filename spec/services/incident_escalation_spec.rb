@@ -57,6 +57,22 @@ RSpec.describe IncidentEscalation do
     expect { e.call }.not_to change(IncidentReport, :count)
   end
 
+  context "in an event outside UTC" do
+    let(:event) { create(:event, starts_at: 1.day.ago, ends_at: 1.day.from_now, timezone: "Eastern Time (US & Canada)") }
+
+    it "gives when it happened on the event's clock" do
+      incident.update!(occurred_at: "2026-07-12T09:30")
+
+      expect(escalation.call.details).to include("Occurred at: 2026-07-12 09:30 EDT")
+    end
+
+    it "keeps a legacy row's time on UTC" do
+      incident.update_columns(occurred_at: Time.utc(2026, 7, 12, 9, 30), times_in_event_zone: false)
+
+      expect(escalation.call.details).to include("Occurred at: 2026-07-12 09:30 UTC")
+    end
+  end
+
   it "flags global admins as HQ staff" do
     organizer.update!(global_role: "global_admin")
     expect(escalation.call.reporter_role).to eq("hq_employee")

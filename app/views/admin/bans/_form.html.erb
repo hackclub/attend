@@ -43,8 +43,8 @@
 
   <div>
     <%= f.label :expires_at, "Expires at", class: "block text-sm font-medium text-gray-700" %>
-    <%= f.datetime_local_field :expires_at, value: ban.expires_at&.strftime("%Y-%m-%dT%H:%M"), class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750]" %>
-    <p class="mt-1 text-sm text-gray-500">Leave blank for an indefinite ban.</p>
+    <%= f.datetime_local_field :expires_at, value: ban.expires_at&.utc&.strftime("%Y-%m-%dT%H:%M"), lang: "en-GB", class: "mt-1 block w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750]" %>
+    <p class="mt-1 text-sm text-gray-500">In UTC. Leave blank for an indefinite ban.</p>
   </div>
 
   <div>

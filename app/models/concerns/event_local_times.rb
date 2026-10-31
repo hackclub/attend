@@ -78,6 +78,13 @@ module EventLocalTimes
     zone = event_local_time_zone
     return if zone.nil?
 
+    # An API client echoing back a legacy row's instant hasn't retyped it;
+    # only a typed wall-clock or a real change moves the row onto the
+    # event's clock.
+    input = input.reject { |attr, raw| raw == :instant && !will_save_change_to_attribute?(attr) }
+    @event_local_time_input = nil
+    return if input.empty?
+
     if legacy_event_local_times?
       (event_local_time_attributes - input.keys).each do |attr|
         self[attr] = reinterpret_utc_wall_clock(self[attr], zone) if self[attr]
@@ -95,7 +102,6 @@ module EventLocalTimes
       end
       self[attr] = parsed if parsed
     end
-    @event_local_time_input = nil
   end
 
   def reinterpret_utc_wall_clock(time, zone)

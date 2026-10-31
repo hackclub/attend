@@ -14,6 +14,8 @@ class SendIncidentUpdateToSlackJob < ApplicationJob
     return if changes.empty?
 
     text = build_update_text(user, changes)
+    # Only fields the thread describes get a post; Slack rejects an empty one.
+    return if text.nil?
 
     SlackService.new.send_to_channel(
       channel_id: CONDUCT_CHANNEL_ID,
