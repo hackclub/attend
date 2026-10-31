@@ -127,7 +127,7 @@
               </div>
               <div>
                 <dt class="portal-hint">Arrival Time</dt>
-                <dd class="portal-body"><%= @travel_inbound.arrival_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                <dd class="portal-body"><%= @travel_inbound.local_time(:arrival_time)&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
               </div>
             <% elsif @travel_inbound&.bus? %>
               <div>
@@ -136,11 +136,11 @@
               </div>
               <div>
                 <dt class="portal-hint">Departure</dt>
-                <dd class="portal-body"><%= @travel_inbound.departure_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                <dd class="portal-body"><%= @travel_inbound.local_time(:departure_time)&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
               </div>
               <div>
                 <dt class="portal-hint">Arrival</dt>
-                <dd class="portal-body"><%= @travel_inbound.arrival_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                <dd class="portal-body"><%= @travel_inbound.local_time(:arrival_time)&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
               </div>
             <% elsif @travel_inbound&.car? %>
               <div class="md:col-span-2">
@@ -149,7 +149,7 @@
               </div>
               <div>
                 <dt class="portal-hint">Expected Arrival</dt>
-                <dd class="portal-body"><%= @travel_inbound.expected_arrival_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                <dd class="portal-body"><%= @travel_inbound.local_time(:expected_arrival_time)&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
               </div>
             <% elsif @travel_inbound&.other? %>
               <div class="md:col-span-2">
@@ -203,7 +203,7 @@
               </div>
               <div>
                 <dt class="portal-hint">Departure Time</dt>
-                <dd class="portal-body"><%= @travel_outbound.departure_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                <dd class="portal-body"><%= @travel_outbound.local_time(:departure_time)&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
               </div>
             <% elsif @travel_outbound&.bus? %>
               <div>
@@ -212,11 +212,11 @@
               </div>
               <div>
                 <dt class="portal-hint">Departure</dt>
-                <dd class="portal-body"><%= @travel_outbound.departure_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                <dd class="portal-body"><%= @travel_outbound.local_time(:departure_time)&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
               </div>
               <div>
                 <dt class="portal-hint">Arrival</dt>
-                <dd class="portal-body"><%= @travel_outbound.arrival_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                <dd class="portal-body"><%= @travel_outbound.local_time(:arrival_time)&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
               </div>
             <% elsif @travel_outbound&.car? %>
               <div class="md:col-span-2">
@@ -225,7 +225,7 @@
               </div>
               <div>
                 <dt class="portal-hint">Departure Time</dt>
-                <dd class="portal-body"><%= @travel_outbound.departure_time&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
+                <dd class="portal-body"><%= @travel_outbound.local_time(:departure_time)&.strftime("%b %d, %Y %H:%M") || "—" %></dd>
               </div>
             <% elsif @travel_outbound&.other? %>
               <div class="md:col-span-2">

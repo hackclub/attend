@@ -156,9 +156,16 @@ module Exports
         "origin_address" => [ "Origin Address", :string ],
         "notes" => [ "Notes", :string ]
       }.each do |attr, (label, type, enum_values)|
+        # Typed train/bus/car times come out on the clock they were typed on,
+        # as the travel pages show them (EventLocalTimes).
+        read = if Travel.event_local_time_attributes.include?(attr.to_sym)
+          ->(t) { t.local_time(attr.to_sym) }
+        else
+          ->(t) { t.public_send(attr) }
+        end
         fields << Field.new(key: "travel.#{dir}.#{attr}", label: "#{dir.capitalize} #{label}", category: "travel",
                             type: type, enum_values: enum_values, includes: { "travel_#{dir}": :travel_legs },
-                            extractor: ->(pe) { travel.call(pe)&.public_send(attr) })
+                            extractor: ->(pe) { travel.call(pe)&.then(&read) })
       end
       fields << Field.new(key: "travel.#{dir}.legs_summary", label: "#{dir.capitalize} Flight Legs", category: "travel",
                           type: :string, includes: { "travel_#{dir}": :travel_legs },

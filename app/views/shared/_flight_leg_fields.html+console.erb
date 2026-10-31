@@ -1,4 +1,4 @@
-<%# locals: (leg:, index:, direction:, show_remove: false, default_date: nil, refresh_url: nil) %>
+<%# locals: (leg:, index:, direction:, show_remove: false, default_date: nil, refresh_url: nil, time_input_lang: nil) %>
 <%# Console variant of the flight leg fields, rendered only in the admin
     console. Onboarding and the participant dashboard keep the original
     partial. Same field names, ids and Stimulus hooks; Cloudscape labels and
@@ -73,6 +73,7 @@
       <div data-cs-field data-cs-label="<%= label %>">
         <label class="cs-field-label" for="<%= "#{direction}_leg_#{index}_#{kind}_time" %>"><%= label %></label>
         <input type="datetime-local"
+               <%= tag.attributes(lang: time_input_lang) %>
                id="<%= "#{direction}_leg_#{index}_#{kind}_time" %>"
                name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][<%= kind %>_time]"
                value="<%= flight_local_input_value(leg, kind, default_date: default_date) %>"

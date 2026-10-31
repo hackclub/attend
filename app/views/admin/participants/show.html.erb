@@ -113,13 +113,13 @@
                       <% if can_view_participant_pii? %><%= @travel_inbound.origin_address %>
                       <% else %><span class="italic text-gray-400" title="Pickup addresses are hidden for your role">Address hidden</span><% end %>
                     </div>
-                    <div><span class="text-gray-500">Arrival:</span> <%= @travel_inbound.expected_arrival_time&.strftime("%b %d, %Y %H:%M") %></div>
+                    <div><span class="text-gray-500">Arrival:</span> <%= @travel_inbound.local_time(:expected_arrival_time)&.strftime("%b %d, %Y %H:%M %Z") %></div>
                   <% elsif @travel_inbound.train? %>
                     <div><span class="text-gray-500">From:</span> <%= @travel_inbound.train_departure_station %></div>
-                    <div><span class="text-gray-500">Arrival:</span> <%= @travel_inbound.arrival_time&.strftime("%b %d, %Y %H:%M") %> - <%= @travel_inbound.train_arrival_station %></div>
+                    <div><span class="text-gray-500">Arrival:</span> <%= @travel_inbound.local_time(:arrival_time)&.strftime("%b %d, %Y %H:%M %Z") %> - <%= @travel_inbound.train_arrival_station %></div>
                   <% elsif @travel_inbound.bus? %>
                     <div><span class="text-gray-500">From:</span> <%= @travel_inbound.bus_departure_location %></div>
-                    <div><span class="text-gray-500">Arrival:</span> <%= @travel_inbound.arrival_time&.strftime("%b %d, %Y %H:%M") %> - <%= @travel_inbound.bus_arrival_location %></div>
+                    <div><span class="text-gray-500">Arrival:</span> <%= @travel_inbound.local_time(:arrival_time)&.strftime("%b %d, %Y %H:%M %Z") %> - <%= @travel_inbound.bus_arrival_location %></div>
                   <% else %>
                     <div><span class="text-gray-500">Details:</span> <%= @travel_inbound.other_details %></div>
                   <% end %>
@@ -144,13 +144,13 @@
                       <% if can_view_participant_pii? %><%= @travel_outbound.origin_address %>
                       <% else %><span class="italic text-gray-400" title="Pickup addresses are hidden for your role">Address hidden</span><% end %>
                     </div>
-                    <div><span class="text-gray-500">Departure:</span> <%= @travel_outbound.departure_time&.strftime("%b %d, %Y %H:%M") %></div>
+                    <div><span class="text-gray-500">Departure:</span> <%= @travel_outbound.local_time(:departure_time)&.strftime("%b %d, %Y %H:%M %Z") %></div>
                   <% elsif @travel_outbound.train? %>
                     <div><span class="text-gray-500">To:</span> <%= @travel_outbound.train_arrival_station %></div>
-                    <div><span class="text-gray-500">Departure:</span> <%= @travel_outbound.departure_time&.strftime("%b %d, %Y %H:%M") %> - <%= @travel_outbound.train_departure_station %></div>
+                    <div><span class="text-gray-500">Departure:</span> <%= @travel_outbound.local_time(:departure_time)&.strftime("%b %d, %Y %H:%M %Z") %> - <%= @travel_outbound.train_departure_station %></div>
                   <% elsif @travel_outbound.bus? %>
                     <div><span class="text-gray-500">To:</span> <%= @travel_outbound.bus_arrival_location %></div>
-                    <div><span class="text-gray-500">Departure:</span> <%= @travel_outbound.departure_time&.strftime("%b %d, %Y %H:%M") %> - <%= @travel_outbound.bus_departure_location %></div>
+                    <div><span class="text-gray-500">Departure:</span> <%= @travel_outbound.local_time(:departure_time)&.strftime("%b %d, %Y %H:%M %Z") %> - <%= @travel_outbound.bus_departure_location %></div>
                   <% else %>
                     <div><span class="text-gray-500">Details:</span> <%= @travel_outbound.other_details %></div>
                   <% end %>

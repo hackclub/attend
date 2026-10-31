@@ -118,13 +118,13 @@
                         <% if can_view_participant_pii? %><%= @travel_inbound.origin_address %>
                         <% else %><span class="italic cs-muted" title="Pickup addresses are hidden for your role">Address hidden</span><% end %>
                       </dd></div>
-                      <div><dt class="cs-kv-label">Arrival</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_inbound.expected_arrival_time) %></dd></div>
+                      <div><dt class="cs-kv-label">Arrival</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_inbound.expected_arrival_time, zone: @travel_inbound.time_display_zone) %></dd></div>
                     <% elsif @travel_inbound.train? %>
                       <div><dt class="cs-kv-label">From</dt><dd class="cs-kv-value"><%= @travel_inbound.train_departure_station %></dd></div>
-                      <div><dt class="cs-kv-label">Arrival</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_inbound.arrival_time) %> - <%= @travel_inbound.train_arrival_station %></dd></div>
+                      <div><dt class="cs-kv-label">Arrival</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_inbound.arrival_time, zone: @travel_inbound.time_display_zone) %> - <%= @travel_inbound.train_arrival_station %></dd></div>
                     <% elsif @travel_inbound.bus? %>
                       <div><dt class="cs-kv-label">From</dt><dd class="cs-kv-value"><%= @travel_inbound.bus_departure_location %></dd></div>
-                      <div><dt class="cs-kv-label">Arrival</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_inbound.arrival_time) %> - <%= @travel_inbound.bus_arrival_location %></dd></div>
+                      <div><dt class="cs-kv-label">Arrival</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_inbound.arrival_time, zone: @travel_inbound.time_display_zone) %> - <%= @travel_inbound.bus_arrival_location %></dd></div>
                     <% else %>
                       <div><dt class="cs-kv-label">Details</dt><dd class="cs-kv-value"><%= @travel_inbound.other_details %></dd></div>
                     <% end %>
@@ -149,13 +149,13 @@
                         <% if can_view_participant_pii? %><%= @travel_outbound.origin_address %>
                         <% else %><span class="italic cs-muted" title="Pickup addresses are hidden for your role">Address hidden</span><% end %>
                       </dd></div>
-                      <div><dt class="cs-kv-label">Departure</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_outbound.departure_time) %></dd></div>
+                      <div><dt class="cs-kv-label">Departure</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_outbound.departure_time, zone: @travel_outbound.time_display_zone) %></dd></div>
                     <% elsif @travel_outbound.train? %>
                       <div><dt class="cs-kv-label">To</dt><dd class="cs-kv-value"><%= @travel_outbound.train_arrival_station %></dd></div>
-                      <div><dt class="cs-kv-label">Departure</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_outbound.departure_time) %> - <%= @travel_outbound.train_departure_station %></dd></div>
+                      <div><dt class="cs-kv-label">Departure</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_outbound.departure_time, zone: @travel_outbound.time_display_zone) %> - <%= @travel_outbound.train_departure_station %></dd></div>
                     <% elsif @travel_outbound.bus? %>
                       <div><dt class="cs-kv-label">To</dt><dd class="cs-kv-value"><%= @travel_outbound.bus_arrival_location %></dd></div>
-                      <div><dt class="cs-kv-label">Departure</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_outbound.departure_time) %> - <%= @travel_outbound.bus_departure_location %></dd></div>
+                      <div><dt class="cs-kv-label">Departure</dt><dd class="cs-kv-value"><%= cs_absolute_time_tag(@travel_outbound.departure_time, zone: @travel_outbound.time_display_zone) %> - <%= @travel_outbound.bus_departure_location %></dd></div>
                     <% else %>
                       <div><dt class="cs-kv-label">Details</dt><dd class="cs-kv-value"><%= @travel_outbound.other_details %></dd></div>
                     <% end %>
