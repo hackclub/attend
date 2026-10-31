@@ -75,4 +75,55 @@ RSpec.describe Incident, type: :model do
       expect(incident.medications).to be_empty
     end
   end
+
+  describe "occurred_at on the event's clock" do
+    let(:event) { create(:event, timezone: "Eastern Time (US & Canada)") }
+
+    def log_incident(**attrs)
+      event.incidents.create!(reported_by: reporter, category: "behavior", severity: "s3", **attrs)
+    end
+
+    it "reads a typed time in the event's time zone" do
+      incident = log_incident(occurred_at: "2026-07-12T09:30")
+
+      expect(incident.occurred_at).to eq(Time.utc(2026, 7, 12, 13, 30))
+      expect(incident.times_in_event_zone).to be(true)
+      expect(incident.local_time(:occurred_at).strftime("%H:%M %Z")).to eq("09:30 EDT")
+      expect(incident.local_time_field_value(:occurred_at)).to eq("2026-07-12T09:30")
+    end
+
+    it "leaves a time that names its own offset alone" do
+      expect(log_incident(occurred_at: "2026-07-12T09:30:00Z").occurred_at).to eq(Time.utc(2026, 7, 12, 9, 30))
+    end
+
+    context "on a row saved before times were read on the event's clock" do
+      let(:incident) do
+        log_incident.tap do |i|
+          i.update_columns(occurred_at: Time.utc(2026, 7, 12, 9, 30), times_in_event_zone: false)
+        end.reload
+      end
+
+      it "keeps showing and prefilling the time on UTC" do
+        expect(incident.time_display_zone.name).to eq("UTC")
+        expect(incident.local_time(:occurred_at).strftime("%H:%M %Z")).to eq("09:30 UTC")
+        expect(incident.local_time_field_value(:occurred_at)).to eq("2026-07-12T09:30")
+      end
+
+      it "stays on UTC through edits that leave the time alone" do
+        incident.update!(status: "closed")
+
+        expect(incident.reload.times_in_event_zone).to be(false)
+        expect(incident.occurred_at).to eq(Time.utc(2026, 7, 12, 9, 30))
+      end
+
+      it "moves onto the event's clock when the form saves its time again" do
+        incident.update!(occurred_at: incident.local_time_field_value(:occurred_at))
+
+        incident.reload
+        expect(incident.times_in_event_zone).to be(true)
+        expect(incident.occurred_at).to eq(Time.utc(2026, 7, 12, 13, 30))
+        expect(incident.local_time(:occurred_at).strftime("%H:%M %Z")).to eq("09:30 EDT")
+      end
+    end
+  end
 end

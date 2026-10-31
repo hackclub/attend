@@ -27,6 +27,28 @@ RSpec.describe Exports::FieldRegistry do
     end
   end
 
+  describe "typed travel times" do
+    let(:event) { create(:event, timezone: "America/New_York") }
+    let(:participant_event) { create(:participant_event, event: event) }
+    def exported
+      csv = Exports::CsvBuilder.new(event: event, columns: [ "travel.inbound.arrival_time" ]).to_csv
+      CSV.parse(csv, headers: true).first["Inbound Arrival Time"]
+    end
+
+    it "come out on the event's clock, as typed" do
+      participant_event.travels.create!(direction: "inbound", mode: "bus", arrival_time: "2026-07-12T09:30")
+
+      expect(exported).to eq("2026-07-12 09:30")
+    end
+
+    it "come out as typed on a row saved before times were zoned" do
+      travel = participant_event.travels.create!(direction: "inbound", mode: "bus")
+      travel.update_columns(times_in_event_zone: false, arrival_time: Time.utc(2026, 7, 12, 9, 30))
+
+      expect(exported).to eq("2026-07-12 09:30")
+    end
+  end
+
   describe ".permitted_keys" do
     it "excludes sensitive categories for ops" do
       keys = described_class.permitted_keys(role: "ops")

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_30_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_31_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -753,6 +753,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_30_120000) do
     t.string "slack_message_ts"
     t.string "status", default: "open", null: false
     t.text "summary"
+    t.boolean "times_in_event_zone", default: false, null: false
     t.datetime "updated_at", null: false
     t.string "visible_to_roles", default: [], array: true
     t.index ["event_id"], name: "index_incidents_on_event_id"
@@ -1189,6 +1190,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_30_120000) do
     t.string "name", null: false
     t.integer "position", default: 0, null: false
     t.datetime "starts_at"
+    t.boolean "times_in_event_zone", default: false, null: false
     t.datetime "updated_at", null: false
     t.text "usage_note"
     t.index ["event_id", "position"], name: "index_scan_contexts_on_event_id_and_position"
@@ -1612,6 +1614,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_30_120000) do
     t.uuid "participant_event_id", null: false
     t.string "passport_nationality"
     t.datetime "pickup_dismissed_at"
+    t.boolean "times_in_event_zone", default: false, null: false
     t.string "train_arrival_station"
     t.string "train_departure_station"
     t.datetime "updated_at", null: false

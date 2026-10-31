@@ -107,7 +107,7 @@
               <h3 class="text-sm font-medium text-gray-700 mb-3">Flight Legs</h3>
               <div data-travel-form-target="inboundLegs" class="space-y-4">
                 <% @travel_inbound.travel_legs.order(:position).each_with_index do |leg, index| %>
-                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "inbound", show_remove: leg.persisted?, default_date: current_event.local_starts_at&.strftime('%Y-%m-%d'), refresh_url: refresh_flight_leg_admin_event_participant_path(current_event, @participant_event, leg_id: leg.id) %>
+                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "inbound", show_remove: leg.persisted?, default_date: current_event.local_starts_at&.strftime('%Y-%m-%d'), refresh_url: refresh_flight_leg_admin_event_participant_path(current_event, @participant_event, leg_id: leg.id), time_input_lang: "en-GB" %>
                 <% end %>
               </div>
               <button type="button" data-action="click->travel-form#addLeg" data-direction="inbound" class="mt-4 inline-flex items-center gap-1 text-sm text-[#ec3750] hover:text-blue-800">
@@ -130,7 +130,8 @@
               </div>
               <div>
                 <%= f.label :arrival_time, "Arrival Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
-                <%= f.datetime_local_field :arrival_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                <%= f.datetime_local_field :arrival_time, value: f.object.local_time_field_value(:arrival_time), lang: "en-GB", class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                <p class="mt-1 text-sm text-gray-500">In the event's time zone: <%= f.object.event_local_time_zone.name %>.</p>
               </div>
             </div>
           <% end %>
@@ -148,11 +149,13 @@
               </div>
               <div>
                 <%= f.label :departure_time, "Departure Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
-                <%= f.datetime_local_field :departure_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                <%= f.datetime_local_field :departure_time, value: f.object.local_time_field_value(:departure_time), lang: "en-GB", class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                <p class="mt-1 text-sm text-gray-500">In the event's time zone: <%= f.object.event_local_time_zone.name %>.</p>
               </div>
               <div>
                 <%= f.label :arrival_time, "Arrival Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
-                <%= f.datetime_local_field :arrival_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                <%= f.datetime_local_field :arrival_time, value: f.object.local_time_field_value(:arrival_time), lang: "en-GB", class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                <p class="mt-1 text-sm text-gray-500">In the event's time zone: <%= f.object.event_local_time_zone.name %>.</p>
               </div>
             </div>
           <% end %>
@@ -168,7 +171,8 @@
               <% end %>
               <div>
                 <%= f.label :expected_arrival_time, "Expected Arrival Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
-                <%= f.datetime_local_field :expected_arrival_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                <%= f.datetime_local_field :expected_arrival_time, value: f.object.local_time_field_value(:expected_arrival_time), lang: "en-GB", class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                <p class="mt-1 text-sm text-gray-500">In the event's time zone: <%= f.object.event_local_time_zone.name %>.</p>
               </div>
             </div>
           <% end %>
@@ -223,7 +227,7 @@
               <h3 class="text-sm font-medium text-gray-700 mb-3">Flight Legs</h3>
               <div data-travel-form-target="outboundLegs" class="space-y-4">
                 <% @travel_outbound.travel_legs.order(:position).each_with_index do |leg, index| %>
-                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "outbound", show_remove: leg.persisted?, default_date: current_event.local_ends_at&.strftime('%Y-%m-%d'), refresh_url: refresh_flight_leg_admin_event_participant_path(current_event, @participant_event, leg_id: leg.id) %>
+                  <%= render "shared/flight_leg_fields", leg: leg, index: index, direction: "outbound", show_remove: leg.persisted?, default_date: current_event.local_ends_at&.strftime('%Y-%m-%d'), refresh_url: refresh_flight_leg_admin_event_participant_path(current_event, @participant_event, leg_id: leg.id), time_input_lang: "en-GB" %>
                 <% end %>
               </div>
               <button type="button" data-action="click->travel-form#addLeg" data-direction="outbound" class="mt-4 inline-flex items-center gap-1 text-sm text-[#ec3750] hover:text-blue-800">
@@ -246,7 +250,8 @@
               </div>
               <div>
                 <%= f.label :departure_time, "Departure Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
-                <%= f.datetime_local_field :departure_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                <%= f.datetime_local_field :departure_time, value: f.object.local_time_field_value(:departure_time), lang: "en-GB", class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                <p class="mt-1 text-sm text-gray-500">In the event's time zone: <%= f.object.event_local_time_zone.name %>.</p>
               </div>
             </div>
           <% end %>
@@ -264,11 +269,13 @@
               </div>
               <div>
                 <%= f.label :departure_time, "Departure Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
-                <%= f.datetime_local_field :departure_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                <%= f.datetime_local_field :departure_time, value: f.object.local_time_field_value(:departure_time), lang: "en-GB", class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                <p class="mt-1 text-sm text-gray-500">In the event's time zone: <%= f.object.event_local_time_zone.name %>.</p>
               </div>
               <div>
                 <%= f.label :arrival_time, "Arrival Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
-                <%= f.datetime_local_field :arrival_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                <%= f.datetime_local_field :arrival_time, value: f.object.local_time_field_value(:arrival_time), lang: "en-GB", class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                <p class="mt-1 text-sm text-gray-500">In the event's time zone: <%= f.object.event_local_time_zone.name %>.</p>
               </div>
             </div>
           <% end %>
@@ -284,7 +291,8 @@
               <% end %>
               <div>
                 <%= f.label :departure_time, "Departure Time", class: "block text-sm font-medium text-gray-700 mb-1" %>
-                <%= f.datetime_local_field :departure_time, class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                <%= f.datetime_local_field :departure_time, value: f.object.local_time_field_value(:departure_time), lang: "en-GB", class: "w-full rounded-md border border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2" %>
+                <p class="mt-1 text-sm text-gray-500">In the event's time zone: <%= f.object.event_local_time_zone.name %>.</p>
               </div>
             </div>
           <% end %>
@@ -374,12 +382,12 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Departure Time <span class="text-red-500">*</span> <span class="font-normal text-gray-500">(local airport time)</span></label>
-        <input type="datetime-local" class="leg-departure-time w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" name="" required>
+        <input type="datetime-local" lang="en-GB" class="leg-departure-time w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" name="" required>
         <select class="leg-departure-tz mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]" name=""><%= travel_leg_time_zone_options %></select>
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Arrival Time <span class="text-red-500">*</span> <span class="font-normal text-gray-500">(local airport time)</span></label>
-        <input type="datetime-local" class="leg-arrival-time w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" name="" required>
+        <input type="datetime-local" lang="en-GB" class="leg-arrival-time w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" name="" required>
         <select class="leg-arrival-tz mt-1 w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#ec3750]" name=""><%= travel_leg_time_zone_options %></select>
       </div>
     </div>

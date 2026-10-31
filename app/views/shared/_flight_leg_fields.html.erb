@@ -1,4 +1,4 @@
-<%# locals: (leg:, index:, direction:, show_remove: false, default_date: nil, refresh_url: nil) %>
+<%# locals: (leg:, index:, direction:, show_remove: false, default_date: nil, refresh_url: nil, time_input_lang: nil) %>
 <% admin_tool do %>
   <details>
     <summary>
@@ -74,6 +74,7 @@
     <div>
       <label class="portal-label">Departure Time <span class="portal-required" aria-hidden="true">*</span> <span class="portal-meta font-normal">(local airport time)</span></label>
       <input type="datetime-local"
+             <%= tag.attributes(lang: time_input_lang) %>
              name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][departure_time]"
              value="<%= flight_local_input_value(leg, :departure, default_date: default_date) %>"
              required
@@ -86,6 +87,7 @@
     <div>
       <label class="portal-label">Arrival Time <span class="portal-required" aria-hidden="true">*</span> <span class="portal-meta font-normal">(local airport time)</span></label>
       <input type="datetime-local"
+             <%= tag.attributes(lang: time_input_lang) %>
              name="travel_<%= direction %>[travel_legs_attributes][<%= index %>][arrival_time]"
              value="<%= flight_local_input_value(leg, :arrival, default_date: default_date) %>"
              required

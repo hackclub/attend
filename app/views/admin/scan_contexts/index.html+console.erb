@@ -38,7 +38,7 @@
               <td class="whitespace-nowrap"><%= cs_badge(context.kind_label) %></td>
               <td class="whitespace-nowrap">
                 <% if context.starts_at? || context.ends_at? %>
-                  <%= [ cs_absolute_time(context.starts_at), cs_absolute_time(context.ends_at) ].compact.join(" – ") %>
+                  <%= [ cs_absolute_time(context.starts_at, zone: context.time_display_zone), cs_absolute_time(context.ends_at, zone: context.time_display_zone) ].compact.join(" – ") %>
                 <% else %>
                   <span class="cs-muted">—</span>
                 <% end %>

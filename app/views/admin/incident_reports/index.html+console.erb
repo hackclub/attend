@@ -141,7 +141,7 @@
             <tbody>
               <% @incidents.each do |incident| %>
                 <tr>
-                  <td class="whitespace-nowrap"><%= cs_absolute_time_tag(incident.occurred_at || incident.created_at) %></td>
+                  <td class="whitespace-nowrap"><%= cs_absolute_time_tag(incident.occurred_at || incident.created_at, zone: incident.time_display_zone) %></td>
                   <td class="whitespace-nowrap"><%= incident.event.name %></td>
                   <td class="max-w-xs">
                     <span class="block truncate" title="<%= incident.summary %>"><%= incident.summary.presence || "No summary" %></span>

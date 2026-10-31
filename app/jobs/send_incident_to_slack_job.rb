@@ -66,7 +66,7 @@ class SendIncidentToSlackJob < ApplicationJob
           },
           {
             type: "mrkdwn",
-            text: "*Occurred:*\n#{incident.occurred_at&.strftime('%B %d, %Y at %H:%M') || 'Not specified'}"
+            text: "*Occurred:*\n#{incident.local_time(:occurred_at)&.strftime('%B %d, %Y at %H:%M') || 'Not specified'}"
           }
         ]
       },

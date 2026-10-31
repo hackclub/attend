@@ -52,14 +52,12 @@ module Admin
     def update
       authorize @incident
 
-      changes = nil
-      if @incident.slack_message_ts.present?
-        @incident.assign_attributes(incident_params)
-        changes = @incident.changes.except("updated_at")
-      end
-
       if @incident.update(incident_params)
-        if changes.present? && changes.any?
+        # Read after saving: the form's occurred_at is only moved onto the
+        # event's clock during validation (EventLocalTimes), so the pre-save
+        # diff would report an unchanged time as edited.
+        changes = @incident.saved_changes.except("updated_at", "times_in_event_zone")
+        if @incident.slack_message_ts.present? && changes.any?
           SendIncidentUpdateToSlackJob.perform_later(@incident.id, current_user.id, changes)
         end
         redirect_to admin_event_incident_path(current_event, @incident), notice: "Incident was successfully updated."

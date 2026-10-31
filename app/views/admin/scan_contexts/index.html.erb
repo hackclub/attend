@@ -34,7 +34,7 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   <% if context.starts_at? || context.ends_at? %>
-                    <%= [ context.starts_at&.strftime("%b %-d, %-l:%M %p"), context.ends_at&.strftime("%b %-d, %-l:%M %p") ].compact.join(" – ") %>
+                    <%= [ context.local_time(:starts_at)&.strftime("%b %-d, %-l:%M %p"), context.local_time(:ends_at)&.strftime("%b %-d, %-l:%M %p") ].compact.join(" – ") %>
                   <% else %>
                     <span class="text-gray-400">—</span>
                   <% end %>

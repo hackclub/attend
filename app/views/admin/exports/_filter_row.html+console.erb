@@ -1,6 +1,7 @@
 <%# locals: index (integer or "NEW_RECORD"), filter (hash with "field"/"operator"/"value" or nil), fields_by_category, categories %>
 <% field = filter && Exports::FieldRegistry.fetch(filter["field"].to_s) %>
-<div class="flex flex-wrap items-start gap-2" data-export-filter-row>
+<div class="flex flex-wrap items-start gap-2" data-export-filter-row
+     data-export-time-zone="<%= current_event.event_time_zone.name %>">
   <select name="filters[<%= index %>][field]" data-export-field-select data-action="export-builder#fieldChanged"
           aria-label="Field"
           class="cs-select w-auto! min-w-[14rem]">
@@ -33,9 +34,11 @@
           <% end %>
         </select>
       <% else %>
+        <% input_type = { date: "date", datetime: "datetime-local" }[field.type] || "text" %>
         <input name="filters[<%= index %>][value]" value="<%= filter["value"] %>" placeholder="value"
                aria-label="Value"
-               type="<%= { date: "date", datetime: "datetime-local" }[field.type] || "text" %>"
+               type="<%= input_type %>"
+               <% if input_type == "datetime-local" %>lang="en-GB" title="In the event's time zone: <%= current_event.event_time_zone.name %>."<% end %>
                class="cs-input">
       <% end %>
     <% end %>

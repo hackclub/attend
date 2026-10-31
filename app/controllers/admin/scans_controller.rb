@@ -8,7 +8,7 @@ module Admin
     def index
       @scan_contexts = current_event.scan_contexts.to_a
       all_scans = Scan.for_event(current_event)
-      today_scans = all_scans.today
+      today_scans = all_scans.where(scanned_at: event_today)
 
       @scans_today = today_scans.count
       @scans_total = all_scans.count
@@ -50,7 +50,7 @@ module Admin
 
     def scanner
       @recent_scans = Scan.for_event(current_event)
-        .today
+        .where(scanned_at: event_today)
         .includes(:user, :scan_context, :participant, participant_event: :participant)
         .recent
         .limit(50)
@@ -247,10 +247,11 @@ module Admin
         @scans = @scans.where(user_id: params[:user_id])
       end
 
+      # A calendar day on the event's clock, as event_today is.
       if params[:date].present?
         date = Date.parse(params[:date]) rescue nil
         if date
-          @scans = @scans.where(scanned_at: date.beginning_of_day..date.end_of_day)
+          @scans = @scans.where(scanned_at: date.in_time_zone(current_event.event_time_zone).all_day)
         end
       end
 
@@ -283,6 +284,12 @@ module Admin
     end
 
     private
+
+    # Scan times are instants, so "today" is the event's calendar day rather
+    # than the UTC one, which ends in the afternoon or evening at a US event.
+    def event_today
+      Time.current.in_time_zone(current_event.event_time_zone).all_day
+    end
 
     def set_scan
       @scan = Scan.for_event(current_event).find(params[:id])

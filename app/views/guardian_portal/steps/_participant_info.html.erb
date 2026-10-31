@@ -181,7 +181,7 @@
               </div>
               <div>
                 <label for="travel_inbound_train_arrival_time" class="portal-label">Arrival Time in <%= @event.location_city || "the event" %></label>
-                <input type="datetime-local" name="travel_inbound[arrival_time]" id="travel_inbound_train_arrival_time" value="<%= @travel_inbound&.arrival_time&.strftime('%Y-%m-%dT%H:%M') %>" class="portal-input">
+                <input type="datetime-local" name="travel_inbound[arrival_time]" id="travel_inbound_train_arrival_time" value="<%= @travel_inbound&.local_time_field_value(:arrival_time) %>" class="portal-input">
               </div>
             </div>
 
@@ -200,11 +200,11 @@
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label for="travel_inbound_bus_departure_time" class="portal-label">Departure Time</label>
-                  <input type="datetime-local" name="travel_inbound[departure_time]" id="travel_inbound_bus_departure_time" value="<%= @travel_inbound&.departure_time&.strftime('%Y-%m-%dT%H:%M') %>" class="portal-input">
+                  <input type="datetime-local" name="travel_inbound[departure_time]" id="travel_inbound_bus_departure_time" value="<%= @travel_inbound&.local_time_field_value(:departure_time) %>" class="portal-input">
                 </div>
                 <div>
                   <label for="travel_inbound_bus_arrival_time" class="portal-label">Arrival Time</label>
-                  <input type="datetime-local" name="travel_inbound[arrival_time]" id="travel_inbound_bus_arrival_time" value="<%= @travel_inbound&.arrival_time&.strftime('%Y-%m-%dT%H:%M') %>" class="portal-input">
+                  <input type="datetime-local" name="travel_inbound[arrival_time]" id="travel_inbound_bus_arrival_time" value="<%= @travel_inbound&.local_time_field_value(:arrival_time) %>" class="portal-input">
                 </div>
               </div>
             </div>
@@ -217,7 +217,7 @@
               </div>
               <div>
                 <label for="travel_inbound_expected_arrival_time" class="portal-label">Expected Arrival Time in <%= @event.location_city || "the event" %></label>
-                <input type="datetime-local" name="travel_inbound[expected_arrival_time]" id="travel_inbound_expected_arrival_time" value="<%= @travel_inbound&.expected_arrival_time&.strftime('%Y-%m-%dT%H:%M') %>" class="portal-input">
+                <input type="datetime-local" name="travel_inbound[expected_arrival_time]" id="travel_inbound_expected_arrival_time" value="<%= @travel_inbound&.local_time_field_value(:expected_arrival_time) %>" class="portal-input">
               </div>
             </div>
 
@@ -312,7 +312,7 @@
               </div>
               <div>
                 <label for="travel_outbound_train_departure_time" class="portal-label">Departure Time from <%= @event.location_city || "the event" %></label>
-                <input type="datetime-local" name="travel_outbound[departure_time]" id="travel_outbound_train_departure_time" value="<%= @travel_outbound&.departure_time&.strftime('%Y-%m-%dT%H:%M') %>" class="portal-input">
+                <input type="datetime-local" name="travel_outbound[departure_time]" id="travel_outbound_train_departure_time" value="<%= @travel_outbound&.local_time_field_value(:departure_time) %>" class="portal-input">
               </div>
             </div>
 
@@ -331,11 +331,11 @@
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label for="travel_outbound_bus_departure_time" class="portal-label">Departure Time</label>
-                  <input type="datetime-local" name="travel_outbound[departure_time]" id="travel_outbound_bus_departure_time" value="<%= @travel_outbound&.departure_time&.strftime('%Y-%m-%dT%H:%M') %>" class="portal-input">
+                  <input type="datetime-local" name="travel_outbound[departure_time]" id="travel_outbound_bus_departure_time" value="<%= @travel_outbound&.local_time_field_value(:departure_time) %>" class="portal-input">
                 </div>
                 <div>
                   <label for="travel_outbound_bus_arrival_time" class="portal-label">Arrival Time</label>
-                  <input type="datetime-local" name="travel_outbound[arrival_time]" id="travel_outbound_bus_arrival_time" value="<%= @travel_outbound&.arrival_time&.strftime('%Y-%m-%dT%H:%M') %>" class="portal-input">
+                  <input type="datetime-local" name="travel_outbound[arrival_time]" id="travel_outbound_bus_arrival_time" value="<%= @travel_outbound&.local_time_field_value(:arrival_time) %>" class="portal-input">
                 </div>
               </div>
             </div>
@@ -348,7 +348,7 @@
               </div>
               <div>
                 <label for="travel_outbound_departure_time" class="portal-label">Departure Time from <%= @event.location_city || "the event" %></label>
-                <input type="datetime-local" name="travel_outbound[departure_time]" id="travel_outbound_departure_time" value="<%= @travel_outbound&.departure_time&.strftime('%Y-%m-%dT%H:%M') %>" class="portal-input">
+                <input type="datetime-local" name="travel_outbound[departure_time]" id="travel_outbound_departure_time" value="<%= @travel_outbound&.local_time_field_value(:departure_time) %>" class="portal-input">
               </div>
             </div>
 

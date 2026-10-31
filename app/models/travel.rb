@@ -1,5 +1,6 @@
 class Travel < ApplicationRecord
   include TravelCalendarCacheInvalidatable
+  include EventLocalTimes
 
   has_paper_trail
 
@@ -9,6 +10,9 @@ class Travel < ApplicationRecord
   has_one :participant, through: :participant_event
   has_one :event, through: :participant_event
   has_many :travel_legs, -> { order(position: :asc) }, dependent: :destroy
+
+  # Train, bus and car times. Flight legs carry their own airport zones.
+  event_local_times :arrival_time, :departure_time, :expected_arrival_time, flag: :times_in_event_zone
 
   accepts_nested_attributes_for :travel_legs, allow_destroy: true, reject_if: ->(attrs) {
     attrs[:id].blank? &&
@@ -32,6 +36,14 @@ class Travel < ApplicationRecord
   validates :mode, presence: true, if: -> { provisional? || confirmed? }
   validate :confirmed_details_are_complete, if: :confirmed?
 
+  # Through the loaded participant_event rather than the has_one :through, so
+  # a travel built off a participant event (and not yet saved) reads its
+  # event's zone, and travels preloaded with participant_event: :event don't
+  # query for it again.
+  def event_local_time_zone
+    participant_event&.event&.event_time_zone
+  end
+
   def flight?
     plane?
   end
@@ -41,7 +53,7 @@ class Travel < ApplicationRecord
       last_leg = travel_legs.last
       [ last_leg.local_arrival_time&.strftime("%b %d, %Y %H:%M %Z"), last_leg.arrival_airport ].compact.join(" - ")
     else
-      [ arrival_time&.strftime("%b %d, %Y %H:%M"), arrival_city ].compact.join(" - ")
+      [ local_time(:arrival_time)&.strftime("%b %d, %Y %H:%M %Z"), arrival_city ].compact.join(" - ")
     end
   end
 
@@ -62,15 +74,19 @@ class Travel < ApplicationRecord
   end
 
   # first_departure_time / last_arrival_time for display: flight legs come back
-  # in the zone they were entered in rather than UTC.
+  # in the zone they were entered in, train/bus/car times on the event's clock
+  # (UTC for a row saved before times_in_event_zone; see EventLocalTimes).
   def local_first_departure_time
-    plane? && travel_legs.any? ? travel_legs.first.local_departure_time : departure_time
+    plane? && travel_legs.any? ? travel_legs.first.local_departure_time : local_time(:departure_time)
   end
 
   def local_last_arrival_time
-    plane? && travel_legs.any? ? travel_legs.last.local_arrival_time : arrival_time
+    plane? && travel_legs.any? ? travel_legs.last.local_arrival_time : local_time(:arrival_time)
   end
 
+  # The instant the travel calendar files this journey under (it shows it on
+  # the event's clock). Train/bus/car rows saved before times_in_event_zone
+  # hold UTC wall-clock, so they land where they always have.
   def calendar_time
     if plane?
       inbound? ? travel_legs.last&.arrival_time : travel_legs.first&.departure_time
