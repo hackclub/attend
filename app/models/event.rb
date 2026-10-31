@@ -1,4 +1,5 @@
 class Event < ApplicationRecord
+  include EventLocalTimes
   include WalletPassUpdatable
   include RasterizesSvgLogo
   include DecodableImageAttachment
@@ -189,24 +190,12 @@ class Event < ApplicationRecord
 
   before_validation :generate_slug_from_name, if: -> { slug.blank? && name.present? }
   before_validation :assign_default_docuseal_host, on: :create, if: -> { docuseal_host.blank? }
-  before_validation :interpret_naive_schedule_times_in_event_timezone
 
-  # datetime-local form inputs submit zone-less strings like "2026-07-12T09:30".
-  # Rails would cast those in the app default zone (UTC); we capture the raw
-  # string here and re-parse it in the event's timezone once validation runs
-  # (by which point a timezone submitted in the same form has been assigned).
-  NAIVE_DATETIME_PATTERN = /\A\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?\z/
-  SCHEDULE_TIME_ATTRIBUTES = %i[starts_at ends_at registration_open_at registration_close_at
-                                arrival_opens_at arrival_closes_at].freeze
+  # Typed on the event's own clock; a timezone submitted in the same form
+  # applies (see EventLocalTimes).
+  event_local_times :starts_at, :ends_at, :registration_open_at, :registration_close_at,
+                    :arrival_opens_at, :arrival_closes_at
 
-  SCHEDULE_TIME_ATTRIBUTES.each do |attr|
-    define_method(:"#{attr}=") do |value|
-      if value.is_a?(String) && value.match?(NAIVE_DATETIME_PATTERN)
-        (@naive_schedule_times ||= {})[attr] = value
-      end
-      super(value)
-    end
-  end
   before_update :flag_waiver_dates_stale, if: :local_event_dates_changed?
   before_save :clear_stale_place_ids, if: :venue_identity_changing?
   after_save :geocode_location, if: :should_geocode?
@@ -342,10 +331,8 @@ class Event < ApplicationRecord
     event_time_zone.tzinfo.name
   end
 
-  # Value for datetime-local form fields: the stored time expressed in the
-  # event's timezone, so admins always see and edit event-local times.
-  def schedule_time_field_value(attr)
-    public_send(attr)&.in_time_zone(event_time_zone)&.strftime("%Y-%m-%dT%H:%M")
+  def event_local_time_zone
+    event_time_zone
   end
 
   # Neither end of the arrival window is set, so attendees' dashboards fall
@@ -809,21 +796,6 @@ class Event < ApplicationRecord
     return if visa_letter_deadline.blank? || visa_letter_deadline_date
 
     errors.add(:visa_letter_deadline, "must be a date")
-  end
-
-  def interpret_naive_schedule_times_in_event_timezone
-    return if @naive_schedule_times.blank?
-
-    tz = event_time_zone
-    @naive_schedule_times.each do |attr, raw|
-      parsed = begin
-        tz.parse(raw)
-      rescue ArgumentError
-        nil
-      end
-      self[attr] = parsed if parsed
-    end
-    @naive_schedule_times = nil
   end
 
   def assign_default_docuseal_host

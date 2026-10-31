@@ -1,5 +1,6 @@
 class Travel < ApplicationRecord
   include TravelCalendarCacheInvalidatable
+  include EventLocalTimes
 
   has_paper_trail
 
@@ -9,6 +10,9 @@ class Travel < ApplicationRecord
   has_one :participant, through: :participant_event
   has_one :event, through: :participant_event
   has_many :travel_legs, -> { order(position: :asc) }, dependent: :destroy
+
+  # Train, bus and car times. Flight legs carry their own airport zones.
+  event_local_times :arrival_time, :departure_time, :expected_arrival_time, flag: :times_in_event_zone
 
   accepts_nested_attributes_for :travel_legs, allow_destroy: true, reject_if: ->(attrs) {
     attrs[:id].blank? &&

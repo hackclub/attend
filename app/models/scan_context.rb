@@ -1,9 +1,12 @@
 class ScanContext < ApplicationRecord
   include TravelCalendarCacheInvalidatable
+  include EventLocalTimes
 
   self.implicit_order_column = "created_at"
 
   belongs_to :event
+
+  event_local_times :starts_at, :ends_at, flag: :times_in_event_zone
   has_many :scans, dependent: :destroy
   # The stay this is the arrival point for, if any: its numbers count only
   # people with a room in that stay.

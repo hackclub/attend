@@ -128,10 +128,10 @@
     <div class="cs-container-body">
       <div class="cs-field-grid">
         <%= cs_form_field f, :starts_at, label: "Starts at", optional: true do |aria| %>
-          <%= f.datetime_local_field :starts_at, value: f.object.schedule_time_field_value(:starts_at), class: "cs-input", **aria %>
+          <%= f.datetime_local_field :starts_at, value: f.object.local_time_field_value(:starts_at), class: "cs-input", **aria %>
         <% end %>
         <%= cs_form_field f, :ends_at, label: "Ends at", optional: true do |aria| %>
-          <%= f.datetime_local_field :ends_at, value: f.object.schedule_time_field_value(:ends_at), class: "cs-input", **aria %>
+          <%= f.datetime_local_field :ends_at, value: f.object.local_time_field_value(:ends_at), class: "cs-input", **aria %>
         <% end %>
       </div>
     </div>
@@ -144,10 +144,10 @@
     <div class="cs-container-body">
       <div class="cs-field-grid">
         <%= cs_form_field f, :registration_open_at, label: "Registration opens at", optional: true do |aria| %>
-          <%= f.datetime_local_field :registration_open_at, value: f.object.schedule_time_field_value(:registration_open_at), class: "cs-input", **aria %>
+          <%= f.datetime_local_field :registration_open_at, value: f.object.local_time_field_value(:registration_open_at), class: "cs-input", **aria %>
         <% end %>
         <%= cs_form_field f, :registration_close_at, label: "Registration closes at", optional: true do |aria| %>
-          <%= f.datetime_local_field :registration_close_at, value: f.object.schedule_time_field_value(:registration_close_at), class: "cs-input", **aria %>
+          <%= f.datetime_local_field :registration_close_at, value: f.object.local_time_field_value(:registration_close_at), class: "cs-input", **aria %>
         <% end %>
       </div>
     </div>
@@ -163,10 +163,10 @@
     <div class="cs-container-body">
       <div class="cs-field-grid">
         <%= cs_form_field f, :arrival_opens_at, label: "Arrival opens at", optional: true do |aria| %>
-          <%= f.datetime_local_field :arrival_opens_at, value: f.object.schedule_time_field_value(:arrival_opens_at), class: "cs-input", **aria %>
+          <%= f.datetime_local_field :arrival_opens_at, value: f.object.local_time_field_value(:arrival_opens_at), class: "cs-input", **aria %>
         <% end %>
         <%= cs_form_field f, :arrival_closes_at, label: "Arrival closes at", optional: true do |aria| %>
-          <%= f.datetime_local_field :arrival_closes_at, value: f.object.schedule_time_field_value(:arrival_closes_at), class: "cs-input", **aria %>
+          <%= f.datetime_local_field :arrival_closes_at, value: f.object.local_time_field_value(:arrival_closes_at), class: "cs-input", **aria %>
         <% end %>
       </div>
     </div>

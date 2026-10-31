@@ -180,7 +180,7 @@
           <%= cs_form_field f, :scheduled_at, label: "Send at", optional: true,
                 description: "In the event's time zone: #{current_event.event_time_zone.name}." do |aria| %>
             <%= f.datetime_local_field :scheduled_at,
-                value: @message.scheduled_at_field_value,
+                value: @message.local_time_field_value(:scheduled_at),
                 class: "cs-input",
                 min: Time.current.in_time_zone(current_event.event_time_zone).strftime("%Y-%m-%dT%H:%M"),
                 data: { action: "change->autosave#save", cs_range_message: "Enter a time in the future." },

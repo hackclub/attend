@@ -387,7 +387,7 @@ RSpec.describe Message, type: :model do
       message.validate
 
       expect(message.scheduled_at).to eq(Time.utc(2030, 7, 12, 16, 30))
-      expect(message.scheduled_at_field_value).to eq("2030-07-12T09:30")
+      expect(message.local_time_field_value(:scheduled_at)).to eq("2030-07-12T09:30")
     end
 
     it "keeps a time that names its own offset" do
@@ -417,7 +417,7 @@ RSpec.describe Message, type: :model do
       message = scheduled("2030-07-12T09:30")
       message.save!
 
-      message.update!(scheduled_at: message.scheduled_at_field_value)
+      message.update!(scheduled_at: message.local_time_field_value(:scheduled_at))
 
       expect(message.saved_changes).not_to have_key("scheduled_at")
       expect(message.reload.scheduled_at).to eq(Time.utc(2030, 7, 12, 16, 30))
