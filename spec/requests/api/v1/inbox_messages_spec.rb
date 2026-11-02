@@ -50,6 +50,18 @@ RSpec.describe "Api::V1::InboxMessages", type: :request do
     expect(delivery.reload).to be_read
   end
 
+  it "fills in placeholders for the signed-in participant" do
+    participant.update!(preferred_name: "Alex")
+    message.update!(subject: "{{first_name}}, bus times", body: "<p>Hi {{first_name}}</p>")
+    deliver(message, "email")
+
+    get api_v1_messages_path, headers: headers
+    expect(json["messages"].sole).to include("subject" => "Alex, bus times", "preview_text" => "Hi Alex")
+
+    get api_v1_message_path(message), headers: headers
+    expect(JSON.parse(response.body)["message"]["body_html"]).to eq("<p>Hi Alex</p>")
+  end
+
   it "doesn't show someone else's message" do
     deliver(message, "email", to: create(:participant_event, event: event))
 

@@ -5,12 +5,13 @@ class MessageMailer < ApplicationMailer
     @event = delivery.event
     @emailable = delivery
 
-    @body_html = @message.body_as_html.html_safe
+    @body_html = @message.body_as_html(recipient: delivery.recipient)
+    @body_plain = @message.body_as_plain(recipient: delivery.recipient)
     @message_url = message_url_for(delivery)
     @footer_text = "You're receiving this message because you're a confirmed attendee at #{@event.name}."
     @support_email = @event.effective_support_email
 
-    subject = @message.subject.presence || "You have a new message from #{@event.name}"
+    subject = @message.subject_for(delivery.recipient) || "You have a new message from #{@event.name}"
 
     mail(
       to: delivery.recipient_email,

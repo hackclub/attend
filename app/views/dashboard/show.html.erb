@@ -909,8 +909,8 @@
           <div class="p-4">
             <div class="flex items-start justify-between gap-3 mb-2">
               <div class="flex items-center gap-2 min-w-0">
-                <% if delivery.message.subject.present? %>
-                  <p class="font-semibold text-(--text-strong) truncate"><%= delivery.message.subject %></p>
+                <% if (subject = delivery.message.subject_for(@participant_event.participant)) %>
+                  <p class="font-semibold text-(--text-strong) truncate"><%= subject %></p>
                 <% end %>
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0
                   <%= case delivery.channel
@@ -924,7 +924,7 @@
               <span class="text-xs text-(--text-faint) shrink-0"><%= time_ago_in_words(delivery.delivered_at) %> ago</span>
             </div>
             <div class="prose prose-sm max-w-none text-(--text)">
-              <%= sanitize delivery.message.body_as_html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
+              <%= sanitize delivery.message.body_as_html(recipient: @participant_event.participant), tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
             </div>
           </div>
         <% end %>

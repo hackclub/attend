@@ -1,4 +1,4 @@
-<% content_for :title, "#{@message.subject.presence || @event.name} – Messages" %>
+<% content_for :title, "#{@message.subject_for(@participant) || @event.name} – Messages" %>
 
 <div class="w-full max-w-3xl mx-auto">
   <!-- Back -->
@@ -14,7 +14,7 @@
     <header class="px-6 py-5 sm:px-8 sm:py-6 border-b border-(--border-soft)">
       <div class="flex items-start justify-between gap-3 mb-3">
         <h1 class="text-xl sm:text-2xl font-bold text-(--text-strong)">
-          <%= @message.subject.presence || "Message from #{@event.name}" %>
+          <%= @message.subject_for(@participant) || "Message from #{@event.name}" %>
         </h1>
         <div class="flex items-center gap-1.5 shrink-0">
           <% @channels.each do |channel| %>
@@ -49,7 +49,7 @@
     <!-- Body -->
     <div class="p-6 sm:p-8">
       <div class="prose prose-lg max-w-none text-(--text)">
-        <%= sanitize @message.body_as_html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote hr], attributes: %w[href target rel] %>
+        <%= sanitize @message.body_as_html(recipient: @participant), tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote hr], attributes: %w[href target rel] %>
       </div>
     </div>
   </article>

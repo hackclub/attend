@@ -98,8 +98,11 @@ module Admin
         return
       end
 
-      @recipients = @message.preview_recipients(limit: 20)
+      @recipients = @message.preview_recipients(limit: 20).load
       @total_count = @message.recipient_count_estimate
+      # The channel previews fill placeholders in for the first recipient, so
+      # staff see what one real person will get.
+      @preview_recipient = @message.person_for(@recipients.first)
     end
 
     def destroy

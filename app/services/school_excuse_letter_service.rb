@@ -24,7 +24,7 @@ class SchoolExcuseLetterService
   # Names and places go into Prawn's inline format, so their own < and &
   # mustn't read as tags.
   def h(value)
-    HackFoundationLetter.escape(value)
+    InlineMarkup.escape(value)
   end
 
   def intro_paragraph

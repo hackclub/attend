@@ -65,6 +65,16 @@ RSpec.describe "Api::V1::Messages", type: :request do
       expect(json["preview"]).to include("total_count" => 1, "sms_text" => "Hello there", "slack_text" => "Hello *there*")
       expect(json["preview"]["recipient_names"].size).to eq(1)
     end
+
+    it "fills placeholders in for the first recipient" do
+      create(:participant_event, event: event, status: :complete, participant: create(:participant, preferred_name: "Alex"))
+      message = draft(channels: %w[email sms], subject: "{{first_name}}!", body: "<p>Hi {{first_name}}</p>")
+
+      get preview_api_v1_event_message_path(event, message), headers: headers
+
+      expect(json["preview"]).to include("placeholders_filled_for" => "Alex", "email_subject" => "Alex!",
+        "sms_text" => "Hi Alex", "body_html" => "<p>Hi Alex</p>")
+    end
   end
 
   describe "POST send_now" do

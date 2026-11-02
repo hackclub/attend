@@ -43,6 +43,13 @@
       </div>
     </section>
 
+    <% if @preview_recipient && @message.uses_placeholders? %>
+      <div class="cs-alert">
+        <%= cs_status_icon(:info) %>
+        <p>Placeholders are filled in as they will be for <strong><%= @preview_recipient.try(:display_name) || @preview_recipient.full_name %></strong>.</p>
+      </div>
+    <% end %>
+
     <% if @message.channels.include?("slack") %>
       <section class="cs-container">
         <div class="cs-container-header">
@@ -60,7 +67,7 @@
                   <span class="font-bold text-white">Hack Club Attend</span>
                   <span class="text-xs text-gray-400">App</span>
                 </div>
-                <div class="mt-1 text-[15px] text-gray-100 whitespace-pre-wrap break-words"><%= @message.body_as_slack_preview_html %></div>
+                <div class="mt-1 text-[15px] text-gray-100 whitespace-pre-wrap break-words"><%= @message.body_as_html(recipient: @preview_recipient) %></div>
               </div>
             </div>
           </div>
@@ -74,13 +81,13 @@
           <div>
             <h2 class="cs-h2">Email preview</h2>
             <p class="cs-container-description">
-              Subject: <strong><%= @message.subject.presence || "You have a new message from #{current_event.name}" %></strong>
+              Subject: <strong><%= @message.subject_for(@preview_recipient) || "You have a new message from #{current_event.name}" %></strong>
             </p>
           </div>
         </div>
         <div class="cs-container-body">
           <div class="prose prose-sm max-w-none">
-            <%= sanitize @message.body_as_html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
+            <%= sanitize @message.body_as_html(recipient: @preview_recipient), tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
           </div>
         </div>
       </section>
@@ -93,14 +100,15 @@
         </div>
         <div class="cs-container-body">
           <%# A mock of a phone's message bubble. %>
+          <% sms_text = @message.body_as_plain(recipient: @preview_recipient) %>
           <div class="max-w-xs">
             <div class="bg-green-500 text-white rounded-2xl rounded-bl-sm px-4 py-2 text-sm">
-              <%= @message.body_as_plain %>
+              <%= sms_text %>
             </div>
             <p class="cs-small cs-muted mt-2 text-right">
-              <%= pluralize(@message.body_as_plain.length, "character") %>
-              <% if @message.body_as_plain.length > 160 %>
-                <%= cs_status(:warning, "(~#{(@message.body_as_plain.length / 160.0).ceil} segments)") %>
+              <%= pluralize(sms_text.length, "character") %>
+              <% if sms_text.length > 160 %>
+                <%= cs_status(:warning, "(~#{(sms_text.length / 160.0).ceil} segments)") %>
               <% end %>
             </p>
           </div>
