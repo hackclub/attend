@@ -59,7 +59,8 @@ class SingleDeliveryJob < ApplicationJob
 
     event = delivery.event
     title = event.name.presence || "Event update"
-    body = delivery.message.subject.presence || delivery.message.body_as_plain.to_s.truncate(140)
+    message = delivery.message
+    body = message.subject_for(delivery.recipient) || message.body_as_plain(recipient: delivery.recipient).truncate(140)
 
     ExpoPushService.send_notification(
       tokens: tokens,
@@ -86,7 +87,7 @@ class SingleDeliveryJob < ApplicationJob
     event = delivery.event
     message_url = message_url_for(delivery)
 
-    message_body = delivery.message.body_as_slack
+    message_body = delivery.message.body_as_slack(recipient: delivery.recipient)
     footer = "\n\n_You're receiving this message because you're a confirmed attendee at #{event.name}._"
 
     slack_service = SlackService.new
@@ -148,7 +149,7 @@ class SingleDeliveryJob < ApplicationJob
     end
 
     message_url = message_url_for(delivery)
-    plain_body = delivery.message.body_as_plain
+    plain_body = delivery.message.body_as_plain(recipient: delivery.recipient)
 
     truncated_body = if plain_body.length > 200
       plain_body[0, 197] + "..."

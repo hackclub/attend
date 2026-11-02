@@ -39,6 +39,19 @@ class Message < ApplicationRecord
 
   DELIVERY_INSERT_BATCH = 500
 
+  # Tokens staff can write in a subject or body, filled in for each recipient
+  # when the message is rendered for them (see #personalize).
+  # participant_first_name names a guardian's children, so it only works for
+  # guardian audiences.
+  PLACEHOLDERS = %w[first_name participant_first_name event_name].freeze
+  GUARDIAN_ONLY_PLACEHOLDERS = %w[participant_first_name].freeze
+  PLACEHOLDER_PATTERN = /\{\{\s*(\w+)\s*\}\}/
+
+  # What {{first_name}} and {{participant_first_name}} become when we have no
+  # name to use, e.g. someone invited without one.
+  FIRST_NAME_FALLBACK = "there"
+  PARTICIPANT_FIRST_NAME_FALLBACK = "your child"
+
   enum :status, {
     draft: "draft",
     scheduled: "scheduled",
@@ -51,6 +64,10 @@ class Message < ApplicationRecord
   validates :audience, presence: true
   validates :channels, presence: true
   validate :channels_are_valid
+  # Only when the content or audience changes, so a status update on an older
+  # message with stray braces in it can't start failing.
+  validate :placeholders_are_valid,
+    if: -> { will_save_change_to_body? || will_save_change_to_subject? || will_save_change_to_audience? }
 
   # Typed on the event's clock (see EventLocalTimes).
   event_local_times :scheduled_at
@@ -113,20 +130,8 @@ class Message < ApplicationRecord
         .joins(:group_memberships)
         .where(group_memberships: { group_id: group_ids })
         .distinct
-    when :all_guardians
-      Guardian.joins(guardian_participant_events: :participant_event)
-        .where(participant_events: { event_id: event.id })
-        .distinct
-    when :guardians_of_confirmed
-      Guardian.joins(guardian_participant_events: :participant_event)
-        .where(participant_events: { event_id: event.id, status: "complete" })
-        .distinct
-    when :guardians_pending
-      Guardian.joins(:guardian_participant_events)
-        .joins("INNER JOIN participant_events ON guardian_participant_events.participant_event_id = participant_events.id")
-        .where(participant_events: { event_id: event.id })
-        .where.not(guardian_participant_events: { status: "complete" })
-        .distinct
+    when :all_guardians, :guardians_of_confirmed, :guardians_pending
+      Guardian.where(id: guardian_links.select(:guardian_id))
     else
       ParticipantEvent.none
     end
@@ -158,23 +163,37 @@ class Message < ApplicationRecord
       .select(:id)
   end
 
-  # Optional group filter applied on top of the base audience.
-  # `attendees_in_groups` already filters by group, so we skip there.
-  def apply_group_filter(scope)
-    return scope if audience.to_s == "attendees_in_groups"
+  # The guardian-registration links a guardian audience covers, group filter
+  # included: a guardian is in the audience through the children listed here,
+  # which is also who {{participant_first_name}} names.
+  def guardian_links
+    links = GuardianParticipantEvent.joins(:participant_event).where(participant_events: { event_id: event_id })
+    links = case audience.to_sym
+    when :guardians_of_confirmed then links.where(participant_events: { status: "complete" })
+    when :guardians_pending then links.where.not(status: "completed").or(links.where(status: nil))
+    else links
+    end
 
-    group_ids = (audience_filters["group_ids"] || []).reject(&:blank?)
+    group_ids = filter_group_ids
+    return links if group_ids.empty?
+
+    links.where(participant_event_id: GroupMembership.where(group_id: group_ids).select(:participant_event_id))
+  end
+
+  # Optional group filter applied on top of the base audience.
+  # `attendees_in_groups` already filters by group, and guardian audiences
+  # apply it in #guardian_links, so we skip those.
+  def apply_group_filter(scope)
+    return scope if audience.to_s == "attendees_in_groups" || guardian_audience?
+
+    group_ids = filter_group_ids
     return scope if group_ids.empty?
 
-    member_pe_ids = GroupMembership.where(group_id: group_ids).select(:participant_event_id)
+    scope.where(id: GroupMembership.where(group_id: group_ids).select(:participant_event_id))
+  end
 
-    if guardian_audience?
-      scope.joins(:guardian_participant_events)
-           .where(guardian_participant_events: { participant_event_id: member_pe_ids })
-           .distinct
-    else
-      scope.where(id: member_pe_ids)
-    end
+  def filter_group_ids
+    (audience_filters["group_ids"] || []).reject(&:blank?)
   end
 
   def guardian_audience?
@@ -251,20 +270,44 @@ class Message < ApplicationRecord
     )
   end
 
-  def body_as_html
-    sanitize_html(body.to_s)
+  # The rendering methods take the person the message is going to (a
+  # Participant or Guardian) and fill in its placeholders for them. Without
+  # one the tokens are left as written, which is what staff see on the
+  # message's own page.
+  def body_as_html(recipient: nil)
+    # Sanitized after filling in, so nothing a recipient put in their name can
+    # survive as markup.
+    sanitize_html(personalize(body.to_s, recipient) { |value| ERB::Util.html_escape(value) })
   end
 
-  def body_as_slack
-    html_to_slack_markdown(body.to_s)
+  def body_as_slack(recipient: nil)
+    personalize(html_to_slack_markdown(body.to_s), recipient) { |value| slack_escape(value) }
   end
 
-  def body_as_slack_preview_html
-    sanitize_html(body.to_s)
+  def body_as_slack_preview_html(recipient: nil)
+    body_as_html(recipient: recipient)
   end
 
-  def body_as_plain
-    ActionController::Base.helpers.strip_tags(body.to_s).gsub(/\s+/, " ").strip
+  # Plain text for SMS, push and the text part of emails. strip_tags leaves
+  # entities encoded, so they're decoded here or "Q&A" would go out as
+  # "Q&amp;A".
+  def body_as_plain(recipient: nil)
+    text = String.new(ActionController::Base.helpers.strip_tags(body.to_s).to_s)
+    personalize(CGI.unescapeHTML(text).gsub(/\s+/, " ").strip, recipient)
+  end
+
+  def subject_for(recipient)
+    personalize(subject.to_s, recipient).presence
+  end
+
+  # The person behind one of #recipients (a Participant or Guardian), which is
+  # what the rendering methods take.
+  def person_for(audience_member)
+    guardian_audience? ? audience_member : audience_member&.participant
+  end
+
+  def uses_placeholders?
+    [ subject, body ].any? { |text| text.to_s.match?(PLACEHOLDER_PATTERN) }
   end
 
   private
@@ -453,6 +496,86 @@ class Message < ApplicationRecord
       tags: %w[p br strong b em i u s strike a ul ol li blockquote code pre],
       attributes: %w[href target]
     )
+  end
+
+  # Replaces each known placeholder in `text` with its value for `recipient`,
+  # passed through the block when the output format needs escaping. Unknown
+  # tokens, and every token when there is no recipient, are left untouched.
+  def personalize(text, recipient)
+    text = String.new(text.to_s)
+    return text if recipient.nil?
+
+    values = placeholder_values_for(recipient)
+    text.gsub(PLACEHOLDER_PATTERN) do |token|
+      name = Regexp.last_match(1)
+      next token unless PLACEHOLDERS.include?(name)
+
+      block_given? ? yield(values[name]) : values[name]
+    end
+  end
+
+  # Values are computed on first use and kept per recipient, since one email
+  # renders the subject, HTML and text parts and a guardian's children's
+  # names take a query.
+  def placeholder_values_for(recipient)
+    @placeholder_values ||= {}
+    @placeholder_values[[ recipient.class.name, recipient.id ]] ||=
+      Hash.new { |hash, name| hash[name] = placeholder_value(name, recipient).to_s }
+  end
+
+  def placeholder_value(name, recipient)
+    case name
+    when "first_name"
+      first_name_for(recipient) || FIRST_NAME_FALLBACK
+    when "participant_first_name"
+      participant_first_names_for(recipient) || PARTICIPANT_FIRST_NAME_FALLBACK
+    when "event_name"
+      event.name
+    end
+  end
+
+  def first_name_for(recipient)
+    recipient.is_a?(Guardian) ? recipient.legal_first_name.presence : recipient.greeting_name
+  end
+
+  # The children who put this guardian in the audience, as "Alex and Sam".
+  # Falls back to all their children at the event, since a message viewed or
+  # re-sent later may no longer match how the audience looked at send time.
+  def participant_first_names_for(recipient)
+    return first_name_for(recipient) unless recipient.is_a?(Guardian)
+
+    all_links = GuardianParticipantEvent.joins(:participant_event)
+      .where(guardian: recipient, participant_events: { event_id: event_id })
+    [ guardian_links.where(guardian: recipient), all_links ].each do |links|
+      names = links.includes(participant_event: :participant).order("participant_events.created_at")
+        .filter_map { |link| link.participant_event.participant.greeting_name }.uniq
+      return names.to_sentence if names.any?
+    end
+    nil
+  end
+
+  # Slack treats &, < and > as control characters in message text.
+  def slack_escape(value)
+    value.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
+  end
+
+  def placeholders_are_valid
+    tokens = [ subject, body ].flat_map { |text| text.to_s.scan(PLACEHOLDER_PATTERN).flatten }.uniq
+
+    unknown = tokens - PLACEHOLDERS
+    if unknown.any?
+      errors.add(:base, "Unknown placeholder #{unknown.map { |t| "{{#{t}}}" }.to_sentence}. " \
+        "Available: #{PLACEHOLDERS.map { |t| "{{#{t}}}" }.join(", ")}.")
+    end
+
+    # A name isn't a safe or valid URL, so placeholders only go in text.
+    in_attribute = Nokogiri::HTML.fragment(body.to_s).xpath(".//@*").any? { |attr| attr.value.match?(PLACEHOLDER_PATTERN) }
+    errors.add(:base, "Placeholders can't go inside a link's address.") if in_attribute
+
+    guardian_only = tokens & GUARDIAN_ONLY_PLACEHOLDERS
+    if guardian_only.any? && !guardian_audience?
+      errors.add(:base, "#{guardian_only.map { |t| "{{#{t}}}" }.to_sentence} only works when sending to guardians.")
+    end
   end
 
   def channels_are_valid

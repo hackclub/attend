@@ -31,8 +31,8 @@ module Api
           message = group.first.message
           {
             id: message.id,
-            subject: message.subject,
-            preview_text: message.body_as_plain.truncate(140),
+            subject: message.subject_for(@participant),
+            preview_text: message.body_as_plain(recipient: @participant).truncate(140),
             event: { id: message.event.id, name: message.event.name },
             ticket_id: group.first.participant_event_id,
             channels: group.map(&:channel).uniq.sort,
@@ -67,8 +67,8 @@ module Api
         render json: {
           message: {
             id: message.id,
-            subject: message.subject,
-            body_html: message.body_as_html,
+            subject: message.subject_for(@participant),
+            body_html: message.body_as_html(recipient: @participant),
             event: { id: message.event.id, name: message.event.name },
             ticket_id: deliveries.first.participant_event_id,
             channels: deliveries.map(&:channel).uniq.sort,

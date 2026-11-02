@@ -51,6 +51,11 @@
 
     <!-- Channel Previews -->
     <div class="space-y-6">
+      <% if @preview_recipient && @message.uses_placeholders? %>
+        <p class="text-sm text-gray-600">
+          Placeholders are filled in as they will be for <strong class="text-gray-900"><%= @preview_recipient.try(:display_name) || @preview_recipient.full_name %></strong>.
+        </p>
+      <% end %>
       <% if @message.channels.include?("slack") %>
         <div>
           <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
@@ -71,7 +76,7 @@
                   <span class="font-bold text-white">Hack Club Attend</span>
                   <span class="text-xs text-gray-400">App</span>
                 </div>
-                <div class="mt-1 text-[15px] text-gray-100 whitespace-pre-wrap break-words"><%= @message.body_as_slack_preview_html %></div>
+                <div class="mt-1 text-[15px] text-gray-100 whitespace-pre-wrap break-words"><%= @message.body_as_slack_preview_html(recipient: @preview_recipient) %></div>
               </div>
             </div>
           </div>
@@ -92,12 +97,12 @@
             <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
               <p class="text-sm">
                 <span class="text-gray-500">Subject:</span>
-                <span class="font-medium"><%= @message.subject.presence || "You have a new message from #{current_event.name}" %></span>
+                <span class="font-medium"><%= @message.subject_for(@preview_recipient) || "You have a new message from #{current_event.name}" %></span>
               </p>
             </div>
             <div class="p-4 bg-white">
               <div class="text-sm leading-relaxed [&_p]:my-4 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_ul]:my-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_blockquote]:my-4 [&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-4 [&_a]:text-[#ec3750] [&_a]:underline">
-                <%= sanitize @message.body_as_html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
+                <%= sanitize @message.body_as_html(recipient: @preview_recipient), tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
               </div>
             </div>
           </div>
@@ -115,14 +120,15 @@
             SMS Preview
           </h2>
           <div class="max-w-xs">
+            <% sms_text = @message.body_as_plain(recipient: @preview_recipient) %>
             <div class="bg-gray-100 rounded-2xl p-4">
               <div class="bg-green-500 text-white rounded-2xl rounded-bl-sm px-4 py-2 text-sm">
-                <%= @message.body_as_plain %>
+                <%= sms_text %>
               </div>
               <p class="text-xs text-gray-400 mt-2 text-right">
-                <%= pluralize(@message.body_as_plain.length, "character") %>
-                <% if @message.body_as_plain.length > 160 %>
-                  <span class="text-amber-500">(~<%= (@message.body_as_plain.length / 160.0).ceil %> segments)</span>
+                <%= pluralize(sms_text.length, "character") %>
+                <% if sms_text.length > 160 %>
+                  <span class="text-amber-500">(~<%= (sms_text.length / 160.0).ceil %> segments)</span>
                 <% end %>
               </p>
             </div>

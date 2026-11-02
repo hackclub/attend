@@ -423,4 +423,142 @@ RSpec.describe Message, type: :model do
       expect(message.reload.scheduled_at).to eq(Time.utc(2030, 7, 12, 16, 30))
     end
   end
+
+  describe "guardian audiences" do
+    it "leaves out guardians who have finished everything for guardians_pending" do
+      pending_link = create(:guardian_participant_event, participant_event: create(:participant_event, event: event))
+      create(:guardian_participant_event, participant_event: create(:participant_event, event: event), status: :completed)
+
+      expect(message_for("guardians_pending").recipients).to contain_exactly(pending_link.guardian)
+    end
+
+    it "counts guardian links with no status as pending" do
+      link = create(:guardian_participant_event, participant_event: create(:participant_event, event: event))
+      link.update_column(:status, nil)
+
+      expect(message_for("guardians_pending").recipients).to contain_exactly(link.guardian)
+    end
+
+    it "applies the group filter to the same child that matched the audience" do
+      group = create(:group, event: event)
+      guardian = create(:guardian)
+      confirmed = create(:participant_event, event: event, status: :complete)
+      grouped = create(:participant_event, event: event, status: :in_progress)
+      GroupMembership.create!(group: group, participant_event: grouped)
+      create(:guardian_participant_event, guardian: guardian, participant_event: confirmed)
+      create(:guardian_participant_event, guardian: guardian, participant_event: grouped)
+
+      message = message_for("guardians_of_confirmed")
+      message.audience_filters = { "group_ids" => [ group.id ] }
+
+      expect(message.recipients).to be_empty
+    end
+  end
+
+  describe "placeholders" do
+    def message_with(body, audience: "confirmed_attendees", subject: nil)
+      message_for(audience).tap { |message| message.assign_attributes(body: body, subject: subject) }
+    end
+
+    def guardian_of(*participants, statuses: nil)
+      create(:guardian, legal_first_name: "Pat").tap do |guardian|
+        participants.each_with_index do |participant, index|
+          participant_event = create(:participant_event, event: event, participant: participant,
+            status: statuses ? statuses[index] : :complete)
+          create(:guardian_participant_event, guardian: guardian, participant_event: participant_event)
+        end
+      end
+    end
+
+    it "uses a participant's preferred name, then their legal first name" do
+      message = message_with("<p>Hi {{first_name}}, welcome to {{ event_name }}!</p>")
+
+      expect(message.body_as_plain(recipient: create(:participant, legal_first_name: "Alexander", preferred_name: "Alex")))
+        .to eq("Hi Alex, welcome to #{event.name}!")
+      expect(message.body_as_plain(recipient: create(:participant, legal_first_name: "Sam")))
+        .to eq("Hi Sam, welcome to #{event.name}!")
+    end
+
+    it "falls back to 'there' when there is no name on file" do
+      participant = create(:participant, legal_first_name: Participant::NAME_PLACEHOLDER)
+
+      expect(message_with("<p>Hi {{first_name}},</p>").body_as_plain(recipient: participant)).to eq("Hi there,")
+    end
+
+    it "fills in the subject" do
+      message = message_with("<p>Hi</p>", subject: "{{first_name}}, your travel details")
+
+      expect(message.subject_for(create(:participant, legal_first_name: "Sam"))).to eq("Sam, your travel details")
+      expect(message_with("<p>Hi</p>").subject_for(create(:participant))).to be_nil
+    end
+
+    it "leaves tokens as written when there is no recipient" do
+      expect(message_with("<p>Hi {{first_name}}</p>").body_as_plain).to eq("Hi {{first_name}}")
+    end
+
+    it "escapes names for each format" do
+      participant = create(:participant, preferred_name: "<b>Jo</b> & Co")
+      message = message_with("<p>Hi {{first_name}}</p>")
+
+      expect(message.body_as_html(recipient: participant)).to eq("<p>Hi &lt;b&gt;Jo&lt;/b&gt; &amp; Co</p>")
+      expect(message.body_as_slack(recipient: participant)).to eq("Hi &lt;b&gt;Jo&lt;/b&gt; &amp; Co")
+      expect(message.body_as_plain(recipient: participant)).to eq("Hi <b>Jo</b> & Co")
+    end
+
+    it "can't turn a name into a link that runs script" do
+      participant = create(:participant, preferred_name: "javascript:alert(1)")
+      message = message_with("<p>x</p>")
+      message.body = %(<p><a href="{{first_name}}">Hi</a></p>)
+
+      expect(message.body_as_html(recipient: participant)).not_to include("javascript:")
+    end
+
+    it "sends plain text with entities decoded" do
+      expect(message_with("<p>Q&amp;A at 5 &lt;3</p>").body_as_plain).to eq("Q&A at 5 <3")
+    end
+
+    it "greets guardians by name and names the children who put them in the audience" do
+      guardian = guardian_of(create(:participant, legal_first_name: "Alex"),
+        create(:participant, legal_first_name: "Sam"),
+        create(:participant, legal_first_name: "Robin"),
+        statuses: [ :complete, :complete, :in_progress ])
+      message = message_with("<p>Hi {{first_name}}, {{participant_first_name}} are all set.</p>",
+        audience: "guardians_of_confirmed")
+
+      expect(message.body_as_plain(recipient: guardian)).to eq("Hi Pat, Alex and Sam are all set.")
+    end
+
+    it "names all of a guardian's children when none match the audience any more" do
+      guardian = guardian_of(create(:participant, legal_first_name: "Alex"), statuses: [ :in_progress ])
+      message = message_with("<p>{{participant_first_name}}</p>", audience: "guardians_of_confirmed")
+
+      expect(message.body_as_plain(recipient: guardian)).to eq("Alex")
+    end
+
+    describe "validation" do
+      it "rejects unknown placeholders in the body or subject" do
+        expect(message_with("<p>Hi {{firstname}}</p>")).not_to be_valid
+        expect(message_with("<p>Hi</p>", subject: "{{name}}")).not_to be_valid
+        expect(message_with("<p>Hi {{first_name}} at {{event_name}}</p>")).to be_valid
+      end
+
+      it "rejects placeholders inside a link's address" do
+        expect(message_with(%(<p><a href="https://example.com/{{first_name}}">Hi</a></p>))).not_to be_valid
+        expect(message_with(%(<p><a href="https://example.com">Hi {{first_name}}</a></p>))).to be_valid
+      end
+
+      it "only allows participant_first_name for guardian audiences" do
+        expect(message_with("<p>{{participant_first_name}}</p>")).not_to be_valid
+        expect(message_with("<p>{{participant_first_name}}</p>", audience: "all_guardians")).to be_valid
+      end
+
+      it "doesn't block status updates on messages saved before the check existed" do
+        message = message_with("<p>Hi</p>")
+        message.save!
+        message.update_column(:body, "<p>{{legacy}}</p>")
+
+        expect { message.reload.update!(status: :completed) }.not_to raise_error
+      end
+    end
+  end
 end

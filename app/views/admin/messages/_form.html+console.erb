@@ -151,7 +151,10 @@
         <% end %>
 
         <%= cs_form_field f, :body, label: "Message", data: { controller: "tinymce" },
-              description: "Use the toolbar for links, bold, italic and lists. Formatting is adapted for each channel.",
+              description: "Use the toolbar for links, bold, italic and lists. Formatting is adapted for each channel. " \
+                "Personalize with {{first_name}} and {{event_name}}; messages to guardians can also use " \
+                "{{participant_first_name}} for their children's names. A missing first name becomes \"there\" (\"Hi there,\"), " \
+                "and a missing child's name becomes \"your child\".",
               constraint: "Required before the message can be sent." do |aria| %>
           <%= f.text_area :body,
               rows: 10,

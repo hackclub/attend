@@ -91,8 +91,10 @@ module Api
       def preview
         return render_error("Cannot preview a message that has already been sent.") unless editable?
 
-        recipients = @message.preview_recipients(limit: 20)
-        sms_text = @message.body_as_plain
+        recipients = @message.preview_recipients(limit: 20).load
+        # Placeholders are filled in for the first recipient, as on the web.
+        person = @message.person_for(recipients.first)
+        sms_text = @message.body_as_plain(recipient: person)
 
         render json: {
           preview: {
@@ -101,9 +103,10 @@ module Api
             audience_label: @message.audience_label,
             channel_labels: @message.channel_labels,
             channels: @message.channels,
-            slack_text: @message.channels.include?("slack") ? @message.body_as_slack : nil,
-            email_subject: @message.channels.include?("email") ? (@message.subject.presence || "You have a new message from #{@event.name}") : nil,
-            body_html: @message.body_as_html,
+            placeholders_filled_for: (person.try(:display_name) || person.full_name if person && @message.uses_placeholders?),
+            slack_text: @message.channels.include?("slack") ? @message.body_as_slack(recipient: person) : nil,
+            email_subject: @message.channels.include?("email") ? (@message.subject_for(person) || "You have a new message from #{@event.name}") : nil,
+            body_html: @message.body_as_html(recipient: person),
             sms_text: @message.channels.include?("sms") ? sms_text : nil,
             sms_length: sms_text.length,
             sms_segments: (sms_text.length / 160.0).ceil,

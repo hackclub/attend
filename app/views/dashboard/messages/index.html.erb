@@ -56,12 +56,12 @@
             <div class="flex-1 min-w-0">
               <div class="flex items-baseline justify-between gap-3 mb-1">
                 <h3 class="truncate text-(--text-strong) <%= group[:unread] ? 'font-semibold' : 'font-medium' %> group-hover:text-[#ec3750] transition-colors">
-                  <%= group[:message].subject.presence || "Message from #{group[:message].event.name}" %>
+                  <%= group[:message].subject_for(@participant) || "Message from #{group[:message].event.name}" %>
                 </h3>
                 <span class="text-xs text-(--text-faint) shrink-0"><%= time_ago_in_words(group[:delivered_at]) %> ago</span>
               </div>
               <p class="text-sm text-(--text-soft) truncate mb-2">
-                <%= truncate(group[:message].body_as_plain.to_s.squish, length: 120) %>
+                <%= truncate(group[:message].body_as_plain(recipient: @participant).squish, length: 120) %>
               </p>
               <div class="flex items-center gap-1.5 flex-wrap">
                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-(--bg-elev-2) text-(--text-soft)">
