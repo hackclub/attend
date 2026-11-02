@@ -71,17 +71,12 @@ class HackFoundationLetter
 
   # Paragraphs separated by blank lines; a single line break stays a line
   # break, as Envoy's simple_format kept it. Prawn's inline <b> and <i> work,
-  # so anything a person typed must be escaped first (see .escape).
+  # so anything a person typed must be escaped first (see InlineMarkup.escape).
   def paragraphs(text)
     text.gsub(/\r\n?/, "\n").strip.split(/\n[ \t]*\n/).each do |paragraph|
       @pdf.text paragraph.strip, align: :justify, inline_format: true
       @pdf.move_down PARAGRAPH_GAP
     end
-  end
-
-  # Prawn's inline format only understands these three entities.
-  def self.escape(value)
-    value.to_s.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
   end
 
   private

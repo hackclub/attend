@@ -281,19 +281,16 @@ class Message < ApplicationRecord
   end
 
   def body_as_slack(recipient: nil)
-    personalize(html_to_slack_markdown(body.to_s), recipient) { |value| slack_escape(value) }
+    personalize(html_to_slack_markdown(body.to_s), recipient) { |value| InlineMarkup.escape(value) }
   end
 
-  def body_as_slack_preview_html(recipient: nil)
-    body_as_html(recipient: recipient)
-  end
-
-  # Plain text for SMS, push and the text part of emails. strip_tags leaves
-  # entities encoded, so they're decoded here or "Q&A" would go out as
-  # "Q&amp;A".
+  # Plain text for SMS, push and the text part of emails. Parsing the body
+  # (rather than strip_tags + CGI.unescapeHTML) decodes every entity the editor
+  # writes, including named ones like &nbsp; and &hellip;, so "Q&A" doesn't go
+  # out as "Q&amp;A" and a double space doesn't go out as "&nbsp;".
   def body_as_plain(recipient: nil)
-    text = String.new(ActionController::Base.helpers.strip_tags(body.to_s).to_s)
-    personalize(CGI.unescapeHTML(text).gsub(/\s+/, " ").strip, recipient)
+    text = Nokogiri::HTML5.fragment(body.to_s).text
+    personalize(text.gsub(/[[:space:]]+/, " ").strip, recipient)
   end
 
   def subject_for(recipient)
@@ -306,8 +303,16 @@ class Message < ApplicationRecord
     guardian_audience? ? audience_member : audience_member&.participant
   end
 
+  # Whether rendering for a recipient changes anything: only the tokens
+  # #personalize knows count, so an unknown {{token}} on an old message
+  # doesn't claim the text was filled in.
   def uses_placeholders?
-    [ subject, body ].any? { |text| text.to_s.match?(PLACEHOLDER_PATTERN) }
+    placeholder_tokens.intersect?(PLACEHOLDERS)
+  end
+
+  def reload(...)
+    @placeholder_values = nil
+    super
   end
 
   private
@@ -517,9 +522,12 @@ class Message < ApplicationRecord
   # Values are computed on first use and kept per recipient, since one email
   # renders the subject, HTML and text parts and a guardian's children's
   # names take a query.
+  # The audience is part of the key because {{participant_first_name}} names
+  # the children who matched it, which changes if the audience is edited on
+  # the same instance before it's rendered again.
   def placeholder_values_for(recipient)
     @placeholder_values ||= {}
-    @placeholder_values[[ recipient.class.name, recipient.id ]] ||=
+    @placeholder_values[[ recipient.class.name, recipient.id, event_id, audience, audience_filters ]] ||=
       Hash.new { |hash, name| hash[name] = placeholder_value(name, recipient).to_s }
   end
 
@@ -542,7 +550,9 @@ class Message < ApplicationRecord
   # Falls back to all their children at the event, since a message viewed or
   # re-sent later may no longer match how the audience looked at send time.
   def participant_first_names_for(recipient)
-    return first_name_for(recipient) unless recipient.is_a?(Guardian)
+    # A participant reading a message meant for guardians is still addressed
+    # as themselves, never as "your child".
+    return first_name_for(recipient) || FIRST_NAME_FALLBACK unless recipient.is_a?(Guardian)
 
     all_links = GuardianParticipantEvent.joins(:participant_event)
       .where(guardian: recipient, participant_events: { event_id: event_id })
@@ -554,13 +564,15 @@ class Message < ApplicationRecord
     nil
   end
 
-  # Slack treats &, < and > as control characters in message text.
-  def slack_escape(value)
-    value.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
+  def placeholder_tokens
+    [ subject, body ].flat_map { |text| text.to_s.scan(PLACEHOLDER_PATTERN).flatten }.uniq
   end
 
   def placeholders_are_valid
-    tokens = [ subject, body ].flat_map { |text| text.to_s.scan(PLACEHOLDER_PATTERN).flatten }.uniq
+    tokens = placeholder_tokens
+    # Most saves (every autosave keystroke) have no tokens at all, so skip
+    # parsing the body for them.
+    return if tokens.empty?
 
     unknown = tokens - PLACEHOLDERS
     if unknown.any?

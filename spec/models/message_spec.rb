@@ -513,8 +513,34 @@ RSpec.describe Message, type: :model do
       expect(message.body_as_html(recipient: participant)).not_to include("javascript:")
     end
 
-    it "sends plain text with entities decoded" do
+    it "sends plain text with entities decoded, named ones included" do
       expect(message_with("<p>Q&amp;A at 5 &lt;3</p>").body_as_plain).to eq("Q&A at 5 <3")
+      expect(message_with("<p>See you&nbsp;there&hellip; it&rsquo;s on</p>").body_as_plain).to eq("See you there… it’s on")
+    end
+
+    it "never calls a participant 'your child' when their name is unknown" do
+      participant = create(:participant, legal_first_name: Participant::NAME_PLACEHOLDER)
+      message = message_with("<p>Hi {{participant_first_name}}</p>", audience: "all_guardians")
+
+      expect(message.body_as_plain(recipient: participant)).to eq("Hi there")
+    end
+
+    it "only counts known placeholders as used" do
+      expect(message_with("<p>Hi {{first_name}}</p>")).to be_uses_placeholders
+      expect(message_with("<p>Hi</p>", subject: "{{event_name}}")).to be_uses_placeholders
+      expect(message_with("<p>Use {{coupon}}</p>")).not_to be_uses_placeholders
+      expect(message_with("<p>Hi</p>")).not_to be_uses_placeholders
+    end
+
+    it "renames the children when the audience changes on the same instance" do
+      guardian = guardian_of(create(:participant, legal_first_name: "Alex"),
+        create(:participant, legal_first_name: "Sam"),
+        statuses: [ :complete, :in_progress ])
+      message = message_with("<p>{{participant_first_name}}</p>", audience: "guardians_of_confirmed")
+
+      expect(message.body_as_plain(recipient: guardian)).to eq("Alex")
+      message.audience = "all_guardians"
+      expect(message.body_as_plain(recipient: guardian)).to eq("Alex and Sam")
     end
 
     it "greets guardians by name and names the children who put them in the audience" do

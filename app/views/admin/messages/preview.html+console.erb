@@ -67,7 +67,7 @@
                   <span class="font-bold text-white">Hack Club Attend</span>
                   <span class="text-xs text-gray-400">App</span>
                 </div>
-                <div class="mt-1 text-[15px] text-gray-100 whitespace-pre-wrap break-words"><%= @message.body_as_slack_preview_html(recipient: @preview_recipient) %></div>
+                <div class="mt-1 text-[15px] text-gray-100 whitespace-pre-wrap break-words"><%= @message.body_as_html(recipient: @preview_recipient) %></div>
               </div>
             </div>
           </div>

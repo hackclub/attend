@@ -115,7 +115,7 @@ class VisaLetterTemplate < ApplicationRecord
     values = placeholder_values(application)
     body.gsub(/\{\{\s*(\w+)\s*\}\}/) do
       key = Regexp.last_match(1)
-      values.key?(key) ? escape(values[key]) : Regexp.last_match(0)
+      values.key?(key) ? InlineMarkup.escape(values[key]) : Regexp.last_match(0)
     end
   end
 
@@ -145,11 +145,6 @@ class VisaLetterTemplate < ApplicationRecord
       "signatory_name" => signatory_name,
       "signatory_title" => signatory_title
     }
-  end
-
-  # Prawn's inline format only understands these three entities.
-  def escape(value)
-    value.to_s.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
   end
 
   def one_global_default
