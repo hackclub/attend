@@ -11,7 +11,8 @@ module Admin
     layout "admin"
 
     helper_method :current_event, :available_events, :can_view_participant_pii?,
-      :registration_change_request_pending_count, :event_page?
+      :registration_change_request_pending_count, :event_page?,
+      :show_waiver_dates_banner?
 
     class_attribute :global_page_actions, instance_writer: false, default: [].freeze
 
@@ -28,6 +29,12 @@ module Admin
       return false unless current_event
 
       global_page_actions != :all && !global_page_actions.include?(action_name)
+    end
+
+    # The stale-waiver-dates banner links to the regeneration flow, so the
+    # controller that is that flow turns it off.
+    def show_waiver_dates_banner?
+      event_page? && current_event.waiver_dates_stale?
     end
 
     # Views that render an exact date of birth or a home address gate on this;

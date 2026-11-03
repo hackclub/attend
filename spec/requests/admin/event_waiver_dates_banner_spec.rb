@@ -25,6 +25,17 @@ RSpec.describe "Admin waiver dates banner", type: :request do
       expect(response.body).not_to include(clear_waiver_dates_warning_admin_event_path(event))
     end
 
+    it "uses the console's alert styling inside the content column in the admin console" do
+      organizer.update!(admin_console_beta: true)
+      sign_in organizer
+      get admin_event_dashboard_path(event)
+
+      banner = Nokogiri::HTML(response.body).at_css('main.cs-main [data-testid="waiver-dates-banner"]')
+      expect(banner).to be_present
+      expect(banner["class"]).to include("cs-alert-warning")
+      expect(banner.text).to include("Waivers still show the old dates")
+    end
+
     it "tells staff who can't regenerate to reach out" do
       sign_in local_organizer
       get admin_event_dashboard_path(event)
