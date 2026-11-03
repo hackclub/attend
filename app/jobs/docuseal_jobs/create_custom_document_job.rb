@@ -33,7 +33,7 @@ module DocusealJobs
       template = client.get_template(custom_document.docuseal_template_id)
       submitter_roles = template["submitters"]&.map { |s| s["name"] } || []
 
-      participant_role, guardian_role = resolve_roles(signers, submitter_roles)
+      participant_role, guardian_role = custom_document.signer_roles(submitter_roles, signers: signers)
 
       context = {
         participant: participant,
@@ -94,7 +94,7 @@ module DocusealJobs
       )
     rescue Docuseal::RateLimitError
       Rails.logger.warn("Docuseal rate limit hit, retrying in 30 seconds")
-      self.class.set(wait: 30.seconds).perform_later(consent_id)
+      self.class.set(wait: 30.seconds).perform_later(consent_id, initiated_by)
     rescue Docuseal::ValidationError => e
       consent.update!(status: :failed, failure_reason: "validation_error: #{e.message}")
       Rails.logger.error("Docuseal validation error: #{e.message}")
@@ -117,24 +117,6 @@ module DocusealJobs
       when "participant_and_guardian", "minor_and_guardian"
         guardian ? [ :participant, :guardian ] : [ :participant ]
       end
-    end
-
-    # Custom templates name their roles however the author liked, so match
-    # loosely and fall back to positional roles for whoever must sign.
-    def resolve_roles(signers, submitter_roles)
-      participant_role = submitter_roles.find { |r| r.match?(/attendee|participant/i) }
-      guardian_role = submitter_roles.find { |r| r.match?(/guardian|parent/i) }
-
-      if signers == [ :participant ]
-        participant_role ||= submitter_roles.first || "Attendee"
-      elsif signers == [ :guardian ]
-        guardian_role ||= submitter_roles.first || "Legal Guardian"
-      else
-        participant_role ||= (submitter_roles - [ guardian_role ].compact).first || "Attendee"
-        guardian_role ||= (submitter_roles - [ participant_role ]).first || "Legal Guardian"
-      end
-
-      [ participant_role, guardian_role ]
     end
   end
 end

@@ -104,6 +104,58 @@ RSpec.describe "Api::V1::Webhooks", type: :request do
         expect(consent.pending_on).to be_nil
       end
 
+      context "with a custom document whose roles have generic names" do
+        let(:custom_document) { create(:custom_document, :dual_signer, event: event) }
+        let!(:custom_consent) do
+          create(:consent, :custom_document, custom_document: custom_document,
+            participant_event: participant_event, status: :sent, docuseal_envelope_id: "777",
+            docuseal_participant_slug: "p-slug", docuseal_guardian_slug: "g-slug", pending_on: "participant")
+        end
+
+        def form_completed(role:, slug: nil)
+          payload = {
+            "event_type" => "form.completed",
+            "data" => { "id" => "777", "role" => role, "slug" => slug,
+                        "metadata" => { "consent_id" => custom_consent.id.to_s } }.compact
+          }
+          post docuseal_api_v1_webhooks_path, params: payload.to_json, headers: headers
+        end
+
+        it "identifies the signer by the configured role" do
+          event.update!(docuseal_field_mappings: {
+            custom_document.mapping_key => { "signer_roles" => { "participant" => "First Party", "guardian" => "Second Party" } }
+          })
+
+          form_completed(role: "First Party")
+          expect(custom_consent.reload.participant_signed_at).to be_present
+          expect(custom_consent.pending_on).to eq("guardian")
+
+          form_completed(role: "Second Party")
+          expect(custom_consent.reload.guardian_signed_at).to be_present
+          expect(custom_consent.pending_on).to be_nil
+        end
+
+        it "identifies the signer by submitter slug when no roles are configured" do
+          form_completed(role: "First Party", slug: "p-slug")
+
+          expect(custom_consent.reload.participant_signed_at).to be_present
+          expect(custom_consent.guardian_signed_at).to be_nil
+        end
+
+        it "falls back to the synced template's role order, like the submission job" do
+          event.update!(docuseal_field_mappings: {
+            custom_document.mapping_key => { "template_snapshot" => {
+              "submitters" => [ { "name" => "First Party" }, { "name" => "Second Party" } ]
+            } }
+          })
+
+          form_completed(role: "Second Party")
+
+          expect(custom_consent.reload.guardian_signed_at).to be_present
+          expect(custom_consent.participant_signed_at).to be_nil
+        end
+      end
+
       context "with freedom waiver consent" do
         let!(:freedom_consent) do
           create(:consent,

@@ -50,6 +50,80 @@ class CustomDocument < ApplicationRecord
     Docuseal::FieldMapper.new(event: event, template_type: mapping_key)
   end
 
+  PARTICIPANT_ROLE_PATTERN = /attendee|participant/i
+  GUARDIAN_ROLE_PATTERN = /guardian|parent/i
+
+  # The DocuSeal role an admin assigned to each Attend signer on the mappings
+  # page, e.g. { "participant" => "First Party", "guardian" => "Second Party" }.
+  def configured_signer_roles
+    roles = event.docuseal_field_mappings&.dig(mapping_key, "signer_roles")
+    roles.is_a?(Hash) ? roles.slice("participant", "guardian").compact_blank : {}
+  end
+
+  # Which template role each signer fills, as [participant_role, guardian_role].
+  # A configured pick wins as long as the template still has that role; after
+  # that, templates name their roles however the author liked, so match
+  # loosely and fall back to role order for whoever must sign.
+  def signer_roles(submitter_roles, signers: default_signers)
+    configured = configured_signer_roles
+    participant_role = configured["participant"].presence_in(submitter_roles)
+    guardian_role = configured["guardian"].presence_in(submitter_roles)
+    guardian_role = nil if guardian_role == participant_role
+
+    participant_role ||= (submitter_roles - [ guardian_role ]).find { |r| r.match?(PARTICIPANT_ROLE_PATTERN) }
+    guardian_role ||= (submitter_roles - [ participant_role ]).find { |r| r.match?(GUARDIAN_ROLE_PATTERN) }
+
+    if signers == [ :participant ]
+      participant_role ||= submitter_roles.first || "Attendee"
+    elsif signers == [ :guardian ]
+      guardian_role ||= submitter_roles.first || "Legal Guardian"
+    else
+      participant_role ||= (submitter_roles - [ guardian_role ].compact).first || "Attendee"
+      guardian_role ||= (submitter_roles - [ participant_role ]).first || "Legal Guardian"
+    end
+
+    [ participant_role, guardian_role ]
+  end
+
+  # Which Attend signer a DocuSeal role name belongs to, or nil if unknown.
+  # Resolves the synced template's roles the same way the submission job
+  # does, so generic names ("First Party") assigned by role order still map
+  # back to the right person.
+  def signer_for_role(role)
+    return nil if role.blank?
+
+    roles = template_submitter_roles
+    if roles.any?
+      participant_role, guardian_role = signer_roles(roles)
+      return :participant if participant_signs? && participant_role&.casecmp?(role)
+      return :guardian if guardian_signs? && guardian_role&.casecmp?(role)
+    end
+
+    configured = configured_signer_roles.find { |_, name| name.casecmp?(role) }&.first
+    return configured.to_sym if configured
+
+    self.class.signer_for_role_name(role)
+  end
+
+  # Classifies a role purely by its name ("Attendee", "Parent/Guardian").
+  def self.signer_for_role_name(role)
+    if role.to_s.match?(PARTICIPANT_ROLE_PATTERN)
+      :participant
+    elsif role.to_s.match?(GUARDIAN_ROLE_PATTERN)
+      :guardian
+    end
+  end
+
+  # Role names from the last template sync on the mappings page.
+  def template_submitter_roles
+    submitters = event.docuseal_field_mappings&.dig(mapping_key, "template_snapshot", "submitters")
+    Array(submitters).filter_map { |s| s["name"].presence if s.is_a?(Hash) }
+  end
+
+  def default_signers
+    [ (:participant if participant_signs?), (:guardian if guardian_signs?) ].compact
+  end
+
   # Both must sign for the dual-signer types.
   def participant_signs?
     signed_by_participant? || signed_by_participant_and_guardian? || signed_by_minor_and_guardian?
