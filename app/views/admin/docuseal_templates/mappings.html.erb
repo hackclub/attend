@@ -98,6 +98,30 @@
         </div>
       <% end %>
 
+      <% if @custom_document&.electronic? && @submitter_roles.any? %>
+        <% participant_role, guardian_role = @custom_document.signer_roles(@submitter_roles) %>
+        <!-- Signers -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4">
+          <h2 class="font-semibold text-gray-900">Signers</h2>
+          <p class="text-sm text-gray-500 mb-4">Choose which DocuSeal role each person signs as. Attend sends that role to them and fills its fields from their details.</p>
+          <div class="grid grid-cols-2 gap-4">
+            <% [
+                 ([ :participant, "Participant signs as", participant_role ] if @custom_document.participant_signs?),
+                 ([ :guardian, "Parent/guardian signs as", guardian_role ] if @custom_document.guardian_signs?)
+               ].compact.each do |key, label, selected_role| %>
+              <div>
+                <label for="signer_roles_<%= key %>" class="block text-sm font-medium text-gray-700 mb-1"><%= label %></label>
+                <select id="signer_roles_<%= key %>" name="signer_roles[<%= key %>]" class="block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                  <% @submitter_roles.each do |role| %>
+                    <option value="<%= role %>" <%= "selected" if role == selected_role %>><%= role %></option>
+                  <% end %>
+                </select>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
       <!-- Field Mappings -->
       <div class="bg-white border border-gray-200 rounded-lg ">
         <div class="p-4 border-b border-gray-100">

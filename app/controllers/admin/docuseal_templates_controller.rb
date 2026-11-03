@@ -59,6 +59,7 @@ module Admin
       @current_mappings = @template_config["mappings"] || []
       @freedom_checkbox_config = @template_config["freedom_checkbox_config"] || {}
       @data_sources = docuseal_data_sources
+      @submitter_roles = (@template_snapshot&.dig("submitters") || []).filter_map { |s| s["name"].presence }
     end
 
     def update_mappings
@@ -75,6 +76,16 @@ module Admin
       end.compact
 
       config_update = { "mappings" => parsed_mappings }
+
+      if @custom_document && params.key?(:signer_roles)
+        signer_roles = parse_signer_roles
+        if signer_roles.nil?
+          redirect_to admin_event_docuseal_template_mappings_path(@event, @template_type),
+                      alert: "The participant and the parent/guardian must sign as different DocuSeal roles."
+          return
+        end
+        config_update["signer_roles"] = signer_roles
+      end
 
       if @template_type == "freedom_waiver"
         config_update["freedom_checkbox_config"] = {
@@ -106,6 +117,17 @@ module Admin
       elsif !VALID_TEMPLATE_TYPES.include?(@template_type)
         redirect_to admin_event_integrations_path(@event), alert: "Invalid template type"
       end
+    end
+
+    # Only roles the synced template actually has are kept; blank means
+    # "work it out from the role names". Nil when both signers got one role.
+    def parse_signer_roles
+      known_roles = (current_template_config.dig("template_snapshot", "submitters") || []).filter_map { |s| s["name"].presence }
+      picked = params.fetch(:signer_roles, {}).permit(:participant, :guardian).to_h
+      roles = picked.select { |_, role| known_roles.include?(role) }
+      return nil if roles.size == 2 && roles["participant"] == roles["guardian"]
+
+      roles
     end
 
     def custom_template_type?

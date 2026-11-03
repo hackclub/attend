@@ -85,9 +85,10 @@ module Api
         return unless consent
 
         role = data["role"]&.downcase
-        Rails.logger.info("[Docuseal] Form completed by #{role} for consent #{consent.id}, consent_type=#{consent.consent_type}, data keys=#{data.keys}")
+        signer = signer_for(consent, data)
+        Rails.logger.info("[Docuseal] Form completed by #{role} (#{signer || "unknown signer"}) for consent #{consent.id}, consent_type=#{consent.consent_type}, data keys=#{data.keys}")
 
-        if role&.include?("attendee") || role&.include?("participant")
+        if signer == :participant
           consent.update!(
             participant_signed_at: Time.current,
             pending_on: "guardian"
@@ -98,7 +99,7 @@ module Api
           if consent.waiver? && consent.participant_event&.requires_guardian?
             resend_guardian_portal_invitation(consent)
           end
-        elsif role&.include?("guardian") || role&.include?("legal guardian") || role&.include?("parent")
+        elsif signer == :guardian
           consent.update!(
             guardian_signed_at: Time.current,
             pending_on: nil
@@ -122,13 +123,9 @@ module Api
         consent = find_consent(data)
         return unless consent
 
-        role = data["role"]&.downcase
         consent.update!(status: :viewed) if consent.sent?
 
-        is_guardian_role = role&.include?("guardian") || role&.include?("legal guardian") || role&.include?("parent")
-        is_participant_role = role&.include?("attendee") || role&.include?("participant")
-
-        if consent.pending_on.blank? && is_participant_role
+        if consent.pending_on.blank? && signer_for(consent, data) == :participant
           consent.update!(pending_on: "participant")
         end
       end
@@ -152,6 +149,27 @@ module Api
           status: :failed,
           failure_reason: event_type
         )
+      end
+
+      # Which Attend signer a form event belongs to. The submitter slugs saved
+      # when the submission was created identify them whatever the template
+      # calls its roles; failing that, a custom document's configured roles,
+      # then the role name itself ("Attendee", "Parent/Guardian", ...).
+      def signer_for(consent, data)
+        slug = data["slug"]
+        if slug.present?
+          return :participant if slug == consent.docuseal_participant_slug
+          return :guardian if slug == consent.docuseal_guardian_slug
+        end
+
+        role = data["role"].to_s
+        return consent.custom_document.signer_for_role(role) if consent.custom_document
+
+        if role.match?(CustomDocument::PARTICIPANT_ROLE_PATTERN)
+          :participant
+        elsif role.match?(CustomDocument::GUARDIAN_ROLE_PATTERN)
+          :guardian
+        end
       end
 
       def find_consent(data)

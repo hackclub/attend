@@ -184,6 +184,60 @@ RSpec.describe "Custom documents", type: :request do
       )
       expect(doc.field_mapper.has_mappings?).to be true
     end
+
+    describe "signer roles" do
+      let(:doc) { create(:custom_document, :dual_signer, event: event, name: "Venue Release") }
+
+      before do
+        event.update!(docuseal_field_mappings: {
+          doc.mapping_key => {
+            "template_snapshot" => {
+              "synced_at" => Time.current.iso8601,
+              "submitters" => [ { "name" => "First Party", "uuid" => "a" }, { "name" => "Second Party", "uuid" => "b" } ],
+              "fields" => [ { "name" => "Name", "type" => "text", "submitter_uuid" => "b" } ]
+            }
+          }
+        })
+      end
+
+      [ false, true ].each do |console|
+        it "shows a role picker for each signer#{" in the admin console" if console}" do
+          admin.update!(admin_console_beta: console)
+
+          get admin_event_docuseal_template_mappings_path(event, doc.mapping_key)
+
+          expect(response).to have_http_status(:ok)
+          expect(response.body).to include("Participant signs as", "Parent/guardian signs as")
+          expect(response.body).to include('name="signer_roles[participant]"', 'name="signer_roles[guardian]"')
+        end
+      end
+
+      it "saves the picked roles" do
+        patch admin_event_docuseal_template_mappings_path(event, doc.mapping_key), params: {
+          mappings: [ { field_name: "Name", source_key: "", role: "Second Party" } ], signer_roles: { participant: "Second Party", guardian: "First Party" }
+        }
+
+        expect(doc.reload.configured_signer_roles).to eq("participant" => "Second Party", "guardian" => "First Party")
+        expect(doc.signer_roles([ "First Party", "Second Party" ])).to eq([ "Second Party", "First Party" ])
+      end
+
+      it "ignores roles the template doesn't have" do
+        patch admin_event_docuseal_template_mappings_path(event, doc.mapping_key), params: {
+          mappings: [ { field_name: "Name", source_key: "", role: "Second Party" } ], signer_roles: { participant: "Third Party", guardian: "Second Party" }
+        }
+
+        expect(doc.reload.configured_signer_roles).to eq("guardian" => "Second Party")
+      end
+
+      it "refuses to give both signers the same role" do
+        patch admin_event_docuseal_template_mappings_path(event, doc.mapping_key), params: {
+          mappings: [ { field_name: "Name", source_key: "", role: "Second Party" } ], signer_roles: { participant: "First Party", guardian: "First Party" }
+        }
+
+        expect(flash[:alert]).to include("different DocuSeal roles")
+        expect(doc.reload.configured_signer_roles).to eq({})
+      end
+    end
   end
 
   describe "admin resend" do

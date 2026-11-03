@@ -114,6 +114,68 @@ RSpec.describe DocusealJobs::CreateCustomDocumentJob, type: :job do
       expect(consent.guardian_participant_event).to eq(gpe)
     end
 
+    it "uses the roles picked on the mappings page over role order" do
+      allow(client).to receive(:get_template).and_return(
+        "submitters" => [ { "name" => "First Party" }, { "name" => "Second Party" } ],
+        "fields" => []
+      )
+      dual_doc = create(:custom_document, :dual_signer, event: event, docuseal_template_id: "9999")
+      event.update!(docuseal_field_mappings: {
+        dual_doc.mapping_key => {
+          "signer_roles" => { "participant" => "Second Party", "guardian" => "First Party" },
+          "mappings" => [
+            { "field_name" => "Parent Name", "source_key" => "guardian.full_name", "readonly" => false, "role" => "First Party" }
+          ]
+        }
+      })
+      gpe = create(:guardian_participant_event, participant_event: pe)
+      consent = create(:consent, participant_event: pe, consent_type: :custom_document,
+        custom_document: dual_doc)
+
+      expect(client).to receive(:create_submission) do |args|
+        participant_submitter, guardian_submitter = args[:submitters]
+        expect(participant_submitter).to include(role: "Second Party", email: pe.participant.email, fields: [])
+        expect(guardian_submitter).to include(role: "First Party", email: gpe.guardian.email)
+        expect(guardian_submitter[:fields]).to eq([
+          { name: "Parent Name", default_value: gpe.guardian.full_name, readonly: false }
+        ])
+        [
+          { "submission_id" => "sub-45", "slug" => "p-slug", "role" => "Second Party" },
+          { "submission_id" => "sub-45", "slug" => "g-slug", "role" => "First Party" }
+        ]
+      end
+
+      described_class.perform_now(consent.id)
+
+      consent.reload
+      expect(consent.docuseal_participant_slug).to eq("p-slug")
+      expect(consent.docuseal_guardian_slug).to eq("g-slug")
+    end
+
+    it "falls back to role order when a picked role is gone from the template" do
+      allow(client).to receive(:get_template).and_return(
+        "submitters" => [ { "name" => "First Party" }, { "name" => "Second Party" } ],
+        "fields" => []
+      )
+      dual_doc = create(:custom_document, :dual_signer, event: event, docuseal_template_id: "9999")
+      event.update!(docuseal_field_mappings: {
+        dual_doc.mapping_key => { "signer_roles" => { "participant" => "Child", "guardian" => "Parent" } }
+      })
+      create(:guardian_participant_event, participant_event: pe)
+      consent = create(:consent, participant_event: pe, consent_type: :custom_document,
+        custom_document: dual_doc)
+
+      expect(client).to receive(:create_submission) do |args|
+        expect(args[:submitters].map { |s| s[:role] }).to eq([ "First Party", "Second Party" ])
+        [
+          { "submission_id" => "sub-47", "slug" => "p-slug", "role" => "First Party" },
+          { "submission_id" => "sub-47", "slug" => "g-slug", "role" => "Second Party" }
+        ]
+      end
+
+      described_class.perform_now(consent.id)
+    end
+
     it "skips the guardian email when the guardian initiates from the portal" do
       allow(client).to receive(:get_template).and_return(
         "submitters" => [ { "name" => "Legal Guardian" } ],
