@@ -153,7 +153,7 @@ module Api
 
       # Which Attend signer a form event belongs to. The submitter slugs saved
       # when the submission was created identify them whatever the template
-      # calls its roles; failing that, a custom document's configured roles,
+      # calls its roles; failing that, a custom document's resolved roles,
       # then the role name itself ("Attendee", "Parent/Guardian", ...).
       def signer_for(consent, data)
         slug = data["slug"]
@@ -165,11 +165,7 @@ module Api
         role = data["role"].to_s
         return consent.custom_document.signer_for_role(role) if consent.custom_document
 
-        if role.match?(CustomDocument::PARTICIPANT_ROLE_PATTERN)
-          :participant
-        elsif role.match?(CustomDocument::GUARDIAN_ROLE_PATTERN)
-          :guardian
-        end
+        CustomDocument.signer_for_role_name(role)
       end
 
       def find_consent(data)

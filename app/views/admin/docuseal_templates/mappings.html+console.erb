@@ -119,6 +119,9 @@
               <% signer_pickers.each do |key, label, selected_role| %>
                 <%= cs_field id: "signer_roles_#{key}", label: label do |aria| %>
                   <select id="signer_roles_<%= key %>" name="signer_roles[<%= key %>]" class="cs-select" <%= tag.attributes(aria) %>>
+                    <% unless @submitter_roles.include?(selected_role) %>
+                      <option value="" selected>Choose a role</option>
+                    <% end %>
                     <% @submitter_roles.each do |role| %>
                       <option value="<%= role %>" <%= "selected" if role == selected_role %>><%= role %></option>
                     <% end %>

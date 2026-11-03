@@ -112,6 +112,9 @@
               <div>
                 <label for="signer_roles_<%= key %>" class="block text-sm font-medium text-gray-700 mb-1"><%= label %></label>
                 <select id="signer_roles_<%= key %>" name="signer_roles[<%= key %>]" class="block w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                  <% unless @submitter_roles.include?(selected_role) %>
+                    <option value="" selected>Choose a role</option>
+                  <% end %>
                   <% @submitter_roles.each do |role| %>
                     <option value="<%= role %>" <%= "selected" if role == selected_role %>><%= role %></option>
                   <% end %>

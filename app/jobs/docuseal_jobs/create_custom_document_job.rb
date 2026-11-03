@@ -94,7 +94,7 @@ module DocusealJobs
       )
     rescue Docuseal::RateLimitError
       Rails.logger.warn("Docuseal rate limit hit, retrying in 30 seconds")
-      self.class.set(wait: 30.seconds).perform_later(consent_id)
+      self.class.set(wait: 30.seconds).perform_later(consent_id, initiated_by)
     rescue Docuseal::ValidationError => e
       consent.update!(status: :failed, failure_reason: "validation_error: #{e.message}")
       Rails.logger.error("Docuseal validation error: #{e.message}")

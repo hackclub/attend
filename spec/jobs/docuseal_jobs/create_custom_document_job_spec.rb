@@ -217,6 +217,17 @@ RSpec.describe DocusealJobs::CreateCustomDocumentJob, type: :job do
       expect(consent.reload).to be_sent
     end
 
+    it "keeps who initiated the request when retrying after a rate limit" do
+      consent = create_custom_consent
+
+      Docuseal::Error # load error.rb so its subclasses are defined
+      allow(client).to receive(:create_submission).and_raise(Docuseal::RateLimitError.new("slow down"))
+
+      expect {
+        described_class.perform_now(consent.id, "guardian")
+      }.to have_enqueued_job(described_class).with(consent.id, "guardian")
+    end
+
     it "marks the consent failed on validation errors" do
       consent = create_custom_consent
 

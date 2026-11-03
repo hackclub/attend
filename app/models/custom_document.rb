@@ -86,17 +86,38 @@ class CustomDocument < ApplicationRecord
   end
 
   # Which Attend signer a DocuSeal role name belongs to, or nil if unknown.
+  # Resolves the synced template's roles the same way the submission job
+  # does, so generic names ("First Party") assigned by role order still map
+  # back to the right person.
   def signer_for_role(role)
     return nil if role.blank?
+
+    roles = template_submitter_roles
+    if roles.any?
+      participant_role, guardian_role = signer_roles(roles)
+      return :participant if participant_signs? && participant_role&.casecmp?(role)
+      return :guardian if guardian_signs? && guardian_role&.casecmp?(role)
+    end
 
     configured = configured_signer_roles.find { |_, name| name.casecmp?(role) }&.first
     return configured.to_sym if configured
 
-    if role.match?(PARTICIPANT_ROLE_PATTERN)
+    self.class.signer_for_role_name(role)
+  end
+
+  # Classifies a role purely by its name ("Attendee", "Parent/Guardian").
+  def self.signer_for_role_name(role)
+    if role.to_s.match?(PARTICIPANT_ROLE_PATTERN)
       :participant
-    elsif role.match?(GUARDIAN_ROLE_PATTERN)
+    elsif role.to_s.match?(GUARDIAN_ROLE_PATTERN)
       :guardian
     end
+  end
+
+  # Role names from the last template sync on the mappings page.
+  def template_submitter_roles
+    submitters = event.docuseal_field_mappings&.dig(mapping_key, "template_snapshot", "submitters")
+    Array(submitters).filter_map { |s| s["name"].presence if s.is_a?(Hash) }
   end
 
   def default_signers

@@ -141,6 +141,19 @@ RSpec.describe "Api::V1::Webhooks", type: :request do
           expect(custom_consent.reload.participant_signed_at).to be_present
           expect(custom_consent.guardian_signed_at).to be_nil
         end
+
+        it "falls back to the synced template's role order, like the submission job" do
+          event.update!(docuseal_field_mappings: {
+            custom_document.mapping_key => { "template_snapshot" => {
+              "submitters" => [ { "name" => "First Party" }, { "name" => "Second Party" } ]
+            } }
+          })
+
+          form_completed(role: "Second Party")
+
+          expect(custom_consent.reload.guardian_signed_at).to be_present
+          expect(custom_consent.participant_signed_at).to be_nil
+        end
       end
 
       context "with freedom waiver consent" do
