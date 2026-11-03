@@ -78,6 +78,11 @@ module Admin
 
     private
 
+    # This page is where the banner's "Update waivers" button goes.
+    def show_waiver_dates_banner?
+      false
+    end
+
     def set_event
       @event = Event.find_by!(slug: params[:event_slug])
       authorize @event, :regenerate_waivers?

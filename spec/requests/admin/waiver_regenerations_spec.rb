@@ -38,6 +38,17 @@ RSpec.describe "Admin waiver regeneration", type: :request do
       expect(response.body).to include("Only unsigned waivers (1 participant)")
     end
 
+    [ false, true ].each do |console|
+      it "doesn't show the stale-dates banner on the page it links to (console: #{console})" do
+        organizer.update!(admin_console_beta: console)
+        sign_in organizer
+        get new_admin_event_waiver_regeneration_path(event)
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).not_to include('data-testid="waiver-dates-banner"')
+      end
+    end
+
     it "renders in the admin console too" do
       organizer.update!(admin_console_beta: true)
       sign_in organizer
