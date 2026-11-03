@@ -305,7 +305,7 @@ RSpec.describe "Api::V1::Participants", type: :request do
       { "Authorization" => "Bearer #{api_key}" }
     end
 
-    it "returns email, name, Slack ID, and status only — nothing else" do
+    it "returns the registration id, email, name, Slack ID, and status only — nothing else" do
       participant = create(:participant, email: "roster@example.com")
       pe = create(:participant_event, participant: participant, event: event)
 
@@ -314,6 +314,7 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(response).to have_http_status(:ok)
       entry = JSON.parse(response.body)["participants"].sole
       expect(entry).to eq(
+        "participant_event_id" => pe.id,
         "email" => "roster@example.com",
         "first_name" => participant.legal_first_name,
         "last_name" => participant.legal_last_name,

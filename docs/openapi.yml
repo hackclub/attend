@@ -3743,6 +3743,12 @@ components:
     RosterEntry:
       type: object
       properties:
+        participant_event_id:
+          type: string
+          format: uuid
+          description: >-
+            The registration's id, the same one creating the invitation
+            returned. Stays the same when the person changes their email.
         email: { type: string, format: email }
         first_name: { type: string, example: Jane }
         last_name: { type: string, example: Doe }

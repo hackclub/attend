@@ -280,6 +280,10 @@ module Api
           participants: participant_events.map { |pe|
             participant = pe.participant
             {
+              # The registration id the invite returned, so a caller can match
+              # entries to its own records even after the person changes their
+              # email here.
+              participant_event_id: pe.id,
               email: participant.email,
               # Mirror Participant#display_name: preferred name wins when set.
               first_name: participant.preferred_name.presence || participant.legal_first_name,
