@@ -748,6 +748,16 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(JSON.parse(response.body)["error"]).to include("YYYY-MM-DD")
     end
 
+    it "rejects a birthday in the future without inviting" do
+      expect {
+        invite(email: "time-traveller@example.com", date_of_birth: (Date.current + 1.day).iso8601)
+      }.not_to change(Invitation, :count)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)["error"]).to include("future")
+      expect(Participant.where(email: "time-traveller@example.com")).not_to exist
+    end
+
     it "rejects a country it doesn't know" do
       invite(email: "narnia@example.com", country: "Narnia")
 
@@ -809,6 +819,18 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
       expect(JSON.parse(response.body)["error"]).to include("in_progress")
       expect(participant_event.reload.status).to eq("in_progress")
+    end
+
+    it "rejects a birthday in the future without saving anything" do
+      participant.update!(date_of_birth: Date.new(2008, 6, 1))
+
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        params: { participant: { preferred_name: "Rob", date_of_birth: (Date.current + 1.day).iso8601 } },
+        headers: api_key_headers
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)["error"]).to include("future")
+      expect(participant.reload).to have_attributes(preferred_name: nil, date_of_birth: Date.new(2008, 6, 1))
     end
 
     it "sets the country from a code or a name" do

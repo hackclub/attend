@@ -224,6 +224,10 @@ module Api
           attributes[:country_of_residence] = country
         end
 
+        # Cast the way the column will, so whatever would be stored is what's checked.
+        date_of_birth = ActiveModel::Type::Date.new.cast(attributes[:date_of_birth])
+        return render_error("date_of_birth can't be in the future") if date_of_birth && date_of_birth > Date.current
+
         # Backfills send fill_blanks so they only add what's missing and
         # never overwrite something the participant entered themselves.
         fill_blanks = ActiveModel::Type::Boolean.new.cast(params[:fill_blanks])
@@ -355,7 +359,12 @@ module Api
       def invitee_details
         details = {}
         details[:preferred_name] = params[:preferred_name].to_s.strip if params[:preferred_name].present?
-        details[:date_of_birth] = Date.iso8601(params[:date_of_birth].to_s) if params[:date_of_birth].present?
+        if params[:date_of_birth].present?
+          date_of_birth = Date.iso8601(params[:date_of_birth].to_s)
+          return [ nil, "date_of_birth can't be in the future" ] if date_of_birth > Date.current
+
+          details[:date_of_birth] = date_of_birth
+        end
         details[:phone] = params[:phone].to_s.strip if params[:phone].present?
         Participant::ADDRESS_FIELDS.each do |field|
           details[field] = params[field].to_s.strip if params[field].present?

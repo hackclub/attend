@@ -1397,7 +1397,11 @@ paths:
                 email: { type: string, format: email }
                 first_name: { type: string }
                 last_name: { type: string }
-                date_of_birth: { type: string, format: date, example: "2009-04-02" }
+                date_of_birth:
+                  type: string
+                  format: date
+                  example: "2009-04-02"
+                  description: Can't be in the future.
                 phone:
                   type: string
                   description: E.164 format, e.g. +12025550100
@@ -1662,7 +1666,10 @@ paths:
                     legal_last_name: { type: string }
                     preferred_name: { type: string }
                     email: { type: string, format: email }
-                    date_of_birth: { type: string, format: date }
+                    date_of_birth:
+                      type: string
+                      format: date
+                      description: Can't be in the future.
                     phone:
                       type: string
                       description: E.164 format, e.g. +12025550100
