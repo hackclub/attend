@@ -1,3 +1,9 @@
+# Depot CI Migration
+# Source: .github/workflows/vale.yml
+#
+# Changes made:
+# - Changed GitHub runs-on labels to their Depot equivalents
+
 # Prose linting for the Markdown docs. Advisory only: this workflow reports
 # what Vale found in the job summary but always exits green, so a style nit
 # never blocks a merge. Config lives in .vale.ini; vocabulary in
@@ -15,7 +21,7 @@ permissions:
 
 jobs:
   vale:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest # was: ubuntu-latest. Mapped standard GitHub runner to Depot equivalent.
     permissions:
       contents: read
 

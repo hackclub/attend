@@ -1,3 +1,9 @@
+# Depot CI Migration
+# Source: .github/workflows/bundler-audit.yml
+#
+# Changes made:
+# - Changed GitHub runs-on labels to their Depot equivalents
+
 name: Bundler Audit
 
 # Runs separately from CI's scan_ruby so a newly published advisory for a
@@ -26,7 +32,7 @@ permissions:
 
 jobs:
   bundler-audit:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest # was: ubuntu-latest. Mapped standard GitHub runner to Depot equivalent.
     permissions:
       contents: read
       issues: write

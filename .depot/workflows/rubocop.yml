@@ -1,3 +1,9 @@
+# Depot CI Migration
+# Source: .github/workflows/rubocop.yml
+#
+# Changes made:
+# - Changed GitHub runs-on labels to their Depot equivalents
+
 # This workflow uses actions that are not certified by GitHub.
 # They are provided by a third-party and are governed by
 # separate terms of service, privacy policy, and support
@@ -21,7 +27,7 @@ permissions:
 
 jobs:
   rubocop:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest # was: ubuntu-latest. Mapped standard GitHub runner to Depot equivalent.
     permissions:
       contents: read
     strategy:
