@@ -32,8 +32,9 @@ class SeriesDashboard
   # same question — who do we call — asked of two populations, so they share one
   # stage and the funnel stays readable across a mixed-age series.
   #
-  # Nine stages are defined, but stage_rows drops any with nothing applicable, so
-  # a typical series renders eight: `documents` only appears once an event has a
+  # `started` comes first and is the one stage that isn't an onboarding step:
+  # see .blocking_stage. Eleven stages are defined, but stage_rows drops any with
+  # nothing applicable, so a typical series renders nine: `documents` only appears once an event has a
   # custom document that applies to someone, and `accommodation` and
   # `freedom_waiver` likewise depend on the event's own settings.
   #
@@ -46,6 +47,8 @@ class SeriesDashboard
   # display status, and a missing travel row also counts people still stuck on
   # their profile). One param, one meaning, and the two screens cannot drift.
   STAGES = [
+    Stage.new(key: :started, label: "Started", chase: "haven't opened their onboarding yet",
+              filter: { blocked_on: "started" }),
     Stage.new(key: :profile, label: "Profile", chase: "haven't finished their own details",
               filter: { blocked_on: "profile" }),
     Stage.new(key: :travel, label: "Travel", chase: "haven't given us both travel legs",
@@ -113,6 +116,22 @@ class SeriesDashboard
         [ 0, starts_at.to_f, event.name.to_s ]
       end
     end
+  end
+
+  # The stage a registration is stuck on, or nil once onboarding is done. Public
+  # and on the class so the participant list's `blocked_on` filter selects the
+  # same people this dashboard counted.
+  #
+  # Imports fill in profile, travel and accommodation before the participant has
+  # done anything, so someone who has never opened onboarding would otherwise
+  # clear those stages and pile up at health. A registration stays `invited`
+  # until its participant first opens onboarding (OnboardingController flips it
+  # to in_progress), which makes the status the test for "hasn't started".
+  def self.blocking_stage(participant_event)
+    return :started if participant_event.invited?
+
+    step = participant_event.onboarding_progress[:blocking_step]
+    step && STEP_TO_STAGE[step]
   end
 
   # Only events that have started and can actually record a check-in. Public and
@@ -364,13 +383,13 @@ class SeriesDashboard
         @active_by_event[event.id] += 1
 
         progress = pe.onboarding_progress
-        applicable = progress[:steps].filter_map { |step| STEP_TO_STAGE[step[:name]] }.uniq
+        applicable = [ :started ] + progress[:steps].filter_map { |step| STEP_TO_STAGE[step[:name]] }.uniq
         applicable.each do |key|
           @applicable_totals[key] += 1
           stages_seen_here << key
         end
 
-        blocking = progress[:blocking_step] && STEP_TO_STAGE[progress[:blocking_step]]
+        blocking = self.class.blocking_stage(pe)
 
         if blocking
           @stalled_totals[blocking] += 1

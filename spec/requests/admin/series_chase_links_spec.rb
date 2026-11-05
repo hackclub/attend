@@ -84,6 +84,9 @@ RSpec.describe "Admin::EventSeries chase links", type: :request do
       create(:participant_event, :checked_in, event: event,
                                               participant: create(:participant, legal_last_name: "AlreadyHere"))
       create_stalled_at(:waiver, surname: "GoneAway", status: :withdrawn)
+      # Imported with everything up to the waiver already filled in, but never
+      # opened onboarding: counted at `started`, not at the waiver.
+      create_stalled_at(:waiver, surname: "NeverOpened", status: :invited)
     end
 
     it "returns exactly the number of participants the dashboard counted" do
@@ -92,7 +95,7 @@ RSpec.describe "Admin::EventSeries chase links", type: :request do
 
       # If the seed stops exercising a stage, this spec quietly stops testing
       # it — so assert the spread before asserting anything about the filters.
-      expect(covered).to include(*STAGE_ORDER, :checked_in)
+      expect(covered).to include(:started, *STAGE_ORDER, :checked_in)
 
       rows.each do |row|
         stage = row[:stage]
@@ -121,6 +124,16 @@ RSpec.describe "Admin::EventSeries chase links", type: :request do
       expect(response.body).not_to include("StuckFreedomWaiver")
       expect(response.body).not_to include("StuckGuardianPortal")
       expect(response.body).not_to include("GoneAway")
+      expect(response.body).not_to include("NeverOpened")
+    end
+
+    it "lists people who have not opened onboarding under started, whatever an import filled in" do
+      sign_in global_admin
+
+      get admin_event_participants_path(event.slug, blocked_on: "started")
+
+      expect(response.body).to include("NeverOpened")
+      expect(listed_count(response.body)).to eq(1)
     end
 
     it "keeps people who have not finished onboarding out of the arrival list" do
