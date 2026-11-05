@@ -61,7 +61,7 @@ RSpec.describe "Admin::EventSeries", type: :request do
       expect(response.body).to include("1 event")
       expect(response.body).to include("1 withdrawn")
       # Funnel: the two endpoints, and nothing restating them above.
-      expect(response.body).to include("started onboarding")
+      expect(response.body).to include("registered")
       expect(response.body).to include("cleared every stage")
       # The KPI strip that repeated all four of these figures is gone.
       expect(response.body).not_to include("fully cleared")

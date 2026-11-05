@@ -979,8 +979,7 @@ module Admin
 
     def blocked_at_stage_ids(scope, stage_key)
       active_participant_events(scope).filter_map do |pe|
-        blocking = pe.onboarding_progress[:blocking_step]
-        pe.id if blocking && SeriesDashboard::STEP_TO_STAGE[blocking] == stage_key
+        pe.id if SeriesDashboard.blocking_stage(pe) == stage_key
       end
     end
 
@@ -994,7 +993,7 @@ module Admin
         .distinct.pluck(:participant_event_id).to_set
 
       active_participant_events(scope).filter_map do |pe|
-        next if checked_in.include?(pe.id) || pe.onboarding_progress[:blocking_step]
+        next if checked_in.include?(pe.id) || SeriesDashboard.blocking_stage(pe)
 
         pe.id
       end

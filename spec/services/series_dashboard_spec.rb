@@ -54,13 +54,29 @@ RSpec.describe SeriesDashboard do
       expect(dashboard.totals[:cleared]).to eq(per_record_cleared)
 
       expected_stalled = records.group_by { |pe|
-        described_class::STEP_TO_STAGE[pe.reload.onboarding_progress[:blocking_step]]
+        described_class.blocking_stage(pe.reload)
       }.transform_values(&:size)
 
       dashboard.stage_rows.each do |row|
         expect(row[:stalled]).to eq(expected_stalled.fetch(row[:stage].key, 0)),
           "#{row[:stage].key} disagreed with the per-record blocking step"
       end
+    end
+
+    # Imports fill in the early stages before the participant has done anything,
+    # so without this stage everyone who never opened onboarding piles up at the
+    # first step only they can clear.
+    it "holds registrations that haven't opened onboarding at the first stage" do
+      create(:participant_event, event: event, status: :invited)
+      create(:participant_event, event: event)
+
+      rows = dashboard_for(event).stage_rows
+      started = rows.first
+
+      expect(started[:stage].key).to eq(:started)
+      expect(started[:stalled]).to eq(1)
+      expect(started[:applicable]).to eq(2)
+      expect(rows.drop(1).sum { |row| row[:stalled] }).to be <= 1
     end
 
     it "leaves withdrawn and rejected participants out of the funnel" do
