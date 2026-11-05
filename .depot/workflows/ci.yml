@@ -1,3 +1,9 @@
+# Depot CI Migration
+# Source: .github/workflows/ci.yml
+#
+# Changes made:
+# - Changed GitHub runs-on labels to their Depot equivalents
+
 name: CI
 
 on:
@@ -11,7 +17,7 @@ permissions:
 
 jobs:
   scan_ruby:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest # was: ubuntu-latest. Mapped standard GitHub runner to Depot equivalent.
     permissions:
       contents: read
 
@@ -32,7 +38,7 @@ jobs:
       # fail CI on unrelated PRs.
 
   scan_js:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest # was: ubuntu-latest. Mapped standard GitHub runner to Depot equivalent.
     permissions:
       contents: read
 
@@ -54,7 +60,7 @@ jobs:
         run: bin/importmap audit
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest # was: ubuntu-latest. Mapped standard GitHub runner to Depot equivalent.
     permissions:
       contents: read
 
@@ -141,7 +147,7 @@ jobs:
           if-no-files-found: ignore
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-latest # was: ubuntu-latest. Mapped standard GitHub runner to Depot equivalent.
     permissions:
       contents: read
     env:
