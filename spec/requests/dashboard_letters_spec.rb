@@ -32,4 +32,18 @@ RSpec.describe "Dashboard letters", type: :request do
     expect(response).to redirect_to(dashboard_path)
     expect(flash[:alert]).to eq("Your invitation letter is available once your registration is complete.")
   end
+
+  it "leaves the invitation letter out when the series hides it" do
+    series = create(:event_series)
+    registration.event.update!(event_series: series)
+    series.update!(hide_invitation_letter: true)
+
+    get dashboard_event_path(registration)
+    expect(response.body).to include(dashboard_download_excuse_letter_path(registration))
+    expect(response.body).not_to include(dashboard_download_invitation_letter_path(registration))
+
+    get dashboard_download_invitation_letter_path(registration)
+    expect(response).to redirect_to(dashboard_event_path(registration))
+    expect(flash[:alert]).to eq("This event doesn't offer an invitation letter.")
+  end
 end

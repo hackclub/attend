@@ -25,10 +25,12 @@ class EventSeries < ApplicationRecord
 
   # Settings every event in the series inherits: onboarding branding (see
   # BrandTheme), notes shown during registration, whether the accommodation
-  # and health steps explain who sees the answers, and account linking modes
+  # and health steps explain who sees the answers, whether participants get
+  # an invitation letter with their entry ticket, and account linking modes
   # with an optional how-to link per provider. Events can override linking.
   store_accessor :config, :brand, :registration_note, :address_note, :tshirt_note,
-    :hide_privacy_notes, :github_linking, :itch_linking, :github_help_url, :itch_help_url
+    :hide_privacy_notes, :hide_invitation_letter,
+    :github_linking, :itch_linking, :github_help_url, :itch_help_url
 
   validates :github_linking, :itch_linking, inclusion: { in: ACCOUNT_LINKING_MODES }, allow_blank: true
   validates :github_help_url, :itch_help_url, format: { with: %r{\Ahttps://\S+\z}, message: "must start with https://" }, allow_blank: true
@@ -61,6 +63,10 @@ class EventSeries < ApplicationRecord
 
   def hide_privacy_notes?
     ActiveModel::Type::Boolean.new.cast(hide_privacy_notes) || false
+  end
+
+  def hide_invitation_letter?
+    ActiveModel::Type::Boolean.new.cast(hide_invitation_letter) || false
   end
 
   def account_linking_mode(provider)
