@@ -153,6 +153,15 @@
         <p class="text-sm text-gray-500">Leaves out the notes on who can see rooming and health answers, and the private request links, on the accommodation and health steps. Health sections also stop offering to discuss privately.</p>
       </div>
     </div>
+    <div class="flex items-start">
+      <div class="flex items-center h-5">
+        <%= f.check_box :hide_invitation_letter, { checked: @series.hide_invitation_letter?, class: "h-4 w-4 text-[#ec3750] focus:ring-[#ec3750] border-gray-300 rounded" } %>
+      </div>
+      <div class="ml-3">
+        <%= f.label :hide_invitation_letter, "Hide the invitation letter", class: "text-sm font-medium text-gray-700" %>
+        <p class="text-sm text-gray-500">Leaves the invitation letter download off the entry ticket on the dashboard and the "you're registered" screen. Visa letter applications are not affected.</p>
+      </div>
+    </div>
   </div>
 
   <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-4">

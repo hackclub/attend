@@ -143,6 +143,13 @@
           <p class="cs-option-description">Leaves out the notes on who can see rooming and health answers, and the private request links, on the accommodation and health steps. Health sections also stop offering to discuss privately.</p>
         </div>
       </div>
+      <div class="cs-option">
+        <%= f.check_box :hide_invitation_letter, { checked: @series.hide_invitation_letter? } %>
+        <div>
+          <%= f.label :hide_invitation_letter, "Hide the invitation letter", class: "cs-option-label" %>
+          <p class="cs-option-description">Leaves the invitation letter download off the entry ticket on the dashboard and the "you're registered" screen. Visa letter applications are not affected.</p>
+        </div>
+      </div>
     </div>
   </section>
 
