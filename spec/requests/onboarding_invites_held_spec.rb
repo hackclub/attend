@@ -323,6 +323,18 @@ RSpec.describe "Onboarding invitations held", type: :request do
       expect(pe.reload).to be_invited
     end
 
+    it "leaves a held invitation unaccepted when its link is opened early, so the release still sends it" do
+      create(:participant_event, event: event, participant: participant, status: :invited)
+      invitation = create(:invitation, event: event, email: "kid@example.com", sent_at: nil)
+
+      get onboarding_path(invite: invitation.token)
+
+      expect(response).to redirect_to(dashboard_path)
+      expect(flash[:alert]).to include("isn't open yet")
+      expect(invitation.reload).to be_held
+      expect(event.invitations.held).to include(invitation)
+    end
+
     it "gets in once a staff member has sent their invitation individually" do
       create(:participant_event, event: event, participant: participant, status: :invited)
       create(:invitation, event: event, email: "kid@example.com", sent_at: 1.hour.ago)

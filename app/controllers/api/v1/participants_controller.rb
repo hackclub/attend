@@ -38,6 +38,9 @@ module Api
           participant_events = participant_events.where("participant_events.updated_at > ?", since)
         end
 
+        participant_events = participant_events.to_a
+        preload_invitations_for(participant_events)
+
         render json: {
           participants: participant_events.map { |pe| participant_json(pe) },
           synced_at: sync_cutoff.iso8601(6)
@@ -67,6 +70,8 @@ module Api
             q: sanitized_like
           )
           .limit(20)
+          .to_a
+        preload_invitations_for(participant_events)
 
         render json: {
           results: participant_events.map { |pe| participant_json(pe) }
@@ -143,8 +148,8 @@ module Api
             participant_id: participant_event.participant_id,
             participant_event_id: participant_event.id,
             status: participant_event.status,
-            # Same gate as #participant_json: see #invite_url_for.
-            **(include_pii? ? { invite_url: AttendUrls.invitation_url(invitation) } : {})
+            # Same gate as #participant_json: see #invite_url_for. nil while held.
+            **(include_pii? ? { invite_url: invitation_url_unless_held(invitation) } : {})
           }, status: :created
         rescue ActiveRecord::RecordInvalid => e
           render json: { success: false, error: e.record.errors.full_messages.join(", ") }, status: :unprocessable_entity
@@ -859,18 +864,52 @@ module Api
       end
 
       # The person's own onboarding link, from their newest invitation to this
-      # event: someone invited more than once has only one open invitation at
-      # a time, and it is always the newest. nil for people who registered
-      # without one.
+      # event that matches their current email: someone invited more than once
+      # has only one open invitation at a time, and it is always the newest.
+      # nil when no invitation matches (they registered without one, it was
+      # revoked, or their email has changed since), and while it is held.
       #
       # Only for callers who pass #include_pii?. Until the invitation is
       # accepted, opening the link shows Hack Club Auth's signup form filled in
       # with the person's date of birth and phone (HackClubAuthPrefill), so the
       # link is worth exactly what those fields are.
       def invite_url_for(participant)
-        @invitations_by_email ||= @event.invitations.order(:created_at).index_by { |invitation| invitation.email.downcase }
-        invitation = @invitations_by_email[participant.email.to_s.downcase]
-        invitation && AttendUrls.invitation_url(invitation)
+        email = participant.email.to_s.downcase
+        invitation =
+          if @invitations_by_email
+            @invitations_by_email[email]
+          else
+            @event.invitations.for_email(email).order(:created_at).last
+          end
+
+        invitation_url_unless_held(invitation)
+      end
+
+      # For list responses: one query for the invitations of just the people
+      # being serialized, instead of one per person. A no-op for callers who
+      # don't get the link.
+      def preload_invitations_for(participant_events)
+        return unless include_pii?
+
+        emails = participant_events.map { |pe| pe.participant.email.to_s.downcase }.uniq
+        @invitations_by_email = @event.invitations
+          .where("LOWER(invitations.email) IN (?)", emails.presence || [ "" ])
+          .select(:id, :email, :token, :sent_at, :accepted_at, :created_at)
+          .order(:created_at)
+          .index_by { |invitation| invitation.email.downcase }
+      end
+
+      # While the event holds onboarding invitations, an unsent invitation's
+      # link stays private: the person hasn't been told about the event, and
+      # opening the link before release would accept it, so the release would
+      # skip their email (SendHeldOnboardingInvitesJob only sends `held` ones).
+      # Checked against the event's hold rather than Invitation#held? alone,
+      # because #create answers before the mail job stamps sent_at.
+      def invitation_url_unless_held(invitation)
+        return if invitation.nil?
+        return if invitation.held? && @event.onboarding_invites_held?
+
+        AttendUrls.invitation_url(invitation)
       end
 
       def default_url_host
