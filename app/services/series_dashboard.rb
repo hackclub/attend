@@ -32,11 +32,13 @@ class SeriesDashboard
   # same question — who do we call — asked of two populations, so they share one
   # stage and the funnel stays readable across a mixed-age series.
   #
-  # `started` comes first and is the one stage that isn't an onboarding step:
-  # see .blocking_stage. Eleven stages are defined, but stage_rows drops any with
-  # nothing applicable, so a typical series renders nine: `documents` only appears once an event has a
-  # custom document that applies to someone, and `accommodation` and
-  # `freedom_waiver` likewise depend on the event's own settings.
+  # `invitation` and `started` come first and are the two stages that aren't
+  # onboarding steps: see .blocking_stage. stage_rows drops any stage with
+  # nothing applicable, so a series only renders the ones its events use:
+  # `invitation` only appears while an event has invitations nobody has sent,
+  # `documents` once an event has a custom document that applies to someone,
+  # and `accommodation` and `freedom_waiver` likewise depend on the event's own
+  # settings.
   #
   # `filter` is the query string that opens the matching participant list for a
   # single event. Every stage uses the same param —
@@ -47,6 +49,8 @@ class SeriesDashboard
   # display status, and a missing travel row also counts people still stuck on
   # their profile). One param, one meaning, and the two screens cannot drift.
   STAGES = [
+    Stage.new(key: :invitation, label: "Invitation", chase: "haven't been sent their invitation yet",
+              filter: { blocked_on: "invitation" }),
     Stage.new(key: :started, label: "Started", chase: "haven't opened their onboarding yet",
               filter: { blocked_on: "started" }),
     Stage.new(key: :profile, label: "Profile", chase: "haven't finished their own details",
@@ -94,6 +98,11 @@ class SeriesDashboard
 
   STAGE_INDEX = STAGES.each_with_index.to_h { |stage, i| [ stage.key, i ] }.freeze
 
+  # Stages the chase list leaves to another row. Everyone at `invitation` is
+  # already counted by the "invitations haven't been sent yet" row, which links
+  # to the list where they can be sent, so a second row would count them twice.
+  CHASED_ELSEWHERE = %i[invitation].freeze
+
   # Onboarding is done with these; they are not people anyone chases.
   INACTIVE_STATUSES = ParticipantEvent::INACTIVE_STATUSES
 
@@ -127,11 +136,46 @@ class SeriesDashboard
   # clear those stages and pile up at health. A registration stays `invited`
   # until its participant first opens onboarding (OnboardingController flips it
   # to in_progress), which makes the status the test for "hasn't started".
-  def self.blocking_stage(participant_event)
-    return :started if participant_event.invited?
+  #
+  # An invited registration whose invitation is still held was never emailed,
+  # so it waits at `invitation` instead: "hasn't opened it" isn't true of
+  # someone who hasn't been sent it. `held_emails` is the event's
+  # .held_invitation_emails, passed in so a list of registrations costs one
+  # query rather than one each. .invited_scope is the SQL form of these two
+  # branches; keep them in step.
+  def self.blocking_stage(participant_event, held_emails:)
+    if participant_event.invited?
+      email = participant_event.participant&.email.to_s.downcase
+      return held_emails.include?(email) ? :invitation : :started
+    end
 
     step = participant_event.onboarding_progress[:blocking_step]
     step && STEP_TO_STAGE[step]
+  end
+
+  # The addresses of each event's held invitations, as { event_id => Set }.
+  # Invitation lowercases its address on create; downcasing again keeps the
+  # comparison in .blocking_stage honest for any older row.
+  def self.held_invitation_emails(event_ids)
+    Invitation.held.where(event_id: event_ids).pluck(:event_id, :email)
+      .each_with_object({}) { |(event_id, email), sets| (sets[event_id] ||= Set.new) << email.to_s.downcase }
+  end
+
+  # The registrations in `scope` that .blocking_stage puts at `invitation` or
+  # `started`, in SQL. Both stages depend only on status and the held
+  # invitations, so the participant list can answer them without computing
+  # onboarding_progress for every row.
+  def self.invited_scope(scope, event, stage)
+    held_participant_ids = Participant
+      .where("LOWER(participants.email) IN (?)", Invitation.held.where(event_id: event.id).select("LOWER(invitations.email)"))
+      .select(:id)
+    invited = scope.where(status: :invited)
+
+    case stage
+    when :invitation then invited.where(participant_id: held_participant_ids)
+    when :started then invited.where.not(participant_id: held_participant_ids)
+    else raise ArgumentError, "#{stage.inspect} is not a status-only stage"
+    end
   end
 
   # Only events that have started and can actually record a check-in. Public and
@@ -215,6 +259,7 @@ class SeriesDashboard
   def chase_rows
     (stage_rows + [ arrival_row ].compact)
       .select { |row| row[:stalled].positive? }
+      .reject { |row| CHASED_ELSEWHERE.include?(row[:stage].key) }
       .sort_by { |row| [ -row[:stalled], STAGE_INDEX.fetch(row[:stage].key, STAGES.length) ] }
   end
 
@@ -369,10 +414,14 @@ class SeriesDashboard
     @arrival_cleared = 0
 
     checked_in_ids = checked_in_participant_event_ids
+    held_emails_by_event = self.class.held_invitation_emails(event_ids)
 
     events.each do |event|
       arrivals_expected = arrivals_expected?(event)
       stages_seen_here = Set.new
+      held_emails = held_emails_by_event.fetch(event.id, Set.new)
+      # The invitation stage only exists for an event holding invitations.
+      lead_stages = held_emails.empty? ? [ :started ] : [ :invitation, :started ]
 
       participant_events_for(event).each do |pe|
         if INACTIVE_STATUSES.include?(pe.status)
@@ -383,13 +432,13 @@ class SeriesDashboard
         @active_by_event[event.id] += 1
 
         progress = pe.onboarding_progress
-        applicable = [ :started ] + progress[:steps].filter_map { |step| STEP_TO_STAGE[step[:name]] }.uniq
+        applicable = lead_stages + progress[:steps].filter_map { |step| STEP_TO_STAGE[step[:name]] }.uniq
         applicable.each do |key|
           @applicable_totals[key] += 1
           stages_seen_here << key
         end
 
-        blocking = self.class.blocking_stage(pe)
+        blocking = self.class.blocking_stage(pe, held_emails: held_emails)
 
         if blocking
           @stalled_totals[blocking] += 1

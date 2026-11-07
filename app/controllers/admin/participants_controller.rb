@@ -965,6 +965,8 @@ module Admin
     # already-preloaded rows and hands the ids back to SQL — keeping the result a
     # relation, so the ordering and any count downstream still work. A parallel
     # SQL reimplementation would drift; see SeriesDashboard's header comment.
+    # The exception is `invitation` and `started`, which depend only on status
+    # and held invitations: SeriesDashboard.invited_scope answers those in SQL.
     def filter_by_blocking_stage(scope, stage_key)
       key = stage_key.to_s
 
@@ -978,9 +980,18 @@ module Admin
     end
 
     def blocked_at_stage_ids(scope, stage_key)
-      active_participant_events(scope).filter_map do |pe|
-        pe.id if SeriesDashboard.blocking_stage(pe) == stage_key
+      # Status-only stages need no onboarding_progress, so SQL answers them.
+      if %i[invitation started].include?(stage_key)
+        return SeriesDashboard.invited_scope(scope, current_event, stage_key).select(:id)
       end
+
+      active_participant_events(scope).filter_map do |pe|
+        pe.id if SeriesDashboard.blocking_stage(pe, held_emails: held_invitation_emails) == stage_key
+      end
+    end
+
+    def held_invitation_emails
+      @held_invitation_emails ||= SeriesDashboard.held_invitation_emails([ current_event.id ]).fetch(current_event.id, Set.new)
     end
 
     # Check-in sits after onboarding, not inside it: these are people who have
@@ -993,7 +1004,7 @@ module Admin
         .distinct.pluck(:participant_event_id).to_set
 
       active_participant_events(scope).filter_map do |pe|
-        next if checked_in.include?(pe.id) || SeriesDashboard.blocking_stage(pe)
+        next if checked_in.include?(pe.id) || SeriesDashboard.blocking_stage(pe, held_emails: held_invitation_emails)
 
         pe.id
       end

@@ -136,6 +136,28 @@ RSpec.describe "Admin::EventSeries chase links", type: :request do
       expect(listed_count(response.body)).to eq(1)
     end
 
+    # Never emailed, so not chased as "hasn't opened onboarding": the
+    # held-invitations row owns them, and the filters keep the two apart.
+    it "lists held, never-emailed registrations under invitation, not started" do
+      never_sent = create_stalled_at(:waiver, surname: "NeverSent", status: :invited)
+      create(:invitation, event: event, email: never_sent.participant.email, sent_at: nil)
+      sign_in global_admin
+
+      get admin_event_participants_path(event.slug, blocked_on: "started")
+      expect(response.body).to include("NeverOpened")
+      expect(response.body).not_to include("NeverSent")
+      expect(listed_count(response.body)).to eq(1)
+
+      get admin_event_participants_path(event.slug, blocked_on: "invitation")
+      expect(response.body).to include("NeverSent")
+      expect(listed_count(response.body)).to eq(1)
+
+      rows = dashboard.stage_rows.index_by { |row| row[:stage].key }
+      expect(rows[:invitation][:stalled]).to eq(1)
+      expect(rows[:started][:stalled]).to eq(1)
+      expect(dashboard.chase_rows.map { |row| row[:stage].key }).not_to include(:invitation)
+    end
+
     it "keeps people who have not finished onboarding out of the arrival list" do
       sign_in global_admin
 

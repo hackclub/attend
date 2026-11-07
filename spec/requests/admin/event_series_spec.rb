@@ -61,7 +61,11 @@ RSpec.describe "Admin::EventSeries", type: :request do
       expect(response.body).to include("1 event")
       expect(response.body).to include("1 withdrawn")
       # Funnel: the two endpoints, and nothing restating them above.
-      expect(response.body).to include("registered")
+      # The left-hand total counts every active registration, not only those
+      # who opened onboarding, so it is labelled "registered".
+      total_label = Nokogiri::HTML(response.body).css("div").find { |node| node.text.strip == "registered" }
+      expect(total_label).to be_present
+      expect(total_label.previous_element.text.strip).to eq("3")
       expect(response.body).to include("cleared every stage")
       # The KPI strip that repeated all four of these figures is gone.
       expect(response.body).not_to include("fully cleared")
