@@ -153,6 +153,18 @@ RSpec.describe "Onboarding welcome and done screens", type: :request do
       expect(response.body).to include("Bring a laptop!")
     end
 
+    it "leaves the invitation letter off the entry ticket when the series hides it" do
+      series.update!(hide_invitation_letter: true)
+      participant_event.update!(status: :complete, code_of_conduct_accepted_at: Time.current)
+      participant_event.emergency_contacts.create!(name: "Erin", phone: "+14155550100")
+      create(:consent, :signed, participant_event: participant_event)
+
+      get onboarding_done_path(event_id: event.id)
+
+      expect(response.body).to include("ENTRY TICKET", dashboard_download_excuse_letter_path(participant_event))
+      expect(response.body).not_to include(dashboard_download_invitation_letter_path(participant_event))
+    end
+
     it "explains what's left for a minor before the guardian finishes, without a ticket" do
       participant.update!(date_of_birth: 15.years.ago)
       participant_event.update!(status: :awaiting_guardian, code_of_conduct_accepted_at: Time.current)

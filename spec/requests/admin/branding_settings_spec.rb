@@ -64,7 +64,7 @@ RSpec.describe "Admin branding and account linking settings", type: :request do
         expect(series.address_note).to eq("For posting prizes.")
         expect(series.tshirt_note).to eq("Unisex sizing.")
         expect(event.reload.hide_privacy_notes?).to be(true)
-        expect(event.hide_invitation_letter?).to be(true)
+        expect(event.reload.hide_invitation_letter?).to be(true)
         expect(event.reload.account_linking_mode("github")).to eq("required")
         expect(event.account_help_url("github")).to eq("https://example.com/github-howto")
       end

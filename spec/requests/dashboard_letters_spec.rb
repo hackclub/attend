@@ -46,4 +46,18 @@ RSpec.describe "Dashboard letters", type: :request do
     expect(response).to redirect_to(dashboard_event_path(registration))
     expect(flash[:alert]).to eq("This event doesn't offer an invitation letter.")
   end
+
+  [ nil, "0" ].each do |setting|
+    it "offers the invitation letter when the series setting is #{setting.inspect}" do
+      series = create(:event_series, hide_invitation_letter: setting)
+      registration.event.update!(event_series: series)
+
+      get dashboard_event_path(registration)
+      expect(response.body).to include(dashboard_download_invitation_letter_path(registration))
+
+      get dashboard_download_invitation_letter_path(registration)
+      expect(response).to have_http_status(:ok)
+      expect(response.media_type).to eq("application/pdf")
+    end
+  end
 end

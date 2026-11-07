@@ -398,6 +398,8 @@ class DashboardController < ApplicationController
     @participant_event = @participant.participant_events.includes(:event).find(params[:id])
     authorize @participant_event, :show?
 
+    # Checked before completion on purpose: when the series doesn't offer a
+    # letter, saying "once your registration is complete" would promise one.
     if @participant_event.event.hide_invitation_letter?
       redirect_to dashboard_event_path(@participant_event), alert: "This event doesn't offer an invitation letter."
       return
