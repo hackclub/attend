@@ -27,6 +27,34 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(participant["scans_by_context"].sole["scan_count"]).to eq(2)
     end
 
+    it "includes each person's newest invitation link, matching the email in any case" do
+      person = create(:participant, email: "Invited@Example.com")
+      create(:participant_event, participant: person, event: event)
+      create(:participant_event, event: event)
+      create(:invitation, event: event, email: "invited@example.com", token: "older-token",
+        created_at: 2.months.ago, sent_at: 2.months.ago, expires_at: 1.month.ago)
+      create(:invitation, event: event, email: "invited@example.com", token: "newer-token")
+
+      get "/api/v1/events/#{event.id}/participants", headers: auth_headers
+
+      links = JSON.parse(response.body)["participants"].to_h { |p| [ p["email"], p["invite_url"] ] }
+      expect(links[person.email]).to end_with("/onboarding?invite=newer-token")
+      expect(links.except(person.email).values).to eq([ nil ])
+    end
+
+    it "leaves invitation links out for a role that can't see PII" do
+      limited = create(:event_role_assignment, event: event, role: "limited").user
+      person = create(:participant)
+      create(:participant_event, participant: person, event: event)
+      create(:invitation, event: event, email: person.email)
+
+      get "/api/v1/events/#{event.id}/participants",
+        headers: { "Authorization" => "Bearer #{MobileToken.generate_for(limited).token}" }
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)["participants"].sole).not_to have_key("invite_url")
+    end
+
     it "returns canonical and deprecated travel pickup fields" do
       pe = create(:participant_event, event: event)
       context = event.scan_contexts.create!(name: "Station pickup", is_travel_pickup: true)
@@ -319,21 +347,8 @@ RSpec.describe "Api::V1::Participants", type: :request do
         "first_name" => participant.legal_first_name,
         "last_name" => participant.legal_last_name,
         "slack_user_id" => participant.slack_user_id,
-        "status" => pe.status,
-        "invite_url" => nil
+        "status" => pe.status
       )
-    end
-
-    it "includes each person's invitation link, matching the email in any case" do
-      participant = create(:participant, email: "Invited@Example.com")
-      create(:participant_event, participant: participant, event: event)
-      create(:invitation, event: event, email: "invited@example.com", token: "older-token", created_at: 2.months.ago, sent_at: 2.months.ago, expires_at: 1.month.ago)
-      create(:invitation, event: event, email: "invited@example.com", token: "newer-token")
-
-      get "/api/v1/events/#{event.id}/participants/roster", headers: api_key_headers
-
-      entry = JSON.parse(response.body)["participants"].sole
-      expect(entry["invite_url"]).to end_with("/onboarding?invite=newer-token")
     end
 
     it "prefers the preferred name over the legal first name" do
@@ -456,13 +471,24 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(response).to have_http_status(:created)
     end
 
-    it "returns the invitation link the email carries" do
+    it "returns the invitation link to a caller who can see PII" do
       post "/api/v1/events/#{event.id}/participants",
         params: { email: "linked@example.com" }, headers: sign_in_headers_for("event_admin")
 
       expect(response).to have_http_status(:created)
       invitation = event.invitations.find_by!(email: "linked@example.com")
       expect(JSON.parse(response.body)["invite_url"]).to end_with("/onboarding?invite=#{invitation.token}")
+    end
+
+    it "leaves the invitation link out for an event API key" do
+      event_token = EventApiToken.generate_for(event, user: create(:user), name: "integration")
+
+      post "/api/v1/events/#{event.id}/participants",
+        params: { email: "unlinked@example.com" },
+        headers: { "Authorization" => "Bearer #{event_token.token}" }
+
+      expect(response).to have_http_status(:created)
+      expect(JSON.parse(response.body)).not_to have_key("invite_url")
     end
 
     it "puts the invitee on the roster as invited, reusing a person who already exists" do

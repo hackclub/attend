@@ -143,7 +143,8 @@ module Api
             participant_id: participant_event.participant_id,
             participant_event_id: participant_event.id,
             status: participant_event.status,
-            invite_url: AttendUrls.invitation_url(invitation)
+            # Same gate as #participant_json: see #invite_url_for.
+            **(include_pii? ? { invite_url: AttendUrls.invitation_url(invitation) } : {})
           }, status: :created
         rescue ActiveRecord::RecordInvalid => e
           render json: { success: false, error: e.record.errors.full_messages.join(", ") }, status: :unprocessable_entity
@@ -280,15 +281,10 @@ module Api
         participant_events = @event.participant_events
           .where.not(status: [ :withdrawn, :rejected ])
           .includes(:participant)
-        # Someone invited more than once has only one open invitation at a
-        # time, and it is always their newest, so the newest is the link an
-        # email would carry.
-        invitations = @event.invitations.order(:created_at).index_by { |invitation| invitation.email.downcase }
 
         render json: {
           participants: participant_events.map { |pe|
             participant = pe.participant
-            invitation = invitations[participant.email.to_s.downcase]
             {
               # The registration id the invite returned, so a caller can match
               # entries to its own records even after the person changes their
@@ -299,9 +295,7 @@ module Api
               first_name: participant.preferred_name.presence || participant.legal_first_name,
               last_name: participant.legal_last_name,
               slack_user_id: participant.slack_user_id,
-              status: pe.status,
-              # nil for people who registered without an invitation.
-              invite_url: invitation && AttendUrls.invitation_url(invitation)
+              status: pe.status
             }
           },
           synced_at: Time.current.iso8601
@@ -551,6 +545,8 @@ module Api
         data[:travel_outbound] = travel_json(pe.travel_outbound) if pe.travel_outbound
 
         data[:scans_by_context] = scans_by_context_json(pe)
+
+        data[:invite_url] = invite_url_for(participant) if include_pii?
 
         if detailed
           data.merge!(detailed_participant_fields(pe))
@@ -860,6 +856,21 @@ module Api
             }
           end
         end
+      end
+
+      # The person's own onboarding link, from their newest invitation to this
+      # event: someone invited more than once has only one open invitation at
+      # a time, and it is always the newest. nil for people who registered
+      # without one.
+      #
+      # Only for callers who pass #include_pii?. Until the invitation is
+      # accepted, opening the link shows Hack Club Auth's signup form filled in
+      # with the person's date of birth and phone (HackClubAuthPrefill), so the
+      # link is worth exactly what those fields are.
+      def invite_url_for(participant)
+        @invitations_by_email ||= @event.invitations.order(:created_at).index_by { |invitation| invitation.email.downcase }
+        invitation = @invitations_by_email[participant.email.to_s.downcase]
+        invitation && AttendUrls.invitation_url(invitation)
       end
 
       def default_url_host

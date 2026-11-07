@@ -1448,8 +1448,9 @@ paths:
                     example: https://attend.hackclub.com/onboarding?invite=abc123
                     description: >-
                       The onboarding link the invitation email carries, also
-                      returned while the invitation is held. See
-                      `RosterEntry.invite_url`.
+                      returned while the invitation is held. Omitted for API
+                      keys and for callers who can't see participant PII; see
+                      `Participant.invite_url`.
         "409":
           description: Already invited, or already registered for this event.
           content:
@@ -1575,9 +1576,7 @@ paths:
         href: /api-reference/participants/minimal-roster
       description: >-
         Identity-only roster (no sensitive PII), excluding withdrawn and
-        rejected registrations. Available to event API keys. Includes each
-        person's onboarding link, so an integration can backfill links for
-        people it invited before `create` returned them.
+        rejected registrations. Available to event API keys.
       parameters:
         - $ref: "#/components/parameters/EventId"
       responses:
@@ -3771,19 +3770,6 @@ components:
         last_name: { type: string, example: Doe }
         slack_user_id: { type: string, nullable: true }
         status: { $ref: "#/components/schemas/ParticipantStatus" }
-        invite_url:
-          type: string
-          format: uri
-          nullable: true
-          example: https://attend.hackclub.com/onboarding?invite=abc123
-          description: >-
-            The person's own onboarding link, the one their invitation email
-            carries. It starts Hack Club Auth with their email filled in, and
-            for someone without an account it prefills the signup form with
-            what Attend knows about them. It only lets in the Hack Club
-            account with the invited email. After the invitation is used or
-            expired the link still works as "sign in to resume". `null` for
-            people who registered without an invitation.
 
     ScanContext:
       type: object
@@ -4050,6 +4036,20 @@ components:
         travel_outbound:
           nullable: true
           allOf: [{ $ref: "#/components/schemas/Travel" }]
+        invite_url:
+          type: string
+          format: uri
+          nullable: true
+          example: https://attend.hackclub.com/onboarding?invite=abc123
+          description: >-
+            The person's own onboarding link, the one their invitation email
+            carries. It starts Hack Club Auth with their email filled in and
+            only lets in the Hack Club account with that email. After the
+            invitation is used or expired it still works as "sign in to
+            resume". `null` for people who registered without an invitation.
+            Omitted for callers who can't see participant PII, like `phone`:
+            until the invitation is accepted, the link shows Hack Club Auth's
+            signup form prefilled with the person's date of birth and phone.
         allergies:
           type: string
           nullable: true
