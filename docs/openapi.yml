@@ -1442,6 +1442,14 @@ paths:
                     type: string
                     example: invited
                     description: Registration status, `invited` on creation.
+                  invite_url:
+                    type: string
+                    format: uri
+                    example: https://attend.hackclub.com/onboarding?invite=abc123
+                    description: >-
+                      The onboarding link the invitation email carries, also
+                      returned while the invitation is held. See
+                      `RosterEntry.invite_url`.
         "409":
           description: Already invited, or already registered for this event.
           content:
@@ -1567,7 +1575,9 @@ paths:
         href: /api-reference/participants/minimal-roster
       description: >-
         Identity-only roster (no sensitive PII), excluding withdrawn and
-        rejected registrations. Available to event API keys.
+        rejected registrations. Available to event API keys. Includes each
+        person's onboarding link, so an integration can backfill links for
+        people it invited before `create` returned them.
       parameters:
         - $ref: "#/components/parameters/EventId"
       responses:
@@ -3761,6 +3771,19 @@ components:
         last_name: { type: string, example: Doe }
         slack_user_id: { type: string, nullable: true }
         status: { $ref: "#/components/schemas/ParticipantStatus" }
+        invite_url:
+          type: string
+          format: uri
+          nullable: true
+          example: https://attend.hackclub.com/onboarding?invite=abc123
+          description: >-
+            The person's own onboarding link, the one their invitation email
+            carries. It starts Hack Club Auth with their email filled in, and
+            for someone without an account it prefills the signup form with
+            what Attend knows about them. It only lets in the Hack Club
+            account with the invited email. After the invitation is used or
+            expired the link still works as "sign in to resume". `null` for
+            people who registered without an invitation.
 
     ScanContext:
       type: object

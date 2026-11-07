@@ -319,8 +319,21 @@ RSpec.describe "Api::V1::Participants", type: :request do
         "first_name" => participant.legal_first_name,
         "last_name" => participant.legal_last_name,
         "slack_user_id" => participant.slack_user_id,
-        "status" => pe.status
+        "status" => pe.status,
+        "invite_url" => nil
       )
+    end
+
+    it "includes each person's invitation link, matching the email in any case" do
+      participant = create(:participant, email: "Invited@Example.com")
+      create(:participant_event, participant: participant, event: event)
+      create(:invitation, event: event, email: "invited@example.com", token: "older-token", created_at: 2.months.ago, sent_at: 2.months.ago, expires_at: 1.month.ago)
+      create(:invitation, event: event, email: "invited@example.com", token: "newer-token")
+
+      get "/api/v1/events/#{event.id}/participants/roster", headers: api_key_headers
+
+      entry = JSON.parse(response.body)["participants"].sole
+      expect(entry["invite_url"]).to end_with("/onboarding?invite=newer-token")
     end
 
     it "prefers the preferred name over the legal first name" do
@@ -441,6 +454,15 @@ RSpec.describe "Api::V1::Participants", type: :request do
       }.to have_enqueued_mail(ParticipantMailer, :invitation)
 
       expect(response).to have_http_status(:created)
+    end
+
+    it "returns the invitation link the email carries" do
+      post "/api/v1/events/#{event.id}/participants",
+        params: { email: "linked@example.com" }, headers: sign_in_headers_for("event_admin")
+
+      expect(response).to have_http_status(:created)
+      invitation = event.invitations.find_by!(email: "linked@example.com")
+      expect(JSON.parse(response.body)["invite_url"]).to end_with("/onboarding?invite=#{invitation.token}")
     end
 
     it "puts the invitee on the roster as invited, reusing a person who already exists" do

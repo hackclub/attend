@@ -142,7 +142,8 @@ module Api
             event: @event.name,
             participant_id: participant_event.participant_id,
             participant_event_id: participant_event.id,
-            status: participant_event.status
+            status: participant_event.status,
+            invite_url: AttendUrls.invitation_url(invitation)
           }, status: :created
         rescue ActiveRecord::RecordInvalid => e
           render json: { success: false, error: e.record.errors.full_messages.join(", ") }, status: :unprocessable_entity
@@ -279,10 +280,15 @@ module Api
         participant_events = @event.participant_events
           .where.not(status: [ :withdrawn, :rejected ])
           .includes(:participant)
+        # Someone invited more than once has only one open invitation at a
+        # time, and it is always their newest, so the newest is the link an
+        # email would carry.
+        invitations = @event.invitations.order(:created_at).index_by { |invitation| invitation.email.downcase }
 
         render json: {
           participants: participant_events.map { |pe|
             participant = pe.participant
+            invitation = invitations[participant.email.to_s.downcase]
             {
               # The registration id the invite returned, so a caller can match
               # entries to its own records even after the person changes their
@@ -293,7 +299,9 @@ module Api
               first_name: participant.preferred_name.presence || participant.legal_first_name,
               last_name: participant.legal_last_name,
               slack_user_id: participant.slack_user_id,
-              status: pe.status
+              status: pe.status,
+              # nil for people who registered without an invitation.
+              invite_url: invitation && AttendUrls.invitation_url(invitation)
             }
           },
           synced_at: Time.current.iso8601
