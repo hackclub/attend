@@ -27,6 +27,11 @@
 
 <nav class="cs-sidenav-section" aria-label="Admin">
   <%= nav_link.call("All events", admin_root_path, request.path == admin_root_path, :events) %>
+  <%# The person's own courses (not /admin/training, which manages them); the
+      console has no top nav, so this is the only way back to them from here. %>
+  <% if training_nav_visible? %>
+    <%= nav_link.call("My training", training_path, request.path == training_path || request.path.start_with?("#{training_path}/"), :training) %>
+  <% end %>
 </nav>
 
 <% if current_event %>

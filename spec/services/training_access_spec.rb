@@ -26,6 +26,22 @@ RSpec.describe TrainingAccess do
     expect(access.events_for(course)).to eq([ upcoming ])
   end
 
+  it "counts a role at an event that has ended, without naming it as the reason" do
+    ended = create(:event, starts_at: 3.weeks.ago, ends_at: 20.days.ago)
+    create(:event_role_assignment, event: ended, user: user, role: "safeguarding_lead")
+    expect(access.reason(course)).to eq(:event)
+    expect(access.courses).to eq([ course ])
+    expect(access.events_for(course)).to be_empty
+  end
+
+  it "counts a series role through events in the series that have ended" do
+    badge.update!(required_roles: %w[event_admin])
+    series = create(:event_series)
+    create(:event, event_series: series, starts_at: 3.weeks.ago, ends_at: 20.days.ago)
+    SeriesRoleAssignment.create!(user: user, event_series: series, role: "owner")
+    expect(access.reason(course)).to eq(:event)
+  end
+
   it "counts open courses, and lets global admins see everything" do
     course.update!(access: "open")
     expect(access.reason(course)).to eq(:open)

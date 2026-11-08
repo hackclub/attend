@@ -177,13 +177,14 @@ RSpec.describe "Training", type: :request do
       expect(response.body).to include("Required for your role at #{event.name}")
     end
 
-    it "doesn't open through an event that has finished" do
+    it "still opens through an event that has finished, without naming it" do
       other.badge.update!(required_roles: %w[volunteer])
       event = create(:event, starts_at: 2.weeks.ago, ends_at: 13.days.ago)
       create(:event_volunteer, event: event, user: learner)
 
       get training_course_path(other)
-      expect(response).to have_http_status(:forbidden)
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("Required for your role at")
     end
 
     it "lets anyone into an open course" do
