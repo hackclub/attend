@@ -1442,6 +1442,17 @@ paths:
                     type: string
                     example: invited
                     description: Registration status, `invited` on creation.
+                  invite_url:
+                    type: string
+                    format: uri
+                    nullable: true
+                    example: https://attend.hackclub.com/onboarding?invite=abc123
+                    description: >-
+                      The onboarding link the invitation email carries. `null`
+                      while the event holds onboarding invitations (`held` is
+                      `true`): the link isn't shared before the invitation is
+                      sent. Omitted for API keys and for callers who can't see
+                      participant PII; see `Participant.invite_url`.
         "409":
           description: Already invited, or already registered for this event.
           content:
@@ -4027,6 +4038,23 @@ components:
         travel_outbound:
           nullable: true
           allOf: [{ $ref: "#/components/schemas/Travel" }]
+        invite_url:
+          type: string
+          format: uri
+          nullable: true
+          example: https://attend.hackclub.com/onboarding?invite=abc123
+          description: >-
+            The person's own onboarding link, the one their invitation email
+            carries. It starts Hack Club Auth with their email filled in and
+            only lets in the Hack Club account with that email. After the
+            invitation is used or expired it still works as "sign in to
+            resume". `null` when no invitation to this event matches the
+            person's current email: they registered without one, it was
+            revoked, or their email has changed since they were invited. Also
+            `null` while the event holds onboarding invitations and theirs
+            hasn't been sent. Omitted for callers who can't see participant PII, like `phone`:
+            until the invitation is accepted, the link shows Hack Club Auth's
+            signup form prefilled with the person's date of birth and phone.
         allergies:
           type: string
           nullable: true

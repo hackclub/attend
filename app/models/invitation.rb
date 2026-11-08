@@ -87,6 +87,21 @@ class Invitation < ApplicationRecord
     !sent? && !accepted?
   end
 
+  # Held while the event is holding onboarding invitations right now. Narrower
+  # than #held? and the `held` scope, which only mean "not emailed yet and not
+  # accepted": that also covers silent adds on an event that isn't holding,
+  # and invitations whose mail job simply hasn't run yet.
+  #
+  # Sharing the link and accepting it key off this, not #held?: only during an
+  # active hold does accepting do harm, because the release job sends just
+  # unaccepted held invitations and would skip this one's email.
+  #
+  # Reads `event`, so load invitations through `event.invitations` (which sets
+  # the inverse) when checking many at once.
+  def withheld?
+    held? && event.onboarding_invites_held?
+  end
+
   def accept!
     update!(accepted_at: Time.current)
   end

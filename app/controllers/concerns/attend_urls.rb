@@ -69,6 +69,12 @@ module AttendUrls
 
   def ticket_url(ticket) = attend_url(routes.support_ticket_path(ticket))
 
+  # The participant's own way into onboarding, the same link their invitation
+  # email carries. It starts Hack Club Auth with their email (and, for a new
+  # account, the signup form) filled in. Once the invitation is used or
+  # expired it still works as "sign in to resume" for that registration.
+  def invitation_url(invitation) = attend_url(routes.onboarding_path(invite: invitation.token))
+
   # Opt-in only: a participant with no public profile has no shareable profile
   # URL at all, and callers should say so rather than guessing a slug.
   def public_profile_url(participant)

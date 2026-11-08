@@ -27,6 +27,96 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(participant["scans_by_context"].sole["scan_count"]).to eq(2)
     end
 
+    it "includes each person's newest invitation link, matching the email in any case" do
+      person = create(:participant, email: "Invited@Example.com")
+      create(:participant_event, participant: person, event: event)
+      create(:participant_event, event: event)
+      create(:invitation, event: event, email: "invited@example.com", token: "older-token",
+        created_at: 2.months.ago, sent_at: 2.months.ago, expires_at: 1.month.ago)
+      create(:invitation, event: event, email: "invited@example.com", token: "newer-token")
+
+      get "/api/v1/events/#{event.id}/participants", headers: auth_headers
+
+      links = JSON.parse(response.body)["participants"].to_h { |p| [ p["email"], p["invite_url"] ] }
+      expect(links[person.email]).to end_with("/onboarding?invite=newer-token")
+      expect(links.except(person.email).values).to eq([ nil ])
+    end
+
+    it "leaves invitation links out for a role that can't see PII" do
+      limited = create(:event_role_assignment, event: event, role: "limited").user
+      person = create(:participant)
+      create(:participant_event, participant: person, event: event)
+      create(:invitation, event: event, email: person.email)
+
+      get "/api/v1/events/#{event.id}/participants",
+        headers: { "Authorization" => "Bearer #{MobileToken.generate_for(limited).token}" }
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)["participants"].sole).not_to have_key("invite_url")
+    end
+
+    it "withholds the link of an invitation the event is still holding, but not one it has sent" do
+      event.update!(onboarding_invites_held: true)
+      held = create(:participant_event, event: event, status: :invited)
+      create(:invitation, event: event, email: held.participant.email, sent_at: nil)
+      sent = create(:participant_event, event: event, status: :invited)
+      sent_invitation = create(:invitation, event: event, email: sent.participant.email, sent_at: 1.hour.ago)
+
+      get "/api/v1/events/#{event.id}/participants", headers: auth_headers
+
+      links = JSON.parse(response.body)["participants"].to_h { |p| [ p["participant_event_id"], p["invite_url"] ] }
+      expect(links[held.id]).to be_nil
+      expect(links[sent.id]).to end_with("/onboarding?invite=#{sent_invitation.token}")
+    end
+
+    it "returns null once the person's invitation has been revoked" do
+      pe = create(:participant_event, event: event)
+      create(:invitation, event: event, email: pe.participant.email).destroy!
+
+      get "/api/v1/events/#{event.id}/participants", headers: auth_headers
+
+      expect(JSON.parse(response.body)["participants"].sole).to include("invite_url" => nil)
+    end
+
+    it "returns null when the person's email has changed since they were invited" do
+      pe = create(:participant_event, event: event)
+      create(:invitation, event: event, email: pe.participant.email)
+      pe.participant.update!(email: "corrected@example.com")
+
+      get "/api/v1/events/#{event.id}/participants", headers: auth_headers
+
+      expect(JSON.parse(response.body)["participants"].sole).to include("invite_url" => nil)
+    end
+
+    it "looks up invitations for the whole roster in one query, without loading the event per row" do
+      event.update!(onboarding_invites_held: true)
+      invite = -> {
+        pe = create(:participant_event, event: event)
+        create(:invitation, event: event, email: pe.participant.email, sent_at: nil)
+      }
+      count_queries = -> {
+        counts = Hash.new(0)
+        callback = ->(*, payload) {
+          counts[:invitations] += 1 if payload[:sql].include?(%(FROM "invitations"))
+          counts[:events] += 1 if payload[:sql].include?(%(FROM "events"))
+        }
+        ActiveSupport::Notifications.subscribed(callback, "sql.active_record") do
+          get "/api/v1/events/#{event.id}/participants", headers: auth_headers
+        end
+        expect(response).to have_http_status(:ok)
+        counts
+      }
+
+      invite.call
+      one = count_queries.call
+      3.times { invite.call }
+      four = count_queries.call
+
+      expect(four[:invitations]).to eq(1)
+      expect(four[:events]).to eq(one[:events])
+      expect(JSON.parse(response.body)["participants"].pluck("invite_url")).to all(be_nil)
+    end
+
     it "returns canonical and deprecated travel pickup fields" do
       pe = create(:participant_event, event: event)
       context = event.scan_contexts.create!(name: "Station pickup", is_travel_pickup: true)
@@ -95,6 +185,40 @@ RSpec.describe "Api::V1::Participants", type: :request do
 
         expect(response.parsed_body["participants"].sole["participant_event_id"]).to eq(pe.id)
       end
+    end
+  end
+
+  describe "invite_url on single-record and search responses" do
+    let(:person) { create(:participant, email: "single@example.com", legal_first_name: "Sloane") }
+    let!(:participant_event) { create(:participant_event, participant: person, event: event) }
+    let!(:invitation) { create(:invitation, event: event, email: "single@example.com") }
+
+    it "is on show" do
+      get "/api/v1/events/#{event.id}/participants/#{participant_event.id}", headers: auth_headers
+
+      expect(JSON.parse(response.body)["participant"]["invite_url"]).to end_with("/onboarding?invite=#{invitation.token}")
+    end
+
+    it "is on search results" do
+      get "/api/v1/events/#{event.id}/participants/search", params: { q: "sloane" }, headers: auth_headers
+
+      expect(JSON.parse(response.body)["results"].sole["invite_url"]).to end_with("/onboarding?invite=#{invitation.token}")
+    end
+
+    it "is on the update response" do
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        params: { participant: { pronouns: "she/her" } }, headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)["participant"]["invite_url"]).to end_with("/onboarding?invite=#{invitation.token}")
+    end
+
+    it "is the same link the invitation email carries" do
+      mail = ParticipantMailer.invitation(email: invitation.email, event: event)
+      mailed = URI(mail.html_part.body.decoded[%r{https?://[^"\s<]+/onboarding\?invite=[^"\s<&]+}])
+      built = URI(AttendUrls.invitation_url(invitation.reload))
+
+      expect([ built.path, built.query ]).to eq([ mailed.path, mailed.query ])
     end
   end
 
@@ -441,6 +565,38 @@ RSpec.describe "Api::V1::Participants", type: :request do
       }.to have_enqueued_mail(ParticipantMailer, :invitation)
 
       expect(response).to have_http_status(:created)
+    end
+
+    it "returns the invitation link to a caller who can see PII" do
+      post "/api/v1/events/#{event.id}/participants",
+        params: { email: "linked@example.com" }, headers: sign_in_headers_for("event_admin")
+
+      expect(response).to have_http_status(:created)
+      invitation = event.invitations.find_by!(email: "linked@example.com")
+      expect(JSON.parse(response.body)["invite_url"]).to end_with("/onboarding?invite=#{invitation.token}")
+    end
+
+    it "returns a null invitation link while the event holds invitations" do
+      event.update!(onboarding_invites_held: true)
+
+      post "/api/v1/events/#{event.id}/participants",
+        params: { email: "held-link@example.com" }, headers: sign_in_headers_for("event_admin")
+
+      expect(response).to have_http_status(:created)
+      body = JSON.parse(response.body)
+      expect(body["held"]).to be(true)
+      expect(body).to include("invite_url" => nil)
+    end
+
+    it "leaves the invitation link out for an event API key" do
+      event_token = EventApiToken.generate_for(event, user: create(:user), name: "integration")
+
+      post "/api/v1/events/#{event.id}/participants",
+        params: { email: "unlinked@example.com" },
+        headers: { "Authorization" => "Bearer #{event_token.token}" }
+
+      expect(response).to have_http_status(:created)
+      expect(JSON.parse(response.body)).not_to have_key("invite_url")
     end
 
     it "puts the invitee on the roster as invited, reusing a person who already exists" do

@@ -1668,7 +1668,10 @@ class OnboardingController < ApplicationController
 
     set_current_event(invitation.event)
 
-    invitation.accept! unless invitation.accepted?
+    # A withheld invitation opened early stays unaccepted so the release still
+    # emails it (see Invitation#withheld?). The wizard is shut until then
+    # anyway (ParticipantEvent#onboarding_held?).
+    invitation.accept! unless invitation.accepted? || invitation.withheld?
     session.delete(:invitation_token)
   end
 
