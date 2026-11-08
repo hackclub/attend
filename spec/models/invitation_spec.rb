@@ -40,6 +40,27 @@ RSpec.describe Invitation, type: :model do
     end
   end
 
+  describe "#withheld?" do
+    it "is true for a held invitation while its event is holding onboarding invitations" do
+      event = create(:event, onboarding_invites_held: true)
+
+      expect(create(:invitation, event: event, sent_at: nil)).to be_withheld
+    end
+
+    it "is false once the invitation has been sent, even while the event holds" do
+      event = create(:event, onboarding_invites_held: true)
+
+      expect(create(:invitation, event: event, sent_at: 1.hour.ago)).not_to be_withheld
+    end
+
+    it "is false for an unsent invitation on an event that isn't holding" do
+      invitation = create(:invitation, event: create(:event, onboarding_invites_held: false), sent_at: nil)
+
+      expect(invitation).to be_held
+      expect(invitation).not_to be_withheld
+    end
+  end
+
   describe ".issue!" do
     it "records and emails the invitation when the event isn't holding" do
       event = create(:event)

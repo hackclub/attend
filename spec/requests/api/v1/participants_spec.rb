@@ -88,20 +88,33 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(JSON.parse(response.body)["participants"].sole).to include("invite_url" => nil)
     end
 
-    it "looks up invitations for the whole roster in one query" do
-      2.times do
+    it "looks up invitations for the whole roster in one query, without loading the event per row" do
+      event.update!(onboarding_invites_held: true)
+      invite = -> {
         pe = create(:participant_event, event: event)
-        create(:invitation, event: event, email: pe.participant.email)
-      end
+        create(:invitation, event: event, email: pe.participant.email, sent_at: nil)
+      }
+      count_queries = -> {
+        counts = Hash.new(0)
+        callback = ->(*, payload) {
+          counts[:invitations] += 1 if payload[:sql].include?(%(FROM "invitations"))
+          counts[:events] += 1 if payload[:sql].include?(%(FROM "events"))
+        }
+        ActiveSupport::Notifications.subscribed(callback, "sql.active_record") do
+          get "/api/v1/events/#{event.id}/participants", headers: auth_headers
+        end
+        expect(response).to have_http_status(:ok)
+        counts
+      }
 
-      queries = []
-      callback = ->(*, payload) { queries << payload[:sql] if payload[:sql].include?(%("invitations")) }
-      ActiveSupport::Notifications.subscribed(callback, "sql.active_record") do
-        get "/api/v1/events/#{event.id}/participants", headers: auth_headers
-      end
+      invite.call
+      one = count_queries.call
+      3.times { invite.call }
+      four = count_queries.call
 
-      expect(response).to have_http_status(:ok)
-      expect(queries.size).to eq(1)
+      expect(four[:invitations]).to eq(1)
+      expect(four[:events]).to eq(one[:events])
+      expect(JSON.parse(response.body)["participants"].pluck("invite_url")).to all(be_nil)
     end
 
     it "returns canonical and deprecated travel pickup fields" do

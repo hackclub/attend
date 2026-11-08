@@ -1668,13 +1668,10 @@ class OnboardingController < ApplicationController
 
     set_current_event(invitation.event)
 
-    # A held invitation opened before the event releases it (a link shared
-    # early) stays unaccepted, so the release still emails it: the job only
-    # sends `held` invitations. The wizard is shut until then anyway
-    # (ParticipantEvent#onboarding_held?).
-    unless invitation.accepted? || (invitation.held? && invitation.event.onboarding_invites_held?)
-      invitation.accept!
-    end
+    # A withheld invitation opened early stays unaccepted so the release still
+    # emails it (see Invitation#withheld?). The wizard is shut until then
+    # anyway (ParticipantEvent#onboarding_held?).
+    invitation.accept! unless invitation.accepted? || invitation.withheld?
     session.delete(:invitation_token)
   end
 

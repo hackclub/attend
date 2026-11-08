@@ -887,27 +887,27 @@ module Api
 
       # For list responses: one query for the invitations of just the people
       # being serialized, instead of one per person. A no-op for callers who
-      # don't get the link.
+      # don't get the link. Loaded through @event.invitations so each record's
+      # `event` is @event itself (the inverse of has_many :invitations), which
+      # keeps Invitation#withheld? from querying the event once per row.
       def preload_invitations_for(participant_events)
         return unless include_pii?
 
         emails = participant_events.map { |pe| pe.participant.email.to_s.downcase }.uniq
         @invitations_by_email = @event.invitations
           .where("LOWER(invitations.email) IN (?)", emails.presence || [ "" ])
-          .select(:id, :email, :token, :sent_at, :accepted_at, :created_at)
+          .select(:id, :event_id, :email, :token, :sent_at, :accepted_at, :created_at)
           .order(:created_at)
           .index_by { |invitation| invitation.email.downcase }
       end
 
       # While the event holds onboarding invitations, an unsent invitation's
-      # link stays private: the person hasn't been told about the event, and
-      # opening the link before release would accept it, so the release would
-      # skip their email (SendHeldOnboardingInvitesJob only sends `held` ones).
-      # Checked against the event's hold rather than Invitation#held? alone,
-      # because #create answers before the mail job stamps sent_at.
+      # link stays private: the person hasn't been told about the event yet.
+      # Invitation#withheld?, not #held?, because #create answers before the
+      # mail job stamps sent_at.
       def invitation_url_unless_held(invitation)
         return if invitation.nil?
-        return if invitation.held? && @event.onboarding_invites_held?
+        return if invitation.withheld?
 
         AttendUrls.invitation_url(invitation)
       end
