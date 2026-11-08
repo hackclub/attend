@@ -619,4 +619,92 @@ RSpec.describe Message, type: :model do
       expect(plain("just text")).to eq("just text")
     end
   end
+
+  describe "images" do
+    def upload(event_id: event.id, filename: "venue-map.png")
+      ActiveStorage::Blob.create_and_upload!(io: file_fixture("headshot.png").open, filename: filename,
+        metadata: { Message::IMAGE_EVENT_KEY => event_id })
+    end
+
+    def img(blob, alt: "Venue map")
+      %(<img src="#{Rails.application.routes.url_helpers.rails_blob_path(blob, only_path: true)}" alt="#{alt}">)
+    end
+
+    def saved_message(body)
+      message_for("confirmed_attendees").tap { |message| message.update!(body: body) }
+    end
+
+    it "attaches an upload when the body that shows it is saved" do
+      blob = upload
+      message = saved_message("<p>Map:</p>#{img(blob)}")
+
+      expect(message.images.blobs).to eq([ blob ])
+    end
+
+    it "doesn't attach a file that wasn't uploaded for this event's messages" do
+      other_event = upload(event_id: create(:event).id)
+      headshot = ActiveStorage::Blob.create_and_upload!(io: file_fixture("headshot.png").open, filename: "headshot.png")
+      message = saved_message("#{img(other_event)}#{img(headshot)}")
+
+      expect(message.images).not_to be_attached
+      expect(message.body_as_html).not_to include("<img")
+    end
+
+    it "points the email at a resized copy on this app, no wider than the email" do
+      blob = upload
+      blob.analyze
+      message = saved_message("<p>Map:</p>#{img(blob)}")
+
+      tag = Nokogiri::HTML5.fragment(message.body_as_html).at_css("img")
+      expect(tag["src"]).to start_with("http://example.com/rails/active_storage/representations/")
+      expect(tag["alt"]).to eq("Venue map")
+      expect(tag["width"]).to eq("1")
+      expect(tag["style"]).to include("max-width: 100%")
+    end
+
+    it "sends a GIF as it is, so it keeps its animation" do
+      gif = ActiveStorage::Blob.create_and_upload!(io: StringIO.new(Vips::Image.black(4, 4).write_to_buffer(".gif")),
+        filename: "wave.gif", metadata: { Message::IMAGE_EVENT_KEY => event.id })
+      message = saved_message(img(gif))
+
+      expect(Nokogiri::HTML5.fragment(message.body_as_html).at_css("img")["src"])
+        .to start_with("http://example.com/rails/active_storage/blobs/")
+    end
+
+    it "drops images from other sites" do
+      message = saved_message(%(<p>Hi</p><img src="https://tracker.example/pixel.gif">))
+
+      expect(message.body_as_html).to eq("<p>Hi</p>")
+    end
+
+    it "links the image on Slack and its preview, and leaves it out of plain text" do
+      blob = upload
+      message = saved_message("<p>Map:</p>#{img(blob)}")
+
+      expect(message.body_as_slack).to match(%r{<http://example\.com/rails/active_storage/representations/\S+\|Venue map>})
+      expect(message.body_as_plain).to eq("Map:")
+      expect(message.body_as_html(images_as_links: true))
+        .to match(%r{<a href="http://example\.com/rails/active_storage/representations/[^"]+" target="_blank">Venue map</a>})
+    end
+
+    describe "#image_upload_error" do
+      def uploaded(path, content_type)
+        Rack::Test::UploadedFile.new(path, content_type)
+      end
+
+      it "accepts an image it can read" do
+        expect(Message.new.image_upload_error(uploaded(file_fixture("headshot.png"), "image/png"))).to be_nil
+      end
+
+      it "rejects other kinds of file" do
+        expect(Message.new.image_upload_error(uploaded(file_fixture("evidence.txt"), "text/plain")))
+          .to eq("Choose a JPEG, PNG, GIF, or WebP image.")
+      end
+
+      it "rejects a file labelled as an image that isn't one" do
+        expect(Message.new.image_upload_error(uploaded(file_fixture("evidence.txt"), "image/png")))
+          .to start_with("That image could not be read.")
+      end
+    end
+  end
 end

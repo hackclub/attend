@@ -924,7 +924,7 @@
               <span class="text-xs text-(--text-faint) shrink-0"><%= time_ago_in_words(delivery.delivered_at) %> ago</span>
             </div>
             <div class="message-body text-sm text-(--text)">
-              <%= sanitize delivery.message.body_as_html(recipient: @participant_event.participant), tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
+              <%= sanitize delivery.message.body_as_html(recipient: @participant_event.participant), tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote img], attributes: %w[href target rel src alt width style] %>
             </div>
           </div>
         <% end %>

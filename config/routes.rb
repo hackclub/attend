@@ -364,6 +364,9 @@ Rails.application.routes.draw do
         end
       end
       resources :messages do
+        collection do
+          post :upload_image
+        end
         member do
           get :preview
           post :send_now

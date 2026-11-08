@@ -157,15 +157,17 @@
       </div>
 
       <!-- Message Body -->
-      <div data-controller="tinymce">
+      <div data-controller="tinymce" data-tinymce-image-upload-url-value="<%= upload_image_admin_event_messages_path(current_event) %>">
         <%= f.label :body, "Message", class: "block text-sm font-medium text-gray-700 mb-1" %>
         <%= f.text_area :body,
             rows: 10,
             class: "w-full rounded-md border-gray-300  focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2",
             data: { tinymce_target: "editor", action: "input->autosave#debouncedSave" } %>
         <p class="mt-1 text-sm text-gray-500">
-          Use the toolbar for formatting. Links, bold, italic, and lists are supported.
-          Formatting will be adapted for each channel.
+          Use the toolbar for formatting. Links, bold, italic, lists, and images are supported.
+          Formatting will be adapted for each channel: images show in email, on Attend and in the app,
+          are sent as a link on Slack, and are left out of SMS and push. Images must be uploaded here;
+          pictures linked from other sites are left out.
         </p>
         <p class="mt-1 text-sm text-gray-500">
           Personalize with <code>{{first_name}}</code> and <code>{{event_name}}</code>; messages to guardians can also use
