@@ -111,7 +111,7 @@
       <div class="cs-container-header">
         <h2 class="cs-h2">Message body</h2>
       </div>
-      <div class="cs-container-body prose prose-sm max-w-none">
+      <div class="cs-container-body message-body text-sm">
         <%= sanitize @email_log.body, tags: %w[p br a strong em ul ol li h1 h2 h3 h4 h5 h6 span div img], attributes: %w[href class style src alt width height] %>
       </div>
     </section>

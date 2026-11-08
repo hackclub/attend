@@ -1216,3 +1216,66 @@
     color: var(--text-strong);
   }
 }
+
+/* ====================================================================
+ * Broadcast message bodies — the TinyMCE HTML organizers write in the
+ * message composer (p, br, lists, blockquote, links, code).
+ *
+ * Tailwind's preflight zeroes paragraph margins and strips list markers,
+ * and the typography plugin isn't installed (so `prose` is a no-op).
+ * Without this, sent messages render as one run-on block with no bullets.
+ * Colours fall back so it also works where the theme tokens aren't set.
+ * ==================================================================== */
+@layer components {
+  .message-body {
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+  }
+  .message-body > :first-child { margin-top: 0; }
+  .message-body > :last-child { margin-bottom: 0; }
+  .message-body p,
+  .message-body ul,
+  .message-body ol,
+  .message-body blockquote,
+  .message-body pre {
+    margin-block: 0.85em;
+  }
+  .message-body ul { list-style: disc; padding-left: 1.5em; }
+  .message-body ol { list-style: decimal; padding-left: 1.5em; }
+  .message-body ul ul { list-style: circle; }
+  .message-body li { margin-block: 0.25em; }
+  .message-body li > ul,
+  .message-body li > ol { margin-block: 0.25em; }
+  .message-body li > p { margin-block: 0; }
+  .message-body strong,
+  .message-body b { font-weight: 600; }
+  .message-body em,
+  .message-body i { font-style: italic; }
+  .message-body u { text-decoration: underline; }
+  .message-body s,
+  .message-body strike { text-decoration: line-through; }
+  .message-body a {
+    color: var(--text-link, #ec3750);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .message-body blockquote {
+    border-left: 3px solid var(--border-strong, #d1d5db);
+    padding-left: 1em;
+    color: var(--text-muted, inherit);
+  }
+  .message-body code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.9em;
+    padding: 0.1em 0.3em;
+    border-radius: 4px;
+    background: var(--bg-sunken, rgba(0, 0, 0, 0.05));
+  }
+  .message-body pre {
+    padding: 0.75em 1em;
+    border-radius: 6px;
+    overflow-x: auto;
+    background: var(--bg-sunken, rgba(0, 0, 0, 0.05));
+  }
+  .message-body pre code { padding: 0; background: none; }
+}

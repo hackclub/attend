@@ -60,7 +60,7 @@ class SingleDeliveryJob < ApplicationJob
     event = delivery.event
     title = event.name.presence || "Event update"
     message = delivery.message
-    body = message.subject_for(delivery.recipient) || message.body_as_plain(recipient: delivery.recipient).truncate(140)
+    body = message.subject_for(delivery.recipient) || message.body_as_plain(recipient: delivery.recipient).squish.truncate(140)
 
     ExpoPushService.send_notification(
       tokens: tokens,

@@ -48,7 +48,7 @@
 
     <!-- Body -->
     <div class="p-6 sm:p-8">
-      <div class="prose prose-lg max-w-none text-(--text)">
+      <div class="message-body text-lg text-(--text)">
         <%= sanitize @message.body_as_html(recipient: @participant), tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote hr], attributes: %w[href target rel] %>
       </div>
     </div>

@@ -39,7 +39,7 @@
         </dl>
         <dl>
           <dt class="cs-kv-label">Message</dt>
-          <dd class="cs-kv-value prose prose-sm max-w-none"><%= @slack_blast.message_as_html.html_safe %></dd>
+          <dd class="cs-kv-value message-body text-sm"><%= sanitize @slack_blast.message_as_html, tags: %w[p br strong b em i u s strike a ul ol li blockquote code pre], attributes: %w[href target] %></dd>
         </dl>
       </div>
     </section>
