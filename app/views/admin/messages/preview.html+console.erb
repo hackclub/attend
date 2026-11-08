@@ -86,7 +86,7 @@
           </div>
         </div>
         <div class="cs-container-body">
-          <div class="prose prose-sm max-w-none">
+          <div class="message-body text-sm">
             <%= sanitize @message.body_as_html(recipient: @preview_recipient), tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
           </div>
         </div>
@@ -102,7 +102,7 @@
           <%# A mock of a phone's message bubble. %>
           <% sms_text = @message.body_as_plain(recipient: @preview_recipient) %>
           <div class="max-w-xs">
-            <div class="bg-green-500 text-white rounded-2xl rounded-bl-sm px-4 py-2 text-sm">
+            <div class="bg-green-500 text-white rounded-2xl rounded-bl-sm px-4 py-2 text-sm whitespace-pre-line">
               <%= sms_text %>
             </div>
             <p class="cs-small cs-muted mt-2 text-right">

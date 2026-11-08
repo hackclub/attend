@@ -288,9 +288,11 @@ class Message < ApplicationRecord
   # (rather than strip_tags + CGI.unescapeHTML) decodes every entity the editor
   # writes, including named ones like &nbsp; and &hellip;, so "Q&A" doesn't go
   # out as "Q&amp;A" and a double space doesn't go out as "&nbsp;".
+  #
+  # Keeps the structure organizers wrote — paragraphs, line breaks and list
+  # bullets — instead of flattening everything onto one line.
   def body_as_plain(recipient: nil)
-    text = Nokogiri::HTML5.fragment(body.to_s).text
-    personalize(text.gsub(/[[:space:]]+/, " ").strip, recipient)
+    personalize(html_to_plain(body.to_s), recipient)
   end
 
   def subject_for(recipient)
@@ -414,6 +416,63 @@ class Message < ApplicationRecord
 
     reachable_ids = conditions.reduce(:or).select(:id)
     guardian_audience? ? scope.where(id: reachable_ids) : scope.where(participant_id: reachable_ids)
+  end
+
+  def html_to_plain(html)
+    return "" if html.blank?
+
+    text = convert_node_to_plain(Nokogiri::HTML5.fragment(html))
+    # Collapsed source whitespace between block tags leaves a single stray
+    # space at line starts; nested-list indents are two spaces, so they stay.
+    text.lines.map { |line| line.rstrip.sub(/\A (?=\S)/, "") }.join("\n")
+        .gsub(/\n{3,}/, "\n\n").strip
+  end
+
+  def convert_node_to_plain(node, depth: 0, preformatted: false)
+    node.children.map do |child|
+      if child.text?
+        preformatted ? child.text : child.text.gsub(/[[:space:]]+/, " ")
+      elsif child.element?
+        convert_element_to_plain(child, depth: depth, preformatted: preformatted)
+      else
+        ""
+      end
+    end.join
+  end
+
+  def convert_element_to_plain(element, depth:, preformatted:)
+    case element.name.downcase
+    when "br"
+      "\n"
+    when "p", "div", "blockquote", "h1", "h2", "h3", "h4"
+      "\n\n#{convert_node_to_plain(element, depth: depth).strip}\n\n"
+    when "pre"
+      "\n\n#{convert_node_to_plain(element, depth: depth, preformatted: true).strip}\n\n"
+    when "ul", "ol"
+      convert_list_to_plain(element, ordered: element.name.downcase == "ol", depth: depth)
+    when "a"
+      label = convert_node_to_plain(element, depth: depth, preformatted: preformatted).strip
+      href = element["href"].to_s.strip
+      if href.blank? || label == href || label == href.delete_prefix("mailto:")
+        label.presence || href
+      else
+        "#{label} (#{href})"
+      end
+    else
+      convert_node_to_plain(element, depth: depth, preformatted: preformatted)
+    end
+  end
+
+  def convert_list_to_plain(list, ordered:, depth:)
+    indent = "  " * depth
+    items = list.element_children.select { |c| c.name.downcase == "li" }
+    lines = items.each_with_index.map do |item, index|
+      marker = ordered ? "#{index + 1}." : "•"
+      content = convert_node_to_plain(item, depth: depth + 1).strip.gsub(/\n{2,}/, "\n")
+      "#{indent}#{marker} #{content}"
+    end
+
+    depth.zero? ? "\n\n#{lines.join("\n")}\n\n" : "\n#{lines.join("\n")}"
   end
 
   def html_to_slack_markdown(html)

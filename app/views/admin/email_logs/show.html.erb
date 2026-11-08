@@ -105,7 +105,7 @@
       <div class="px-6 py-4 border-b border-gray-200">
         <h2 class="text-lg font-medium text-gray-900">Message Body</h2>
       </div>
-      <div class="px-6 py-4 prose prose-sm max-w-none">
+      <div class="px-6 py-4 message-body text-sm">
         <%= sanitize @email_log.body, tags: %w[p br a strong em ul ol li h1 h2 h3 h4 h5 h6 span div img], attributes: %w[href class style src alt width height] %>
       </div>
     </div>

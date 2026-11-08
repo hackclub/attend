@@ -587,4 +587,36 @@ RSpec.describe Message, type: :model do
       end
     end
   end
+
+  describe "#body_as_plain" do
+    def plain(html)
+      Message.new(body: html).body_as_plain
+    end
+
+    it "keeps paragraphs apart and line breaks intact" do
+      expect(plain("<p>Doors open at 9.</p>\n<p>See you there.<br>Bring snacks.</p>"))
+        .to eq("Doors open at 9.\n\nSee you there.\nBring snacks.")
+    end
+
+    it "renders bullet and numbered lists, including nested ones" do
+      html = "<p>Bring:</p>\n<ul>\n<li>A laptop</li>\n<li>ID\n<ul><li>passport works</li></ul></li>\n</ul>" \
+             "<ol><li>first</li><li>second</li></ol>"
+
+      expect(plain(html)).to eq("Bring:\n\n• A laptop\n• ID\n  • passport works\n\n1. first\n2. second")
+    end
+
+    it "spells out link targets and decodes entities" do
+      expect(plain('<p>Read <a href="https://example.com/faq">the FAQ</a> &amp; reply</p>'))
+        .to eq("Read the FAQ (https://example.com/faq) & reply")
+    end
+
+    it "doesn't repeat a link whose text is already the URL" do
+      expect(plain('<a href="https://example.com">https://example.com</a>')).to eq("https://example.com")
+    end
+
+    it "handles blank and tagless bodies" do
+      expect(plain("")).to eq("")
+      expect(plain("just text")).to eq("just text")
+    end
+  end
 end
