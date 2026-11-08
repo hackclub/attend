@@ -51,7 +51,7 @@ class SeriesDashboard
   STAGES = [
     Stage.new(key: :invitation, label: "Invitation", chase: "haven't been sent their invitation yet",
               filter: { blocked_on: "invitation" }),
-    Stage.new(key: :started, label: "Started", chase: "haven't opened their onboarding yet",
+    Stage.new(key: :started, label: "Sign in", chase: "haven't signed in to start onboarding yet",
               filter: { blocked_on: "started" }),
     Stage.new(key: :profile, label: "Profile", chase: "haven't finished their own details",
               filter: { blocked_on: "profile" }),

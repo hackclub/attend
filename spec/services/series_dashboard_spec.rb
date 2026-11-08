@@ -74,6 +74,8 @@ RSpec.describe SeriesDashboard do
       started = rows.first
 
       expect(started[:stage].key).to eq(:started)
+      expect(started[:stage].label).to eq("Sign in")
+      expect(started[:stage].chase_for(1)).to eq("hasn't signed in to start onboarding yet")
       expect(started[:stalled]).to eq(1)
       expect(started[:applicable]).to eq(2)
       # The in-progress registration is stuck at exactly one later stage.

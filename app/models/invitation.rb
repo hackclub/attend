@@ -23,6 +23,7 @@ class Invitation < ApplicationRecord
   scope :pending, -> { where(accepted_at: nil).where("invitations.sent_at IS NULL OR invitations.expires_at > ?", Time.current) }
   # Recorded but never emailed — the participant doesn't know about the event
   # yet. Released in bulk by SendHeldOnboardingInvitesJob.
+  # Means "not emailed yet and not accepted" (silent adds and invitations whose mail job hasn't run included), not "the event is holding invitations right now" (Event#onboarding_invites_held?).
   scope :held, -> { where(sent_at: nil, accepted_at: nil) }
   scope :sent, -> { where.not(sent_at: nil) }
   scope :for_email, ->(email) { where("LOWER(email) = ?", email.downcase) }
