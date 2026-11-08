@@ -392,10 +392,16 @@ class DashboardController < ApplicationController
   end
 
   # For a border crossed without a visa. It says they've been invited, so
-  # only once their registration is complete, as the entry ticket is.
+  # only once their registration is complete, as the entry ticket is, and
+  # only for series that hand one out.
   def download_invitation_letter
     @participant_event = @participant.participant_events.includes(:event).find(params[:id])
     authorize @participant_event, :show?
+
+    if @participant_event.event.hide_invitation_letter?
+      redirect_to dashboard_event_path(@participant_event), alert: "This event doesn't offer an invitation letter."
+      return
+    end
 
     unless RegistrationCompletionPresenter.new(@participant_event, viewer: :participant).confirmed?
       redirect_to dashboard_path, alert: "Your invitation letter is available once your registration is complete."
