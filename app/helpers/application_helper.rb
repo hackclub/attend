@@ -159,6 +159,7 @@ def admin_tool(class_name = "", element = "div", **options, &block)
     "Costa Rica",
     "Croatia",
     "Cuba",
+    "Curaçao",
     "Cyprus",
     "Czech Republic",
     "Denmark",

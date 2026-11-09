@@ -50,7 +50,7 @@ class LandingStats
   KNOWN_COUNTRIES = (ApplicationHelper::COUNTRIES.without("---") + [
     "Hong Kong", "Macau", "Puerto Rico", "Guam", "Bermuda", "Cayman Islands", "Anguilla",
     "Gibraltar", "Greenland", "Faroe Islands", "Isle of Man", "Jersey", "Guernsey",
-    "Aruba", "Curaçao", "Réunion", "French Polynesia", "New Caledonia",
+    "Aruba", "Réunion", "French Polynesia", "New Caledonia",
     "British Virgin Islands", "U.S. Virgin Islands", "Turks and Caicos Islands", "Montserrat"
   ]).to_set.freeze
 
