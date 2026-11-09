@@ -34,6 +34,10 @@ module Bans
     # then expires in Attend at that moment. A temp ban without a date is
     # ignored rather than mirrored as indefinite, and one already served is
     # not mirrored as an expired row.
+    #
+    # A perma ban with an "Action Until" date ends then too, the same way. One
+    # without a date (or with a date that won't parse) stays indefinite, so a
+    # typo in the field never lifts a ban.
     TEMP_SEGMENT = /\A\s*temp(orary)?\s+ban/i
     EXCLUDED_STATUSES = %w[removed].freeze
 
@@ -51,7 +55,7 @@ module Bans
     Result = Struct.new(:added, :reinstated, :revoked, :unchanged, :cases_without_identity, keyword_init: true)
 
     # cases: [{ id:, record_id:, until: }]. expires_at is nil while any case is
-    # indefinite; otherwise the latest temp ban end.
+    # indefinite; otherwise the latest case end.
     Person = Struct.new(:emails, :slack_ids, :cases, keyword_init: true) do
       # Stable while the person keeps any email; Slack-only people key on their ID.
       def key = emails.min || "slack:#{slack_ids.min}"
@@ -64,20 +68,17 @@ module Bans
       return false if EXCLUDED_STATUSES.include?(fields[STATUS_FIELD].to_s.downcase)
 
       segments = fields[ACTION_FIELD].to_s.split(",")
-      return true if segments.any? { |segment| segment.match?(PERMA_SEGMENT) || segment.match?(BAN_SEGMENT) }
-
-      return false unless segments.any? { |segment| segment.match?(TEMP_SEGMENT) }
+      perma = segments.any? { |segment| segment.match?(PERMA_SEGMENT) || segment.match?(BAN_SEGMENT) }
+      return false unless perma || segments.any? { |segment| segment.match?(TEMP_SEGMENT) }
 
       until_at = action_until(fields)
-      until_at.present? && until_at.future?
+      until_at.nil? ? perma : until_at.future?
     end
 
-    # When a temp ban ends, or nil for an indefinite one (or a temp ban whose
-    # date won't parse, which then doesn't qualify). A date with no time
-    # means the whole of that day, so it ends at the end of it.
+    # When the ban ends, or nil when the case gives no date that parses: an
+    # indefinite perma ban, or a temp ban that then doesn't qualify. A date
+    # with no time means the whole of that day, so it ends at the end of it.
     def self.action_until(fields)
-      return nil if fields[ACTION_FIELD].to_s.split(",").any? { |segment| segment.match?(PERMA_SEGMENT) || segment.match?(BAN_SEGMENT) }
-
       raw = fields[UNTIL_FIELD].to_s.strip
       return nil if raw.blank?
 
