@@ -567,4 +567,34 @@ RSpec.describe ParticipantEvent, type: :model do
         .to have_enqueued_job(InviteToEventSlackChannelJob).with(pe.id)
     end
   end
+
+  # .onboarding_held_in is the SQL form of #onboarding_held?; the participant
+  # list filters with one and the dashboard counts with the other.
+  describe ".onboarding_held_in" do
+    let(:event) { create(:event, onboarding_invites_held: true) }
+
+    it "selects exactly the registrations #onboarding_held? is true for" do
+      no_row = create(:participant_event, event: event, status: :invited)
+      emailed = create(:participant_event, event: event, status: :invited)
+      create(:invitation, event: event, email: emailed.participant.email.upcase, sent_at: 1.day.ago)
+      held_row = create(:participant_event, event: event, status: :invited)
+      create(:invitation, event: event, email: held_row.participant.email, sent_at: nil)
+      create(:participant_event, event: event, status: :in_progress)
+
+      sent = Invitation.sent_emails_by_event([ event ]).fetch(event.id, Set.new)
+      in_ruby = event.participant_events.select { |pe| pe.onboarding_held? }
+      batched = event.participant_events.select { |pe| pe.onboarding_held?(sent_emails: sent) }
+
+      expect(described_class.onboarding_held_in(event)).to match_array(in_ruby)
+      expect(batched).to match_array(in_ruby)
+      expect(in_ruby).to contain_exactly(no_row, held_row)
+    end
+
+    it "is empty when the event is not holding invitations" do
+      event.update!(onboarding_invites_held: false)
+      create(:participant_event, event: event, status: :invited)
+
+      expect(described_class.onboarding_held_in(event)).to be_empty
+    end
+  end
 end

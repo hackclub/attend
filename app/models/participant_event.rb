@@ -200,11 +200,32 @@ class ParticipantEvent < ApplicationRecord
   # out, they haven't been told about the event, so the wizard stays shut even
   # if they find the event on their dashboard. A staff member sending their
   # invitation individually opens it for them.
-  def onboarding_held?
+  #
+  # This is the one definition of "held" for a registration: the series
+  # dashboard's `invitation` stage and the participant list's
+  # `blocked_on=invitation` filter both read it, so nobody is chased to sign in
+  # to a wizard that would turn them away. Pass `sent_emails` (from
+  # Invitation.sent_emails_by_event) to check a list without a query per row;
+  # .onboarding_held_in is the SQL form, kept next to this so the two move
+  # together.
+  def onboarding_held?(sent_emails: nil)
     return false unless invited?
     return false unless event.onboarding_invites_held?
 
-    !event.invitations.sent.for_email(participant.email).exists?
+    if sent_emails
+      !sent_emails.include?(participant.email.to_s.downcase)
+    else
+      !event.invitations.sent.for_email(participant.email).exists?
+    end
+  end
+
+  # The registrations at `event` for which #onboarding_held? is true, in SQL.
+  def self.onboarding_held_in(event)
+    return none unless event.onboarding_invites_held?
+
+    emailed = Participant.where("LOWER(participants.email) IN (?)",
+                                event.invitations.sent.select("LOWER(invitations.email)")).select(:id)
+    where(event: event, status: :invited).where.not(participant_id: emailed)
   end
 
   def awaiting_guardian_completion?

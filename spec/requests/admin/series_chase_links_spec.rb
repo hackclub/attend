@@ -139,8 +139,13 @@ RSpec.describe "Admin::EventSeries chase links", type: :request do
     # Never emailed, so not chased as "hasn't opened onboarding": the
     # held-invitations row owns them, and the filters keep the two apart.
     it "lists held, never-emailed registrations under invitation, not started" do
+      event.update!(onboarding_invites_held: true)
+      # Emailed before the hold went on, so the wizard is open to them.
+      never_opened = Participant.find_by!(legal_last_name: "NeverOpened")
+      create(:invitation, event: event, email: never_opened.email, sent_at: 2.days.ago)
+      # The onboarding gate shuts this one out; no invitation row needed.
       never_sent = create_stalled_at(:waiver, surname: "NeverSent", status: :invited)
-      create(:invitation, event: event, email: never_sent.participant.email, sent_at: nil)
+      expect(never_sent.onboarding_held?).to be(true)
       sign_in global_admin
 
       get admin_event_participants_path(event.slug, blocked_on: "started")
