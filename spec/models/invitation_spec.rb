@@ -127,4 +127,88 @@ RSpec.describe Invitation, type: :model do
       expect(build(:invitation, email: "banned@example.com")).to be_valid
     end
   end
+
+  describe ".follow_email_change!" do
+    let(:event) { create(:event) }
+    let(:participant) { create(:participant, email: "Fern.Old@example.com") }
+
+    def change_email!
+      participant.update!(email: "fern.new@example.com")
+    end
+
+    before { create(:participant_event, event: event, participant: participant) }
+
+    it "moves held and sent unaccepted invitations to the new address" do
+      held = create(:invitation, event: event, email: "fern.old@example.com", sent_at: nil)
+      other_event = create(:event)
+      create(:participant_event, event: other_event, participant: participant)
+      sent = create(:invitation, event: other_event, email: "fern.old@example.com", sent_at: 1.day.ago)
+      token = sent.token
+
+      change_email!
+
+      expect(held.reload.email).to eq("fern.new@example.com")
+      expect(sent.reload.email).to eq("fern.new@example.com")
+      expect(sent.token).to eq(token)
+    end
+
+    # An edit made from one event must not redirect another event's invitation.
+    it "leaves invitations for events the participant isn't registered at" do
+      elsewhere = create(:invitation, event: create(:event), email: "fern.old@example.com", sent_at: nil)
+
+      change_email!
+
+      expect(elsewhere.reload.email).to eq("fern.old@example.com")
+    end
+
+    it "leaves accepted invitations where they were sent" do
+      accepted = create(:invitation, :accepted, event: event, email: "fern.old@example.com", sent_at: 2.days.ago)
+
+      change_email!
+
+      expect(accepted.reload.email).to eq("fern.old@example.com")
+    end
+
+    it "drops the old invitation when the new address already has one for the event" do
+      old = create(:invitation, event: event, email: "fern.old@example.com", sent_at: nil)
+      existing = create(:invitation, event: event, email: "fern.new@example.com", sent_at: nil)
+
+      change_email!
+
+      expect(Invitation.exists?(old.id)).to be(false)
+      expect(event.invitations.held.pluck(:id)).to eq([ existing.id ])
+    end
+
+    it "ignores a change of case" do
+      invitation = create(:invitation, event: event, email: "fern.old@example.com", sent_at: nil)
+
+      participant.update!(email: "FERN.OLD@example.com")
+
+      expect(invitation.reload.email).to eq("fern.old@example.com")
+    end
+
+    # Duplicate participant rows can share an address; the invitation may be
+    # the other row's.
+    it "moves nothing while another participant still has the old address" do
+      participant
+      create(:participant, email: "fern.old@example.com")
+      invitation = create(:invitation, event: event, email: "fern.old@example.com", sent_at: nil)
+
+      change_email!
+
+      expect(invitation.reload.email).to eq("fern.old@example.com")
+    end
+
+    it "keeps the release job and the onboarding gate on the participant's address" do
+      event.update!(onboarding_invites_held: true)
+      pe = participant.participant_events.sole
+      pe.update!(status: :invited)
+      create(:invitation, event: event, email: "fern.old@example.com", sent_at: nil)
+
+      change_email!
+
+      expect(event.invitations.held.pluck(:email)).to eq([ "fern.new@example.com" ])
+      expect(pe.reload.onboarding_held?).to be(true)
+    end
+  end
 end

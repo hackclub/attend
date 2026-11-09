@@ -105,6 +105,9 @@ class Participant < ApplicationRecord
   before_validation :normalize_public_profile_slug
   before_validation :generate_public_profile_slug, if: -> { public_profile_enabled? && public_profile_slug.blank? }
   after_update_commit :touch_participant_events
+  # Runs on the HCA sign-in sync too: that saves with validate: false, which
+  # still fires commit callbacks. See Invitation.follow_email_change!.
+  after_update_commit :move_invitations_to_new_email, if: :saved_change_to_email?
   # Sign-in sync from Hack Club Auth, Slack OAuth and CSV import all land here.
   after_update_commit :invite_to_slack_channels, if: -> { saved_change_to_slack_user_id? && slack_user_id.present? }
 
@@ -336,6 +339,11 @@ class Participant < ApplicationRecord
     participant_events.complete.joins(:event).where.not(events: { slack_channel_id: [ nil, "" ] }).pluck(:id).each do |participant_event_id|
       InviteToEventSlackChannelJob.perform_later(participant_event_id)
     end
+  end
+
+  def move_invitations_to_new_email
+    from, to = saved_change_to_email
+    Invitation.follow_email_change!(from: from, to: to, event_ids: participant_events.pluck(:event_id))
   end
 
   def email_differs_from_guardians
