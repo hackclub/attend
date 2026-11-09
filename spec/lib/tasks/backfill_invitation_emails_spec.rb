@@ -12,6 +12,7 @@ RSpec.describe "backfill:invitation_emails" do
   before do
     # The change paper_trail recorded, then the invitation put back where it
     # sat before invitations followed email changes.
+    create(:participant_event, event: event, participant: participant)
     participant.update!(email: "wren.new@example.com")
     left_behind.update_column(:email, "wren.old@example.com")
   end

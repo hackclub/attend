@@ -136,9 +136,13 @@ RSpec.describe Invitation, type: :model do
       participant.update!(email: "fern.new@example.com")
     end
 
+    before { create(:participant_event, event: event, participant: participant) }
+
     it "moves held and sent unaccepted invitations to the new address" do
       held = create(:invitation, event: event, email: "fern.old@example.com", sent_at: nil)
-      sent = create(:invitation, event: create(:event), email: "fern.old@example.com", sent_at: 1.day.ago)
+      other_event = create(:event)
+      create(:participant_event, event: other_event, participant: participant)
+      sent = create(:invitation, event: other_event, email: "fern.old@example.com", sent_at: 1.day.ago)
       token = sent.token
 
       change_email!
@@ -146,6 +150,15 @@ RSpec.describe Invitation, type: :model do
       expect(held.reload.email).to eq("fern.new@example.com")
       expect(sent.reload.email).to eq("fern.new@example.com")
       expect(sent.token).to eq(token)
+    end
+
+    # An edit made from one event must not redirect another event's invitation.
+    it "leaves invitations for events the participant isn't registered at" do
+      elsewhere = create(:invitation, event: create(:event), email: "fern.old@example.com", sent_at: nil)
+
+      change_email!
+
+      expect(elsewhere.reload.email).to eq("fern.old@example.com")
     end
 
     it "leaves accepted invitations where they were sent" do
@@ -188,7 +201,8 @@ RSpec.describe Invitation, type: :model do
 
     it "keeps the release job and the onboarding gate on the participant's address" do
       event.update!(onboarding_invites_held: true)
-      pe = create(:participant_event, event: event, participant: participant, status: :invited)
+      pe = participant.participant_events.sole
+      pe.update!(status: :invited)
       create(:invitation, event: event, email: "fern.old@example.com", sent_at: nil)
 
       change_email!

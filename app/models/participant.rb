@@ -343,7 +343,7 @@ class Participant < ApplicationRecord
 
   def move_invitations_to_new_email
     from, to = saved_change_to_email
-    Invitation.follow_email_change!(from: from, to: to)
+    Invitation.follow_email_change!(from: from, to: to, event_ids: participant_events.pluck(:event_id))
   end
 
   def email_differs_from_guardians

@@ -22,15 +22,19 @@ namespace :backfill do
         &.item_id
       participant = participant_id && Participant.find_by(id: participant_id)
 
-      ids = orphaned.for_email(address).pluck(:id)
       unless participant
-        untraced += ids.size
+        untraced += orphaned.for_email(address).count
         next
       end
 
+      # Only their own events' invitations, as Invitation.follow_email_change! says.
+      event_ids = participant.participant_events.pluck(:event_id)
+      ids = orphaned.for_email(address).where(event_id: event_ids).pluck(:id)
+      next if ids.empty?
+
       moved += ids.size
       puts "invitations #{ids.join(", ")} -> participant #{participant.id}"
-      Invitation.follow_email_change!(from: address, to: participant.email) if apply
+      Invitation.follow_email_change!(from: address, to: participant.email, event_ids: event_ids) if apply
     end
 
     puts "\n#{apply ? "Moved" : "Would move"} #{moved} invitation(s); left #{untraced} with no recorded email change alone."

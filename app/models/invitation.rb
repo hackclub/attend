@@ -124,16 +124,21 @@ class Invitation < ApplicationRecord
   # on the old one is mailed to the wrong inbox and invisible to the person it
   # was for. Accepted invitations stay as the record of where they went.
   #
+  # Only invitations for `event_ids` — the events the participant is registered
+  # at — move. An invitation to any other event was addressed to an inbox, not
+  # to this person, and an email edit made from one event must not redirect
+  # another event's invitations.
+  #
   # Where the new address already has a pending invitation for the same event,
   # the old one is dropped rather than leaving two. Nothing moves while another
   # participant still uses the old address: those invitations may be theirs.
-  def self.follow_email_change!(from:, to:)
+  def self.follow_email_change!(from:, to:, event_ids:)
     old_address = from.to_s.strip.downcase
     new_address = to.to_s.strip.downcase
     return if old_address.blank? || new_address.blank? || old_address == new_address
     return if Participant.where("LOWER(email) = ?", old_address).exists?
 
-    where(accepted_at: nil).for_email(old_address).find_each do |invitation|
+    where(accepted_at: nil, event_id: event_ids).for_email(old_address).find_each do |invitation|
       if pending.where(event_id: invitation.event_id).for_email(new_address).where.not(id: invitation.id).exists?
         invitation.destroy!
       else
