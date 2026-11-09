@@ -116,6 +116,32 @@ class Invitation < ApplicationRecord
     update!(attrs)
   end
 
+  # A participant's address changed (Hack Club Auth sync, an admin edit, a
+  # corrected import address). Every invitation path matches on the address —
+  # the held-invitation release emails it, ParticipantEvent#onboarding_held?
+  # and Participant#pending_invitations look it up, and the landing page
+  # compares it with the signed-in account — so an unaccepted invitation left
+  # on the old one is mailed to the wrong inbox and invisible to the person it
+  # was for. Accepted invitations stay as the record of where they went.
+  #
+  # Where the new address already has a pending invitation for the same event,
+  # the old one is dropped rather than leaving two. Nothing moves while another
+  # participant still uses the old address: those invitations may be theirs.
+  def self.follow_email_change!(from:, to:)
+    old_address = from.to_s.strip.downcase
+    new_address = to.to_s.strip.downcase
+    return if old_address.blank? || new_address.blank? || old_address == new_address
+    return if Participant.where("LOWER(email) = ?", old_address).exists?
+
+    where(accepted_at: nil).for_email(old_address).find_each do |invitation|
+      if pending.where(event_id: invitation.event_id).for_email(new_address).where.not(id: invitation.id).exists?
+        invitation.destroy!
+      else
+        invitation.update!(email: new_address)
+      end
+    end
+  end
+
   private
 
   def normalize_email

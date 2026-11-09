@@ -167,6 +167,15 @@ RSpec.describe User, type: :model do
       expect(participant.reload.email).to eq("new@example.com")
     end
 
+# The release job would otherwise mail the address the person just left.
+it "moves the participant's held invitation to the new address" do
+  invitation = create(:invitation, email: "old@example.com", sent_at: nil)
+
+  user.sync_email_to_participant
+
+  expect(invitation.reload.email).to eq("new@example.com")
+end
+
     it "does nothing when there is no linked participant" do
       participant.destroy!
       expect { user.reload.sync_email_to_participant }.not_to raise_error

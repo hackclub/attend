@@ -78,14 +78,16 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(JSON.parse(response.body)["participants"].sole).to include("invite_url" => nil)
     end
 
-    it "returns null when the person's email has changed since they were invited" do
+    # The invitation follows the address (Invitation.follow_email_change!), so
+    # the link survives a corrected email instead of going null.
+    it "keeps the link when the person's email has changed since they were invited" do
       pe = create(:participant_event, event: event)
-      create(:invitation, event: event, email: pe.participant.email)
+      invitation = create(:invitation, event: event, email: pe.participant.email)
       pe.participant.update!(email: "corrected@example.com")
 
       get "/api/v1/events/#{event.id}/participants", headers: auth_headers
 
-      expect(JSON.parse(response.body)["participants"].sole).to include("invite_url" => nil)
+      expect(JSON.parse(response.body)["participants"].sole["invite_url"]).to end_with("/onboarding?invite=#{invitation.token}")
     end
 
     it "looks up invitations for the whole roster in one query, without loading the event per row" do
