@@ -319,19 +319,19 @@ HelpScout, DocuSeal, Twilio) stay pointed at production, so staging never receiv
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Make your changes
+3. Make your changes.
 4. Run tests: `bundle exec rspec`
 5. Run linter: `bin/rubocop`
-6. Commit with clear messages
-7. Push and open a Pull Request
+6. Commit with clear messages.
+7. Push and open a Pull Request.
 
 ### Code Style
 
-- Follow the [Rails Omakase](https://github.com/rails/rubocop-rails-omakase) style guide
-- Use UUID primary keys for all models
-- Encrypt sensitive data with Active Record Encryption
-- Add Pundit policies for new resources
-- Write specs for new features
+- Follow the [Rails Omakase](https://github.com/rails/rubocop-rails-omakase) style guide.
+- Use UUID primary keys for all models.
+- Encrypt sensitive data with Active Record Encryption.
+- Add Pundit policies for new resources.
+- Write specs for new features.
 
 ### Commit Messages
 
@@ -347,8 +347,8 @@ Add flight tracking integration with FlightAware
 
 ### Security
 
-- Never commit secrets or credentials
-- Use Rails credentials for sensitive configuration
+- Never commit secrets or credentials.
+- Use Rails credentials for sensitive configuration.
 - Report security issues via [security.hackclub.com](security.hackclub.com)
 
 ---
