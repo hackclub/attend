@@ -23,9 +23,22 @@ class Invitation < ApplicationRecord
   scope :pending, -> { where(accepted_at: nil).where("invitations.sent_at IS NULL OR invitations.expires_at > ?", Time.current) }
   # Recorded but never emailed — the participant doesn't know about the event
   # yet. Released in bulk by SendHeldOnboardingInvitesJob.
+  # Means "not emailed yet and not accepted" (silent adds and invitations whose mail job hasn't run included), not "the event is holding invitations right now" (Event#onboarding_invites_held?).
   scope :held, -> { where(sent_at: nil, accepted_at: nil) }
   scope :sent, -> { where.not(sent_at: nil) }
   scope :for_email, ->(email) { where("LOWER(email) = ?", email.downcase) }
+
+  # The addresses each event has emailed an invitation to, as
+  # { event_id => Set }, for ParticipantEvent#onboarding_held?(sent_emails:).
+  # Only events holding invitations need it; any other event's registrations
+  # are never held.
+  def self.sent_emails_by_event(events)
+    holding_ids = events.select(&:onboarding_invites_held?).map(&:id)
+    return {} if holding_ids.empty?
+
+    sent.where(event_id: holding_ids).pluck(:event_id, :email)
+      .each_with_object({}) { |(event_id, email), sets| (sets[event_id] ||= Set.new) << email.to_s.downcase }
+  end
 
   # The one entry point for inviting someone to onboard, whichever surface
   # asked (admin form, API, CSV import). Records the invitation and emails it,

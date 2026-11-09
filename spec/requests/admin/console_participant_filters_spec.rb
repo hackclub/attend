@@ -162,6 +162,13 @@ RSpec.describe "Admin console participant filters", type: :request do
       expect(document.at_css("form[data-controller~='cs-property-filter'] input[type='hidden'][name='blocked_on']")["value"]).to eq("waiver")
     end
 
+    # The key stays `started`; the label says what the participant has to do.
+    it "labels the started stage's token as signing in" do
+      get admin_event_participants_path(event), params: { blocked_on: "started" }
+
+      expect(tokens).to eq([ "Blocked on = Sign in" ])
+    end
+
     it "escapes participant-controlled text in tokens" do
       get admin_event_participants_path(event), params: { search: "<img src=x>" }
 

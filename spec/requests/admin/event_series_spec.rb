@@ -61,10 +61,27 @@ RSpec.describe "Admin::EventSeries", type: :request do
       expect(response.body).to include("1 event")
       expect(response.body).to include("1 withdrawn")
       # Funnel: the two endpoints, and nothing restating them above.
-      expect(response.body).to include("started onboarding")
+      # The left-hand total counts every active registration, not only those
+      # who opened onboarding, so it is labelled "registered".
+      total_label = Nokogiri::HTML(response.body).css("div").find { |node| node.text.strip == "registered" }
+      expect(total_label).to be_present
+      expect(total_label.previous_element.text.strip).to eq("3")
       expect(response.body).to include("cleared every stage")
       # The KPI strip that repeated all four of these figures is gone.
       expect(response.body).not_to include("fully cleared")
+    end
+
+    # The `started` stage is labelled for what the participant has to do, in
+    # the funnel, the chase list and the events table alike.
+    it "labels people who haven't opened onboarding as needing to sign in" do
+      2.times { create(:participant_event, event: sub_event, status: :invited) }
+      sign_in owner
+
+      get admin_series_path(series)
+
+      expect(response.body).to include("participants haven&#39;t signed in to start onboarding yet")
+      expect(response.body).to include("stuck on sign in")
+      expect(response.body).not_to include("haven&#39;t opened their onboarding yet")
     end
 
     it "searches the events table by name or location" do

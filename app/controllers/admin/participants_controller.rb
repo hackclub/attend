@@ -965,6 +965,9 @@ module Admin
     # already-preloaded rows and hands the ids back to SQL — keeping the result a
     # relation, so the ordering and any count downstream still work. A parallel
     # SQL reimplementation would drift; see SeriesDashboard's header comment.
+    # The exception is the lead stages, `invitation` and `started`, which depend
+    # only on status and ParticipantEvent.onboarding_held_in:
+    # SeriesDashboard.lead_stage_scope answers those in SQL.
     def filter_by_blocking_stage(scope, stage_key)
       key = stage_key.to_s
 
@@ -978,9 +981,16 @@ module Admin
     end
 
     def blocked_at_stage_ids(scope, stage_key)
+      if SeriesDashboard::STAGES[SeriesDashboard::STAGE_INDEX.fetch(stage_key)].lead?
+        return SeriesDashboard.lead_stage_scope(scope, current_event, stage_key).select(:id)
+      end
+
+      # An invited registration sits at a lead stage whatever its steps say,
+      # and which lead stage doesn't matter here.
       active_participant_events(scope).filter_map do |pe|
-        blocking = pe.onboarding_progress[:blocking_step]
-        pe.id if blocking && SeriesDashboard::STEP_TO_STAGE[blocking] == stage_key
+        next if pe.invited?
+
+        pe.id if SeriesDashboard::STEP_TO_STAGE[pe.onboarding_progress[:blocking_step]] == stage_key
       end
     end
 
@@ -994,7 +1004,7 @@ module Admin
         .distinct.pluck(:participant_event_id).to_set
 
       active_participant_events(scope).filter_map do |pe|
-        next if checked_in.include?(pe.id) || pe.onboarding_progress[:blocking_step]
+        next if checked_in.include?(pe.id) || pe.invited? || pe.onboarding_progress[:blocking_step]
 
         pe.id
       end

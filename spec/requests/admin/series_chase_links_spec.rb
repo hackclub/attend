@@ -84,6 +84,9 @@ RSpec.describe "Admin::EventSeries chase links", type: :request do
       create(:participant_event, :checked_in, event: event,
                                               participant: create(:participant, legal_last_name: "AlreadyHere"))
       create_stalled_at(:waiver, surname: "GoneAway", status: :withdrawn)
+      # Imported with everything up to the waiver already filled in, but never
+      # opened onboarding: counted at `started`, not at the waiver.
+      create_stalled_at(:waiver, surname: "NeverOpened", status: :invited)
     end
 
     it "returns exactly the number of participants the dashboard counted" do
@@ -92,7 +95,7 @@ RSpec.describe "Admin::EventSeries chase links", type: :request do
 
       # If the seed stops exercising a stage, this spec quietly stops testing
       # it — so assert the spread before asserting anything about the filters.
-      expect(covered).to include(*STAGE_ORDER, :checked_in)
+      expect(covered).to include(:started, *STAGE_ORDER, :checked_in)
 
       rows.each do |row|
         stage = row[:stage]
@@ -121,6 +124,43 @@ RSpec.describe "Admin::EventSeries chase links", type: :request do
       expect(response.body).not_to include("StuckFreedomWaiver")
       expect(response.body).not_to include("StuckGuardianPortal")
       expect(response.body).not_to include("GoneAway")
+      expect(response.body).not_to include("NeverOpened")
+    end
+
+    it "lists people who have not opened onboarding under started, whatever an import filled in" do
+      sign_in global_admin
+
+      get admin_event_participants_path(event.slug, blocked_on: "started")
+
+      expect(response.body).to include("NeverOpened")
+      expect(listed_count(response.body)).to eq(1)
+    end
+
+    # Never emailed, so not chased as "hasn't opened onboarding": the
+    # held-invitations row owns them, and the filters keep the two apart.
+    it "lists held, never-emailed registrations under invitation, not started" do
+      event.update!(onboarding_invites_held: true)
+      # Emailed before the hold went on, so the wizard is open to them.
+      never_opened = Participant.find_by!(legal_last_name: "NeverOpened")
+      create(:invitation, event: event, email: never_opened.email, sent_at: 2.days.ago)
+      # The onboarding gate shuts this one out; no invitation row needed.
+      never_sent = create_stalled_at(:waiver, surname: "NeverSent", status: :invited)
+      expect(never_sent.onboarding_held?).to be(true)
+      sign_in global_admin
+
+      get admin_event_participants_path(event.slug, blocked_on: "started")
+      expect(response.body).to include("NeverOpened")
+      expect(response.body).not_to include("NeverSent")
+      expect(listed_count(response.body)).to eq(1)
+
+      get admin_event_participants_path(event.slug, blocked_on: "invitation")
+      expect(response.body).to include("NeverSent")
+      expect(listed_count(response.body)).to eq(1)
+
+      rows = dashboard.stage_rows.index_by { |row| row[:stage].key }
+      expect(rows[:invitation][:stalled]).to eq(1)
+      expect(rows[:started][:stalled]).to eq(1)
+      expect(dashboard.chase_rows.map { |row| row[:stage].key }).not_to include(:invitation)
     end
 
     it "keeps people who have not finished onboarding out of the arrival list" do

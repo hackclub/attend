@@ -54,12 +54,140 @@ RSpec.describe SeriesDashboard do
       expect(dashboard.totals[:cleared]).to eq(per_record_cleared)
 
       expected_stalled = records.group_by { |pe|
-        described_class::STEP_TO_STAGE[pe.reload.onboarding_progress[:blocking_step]]
+        described_class.blocking_stage(pe.reload, sent_emails: Set.new)
       }.transform_values(&:size)
 
       dashboard.stage_rows.each do |row|
         expect(row[:stalled]).to eq(expected_stalled.fetch(row[:stage].key, 0)),
           "#{row[:stage].key} disagreed with the per-record blocking step"
+      end
+    end
+
+    # Imports fill in the early stages before the participant has done anything,
+    # so without this stage everyone who never opened onboarding piles up at the
+    # first step only they can clear.
+    it "holds registrations that haven't opened onboarding at the first stage" do
+      create(:participant_event, event: event, status: :invited)
+      create(:participant_event, event: event)
+
+      rows = dashboard_for(event).stage_rows
+      started = rows.first
+
+      expect(started[:stage].key).to eq(:started)
+      expect(started[:stage].label).to eq("Sign in")
+      expect(started[:stage].chase_for(1)).to eq("hasn't signed in to start onboarding yet")
+      expect(started[:stalled]).to eq(1)
+      # A lead stage applies only to whoever is on it, so it carries no
+      # "N of M events" note.
+      expect(started[:applicable]).to eq(1)
+      expect(started[:partial_events]).to be_nil
+      # The in-progress registration is stuck at exactly one later stage.
+      expect(rows.drop(1).sum { |row| row[:stalled] }).to eq(1)
+      # The event isn't holding invitations, so the invitation stage doesn't render.
+      expect(rows.map { |row| row[:stage].key }).not_to include(:invitation)
+    end
+
+    # A series where everyone signs themselves up never has anyone at either
+    # lead stage, and a permanent empty "Sign in" bar would be noise.
+    it "drops the lead stages once nobody is on them" do
+      2.times { create(:participant_event, event: event) }
+
+      keys = dashboard_for(event).stage_rows.map { |row| row[:stage].key }
+
+      expect(keys).not_to include(:invitation, :started)
+    end
+
+    # Invite-by-email rows nobody has registered under yet aren't anyone's
+    # stage; they only show in the held-invitations count.
+    it "doesn't render the invitation stage for held invitations with no registration" do
+      event.update!(onboarding_invites_held: true)
+      create(:participant_event, event: event)
+      create(:invitation, event: event, sent_at: nil)
+
+      dashboard = dashboard_for(event)
+
+      expect(dashboard.stage_rows.map { |row| row[:stage].key }).not_to include(:invitation)
+      expect(dashboard.totals[:held_invitations]).to eq(1)
+    end
+
+    # Imported data can clear every step a participant could be chased for;
+    # until they open onboarding they still haven't started.
+    it "keeps an invited registration with every step filled in at started" do
+      participant = create(:participant, legal_first_name: "Pim", legal_last_name: "Brackenfold", date_of_birth: 18.years.ago - 1.day)
+      pe = create(:participant_event, event: event, participant: participant, status: :invited)
+      pe.create_travel_inbound!(direction: :inbound)
+      pe.create_travel_outbound!(direction: :outbound)
+      pe.create_accommodation! if event.accommodation_enabled?
+      pe.create_medical!
+      pe.create_dietary!
+      pe.create_accessibility!
+      pe.update!(code_of_conduct_accepted_at: Time.current)
+      pe.emergency_contacts.create!(name: "Odo Fernwhistle", phone: "+14155550123")
+      create(:consent, :signed, participant_event: pe)
+      expect(pe.reload.onboarding_progress[:blocking_step]).to be_nil
+
+      dashboard = dashboard_for(event)
+
+      expect(described_class.blocking_stage(pe, sent_emails: Set.new)).to eq(:started)
+      expect(dashboard.totals[:cleared]).to eq(0)
+      expect(dashboard.stage_rows.first[:stalled]).to eq(1)
+    end
+
+    # Someone whose invitation is still held hasn't been told about the event,
+    # so "hasn't opened onboarding" isn't true of them. They wait at the
+    # invitation stage, and the chase list leaves them to its "invitations
+    # haven't been sent yet" row rather than counting them twice.
+    it "holds registrations whose invitation hasn't been sent at the invitation stage" do
+      event.update!(onboarding_invites_held: true)
+      held = create(:participant_event, event: event, status: :invited)
+      create(:invitation, event: event, email: held.participant.email.upcase, sent_at: nil)
+      opened_elsewhere = create(:participant_event, event: event, status: :invited)
+      create(:invitation, event: event, email: opened_elsewhere.participant.email, sent_at: 1.day.ago)
+
+      dashboard = dashboard_for(event)
+      rows = dashboard.stage_rows.index_by { |row| row[:stage].key }
+
+      expect(rows.keys.first(2)).to eq(%i[invitation started])
+      expect(rows[:invitation][:stalled]).to eq(1)
+      expect(rows[:invitation][:applicable]).to eq(1)
+      expect(rows[:started][:stalled]).to eq(1)
+      expect(dashboard.chase_rows.map { |row| row[:stage].key }).to eq([ :started ])
+      expect(dashboard.totals[:held_invitations]).to eq(1)
+    end
+
+    # The funnel's `invitation` stage and the gate that keeps the wizard shut
+    # (ParticipantEvent#onboarding_held?) must be one test, or organizers are
+    # told to chase people the wizard turns away, and the other way round.
+    context "while the event holds onboarding invitations" do
+      before { event.update!(onboarding_invites_held: true) }
+
+      def stage_of(pe)
+        dashboard_for(event).stage_rows.find { |row| row[:stalled].positive? }&.dig(:stage)&.key
+      end
+
+      it "puts someone the gate shuts out at invitation even with no invitation row" do
+        pe = create(:participant_event, event: event, status: :invited)
+        expect(pe.onboarding_held?).to be(true)
+
+        expect(stage_of(pe)).to eq(:invitation)
+      end
+
+      it "puts someone who was emailed at started even if a newer invitation is held" do
+        pe = create(:participant_event, event: event, status: :invited)
+        create(:invitation, :expired, event: event, email: pe.participant.email, sent_at: 40.days.ago)
+        create(:invitation, event: event, email: pe.participant.email, sent_at: nil)
+        expect(pe.onboarding_held?).to be(false)
+
+        expect(stage_of(pe)).to eq(:started)
+      end
+
+      it "agrees with onboarding_held? after the participant's email changes" do
+        pe = create(:participant_event, event: event, status: :invited)
+        create(:invitation, event: event, email: pe.participant.email, sent_at: nil)
+        pe.participant.update!(email: "renamed-#{pe.participant.email}")
+        expect(pe.reload.onboarding_held?).to be(true)
+
+        expect(stage_of(pe)).to eq(:invitation)
       end
     end
 
@@ -167,7 +295,7 @@ RSpec.describe SeriesDashboard do
     it "puts the opening verb in the singular for one participant" do
       stages = SeriesDashboard::STAGES + [ SeriesDashboard::ARRIVAL_STAGE ]
 
-      stages.each do |stage|
+      stages.select(&:chased?).each do |stage|
         expect(stage.chase_for(2)).to eq(stage.chase)
         expect(stage.chase_for(1)).not_to match(/\A(haven't|have|are)\b/)
       end
