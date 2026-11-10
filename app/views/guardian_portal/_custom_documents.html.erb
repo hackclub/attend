@@ -12,7 +12,7 @@
       Forms this event asks for on top of the standard consents.
     </p>
 
-    <ul class="divide-y" style="border-color: var(--border);">
+    <ul class="divide-y divide-[var(--border)]">
       <% guardian_docs.each do |doc| %>
         <% consent = @participant_event.consents.find { |c| c.custom_document_id == doc.id } %>
         <% document_tasks = @completion.outstanding_tasks.select { |task| task.custom_document == doc } %>

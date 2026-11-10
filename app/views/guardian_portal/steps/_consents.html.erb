@@ -35,7 +35,7 @@
       Review and sign each one for <%= first_name %>'s participation.
     </p>
 
-    <ul class="divide-y" style="border-color: var(--border);">
+    <ul class="divide-y divide-[var(--border)]">
       <% @required_consent_types.each do |consent_type| %>
         <% existing_consent = @consents.find { |c| c.consent_type == consent_type } %>
         <% is_waiver = consent_type == "waiver" %>
@@ -58,8 +58,8 @@
               <%= is_code_of_conduct ? "Code of Conduct & Safeguarding" : consent_type_label(consent_type) %>
             </h3>
             <% if is_complete %>
-              <span class="portal-badge portal-badge-done">Signed</span>
-            <% elsif guardian_signed_waiver %>
+              <span class="portal-badge portal-badge-done"><%= is_code_of_conduct ? "Agreed" : "Signed" %></span>
+            <% elsif guardian_signed_waiver || is_code_of_conduct %>
               <span class="portal-badge portal-badge-waiting">Waiting on <%= first_name %></span>
             <% else %>
               <span class="portal-badge portal-badge-pending">Needs you</span>
@@ -83,7 +83,7 @@
               </p>
             <% else %>
               <p class="portal-hint text-sm">
-                <%= first_name %> agrees to this during their own onboarding — nothing for you to do here.
+                <%= first_name %> agrees to this in their own onboarding. You don't need to do anything.
               </p>
             <% end %>
 
