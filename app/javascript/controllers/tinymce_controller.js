@@ -1,12 +1,24 @@
 import { Controller } from "@hotwired/stimulus"
 
+// What each placeholder becomes, shown in the {{ picker. Keep in step with
+// Message#personalize.
+const MERGE_TAG_DESCRIPTIONS = {
+  first_name: 'Recipient\'s first name, or "there"',
+  event_name: 'This event\'s name',
+  participant_first_name: 'Guardians only: their children\'s names'
+}
+
 export default class extends Controller {
   static targets = ["editor"]
   static values = {
     slackMode: { type: Boolean, default: false },
     // Where pasted, dropped or picked images are uploaded. Images are only
     // offered when it's set.
-    imageUploadUrl: String
+    imageUploadUrl: String,
+    // Personalization tokens the server fills in, e.g. ["first_name"]. When
+    // set, {{tokens}} in the editor are highlighted so staff can see they'll
+    // be replaced; ones not in the list are marked as mistakes.
+    placeholders: Array
   }
 
   async connect() {
@@ -23,6 +35,7 @@ export default class extends Controller {
   }
 
   disconnect() {
+    if (this.mergeTagFrame) cancelAnimationFrame(this.mergeTagFrame)
     document.removeEventListener("submit", this.boundHoldSubmit, true)
     if (this.editor) {
       this.editor.destroy()
@@ -77,7 +90,10 @@ export default class extends Controller {
       statusbar: false,
       plugins: allowImages ? 'link lists autolink image' : 'link lists autolink',
       toolbar: toolbar,
-      content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 14px; line-height: 1.5; } img { max-width: 100%; height: auto; }',
+      // Wrap onto a second row on narrow screens rather than hiding buttons
+      // behind a "more" menu.
+      toolbar_mode: 'wrap',
+      ...this.themeOptions(),
       link_default_target: '_blank',
       link_title: false,
       link_context_toolbar: true,
@@ -94,8 +110,46 @@ export default class extends Controller {
         
         editor.on('change keyup', () => this.sync('input'))
         editor.on('blur', () => this.sync('change'))
+
+        if (this.placeholdersValue.length > 0) {
+          editor.on('init SetContent input keyup change undo redo NodeChange', () => this.scheduleMergeTagHighlight())
+          this.addMergeTagAutocompleter(editor)
+        }
       }
     })
+  }
+
+  // Inside the admin console the editor follows the console's light or dark
+  // mode and paints its editing area from the --cs-* tokens; elsewhere it
+  // keeps TinyMCE's light look. Read once at init, so a mode switch shows on
+  // the next page load.
+  themeOptions() {
+    const root = document.documentElement
+    const inConsole = root.classList.contains('cs-console')
+    const dark = inConsole && root.dataset.theme === 'dark'
+    const token = (name, fallback) => (inConsole && getComputedStyle(root).getPropertyValue(name).trim()) || fallback
+
+    const info = token('--cs-info', '#1d4ed8')
+    const error = token('--cs-error', '#b91c1c')
+    const style = `
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        font-size: 14px; line-height: 1.5;
+        background-color: ${token('--cs-bg-input', '#ffffff')};
+        color: ${token('--cs-text-body', '#0f141a')};
+      }
+      a { color: ${token('--cs-accent', '#c8283f')}; }
+      img { max-width: 100%; height: auto; }
+      ::selection { background-color: ${token('--cs-bg-pressed', '#ffe5e9')}; }
+      ::highlight(merge-tag) { background-color: color-mix(in srgb, ${info} 16%, transparent); color: ${info}; }
+      ::highlight(merge-tag-unknown) { background-color: color-mix(in srgb, ${error} 14%, transparent); color: ${error}; text-decoration: underline wavy ${error}; }
+    `
+
+    return {
+      skin: dark ? 'oxide-dark' : 'oxide',
+      content_css: dark ? 'dark' : 'default',
+      content_style: style
+    }
   }
 
   // Copies the editor into the textarea and tells autosave. Not while an image
@@ -193,6 +247,82 @@ export default class extends Controller {
       throw { message: data.error || 'The image could not be uploaded.', remove: true }
     }
     return data.location
+  }
+
+  // Typing {{ opens a picker of the placeholders; keep typing to filter.
+  // Choosing one replaces what was typed with the whole {{token}}.
+  addMergeTagAutocompleter(editor) {
+    editor.ui.registry.addAutocompleter('merge-tags', {
+      trigger: '{{',
+      minChars: 0,
+      columns: 1,
+      fetch: (pattern) => {
+        const query = pattern.trim().toLowerCase()
+        return Promise.resolve(
+          this.placeholdersValue
+            .filter((token) => token.includes(query))
+            .map((token) => ({
+              type: 'cardmenuitem',
+              value: `{{${token}}}`,
+              label: token,
+              items: [
+                {
+                  type: 'cardcontainer',
+                  direction: 'vertical',
+                  items: [
+                    { type: 'cardtext', text: `{{${token}}}`, name: 'token' },
+                    { type: 'cardtext', text: MERGE_TAG_DESCRIPTIONS[token] || '' }
+                  ]
+                }
+              ]
+            }))
+        )
+      },
+      onAction: (api, range, value) => {
+        editor.selection.setRng(range)
+        editor.insertContent(value)
+        api.hide()
+      }
+    })
+  }
+
+  scheduleMergeTagHighlight() {
+    if (this.mergeTagFrame) return
+    this.mergeTagFrame = requestAnimationFrame(() => {
+      this.mergeTagFrame = null
+      this.highlightMergeTags()
+    })
+  }
+
+  // Marks {{tokens}} with the CSS Custom Highlight API, which styles text
+  // ranges without touching the DOM, so the saved HTML, the caret and undo
+  // history are exactly as if nothing were highlighted. Matching runs one
+  // text node at a time with the same pattern as Message::PLACEHOLDER_PATTERN
+  // on the HTML: a token split by formatting or a line break isn't filled in
+  // when sent, so it isn't highlighted either. Browsers without the API just
+  // show plain text.
+  highlightMergeTags() {
+    const win = this.editor?.getWin()
+    const doc = this.editor?.getDoc()
+    if (!win?.CSS?.highlights || !win.Highlight || !doc?.body) return
+
+    const known = new Set(this.placeholdersValue)
+    const knownRanges = []
+    const unknownRanges = []
+    const pattern = /\{\{[ \t\r\n]*(\w+)[ \t\r\n]*\}\}/g
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
+
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      for (const match of node.data.matchAll(pattern)) {
+        const range = doc.createRange()
+        range.setStart(node, match.index)
+        range.setEnd(node, match.index + match[0].length)
+        ;(known.has(match[1]) ? knownRanges : unknownRanges).push(range)
+      }
+    }
+
+    win.CSS.highlights.set('merge-tag', new win.Highlight(...knownRanges))
+    win.CSS.highlights.set('merge-tag-unknown', new win.Highlight(...unknownRanges))
   }
 
   getContent() {

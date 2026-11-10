@@ -2017,6 +2017,26 @@
 
   .cs-tiles { display: flex; flex-direction: column; gap: 12px; }
 
+  /* Tiles side by side: a short set of peer choices (message channels).
+   * One column on phones, two from 640px, four from 1024px. */
+  .cs-tiles-row { display: grid; grid-template-columns: minmax(0, 1fr); }
+
+  @media (min-width: 640px) {
+    .cs-tiles-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (min-width: 1024px) {
+    .cs-tiles-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+
+  .cs-tile:has(> .cs-option > input:disabled) {
+    cursor: default;
+    background-color: var(--cs-bg-input-disabled);
+    border-color: var(--cs-bg-input-disabled);
+
+    .cs-option-label { color: var(--cs-text-disabled); }
+  }
+
   /* Status chips stay on one line in tables, but inside key-value and list
    * layouts the column can be narrower than the label (e.g. "Awaiting
    * Participant" in a 4-up grid with a vertical tab bar eating the width),
@@ -2917,3 +2937,47 @@
   .cs-tint-green { --cs-tint-bg: var(--cs-tint-green-bg); --cs-tint-fg: var(--cs-tint-green-fg); }
   .cs-tint-grey { --cs-tint-bg: var(--cs-tint-grey-bg); --cs-tint-fg: var(--cs-tint-grey-fg); }
 }
+
+/* ---------- TinyMCE (message and Slack blast editors) ----------
+ * Unlayered on purpose: TinyMCE injects its skin CSS unlayered at runtime, so
+ * layered kit rules would lose. tinymce_controller picks the oxide or
+ * oxide-dark skin by mode and paints the editing area from these tokens; this
+ * maps the chrome onto the field treatment and swaps TinyMCE's blue for the
+ * accent (The Red-For-Blue Rule). */
+:root.cs-console .tox.tox-tinymce {
+  border: 1px solid var(--cs-border-input);
+  border-radius: var(--cs-radius-input);
+}
+
+:root.cs-console .tox .tox-editor-header,
+:root.cs-console .tox .tox-toolbar,
+:root.cs-console .tox .tox-toolbar__primary,
+:root.cs-console .tox .tox-toolbar-overlord {
+  background-color: var(--cs-bg-container);
+}
+
+:root.cs-console .tox .tox-editor-header {
+  border-bottom: 1px solid var(--cs-border-divider-secondary);
+  box-shadow: none;
+  padding: 0;
+}
+
+:root.cs-console .tox .tox-toolbar__group { background: transparent; }
+:root.cs-console .tox .tox-tbtn { color: var(--cs-text-body); background: transparent; }
+:root.cs-console .tox .tox-tbtn svg { fill: var(--cs-text-body); }
+:root.cs-console .tox .tox-tbtn:hover { background-color: var(--cs-bg-hover); }
+:root.cs-console .tox .tox-tbtn--enabled,
+:root.cs-console .tox .tox-tbtn--enabled:hover { background-color: var(--cs-bg-pressed); }
+:root.cs-console .tox .tox-tbtn--enabled svg { fill: var(--cs-accent); }
+
+:root.cs-console .tox .tox-edit-area::before {
+  border: 2px solid var(--cs-focus);
+  border-radius: 0 0 var(--cs-radius-input) var(--cs-radius-input);
+}
+
+:root.cs-console .tox .tox-collection--list .tox-collection__item--active,
+:root.cs-console .tox .tox-collection__item--active {
+  background-color: var(--cs-bg-selected);
+  color: var(--cs-text-heading);
+}
+

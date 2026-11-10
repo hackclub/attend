@@ -49,7 +49,7 @@
                     <% if message.subject.present? %>
                       <span class="block cs-link-strong"><%= message.subject %></span>
                     <% end %>
-                    <span class="block truncate max-w-xs cs-secondary"><%= truncate(message.body.presence || "(empty)", length: 60) %></span>
+                    <span class="block truncate max-w-xs cs-secondary"><%= truncate(message.body_as_plain.squish.presence || "(empty)", length: 60) %></span>
                   <% end %>
                 </td>
                 <td class="whitespace-nowrap"><%= message.audience_label %></td>

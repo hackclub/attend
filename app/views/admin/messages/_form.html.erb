@@ -157,7 +157,7 @@
       </div>
 
       <!-- Message Body -->
-      <div data-controller="tinymce" data-tinymce-image-upload-url-value="<%= upload_image_admin_event_messages_path(current_event) %>">
+      <div data-controller="tinymce" data-tinymce-image-upload-url-value="<%= upload_image_admin_event_messages_path(current_event) %>" data-tinymce-placeholders-value="<%= Message::PLACEHOLDERS.to_json %>">
         <%= f.label :body, "Message", class: "block text-sm font-medium text-gray-700 mb-1" %>
         <%= f.text_area :body,
             rows: 10,
