@@ -27,7 +27,7 @@ module Admin
       exact_matches = if (phone = phone_query_e164(query))
         scope.where(phone: phone).limit(10).to_a
       elsif (slack_id = slack_id_query(query))
-        scope.where("UPPER(slack_user_id) = ?", slack_id).limit(10).to_a
+        scope.where("UPPER(participants.slack_user_id) = ?", slack_id).limit(10).to_a
       else
         []
       end
