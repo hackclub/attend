@@ -10,7 +10,7 @@ module Admin
 
     layout "admin"
 
-    helper_method :current_event, :available_events, :can_view_participant_pii?,
+    helper_method :current_event, :available_events, :switcher_events, :can_view_participant_pii?,
       :registration_change_request_pending_count, :event_page?,
       :show_waiver_dates_banner?
 
@@ -53,6 +53,19 @@ module Admin
       @available_events ||= policy_scope(Event)
         .includes(logo_attachment: :blob, event_series: { logo_attachment: :blob })
         .order(starts_at: :desc)
+    end
+
+    # What the console's event switcher lists: running and upcoming events,
+    # plus the current one. Long-finished events are dropped in SQL — with
+    # every event a global admin can see, loading them all was most of the
+    # layout's cost on every page. Two days of slack covers any time zone, and
+    # the switcher still asks Event#completed? about what's left.
+    def switcher_events
+      @switcher_events ||= begin
+        recent = available_events.where(ends_at: nil).or(available_events.where(ends_at: 2.days.ago..))
+        recent = recent.or(available_events.where(id: current_event.id)) if current_event
+        recent.to_a
+      end
     end
 
     def registration_change_request_pending_count

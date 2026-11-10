@@ -345,4 +345,67 @@ RSpec.describe "Admin::Messages", type: :request do
       end
     end
   end
+
+  describe "GET show" do
+    let(:message) do
+      event.messages.create!(audience: "all_attendees", channels: [ "email" ], subject: "Made-up update",
+        body: "Hello", sent_by_user: admin, status: :completed, sent_at: 1.hour.ago)
+    end
+
+    def deliver_to_new_participant
+      participant_event = create(:participant_event, event: event, status: :complete)
+      MessageDelivery.create!(message: message, participant_event: participant_event, channel: "email",
+        status: "delivered", delivered_at: 30.minutes.ago)
+    end
+
+    def queries_for_show
+      count = 0
+      counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" || payload[:cached] }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") do
+        get admin_event_message_path(event, message)
+      end
+      expect(response).to have_http_status(:ok)
+      count
+    end
+
+    [ false, true ].each do |console|
+      it "loads recipients in bulk rather than one per delivery (console: #{console})" do
+        admin.update!(admin_console_beta: console)
+        2.times { deliver_to_new_participant }
+        queries_for_show # warm-up
+        baseline = queries_for_show
+
+        3.times { deliver_to_new_participant }
+
+        expect(queries_for_show).to eq(baseline)
+      end
+    end
+  end
+
+  describe "GET preview" do
+    let(:message) do
+      event.messages.create!(audience: "all_attendees", channels: [ "email" ], subject: "Made-up update",
+        body: "Hello", sent_by_user: admin, status: :draft)
+    end
+
+    def queries_for_preview
+      count = 0
+      counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" || payload[:cached] }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") do
+        get preview_admin_event_message_path(event, message)
+      end
+      expect(response).to have_http_status(:ok)
+      count
+    end
+
+    it "loads the listed recipients' names in bulk" do
+      2.times { create(:participant_event, event: event, status: :complete) }
+      queries_for_preview # warm-up
+      baseline = queries_for_preview
+
+      3.times { create(:participant_event, event: event, status: :complete) }
+
+      expect(queries_for_preview).to eq(baseline)
+    end
+  end
 end

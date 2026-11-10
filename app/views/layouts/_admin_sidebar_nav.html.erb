@@ -31,26 +31,9 @@
           All events
         <% end %>
       </div>
-      <div class="max-h-72 overflow-y-auto py-1">
-        <% available_events.each do |event| %>
-          <% is_current = current_event && event.id == current_event.id %>
-          <% next if event.completed? && !is_current %>
-          <% if is_current %>
-            <div class="sidebar-dropdown-item sidebar-dropdown-item-active">
-              <%= render "admin/events/avatar", event: event, size: 20 %>
-              <span class="truncate flex-1"><%= event.name %></span>
-              <svg class="h-4 w-4 text-[#1f2d3d] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-              </svg>
-            </div>
-          <% else %>
-            <%= button_to select_admin_event_path(event), method: :post, data: { turbo: false }, class: "sidebar-dropdown-item w-full text-left", form: { class: "block" } do %>
-              <%= render "admin/events/avatar", event: event, size: 20 %>
-              <span class="truncate flex-1"><%= event.name %></span>
-            <% end %>
-          <% end %>
-        <% end %>
-      </div>
+      <%# Desktop and mobile both render this nav; the event list is the same in
+          each and is most of its cost, so it is rendered once per request. %>
+      <%= @admin_sidebar_event_list ||= render("layouts/admin_sidebar_event_list") %>
     </div>
   </div>
 </div>

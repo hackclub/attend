@@ -23,25 +23,12 @@
     <% end %>
     <div class="cs-menu-divider"></div>
     <p class="cs-menu-group-label">Running and upcoming</p>
-    <div class="cs-menu-scroll">
-      <%# The current event leads the list, so it's never scrolled out of view. %>
-      <% current_first = available_events.partition { |e| current_event && e.id == current_event.id }.flatten %>
-      <% current_first.each do |event| %>
-        <% is_current = current_event && event.id == current_event.id %>
-        <% next if event.completed? && !is_current %>
-        <% if is_current %>
-          <div class="cs-menu-item" aria-current="true">
-            <%= render "admin/events/avatar", event: event, size: 20, rounded: "rounded" %>
-            <span class="cs-menu-item-label"><%= event.name %></span>
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-          </div>
-        <% else %>
-          <%= button_to select_admin_event_path(event), method: :post, data: { turbo: false }, class: "cs-menu-item", form: { class: "block" } do %>
-            <%= render "admin/events/avatar", event: event, size: 20, rounded: "rounded" %>
-            <span class="cs-menu-item-label"><%= event.name %></span>
-          <% end %>
-        <% end %>
-      <% end %>
+    <%# The topnav and the mobile drawer both carry this menu. The list is the
+        same in both, and with a few hundred events its avatars and per-row forms
+        are most of the layout's render time, so it is rendered once per request.
+        The drawer closes on any click inside the list via the wrapper below. %>
+    <div <%= tag.attributes(data: item_data) %>>
+      <%= @admin_event_switcher_items ||= render("layouts/admin_event_switcher_items") %>
     </div>
   </div>
 </div>
