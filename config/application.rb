@@ -19,6 +19,7 @@ require "action_cable/engine"
 Bundler.require(*Rails.groups)
 
 require_relative "../lib/middleware/malformed_request_guard"
+require_relative "../lib/middleware/strip_client_forwarded_header"
 
 module Attend
   class Application < Rails::Application
@@ -49,5 +50,8 @@ module Attend
     config.action_dispatch.rescue_responses["Rack::Multipart::BoundaryTooLongError"] = :bad_request
     # ...and a POST raises it from Rack::MethodOverride, above ShowExceptions.
     config.middleware.insert_before Rack::MethodOverride, MalformedRequestGuard
+
+    # Ahead of everything that reads the client's IP, host or scheme.
+    config.middleware.insert_before 0, StripClientForwardedHeader
   end
 end
