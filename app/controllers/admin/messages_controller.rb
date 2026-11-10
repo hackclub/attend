@@ -98,7 +98,11 @@ module Admin
         return
       end
 
-      @recipients = @message.preview_recipients(limit: 20).load
+      @recipients = @message.preview_recipients(limit: 20)
+      # Registrations are listed by their participant's name; guardians carry
+      # their own.
+      @recipients = @recipients.preload(:participant) if @recipients.klass == ParticipantEvent
+      @recipients = @recipients.load
       @total_count = @message.recipient_count_estimate
       # The channel previews fill placeholders in for the first recipient, so
       # staff see what one real person will get.

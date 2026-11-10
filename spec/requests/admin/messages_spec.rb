@@ -381,4 +381,31 @@ RSpec.describe "Admin::Messages", type: :request do
       end
     end
   end
+
+  describe "GET preview" do
+    let(:message) do
+      event.messages.create!(audience: "all_attendees", channels: [ "email" ], subject: "Made-up update",
+        body: "Hello", sent_by_user: admin, status: :draft)
+    end
+
+    def queries_for_preview
+      count = 0
+      counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" || payload[:cached] }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") do
+        get preview_admin_event_message_path(event, message)
+      end
+      expect(response).to have_http_status(:ok)
+      count
+    end
+
+    it "loads the listed recipients' names in bulk" do
+      2.times { create(:participant_event, event: event, status: :complete) }
+      queries_for_preview # warm-up
+      baseline = queries_for_preview
+
+      3.times { create(:participant_event, event: event, status: :complete) }
+
+      expect(queries_for_preview).to eq(baseline)
+    end
+  end
 end
