@@ -35,6 +35,9 @@ class ParticipantsToolbox < ApplicationToolbox
   tool "Update a participant's contact and profile details.", access: :write, scope: "participants:write" do
     param :participant_id, :string, "Participant ID"
     param :preferred_name, :string, "Preferred name", optional: true
+    param :legal_first_name, :string, "Legal first name (as on waivers)", optional: true
+    param :legal_last_name, :string, "Legal last name (as on waivers)", optional: true
+    param :date_of_birth, :string, "Date of birth, YYYY-MM-DD", optional: true
     param :email, :string, "Primary email", optional: true
     param :phone, :string, "Phone number", optional: true
     param :pronouns, :string, "Pronouns", optional: true
@@ -45,8 +48,11 @@ class ParticipantsToolbox < ApplicationToolbox
   end
   def update
     @participant = accessible_participants.find(params[:participant_id])
-    permitted = %i[preferred_name email phone pronouns tshirt_size city state country_of_residence]
-    permitted -= %i[phone city state country_of_residence] unless view_pii?
+    # Same fields as the admin participant edit form. Date of birth is PII, so
+    # roles that can't read it can't write it either.
+    permitted = %i[preferred_name legal_first_name legal_last_name date_of_birth email phone pronouns tshirt_size
+      city state country_of_residence]
+    permitted -= %i[date_of_birth phone city state country_of_residence] unless view_pii?
     @participant.update!(params.permit(*permitted).to_h)
     render json: serialize_participant(@participant, full: true)
   end

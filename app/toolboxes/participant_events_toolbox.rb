@@ -143,7 +143,200 @@ class ParticipantEventsToolbox < ApplicationToolbox
     } }
   end
 
+  # --- Guardians -------------------------------------------------------------
+  # The same operations as the guardian card on the admin participant page.
+  # Guardian contact details are PII, so these need a role that can see it.
+
+  tool "List a registration's guardians with their contact details and invite state.",
+    access: :read, scope: "participants:read" do
+    param :participant_event_id, :string, "ParticipantEvent ID"
+  end
+  def guardians
+    load_participant_event!
+    authorize! @participant_event, :show?
+    require_pii_access!("see guardian contact details")
+
+    render json: {
+      participant_event_id: @participant_event.id,
+      requires_guardian: @participant_event.requires_guardian?,
+      guardian_invites_locked: @participant_event.event.guardian_invites_locked?,
+      guardians: @participant_event.guardian_participant_events.includes(:guardian).map { |gpe| serialize_guardian_link(gpe) }
+    }
+  end
+
+  tool "Correct a guardian's name, email or phone (e.g. a mistyped address). If the email changes " \
+       "and the guardian hasn't finished, their next invite is a fresh one. Does not send anything — " \
+       "follow with participant_events_resend_guardian_invite.",
+    access: :write, scope: "participants:write" do
+    param :participant_event_id, :string, "ParticipantEvent ID"
+    param :guardian_participant_event_id, :string, "Guardian link ID, from participant_events_guardians"
+    param :email, :string, "New email", optional: true
+    param :legal_first_name, :string, "Legal first name", optional: true
+    param :legal_last_name, :string, "Legal last name", optional: true
+    param :phone, :string, "Phone number (E.164)", optional: true
+  end
+  def update_guardian
+    load_participant_event!
+    authorize! @participant_event, :manage_guardians?
+    require_pii_access!("edit guardian contact details")
+
+    gpe = @participant_event.guardian_participant_events.find(params[:guardian_participant_event_id])
+    @guardian = gpe.guardian
+    attributes = params.permit(:email, :legal_first_name, :legal_last_name, :phone).to_h.compact_blank
+    halt error: "Pass at least one of email, legal_first_name, legal_last_name, phone." if attributes.empty?
+
+    # Mirrors Admin::GuardiansController#update: a guardian can't share the
+    # participant's phone (the email check lives on the model).
+    participant_phone = @participant_event.participant.phone
+    if attributes["phone"].present? && participant_phone.present? &&
+        PhoneNormalizer.normalize(attributes["phone"]) == participant_phone
+      halt error: "Guardian phone cannot be the same as the participant's phone number."
+    end
+
+    # A guardian row is shared by every registration it's linked to (siblings),
+    # so say so rather than silently changing their details too.
+    other_registrations = @guardian.guardian_participant_events.where.not(id: gpe.id).count
+
+    old_email = @guardian.email
+    @guardian.update!(attributes)
+    gpe.update!(invite_token_sent_at: nil) if @guardian.email != old_email && !gpe.completed?
+
+    render json: {
+      guardian: serialize_guardian_link(gpe.reload),
+      also_linked_to_other_registrations: other_registrations,
+      next_step: "Call participant_events_resend_guardian_invite to email the guardian."
+    }
+  end
+
+  tool "Email a guardian their portal invite again (sends a real email).",
+    access: :write, scope: "participants:write" do
+    param :participant_event_id, :string, "ParticipantEvent ID"
+    param :guardian_participant_event_id, :string, "Guardian link ID, from participant_events_guardians"
+  end
+  def resend_guardian_invite
+    load_participant_event!
+    authorize! @participant_event, :manage_guardians?
+
+    if @participant_event.event.guardian_invites_locked?
+      halt error: "Guardian invites are currently locked for #{@participant_event.event.name}."
+    end
+
+    @guardian_participant_event = @participant_event.guardian_participant_events.find(params[:guardian_participant_event_id])
+    guardian = @guardian_participant_event.guardian
+    if guardian.email_undeliverable?
+      halt error: "The guardian's email is bouncing — correct it with participant_events_update_guardian first."
+    end
+
+    @guardian_participant_event.update!(invite_token_sent_at: nil)
+    GuardianMailer.invitation(guardian_participant_event: @guardian_participant_event).deliver_later
+
+    render json: { sent: true, to: guardian.email, guardian: serialize_guardian_link(@guardian_participant_event) }
+  end
+
+  # --- Consents / waivers ----------------------------------------------------
+
+  tool "List a registration's consents and waivers with their signing state (who it's pending on, " \
+       "failure reason, signed timestamps).",
+    access: :read, scope: "participants:read" do
+    param :participant_event_id, :string, "ParticipantEvent ID"
+  end
+  def consents
+    load_participant_event!
+    authorize! @participant_event, :show?
+
+    render json: {
+      participant_event_id: @participant_event.id,
+      consents_url: registration_url(@participant_event, page: :consents),
+      consents: @participant_event.consents.includes(:custom_document).map { |c| serialize_consent(c) }
+    }
+  end
+
+  tool "Re-issue a registration's waiver or freedom waiver: discards the current DocuSeal submission " \
+       "(including any signature or delegation), reopens the guardian portal, and emails whoever signs " \
+       "(guardian for minors, participant otherwise). Sends a real email.",
+    access: :write, scope: "participants:write" do
+    param :participant_event_id, :string, "ParticipantEvent ID"
+    param :waiver_type, :string, "Which waiver", enum: %w[waiver freedom_waiver]
+  end
+  def reset_waiver
+    load_participant_event!
+    authorize! @participant_event, :reset_waiver?
+
+    waiver_type = params[:waiver_type].to_s
+    halt error: "waiver_type must be waiver or freedom_waiver." unless %w[waiver freedom_waiver].include?(waiver_type)
+
+    @consent = @participant_event.consents.find_by(consent_type: waiver_type)
+    halt error: "No #{waiver_type.humanize.downcase} found on this registration." if @consent.nil?
+
+    # Same steps as Admin::ParticipantsController#reset_waiver / #reset_freedom_waiver.
+    # No reload before rendering: the audit log reads @consent.previous_changes.
+    @consent.reset_for_reissue!
+    @participant_event.reopen_guardian_portal_access! if @participant_event.requires_guardian?
+    emailed = send_waiver_reset_email(waiver_type.to_sym)
+
+    render json: {
+      consent: serialize_consent(@consent),
+      emailed: emailed,
+      note: "A new document is generated when they next open the portal."
+    }
+  end
+
   private
+
+  def load_participant_event!
+    @participant_event = ParticipantEvent.includes(:event, :participant).find(params[:participant_event_id])
+    # Several ParticipantEventPolicy checks compare against Current.event, the
+    # way the admin UI scopes them.
+    Current.event = @participant_event.event
+  end
+
+  def require_pii_access!(what)
+    halt error: "Your role can't #{what}." unless view_pii?
+  end
+
+  def serialize_guardian_link(gpe)
+    g = gpe.guardian
+    {
+      guardian_participant_event_id: gpe.id,
+      name: person_name(g&.full_name),
+      email: g&.email,
+      phone: (g&.phone if view_pii?),
+      relationship: gpe.relationship,
+      primary: gpe.is_primary_guardian,
+      status: gpe.status,
+      invite_sent_at: gpe.invite_token_sent_at,
+      email_undeliverable: g&.email_undeliverable? || false
+    }
+  end
+
+  def serialize_consent(c)
+    {
+      consent_id: c.id,
+      type: c.consent_type,
+      name: c.display_name,
+      status: c.status,
+      pending_on: c.pending_on,
+      failure_reason: c.failure_reason,
+      sent_at: c.sent_at,
+      participant_signed_at: c.participant_signed_at,
+      guardian_signed_at: c.guardian_signed_at,
+      signed_at: c.signed_at
+    }
+  end
+
+  # Returns who was emailed, for the response.
+  def send_waiver_reset_email(waiver_type)
+    if @participant_event.requires_guardian?
+      gpe = @participant_event.guardian_participant_events.first
+      return "nobody (no guardian on file)" unless gpe
+
+      GuardianMailer.waiver_reset(guardian_participant_event: gpe, waiver_type: waiver_type).deliver_later
+      "guardian"
+    else
+      ParticipantMailer.waiver_ready(participant_event: @participant_event).deliver_later
+      "participant"
+    end
+  end
 
   def serialize_registration(pe)
     p = pe.participant
