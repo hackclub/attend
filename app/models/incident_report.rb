@@ -35,7 +35,9 @@ class IncidentReport < ApplicationRecord
     "event_safety" => "Event Safety / Conduct Issues",
     "medical_emergency" => "Medical Emergency",
     "hq_staff" => "Incident involving Hack Club Staff",
-    "other" => "Other"
+    # Key stays "other" for existing rows; the label says it's still a safety
+    # report, because a bare "Other" is where support questions ended up.
+    "other" => "Other safety or wellbeing concern"
   }.freeze
 
   # Priority uses the platform-wide IncidentLevel scale (S0–S3).
