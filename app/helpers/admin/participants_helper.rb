@@ -1,4 +1,18 @@
 module Admin::ParticipantsHelper
+  # Mirrors NotePolicy's read rules so authors can see who a note reaches.
+  def note_audience_label(note)
+    if note.restricted?
+      note.safeguarding? ? "Safeguarding leads only" : "Event admins & safeguarding leads only"
+    elsif note.safeguarding?
+      "Safeguarding leads only"
+    elsif note.visible_to_roles.blank?
+      "Visible to the whole event team"
+    else
+      roles = ([ "safeguarding_lead" ] | note.visible_to_roles).map(&:titleize)
+      "Visible to #{roles.to_sentence}"
+    end
+  end
+
   # Colours for ParticipantStatusPresenter tones: green done, amber waiting,
   # blue with staff right now, grey nothing to act on.
   STATUS_TONE_STYLES = {

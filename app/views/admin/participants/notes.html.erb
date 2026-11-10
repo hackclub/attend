@@ -19,11 +19,31 @@
             <%= f.select :note_type, Note.note_types.keys.map { |t| [t.titleize, t] }, {}, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
           </div>
 
-          <div>
-            <%= f.label :sensitivity, class: "block text-sm font-medium text-gray-700 mb-1" %>
-            <%= f.select :sensitivity, Note.sensitivities.keys.map { |s| [s.titleize, s] }, {}, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
-          </div>
+          <% if Note.restricted_visible_to?(current_user, current_event) %>
+            <div>
+              <%= f.label :sensitivity, class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= f.select :sensitivity, Note.sensitivities.keys.map { |s| [s.titleize, s] }, {}, class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#ec3750]" %>
+              <p class="mt-1 text-xs text-gray-500">Restricted notes are only visible to event admins and safeguarding leads.</p>
+            </div>
+          <% end %>
         </div>
+
+        <fieldset>
+          <legend class="block text-sm font-medium text-gray-700 mb-1">Who can see this?</legend>
+          <%= hidden_field_tag "note[visible_to_roles][]", "", id: nil %>
+          <div class="flex flex-wrap gap-x-6 gap-y-2">
+            <% NotePolicy::SELECTABLE_ROLES.each do |role| %>
+              <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                <%= check_box_tag "note[visible_to_roles][]", role, false, id: "note_visible_to_roles_#{role}" %>
+                <%= role.titleize %>
+              </label>
+            <% end %>
+          </div>
+          <p class="mt-1 text-xs text-gray-500">
+            Leave all unticked to share with the whole event team. Safeguarding leads always see every note,
+            and safeguarding notes are only visible to them.
+          </p>
+        </fieldset>
 
         <div>
           <%= f.submit "Add Note", class: "bg-[#d42f46] text-white px-6 py-2 rounded-md hover:bg-[#b82840] cursor-pointer" %>
@@ -59,6 +79,7 @@
 
           <div class="mt-3 text-sm text-gray-500">
             <%= note.author&.email || "Unknown" %> · <%= note.created_at.strftime("%B %d, %Y at %H:%M") %>
+            · <%= note_audience_label(note) %>
           </div>
         </div>
       <% end %>

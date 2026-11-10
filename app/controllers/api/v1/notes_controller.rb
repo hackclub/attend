@@ -8,7 +8,7 @@ module Api
       before_action :set_participant_event
 
       def index
-        notes = @participant_event.notes
+        notes = NotePolicy::Scope.new(current_user, @participant_event.notes).resolve
           .includes(:author)
           .order(created_at: :desc)
 
@@ -26,7 +26,9 @@ module Api
           sensitivity: params[:sensitivity] || "normal"
         )
 
-        if note.save
+        if note.restricted? && !Note.restricted_visible_to?(current_user, @event)
+          render json: { error: "Only event admins and safeguarding leads can add restricted notes" }, status: :forbidden
+        elsif note.save
           render json: { note: note_json(note) }, status: :created
         else
           render json: { error: note.errors.full_messages.join(", ") }, status: :unprocessable_entity

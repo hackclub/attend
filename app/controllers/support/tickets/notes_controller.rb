@@ -13,6 +13,10 @@ module Support
         # event-based checks don't apply; anyone who can work the ticket can note it.
         authorize @ticket, :update?
 
+        if @note.restricted? && !Note.restricted_visible_to?(current_user, @ticket.event)
+          return redirect_to support_ticket_path(@ticket), alert: "Only event admins and safeguarding leads can add restricted notes."
+        end
+
         if @note.save
           respond_to do |format|
             format.turbo_stream
