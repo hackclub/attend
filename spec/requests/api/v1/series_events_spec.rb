@@ -282,6 +282,15 @@ RSpec.describe "Api::V1::Series::Events", type: :request do
       expect(elsewhere.reload.venue_name).to eq("Theirs")
     end
 
+    it "says which parameter is missing when the body has no event", :raise_exceptions do
+      patch "/api/v1/series/current/events/#{event.slug}",
+        params: { venue_name: "Not wrapped" },
+        headers: series_headers
+
+      expect(response).to have_http_status(:bad_request)
+      expect(JSON.parse(response.body)).to eq("error" => "Missing required parameter: event")
+    end
+
     it "returns validation errors" do
       patch "/api/v1/series/current/events/#{event.slug}",
         params: { event: { support_email: "team@example.com" } },

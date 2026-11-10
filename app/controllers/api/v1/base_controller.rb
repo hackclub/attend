@@ -14,6 +14,18 @@ module Api
         render json: { error: "Not found" }, status: :not_found
       end
 
+      # Controllers that authorize through Pundit get a JSON 403 rather than
+      # an exception (and an error report) for a caller who isn't allowed.
+      rescue_from Pundit::NotAuthorizedError do
+        render json: { error: "Forbidden" }, status: :forbidden
+      end
+
+      # params.require on a body that doesn't have the key: tell the client
+      # which one, in the same shape as every other API error.
+      rescue_from ActionController::ParameterMissing do |exception|
+        render json: { error: "Missing required parameter: #{exception.param}" }, status: :bad_request
+      end
+
       class_attribute :required_scope, instance_writer: false, default: nil
       class_attribute :action_scopes, instance_writer: false, default: {}.freeze
 

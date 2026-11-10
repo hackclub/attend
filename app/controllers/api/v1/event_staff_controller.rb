@@ -16,10 +16,6 @@ module Api
       include Api::V1::EventScoped
       include Api::V1::ApiAuditing
 
-      rescue_from Pundit::NotAuthorizedError do
-        render json: { error: "Forbidden" }, status: :forbidden
-      end
-
       before_action :set_assignment, only: [ :update, :destroy ]
 
       def index

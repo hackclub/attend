@@ -4,12 +4,6 @@ module Api
       include Pundit::Authorization
       include Api::V1::ApiAuditing
 
-      # Roles without participant API access (read_only, limited) would
-      # otherwise surface Pundit's exception as a 500 to the mobile app.
-      rescue_from Pundit::NotAuthorizedError do
-        render json: { error: "Forbidden" }, status: :forbidden
-      end
-
       requires_scope "support:read", only: :lookup
 
       before_action :restrict_api_key_actions
