@@ -29,8 +29,7 @@ RSpec.describe ProcessImportBatchJob do
 
   it "enqueues every invitation without pausing between them" do
     rows = %w[first second third].map do |label|
-      { email: "#{label}-invitee@example.com", legal_first_name: "Pat", legal_last_name: label.capitalize,
-        date_of_birth: "1/15/08" }
+      { email: "#{label}-invitee@example.com", legal_first_name: "Pat", legal_last_name: label.capitalize }
     end
     import_batch = ImportBatch.create!(event: event, status: :pending, total_count: rows.size,
       send_invitations: true, rows_data: rows)
