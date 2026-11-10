@@ -567,32 +567,13 @@ class OnboardingController < ApplicationController
     case @step
     when "profile"
       load_identity_correction
-      birthday_locked = @participant_event.too_old_for_event?
-      @participant = assign_profile_attributes(profile_params)
-      unless assign_staged_headshot(@participant)
-        flash.now[:alert] = "Your new headshot expired before it was saved. Please choose it again."
-        return false
+      # A double-submitted profile attaches the same staged headshot twice.
+      # Locking the row makes the second submit wait, then see the first's
+      # attachment and reuse it instead of inserting a duplicate.
+      Participant.transaction do
+        @participant_event.participant.lock!
+        save_profile_step
       end
-      if profile_params[:tshirt_size].blank?
-        flash.now[:alert] = "Please select a t-shirt size"
-        return false
-      end
-      # The profile form has no error summary, so say what was actually wrong
-      # (e.g. an email that belongs to this participant's guardian).
-      unless @participant.save
-        flash.now[:alert] = @participant.errors.full_messages.to_sentence
-        return false
-      end
-
-      # Saved even so: it's what they told us. From here the birthday is
-      # locked and they can only ask staff to correct it. Someone already
-      # held can still save the rest of their profile (see #update).
-      if !birthday_locked && @participant_event.too_old_for_event?
-        flash.now[:alert] = "You will be 19 or older during this event, so you can't continue registering."
-        return false
-      end
-
-      true
     when "travel"
       save_travel_data
     when "accommodation"
@@ -610,6 +591,35 @@ class OnboardingController < ApplicationController
     when "review"
       true
     end
+  end
+
+  def save_profile_step
+    birthday_locked = @participant_event.too_old_for_event?
+    @participant = assign_profile_attributes(profile_params)
+    unless assign_staged_headshot(@participant)
+      flash.now[:alert] = "Your new headshot expired before it was saved. Please choose it again."
+      return false
+    end
+    if profile_params[:tshirt_size].blank?
+      flash.now[:alert] = "Please select a t-shirt size"
+      return false
+    end
+    # The profile form has no error summary, so say what was actually wrong
+    # (e.g. an email that belongs to this participant's guardian).
+    unless @participant.save
+      flash.now[:alert] = @participant.errors.full_messages.to_sentence
+      return false
+    end
+
+    # Saved even so: it's what they told us. From here the birthday is
+    # locked and they can only ask staff to correct it. Someone already
+    # held can still save the rest of their profile (see #update).
+    if !birthday_locked && @participant_event.too_old_for_event?
+      flash.now[:alert] = "You will be 19 or older during this event, so you can't continue registering."
+      return false
+    end
+
+    true
   end
 
   def autosave_step_data
