@@ -9,6 +9,10 @@
 class BadgeRedirectsController < ActionController::Base
   layout false
 
+  # Nothing on the badge host takes a write: show is GET-only and the
+  # catch-all refuses every other verb itself.
+  skip_forgery_protection only: :elsewhere
+
   def show
     badge_redirect = BadgeRedirect.for_slack_id(params[:slack_id])
 
@@ -24,10 +28,12 @@ class BadgeRedirectsController < ActionController::Base
   # people to the page where they can set theirs instead of serving them a
   # second copy of the app on the wrong domain.
   #
-  # The catch-all route hands this every verb, and forgery protection is left
-  # on deliberately: a GET gets the redirect, and anything that tries to write
-  # to the badge domain is refused before it reaches the app at all.
+  # The catch-all route hands this every verb. A GET gets the redirect;
+  # anything that tries to write to the badge domain (bots posting at random
+  # paths) is a plain 404, never routed on to Attend's own controllers.
   def elsewhere
+    return head :not_found unless request.get? || request.head?
+
     redirect_to AttendUrls.attend_url(
       Rails.application.routes.url_helpers.dashboard_profile_path(anchor: "badge-link")
     ), allow_other_host: true, status: :moved_permanently
