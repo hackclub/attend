@@ -13,27 +13,65 @@ import { Controller } from "@hotwired/stimulus"
 // page was rendered with, reload and let the server decide what comes next.
 // We only reload on a *change*, so a page rendered mid-signing stays put and
 // nobody loses a partly-filled form.
+//
+// Polls start every few seconds and slow down the longer the page sits
+// unchanged (a tab left open shouldn't hit the server every 5s for hours),
+// and coming back to the tab — the usual end of signing in a new window —
+// checks straight away and starts the fast polling over.
 export default class extends Controller {
   static values = {
     url: String,
     signedIds: Array,
-    interval: { type: Number, default: 5000 }
+    interval: { type: Number, default: 5000 },
+    maxInterval: { type: Number, default: 30000 },
+    backoff: { type: Number, default: 1.5 }
   }
 
   connect() {
     this.rendered = this.normalise(this.signedIdsValue)
-    this.timer = setInterval(() => this.check(), this.intervalValue)
+    this.stopped = false
+    this.delay = this.intervalValue
+    this.onVisibilityChange = () => {
+      if (document.hidden) return
+      this.delay = this.intervalValue
+      this.poll()
+    }
+    document.addEventListener("visibilitychange", this.onVisibilityChange)
+    this.schedule()
   }
 
   disconnect() {
     this.stop()
+    document.removeEventListener("visibilitychange", this.onVisibilityChange)
+  }
+
+  schedule() {
+    clearTimeout(this.timer)
+    this.timer = setTimeout(() => this.poll(), this.delay)
+  }
+
+  async poll() {
+    clearTimeout(this.timer)
+    this.timer = null
+    // A tab coming back while a check is already out: that check reschedules.
+    if (this.stopped || this.checking) return
+
+    this.checking = true
+    try {
+      await this.check()
+    } finally {
+      this.checking = false
+    }
+    if (this.stopped) return
+
+    this.delay = Math.min(this.delay * this.backoffValue, this.maxIntervalValue)
+    this.schedule()
   }
 
   stop() {
-    if (this.timer) {
-      clearInterval(this.timer)
-      this.timer = null
-    }
+    this.stopped = true
+    clearTimeout(this.timer)
+    this.timer = null
   }
 
   async check() {
