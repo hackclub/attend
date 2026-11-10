@@ -50,8 +50,49 @@ RSpec.describe Bans::UcatSync do
       expect(described_class.qualifies?("Action Taken" => "Temp Ban", "Action Until" => "not a date", "Status" => "resolved")).to be false
     end
 
-    it "treats a date-only end as lasting the whole day" do
-      expect(described_class.action_until("Action Taken" => "Temp Ban", "Action Until" => "2030-01-01")).to eq(Time.zone.parse("2030-01-01").end_of_day)
+    it "counts a perma ban with an end date only until then, and one without a usable date indefinitely" do
+      expect(described_class.qualifies?("Action Taken" => "Perma Ban", "Action Until" => "2030-01-01T00:00:00.000Z", "Status" => "resolved")).to be true
+      expect(described_class.qualifies?("Action Taken" => "Perma Ban", "Action Until" => "2020-01-01T00:00:00.000Z", "Status" => "resolved")).to be false
+      expect(described_class.qualifies?("Action Taken" => "Perma Ban", "Action Until" => "not a date", "Status" => "resolved")).to be true
+      expect(described_class.action_until("Action Taken" => "Perma Ban", "Action Until" => "not a date")).to be_nil
+    end
+
+    # Time.zone.parse reads these as real dates, filling the rest from today,
+    # so they could land in the past and lift the ban.
+    [ "March", "12", "Jan", "next week", "2026-13-45", "01/02/2030" ].each do |raw|
+      it "keeps a perma ban indefinite when Action Until is the partial or loose date #{raw.inspect}" do
+        travel_to(Time.zone.parse("2026-11-20 12:00")) do
+          fields = { "Action Taken" => "Perma Ban", "Action Until" => raw, "Status" => "resolved" }
+          expect(described_class.action_until(fields)).to be_nil
+          expect(described_class.qualifies?(fields)).to be true
+        end
+      end
+    end
+
+    [
+      "Perma Ban",
+      "Indefinite ban",
+      "ban",
+      "Warning, Ban",
+      "Perma Ban, indefinite ban + 1wk shush on appeal",
+      "Temp Ban, Perma Ban",
+      "Indef Ban, Must verify identity"
+    ].each do |action|
+      it "is a ban case for #{action.inspect} that ends on its Action Until date" do
+        future = { "Action Taken" => action, "Action Until" => "2030-01-01T09:30:00.000Z", "Status" => "resolved" }
+        past = future.merge("Action Until" => "2020-01-01T00:00:00.000Z")
+
+        expect(described_class.action_until(future)).to eq(Time.utc(2030, 1, 1, 9, 30))
+        expect(described_class.qualifies?(future)).to be true
+        expect(described_class.ban_case?(past)).to be true
+        expect(described_class.qualifies?(past)).to be false
+      end
+    end
+
+    it "treats a date-only end as lasting until that day is over everywhere" do
+      last_moment = Time.utc(2030, 1, 2, 11, 59, 59)
+      expect(described_class.action_until("Action Taken" => "Temp Ban", "Action Until" => "2030-01-01").to_i).to eq(last_moment.to_i)
+      expect(described_class.action_until("Action Taken" => "Perma Ban", "Action Until" => "2030-01-01").to_i).to eq(last_moment.to_i)
       expect(described_class.action_until("Action Taken" => "Temp Ban", "Action Until" => "2030-01-01T09:30:00.000Z")).to eq(Time.zone.parse("2030-01-01T09:30:00Z"))
     end
   end
@@ -86,12 +127,18 @@ RSpec.describe Bans::UcatSync do
       end
     end
 
-    it "revokes the ban when UCAT ends the temp ban early" do
+    it "lets the ban expire on the new date when UCAT ends the temp ban early" do
       sync
-      records[0] = row(id: "T1", email: "temp@example.com", action: "Temp Ban", until_at: 1.day.ago)
+      ended = 1.day.ago.change(usec: 0)
+      records[0] = row(id: "T1", email: "temp@example.com", action: "Temp Ban", until_at: ended)
 
-      expect(sync(force: true).revoked).to eq(1)
-      expect(Ban.ucat.sole).to be_revoked
+      result = sync
+      expect(result.revoked).to eq(0)
+      expect(result.expired).to eq(1)
+      ban = Ban.ucat.sole
+      expect(ban).not_to be_revoked
+      expect(ban.expires_at).to eq(ended)
+      expect(ban.status).to eq("Expired")
     end
 
     it "becomes indefinite when the same person also has a perma ban" do
@@ -105,6 +152,54 @@ RSpec.describe Bans::UcatSync do
       records << row(id: "T2", email: "temp@example.com", action: "Temp Ban", until_at: later)
       sync
       expect(Ban.ucat.sole.expires_at).to eq(later)
+    end
+
+    it "stays bounded when the same person's perma ban also has an end date" do
+      later = 4.weeks.from_now.change(usec: 0)
+      records << row(id: "T2", email: "temp@example.com", action: "Perma Ban", until_at: later)
+      sync
+      expect(Ban.ucat.sole.expires_at).to eq(later)
+    end
+  end
+
+  describe "perma bans with an end date" do
+    let(:until_at) { 2.weeks.from_now.change(usec: 0) }
+    let(:records) { [ row(id: "P1", email: "perma@example.com", until_at: until_at) ] }
+
+    it "mirrors the case's end date as the ban expiry" do
+      sync
+      ban = Ban.ucat.sole
+      expect(ban.expires_at).to eq(until_at)
+      expect(ban).to be_active
+    end
+
+    it "lets the ban expire once the date has passed" do
+      sync
+
+      travel_to(until_at + 1.day) do
+        expect(sync.revoked).to eq(0)
+        expect(Ban.ucat.sole.status).to eq("Expired")
+        expect(Ban.banned?("perma@example.com")).to be false
+      end
+    end
+
+    it "does not create a row for one whose date has already passed" do
+      records[0] = row(id: "P1", email: "perma@example.com", until_at: 1.day.ago)
+      expect(sync.added).to eq(0)
+      expect(Ban.count).to eq(0)
+    end
+
+    it "stays indefinite when the same person also has an undated perma ban" do
+      records << row(id: "P2", email: "perma@example.com")
+      sync
+      expect(Ban.ucat.sole.expires_at).to be_nil
+    end
+
+    it "becomes indefinite again when UCAT clears the date" do
+      sync
+      records[0] = row(id: "P1", email: "perma@example.com")
+      sync
+      expect(Ban.ucat.sole.expires_at).to be_nil
     end
   end
 
@@ -240,6 +335,19 @@ RSpec.describe Bans::UcatSync do
       expect(result.reinstated).to eq(1)
       expect(result.unchanged).to eq(kept.size)
       expect(expired.reload).to be_active
+    end
+
+    it "lets bans whose perma date is already past expire on first sync without tripping the safety limit" do
+      ended = Array.new(6) { |i| create(:ban, source: :ucat, external_key: "ended#{i}@example.com", email: "ended#{i}@example.com") }
+      records.concat(ended.map { |ban| row(id: ban.external_key, email: ban.external_key, until_at: 1.week.ago) })
+
+      result = sync
+      expect(result.revoked).to eq(1) # just "lifted"
+      expect(result.expired).to eq(6)
+      ended.each do |ban|
+        expect(ban.reload).not_to be_revoked
+        expect(ban.status).to eq("Expired")
+      end
     end
 
     it "leaves a ban an admin revoked by hand alone" do
