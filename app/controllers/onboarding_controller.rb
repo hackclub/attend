@@ -5,6 +5,7 @@ class OnboardingController < ApplicationController
   include OptionalDocumentEnrolment
   include OnboardingAccountsStep
   include DocusealStatusPolling
+  include DirectUploadedBlobs
 
   before_action :force_html_format, except: [ :documents_status ]
   before_action :store_invitation_token
@@ -323,25 +324,20 @@ class OnboardingController < ApplicationController
   # against the same rules as a submitted photo, but only staged: the signed id
   # goes back into the form, and the photo replaces the current headshot when
   # the profile is submitted (see #assign_staged_headshot).
+  #
+  # The browser normally uploads the photo straight to storage first and sends
+  # only its blob's signed id (`signed_blob_id`), so this request never waits
+  # on the bucket. When that direct upload can't happen (no JavaScript module
+  # support, storage CORS not set up, a network error) the file itself comes
+  # as `headshot`, the way it always has.
   def stage_headshot
-    file = params[:headshot]
-    unless file.is_a?(ActionDispatch::Http::UploadedFile)
-      render json: { success: false, error: "Please choose a photo." }, status: :unprocessable_content
-      return
+    blob = if params[:signed_blob_id].present?
+      stage_direct_uploaded_headshot
+    else
+      stage_posted_headshot
     end
+    return unless blob
 
-    # A throwaway participant runs the model's headshot checks (type, size,
-    # whether it decodes) without touching the real record. Only the first
-    # problem is shown: a text file is both the wrong type and unreadable.
-    error = Participant.new(headshot: file).tap(&:validate).errors.full_messages_for(:headshot).first
-    if error
-      render json: { success: false, error: error }, status: :unprocessable_content
-      return
-    end
-
-    # Validation read the file, so upload it from the start.
-    file.tempfile.rewind
-    blob = ActiveStorage::Blob.create_and_upload!(io: file.tempfile, filename: file.original_filename, content_type: file.content_type)
     # Cleans up a photo that's never submitted. Blob#purge leaves one that's
     # been attached by then alone.
     ActiveStorage::PurgeJob.set(wait: STAGED_HEADSHOT_TTL).perform_later(blob)
@@ -1189,10 +1185,54 @@ class OnboardingController < ApplicationController
     return false unless blob
 
     participant.headshot = blob
+    # Checked when it was staged; no need to read it back from storage again.
+    participant.trust_decoded_image(blob)
     # Carried back into the form if something else stops the save, so the
     # photo doesn't have to be picked again.
     @staged_headshot_id = params[:staged_headshot]
     true
+  end
+
+  # A photo the browser already put in storage. The same checks as a posted
+  # file, run against the stored bytes; one that fails is deleted again.
+  def stage_direct_uploaded_headshot
+    blob = find_direct_uploaded_blob(params[:signed_blob_id])
+    return render_staged_headshot_error("That upload has expired. Please choose the photo again.") unless blob
+
+    # What the bytes are, not what the browser called them: the same sniff a
+    # posted file gets when Active Storage stores it.
+    blob.identify
+    if (error = headshot_error(blob))
+      discard_direct_upload(blob)
+      return render_staged_headshot_error(error)
+    end
+
+    blob
+  end
+
+  def stage_posted_headshot
+    file = params[:headshot]
+    return render_staged_headshot_error("Please choose a photo.") unless file.is_a?(ActionDispatch::Http::UploadedFile)
+
+    if (error = headshot_error(file))
+      return render_staged_headshot_error(error)
+    end
+
+    # Validation read the file, so upload it from the start.
+    file.tempfile.rewind
+    ActiveStorage::Blob.create_and_upload!(io: file.tempfile, filename: file.original_filename, content_type: file.content_type)
+  end
+
+  # A throwaway participant runs the model's headshot checks (type, size,
+  # whether it decodes) without touching the real record. Only the first
+  # problem is shown: a text file is both the wrong type and unreadable.
+  def headshot_error(attachable)
+    Participant.new(headshot: attachable).tap(&:validate).errors.full_messages_for(:headshot).first
+  end
+
+  def render_staged_headshot_error(error)
+    render json: { success: false, error: error }, status: :unprocessable_content
+    nil
   end
 
   # Ties a staged headshot to the participant who uploaded it.

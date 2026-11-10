@@ -71,7 +71,7 @@
         <% end %>
       </div>
 
-      <div data-controller="headshot-upload" data-headshot-upload-url-value="<%= onboarding_stage_headshot_path(event_id: current_event.id) %>">
+      <div data-controller="headshot-upload" data-headshot-upload-url-value="<%= onboarding_stage_headshot_path(event_id: current_event.id) %>" data-headshot-upload-direct-upload-url-value="<%= rails_direct_uploads_path %>">
         <%= f.label :headshot, label_text("Headshot Photo", required: !@participant.headshot.attached?), class: "portal-label" %>
         <% headshot_shown = @participant.headshot.attached? && @participant.headshot.blob.persisted? %>
         <div class="mb-3 flex items-center gap-4" data-headshot-upload-target="preview" <%= "hidden" unless headshot_shown %>>
