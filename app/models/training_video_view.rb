@@ -21,11 +21,14 @@ class TrainingVideoView < ApplicationRecord
   end
 
   def record_heartbeat!(position:, now: Time.current)
+    # Only the lesson's known length counts; what the player reports is
+    # ignored. Unknown means the view can't finish — fail closed rather than
+    # trust a length a forged request could shorten. Read before locking:
+    # the lock reloads this row and drops the cached lesson.
+    known_duration = lesson.known_video_duration
+
     with_lock do
-      # Only the lesson's known length counts; what the player reports is
-      # ignored. Unknown means the view can't finish — fail closed rather than
-      # trust a length a forged request could shorten.
-      self.duration_seconds = lesson.known_video_duration
+      self.duration_seconds = known_duration
 
       # The row is created when the lesson page loads (LessonsController#show),
       # so the first heartbeat is measured from then.

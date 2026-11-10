@@ -29,7 +29,7 @@ module Training
     # Every course and lesson action goes through here, so an invite-only
     # course can't be started, continued or finished without access.
     def set_course
-      @course = visible_courses.includes(:badge, lessons: { questions: :options }).find_by!(slug: params[:course_slug] || params[:slug])
+      @course = visible_courses.includes(*course_preloads).find_by!(slug: params[:course_slug] || params[:slug])
 
       unless training_access.accessible?(@course)
         render "training/courses/not_invited", status: :forbidden
@@ -44,6 +44,12 @@ module Training
       end
 
       @enrollment = current_user.training_enrollments.find_by(course: @course)
+      # Share the loaded course rather than fetching it again.
+      @enrollment.course = @course if @enrollment
+    end
+
+    def course_preloads
+      [ :badge, { lessons: { questions: :options } } ]
     end
   end
 end

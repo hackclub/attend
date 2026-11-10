@@ -73,11 +73,18 @@ module Training
       @lesson.learn_video_duration!(params[:duration]) if current_user.global_admin?
 
       view = @enrollment.video_view_for(@lesson)
+      view.lesson = @lesson
       view.record_heartbeat!(position: params[:position])
-      render json: { watched: view.watched_seconds, complete: @enrollment.video_watched?(@lesson) }
+      render json: { watched: view.watched_seconds, complete: view.completed? || @enrollment.lesson_completed?(@lesson) }
     end
 
     private
+
+    # Heartbeats arrive every few seconds from everyone watching, so they skip
+    # the quiz questions the rest of the lesson pages need.
+    def course_preloads
+      action_name == "video_progress" ? [ :lessons ] : super
+    end
 
     def require_enrollment
       return if @enrollment
