@@ -96,14 +96,7 @@ class GuardianPortalCompletion
       c.guardian_participant_event = guardian_participant_event
     end
 
-    unless waiver.signed? || waiver.sent?
-      DocusealJobs::CreateMinorWaiverJob.perform_later(waiver.id)
-    end
-
-    if waiver.failed?
-      waiver.update!(status: :pending, failure_reason: nil)
-      DocusealJobs::CreateMinorWaiverJob.perform_later(waiver.id)
-    end
+    DocusealJobs::CreateMinorWaiverJob.perform_later(waiver.id) if send_waiver?(waiver)
 
     # Create and trigger the freedom waiver (only if enabled for this event)
     return unless event.freedom_waivers_enabled?
@@ -113,17 +106,27 @@ class GuardianPortalCompletion
       c.guardian_participant_event = guardian_participant_event
     end
 
-    unless freedom_waiver.signed? || freedom_waiver.sent?
-      DocusealJobs::CreateFreedomWaiverJob.perform_later(freedom_waiver.id)
-    end
-
-    if freedom_waiver.failed?
-      freedom_waiver.update!(status: :pending, failure_reason: nil)
-      DocusealJobs::CreateFreedomWaiverJob.perform_later(freedom_waiver.id)
-    end
+    DocusealJobs::CreateFreedomWaiverJob.perform_later(freedom_waiver.id) if send_waiver?(freedom_waiver)
   end
 
   private
+
+  # Runs on every render of the consents step, so it must stay quiet once a
+  # waiver can't be sent: a failure on the event's template config is left
+  # failed (organisers see it on the admin consents page) until the template
+  # changes, instead of hitting DocuSeal again on each page view.
+  def send_waiver?(consent)
+    return false if consent.signed? || consent.voided?
+
+    if consent.failed?
+      return false unless Docuseal::WaiverTemplate.retry_failed?(consent)
+
+      consent.update!(status: :pending, failure_reason: nil)
+      return true
+    end
+
+    consent.pending?
+  end
 
   # A withdrawn or rejected registration is closed: a guardian finishing a
   # DocuSeal link that was still open must not complete, or the commit hook

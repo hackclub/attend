@@ -167,15 +167,21 @@ RSpec.describe "Onboarding documents step", type: :request do
         "submitters" => [ { "slug" => "pslug", "completed_at" => nil } ]
       )
 
-      get status_path
-      get status_path # inside the throttle window — no second API call
+      # The poll answers from the database and syncs in the background.
+      perform_enqueued_jobs do
+        get status_path
+        get status_path # inside the throttle window — no second API call
+      end
       expect(client).to have_received(:get_submission).once
 
       allow(client).to receive(:get_submission).with("sub-2").and_return(
         "submitters" => [ { "slug" => "pslug", "completed_at" => Time.current.iso8601 } ]
       )
 
-      travel(OnboardingController::DOCUSEAL_POLL_THROTTLE + 1.second) { get status_path }
+      travel(OnboardingController::DOCUSEAL_POLL_THROTTLE + 1.second) do
+        perform_enqueued_jobs { get status_path } # finds the signature
+        get status_path # reports it
+      end
 
       expect(signed_ids).to eq([ consent.id.to_s ])
       expect(consent.reload).to be_signed

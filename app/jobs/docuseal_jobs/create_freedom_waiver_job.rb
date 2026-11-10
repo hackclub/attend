@@ -1,8 +1,8 @@
 module DocusealJobs
   class CreateFreedomWaiverJob < ApplicationJob
-    queue_as :default
+    include WaiverJobErrors
 
-    DEFAULT_TEMPLATE_ID = 2274416
+    queue_as :default
 
     def perform(consent_id)
       consent = Consent.find(consent_id)
@@ -20,7 +20,8 @@ module DocusealJobs
       event = participant_event.event
 
       client = Docuseal::Client.for(consent)
-      template_id = template_id_for(participant_event)
+      template_id = Docuseal::WaiverTemplate.id_for_consent(consent, kind: :freedom_waiver)
+      return fail_unconfigured_template!(consent, :freedom_waiver) if template_id.blank?
 
       # Fetch template to get correct role and field names (varies by template)
       template = client.get_template(template_id)
@@ -84,6 +85,10 @@ module DocusealJobs
     rescue Docuseal::ValidationError => e
       consent.update!(status: :failed, failure_reason: "validation_error: #{e.message}")
       Rails.logger.error("Docuseal validation error: #{e.message}")
+    rescue Docuseal::NotFoundError
+      fail_missing_template!(consent, template_id)
+    rescue *WaiverJobErrors::TRANSIENT_ERRORS
+      raise # retry_on backs off and retries
     rescue Docuseal::Error => e
       consent.update!(status: :failed, failure_reason: "docuseal_error: #{e.message}")
       Rails.logger.error("Docuseal freedom waiver failed for consent #{consent_id}: #{e.message}")
@@ -91,11 +96,6 @@ module DocusealJobs
     end
 
     private
-
-    def template_id_for(participant_event)
-      event = participant_event.event
-      event.docuseal_freedom_waiver_template_id.presence || DEFAULT_TEMPLATE_ID
-    end
 
     # Fallback fuzzy matching for backwards compatibility
     def guardian_fields_fuzzy(guardian, participant, template_fields)

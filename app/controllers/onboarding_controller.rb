@@ -1430,6 +1430,8 @@ class OnboardingController < ApplicationController
     end
 
     if consent.failed?
+      return unless Docuseal::WaiverTemplate.retry_failed?(consent)
+
       consent.update!(status: :pending, failure_reason: nil)
       DocusealJobs::CreateAdultWaiverJob.perform_later(consent.id)
     elsif !consent.signed? && consent.docuseal_participant_slug.blank?
@@ -1449,12 +1451,12 @@ class OnboardingController < ApplicationController
       c.guardian_participant_event = guardian_participant_event
     end
 
-    unless consent.signed? || consent.sent?
-      DocusealJobs::CreateMinorWaiverJob.perform_later(consent.id)
-    end
-
     if consent.failed?
+      return unless Docuseal::WaiverTemplate.retry_failed?(consent)
+
       consent.update!(status: :pending, failure_reason: nil)
+      DocusealJobs::CreateMinorWaiverJob.perform_later(consent.id)
+    elsif consent.pending?
       DocusealJobs::CreateMinorWaiverJob.perform_later(consent.id)
     end
   end

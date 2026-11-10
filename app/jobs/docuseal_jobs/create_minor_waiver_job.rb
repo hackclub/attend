@@ -1,8 +1,8 @@
 module DocusealJobs
   class CreateMinorWaiverJob < ApplicationJob
-    queue_as :default
+    include WaiverJobErrors
 
-    DEFAULT_TEMPLATE_ID = 2274072
+    queue_as :default
 
     # dates_changed: the waiver replaces one voided because the event's dates
     # moved (Docuseal::WaiverDateRegeneration), so the teen's email says why.
@@ -23,7 +23,8 @@ module DocusealJobs
       event = participant_event.event
 
       client = Docuseal::Client.for(consent)
-      template_id = template_id_for(participant_event)
+      template_id = Docuseal::WaiverTemplate.id_for_consent(consent, kind: :minor_waiver)
+      return fail_unconfigured_template!(consent, :minor_waiver) if template_id.blank?
 
       # Fetch template to get correct role and field names (varies by template)
       template = client.get_template(template_id)
@@ -110,6 +111,10 @@ module DocusealJobs
     rescue Docuseal::ValidationError => e
       consent.update!(status: :failed, failure_reason: "validation_error: #{e.message}")
       Rails.logger.error("Docuseal validation error: #{e.message}")
+    rescue Docuseal::NotFoundError
+      fail_missing_template!(consent, template_id)
+    rescue *WaiverJobErrors::TRANSIENT_ERRORS
+      raise # retry_on backs off and retries
     rescue Docuseal::Error => e
       consent.update!(status: :failed, failure_reason: "docuseal_error: #{e.message}")
       Rails.logger.error("Docuseal minor waiver failed for consent #{consent_id}: #{e.message}")
@@ -117,11 +122,6 @@ module DocusealJobs
     end
 
     private
-
-    def template_id_for(participant_event)
-      event = participant_event.event
-      event.docuseal_waiver_template_id.presence || DEFAULT_TEMPLATE_ID
-    end
 
     # Fallback fuzzy matching for backwards compatibility
     def guardian_fields_fuzzy(guardian, template_fields)

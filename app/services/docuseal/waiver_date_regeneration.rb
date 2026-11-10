@@ -141,7 +141,7 @@ module Docuseal
     end
 
     # adult_waiver only counts when it's what adults actually get, mirroring
-    # CreateAdultWaiverJob#template_id_for: the event's waiver template wins.
+    # Docuseal::WaiverTemplate.id_for (adult_waiver): the event's waiver template wins.
     def template_id_in_use(template_type)
       return if template_type == "adult_waiver" && @event.docuseal_waiver_template_id.present?
 

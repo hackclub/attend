@@ -21,6 +21,8 @@ module DocusealStatusPolling
     return if Rails.cache.read(key)
     Rails.cache.write(key, true, expires_in: DOCUSEAL_POLL_THROTTLE)
 
-    consent.sync_from_docuseal!
+    # Off the request: a DocuSeal round-trip is ~250-400ms, and the poll
+    # only needs the next answer to reflect it.
+    SyncConsentFromDocusealJob.perform_later(consent.id)
   end
 end
