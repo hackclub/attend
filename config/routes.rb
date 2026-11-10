@@ -738,6 +738,11 @@ Rails.application.routes.draw do
   end
 
   get "up" => "rails/health#show", as: :rails_health_check
-  get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
-  get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
+  # Pinned to the one format each has a template for. Otherwise the format
+  # comes from the Accept header, and a crawler asking for text/html made
+  # Rails::PwaController raise MissingTemplate.
+  get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker,
+    defaults: { format: :js }, constraints: { format: :js }
+  get "manifest" => "rails/pwa#manifest", as: :pwa_manifest,
+    defaults: { format: :json }, constraints: { format: :json }
 end
