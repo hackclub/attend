@@ -158,7 +158,7 @@ class DashboardController < ApplicationController
   end
 
   def update_public_profile
-    if @participant.update(public_profile_params)
+    if save_public_profile
       @participant.public_profile_photo.purge_later if params[:remove_public_profile_photo] == "1"
       update_public_profile_event_visibility
       update_public_profile_staff_event_visibility
@@ -484,6 +484,17 @@ class DashboardController < ApplicationController
     @visa_letter_events = Event.open_for_visa_letters
     @visa_letter_applications = current_user.visa_letter_applications
       .where(event_id: @visa_letter_events.map(&:id)).index_by(&:event_id)
+  end
+
+  # The uniqueness validation can't see a slug another request claims between
+  # its check and our write, so the index has the last word.
+  def save_public_profile
+    @participant.update(public_profile_params)
+  rescue ActiveRecord::RecordNotUnique => e
+    raise unless e.message.include?("index_participants_on_public_profile_slug")
+
+    @participant.errors.add(:public_profile_slug, :taken)
+    false
   end
 
   def public_profile_params

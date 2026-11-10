@@ -33,6 +33,30 @@ RSpec.describe "Dashboard public profile settings", type: :request do
       expect(participant.public_profile_slug).to eq("grace-hopper")
     end
 
+    it "saves with the profile off when another row already holds a blank slug" do
+      # A row saved before blank slugs became nil.
+      create(:participant).update_column(:public_profile_slug, "")
+
+      patch dashboard_public_profile_path, params: {
+        participant: { public_profile_enabled: "0", public_profile_slug: "", public_profile_bio: "" }
+      }
+
+      expect(response).to redirect_to(dashboard_profile_path)
+      expect(flash[:notice]).to eq("Public profile is off.")
+      expect(participant.reload.public_profile_slug).to be_nil
+    end
+
+    it "says the address is taken when another request claims the slug first" do
+      allow_any_instance_of(Participant).to receive(:save).and_raise(
+        ActiveRecord::RecordNotUnique, "duplicate key value violates unique constraint \"index_participants_on_public_profile_slug\""
+      )
+
+      patch dashboard_public_profile_path, params: { participant: { public_profile_enabled: "1", public_profile_slug: "gracie" } }
+
+      expect(response).to redirect_to(dashboard_profile_path)
+      expect(flash[:alert]).to eq("Public profile slug has already been taken")
+    end
+
     it "saves a custom slug, bio, and profile details" do
       patch dashboard_public_profile_path, params: {
         participant: {

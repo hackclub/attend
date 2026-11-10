@@ -29,6 +29,13 @@ class Travel < ApplicationRecord
     provisional: "provisional",
     confirmed: "confirmed"
   }
+  # The travel forms' status selects post "" until a choice is made, and the
+  # enum casts that to nil, which the NOT NULL column rejects on autosave.
+  # Blank means we don't know yet, which is what the column defaults to.
+  def arrangement_status=(value)
+    super(value.presence || "unknown")
+  end
+
   enum :visa_status, { not_required: "not_required", pending: "not_applied", applied: "applied", approved: "approved", denied: "denied" }
 
   validates :participant_event_id, presence: true

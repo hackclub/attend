@@ -355,10 +355,10 @@ class Participant < ApplicationRecord
     errors.add(:email, "cannot be the same as a parent or guardian's email address")
   end
 
+  # Blank becomes nil: the profile form posts "" for the slug while the
+  # profile is off, and the unique index only lets one row hold "".
   def normalize_public_profile_slug
-    return if public_profile_slug.blank?
-
-    self.public_profile_slug = public_profile_slug.strip.downcase
+    self.public_profile_slug = public_profile_slug.to_s.strip.downcase.presence
   end
 
   def generate_public_profile_slug

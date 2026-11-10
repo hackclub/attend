@@ -90,6 +90,19 @@ RSpec.describe "onboarding invitation entry", type: :request do
     expect(participant.reload).to have_attributes(address_line_1: "15 Example Rd", city: "Sample Town", state: "VT")
   end
 
+  it "links an imported registrant whose phone the model would now reject" do
+    participant = create(:participant, email: invitation.email, user: nil)
+    participant.update_column(:phone, "call the office")
+    user = create(:user, email: invitation.email)
+    sign_in user
+
+    get onboarding_path(invite: invitation.token)
+
+    expect(response).to redirect_to(onboarding_welcome_path(event_id: event.id))
+    expect(participant.reload.user).to eq(user)
+    expect(participant.phone).to eq("call the office")
+  end
+
   it "explains an account mismatch before linking or creating records" do
     user = create(:user, email: "wrong@example.com")
     sign_in user

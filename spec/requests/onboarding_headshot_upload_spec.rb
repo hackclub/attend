@@ -114,6 +114,21 @@ RSpec.describe "Onboarding headshot upload", type: :request do
       expect(participant.reload.headshot.blob).to eq(staged_blob)
     end
 
+    # A double-submit: the second request read the participant before the
+    # first one attached the photo, then tries to attach the same blob again.
+    it "reuses the first attachment when the same photo is submitted twice at once" do
+      signed_id = stage_photo
+      staged_blob = ActiveStorage::Blob.last
+      stale = Participant.find(participant.id).tap(&:headshot_attachment)
+
+      submit_profile(staged_headshot: signed_id)
+      allow_any_instance_of(ParticipantEvent).to receive(:participant).and_return(stale)
+      submit_profile(staged_headshot: signed_id)
+
+      expect(response).to redirect_to(onboarding_step_path(step: "travel", event_id: event.id))
+      expect(ActiveStorage::Attachment.where(record: participant, name: "headshot").pluck(:blob_id)).to eq([ staged_blob.id ])
+    end
+
     it "replaces the current headshot and purges the old one" do
       old_blob = attach_old_headshot
       signed_id = stage_photo
