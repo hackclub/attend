@@ -689,6 +689,10 @@ Rails.application.routes.draw do
         # never an email address — those don't belong in a URL.
         resources :staff, only: [ :index, :create, :update, :destroy ], controller: "event_staff"
 
+        # People working the event without a role: on the roster for their
+        # training, with no access to the event itself.
+        resources :volunteers, only: [ :index, :create, :destroy ], controller: "event_volunteers"
+
         resources :participants, only: [ :index, :show, :create, :update, :destroy ], controller: "participants" do
           collection do
             get :search
