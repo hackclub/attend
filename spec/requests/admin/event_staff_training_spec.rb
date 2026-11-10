@@ -73,4 +73,59 @@ RSpec.describe "Event staff training flags", type: :request do
     get admin_training_badge_path(badge)
     expect(response.body).to include("Everyone working an event")
   end
+  describe "as staff who aren't event admins" do
+    let(:staff) { create(:event_role_assignment, event: event, role: "limited").user }
+    let!(:colleague) { create(:event_role_assignment, event: event, role: "ops") }
+
+    before do
+      sign_in staff
+      get select_admin_event_path(slug: event.slug)
+    end
+
+    [ true, false ].each do |console|
+      it "shows the roster and the volunteer form, without staff controls (#{console ? "console" : "original"})" do
+        staff.update!(admin_console_beta: console)
+
+        get admin_event_staff_index_path(event_slug: event.slug)
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include(colleague.user.email, "Volunteers", admin_event_volunteers_path(event))
+        expect(response.body).not_to include(new_admin_event_staff_path(event))
+        expect(response.body).not_to include(admin_event_staff_path(event, colleague))
+      end
+    end
+
+    it "adds and removes volunteers" do
+      expect {
+        post admin_event_volunteers_path(event_slug: event.slug), params: { email: "another-volunteer@example.com" }
+      }.to have_enqueued_mail(TrainingMailer, :volunteer_added)
+      record = event.event_volunteers.sole
+      expect(record.added_by).to eq(staff)
+
+      expect {
+        delete admin_event_volunteer_path(event_slug: event.slug, id: record.id)
+      }.to change(EventVolunteer, :count).by(-1)
+    end
+
+    it "still can't add, change or remove staff" do
+      expect {
+        post admin_event_staff_index_path(event_slug: event.slug),
+          params: { email: "sneaky@example.com", event_role_assignment: { role: "event_admin" } }
+      }.not_to change(EventRoleAssignment, :count)
+
+      patch admin_event_staff_path(event_slug: event.slug, id: colleague.id), params: { event_role_assignment: { role: "event_admin" } }
+      expect(colleague.reload.role).to eq("ops")
+
+      expect {
+        delete admin_event_staff_path(event_slug: event.slug, id: colleague.id)
+      }.not_to change(EventRoleAssignment, :count)
+    end
+  end
+
+  it "doesn't let someone with no role on the event add volunteers" do
+    sign_in create(:user)
+    expect {
+      post admin_event_volunteers_path(event_slug: event.slug), params: { email: "another-volunteer@example.com" }
+    }.not_to change(EventVolunteer, :count)
+  end
 end

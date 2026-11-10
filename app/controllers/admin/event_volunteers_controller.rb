@@ -1,9 +1,11 @@
 module Admin
   # Volunteers sit on the staff page so their training shows next to everyone
-  # else's, but they get no access to the event (see EventVolunteer).
+  # else's, but they get no access to the event (see EventVolunteer). Anyone
+  # with a role on the event can manage them, not just event admins: adding a
+  # volunteer grants nothing beyond a training invite.
   class EventVolunteersController < BaseController
     before_action :require_event_selected
-    before_action :require_event_admin_access
+    before_action :require_event_access
 
     def create
       email = params[:email].to_s.strip.downcase
@@ -32,11 +34,10 @@ module Admin
 
     private
 
-    def require_event_admin_access
-      return if current_user.global_admin?
-      return if current_user.event_admin_for?(current_event)
+    def require_event_access
+      return if current_user.can_access_event?(current_event)
 
-      redirect_to admin_root_path, alert: "Only event admins can manage volunteers."
+      redirect_to admin_root_path, alert: "You don't have access to this event."
     end
   end
 end

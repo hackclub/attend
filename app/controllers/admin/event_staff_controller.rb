@@ -1,7 +1,9 @@
 module Admin
   class EventStaffController < BaseController
     before_action :require_event_selected
-    before_action :require_event_admin_access
+    # Anyone working the event can see who's on it and their training, and
+    # add volunteers from here; changing the staff themselves is for admins.
+    before_action :require_event_admin_access, except: :index
     before_action :set_event_role_assignment, only: [ :update, :destroy ]
 
     def index
@@ -93,7 +95,9 @@ module Admin
     # Why this row's role can't be changed here, or nil when it can. The index
     # uses the same check to lock the cell, so the two can't disagree.
     def role_change_refusal(assignment)
-      if assignment.inherited_from_series?
+      if !can_manage_staff?
+        "Only event admins can change roles."
+      elsif assignment.inherited_from_series?
         "Series #{assignment.series_role}s are event admins on every event in the series. Change their role from the series members page."
       elsif assignment.user_id == current_user.id && !current_user.global_admin?
         "You can't change your own role. Ask another event admin."
@@ -121,9 +125,13 @@ module Admin
       ), status: status
     end
 
+    def can_manage_staff?
+      current_user.event_admin_for?(current_event)
+    end
+    helper_method :can_manage_staff?
+
     def require_event_admin_access
-      return if current_user.global_admin?
-      return if current_user.event_admin_for?(current_event)
+      return if can_manage_staff?
 
       redirect_to admin_root_path, alert: "Only event admins can manage staff."
     end
