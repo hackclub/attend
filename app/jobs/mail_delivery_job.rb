@@ -5,6 +5,13 @@
 # problem. Flag the owning Participant/Guardian so admins see it and manual
 # sends refuse early, then drop the job.
 class MailDeliveryJob < ActionMailer::MailDeliveryJob
+  # The record the mail was about (usually a registration) was deleted between
+  # enqueue and send, so there's nothing left to send about.
+  discard_on ActiveJob::DeserializationError do |job, error|
+    mailer, action = job.serialized_arguments || job.arguments
+    Rails.logger.warn("[MailDeliveryJob] Discarded #{mailer}##{action}: #{error.cause&.class || error.class} while loading its arguments")
+  end
+
   discard_on Postmark::InactiveRecipientError do |job, error|
     mailer, action = job.arguments
     if error.recipients.blank?

@@ -46,6 +46,16 @@ RSpec.describe MailDeliveryJob do
     end
   end
 
+  it "discards a send whose record was deleted before it ran" do
+    participant_event = create(:participant_event)
+    job = described_class.new("ParticipantMailer", "travel_update_reminder", "deliver_now",
+      args: [ participant_event ])
+    serialized = job.serialize
+    participant_event.destroy!
+
+    expect { ActiveJob::Base.execute(serialized) }.not_to raise_error
+  end
+
   it "re-raises other Postmark errors" do
     expect {
       perform_failing_delivery(Postmark::ApiInputError.new(300, "bad", { "Message" => "bad" }))
