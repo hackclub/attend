@@ -1,8 +1,6 @@
 class ProcessImportBatchJob < ApplicationJob
   queue_as :default
 
-  INVITE_DELAY_SECONDS = 1.0
-
   def perform(import_batch_id)
     @batch = ImportBatch.find(import_batch_id)
     @event = @batch.event
@@ -145,10 +143,9 @@ class ProcessImportBatchJob < ApplicationJob
         Rails.logger.error("[ProcessImportBatchJob] Failed to #{verb} invitation for #{participant.email}: #{e.message}")
       end
 
-      next unless sending
-
-      @batch.broadcast_progress
-      sleep(INVITE_DELAY_SECONDS)
+      # The email itself goes out from its own MailDeliveryJob; there's
+      # nothing here to pace, so don't hold a worker between enqueues.
+      @batch.broadcast_progress if sending
     end
   end
 

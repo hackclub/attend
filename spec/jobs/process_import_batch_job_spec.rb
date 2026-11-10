@@ -27,6 +27,23 @@ RSpec.describe ProcessImportBatchJob do
     expect(import_batch.rows_data).to eq([])
   end
 
+  it "enqueues every invitation without pausing between them" do
+    rows = %w[first second third].map do |label|
+      { email: "#{label}-invitee@example.com", legal_first_name: "Pat", legal_last_name: label.capitalize,
+        date_of_birth: "1/15/08" }
+    end
+    import_batch = ImportBatch.create!(event: event, status: :pending, total_count: rows.size,
+      send_invitations: true, rows_data: rows)
+    job = described_class.new
+    allow(job).to receive(:sleep)
+
+    expect { job.perform(import_batch.id) }
+      .to have_enqueued_mail(ParticipantMailer, :invitation).exactly(3).times
+
+    expect(job).not_to have_received(:sleep)
+    expect(import_batch.reload).to have_attributes(status: "completed", invites_sent_count: 3)
+  end
+
   it "imports a row whose parent email repeats the participant's, without a guardian" do
     import_batch = ImportBatch.create!(
       event: event,
