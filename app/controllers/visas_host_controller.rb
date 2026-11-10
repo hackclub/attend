@@ -6,12 +6,12 @@
 # Not an ApplicationController subclass, for the reasons
 # BadgeRedirectsController gives: nothing about a signed-in person using
 # Attend belongs between an embassy and a letter. Forgery protection stays on
-# for /verify, the one form on this host; the catch-all skips it, since it
-# writes nothing and refuses every write itself.
+# for /verify, the one form on this host. Writes to the catch-all are refused
+# with a 404 before forgery protection runs, since it takes no writes.
 class VisasHostController < ActionController::Base
   layout "visas_host"
 
-  skip_forgery_protection only: :elsewhere
+  prepend_before_action :refuse_writes, only: :elsewhere
 
   # A /verify post without a valid token: a form left open across a session
   # reset, or a script posting the code straight at us. Show the form again
@@ -113,12 +113,14 @@ class VisasHostController < ActionController::Base
   # pages. Nothing here takes a write, so anything else (bots posting at
   # random paths) is a plain 404 rather than a forgery-protection error.
   def elsewhere
-    return head :not_found unless request.get? || request.head?
-
     redirect_to_attend visas_path
   end
 
   private
+
+  def refuse_writes
+    head :not_found unless request.get? || request.head?
+  end
 
   def redirect_to_attend(path, status: :moved_permanently)
     redirect_to AttendUrls.attend_url(path), allow_other_host: true, status: status
