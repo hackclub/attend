@@ -328,6 +328,17 @@ RSpec.describe "Onboarding headshot upload", type: :request do
       expect(participant.reload.headshot).not_to be_attached
     end
 
+    it "won't attach someone else's photo from a signed id posted as the headshot" do
+      someone = create(:participant)
+      someone.headshot.attach(io: Rails.root.join("spec/fixtures/files/headshot.png").open,
+                              filename: "theirs.png", content_type: "image/png")
+
+      submit_profile(participant: { headshot: someone.headshot.blob.signed_id })
+
+      expect(participant.reload.headshot).not_to be_attached
+      expect(someone.reload.headshot).to be_attached
+    end
+
     it "ignores a staged photo on autosave" do
       signed_id = stage_photo
 

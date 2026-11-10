@@ -616,7 +616,7 @@ class DashboardController < ApplicationController
   end
 
   def staff_profile_params
-    params.require(:user).permit(:display_name, :avatar, :phone_number, :slack_user_id)
+    uploaded_files_only(params.require(:user).permit(:display_name, :avatar, :phone_number, :slack_user_id), :avatar)
   end
 
   def travel_params(direction)

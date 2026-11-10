@@ -1153,13 +1153,15 @@ class OnboardingController < ApplicationController
   end
 
   def profile_params
-    params.fetch(:participant, {}).permit(
+    permitted = params.fetch(:participant, {}).permit(
       :legal_first_name, :legal_last_name, :preferred_name,
       :email, :phone, :date_of_birth,
       :pronouns, :address_line_1, :address_line_2, :city,
       :state, :postal_code, :country_of_residence, :tshirt_size,
       :headshot, :engagement_preference, :engagement_notes
     )
+    # A photo picked ahead of submit arrives as staged_headshot instead.
+    uploaded_files_only(permitted, :headshot)
   end
 
   # A birthday that ages the participant out is locked: changing it to one

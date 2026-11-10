@@ -26,6 +26,17 @@ module DirectUploadedBlobs
     blob
   end
 
+  # Active Storage attaches a signed blob id assigned to an attachment
+  # attribute just as it would a file, and that id can name a blob that's
+  # already someone else's photo. Forms that post the file itself keep only
+  # a real upload under these keys.
+  def uploaded_files_only(permitted, *keys)
+    keys.each do |key|
+      permitted.delete(key) unless permitted[key].is_a?(ActionDispatch::Http::UploadedFile)
+    end
+    permitted
+  end
+
   # A direct upload the model refused has nothing pointing at it; don't leave
   # it in the bucket until the nightly sweep.
   def discard_direct_upload(blob)
