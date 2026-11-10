@@ -50,12 +50,25 @@ RSpec.describe TrainingVideoView do
   end
 
   it "settles a view that reached the end under a tighter tolerance" do
+    lesson.update!(video_duration_seconds: 524)
     view.update!(duration_seconds: 524, watched_seconds: 522.9)
     expect(view.settle!).to be_completed
   end
 
   it "leaves an unfinished view alone when settling" do
+    lesson.update!(video_duration_seconds: 524)
     view.update!(duration_seconds: 524, watched_seconds: 300)
+    expect(view.settle!).not_to be_completed
+  end
+
+  # The length stored on the row is from the last heartbeat; the video may
+  # have been swapped for a longer one, or its length forgotten, since.
+  it "settles against the lesson's current length, not the one it last saw" do
+    view.update!(duration_seconds: 20, watched_seconds: 19.5)
+    expect(view.settle!).not_to be_completed
+    expect(view.duration_seconds).to eq(600)
+
+    lesson.update!(video_duration_seconds: nil)
     expect(view.settle!).not_to be_completed
   end
 

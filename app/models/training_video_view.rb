@@ -48,9 +48,20 @@ class TrainingVideoView < ApplicationRecord
 
   # Closes a view that already reached the end but was never marked: one that
   # stopped just short under an older, tighter tolerance. Called when the
-  # lesson page loads, so nobody has to rewatch anything.
+  # lesson page loads, so nobody has to rewatch anything. Judged against the
+  # lesson's length as it is now, never the one stored on this row: the video
+  # may have been swapped for a longer one since the last heartbeat.
   def settle!
-    update!(completed_at: Time.current) if !completed? && finished?
+    return self if completed?
+
+    # Read before locking, as in record_heartbeat!.
+    known_duration = lesson.known_video_duration
+
+    with_lock do
+      self.duration_seconds = known_duration
+      self.completed_at ||= Time.current if finished?
+      save! if changed?
+    end
     self
   end
 
