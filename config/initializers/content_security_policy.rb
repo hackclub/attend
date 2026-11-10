@@ -28,6 +28,12 @@ Rails.application.configure do
   # maps.googleapis.com. Without these the script is blocked and the field
   # silently shows no suggestions.
   google_maps = %w[https://maps.googleapis.com https://maps.gstatic.com]
+  # Direct uploads (utils/direct_upload.js) PUT photos straight to the R2
+  # bucket, addressed as <bucket>.<account>.r2.cloudflarestorage.com. Scoped
+  # to our account so a script can't post data to anyone else's bucket. If
+  # this is missing the upload fails and the form posts the file instead.
+  r2_account_id = Rails.application.credentials.dig(:cloudflare_r2, :account_id)
+  r2_buckets = r2_account_id.present? ? [ "https://*.#{r2_account_id}.r2.cloudflarestorage.com" ] : []
 
   config.content_security_policy do |policy|
     policy.default_src :self
@@ -38,7 +44,7 @@ Rails.application.configure do
     policy.media_src   :self, :https
     policy.script_src  :self, "https://cdn.docuseal.com", *docuseal_origins, "https://cdn.cloudflare.com", "https://unpkg.com", "https://cdn.jsdelivr.net", "https://challenges.cloudflare.com", "https://plausible.io", mintlify_widget, *hcaptcha, *training_video_apis, *google_maps
     policy.style_src   :self, :unsafe_inline, "https://cdn.docuseal.com", *docuseal_origins, "https://cdn.jsdelivr.net", mintlify_widget
-    policy.connect_src :self, "https://api.docuseal.com", *docuseal_origins, "ws://localhost:9876", "ws://127.0.0.1:9876", "https://challenges.cloudflare.com", "https://plausible.io", mintlify_widget, *mintlify_api, *hcaptcha, *google_maps
+    policy.connect_src :self, "https://api.docuseal.com", *docuseal_origins, "ws://localhost:9876", "ws://127.0.0.1:9876", "https://challenges.cloudflare.com", "https://plausible.io", mintlify_widget, *mintlify_api, *hcaptcha, *google_maps, *r2_buckets
     policy.frame_src   :self, *docuseal_origins, "https://challenges.cloudflare.com", *hcaptcha, *training_video_players
     policy.frame_ancestors :self
     policy.base_uri    :self

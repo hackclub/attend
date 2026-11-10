@@ -4,7 +4,9 @@ import test from "node:test"
 
 const controllerUrl = new URL("../../app/javascript/controllers/headshot_upload_controller.js", import.meta.url)
 const controllerSource = await readFile(controllerUrl, "utf8")
-const runnableSource = controllerSource.replace('import { Controller } from "@hotwired/stimulus"', "class Controller {}")
+const runnableSource = controllerSource
+  .replace('import { Controller } from "@hotwired/stimulus"', "class Controller {}")
+  .replace('import { directUpload } from "utils/direct_upload"', "const directUpload = (...args) => globalThis.directUpload(...args)")
 const { default: HeadshotUploadController } = await import(`data:text/javascript;base64,${Buffer.from(runnableSource).toString("base64")}`)
 
 class FakeFormData {
@@ -44,7 +46,7 @@ function classList() {
   }
 }
 
-function buildController({ src = "/current.png", staged = "", required = false, hidden = false } = {}) {
+function buildController({ src = "/current.png", staged = "", required = false, hidden = false, directUploadUrl = "" } = {}) {
   const input = { files: [], value: "", required }
   const stagedInput = { value: staged }
   const preview = { hidden }
@@ -62,6 +64,7 @@ function buildController({ src = "/current.png", staged = "", required = false, 
   Object.assign(controller, {
     element,
     urlValue: "/onboarding/headshot",
+    directUploadUrlValue: directUploadUrl,
     inputTarget: input,
     stagedTarget: stagedInput,
     previewTarget: preview,
@@ -79,6 +82,20 @@ function pick(input, name = "new.png") {
   input.value = `C:\\fakepath\\${name}`
 }
 
+// What utils/direct_upload resolves to: a signed blob id, or null when the
+// browser couldn't put the file in storage itself.
+function directUploadResolving(signedId) {
+  const calls = []
+  globalThis.directUpload = async (file, url) => {
+    calls.push({ file, url })
+    return url ? signedId : null
+  }
+  return calls
+}
+
+const flush = () => new Promise((resolve) => setImmediate(resolve))
+
+directUploadResolving(null)
 globalThis.FormData = FakeFormData
 globalThis.FileReader = FakeFileReader
 globalThis.document = {
@@ -167,6 +184,7 @@ test("a slow response to an earlier pick can't replace a later one", async () =>
 
   pick(input, "first.png")
   const firstUpload = controller.upload()
+  await flush()
   pick(input, "second.png")
   const secondUpload = controller.upload()
 
@@ -188,4 +206,67 @@ test("closing the file picker without choosing keeps a staged photo", async () =
 
   assert.equal(calls, 0)
   assert.equal(stagedInput.value, "signed-123")
+})
+
+test("a photo stored directly sends only its signed blob id to be staged", async () => {
+  const directUploads = directUploadResolving("direct-blob-1")
+  const { controller, input, stagedInput } = buildController({ directUploadUrl: "/rails/active_storage/direct_uploads" })
+  let request
+  globalThis.fetch = async (url, options) => {
+    request = { url, options }
+    return { ok: true, json: async () => ({ success: true, signed_id: "staged-1" }) }
+  }
+
+  pick(input)
+  await controller.upload()
+
+  assert.equal(directUploads.length, 1)
+  assert.equal(directUploads[0].url, "/rails/active_storage/direct_uploads")
+  assert.equal(directUploads[0].file.name, "new.png")
+  assert.equal(request.url, "/onboarding/headshot")
+  assert.equal(request.options.body.values.get("signed_blob_id"), "direct-blob-1")
+  assert.equal(request.options.body.values.has("headshot"), false)
+  assert.equal(stagedInput.value, "staged-1")
+  directUploadResolving(null)
+})
+
+test("a direct upload that fails posts the file itself instead", async () => {
+  globalThis.directUpload = async () => null
+  const { controller, input, stagedInput } = buildController({ directUploadUrl: "/rails/active_storage/direct_uploads" })
+  let request
+  globalThis.fetch = async (url, options) => {
+    request = { url, options }
+    return { ok: true, json: async () => ({ success: true, signed_id: "staged-2" }) }
+  }
+
+  pick(input)
+  await controller.upload()
+
+  assert.equal(request.options.body.values.get("headshot").name, "new.png")
+  assert.equal(request.options.body.values.has("signed_blob_id"), false)
+  assert.equal(stagedInput.value, "staged-2")
+  directUploadResolving(null)
+})
+
+test("a slow direct upload for an earlier pick is dropped", async () => {
+  const first = deferred()
+  const uploads = [ first.promise, Promise.resolve("second-blob") ]
+  globalThis.directUpload = () => uploads.shift()
+  const bodies = []
+  globalThis.fetch = async (url, options) => {
+    bodies.push(options.body.values.get("signed_blob_id"))
+    return { ok: true, json: async () => ({ success: true, signed_id: "staged-second" }) }
+  }
+  const { controller, input, stagedInput } = buildController({ directUploadUrl: "/rails/active_storage/direct_uploads" })
+
+  pick(input, "first.png")
+  const firstUpload = controller.upload()
+  pick(input, "second.png")
+  await controller.upload()
+  first.resolve("first-blob")
+  await firstUpload
+
+  assert.deepEqual(bodies, [ "second-blob" ])
+  assert.equal(stagedInput.value, "staged-second")
+  directUploadResolving(null)
 })

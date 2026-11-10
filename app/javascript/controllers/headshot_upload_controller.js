@@ -1,13 +1,19 @@
 import { Controller } from "@hotwired/stimulus"
+import { directUpload } from "utils/direct_upload"
 
 // Uploads a headshot as soon as it's picked, so it's already stored by the
 // time the participant presses Save & Continue. The server only stages it: its
 // signed id goes into a hidden field, and the photo replaces the current
 // headshot when the form is submitted. If the upload can't reach the server,
 // the file stays in the input and goes up with the form as before.
+//
+// The bytes go straight to storage first (utils/direct_upload), and the server
+// is sent only the stored blob's signed id to check and stage. When that
+// direct upload fails, the file is posted to the server instead, the way it
+// was before direct uploads.
 export default class extends Controller {
   static targets = ["input", "staged", "preview", "image", "caption", "status"]
-  static values = { url: String }
+  static values = { url: String, directUploadUrl: String }
 
   connect() {
     this.request = 0
@@ -20,7 +26,7 @@ export default class extends Controller {
     }
   }
 
-  upload() {
+  async upload() {
     const file = this.inputTarget.files[0]
     if (!file) return
 
@@ -31,8 +37,15 @@ export default class extends Controller {
     this.showPreview(file, request)
     this.setStatus("Uploading photo…")
 
+    const signedBlobId = await directUpload(file, this.directUploadUrlValue)
+    if (request !== this.request) return
+
     const formData = new FormData()
-    formData.append("headshot", file)
+    if (signedBlobId) {
+      formData.append("signed_blob_id", signedBlobId)
+    } else {
+      formData.append("headshot", file)
+    }
 
     return fetch(this.urlValue, {
       method: "POST",

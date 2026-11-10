@@ -8,6 +8,18 @@ RSpec.describe "Dashboard public profile settings", type: :request do
 
   before { sign_in user }
 
+  def png_bytes
+    Rails.root.join("spec/fixtures/files/headshot.png").binread
+  end
+
+  # A blob as the browser leaves it after a direct upload: stored, unchecked,
+  # attached to nothing.
+  def direct_upload(bytes = png_bytes, content_type: "image/png")
+    ActiveStorage::Blob.create_before_direct_upload!(
+      filename: "photo.png", byte_size: bytes.bytesize, checksum: OpenSSL::Digest::MD5.base64digest(bytes), content_type: content_type
+    ).tap { |blob| blob.upload_without_unfurling(StringIO.new(bytes)) }
+  end
+
   def past_event(attrs = {})
     create(:event, { starts_at: 3.months.ago, ends_at: 3.months.ago + 2.days,
                      registration_close_at: 4.months.ago }.merge(attrs))
@@ -99,6 +111,79 @@ RSpec.describe "Dashboard public profile settings", type: :request do
 
       perform_enqueued_jobs if respond_to?(:perform_enqueued_jobs)
       expect(participant.reload.headshot).to be_attached
+    end
+
+    describe "with a photo the browser uploaded directly" do
+      include ActiveJob::TestHelper
+
+      it "attaches the stored blob" do
+        blob = direct_upload
+
+        expect {
+          patch dashboard_public_profile_path, params: { participant: { public_profile_bio: "hi" }, public_profile_photo_signed_blob_id: blob.signed_id }
+        }.not_to change(ActiveStorage::Blob, :count)
+
+        expect(response).to redirect_to(dashboard_profile_path)
+        expect(flash[:notice]).to be_present
+        expect(participant.reload.public_profile_photo.blob).to eq(blob)
+        expect(participant.public_profile_bio).to eq("hi")
+      end
+
+      it "refuses and deletes a stored file that won't open as an image" do
+        blob = direct_upload("\x89PNG\r\n\x1a\n but not really")
+
+        perform_enqueued_jobs(only: ActiveStorage::PurgeJob) do
+          patch dashboard_public_profile_path, params: { participant: { public_profile_bio: "hi" }, public_profile_photo_signed_blob_id: blob.signed_id }
+        end
+
+        expect(flash[:alert]).to include("could not be read as an image")
+        expect(participant.reload.public_profile_photo).not_to be_attached
+        expect(ActiveStorage::Blob.exists?(blob.id)).to be(false)
+      end
+
+      it "judges the type by the stored bytes, not the browser's label" do
+        blob = direct_upload("%PDF-1.4\n%fake document\n")
+
+        patch dashboard_public_profile_path, params: { participant: { public_profile_bio: "hi" }, public_profile_photo_signed_blob_id: blob.signed_id }
+
+        expect(flash[:alert]).to include("must be a JPEG, PNG, or WebP image")
+        expect(participant.reload.public_profile_photo).not_to be_attached
+      end
+
+      it "won't attach a blob that's already someone else's photo" do
+        someone = create(:participant)
+        someone.headshot.attach(io: StringIO.new(png_bytes), filename: "theirs.png", content_type: "image/png")
+        their_blob = someone.headshot.blob
+
+        perform_enqueued_jobs(only: ActiveStorage::PurgeJob) do
+          patch dashboard_public_profile_path, params: { participant: { public_profile_bio: "hi" }, public_profile_photo_signed_blob_id: their_blob.signed_id }
+        end
+
+        expect(flash[:alert]).to include("expired")
+        expect(participant.reload.public_profile_photo).not_to be_attached
+        expect(someone.reload.headshot.blob).to eq(their_blob)
+      end
+
+      it "ignores a signed blob id sent in place of the file" do
+        someone = create(:participant)
+        someone.headshot.attach(io: StringIO.new(png_bytes), filename: "theirs.png", content_type: "image/png")
+
+        patch dashboard_public_profile_path, params: { participant: { public_profile_bio: "hi", public_profile_photo: someone.headshot.blob.signed_id } }
+
+        expect(response).to redirect_to(dashboard_profile_path)
+        expect(participant.reload.public_profile_bio).to eq("hi")
+        expect(participant.public_profile_photo).not_to be_attached
+      end
+
+      it "still takes a posted file when the direct upload didn't happen" do
+        patch dashboard_public_profile_path, params: {
+          participant: { public_profile_photo: Rack::Test::UploadedFile.new(StringIO.new(png_bytes), "image/png", original_filename: "photo.png") },
+          public_profile_photo_signed_blob_id: ""
+        }
+
+        expect(response).to redirect_to(dashboard_profile_path)
+        expect(participant.reload.public_profile_photo).to be_attached
+      end
     end
 
     it "rejects a slug that is already taken" do

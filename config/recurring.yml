@@ -20,6 +20,10 @@ default: &default
   sync_org_support_slack_channel:
     class: SyncOrgSupportSlackChannelJob
     schedule: every day at 9am
+  # Photos uploaded straight to storage from a form that was never submitted.
+  purge_unattached_blobs:
+    class: PurgeUnattachedBlobsJob
+    schedule: every hour at minute 41
 
 # Deliberately does not inherit *default: airtable_sync writes back to the
 # Airtable base it reads, so a staging box running it every 5 minutes would
@@ -29,6 +33,9 @@ staging:
   process_scheduled_messages:
     class: ProcessScheduledMessagesJob
     schedule: every minute
+  purge_unattached_blobs:
+    class: PurgeUnattachedBlobsJob
+    schedule: every hour at minute 41
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
     schedule: every hour at minute 12
