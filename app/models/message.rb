@@ -295,11 +295,17 @@ class Message < ApplicationRecord
     added
   end
 
+  # Called by every SingleDeliveryJob as it settles, so a broadcast to N people
+  # runs it N times, often concurrently. One grouped count, and a plain column
+  # write: these are tallies, not edits, so they don't earn a PaperTrail
+  # version each (that was one version per recipient) or the callbacks.
   def update_counts!
-    update!(
-      sent_count: message_deliveries.where(status: "delivered").count,
-      failed_count: message_deliveries.where(status: "failed").count
-    )
+    counts = message_deliveries.where(status: %w[delivered failed]).group(:status).count
+    sent = counts.fetch("delivered", 0)
+    failed = counts.fetch("failed", 0)
+    return if sent == sent_count && failed == failed_count
+
+    update_columns(sent_count: sent, failed_count: failed, updated_at: Time.current)
   end
 
   # The rendering methods take the person the message is going to (a

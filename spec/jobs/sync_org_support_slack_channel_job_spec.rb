@@ -13,6 +13,9 @@ RSpec.describe SyncOrgSupportSlackChannelJob, type: :job do
     allow(SlackService).to receive(:new).and_return(slack_service)
     allow(slack_service).to receive(:invite_to_channel).and_return({ success: true })
     allow(slack_service).to receive(:remove_from_channel).and_return({ success: true })
+    # By default Slack won't list the channel, so the job falls back to
+    # inviting everyone; the "with the channel listed" specs cover the rest.
+    allow(slack_service).to receive(:channel_member_ids).and_raise(SlackService::Error, "missing_scope")
     stub_const("SyncOrgSupportSlackChannelJob::SLACK_PAUSE", 0)
     allow_any_instance_of(described_class).to receive(:sleep)
   end
@@ -211,6 +214,68 @@ RSpec.describe SyncOrgSupportSlackChannelJob, type: :job do
 
     expect(SlackChannelInvite.exists?(user: old)).to be(false)
     expect(Setting.org_support_slack_last_sync).to include("removed" => 1)
+  end
+
+  context "with the channel listed" do
+    it "only spends invites on people who aren't in the channel yet" do
+      present = staff("event_admin", slack_id: "UPRESENT")
+      newcomer = staff("ops", slack_id: "UNEWCOMER")
+      allow(slack_service).to receive(:channel_member_ids).with(channel_id: "CORG").and_return(Set["UPRESENT", "UOTHER"])
+
+      described_class.perform_now
+
+      expect_invited(newcomer)
+      expect(slack_service).to have_received(:invite_to_channel).once
+      expect(Setting.org_support_slack_last_sync).to include("added" => 1, "already_member" => 1)
+      expect(SlackChannelInvite.where(channel_id: "CORG").pluck(:user_id)).to eq([ newcomer.id ])
+      expect(present).to be_persisted
+    end
+
+    it "hands an orphaned invite to an eligible member without calling Slack" do
+      user = staff("event_admin", slack_id: "USHARED")
+      orphan = SlackChannelInvite.create!(channel_id: "CORG", slack_user_id: "USHARED", user: nil)
+      allow(slack_service).to receive(:channel_member_ids).and_return(Set["USHARED"])
+
+      described_class.perform_now
+
+      expect(orphan.reload.user_id).to eq(user.id)
+      expect(slack_service).not_to have_received(:invite_to_channel)
+      expect(slack_service).not_to have_received(:remove_from_channel)
+    end
+
+    it "drops stale rows for people who already left without kicking, and kicks the ones still there" do
+      left = staff("event_admin", event: long_ended_event, slack_id: "ULEFT")
+      still_there = staff("event_admin", event: long_ended_event, slack_id: "USTILL")
+      SlackChannelInvite.create!(channel_id: "CORG", slack_user_id: "ULEFT", user: left)
+      SlackChannelInvite.create!(channel_id: "CORG", slack_user_id: "USTILL", user: still_there)
+      allow(slack_service).to receive(:channel_member_ids).and_return(Set["USTILL"])
+
+      described_class.perform_now
+
+      expect(slack_service).to have_received(:remove_from_channel).with(channel_id: "CORG", user_id: "USTILL").once
+      expect(SlackChannelInvite.where(channel_id: "CORG")).to be_empty
+      expect(Setting.org_support_slack_last_sync).to include("removed" => 2)
+    end
+
+    it "doesn't list the channel for a single-user run" do
+      user = staff("event_admin")
+
+      described_class.perform_now([ user.id ])
+
+      expect(slack_service).not_to have_received(:channel_member_ids)
+      expect_invited(user)
+    end
+  end
+
+  it "doesn't pause after the last Slack call" do
+    stub_const("SyncOrgSupportSlackChannelJob::SLACK_PAUSE", 5)
+    job = described_class.new
+    allow(job).to receive(:sleep)
+    user = staff("event_admin")
+
+    job.perform([ user.id ])
+
+    expect(job).not_to have_received(:sleep)
   end
 
   it "only trusts the Slack ID from Hack Club Auth" do

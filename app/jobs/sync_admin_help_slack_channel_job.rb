@@ -2,6 +2,8 @@
 # Attend (see Setting.admin_help_slack_channel_id). Runs for a single user when
 # they're handed a staff role, and for everyone from the global settings page.
 class SyncAdminHelpSlackChannelJob < ApplicationJob
+  include SlackChannelSync
+
   queue_as :default
 
   # Slack conversations.invite is Tier 3 (~50 req/min) — pause between calls.
@@ -18,6 +20,8 @@ class SyncAdminHelpSlackChannelJob < ApplicationJob
 
     slack_service = SlackService.new
     counts = { "added" => 0, "already_member" => 0, "failed" => 0, "no_slack" => 0 }
+    # Listing the channel costs a call, so it only pays off past one person.
+    channel_members = prefetch_channel_members(slack_service, channel_id) unless user_ids&.one?
 
     users.find_each do |user|
       slack_id = user.verified_slack_id
@@ -26,15 +30,18 @@ class SyncAdminHelpSlackChannelJob < ApplicationJob
         next
       end
 
+      if channel_members&.include?(slack_id)
+        counts["already_member"] += 1
+        next
+      end
+
       begin
-        result = slack_service.invite_to_channel(channel_id: channel_id, user_id: slack_id)
+        result = throttle_slack(INVITE_PAUSE) { slack_service.invite_to_channel(channel_id: channel_id, user_id: slack_id) }
         counts[result[:already_member] ? "already_member" : "added"] += 1
       rescue SlackService::Error => e
         Rails.logger.error("[SyncAdminHelpSlackChannel] Failed to add #{slack_id}: #{e.message}")
         counts["failed"] += 1
       end
-
-      sleep INVITE_PAUSE
     end
 
     Setting.admin_help_slack_last_sync = counts.merge("at" => Time.current.iso8601) if user_ids.nil?

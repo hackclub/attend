@@ -64,4 +64,48 @@ RSpec.describe GoogleWallet::EventTicket do
       expect(url).to end_with("/series-banner.png")
     end
   end
+
+  describe "#push_class_if_needed" do
+    before do
+      allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+    end
+
+    def ticket_for(pe) = described_class.new(pe)
+
+    it "pushes the event's class once, not again for the next attendee" do
+      other = create(:participant_event, event: event)
+      first, second = ticket_for(participant_event), ticket_for(other)
+      [ first, second ].each { |t| allow(t).to receive(:push_class_with_logging).and_return(true) }
+
+      first.send(:push_class_if_needed)
+      second.send(:push_class_if_needed)
+
+      expect(first).to have_received(:push_class_with_logging).once
+      expect(second).not_to have_received(:push_class_with_logging)
+    end
+
+    it "pushes again once the event changes what the class shows" do
+      allow_any_instance_of(described_class).to receive(:push_class_with_logging).and_return(true)
+      ticket_for(participant_event).send(:push_class_if_needed)
+
+      event.update!(name: "Renamed Hackathon")
+      renamed = ticket_for(participant_event.reload)
+      allow(renamed).to receive(:push_class_with_logging).and_return(true)
+      renamed.send(:push_class_if_needed)
+
+      expect(renamed).to have_received(:push_class_with_logging).once
+    end
+
+    it "retries a push that failed" do
+      failing = ticket_for(participant_event)
+      allow(failing).to receive(:push_class_with_logging).and_return(false)
+      failing.send(:push_class_if_needed)
+
+      retry_ticket = ticket_for(participant_event)
+      allow(retry_ticket).to receive(:push_class_with_logging).and_return(true)
+      retry_ticket.send(:push_class_if_needed)
+
+      expect(retry_ticket).to have_received(:push_class_with_logging).once
+    end
+  end
 end

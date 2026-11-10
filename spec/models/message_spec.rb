@@ -129,6 +129,21 @@ RSpec.describe Message, type: :model do
     end
   end
 
+  describe "#update_counts!" do
+    it "tallies delivered and failed rows without a PaperTrail version per call" do
+      message = message_for("confirmed_attendees")
+      message.update!(body: "<p>Hi</p>")
+      %w[delivered delivered failed pending].each do |status|
+        message.message_deliveries.create!(participant_event: create(:participant_event, event: event),
+          channel: "email", status: status)
+      end
+
+      expect { message.update_counts! }.not_to change { message.versions.count }
+
+      expect(message.reload).to have_attributes(sent_count: 2, failed_count: 1)
+    end
+  end
+
   describe "#send!" do
     it "creates a pending delivery per reachable channel and stamps the send" do
       reachable = create(:participant_event, event: event, status: :complete)

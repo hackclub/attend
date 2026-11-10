@@ -30,6 +30,27 @@ RSpec.describe SlackService do
     end
   end
 
+  describe "#channel_member_ids" do
+    it "follows Slack's cursor across pages, form-encoded" do
+      stub_request(:post, "https://slack.com/api/conversations.members")
+        .with(body: { "channel" => "CORG", "limit" => "1000" })
+        .to_return(status: 200, headers: { "Content-Type" => "application/json" },
+                   body: { ok: true, members: %w[UONE UTWO], response_metadata: { next_cursor: "page2" } }.to_json)
+      stub_request(:post, "https://slack.com/api/conversations.members")
+        .with(body: { "channel" => "CORG", "limit" => "1000", "cursor" => "page2" })
+        .to_return(status: 200, headers: { "Content-Type" => "application/json" },
+                   body: { ok: true, members: %w[UTHREE], response_metadata: { next_cursor: "" } }.to_json)
+
+      expect(service.channel_member_ids(channel_id: "CORG")).to eq(Set["UONE", "UTWO", "UTHREE"])
+    end
+
+    it "raises when Slack won't list the channel" do
+      stub_slack("conversations.members", body: { ok: false, error: "missing_scope" })
+
+      expect { service.channel_member_ids(channel_id: "CORG") }.to raise_error(SlackService::Error, /missing_scope/)
+    end
+  end
+
   describe "#remove_from_channel" do
     it "treats not_in_channel as not a member" do
       stub_slack("conversations.kick", body: { ok: false, error: "not_in_channel" })

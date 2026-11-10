@@ -11,6 +11,7 @@ RSpec.describe SyncAdminHelpSlackChannelJob, type: :job do
     Setting.admin_help_slack_channel_id = "CHELP"
     allow(SlackService).to receive(:new).and_return(slack_service)
     allow(slack_service).to receive(:invite_to_channel).and_return({ success: true })
+    allow(slack_service).to receive(:channel_member_ids).and_raise(SlackService::Error, "missing_scope")
     stub_const("SyncAdminHelpSlackChannelJob::INVITE_PAUSE", 0)
   end
 
@@ -81,6 +82,18 @@ RSpec.describe SyncAdminHelpSlackChannelJob, type: :job do
 
     expect(slack_service).to have_received(:invite_to_channel).with(channel_id: "CHELP", user_id: added.verified_slack_id)
     expect(Setting.admin_help_slack_last_sync).to include("added" => 1, "already_member" => 1, "failed" => 1, "no_slack" => 0)
+  end
+
+  it "skips people Slack already lists in the channel" do
+    present = staff("event_admin", slack_id: "UPRESENT")
+    newcomer = staff("ops", slack_id: "UNEWCOMER")
+    allow(slack_service).to receive(:channel_member_ids).with(channel_id: "CHELP").and_return(Set["UPRESENT"])
+
+    described_class.perform_now
+
+    expect(slack_service).to have_received(:invite_to_channel).with(channel_id: "CHELP", user_id: newcomer.verified_slack_id).once
+    expect(slack_service).not_to have_received(:invite_to_channel).with(channel_id: "CHELP", user_id: present.verified_slack_id)
+    expect(Setting.admin_help_slack_last_sync).to include("added" => 1, "already_member" => 1)
   end
 
   it "only trusts the Slack ID from Hack Club Auth, never the profile override" do

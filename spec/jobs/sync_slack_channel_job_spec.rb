@@ -9,6 +9,7 @@ RSpec.describe SyncSlackChannelJob, type: :job do
   before do
     allow(SlackService).to receive(:new).and_return(slack_service)
     stub_const("SyncSlackChannelJob::INVITE_PAUSE", 0)
+    allow(slack_service).to receive(:channel_member_ids).and_raise(SlackService::Error, "missing_scope")
   end
 
   def create_complete_pe(slack_user_id: nil)
@@ -39,6 +40,21 @@ RSpec.describe SyncSlackChannelJob, type: :job do
     final = broadcasts.last
     expect(final[0]).to eq("slack_sync_#{event.id}")
     expect(final[1]).to include(status: "completed", added: 1, already_member: 1, failed: 1)
+  end
+
+  it "only invites participants Slack doesn't already list in the channel" do
+    create_complete_pe(slack_user_id: "U1")
+    create_complete_pe(slack_user_id: "U2")
+    allow(slack_service).to receive(:channel_member_ids).with(channel_id: "C123").and_return(Set["U2"])
+    allow(slack_service).to receive(:invite_to_channel).and_return({ success: true })
+    broadcasts = []
+    allow(ActionCable.server).to receive(:broadcast) { |_, payload| broadcasts << payload }
+
+    described_class.perform_now(event.id)
+
+    expect(slack_service).to have_received(:invite_to_channel).with(channel_id: "C123", user_id: "U1").once
+    expect(slack_service).to have_received(:invite_to_channel).once
+    expect(broadcasts.last).to include(status: "completed", added: 1, already_member: 1)
   end
 
   it "emails completed participants without Slack accounts when send_emails is set" do
