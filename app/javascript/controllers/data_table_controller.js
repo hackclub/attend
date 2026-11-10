@@ -30,6 +30,7 @@ export default class extends Controller {
 
   connect() {
     this.loadStateFromUrl()
+    this.loadColumnPreferences()
     this.applyColumnVisibility()
   }
 
@@ -261,7 +262,17 @@ export default class extends Controller {
       url.searchParams.set("filter_logic", this.filterLogicValue)
     }
 
+    this.appendSearch(url)
+
+    // No page param: a new sort, grouping or filter starts on page one.
     window.location.href = url.toString()
+  }
+
+  // The search box runs server-side over every page, so a sort, grouping or
+  // filter change keeps it.
+  appendSearch(url) {
+    const search = this.hasSearchInputTarget ? this.searchInputTarget.value.trim() : ""
+    if (search) url.searchParams.set("search", search)
   }
 
   clearFilters() {
@@ -273,6 +284,7 @@ export default class extends Controller {
       url.searchParams.set("sort", this.sortValue)
       url.searchParams.set("direction", this.directionValue)
     }
+    this.appendSearch(url)
     window.location.href = url.toString()
   }
 
@@ -328,8 +340,27 @@ export default class extends Controller {
     })
   }
 
+  // Hidden columns survive page turns and re-sorts, which are full page loads.
+  loadColumnPreferences() {
+    try {
+      const saved = JSON.parse(localStorage.getItem("participantTableColumns") || "[]")
+      if (Array.isArray(saved)) this.hiddenColumnsValue = saved
+    } catch {
+      return
+    }
+
+    if (!this.hasColumnToggleTarget) return
+    this.columnToggleTarget.querySelectorAll("input[data-column]").forEach(checkbox => {
+      checkbox.checked = !this.hiddenColumnsValue.includes(checkbox.dataset.column)
+    })
+  }
+
   saveColumnPreferences() {
-    localStorage.setItem("participantTableColumns", JSON.stringify(this.hiddenColumnsValue))
+    try {
+      localStorage.setItem("participantTableColumns", JSON.stringify(this.hiddenColumnsValue))
+    } catch {
+      // Storage blocked (private mode): the choice lasts until the next page load.
+    }
   }
 
   search(event) {
@@ -353,9 +384,19 @@ export default class extends Controller {
     const matches = Array.from(rows).filter(row => row.textContent.toLowerCase().includes(query)).length
 
     if (this.hasCountTarget) {
-      const filtered = query !== "" || this.countTarget.dataset.serverFiltered === "true"
-      this.countTarget.textContent = filtered ? `${matches} ${matches === 1 ? "match" : "matches"}` : ""
-      this.countTarget.hidden = !filtered
+      const serverFiltered = this.countTarget.dataset.serverFiltered === "true"
+      this.countTarget.serverText ??= this.countTarget.textContent
+
+      if (query === "") {
+        // Back to the server's count, which covers every page.
+        this.countTarget.textContent = serverFiltered ? this.countTarget.serverText : ""
+        this.countTarget.hidden = !serverFiltered
+      } else {
+        // Typing narrows only the rows on this page; Enter searches every page.
+        const onThisPage = this.countTarget.dataset.paginated === "true" ? " on this page" : ""
+        this.countTarget.textContent = `${matches} ${matches === 1 ? "match" : "matches"}${onThisPage}`
+        this.countTarget.hidden = false
+      }
     }
 
     if (this.hasNoMatchTarget) {

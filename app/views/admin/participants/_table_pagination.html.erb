@@ -1,0 +1,20 @@
+<% if @total_pages > 1 %>
+  <% first_row = (@page - 1) * @per_page + 1
+     last_row = [ @page * @per_page, @table_row_count ].min
+     noun = @table_row_count == @total_count ? "participant" : "row" %>
+  <div class="mt-4 flex items-center justify-between" data-testid="table-pagination">
+    <div class="text-sm text-gray-500">
+      Showing <%= first_row %> to <%= last_row %> of <%= pluralize(@table_row_count, noun) %>
+    </div>
+    <nav class="flex gap-2" aria-label="Pagination">
+      <% if @page > 1 %>
+        <%= link_to "← Previous", table_page_path(@page - 1), rel: "prev",
+            class: "px-4 py-2 bg-white border border-gray-300 rounded-md text-sm hover:bg-gray-50" %>
+      <% end %>
+      <% if @page < @total_pages %>
+        <%= link_to "Next →", table_page_path(@page + 1), rel: "next",
+            class: "px-4 py-2 bg-white border border-gray-300 rounded-md text-sm hover:bg-gray-50" %>
+      <% end %>
+    </nav>
+  </div>
+<% end %>
