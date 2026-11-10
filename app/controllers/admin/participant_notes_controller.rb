@@ -9,6 +9,12 @@ module Admin
       @note.event = current_event
       @note.author = current_user
 
+      if @note.restricted? && !Note.restricted_visible_to?(current_user, current_event)
+        redirect_to admin_event_participant_path(current_event, @participant_event),
+          alert: "Only event admins and safeguarding leads can add restricted notes."
+        return
+      end
+
       if @note.save
         redirect_to admin_event_participant_path(current_event, @participant_event), notice: "Note added successfully."
       else

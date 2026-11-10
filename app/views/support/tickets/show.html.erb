@@ -299,7 +299,7 @@
       <div>
         <h3 class="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-3">Notes</h3>
         <div id="ticket_notes" class="space-y-2 mb-3">
-          <% @ticket.notes.includes(:author).order(created_at: :desc).each do |note| %>
+          <% @ticket.notes.sensitivity_visible_to(current_user, @ticket.event).includes(:author).order(created_at: :desc).each do |note| %>
             <%= render "note", note: note %>
           <% end %>
         </div>

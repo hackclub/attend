@@ -18,8 +18,28 @@
             <%= f.select :note_type, Note.note_types.keys.map { |t| [t.titleize, t] }, {}, class: "cs-select", id: f.field_id(:note_type), **aria %>
           <% end %>
 
-          <%= cs_form_field f, :sensitivity, label: "Sensitivity" do |aria| %>
-            <%= f.select :sensitivity, Note.sensitivities.keys.map { |s| [s.titleize, s] }, {}, class: "cs-select", id: f.field_id(:sensitivity), **aria %>
+          <% if Note.restricted_visible_to?(current_user, current_event) %>
+            <%= cs_form_field f, :sensitivity, label: "Sensitivity",
+                  description: "Restricted notes are only visible to event admins and safeguarding leads." do |aria| %>
+              <%= f.select :sensitivity, Note.sensitivities.keys.map { |s| [s.titleize, s] }, {}, class: "cs-select", id: f.field_id(:sensitivity), **aria %>
+            <% end %>
+          <% end %>
+        </div>
+
+        <div class="mt-4">
+          <%= cs_form_field f, :visible_to_roles, label: "Who can see this?", group: true, optional: true,
+                description: "Leave all unticked to share with the whole event team. Safeguarding leads always see every note, and safeguarding notes are only visible to them." do |aria| %>
+            <%= hidden_field_tag "note[visible_to_roles][]", "", id: nil %>
+            <div class="space-y-3">
+              <% NotePolicy::SELECTABLE_ROLES.each do |role| %>
+                <div class="cs-option">
+                  <%= check_box_tag "note[visible_to_roles][]", role, false, id: "note_visible_to_roles_#{role}", **aria %>
+                  <div>
+                    <%= label_tag "note_visible_to_roles_#{role}", role.titleize, class: "cs-option-label" %>
+                  </div>
+                </div>
+              <% end %>
+            </div>
           <% end %>
         </div>
       </div>
@@ -56,6 +76,7 @@
 
             <div class="mt-3 cs-small cs-muted">
               <%= note.author&.email || "Unknown" %> · <%= cs_relative_time(note.created_at) %>
+              · <%= note_audience_label(note) %>
             </div>
           </li>
         <% end %>

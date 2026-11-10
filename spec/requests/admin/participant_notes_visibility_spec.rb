@@ -110,4 +110,53 @@ RSpec.describe "Participant notes visibility", type: :request do
       expect(Note.exists?(hidden_note.id)).to be(false)
     end
   end
+
+  describe "restricted notes and the audience picker" do
+    before do
+      Note.create!(event: event, participant_event: participant_event, author: author,
+        note_type: "ops", sensitivity: "restricted", visible_to_roles: %w[ops], body: "Restricted note body")
+    end
+
+    [ false, true ].each do |console|
+      context(console ? "in the console UI" : "in the original UI") do
+        it "hides restricted notes and the sensitivity picker from ops" do
+          sign_in_with_role("ops", console: console)
+
+          get notes_admin_event_participant_path(event.slug, participant_event)
+
+          expect(response.body).not_to include("Restricted note body")
+          expect(response.body).not_to include("note[sensitivity]")
+          expect(response.body).to include("note_visible_to_roles_ops")
+        end
+
+        it "shows restricted notes and the sensitivity picker to event admins" do
+          sign_in_with_role("event_admin", console: console)
+
+          get notes_admin_event_participant_path(event.slug, participant_event)
+
+          expect(response.body).to include("Restricted note body", "note[sensitivity]")
+        end
+      end
+    end
+
+    it "saves the roles ticked on the form" do
+      sign_in_with_role("ops")
+      get notes_admin_event_participant_path(event.slug, participant_event) # warm-up for the audit log
+
+      post admin_event_participant_notes_path(event.slug, participant_event),
+        params: { note: { body: "Picked roles", note_type: "ops", visible_to_roles: [ "", "limited" ] } }
+
+      expect(Note.order(:created_at).last.visible_to_roles).to eq(%w[limited])
+    end
+
+    it "won't let ops create a restricted note" do
+      sign_in_with_role("ops")
+      get notes_admin_event_participant_path(event.slug, participant_event)
+
+      expect {
+        post admin_event_participant_notes_path(event.slug, participant_event),
+          params: { note: { body: "Sneaky", note_type: "ops", sensitivity: "restricted" } }
+      }.not_to change(Note, :count)
+    end
+  end
 end
