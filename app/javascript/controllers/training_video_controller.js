@@ -11,8 +11,15 @@ import { WatchFrontier, MAX_RATE } from "utils/watch_frontier"
 //
 // Sources: an uploaded file in a <video> (source "upload"), or a YouTube or
 // Vimeo embed driven through the provider's player API.
-const HEARTBEAT_MS = 5000
+//
+// Heartbeats are every 15s, and skipped while the mark hasn't moved (paused,
+// tab in the background): everyone in a course watches at once, and each one
+// is a request. The server allows progress by real elapsed time, so fewer,
+// further-apart heartbeats lose nothing.
+const HEARTBEAT_MS = 15000
 const TICK_MS = 250
+// Matches TrainingVideoView::END_TOLERANCE_SECONDS.
+const END_TOLERANCE_SECONDS = 1
 
 export default class extends Controller {
   static targets = ["player", "gate", "locked", "status"]
@@ -78,6 +85,10 @@ export default class extends Controller {
 
   async report() {
     if (this.completeValue || !this.duration) return
+    // Nothing new to say — unless the player reached the end and the server
+    // hasn't agreed yet, which keeps retrying until it does.
+    const mark = this.furthest
+    if (mark === this.reported && mark < this.duration - END_TOLERANCE_SECONDS) return
 
     try {
       const response = await fetch(this.progressUrlValue, {
@@ -87,9 +98,10 @@ export default class extends Controller {
           Accept: "application/json",
           "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content
         },
-        body: JSON.stringify({ position: this.furthest, duration: this.duration })
+        body: JSON.stringify({ position: mark, duration: this.duration })
       })
       if (!response.ok) return
+      this.reported = mark
 
       const data = await response.json()
       if (data.complete) {
