@@ -58,15 +58,26 @@ module GoogleWallet
       )
     end
 
+    # Every attendee of an event shares one class, and pushing it is a GET and
+    # a PUT to Google (~500ms) on every "Add to Google Wallet" click and every
+    # wallet-pass update. Skip it while Google already has exactly this
+    # payload; a change to the event changes the digest and pushes again.
+    CLASS_PUSH_TTL = 6.hours
+
     def push_class_if_needed
+      digest = Digest::SHA256.hexdigest(class_attributes.to_json)
+      cache_key = "google_wallet/class_pushed/#{class_identifier}/#{digest}"
+      return true if Rails.cache.read(cache_key)
+
       Rails.logger.info("Google Wallet: Pushing class with id: #{class_identifier}")
-      push_class_with_logging
+      pushed = push_class_with_logging
+      Rails.cache.write(cache_key, true, expires_in: CLASS_PUSH_TTL) if pushed
+      pushed
     end
 
     def push_class_with_logging
       require "httparty"
 
-      access_token = ::GoogleWallet::Authentication.new.access_token
       class_id = event_class.id
       endpoint = "#{GoogleWallet.configuration.api_endpoint}/eventTicketClass"
 
@@ -105,6 +116,11 @@ module GoogleWallet
       response.success?
     end
 
+    # One token for both the class and the object push.
+    def access_token
+      @access_token ||= ::GoogleWallet::Authentication.new.access_token
+    end
+
     def sign_with_origins
       push_result = push_object_with_logging
       Rails.logger.info("Google Wallet: Object push result: #{push_result}")
@@ -133,7 +149,6 @@ module GoogleWallet
     def push_object_with_logging
       require "httparty"
 
-      access_token = ::GoogleWallet::Authentication.new.access_token
       object_id = ticket_object.id
       endpoint = "#{GoogleWallet.configuration.api_endpoint}/eventTicketObject"
 

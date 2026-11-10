@@ -32,7 +32,7 @@ class WalletPassUpdateService
     ticket = ::GoogleWallet::EventTicket.new(@participant_event)
 
     # Use the logging versions that capture errors
-    class_result = ticket.send(:push_class_with_logging)
+    class_result = ticket.send(:push_class_if_needed)
     object_result = ticket.send(:push_object_with_logging)
 
     Rails.logger.info("Google Wallet update for ParticipantEvent #{@participant_event.id}: class=#{class_result}, object=#{object_result}")
