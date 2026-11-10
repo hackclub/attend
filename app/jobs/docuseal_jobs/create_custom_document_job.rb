@@ -49,7 +49,7 @@ module DocusealJobs
             role: participant_role,
             email: participant.email,
             name: participant.full_name,
-            fields: field_mapper.build_fields_for_role(role: participant_role, context: context),
+            fields: field_mapper.build_fields_for_role(role: participant_role, context: context, template: template),
             # Participants sign embedded in Attend, so DocuSeal shouldn't email them.
             send_email: false
           }
@@ -58,9 +58,10 @@ module DocusealJobs
             role: guardian_role,
             email: guardian.email,
             name: guardian.full_name,
-            fields: field_mapper.build_fields_for_role(role: guardian_role, context: context),
-            # A guardian on the portal signs embedded right away; otherwise
-            # DocuSeal emails them their link (after the participant, if both sign).
+            fields: field_mapper.build_fields_for_role(role: guardian_role, context: context, template: template),
+            # A guardian on the portal signs embedded right away. DocuSeal's
+            # next-signer email never actually arrives on our instance, so the
+            # webhook emails the guardian once the participant has signed.
             send_email: initiated_by != "guardian"
           }
         end

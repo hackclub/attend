@@ -69,6 +69,8 @@ class GuardianMailer < ApplicationMailer
     @child_first_name = @participant.legal_first_name
     @event_name = @event.name
     @waiver_link = consent.guardian_signing_url
+    # Custom documents go out under their own name; everything else is "the waiver".
+    @document_name = consent.custom_document&.name
     @support_email = @event.effective_support_email
     completion = RegistrationCompletionPresenter.new(@participant_event, viewer: :guardian,
       guardian_participant_event: @guardian_participant_event)
@@ -79,7 +81,7 @@ class GuardianMailer < ApplicationMailer
     mail(
       to: @guardian.email,
       from: "Hack Club #{@event_name} <#{@support_email}>",
-      subject: "#{@child_first_name} signed their waiver - your signature needed for #{@event_name}",
+      subject: "#{@child_first_name} signed #{@document_name ? "\"#{@document_name}\"" : "their waiver"} - your signature needed for #{@event_name}",
       reply_to: @support_email
     )
   end

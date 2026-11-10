@@ -1,11 +1,17 @@
 Dear <%= @first_name %>,
 
+<% if @document_name %>
+Great news! <%= @child_first_name %> has completed their portion of "<%= @document_name %>" for <%= @event_name %>. Now we need your signature on it.
+
+Sign it here: <%= @waiver_link %>
+<% else %>
 Great news! <%= @child_first_name %> has completed their portion of the waiver for <%= @event_name %>. Now we need your signature on this waiver.
 
 Sign the waiver here: <%= @waiver_link %>
+<% end %>
 
 <% if @waiver_is_final_task %>
-Once you've signed, we'll process the completed waiver and confirm <%= @child_first_name %>'s registration.
+Once you've signed, we'll process the completed <%= @document_name ? "document" : "waiver" %> and confirm <%= @child_first_name %>'s registration.
 <% else %>
 After you sign, any remaining steps will stay visible on <%= @child_first_name %>'s dashboard.
 <% end %>

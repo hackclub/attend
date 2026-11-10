@@ -38,6 +38,21 @@ RSpec.describe GuardianMailer, type: :mailer do
       expect(mail.body.encoded).to include("process the completed waiver")
     end
 
+    it "names a custom document instead of calling it a waiver" do
+      document = create(:custom_document, event: event, name: "Hotel consent")
+      consent = create(:consent, participant_event: participant_event, consent_type: :custom_document,
+        custom_document: document, status: :sent, participant_signed_at: Time.current,
+        docuseal_guardian_slug: "guardian-doc")
+
+      mail = described_class.waiver_signing(
+        guardian_participant_event: guardian_participant_event, consent: consent
+      )
+
+      expect(mail.subject).to include(%(signed "Hotel consent"))
+      expect(mail.body.encoded).to include("Hotel consent")
+      expect(mail.body.encoded).to include("guardian-doc")
+    end
+
     it "names the participant by legal name, not preferred name" do
       participant_event.participant.update!(legal_first_name: "Robin", preferred_name: "Birdie")
 

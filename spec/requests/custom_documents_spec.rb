@@ -185,6 +185,57 @@ RSpec.describe "Custom documents", type: :request do
       expect(doc.field_mapper.has_mappings?).to be true
     end
 
+    describe "templates that repeat a field name within one role" do
+      let(:doc) { create(:custom_document, :dual_signer, event: event, name: "Venue Release") }
+
+      before do
+        event.update!(docuseal_field_mappings: {
+          doc.mapping_key => {
+            "template_snapshot" => {
+              "synced_at" => Time.current.iso8601,
+              "submitters" => [ { "name" => "First Party", "uuid" => "a" } ],
+              "fields" => [
+                { "name" => "Full Name", "type" => "text", "uuid" => "name-1", "submitter_uuid" => "a" },
+                { "name" => "Full Name", "type" => "text", "uuid" => "name-2", "submitter_uuid" => "a" }
+              ]
+            },
+            "mappings" => [
+              { "field_name" => "Full Name", "field_uuid" => "name-2", "source_key" => "guardian.phone", "role" => "First Party" }
+            ]
+          }
+        })
+      end
+
+      [ false, true ].each do |console|
+        it "shows each row its own mapping#{" in the admin console" if console}" do
+          admin.update!(admin_console_beta: console)
+
+          get admin_event_docuseal_template_mappings_path(event, doc.mapping_key)
+
+          expect(response).to have_http_status(:ok)
+          rows = Nokogiri::HTML(response.body).css("input[name='mappings[][field_uuid]']").map do |input|
+            row = input.ancestors.find { |node| node.at_css("select[name='mappings[][source_key]']") }
+            [ input["value"], row.at_css("select[name='mappings[][source_key]'] option[selected]")&.[]("value") ]
+          end
+          expect(rows).to eq([ [ "name-1", nil ], [ "name-2", "guardian.phone" ] ])
+        end
+      end
+
+      it "saves which field each mapping belongs to" do
+        patch admin_event_docuseal_template_mappings_path(event, doc.mapping_key), params: {
+          mappings: [
+            { field_name: "Full Name", field_uuid: "name-1", source_key: "participant.full_name", role: "First Party" },
+            { field_name: "Full Name", field_uuid: "name-2", source_key: "guardian.full_name", role: "First Party" }
+          ]
+        }
+
+        saved = event.reload.docuseal_field_mappings[doc.mapping_key]["mappings"]
+        expect(saved.map { |m| m.values_at("field_uuid", "source_key") }).to eq([
+          [ "name-1", "participant.full_name" ], [ "name-2", "guardian.full_name" ]
+        ])
+      end
+    end
+
     describe "signer roles" do
       let(:doc) { create(:custom_document, :dual_signer, event: event, name: "Venue Release") }
 

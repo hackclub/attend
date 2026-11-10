@@ -50,8 +50,8 @@ module DocusealJobs
 
       if field_mapper.has_mappings?
         Rails.logger.info("DocuSeal using configured field mappings for waiver")
-        attendee_field_values = field_mapper.build_fields_for_role(role: attendee_role, context: context)
-        guardian_field_values = field_mapper.build_fields_for_role(role: guardian_role, context: context)
+        attendee_field_values = field_mapper.build_fields_for_role(role: attendee_role, context: context, template: template)
+        guardian_field_values = field_mapper.build_fields_for_role(role: guardian_role, context: context, template: template)
       else
         Rails.logger.info("DocuSeal using fuzzy field matching (no configured mappings)")
         attendee_field_values = attendee_fields_fuzzy(participant, template_fields)
