@@ -18,6 +18,8 @@ require "action_cable/engine"
 # you've limited to :test, :development, or :production.
 Bundler.require(*Rails.groups)
 
+require_relative "../lib/middleware/malformed_request_guard"
+
 module Attend
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
@@ -26,7 +28,7 @@ module Attend
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.
-    config.autoload_lib(ignore: %w[assets tasks omniauth])
+    config.autoload_lib(ignore: %w[assets tasks omniauth middleware])
 
     # Configuration for the application, engines, and railties goes here.
     #
@@ -41,5 +43,11 @@ module Attend
 
     # Discards sends to Postmark-suppressed addresses instead of erroring.
     config.action_mailer.delivery_job = "MailDeliveryJob"
+
+    # Rack raises this for a malformed multipart body, but Rails doesn't map
+    # it to a status, so a garbage upload was a 500 instead of a 400.
+    config.action_dispatch.rescue_responses["Rack::Multipart::BoundaryTooLongError"] = :bad_request
+    # ...and a POST raises it from Rack::MethodOverride, above ShowExceptions.
+    config.middleware.insert_before Rack::MethodOverride, MalformedRequestGuard
   end
 end
