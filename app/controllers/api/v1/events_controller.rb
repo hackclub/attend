@@ -15,6 +15,11 @@ module Api
       # Mirrors EventPolicy#api_participants?: everyone but read-only staff.
       PARTICIPANT_API_ROLES = %w[event_admin ops limited safeguarding_lead].freeze
 
+      # Lists the caller's events with their standing on each, which only
+      # means something for a person. An event or series API key has no
+      # user, so it's refused rather than tripping over a nil one.
+      before_action :require_user!
+
       def index
         events = if current_user.global_admin?
           Event.all
@@ -29,6 +34,12 @@ module Api
       end
 
       private
+
+      def require_user!
+        return if current_user
+
+        render json: { error: "API key is not authorized for this action" }, status: :forbidden
+      end
 
       def event_json(event)
         {

@@ -31,6 +31,16 @@ RSpec.describe "Api::V1::Events", type: :request do
     expect(grown).to eq(baseline)
   end
 
+  it "refuses an event API key with a JSON 403 instead of raising on the missing user", :raise_exceptions do
+    event = create(:event)
+    key = EventApiToken.generate_for(event, user: user, name: "scanner").token
+
+    get api_v1_events_path, headers: { "Authorization" => "Bearer #{key}" }
+
+    expect(response).to have_http_status(:forbidden)
+    expect(JSON.parse(response.body)["error"]).to eq("API key is not authorized for this action")
+  end
+
   describe "capability flags" do
     def event_payload(event)
       get api_v1_events_path, headers: headers
