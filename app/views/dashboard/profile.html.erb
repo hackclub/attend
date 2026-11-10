@@ -248,7 +248,7 @@
               </span>
             </label>
 
-            <div>
+            <div data-controller="direct-upload" data-direct-upload-url-value="<%= rails_direct_uploads_path %>">
               <%= f.label :public_profile_photo, "Profile photo", class: "block text-sm font-medium text-(--text-strong) mb-1" %>
               <div class="flex items-center gap-4">
                 <% current_photo = @participant.public_profile_photo.attached? && @participant.public_profile_photo.blob.persisted? ? @participant.public_profile_photo : (@participant.headshot if @participant.headshot.attached? && @participant.headshot.blob.persisted?) %>
@@ -261,7 +261,10 @@
                   </div>
                 <% end %>
                 <div class="min-w-0">
-                  <%= f.file_field :public_profile_photo, accept: "image/jpeg,image/png,image/webp", class: "block w-full text-sm text-(--text-muted) file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-(--bg-elev-2) file:text-(--text-strong) file:text-sm file:font-medium file:cursor-pointer" %>
+                  <%= f.file_field :public_profile_photo, accept: "image/jpeg,image/png,image/webp", class: "block w-full text-sm text-(--text-muted) file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-(--bg-elev-2) file:text-(--text-strong) file:text-sm file:font-medium file:cursor-pointer",
+                        data: { direct_upload_target: "input", action: "change->direct-upload#upload" } %>
+                  <%= hidden_field_tag :public_profile_photo_signed_blob_id, nil, id: nil, data: { direct_upload_target: "signedId" } %>
+                  <p class="text-xs text-(--text-muted) mt-1 empty:hidden" data-direct-upload-target="status" aria-live="polite"></p>
                   <p class="text-xs text-(--text-faint) mt-1">
                     Only used on your public profile — it never changes the headshot event organizers see.
                     <% if @participant.public_profile_photo.attached? %>

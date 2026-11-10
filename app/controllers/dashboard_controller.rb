@@ -3,6 +3,7 @@ class DashboardController < ApplicationController
   include TravelLegDateMerging
   include PhysicalDocumentUploads
   include OptionalDocumentEnrolment
+  include DirectUploadedBlobs
 
   # MCP connections are managed from the profile page, so they follow the same
   # rule as the rest of it: admins without a participant record still get in.
@@ -16,6 +17,8 @@ class DashboardController < ApplicationController
   # where their staff settings (display name, avatar, contact info) live now.
   before_action :require_participant_or_admin, only: PROFILE_ACTIONS
   before_action :require_admin, only: [ :update_staff_profile, :destroy_staff_avatar, :update_mcp_connection ]
+  before_action :assign_direct_uploaded_public_profile_photo, only: :update_public_profile
+  after_action :discard_rejected_public_profile_photo, only: :update_public_profile
 
   def index
     # display_status per row walks travel/health/guardian/consent/custom-doc
@@ -477,6 +480,37 @@ class DashboardController < ApplicationController
   end
 
   private
+
+  # The profile photo field uploads straight to storage when it can (see
+  # direct_upload_controller.js) and sends the blob's signed id in
+  # `public_profile_photo_signed_blob_id`; without JavaScript, or when that
+  # upload fails, the file comes in the form as before. The model checks
+  # either one the same way (type, size, whether it decodes).
+  def assign_direct_uploaded_public_profile_photo
+    participant_params = params[:participant]
+    return unless participant_params.is_a?(ActionController::Parameters)
+
+    # The participant param takes a posted file only. Active Storage would
+    # also take a signed blob id there, which can name a blob that's already
+    # someone else's photo.
+    posted = participant_params[:public_profile_photo]
+    return if posted.is_a?(ActionDispatch::Http::UploadedFile)
+
+    participant_params.delete(:public_profile_photo)
+    signed_id = params[:public_profile_photo_signed_blob_id]
+    return if signed_id.blank?
+
+    @direct_uploaded_photo = find_direct_uploaded_blob(signed_id)
+    if @direct_uploaded_photo
+      @participant.public_profile_photo = @direct_uploaded_photo
+    else
+      redirect_to dashboard_profile_path, alert: "That photo upload expired. Please choose it again."
+    end
+  end
+
+  def discard_rejected_public_profile_photo
+    discard_direct_upload(@direct_uploaded_photo)
+  end
 
   # Events taking visa letter applications, offered on the dashboard, with
   # the participant's own application to each where they already have one.
