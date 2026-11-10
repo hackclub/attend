@@ -6,6 +6,16 @@ RSpec.describe "Signing in to training with an emailed code", type: :request do
   let(:volunteer) { create(:user, email: "volunteer@example.com") }
   let(:course) { create(:training_course, :published) }
 
+  # The code and its attempt count live in Rails.cache, which is a null store
+  # in tests.
+  around do |example|
+    original = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+    example.run
+  ensure
+    Rails.cache = original
+  end
+
   before do
     # Whether Turnstile is configured depends on the local credentials.
     allow(TurnstileVerifier).to receive(:verify).and_return(true)
@@ -106,6 +116,39 @@ RSpec.describe "Signing in to training with an emailed code", type: :request do
     expect(response).to redirect_to(training_sign_in_path)
     get training_path
     expect(response).to redirect_to(training_sign_in_path)
+  end
+
+  it "doesn't reset the attempt count when an old copy of the session cookie is replayed" do
+    request_code(volunteer.email)
+    fresh_cookie = cookies.to_hash.dup
+
+    5.times { post training_sign_in_verify_path, params: { code: "000000" } }
+    fresh_cookie.each { |name, value| cookies[name] = value }
+    post training_sign_in_verify_path, params: { code: "123456" }
+
+    expect(response).to redirect_to(training_sign_in_path)
+    get training_path
+    expect(response).to redirect_to(training_sign_in_path)
+  end
+
+  it "caps how many codes one address gets, whichever browser asks" do
+    5.times do
+      reset!
+      expect { request_code(volunteer.email) }.to have_enqueued_mail(TrainingMailer, :sign_in_code)
+    end
+    reset!
+    expect { request_code(volunteer.email) }.not_to have_enqueued_mail(TrainingMailer, :sign_in_code)
+    expect(response).to redirect_to(training_sign_in_path)
+    expect(flash[:alert]).to include("for that address")
+  end
+
+  it "challenges a code request for a different address than the pending one" do
+    request_code(volunteer.email)
+    allow(TurnstileVerifier).to receive(:verify).and_return(false)
+
+    expect { request_code(volunteer.email) }.to have_enqueued_mail(TrainingMailer, :sign_in_code)
+    expect { request_code("someone-else@example.com") }.not_to have_enqueued_mail(TrainingMailer, :sign_in_code)
+    expect(flash[:alert]).to include("verify that you're human")
   end
 
   it "won't sign in someone who was given a role after the code went out" do
