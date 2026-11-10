@@ -247,6 +247,12 @@ RSpec.describe SeriesDashboard do
       expect(dashboard_for(event).open_incidents[event.id]).to eq(1)
     end
 
+    it "reports zero, not nil, to a global admin for an event with none open" do
+      quiet = create(:event, event_series: series)
+
+      expect(dashboard_for([ event, quiet ]).open_incidents[quiet.id]).to eq(0)
+    end
+
     # Series membership alone does not grant incident visibility — IncidentPolicy
     # keys off event_role_assignments — so this must stay nil rather than 0, or
     # the view would report "none open" to someone who simply cannot see them.
@@ -273,6 +279,38 @@ RSpec.describe SeriesDashboard do
       )
 
       expect(dashboard_for(event, user: ops).open_incidents[event.id]).to eq(1)
+    end
+  end
+
+  # Big series (a hundred-plus events) made this page take seconds when every
+  # event loaded and preloaded its own registrations.
+  describe "query count" do
+    def load_events(events)
+      events.map { |e| Event.includes(:scan_contexts, :custom_documents).find(e.id) }
+    end
+
+    def queries_for_dashboard(events)
+      count = 0
+      counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" || payload[:cached] }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") do
+        dashboard = dashboard_for(events)
+        dashboard.event_rows
+        dashboard.totals
+        dashboard.chase_rows
+      end
+      count
+    end
+
+    it "does not grow with the number of events" do
+      events = 2.times.map { create(:event, event_series: series, starts_at: 2.weeks.from_now) }
+      events.each { |event| 2.times { create(:participant_event, event: event) } }
+      queries_for_dashboard(load_events(events)) # warm per-process lookups
+      baseline = queries_for_dashboard(load_events(events))
+
+      more = 3.times.map { create(:event, event_series: series, starts_at: 2.weeks.from_now) }
+      more.each { |event| 2.times { create(:participant_event, event: event) } }
+
+      expect(queries_for_dashboard(load_events(events + more))).to eq(baseline)
     end
   end
 

@@ -10,8 +10,8 @@
 # in SQL at all (CustomDocument#applies_to? and Participant#minor_on? both
 # branch in Ruby), so a SQL twin would drift, and a series total that disagrees
 # with the rows behind it is worse than a slower page. The cost is one
-# preloaded pass over the series' participant_events; the controller wraps this
-# in a short-lived cache so a reload of an active series is cheap.
+# preloaded pass over the series' participant_events, loaded for every event at
+# once so the query count stays flat however many events the series has.
 class SeriesDashboard
   SINGULAR_VERBS = { "haven't" => "hasn't", "have" => "has", "are" => "is" }.freeze
 
@@ -339,17 +339,24 @@ class SeriesDashboard
   # for an event the viewer can't see incidents on, keeping "none open" and "not
   # yours to see" distinct all the way to the view.
   def open_incidents
-    @open_incidents ||= events.index_by(&:id).transform_values do |event|
-      if user.global_admin?
-        event.incidents.open_incidents.count
-      else
-        roles = incident_roles_by_event[event.id]
-        roles.present? ? event.incidents.open_incidents.visible_to_staff(user, roles).count : nil
-      end
+    @open_incidents ||= if user.global_admin?
+      counts = Incident.open_incidents.where(event_id: event_ids).group(:event_id).count
+      event_ids.index_with { |id| counts.fetch(id, 0) }
+    else
+      open_incidents_for_staff
     end
   end
 
   private
+
+  # Without global admin, visibility hangs on the viewer's roles on each event,
+  # so this stays one count per event the viewer holds a role on.
+  def open_incidents_for_staff
+    events.index_by(&:id).transform_values do |event|
+      roles = incident_roles_by_event[event.id]
+      roles.present? ? event.incidents.open_incidents.visible_to_staff(user, roles).count : nil
+    end
+  end
 
   def event_ids
     @event_ids ||= events.map(&:id)
@@ -408,13 +415,14 @@ class SeriesDashboard
 
     checked_in_ids = checked_in_participant_event_ids
     sent_emails_by_event = Invitation.sent_emails_by_event(events)
+    participant_events_by_event = participant_events_by_event_id
 
     events.each do |event|
       arrivals_expected = arrivals_expected?(event)
       stages_seen_here = Set.new
       sent_emails = sent_emails_by_event.fetch(event.id, Set.new)
 
-      participant_events_for(event).each do |pe|
+      participant_events_by_event.fetch(event.id, []).each do |pe|
         if INACTIVE_STATUSES.include?(pe.status)
           @inactive_by_event[event.id] += 1
           next
@@ -457,20 +465,23 @@ class SeriesDashboard
     @loaded = true
   end
 
-  def participant_events_for(event)
-    scope = event.participant_events.preload(
+  # Every registration in the series in one preloaded load, grouped by event.
+  # Loading per event made the preload fan out into a dozen queries per event,
+  # which on a series of a hundred-plus events was thousands of round trips.
+  def participant_events_by_event_id
+    events_by_id = events.index_by(&:id)
+
+    ParticipantEvent.where(event_id: event_ids).preload(
       :participant, :travel_inbound, :travel_outbound, :accommodation, :medical,
       :dietary, :accessibility, :consents, :emergency_contacts,
       guardian_participant_events: :emergency_contacts
-    )
-
-    scope.to_a.each do |pe|
+    ).to_a.each do |pe|
       # onboarding_progress reads pe.event for the accommodation, freedom-waiver
       # and custom-document branches. Pointing every row at the event instance we
       # already hold keeps active_custom_documents memoized once per event
       # instead of re-querying per participant.
-      pe.association(:event).target = event
-    end
+      pe.association(:event).target = events_by_id.fetch(pe.event_id)
+    end.group_by(&:event_id)
   end
 
   def arrivals_expected?(event)
