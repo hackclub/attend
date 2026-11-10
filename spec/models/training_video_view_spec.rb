@@ -35,6 +35,43 @@ RSpec.describe TrainingVideoView do
     expect(view).to be_completed
   end
 
+  # Regression: YouTube's player ended a 524s video at 522.9s, just outside a
+  # 1s tolerance, leaving the learner at "99% watched" with the quiz locked.
+  it "completes when the player stops a little short of the advertised length" do
+    lesson.update!(video_duration_seconds: 524)
+    view.record_heartbeat!(position: 522.9, now: start + 530)
+    expect(view).to be_completed
+  end
+
+  it "still wants more than a few seconds off the end" do
+    lesson.update!(video_duration_seconds: 524)
+    view.record_heartbeat!(position: 515, now: start + 530)
+    expect(view).not_to be_completed
+  end
+
+  it "settles a view that reached the end under a tighter tolerance" do
+    lesson.update!(video_duration_seconds: 524)
+    view.update!(duration_seconds: 524, watched_seconds: 522.9)
+    expect(view.settle!).to be_completed
+  end
+
+  it "leaves an unfinished view alone when settling" do
+    lesson.update!(video_duration_seconds: 524)
+    view.update!(duration_seconds: 524, watched_seconds: 300)
+    expect(view.settle!).not_to be_completed
+  end
+
+  # The length stored on the row is from the last heartbeat; the video may
+  # have been swapped for a longer one, or its length forgotten, since.
+  it "settles against the lesson's current length, not the one it last saw" do
+    view.update!(duration_seconds: 20, watched_seconds: 19.5)
+    expect(view.settle!).not_to be_completed
+    expect(view.duration_seconds).to eq(600)
+
+    lesson.update!(video_duration_seconds: nil)
+    expect(view.settle!).not_to be_completed
+  end
+
   it "never moves backwards" do
     view.record_heartbeat!(position: 20, now: start + 20)
     view.record_heartbeat!(position: 3, now: start + 25)

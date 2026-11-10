@@ -95,6 +95,18 @@ RSpec.describe "Training", type: :request do
       expect(flash[:alert]).to include("Watch the whole video")
     end
 
+    # Regression: a player that stopped just short of the advertised length
+    # left the view open for good; loading the lesson closes it.
+    it "opens the quiz on load for a view that already reached the end" do
+      enrollment = enroll
+      view = enrollment.video_view_for(reading)
+      view.update!(duration_seconds: 20, watched_seconds: 18.5)
+
+      get training_course_lesson_path(course, reading)
+      expect(view.reload).to be_completed
+      expect(response.body).to include('data-training-video-complete-value="true"')
+    end
+
     it "takes progress heartbeats and opens once the end is reached in real time" do
       enrollment = enroll
       start = Time.current

@@ -11,7 +11,11 @@ module Training
       @attempt = @enrollment.quiz_attempts.find_by(id: params[:attempt], training_lesson_id: @lesson.id) if params[:attempt]
       # Created on page load so the server's watch clock starts here, not at
       # the first heartbeat (TrainingVideoView#record_heartbeat!).
-      @video_view = @enrollment.video_view_for(@lesson) if @lesson.watch_required? && !@enrollment.lesson_completed?(@lesson)
+      if @lesson.watch_required? && !@enrollment.lesson_completed?(@lesson)
+        @video_view = @enrollment.video_view_for(@lesson)
+        @video_view.lesson = @lesson
+        @video_view.settle!
+      end
     end
 
     def complete
