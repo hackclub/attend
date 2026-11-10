@@ -1,13 +1,6 @@
 <% content_for :breadcrumbs, cs_event_breadcrumbs([ "Messages", admin_event_messages_path(current_event) ], [ "Compose message", edit_admin_event_message_path(current_event, @message) ], [ "Preview and send", nil ]) %>
 
-<div class="max-w-4xl">
-  <div class="cs-header">
-    <div class="cs-header-text">
-      <h1 class="cs-h1">Preview &amp; send</h1>
-      <p class="cs-description">Step 2 of 2 — Review and send your message</p>
-    </div>
-  </div>
-
+<%= render layout: "wizard", locals: { current_step: "preview", title: "Preview and send" } do %>
   <div class="cs-stack">
     <section class="cs-container">
       <div class="cs-container-header">
@@ -126,7 +119,7 @@
       </div>
     <% end %>
 
-    <div class="flex flex-wrap justify-end items-center gap-2">
+    <div class="cs-wizard-actions">
       <%= link_to "Edit message", edit_admin_event_message_path(current_event, @message), class: "cs-btn cs-btn-link" %>
       <% if @message.scheduled_at.present? && @message.scheduled_at > Time.current %>
         <%= button_to "Schedule message", send_now_admin_event_message_path(current_event, @message),
@@ -143,4 +136,4 @@
       <% end %>
     </div>
   </div>
-</div>
+<% end %>

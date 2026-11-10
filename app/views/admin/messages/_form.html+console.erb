@@ -1,16 +1,6 @@
 <% content_for :breadcrumbs, cs_event_breadcrumbs([ "Messages", admin_event_messages_path(current_event) ], [ "Compose message", nil ]) %>
 
-<div class="max-w-3xl">
-  <div class="cs-header">
-    <div class="cs-header-text">
-      <h1 class="cs-h1">Compose message</h1>
-      <p class="cs-description">Step 1 of 2 — Write your message</p>
-    </div>
-    <div class="cs-actions">
-      <span class="cs-small text-gray-400" id="save-status">Draft</span>
-    </div>
-  </div>
-
+<%= render layout: "wizard", locals: { current_step: "compose", title: "Compose message" } do %>
   <%= form_with model: @message,
       url: @message.persisted? ? admin_event_message_path(current_event, @message) : admin_event_messages_path(current_event),
       method: @message.persisted? ? :patch : :post,
@@ -28,39 +18,46 @@
         <h2 class="cs-h2">Recipients</h2>
       </div>
       <div class="cs-container-body">
-        <div class="cs-field-grid">
-          <%= cs_form_field f, :audience, label: "Audience", messages: { inclusion: "Select a valid audience." } do |aria| %>
-            <%= f.select :audience,
-                Message::AUDIENCES.reject { |k, _| k == :attendees_in_groups && !current_event.groups_enabled? }.map { |k, v| [ v, k ] },
-                {},
-                class: "cs-select",
-                required: true,
-                data: { action: "change->autosave#save change->autosave#toggleParticipantSelect" },
-                **aria %>
-          <% end %>
+        <%= cs_form_field f, :audience, label: "Audience", messages: { inclusion: "Select a valid audience." } do |aria| %>
+          <%= f.select :audience,
+              Message::AUDIENCES.reject { |k, _| k == :attendees_in_groups && !current_event.groups_enabled? }.map { |k, v| [ v, k ] },
+              {},
+              class: "cs-select max-w-md",
+              required: true,
+              data: { action: "change->autosave#save change->autosave#toggleParticipantSelect" },
+              **aria %>
+        <% end %>
 
-          <%= cs_form_field f, :channels, label: "Channels", group: true,
-                messages: { blank: "Select at least one channel." } do |aria| %>
+        <%# Each tile says what the channel does with the content, so the
+            message field doesn't have to. Keep in step with Message's
+            per-channel rendering. %>
+        <% channel_notes = {
+             slack: "Attendees only. Images are sent as links.",
+             email: "Uses the subject line. Images included.",
+             sms: "Text only. Images are left out.",
+             push: "Shows the subject, or the start of the message."
+           } %>
+        <%= cs_form_field f, :channels, label: "Channels", group: true,
+              messages: { blank: "Select at least one channel." } do |aria| %>
+          <div class="cs-tiles cs-tiles-row">
             <% Message::CHANNELS.each do |key, label| %>
               <% sms_disabled = key == :sms && !Setting.twilio_enabled? %>
-              <div class="cs-option">
-                <%= check_box_tag "message[channels][]", key, @message.channels.include?(key.to_s),
-                    id: "channel_#{key}",
-                    disabled: sms_disabled,
-                    data: { action: "change->autosave#save" },
-                    **aria %>
-                <div>
-                  <label class="cs-option-label" for="channel_<%= key %>"><%= label %></label>
-                  <% if key == :slack %>
-                    <p class="cs-option-description">Attendees only</p>
-                  <% elsif sms_disabled %>
-                    <p class="cs-option-description">Disabled in settings</p>
-                  <% end %>
-                </div>
-              </div>
+              <label class="cs-tile">
+                <span class="cs-option">
+                  <%= check_box_tag "message[channels][]", key, @message.channels.include?(key.to_s),
+                      id: "channel_#{key}",
+                      disabled: sms_disabled,
+                      data: { action: "change->autosave#save" },
+                      **aria %>
+                  <span>
+                    <span class="cs-option-label block"><%= label %></span>
+                    <span class="cs-option-description block"><%= sms_disabled ? "Turned off in settings." : channel_notes[key] %></span>
+                  </span>
+                </span>
+              </label>
             <% end %>
-          <% end %>
-        </div>
+          </div>
+        <% end %>
 
         <% selected_ids = @message.audience_filters["participant_event_ids"] || [] %>
         <div id="participant-select-container" class="mt-4 <%= @message.audience == 'specific_participants' ? '' : 'hidden' %>">
@@ -142,23 +139,17 @@
       </div>
       <div class="cs-container-body">
         <%= cs_form_field f, :subject, label: "Subject", optional: true,
-              description: "The email subject line. Slack and SMS use the event name.",
-              constraint: "For example: Important update about your travel" do |aria| %>
+              description: "The email subject line and the push notification text. Slack and SMS use the event name." do |aria| %>
           <%= f.text_field :subject,
               class: "cs-input",
+              placeholder: "Important update about your travel",
               data: { action: "input->autosave#debouncedSave" },
               **aria %>
         <% end %>
 
         <%= cs_form_field f, :body, label: "Message",
-              data: { controller: "tinymce", tinymce_image_upload_url_value: upload_image_admin_event_messages_path(current_event) },
-              description: "Use the toolbar for links, bold, italic, lists and images. Formatting is adapted for each channel: " \
-                "images show in email, on Attend and in the app, are sent as a link on Slack, and are left out of SMS and push. " \
-                "Images must be uploaded here; pictures linked from other sites are left out. " \
-                "Personalize with {{first_name}} and {{event_name}}; messages to guardians can also use " \
-                "{{participant_first_name}} for their children's names. A missing first name becomes \"there\" (\"Hi there,\"), " \
-                "and a missing child's name becomes \"your child\".",
-              constraint: "Required before the message can be sent." do |aria| %>
+              data: { controller: "tinymce", tinymce_image_upload_url_value: upload_image_admin_event_messages_path(current_event), tinymce_placeholders_value: Message::PLACEHOLDERS.to_json },
+              description: "Type {{ to add a recipient's name or the event name. Images have to be uploaded here; ones linked from other sites are left out." do |aria| %>
           <%= f.text_area :body,
               rows: 10,
               class: "cs-input",
@@ -180,6 +171,7 @@
                  data-action="change->autosave#toggleSchedule">
           <div>
             <label class="cs-option-label" for="schedule-toggle">Schedule for later</label>
+            <p class="cs-option-description">Otherwise it goes out when you send it from the preview.</p>
           </div>
         </div>
         <div id="schedule-fields" class="mt-4 max-w-xs <%= @message.scheduled_at.present? ? '' : 'hidden' %>">
@@ -199,9 +191,10 @@
 
     <%= cs_form_errors f %>
 
-    <div class="flex justify-end gap-2">
+    <div class="cs-wizard-actions">
+      <span class="cs-small cs-muted sm:mr-auto" id="save-status" role="status">Draft</span>
       <%= link_to "Cancel", admin_event_messages_path(current_event), class: "cs-btn cs-btn-link" %>
-      <%= f.button "Next: Preview →", class: "cs-btn cs-btn-primary", name: "commit", value: "Next: Preview →" %>
+      <%= f.button "Next: Preview", class: "cs-btn cs-btn-primary", name: "commit", value: "Next: Preview →" %>
     </div>
   <% end %>
-</div>
+<% end %>

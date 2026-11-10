@@ -30,6 +30,35 @@ RSpec.describe "Admin::Messages", type: :request do
         expect(response).to have_http_status(:ok)
         expect(response.body).to include("Compose message")
       end
+
+      it "frames the form as step 1 of 2 with a tile per channel saying what it does" do
+        get new_admin_event_message_path(event_slug: event.slug)
+
+        page = Nokogiri::HTML(response.body)
+        expect(page.at_css(".cs-wizard-nav [aria-current='step']").text).to eq("Write message")
+        expect(page.css(".cs-tiles-row .cs-tile input[name='message[channels][]']").map { |input| input["value"] })
+          .to eq(Message::CHANNELS.keys.map(&:to_s))
+        expect(page.at_css("#channel_push").ancestors(".cs-tile").first.text).to include("Shows the subject, or the start of the message.")
+        expect(page.at_css("[data-tinymce-placeholders-value]")["data-tinymce-placeholders-value"])
+          .to eq(Message::PLACEHOLDERS.to_json)
+      end
+    end
+  end
+
+  describe "GET index" do
+    context "with the admin console beta" do
+      before { admin.update!(admin_console_beta: true) }
+
+      it "shows each message's body as text, with placeholders left as written" do
+        event.messages.create!(audience: "confirmed_attendees", channels: [ "email" ], subject: "Test",
+          body: "<p>{{first_name}} &amp; friends</p>", sent_by_user: admin, status: :draft)
+
+        get admin_event_messages_path(event_slug: event.slug)
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).not_to include("&lt;p&gt;")
+        expect(Nokogiri::HTML(response.body).text).to include("{{first_name}} & friends")
+      end
     end
   end
 
