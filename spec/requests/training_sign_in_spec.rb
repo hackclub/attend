@@ -2,6 +2,8 @@ require "rails_helper"
 
 RSpec.describe "Signing in to training with an emailed code", type: :request do
   include ActiveSupport::Testing::TimeHelpers
+
+  after { travel_back }
   let(:event) { create(:event) }
   let(:volunteer) { create(:user, email: "volunteer@example.com") }
   let(:course) { create(:training_course, :published) }
@@ -131,8 +133,9 @@ RSpec.describe "Signing in to training with an emailed code", type: :request do
     expect(response).to redirect_to(training_sign_in_path)
   end
 
-  it "caps how many codes one address gets, whichever browser asks" do
-    5.times do
+  it "caps how many codes one address gets, whichever browser asks, until the hour turns" do
+    travel_to Time.zone.local(2030, 1, 1, 10, 5)
+    10.times do
       reset!
       expect { request_code(volunteer.email) }.to have_enqueued_mail(TrainingMailer, :sign_in_code)
     end
@@ -140,6 +143,10 @@ RSpec.describe "Signing in to training with an emailed code", type: :request do
     expect { request_code(volunteer.email) }.not_to have_enqueued_mail(TrainingMailer, :sign_in_code)
     expect(response).to redirect_to(training_sign_in_path)
     expect(flash[:alert]).to include("for that address")
+
+    travel_to Time.zone.local(2030, 1, 1, 11, 0)
+    reset!
+    expect { request_code(volunteer.email) }.to have_enqueued_mail(TrainingMailer, :sign_in_code)
   end
 
   it "challenges a code request for a different address than the pending one" do
@@ -149,6 +156,21 @@ RSpec.describe "Signing in to training with an emailed code", type: :request do
     expect { request_code(volunteer.email) }.to have_enqueued_mail(TrainingMailer, :sign_in_code)
     expect { request_code("someone-else@example.com") }.not_to have_enqueued_mail(TrainingMailer, :sign_in_code)
     expect(flash[:alert]).to include("verify that you're human")
+  end
+
+  it "doesn't let another browser asking for the same address overwrite or burn this one's code" do
+    request_code(volunteer.email)
+    mine = cookies.to_hash.dup
+
+    reset!
+    allow(SecureRandom).to receive(:random_number).with(1_000_000).and_return(654_321)
+    request_code(volunteer.email)
+    6.times { post training_sign_in_verify_path, params: { code: "000000" } }
+
+    reset!
+    mine.each { |name, value| cookies[name] = value }
+    post training_sign_in_verify_path, params: { code: "123456" }
+    expect(response).to redirect_to(training_path)
   end
 
   it "won't sign in someone who was given a role after the code went out" do
