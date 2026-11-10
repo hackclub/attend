@@ -34,12 +34,16 @@ class TrainingStatus
   # Staff by their event roles, volunteers as "volunteer", and the event's
   # series owners and organizers as "event_admin" — they act as event admins
   # on every event in the series without a role on each.
-  def self.for_event(event)
+  #
+  # Ineligibility comes from criminal-record declarations, so it's only for
+  # people who manage the event's staff: with include_ineligible: false,
+  # everyone shows their training state as if they'd been cleared.
+  def self.for_event(event, include_ineligible: true)
     roles = Hash.new { |hash, key| hash[key] = [] }
     event.event_role_assignments.pluck(:user_id, :role).each { |user_id, role| roles[user_id] << role }
     event.event_volunteers.pluck(:user_id).each { |user_id| roles[user_id] << "volunteer" }
     series_member_ids(event).each { |user_id| roles[user_id] |= [ "event_admin" ] }
-    new(roles)
+    new(roles, include_ineligible: include_ineligible)
   end
 
   def self.for_user_at_event(user, event)
@@ -56,9 +60,10 @@ class TrainingStatus
   end
 
   # roles_by_user_id: { user_id => [role, ...] }
-  def initialize(roles_by_user_id, now: Time.current)
+  def initialize(roles_by_user_id, now: Time.current, include_ineligible: true)
     @roles_by_user_id = roles_by_user_id
     @now = now
+    @include_ineligible = include_ineligible
   end
 
   def for(user)
@@ -85,7 +90,7 @@ class TrainingStatus
         .where(user_id: @roles_by_user_id.keys, training_badge_id: badges.map(&:id))
         .order(:expires_at).to_a
       awards_by_user = awards.group_by(&:user_id)
-      ineligible_ids = TrainingDisclosure.ineligible_user_ids(@roles_by_user_id.keys)
+      ineligible_ids = @include_ineligible ? TrainingDisclosure.ineligible_user_ids(@roles_by_user_id.keys) : []
 
       @roles_by_user_id.to_h do |user_id, roles|
         required = badges.select { |badge| badge.required_for?(roles) }

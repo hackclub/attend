@@ -15,6 +15,8 @@ class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
     @user = User.from_omniauth(auth)
 
     if @user.persisted?
+      # Hack Club Auth lifts the training-only limit of an emailed code.
+      session.delete(TrainingSignIn::SESSION_KEY)
       sign_in @user, event: :authentication
       if @user.previous_email_at_sign_in.present?
         flash[:email_changed] = {

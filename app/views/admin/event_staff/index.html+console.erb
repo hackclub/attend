@@ -5,9 +5,11 @@
     <div class="cs-header-text">
       <h1 class="cs-h1">Event staff <span class="cs-counter">(<%= @event_role_assignments.size %>)</span></h1>
     </div>
-    <div class="cs-actions">
-      <%= link_to "Add staff member", new_admin_event_staff_path(current_event), class: "cs-btn cs-btn-primary cs-btn-full" %>
-    </div>
+    <% if can_manage_staff? %>
+      <div class="cs-actions">
+        <%= link_to "Add staff member", new_admin_event_staff_path(current_event), class: "cs-btn cs-btn-primary cs-btn-full" %>
+      </div>
+    <% end %>
   </div>
 
   <%= render "admin/event_staff/training_summary", summary: @training_status.summary %>
@@ -41,7 +43,7 @@
                 <td class="whitespace-nowrap text-right">
                   <% if assignment.inherited_from_series? %>
                     <span title="Series <%= assignment.series_role %>s act as event admins on every event in the series. Manage them from the series members page."><%= cs_status(:info, "Inherited from series") %></span>
-                  <% else %>
+                  <% elsif can_manage_staff? %>
                     <%= button_to "Remove", admin_event_staff_path(current_event, assignment), method: :delete, class: "cs-btn cs-btn-link", data: { turbo_confirm: "Are you sure you want to remove #{assignment.user.email} from this event?" } %>
                   <% end %>
                 </td>
@@ -53,10 +55,12 @@
     <% else %>
       <div class="cs-empty">
         <p class="cs-empty-title">No staff members assigned to this event yet</p>
-        <p>Add staff members to give them access to manage this event.</p>
-        <div class="cs-actions">
-          <%= link_to "Add staff member", new_admin_event_staff_path(current_event), class: "cs-btn" %>
-        </div>
+        <% if can_manage_staff? %>
+          <p>Add staff members to give them access to manage this event.</p>
+          <div class="cs-actions">
+            <%= link_to "Add staff member", new_admin_event_staff_path(current_event), class: "cs-btn" %>
+          </div>
+        <% end %>
       </div>
     <% end %>
   </section>

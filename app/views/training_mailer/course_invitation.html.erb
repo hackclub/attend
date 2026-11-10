@@ -13,7 +13,7 @@
   <p><%= @course.summary %></p>
 <% end %>
 
-<p>Sign in with your Hack Club account using this email address (<%= @user.email %>) to start:</p>
+<p>Sign in with your Hack Club account, or if you don't have one, ask for a code sent to this email address (<%= @user.email %>):</p>
 
 <p><%= mail_button "Start the course", @course_url %></p>
 

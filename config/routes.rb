@@ -168,6 +168,14 @@ Rails.application.routes.draw do
   # volunteers with no admin access can take it too. Awards are routed ahead
   # of courses because a course lives at /training/:slug.
   get "training", to: "training/courses#index", as: :training
+  # Signing in with an emailed code, for volunteers without a Hack Club
+  # account (see TrainingSignIn). Ahead of courses, which live at /training/:slug.
+  scope "training/sign-in", module: :training, controller: :sign_ins do
+    get "/", action: :new, as: :training_sign_in
+    post "/code", action: :request_code, as: :training_sign_in_code
+    get "/verify", action: :verify_form, as: :training_sign_in_verify
+    post "/verify", action: :verify
+  end
   namespace :training do
     resources :awards, only: :show, path: "badges" do
       member do
