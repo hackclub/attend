@@ -1,22 +1,24 @@
 <% content_for :title, "Participants Table – #{current_event.name} – Attend" %>
 <% content_for :breadcrumbs, cs_event_breadcrumbs([ "Participants", nil ]) %>
 
-<%# Applied panel filters, shown as Cloudscape filter tokens. Each token
-    links to this view without that one filter; sort and grouping carry
-    over. The free-text box filters the loaded rows on the client. %>
+<%# Applied panel filters and the name/email search, shown as Cloudscape
+    filter tokens. Each token links to this view without that one filter;
+    sort and grouping carry over. The search box searches every page on
+    Enter; while typing it narrows the rows on this page. %>
 <% raw_filters = params[:filters].respond_to?(:to_unsafe_h) ? params[:filters].to_unsafe_h.values : Array(params[:filters])
    applied_filters = raw_filters.filter_map { |f| f = f.to_h.stringify_keys; f.slice("field", "operator", "value") if f["field"].present? && f["value"].present? }
    filter_logic = params[:filter_logic] == "or" ? "or" : "and"
    view_query = request.query_parameters.slice("sort", "direction", "group_by")
-   table_filter_href = ->(filters) {
+   table_filter_href = ->(filters, search = @search) {
      query = view_query.dup
+     query["search"] = search if search.present?
      if filters.any?
        query["filters"] = filters.each_with_index.to_h { |f, i| [ i.to_s, f ] }
        query["filter_logic"] = filter_logic if filter_logic == "or"
      end
      table_admin_event_participants_path(current_event, query)
    }
-   clear_table_filters_href = table_filter_href.call([])
+   clear_table_filters_href = table_filter_href.call([], nil)
    field_labels = {
      "legal_first_name" => "First name", "legal_last_name" => "Last name", "preferred_name" => "Preferred name",
      "email" => "Email", "pronouns" => "Pronouns", "tshirt_size" => "T-shirt size", "status" => "Status",
@@ -62,7 +64,11 @@
      end
      token.merge(remove_href: table_filter_href.call(applied_filters.reject.with_index { |_, i| i == index }))
    end
-   table_filtering = table_filter_tokens.any? %>
+   if @search
+     table_filter_tokens.unshift({ label: "Name or email", operator: "contains", value: "“#{@search}”", remove_href: table_filter_href.call(applied_filters, nil) })
+   end
+   table_filtering = table_filter_tokens.any?
+   paginated = @total_pages > 1 %>
 <div data-controller="data-table"
      data-data-table-base-url-value="<%= table_admin_event_participants_path(current_event) %>"
      data-data-table-scan-contexts-value="<%= @scan_contexts.map { |sc| { id: sc.id, name: sc.name } }.to_json %>"
@@ -70,8 +76,8 @@
      data-data-table-optional-documents-value="<%= @optional_documents.map { |d| { id: d.id, name: d.name } }.to_json %>">
   <div class="cs-header">
     <div class="cs-header-text">
-      <h1 class="cs-h1">Participants <span class="cs-counter">(<%= @participant_events.size %>)</span></h1>
-      <p class="cs-description"><%= @participant_events.size %> total</p>
+      <h1 class="cs-h1">Participants <span class="cs-counter">(<%= @total_count %>)</span></h1>
+      <p class="cs-description"><%= @total_count %> total</p>
     </div>
     <div class="cs-actions">
       <div class="cs-segmented" role="group" aria-label="View">
@@ -88,22 +94,29 @@
   <section class="cs-container">
   <div class="cs-container-header cs-container-header-divided sticky top-12 lg:top-0 z-20 bg-(--cs-bg-container) rounded-t-[inherit]">
     <div class="flex flex-wrap items-center gap-3 w-full">
-      <label class="cs-search flex-1 min-w-[200px]">
+      <%= form_with url: table_admin_event_participants_path(current_event), method: :get, class: "flex-1 min-w-[200px]" do %>
+      <%= table_query_hidden_fields(except: [ "search" ]) %>
+      <label class="cs-search">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
         </svg>
         <span class="sr-only">Find participants</span>
         <input type="search"
+               name="search"
+               value="<%= @search %>"
                placeholder="Find participants"
                class="cs-input"
+               <%= tag.attributes(title: ("Press Enter to search every page" if paginated)) %>
                data-data-table-target="searchInput"
                data-action="input->data-table#search">
       </label>
+      <% end %>
       <span class="cs-text-filter-count" role="status" aria-live="polite"
             data-data-table-target="count"
             data-server-filtered="<%= table_filtering %>"
+            data-paginated="<%= paginated %>"
             data-testid="filter-match-count"
-            <%= "hidden" unless table_filtering %>><%= cs_match_count(@participant_events.size) if table_filtering %></span>
+            <%= "hidden" unless table_filtering %>><%= cs_match_count(@total_count) if table_filtering %></span>
 
       <button type="button"
               class="cs-btn"
@@ -265,7 +278,7 @@
         <% header_row = capture do %>
           <tr>
             <th scope="col" class="w-8 sticky left-0 z-10">
-              <input type="checkbox" aria-label="Select all" class="accent-(--cs-accent)" data-action="change->data-table#selectAll">
+              <input type="checkbox" aria-label="<%= paginated ? "Select all on this page" : "Select all" %>" class="accent-(--cs-accent)" data-action="change->data-table#selectAll">
             </th>
             <th scope="col" class="cursor-pointer"
                 data-column="first_name" data-action="click->data-table#sort" data-sort-field="legal_first_name" <%= tag.attributes("aria-sort": sort_aria("legal_first_name", @sort_field, @sort_direction)) %>>
@@ -365,7 +378,10 @@
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                     <span><%= group_name.to_s.titleize %></span>
-                    <span class="cs-counter">(<%= participants.size %>)</span>
+                    <span class="cs-counter">(<%= @group_sizes[group_name] %>)</span>
+                    <% if participants.size < @group_sizes[group_name] %>
+                      <span class="cs-secondary font-normal"><%= participants.size %> on this page</span>
+                    <% end %>
                   </div>
                 </td>
               </tr>
@@ -379,7 +395,7 @@
             <% end %>
           <% end %>
 
-          <% if @participant_events.empty? %>
+          <% if @total_count.zero? %>
             <tr>
               <td colspan="<%= column_count %>" class="cs-table-empty-cell">
                 <% if table_filtering %>
@@ -413,5 +429,6 @@
         </tbody>
       </table>
     </div>
+    <%= render "table_pagination" %>
   </section>
 </div>

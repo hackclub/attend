@@ -8,7 +8,7 @@
   <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
     <div class="flex items-center gap-4">
       <h1 class="text-2xl font-bold">Participants</h1>
-      <span class="text-gray-500 text-sm"><%= @participant_events.size %> total</span>
+      <span class="text-gray-500 text-sm"><%= @total_count %> total</span>
     </div>
     <div class="flex items-center gap-2">
       <%= link_to admin_event_participants_path(current_event), class: "px-3 py-1.5 text-gray-600 hover:text-gray-900 text-sm flex items-center gap-1" do %>
@@ -30,10 +30,14 @@
   <div class="bg-white rounded-lg border border-gray-200 mb-4 p-3 sticky top-12 lg:top-0 z-20 shadow-sm">
     <div class="flex flex-wrap items-center gap-3">
       <!-- Search -->
-      <div class="flex-1 min-w-[200px]">
+      <%= form_with url: table_admin_event_participants_path(current_event), method: :get, class: "flex-1 min-w-[200px]" do %>
+        <%= table_query_hidden_fields(except: [ "search" ]) %>
         <div class="relative">
           <input type="text"
+                 name="search"
+                 value="<%= @search %>"
                  placeholder="Search participants..."
+                 <%= tag.attributes(title: ("Press Enter to search every page" if @total_pages > 1)) %>
                  class="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#ec3750] focus:border-[#ec3750]"
                  data-data-table-target="searchInput"
                  data-action="input->data-table#search">
@@ -41,7 +45,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
           </svg>
         </div>
-      </div>
+      <% end %>
 
       <!-- Filter Button -->
       <button type="button"
@@ -206,7 +210,7 @@
         <% header_row = capture do %>
           <tr>
             <th class="px-2 py-2 text-left w-8 sticky left-0 bg-gray-50 z-10">
-              <input type="checkbox" class="rounded border-gray-300 text-[#ec3750]" data-action="change->data-table#selectAll">
+              <input type="checkbox" aria-label="<%= @total_pages > 1 ? "Select all on this page" : "Select all" %>" class="rounded border-gray-300 text-[#ec3750]" data-action="change->data-table#selectAll">
             </th>
             <th class="px-2 py-2 text-left font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 whitespace-nowrap"
                 data-column="first_name" data-action="click->data-table#sort" data-sort-field="legal_first_name">
@@ -306,7 +310,10 @@
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                     </svg>
                     <span><%= group_name.to_s.titleize %></span>
-                    <span class="text-gray-500 font-normal">(<%= participants.size %>)</span>
+                    <span class="text-gray-500 font-normal">(<%= @group_sizes[group_name] %>)</span>
+                    <% if participants.size < @group_sizes[group_name] %>
+                      <span class="text-gray-400 font-normal text-xs"><%= participants.size %> on this page</span>
+                    <% end %>
                   </div>
                 </td>
               </tr>
@@ -320,7 +327,7 @@
             <% end %>
           <% end %>
 
-          <% if @participant_events.empty? %>
+          <% if @total_count.zero? %>
             <tr>
               <td colspan="<%= column_count %>" class="px-6 py-12 text-center text-gray-500">
                 No participants found.
@@ -331,4 +338,5 @@
       </table>
     </div>
   </div>
+  <%= render "table_pagination" %>
 </div>

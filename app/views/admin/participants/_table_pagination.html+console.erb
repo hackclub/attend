@@ -1,0 +1,26 @@
+<% if @total_pages > 1 %>
+  <% first_row = (@page - 1) * @per_page + 1
+     last_row = [ @page * @per_page, @table_row_count ].min
+     noun = @table_row_count == @total_count ? "participant" : "row" %>
+  <div class="cs-container-footer flex flex-wrap items-center justify-between gap-3" data-testid="table-pagination">
+    <span>Showing <%= first_row %> to <%= last_row %> of <%= pluralize(@table_row_count, noun) %></span>
+    <nav class="cs-pagination" aria-label="Pagination">
+      <% if @page > 1 %>
+        <%= link_to table_page_path(@page - 1), "aria-label": "Previous page", rel: "prev" do %>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg>
+        <% end %>
+      <% else %>
+        <span aria-disabled="true" aria-label="Previous page"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg></span>
+      <% end %>
+      <span aria-current="page"><%= @page %></span>
+      <span class="cs-muted">of <%= @total_pages %></span>
+      <% if @page < @total_pages %>
+        <%= link_to table_page_path(@page + 1), "aria-label": "Next page", rel: "next" do %>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>
+        <% end %>
+      <% else %>
+        <span aria-disabled="true" aria-label="Next page"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></span>
+      <% end %>
+    </nav>
+  </div>
+<% end %>

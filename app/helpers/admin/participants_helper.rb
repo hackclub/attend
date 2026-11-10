@@ -1,4 +1,20 @@
 module Admin::ParticipantsHelper
+  # Hidden fields carrying the participants table's current query (filters,
+  # sort, grouping) so its search form keeps them. The page is dropped: a new
+  # search starts on page one.
+  def table_query_hidden_fields(except: [])
+    query = request.query_parameters.except("page", *except)
+    fields = Rack::Utils.build_nested_query(query).split("&").map do |pair|
+      name, value = pair.split("=", 2).map { |part| Rack::Utils.unescape(part.to_s) }
+      hidden_field_tag(name, value, id: nil)
+    end
+    safe_join(fields)
+  end
+
+  def table_page_path(page)
+    table_admin_event_participants_path(current_event, request.query_parameters.merge("page" => page))
+  end
+
   # Mirrors NotePolicy's read rules so authors can see who a note reaches.
   def note_audience_label(note)
     if note.restricted?

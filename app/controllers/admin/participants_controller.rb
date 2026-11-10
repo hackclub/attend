@@ -107,42 +107,43 @@ module Admin
       @participant_events = @participant_events.joins(:participant).order("participants.legal_last_name ASC") if @participant_events.is_a?(ActiveRecord::Relation)
     end
 
+    # Rows rendered per page. Each row runs a few dozen cell helpers (~2ms of
+    # Ruby), so rendering a whole large event in one go is what made this page
+    # slow; sorting, filtering and searching still run over the whole event.
+    TABLE_PER_PAGE = 100
+
     def table
       authorize ParticipantEvent
-
-      @participant_events = policy_scope(current_event.participant_events)
-        .includes(
-          participant: [],
-          travel_inbound: :travel_legs,
-          travel_outbound: :travel_legs,
-          accommodation: [],
-          medical: [],
-          dietary: [],
-          accessibility: [],
-          safeguarding_info: [],
-          consents: [],
-          emergency_contacts: [],
-          event: [],
-          guardian_participant_events: [ :guardian, :emergency_contacts ],
-          scans: [ :scan_context, :user ],
-          groups: []
-        )
-        .preload(room_assignments: { room: [ :rooming_context, { participant_events: :participant } ] })
 
       @sort_field = params[:sort] || "legal_last_name"
       @sort_direction = params[:direction] == "desc" ? "desc" : "asc"
       @group_by = params[:group_by].presence || "status"
+      @search = params[:search].to_s.strip.presence
 
       @scan_contexts = current_event.scan_contexts.to_a
       # One column, sort key and grouping per optional document — an event can
       # run several opt-in activities, and each is its own question.
       @optional_documents = current_event.active_custom_documents.select(&:optional?)
 
-      @participant_events = apply_table_filters(@participant_events)
-      @participant_events = apply_table_sorting(@participant_events)
+      # Search, filter and sort in SQL over every matching row, then load the
+      # render-heavy associations only for the rows actually shown. Plucking
+      # ids keeps the render includes out of the filtered query (no eager-load
+      # JOIN explosion), and uniq drops the duplicates a has-many sort join
+      # (the group sort) produces.
+      scope = policy_scope(current_event.participant_events)
+      scope = apply_table_search(scope)
+      scope = apply_table_filters(scope)
+      scope = apply_table_sorting(scope)
+      ordered_ids = scope.pluck(:id).uniq
+
+      @total_count = ordered_ids.size
+      @per_page = TABLE_PER_PAGE
 
       if @group_by.present? && @group_by != "none"
-        @grouped_participants = group_participants(@participant_events)
+        paginate_grouped_table(ordered_ids)
+      else
+        set_table_page(@total_count)
+        @participant_events = load_table_rows(ordered_ids.slice((@page - 1) * @per_page, @per_page) || [])
       end
     end
 
@@ -1154,6 +1155,72 @@ module Admin
         redirect_to admin_event_participant_path(current_event, @participant_event),
           alert: "Only safeguarding leads and event admins can access this information."
       end
+    end
+
+    # What grouping reads: display_status walks most of onboarding, and the
+    # other group keys read a single association each.
+    TABLE_GROUPING_INCLUDES = [
+      :participant, :travel_inbound, :travel_outbound, :accommodation, :medical,
+      :dietary, :accessibility, :safeguarding_info, :consents, :emergency_contacts,
+      :event, :groups, { guardian_participant_events: [ :guardian, :emergency_contacts ] }
+    ].freeze
+
+    # What only the rendered cells read on top of that.
+    TABLE_RENDER_PRELOADS = [
+      { travel_inbound: :travel_legs, travel_outbound: :travel_legs },
+      { scans: [ :scan_context, :user ] },
+      { room_assignments: { room: [ :rooming_context, { participant_events: :participant } ] } }
+    ].freeze
+
+    # Groups are Ruby (display_status and friends aren't SQL), so a grouped
+    # table still loads every matching row to bucket it — but only the page it
+    # renders gets the cell-only preloads. A participant in several groups
+    # (group_by "group") is a row in each, so pages count rows, not people.
+    def paginate_grouped_table(ordered_ids)
+      groups = group_participants(load_table_rows(ordered_ids, preload_cells: false))
+      @group_sizes = groups.transform_values(&:size)
+      rows = groups.flat_map { |name, pes| pes.map { |pe| [ name, pe ] } }
+
+      set_table_page(rows.size)
+      page_rows = rows.slice((@page - 1) * @per_page, @per_page) || []
+      @grouped_participants = page_rows.group_by(&:first).transform_values { |pairs| pairs.map(&:last) }
+      @participant_events = page_rows.map(&:last).uniq
+      preload_table_cells(@participant_events)
+    end
+
+    def set_table_page(row_count)
+      @table_row_count = row_count
+      @total_pages = [ (row_count.to_f / @per_page).ceil, 1 ].max
+      @page = params[:page].to_i.clamp(1, @total_pages)
+    end
+
+    # Loads the given rows in the order of `ids`.
+    def load_table_rows(ids, preload_cells: true)
+      return [] if ids.empty?
+
+      by_id = ParticipantEvent.where(id: ids).preload(*TABLE_GROUPING_INCLUDES).index_by(&:id)
+      rows = ids.filter_map { |id| by_id[id] }
+      preload_table_cells(rows) if preload_cells
+      rows
+    end
+
+    def preload_table_cells(rows)
+      ActiveRecord::Associations::Preloader.new(records: rows, associations: TABLE_RENDER_PRELOADS).call
+    end
+
+    # The same name-or-email search as the list view, so its "Table view"
+    # link carries the search across.
+    def apply_table_search(scope)
+      return scope unless @search
+
+      term = "%#{ActiveRecord::Base.sanitize_sql_like(@search)}%"
+      scope.joins(:participant).where(
+        "participants.legal_first_name ILIKE :term OR " \
+        "participants.legal_last_name ILIKE :term OR " \
+        "participants.preferred_name ILIKE :term OR " \
+        "participants.email ILIKE :term",
+        term: term
+      )
     end
 
     def apply_table_filters(scope)
