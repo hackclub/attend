@@ -57,6 +57,7 @@ module Admin
       @template_config = current_template_config
       @template_snapshot = @template_config["template_snapshot"]
       @current_mappings = @template_config["mappings"] || []
+      @field_mapper = Docuseal::FieldMapper.new(event: @event, template_type: @template_type)
       @freedom_checkbox_config = @template_config["freedom_checkbox_config"] || {}
       @data_sources = docuseal_data_sources
       @submitter_roles = @custom_document&.template_submitter_roles || []
@@ -69,10 +70,11 @@ module Admin
         next if m[:source_key].blank?
         {
           "field_name" => m[:field_name],
+          "field_uuid" => m[:field_uuid].presence,
           "source_key" => m[:source_key],
           "readonly" => m[:readonly] == "1" || m[:readonly] == true,
           "role" => m[:role]
-        }
+        }.compact
       end.compact
 
       config_update = { "mappings" => parsed_mappings }

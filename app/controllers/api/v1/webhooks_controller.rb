@@ -98,6 +98,11 @@ module Api
           # (guardian still needs to complete their portal before signing the waiver)
           if consent.waiver? && consent.participant_event&.requires_guardian?
             resend_guardian_portal_invitation(consent)
+          elsif guardian_signs_next?(consent)
+            # DocuSeal's own "your turn" email to the next signer never goes
+            # out, so a custom document would otherwise sit unsigned with the
+            # guardian none the wiser.
+            resend_guardian_portal_invitation(consent)
           end
         elsif signer == :guardian
           consent.update!(
@@ -320,6 +325,10 @@ module Api
           ParticipantMailer.adult_waiver_completion(participant_event: participant_event).deliver_later
           Rails.logger.info("Waiver fully signed notification sent to adult participant for participant_event #{participant_event.id}")
         end
+      end
+
+      def guardian_signs_next?(consent)
+        consent.custom_document&.guardian_signs? && consent.docuseal_guardian_slug.present? && !consent.guardian_signed?
       end
 
       def resend_guardian_portal_invitation(consent)

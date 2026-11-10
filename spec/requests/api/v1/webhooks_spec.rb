@@ -142,6 +142,32 @@ RSpec.describe "Api::V1::Webhooks", type: :request do
           expect(custom_consent.guardian_signed_at).to be_nil
         end
 
+        context "when the guardian signs after the participant" do
+          let!(:guardian_participant_event) do
+            create(:guardian_participant_event, participant_event: participant_event,
+              status: :completed, completed_at: Time.current)
+          end
+
+          before do
+            participant_event.update!(code_of_conduct_accepted_at: Time.current)
+            event.update!(docuseal_field_mappings: {
+              custom_document.mapping_key => { "signer_roles" => { "participant" => "First Party", "guardian" => "Second Party" } }
+            })
+          end
+
+          it "emails the guardian their signing link once the participant has signed" do
+            expect { form_completed(role: "First Party") }
+              .to have_enqueued_mail(GuardianMailer, :waiver_signing)
+              .with(guardian_participant_event: guardian_participant_event, consent: custom_consent)
+          end
+
+          it "does not email the guardian again when they sign" do
+            custom_consent.update!(participant_signed_at: Time.current, pending_on: "guardian")
+
+            expect { form_completed(role: "Second Party") }.not_to have_enqueued_mail(GuardianMailer, :waiver_signing)
+          end
+        end
+
         it "falls back to the synced template's role order, like the submission job" do
           event.update!(docuseal_field_mappings: {
             custom_document.mapping_key => { "template_snapshot" => {

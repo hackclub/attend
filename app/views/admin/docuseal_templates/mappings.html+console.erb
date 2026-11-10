@@ -162,7 +162,7 @@
                 <% fields.each_with_index do |field, index| %>
                   <%
                     field_name = field["name"]
-                    existing_mapping = @current_mappings.find { |m| m["field_name"] == field_name }
+                    existing_mapping = @field_mapper.mapping_for_field(field)
                     field_role = field["submitter_uuid"] ? submitters.find { |s| s["uuid"] == field["submitter_uuid"] }&.dig("name") : nil
                   %>
                   <tr>
@@ -176,6 +176,7 @@
                         <% end %>
                       </div>
                       <input type="hidden" name="mappings[][field_name]" value="<%= field_name %>">
+                      <input type="hidden" name="mappings[][field_uuid]" value="<%= field["uuid"] %>">
                       <input type="hidden" name="mappings[][role]" value="<%= field_role %>">
                     </td>
                     <td class="min-w-56">
