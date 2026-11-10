@@ -15,7 +15,7 @@ module Admin
       authorize current_event, :update?
 
       @deliveries = @message.message_deliveries
-        .includes(:participant_event, :guardian)
+        .includes(:guardian, participant_event: { participant: :user })
         .order(:status, :created_at)
       @new_recipient_count = @message.can_send_to_new_recipients? ? @message.new_recipients.count : 0
     end
