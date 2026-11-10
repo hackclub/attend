@@ -1,0 +1,41 @@
+<% content_for :title, "Enter your code – Attend" %>
+
+<div class="w-full max-w-lg mx-auto">
+  <%= render "shared/portal_masthead",
+        back_to: { label: "Change", path: training_sign_in_path } %>
+
+  <div class="mb-8">
+    <h1 class="portal-title text-2xl mb-3">Check your email</h1>
+    <p class="portal-body text-lg">
+      If <strong class="portal-heading break-words"><%= @pending&.dig("email") %></strong> can sign in to
+      training this way, we've just sent a 6-digit code there. It's good for 10 minutes.
+    </p>
+  </div>
+
+  <div class="portal-card p-5 sm:p-6 mb-6">
+    <%= form_with url: training_sign_in_verify_path, method: :post do |f| %>
+      <%= label_tag :code, "Sign-in code", class: "portal-label" %>
+      <%= f.text_field :code, id: "code", required: true, autofocus: true,
+            inputmode: "numeric", autocomplete: "one-time-code", maxlength: 6, pattern: "\\d{6}",
+            placeholder: "000000",
+            class: "portal-input text-center text-2xl font-mono tracking-[0.4em] pl-[0.4em]" %>
+
+      <button type="submit" class="portal-btn portal-btn-primary w-full sm:w-auto mt-4">Sign in</button>
+    <% end %>
+  </div>
+
+  <div class="portal-panel p-5 mb-6">
+    <p class="portal-hint text-sm">
+      No email? Check your spam folder, and that this is the address your invitation went to. If you work
+      at an event as staff rather than a volunteer, sign in with your Hack Club account instead.
+    </p>
+  </div>
+
+  <div class="flex flex-col items-center gap-1">
+    <%= form_with url: training_sign_in_code_path, method: :post do |f| %>
+      <%= f.hidden_field :email, value: @pending&.dig("email") %>
+      <button type="submit" class="portal-btn portal-btn-quiet">Send a new code</button>
+    <% end %>
+    <%= link_to "Use a different email address", training_sign_in_path, class: "portal-hint text-sm underline underline-offset-2" %>
+  </div>
+</div>

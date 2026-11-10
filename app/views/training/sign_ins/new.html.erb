@@ -1,0 +1,49 @@
+<% content_for :title, "Sign in to training – Attend" %>
+
+<div class="w-full max-w-lg mx-auto">
+  <%= render "shared/portal_masthead" %>
+
+  <div class="mb-8">
+    <h1 class="portal-title text-2xl mb-3">Sign in to training</h1>
+    <p class="portal-body text-lg">
+      Safeguarding training for everyone working at a Hack Club event.
+    </p>
+  </div>
+
+  <div class="portal-card p-5 sm:p-6 mb-6">
+    <h2 class="portal-heading text-base mb-3">Have a Hack Club account?</h2>
+    <%= button_to user_hack_club_omniauth_authorize_path,
+          method: :post,
+          data: { turbo: false },
+          class: "portal-btn portal-btn-primary w-full sm:w-auto" do %>
+      Continue with Hack Club
+    <% end %>
+  </div>
+
+  <div class="portal-card p-5 sm:p-6 mb-6">
+    <%= form_with url: training_sign_in_code_path, method: :post do |f| %>
+      <h2 class="portal-heading text-base mb-1">No Hack Club account?</h2>
+      <p class="portal-hint text-sm mb-3">
+        If you've been added as a volunteer or invited to a course, we can email you a code instead.
+        Use the address the invitation went to.
+      </p>
+      <%= label_tag :email, "Email address", class: "portal-label" %>
+      <%= f.email_field :email, id: "email", required: true,
+            autocomplete: "email",
+            placeholder: "you@example.com",
+            class: "portal-input" %>
+
+      <% if TurnstileVerifier.site_key.present? %>
+        <div class="cf-turnstile mt-4"
+             data-sitekey="<%= TurnstileVerifier.site_key %>"
+             data-action="<%= Training::SignInsController::TURNSTILE_ACTION %>"></div>
+      <% end %>
+
+      <button type="submit" class="portal-btn w-full sm:w-auto mt-4">Email me a code</button>
+    <% end %>
+  </div>
+</div>
+
+<% if TurnstileVerifier.site_key.present? %>
+  <%= javascript_include_tag "https://challenges.cloudflare.com/turnstile/v0/api.js", async: true, defer: true %>
+<% end %>

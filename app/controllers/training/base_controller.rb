@@ -2,9 +2,19 @@ module Training
   class BaseController < ApplicationController
     include RestrictsBannedUsers
 
-    before_action :authenticate_user!
+    before_action :require_sign_in
 
     private
+
+    # Volunteers often have no Hack Club account, so signed-out visitors go to
+    # a page offering both Hack Club Auth and an emailed code, and come back
+    # to the page they asked for.
+    def require_sign_in
+      return if user_signed_in?
+
+      session[:training_return_to] = request.fullpath if request.get? || request.head?
+      redirect_to training_sign_in_path
+    end
 
     def training_access
       @training_access ||= TrainingAccess.new(current_user)

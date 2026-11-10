@@ -17,6 +17,15 @@ class TrainingMailer < ApplicationMailer
     )
   end
 
+  # A code for signing in to training without a Hack Club account (see
+  # Training::SignInsController). The code stays out of the subject line.
+  def sign_in_code(user:, code:)
+    @code = code
+    @emailable = @user = user
+
+    mail(to: user.email, subject: "Your Attend training sign-in code")
+  end
+
   # Sent when someone is invited by hand to an invite-only course.
   def course_invitation(invitation:)
     @user = invitation.user

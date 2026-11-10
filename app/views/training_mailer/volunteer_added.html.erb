@@ -13,7 +13,7 @@
   <p>
     Everyone working at a Hack Club event needs to complete our safeguarding training first.
     Before the event, please earn <%= @badges.map { |badge| "<strong>#{ERB::Util.h(badge.name)}</strong>" }.to_sentence.html_safe %>
-    on Attend — sign in with your Hack Club account using this email address (<%= @user.email %>).
+    on Attend. Sign in with your Hack Club account, or if you don't have one, ask for a code sent to this email address (<%= @user.email %>).
   </p>
 
   <p><%= mail_button "Start your training", @training_url %></p>

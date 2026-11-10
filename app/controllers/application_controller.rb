@@ -15,6 +15,7 @@ class ApplicationController < ActionController::Base
   before_action :preserve_invitation_token_for_sign_out
   before_action :set_current_attributes
   before_action :set_paper_trail_whodunnit
+  before_action :confine_training_only_session
 
   rescue_from Pundit::NotAuthorizedError, with: :user_not_authorized
   rescue_from ActionController::InvalidAuthenticityToken, with: :handle_invalid_authenticity_token
@@ -69,6 +70,30 @@ class ApplicationController < ActionController::Base
     elsif user.event_role_assignments.exists? || user.event_volunteers.exists? || user.training_course_invitations.exists?
       training_path
     end
+  end
+
+  # A session started from an emailed training code (see TrainingSignIn)
+  # reaches /training and signing out, nothing else. If the person has since
+  # become someone a code can't sign in, such as by getting a role on an
+  # event, the session ends and they sign in again with Hack Club Auth.
+  def confine_training_only_session
+    return unless session[TrainingSignIn::SESSION_KEY]
+
+    unless user_signed_in?
+      session.delete(TrainingSignIn::SESSION_KEY)
+      return
+    end
+
+    unless TrainingSignIn.eligible?(current_user)
+      sign_out(current_user)
+      session.delete(TrainingSignIn::SESSION_KEY)
+      redirect_to training_sign_in_path, alert: "Please sign in with your Hack Club account."
+      return
+    end
+
+    return if self.class.module_parent == Training || devise_controller? || is_a?(BadgeVerificationsController)
+
+    redirect_to training_path
   end
 
   def preserve_invitation_token_for_sign_out
