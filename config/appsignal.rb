@@ -17,4 +17,15 @@ Appsignal.configure do |config|
   # For more information see our docs:
   # https://docs.appsignal.com/ruby/configuration/ignore-errors.html
   # config.ignore_errors << "MyCustomError"
+  #
+  # Malformed requests: invalid UTF-8 in a path or query, a body that doesn't
+  # parse as its Content-Type says, an oversized multipart boundary. Rails
+  # answers each with a 400 before any of our code runs, so there's nothing
+  # to fix; they're crawlers and vulnerability scanners, and only drowned out
+  # real errors.
+  config.ignore_errors += [
+    "ActionController::BadRequest",
+    "ActionDispatch::Http::Parameters::ParseError",
+    "Rack::Multipart::BoundaryTooLongError"
+  ]
 end

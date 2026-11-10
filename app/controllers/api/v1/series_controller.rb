@@ -10,10 +10,6 @@ module Api
       include Pundit::Authorization
       include SeriesScoped
 
-      rescue_from Pundit::NotAuthorizedError do
-        render json: { error: "Forbidden" }, status: :forbidden
-      end
-
       skip_before_action :set_series, only: [ :index ]
 
       def index

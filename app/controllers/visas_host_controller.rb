@@ -5,10 +5,22 @@
 #
 # Not an ApplicationController subclass, for the reasons
 # BadgeRedirectsController gives: nothing about a signed-in person using
-# Attend belongs between an embassy and a letter. Forgery protection stays on:
-# /verify takes a form post, and nothing else on this host takes any write.
+# Attend belongs between an embassy and a letter. Forgery protection stays on
+# for /verify, the one form on this host. Writes to the catch-all are refused
+# with a 404 before forgery protection runs, since it takes no writes.
 class VisasHostController < ActionController::Base
   layout "visas_host"
+
+  prepend_before_action :refuse_writes, only: :elsewhere
+
+  # A /verify post without a valid token: a form left open across a session
+  # reset, or a script posting the code straight at us. Show the form again
+  # (it carries a fresh token) instead of a bare 422 and an error report.
+  rescue_from ActionController::InvalidAuthenticityToken do
+    @verification_code = params[:code].to_s
+    flash.now[:alert] = "That form had expired. Please press Verify again."
+    render :verify_form, status: :unprocessable_content
+  end
 
   rate_limit to: 30, within: 15.minutes, only: :verify, with: -> {
     flash.now[:alert] = "Too many attempts. Please wait a few minutes and try again."
@@ -98,13 +110,17 @@ class VisasHostController < ActionController::Base
   end
 
   # The catch-all route hands this every verb. A GET is sent to Attend's visa
-  # pages; anything that tries to write is refused by forgery protection
-  # before it gets here.
+  # pages. Nothing here takes a write, so anything else (bots posting at
+  # random paths) is a plain 404 rather than a forgery-protection error.
   def elsewhere
     redirect_to_attend visas_path
   end
 
   private
+
+  def refuse_writes
+    head :not_found unless request.get? || request.head?
+  end
 
   def redirect_to_attend(path, status: :moved_permanently)
     redirect_to AttendUrls.attend_url(path), allow_other_host: true, status: status

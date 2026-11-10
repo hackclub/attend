@@ -7,10 +7,6 @@ module Api
       include Pundit::Authorization
       include Api::V1::ApiAuditing
 
-      rescue_from Pundit::NotAuthorizedError do
-        render json: { error: "Forbidden" }, status: :forbidden
-      end
-
       before_action :reject_api_key_auth
       before_action :set_paper_trail_whodunnit
       before_action :set_event

@@ -149,13 +149,29 @@ RSpec.describe "The visas.hackclub.com host", type: :request do
       expect(response.headers["Location"]).to eq(attend(admin_event_visa_letter_path(event, application)))
     end
 
-    it "refuses writes once forgery protection is on, as it is in production" do
+    it "answers a write to any other path with a plain 404, forgery protection on or off", :raise_exceptions do
       original = ActionController::Base.allow_forgery_protection
       ActionController::Base.allow_forgery_protection = true
 
       post "/lookup", params: { reference_number: application.reference_number }
+      expect(response).to have_http_status(:not_found)
+
+      delete "/wp-admin/anything"
+      expect(response).to have_http_status(:not_found)
+    ensure
+      ActionController::Base.allow_forgery_protection = original
+    end
+
+    it "keeps forgery protection on the verify form, and shows it again with a fresh token", :raise_exceptions do
+      original = ActionController::Base.allow_forgery_protection
+      ActionController::Base.allow_forgery_protection = true
+
+      post "/verify", params: { code: "ABC123" }
 
       expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include("That form had expired")
+      expect(response.body).to include('value="ABC123"')
+      expect(response.body).to include('name="authenticity_token"')
     ensure
       ActionController::Base.allow_forgery_protection = original
     end

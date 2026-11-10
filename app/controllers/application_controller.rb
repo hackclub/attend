@@ -19,6 +19,7 @@ class ApplicationController < ActionController::Base
   rescue_from Pundit::NotAuthorizedError, with: :user_not_authorized
   rescue_from ActionController::InvalidAuthenticityToken, with: :handle_invalid_authenticity_token
   rescue_from ActiveRecord::RecordNotFound, with: :handle_record_not_found
+  rescue_from ActionController::UnknownFormat, with: :handle_unknown_format
 
   helper_method :current_event, :impersonating?, :impersonator, :page_brand
 
@@ -106,6 +107,17 @@ class ApplicationController < ActionController::Base
   def handle_record_not_found
     flash[:alert] = "The record you were looking for could not be found. It may have been removed."
     redirect_back(fallback_location: root_path)
+  end
+
+  # A request for a format the action doesn't render (crawlers asking for
+  # /dashboard.json, an Accept header of application/xml, and so on). Rails
+  # would answer 406 anyway, but by raising, so every probe landed in error
+  # tracking. MissingExactTemplate is the one subclass that means *we* are
+  # missing an HTML template, which is a real bug, so that one still raises.
+  def handle_unknown_format(exception)
+    raise exception if exception.is_a?(ActionController::MissingExactTemplate)
+
+    head :not_acceptable
   end
 
   def find_current_auditor

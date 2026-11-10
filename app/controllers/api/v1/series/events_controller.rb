@@ -19,10 +19,6 @@ module Api
         include Api::V1::SeriesScoped
         include Api::V1::EventSerialization
 
-        rescue_from Pundit::NotAuthorizedError do
-          render json: { error: "Forbidden" }, status: :forbidden
-        end
-
         before_action :require_series_api_key!, only: [ :create ]
         before_action :set_event, only: [ :show, :update ]
 
