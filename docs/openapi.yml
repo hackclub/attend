@@ -38,8 +38,8 @@ info:
     - **Event API key** — per-event key (`EventApiToken`, or the legacy
       `Event#api_key`). Does **not** set a current user, so it only works on the
       subset of endpoints that don't require one (participant `lookup`,
-      `roster`, `create`, `update` and `delete`, event setup, event staff, and
-      the travel calendar).
+      `roster`, `create`, `update` and `delete`, event setup, event staff,
+      event volunteers, and the travel calendar).
 
     Missing or invalid credentials return `401 { "error": "Unauthorized" }`.
 
@@ -56,6 +56,7 @@ info:
     | Participant `lookup`, `roster`, `create` | ✅ any event in the series | ✅ its own event |
     | `PATCH`/`DELETE` a participant | ✅ any event in the series | ✅ its own event |
     | `/events/{id}/setup/…` and `/events/{id}/staff` | ✅ any event in the series | ✅ its own event |
+    | `/events/{id}/volunteers` | ✅ any event in the series | ✅ its own event |
     | `GET /events/{id}/travel` | ✅ any event in the series | ✅ its own event |
     | `GET /events/{id}/participants` (full payload) | ❌ `403` | ❌ `403` |
     | Notes, scans, scan contexts, Slack blasts, NFC badges | ❌ `403` | ❌ `403` |
@@ -72,7 +73,7 @@ info:
     - All timestamps are ISO 8601 strings and may be `null` where noted.
     - Errors use the envelope `{ "error": "<message>" }`.
     - `:event_id` path segments accept a numeric id or the event slug on the
-      participants, setup, and staff endpoints; other endpoints accept the
+      participants, setup, staff, and volunteers endpoints; other endpoints accept the
       numeric id only.
     - A caller that may *write* a field cannot always *read* it back: dates of
       birth, phone numbers, addresses and the details of the people around a
@@ -108,6 +109,10 @@ tags:
       out of draft — for events created through the API.
   - name: Event Staff
     description: Who has access to an event, and what they can do there.
+  - name: Event Volunteers
+    description: >-
+      People working an event without a role. They get no access to the event;
+      they're on its roster so it can see whether they've done their training.
   - name: Participants
     description: Participant registrations for an event.
   - name: Notes
@@ -1316,6 +1321,100 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/volunteers:
+    get:
+      tags: [Event Volunteers]
+      summary: List volunteers
+      x-mint:
+        href: /api-reference/event-volunteers/list-volunteers
+      description: >-
+        Everyone on this event's volunteer roster, with whether they hold the
+        training volunteers are required to. Anyone with a role on the event may
+        call this, as may an API key for the event or its series.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200":
+          description: The volunteer roster.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  volunteers:
+                    type: array
+                    items: { $ref: "#/components/schemas/Volunteer" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Event Volunteers]
+      summary: Add a volunteer
+      x-mint:
+        href: /api-reference/event-volunteers/add-a-volunteer
+      description: >-
+        Puts someone on the event's volunteer roster and emails them the
+        training they need to complete. This grants no access to the event.
+        Someone who has never signed in to Attend gets a shell account now,
+        which links up on their first sign-in — `account_created` says whether
+        that happened. Volunteers without a Hack Club account can sign in to
+        training with a code emailed to them.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "201":
+          description: Volunteer added.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  volunteer: { $ref: "#/components/schemas/Volunteer" }
+                  account_created:
+                    type: boolean
+                    description: Whether a new Attend account was created for this email.
+        "422":
+          description: Invalid email, or this person is already a volunteer at the event.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{event_id}/volunteers/{id}:
+    delete:
+      tags: [Event Volunteers]
+      summary: Remove a volunteer
+      x-mint:
+        href: /api-reference/event-volunteers/remove-a-volunteer
+      description: >-
+        Takes someone off the event's volunteer roster. Their Attend account
+        and any training they've earned are kept.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          description: >-
+            The volunteer id from `GET /events/{event_id}/volunteers` — not an
+            email address; those don't belong in a URL.
+      responses:
+        "204": { description: Removed. }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -3453,6 +3552,33 @@ components:
             email: { type: string, format: email }
             name: { type: string, nullable: true }
             global_admin: { type: boolean }
+
+    Volunteer:
+      type: object
+      properties:
+        id: { type: string }
+        created_at: { type: string, format: date-time }
+        user:
+          type: object
+          properties:
+            id: { type: string }
+            email: { type: string, format: email }
+            name: { type: string, nullable: true }
+        training:
+          type: object
+          properties:
+            state:
+              type: string
+              enum: [trained, expiring, untrained, not_required, ineligible]
+              description: >-
+                `expiring` means a required badge lapses soon. `ineligible`
+                (a criminal-record declaration the Hack Club Safety Team hasn't
+                cleared) is only reported to event admins — API keys and other
+                roles see the state as if they'd been cleared.
+            missing:
+              type: array
+              items: { type: string }
+              description: Names of the required badges they don't currently hold.
 
     EventWaivers:
       type: object
