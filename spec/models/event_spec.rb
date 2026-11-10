@@ -39,6 +39,18 @@ RSpec.describe Event, type: :model do
       expect(event.reload.update(name: "Renamed")).to be(true)
     end
 
+    it "lets legacy events with an off-domain support email still be saved" do
+      event = create(:event)
+      event.update_column(:support_email, "sunbeam@gmail.com")
+      expect(event.reload.update(name: "Renamed")).to be(true)
+    end
+
+    it "still checks the domain when a legacy support email is edited" do
+      event = create(:event)
+      event.update_column(:support_email, "sunbeam@gmail.com")
+      expect(event.reload.update(support_email: "moonbeam@gmail.com")).to be(false)
+    end
+
     it "does not let an existing support email be cleared" do
       event = create(:event)
       expect(event.update(support_email: "")).to be(false)

@@ -181,7 +181,8 @@ class Event < ApplicationRecord
               with: SUPPORT_EMAIL_FORMAT,
               message: "must be a #{SUPPORT_EMAIL_DOMAINS_SENTENCE} address"
             },
-            allow_blank: true
+            allow_blank: true,
+            if: :support_email_changed?
 
   validates :slug, presence: true,
                    uniqueness: true,
