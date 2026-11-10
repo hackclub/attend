@@ -115,16 +115,32 @@ RSpec.describe "Guardian portal signing status", type: :request do
     it "pulls an outstanding signature from the DocuSeal API, throttled" do
       docuseal_reports("waiver-1", guardian_completed: false)
 
-      get status_path
-      get status_path # inside the throttle window, so no second API call
+      # The poll answers from the database and syncs in the background.
+      perform_enqueued_jobs do
+        get status_path
+        get status_path # inside the throttle window, so no second API call
+      end
       expect(client).to have_received(:get_submission).once
       expect(signed_ids).to eq([])
 
       docuseal_reports("waiver-1", guardian_completed: true)
-      travel(GuardianPortalController::DOCUSEAL_POLL_THROTTLE + 1.second) { get status_path }
+      travel(GuardianPortalController::DOCUSEAL_POLL_THROTTLE + 1.second) do
+        perform_enqueued_jobs { get status_path } # finds the signature
+        get status_path # reports it
+      end
 
       expect(signed_ids).to eq([ waiver.id.to_s ])
       expect(waiver.reload).to be_signed
+    end
+
+    it "answers without waiting on DocuSeal, syncing in the background" do
+      docuseal_reports("waiver-1", guardian_completed: true)
+
+      get status_path
+
+      expect(client).not_to have_received(:get_submission)
+      expect(signed_ids).to eq([])
+      expect(SyncConsentFromDocusealJob).to have_been_enqueued.with(waiver.id)
     end
 
     it "doesn't answer for another registration's consent" do
