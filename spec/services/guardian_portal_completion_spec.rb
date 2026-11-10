@@ -61,8 +61,26 @@ RSpec.describe GuardianPortalCompletion do
 
       expect(waiver.reload).to be_pending
       expect(freedom_waiver.reload).to be_pending
-      expect(DocusealJobs::CreateMinorWaiverJob).to have_been_enqueued.with(waiver.id).at_least(:once)
-      expect(DocusealJobs::CreateFreedomWaiverJob).to have_been_enqueued.with(freedom_waiver.id).at_least(:once)
+      expect(DocusealJobs::CreateMinorWaiverJob).to have_been_enqueued.with(waiver.id).exactly(:once)
+      expect(DocusealJobs::CreateFreedomWaiverJob).to have_been_enqueued.with(freedom_waiver.id).exactly(:once)
+    end
+
+    it "doesn't keep re-sending a waiver whose template is missing until the template changes" do
+      event.update!(docuseal_freedom_waiver_template_id: "42")
+      create(:consent, participant_event: participant_event, status: :sent, docuseal_guardian_slug: "g")
+      freedom_waiver = create(:consent, :freedom_waiver, participant_event: participant_event, status: :failed,
+        docuseal_template_id: "42", failure_reason: "template_not_found: DocuSeal template 42 doesn't exist")
+
+      described_class.new(gpe).ensure_waiver_exists_and_triggered
+
+      expect(freedom_waiver.reload).to be_failed
+      expect(DocusealJobs::CreateFreedomWaiverJob).not_to have_been_enqueued.with(freedom_waiver.id)
+
+      event.update!(docuseal_freedom_waiver_template_id: "43")
+      described_class.new(gpe).ensure_waiver_exists_and_triggered
+
+      expect(freedom_waiver.reload).to be_pending
+      expect(DocusealJobs::CreateFreedomWaiverJob).to have_been_enqueued.with(freedom_waiver.id).exactly(:once)
     end
   end
 end

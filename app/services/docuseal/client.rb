@@ -98,6 +98,8 @@ module Docuseal
         raise Docuseal::ValidationError.new(extract_error_message(response), response: response, status: response.status)
       when 429
         raise Docuseal::RateLimitError.new("Rate limit exceeded", response: response, status: response.status)
+      when 500..599
+        raise Docuseal::ServerError.new(extract_error_message(response), response: response, status: response.status)
       else
         raise Docuseal::Error.new(extract_error_message(response), response: response, status: response.status)
       end
