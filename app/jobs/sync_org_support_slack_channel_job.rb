@@ -5,6 +5,8 @@
 # SlackChannelInvite row) are ever removed. Runs for a single user when they're
 # handed a role, and for everyone daily and from the global settings page.
 class SyncOrgSupportSlackChannelJob < ApplicationJob
+  include SlackChannelSync
+
   queue_as :default
 
   # conversations.invite and .kick are Tier 3 (~50 req/min) — pause between
@@ -26,6 +28,8 @@ class SyncOrgSupportSlackChannelJob < ApplicationJob
     # Set once Slack confirms the bot is in the channel (any invite that
     # doesn't fail), which removals need; see SlackService#remove_from_channel.
     @bot_in_channel = false
+    # Listing the channel costs a call, so it only pays off past one person.
+    @channel_members = prefetch_channel_members(@slack_service, channel_id) unless user_ids&.one?
 
     members = User.org_support_channel_members
     invite_all(user_ids ? members.where(id: user_ids) : members)
@@ -51,6 +55,12 @@ class SyncOrgSupportSlackChannelJob < ApplicationJob
         next
       end
 
+      if @channel_members&.include?(slack_id)
+        claim_existing_invite(user, slack_id)
+        @counts["already_member"] += 1
+        next
+      end
+
       begin
         result = with_rate_limit_retry { @slack_service.invite_to_channel(channel_id: @channel_id, user_id: slack_id) }
         @bot_in_channel = true
@@ -67,13 +77,19 @@ class SyncOrgSupportSlackChannelJob < ApplicationJob
         Rails.logger.error("[SyncOrgSupportSlackChannel] Failed to add #{slack_id}: #{e.message}")
         @counts["failed"] += 1
       end
-
-      sleep SLACK_PAUSE
     end
   end
 
   def remove_all(invites)
     invites.find_each do |invite|
+      # Slack just listed the channel without them: they've already gone, so
+      # there's nothing to kick.
+      if @channel_members && !@channel_members.include?(invite.slack_user_id)
+        invite.destroy!
+        @counts["removed"] += 1
+        next
+      end
+
       result = with_rate_limit_retry { @slack_service.remove_from_channel(channel_id: @channel_id, user_id: invite.slack_user_id) }
       if result[:not_member] && !@bot_in_channel
         # Could just as well mean the bot isn't in the channel: keep the row
@@ -88,15 +104,13 @@ class SyncOrgSupportSlackChannelJob < ApplicationJob
     rescue SlackService::Error => e
       Rails.logger.error("[SyncOrgSupportSlackChannel] Failed to remove #{invite.slack_user_id}: #{e.message}")
       @counts["failed"] += 1
-    ensure
-      sleep SLACK_PAUSE
     end
   end
 
   def with_rate_limit_retry
     waits = 0
     begin
-      yield
+      throttle_slack(SLACK_PAUSE) { yield }
     rescue SlackService::RateLimited => e
       raise if (waits += 1) > MAX_RATE_LIMIT_WAITS
 

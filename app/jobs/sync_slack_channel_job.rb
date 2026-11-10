@@ -1,4 +1,6 @@
 class SyncSlackChannelJob < ApplicationJob
+  include SlackChannelSync
+
   queue_as :default
 
   # Slack conversations.invite is Tier 3 (~50 req/min) — pause between calls
@@ -23,14 +25,18 @@ class SyncSlackChannelJob < ApplicationJob
     already_member_count = 0
     failed_count = 0
     processed = 0
+    channel_members = prefetch_channel_members(slack_service, event.slack_channel_id) if total > 1
 
     participants_with_slack.includes(:participant).find_each do |pe|
       begin
-        result = slack_service.invite_to_channel(
-          channel_id: event.slack_channel_id,
-          user_id: pe.participant.slack_user_id
-        )
-        result[:already_member] ? already_member_count += 1 : added_count += 1
+        if channel_members&.include?(pe.participant.slack_user_id)
+          already_member_count += 1
+        else
+          result = throttle_slack(INVITE_PAUSE) do
+            slack_service.invite_to_channel(channel_id: event.slack_channel_id, user_id: pe.participant.slack_user_id)
+          end
+          result[:already_member] ? already_member_count += 1 : added_count += 1
+        end
       rescue SlackService::Error => e
         Rails.logger.error("[SyncSlackChannel] Failed to add #{pe.participant.slack_user_id}: #{e.message}")
         failed_count += 1
@@ -41,7 +47,6 @@ class SyncSlackChannelJob < ApplicationJob
         broadcast(event, status: "running", total: total, processed: processed,
                   added: added_count, already_member: already_member_count, failed: failed_count)
       end
-      sleep INVITE_PAUSE unless processed == total
     end
 
     emailed_count = 0

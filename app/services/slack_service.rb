@@ -23,6 +23,8 @@ class SlackService
   # can retry should, rather than treating it like a refusal from Slack.
   class TransportError < Error; end
 
+  MEMBERS_PAGE_SIZE = 1000
+
   def initialize(bot_token: nil)
     @bot_token = bot_token || Rails.application.credentials.dig(:slack, :bot_token)
   end
@@ -55,6 +57,28 @@ class SlackService
     else
       raise Error, "Failed to remove user from channel: #{response["error"]}"
     end
+  end
+
+  # Every Slack user ID in the channel, so a sync can skip the people already
+  # there instead of spending a rate-limited conversations.invite on each.
+  # conversations.members is Tier 4 and pages up to 1,000 IDs per call. Needs
+  # channels:read (public) or groups:read (private, with the bot in it);
+  # raises Error when Slack refuses, so callers can fall back to inviting
+  # everyone.
+  def channel_member_ids(channel_id:)
+    ids = Set.new
+    cursor = nil
+    loop do
+      params = { channel: channel_id, limit: MEMBERS_PAGE_SIZE }
+      params[:cursor] = cursor if cursor.present?
+      response = post_form("conversations.members", params)
+      raise Error, "Failed to list channel members: #{response["error"]}" unless response["ok"]
+
+      ids.merge(response["members"] || [])
+      cursor = response.dig("response_metadata", "next_cursor")
+      break if cursor.blank?
+    end
+    ids
   end
 
   def get_user_info(user_id:)
@@ -195,10 +219,20 @@ class SlackService
   private
 
   def post(method, params = {})
+    call_slack(method, "application/json", params.to_json)
+  end
+
+  # Slack's read methods (conversations.members and friends) ignore JSON
+  # bodies, so those go form-encoded.
+  def post_form(method, params)
+    call_slack(method, "application/x-www-form-urlencoded", URI.encode_www_form(params))
+  end
+
+  def call_slack(method, content_type, body)
     response = Faraday.post("#{SLACK_API_BASE}/#{method}") do |req|
       req.headers["Authorization"] = "Bearer #{@bot_token}"
-      req.headers["Content-Type"] = "application/json"
-      req.body = params.to_json
+      req.headers["Content-Type"] = content_type
+      req.body = body
     end
 
     raise RateLimited.new(retry_after(response)) if response.status == 429
