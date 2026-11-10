@@ -437,8 +437,11 @@ class OnboardingController < ApplicationController
       # Check if a participant with this email already exists (e.g., from CSV import)
       participant = Participant.find_by("LOWER(email) = ?", current_user.email&.downcase)
       if participant
-        # Link the existing participant to this user
-        participant.update!(user: current_user)
+        # Link the existing participant to this user. Imported rows can hold
+        # data the model would now reject (a phone with no country code), and
+        # that shouldn't stop them signing in: the profile step asks them to
+        # fix it when they save.
+        participant.update_attribute(:user, current_user)
       else
         participant = current_user.build_participant(participant_attrs_from_oidc)
       end
