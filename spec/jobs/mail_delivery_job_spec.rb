@@ -46,6 +46,43 @@ RSpec.describe MailDeliveryJob do
     end
   end
 
+  describe "on Postmark::InvalidEmailRequestError for a malformed recipient" do
+    def invalid_to_error(address)
+      message = "Invalid 'To' address: '#{address}'."
+      Postmark::InvalidEmailRequestError.new(300, message, { "ErrorCode" => 300, "Message" => message })
+    end
+
+    it "flags the participant and guardian with that address and discards" do
+      participant = create(:participant)
+      guardian = create(:guardian)
+      # rows saved before the address check was tightened can still hold a
+      # domain with no top-level part
+      participant.update_column(:email, "someone@nowhere")
+      guardian.update_column(:email, "someone@nowhere")
+
+      expect { perform_failing_delivery(invalid_to_error("Someone@Nowhere")) }.not_to raise_error
+
+      expect(participant.reload.email_undeliverable_at).to be_present
+      expect(guardian.reload.email_undeliverable_at).to be_present
+    end
+
+    it "still raises for other malformed-request errors, which are our bug" do
+      error = Postmark::InvalidEmailRequestError.new(300, "Provide either email TextBody or HtmlBody or both.", {})
+
+      expect { perform_failing_delivery(error) }.to raise_error(Postmark::InvalidEmailRequestError)
+    end
+  end
+
+  it "discards a send whose record was deleted before it ran" do
+    participant_event = create(:participant_event)
+    job = described_class.new("ParticipantMailer", "travel_update_reminder", "deliver_now",
+      args: [ participant_event ])
+    serialized = job.serialize
+    participant_event.destroy!
+
+    expect { ActiveJob::Base.execute(serialized) }.not_to raise_error
+  end
+
   it "re-raises other Postmark errors" do
     expect {
       perform_failing_delivery(Postmark::ApiInputError.new(300, "bad", { "Message" => "bad" }))
