@@ -20,6 +20,19 @@ RSpec.describe "Onboarding travel autosave", type: :request do
     }
   end
 
+  it "saves travel whose status hasn't been picked yet" do
+    autosave(
+      inbound: { arrangement_status: "", mode: "" },
+      outbound: { arrangement_status: "", mode: "", notes: "Leaving after the closing ceremony" }
+    )
+
+    expect(response).to have_http_status(:ok)
+    expect(participant_event.travels.inbound.first).to be_unknown
+    expect(participant_event.travels.outbound.first).to have_attributes(
+      arrangement_status: "unknown", notes: "Leaving after the closing ceremony"
+    )
+  end
+
   it "reports a new flight leg as awaiting explicit save without creating duplicates" do
     inbound = {
       mode: "plane",

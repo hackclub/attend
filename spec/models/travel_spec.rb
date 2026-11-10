@@ -15,6 +15,27 @@ RSpec.describe Travel, type: :model do
     end
   end
 
+  describe "#arrangement_status=" do
+    it "treats a blank status from the form as unknown, so the row still saves" do
+      travel = Travel.new(participant_event: create(:participant_event), direction: "outbound")
+      travel.assign_attributes(arrangement_status: "")
+
+      expect(travel.arrangement_status).to eq("unknown")
+      expect { travel.save! }.not_to raise_error
+      expect(travel.reload).to be_unknown
+    end
+
+    it "treats nil the same way" do
+      travel = Travel.new(direction: "inbound", arrangement_status: nil)
+
+      expect(travel.arrangement_status).to eq("unknown")
+    end
+
+    it "keeps a real choice" do
+      expect(Travel.new(arrangement_status: "provisional")).to be_provisional
+    end
+  end
+
   # Train, bus and car times are typed in datetime-local fields on the event's
   # clock. 2026-07-12 is EDT (UTC-4) in New York.
   describe "event-local times" do
