@@ -687,23 +687,63 @@ RSpec.describe Message, type: :model do
         .to match(%r{<a href="http://example\.com/rails/active_storage/representations/[^"]+" target="_blank">Venue map</a>})
     end
 
-    describe "#image_upload_error" do
-      def uploaded(path, content_type)
-        Rack::Test::UploadedFile.new(path, content_type)
+    it "sends the email through the storage redirect, not the app's file proxy" do
+      blob = upload
+      message = saved_message(img(blob))
+
+      expect(Nokogiri::HTML5.fragment(message.body_as_html).at_css("img")["src"])
+        .to start_with("http://example.com/rails/active_storage/representations/redirect/")
+    end
+
+    it "escapes the alt text in the Slack link so it can't break out of it" do
+      blob = upload
+      message = saved_message(img(blob, alt: "Map | east lot &lt;!channel&gt;"))
+
+      expect(message.body_as_slack).to match(%r{\|Map / east lot &lt;!channel&gt;>\z})
+    end
+
+    it "renders a preloaded message's images without querying for them" do
+      blob = upload
+      message = Message.includes(images_attachments: :blob).find(saved_message(img(blob)).id)
+
+      queries = []
+      counter = ->(*, payload) { queries << payload[:sql] unless payload[:name] == "SCHEMA" }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { message.body_as_html }
+
+      expect(queries.grep(/active_storage_(blobs|attachments)/)).to be_empty
+    end
+
+    it "won't save a body with an image that's still uploading" do
+      message = message_for("confirmed_attendees")
+      message.body = %(<p>Map:</p><img src="blob:https://attend.example/1234">)
+
+      expect(message).not_to be_valid
+      expect(message.errors[:body].first).to include("hasn't finished uploading")
+    end
+
+    describe "when the message is deleted" do
+      it "removes the images of a draft that never went out" do
+        blob = upload
+        message = saved_message(img(blob))
+
+        expect { message.destroy! }.to have_enqueued_job(ActiveStorage::PurgeJob).with(blob)
       end
 
-      it "accepts an image it can read" do
-        expect(Message.new.image_upload_error(uploaded(file_fixture("headshot.png"), "image/png"))).to be_nil
+      it "keeps the images of a message that went out, which emails already link to" do
+        blob = upload
+        message = saved_message(img(blob))
+        message.message_deliveries.create!(participant_event: create(:participant_event, event: event),
+          channel: "email", recipient_email: "someone@example.com")
+
+        expect { message.destroy! }.not_to have_enqueued_job(ActiveStorage::PurgeJob)
       end
 
-      it "rejects other kinds of file" do
-        expect(Message.new.image_upload_error(uploaded(file_fixture("evidence.txt"), "text/plain")))
-          .to eq("Choose a JPEG, PNG, GIF, or WebP image.")
-      end
+      it "keeps an image another message shows too" do
+        blob = upload
+        message = saved_message(img(blob))
+        saved_message(img(blob))
 
-      it "rejects a file labelled as an image that isn't one" do
-        expect(Message.new.image_upload_error(uploaded(file_fixture("evidence.txt"), "image/png")))
-          .to start_with("That image could not be read.")
+        expect { message.destroy! }.not_to have_enqueued_job(ActiveStorage::PurgeJob)
       end
     end
   end

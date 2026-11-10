@@ -256,9 +256,17 @@ RSpec.describe "Admin::Messages", type: :request do
       expect(blob.metadata[Message::IMAGE_EVENT_KEY]).to eq(event.id)
     end
 
-    it "cleans the image up later if no message ends up using it" do
+    it "cleans the image up later if no message ends up using it, and resizes it in the background" do
       expect { upload(file_fixture("headshot.png"), "image/png") }
         .to have_enqueued_job(ActiveStorage::PurgeJob)
+        .and have_enqueued_job(ActiveStorage::TransformJob)
+    end
+
+    it "turns away a request without a file" do
+      post upload_image_admin_event_messages_path(event_slug: event.slug), params: {}, as: :multipart
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["error"]).to eq("Please choose an image.")
     end
 
     it "turns away a file that isn't an image" do

@@ -182,7 +182,7 @@ class DashboardController < ApplicationController
     @completion = RegistrationCompletionPresenter.new(@participant_event, viewer: :participant)
     @scans = @participant_event.scans.includes(:user).recent.limit(20)
     @messages = @participant_event.message_deliveries
-      .includes(message: :sent_by_user)
+      .includes(message: [ :sent_by_user, { images_attachments: :blob } ])
       .where(status: "delivered")
       .order(delivered_at: :desc)
       .limit(20)

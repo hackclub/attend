@@ -1,7 +1,5 @@
 module Admin
   class MessagesController < BaseController
-    UNSAVED_IMAGE_TTL = 1.day
-
     before_action :require_event_selected
     before_action :set_message, only: [ :show, :edit, :update, :destroy, :preview, :send_now, :cancel, :retry_failed, :retry_delivery, :send_to_new_recipients ]
 
@@ -202,39 +200,17 @@ module Admin
     end
 
     # Stores an image dropped into the editor and returns the address the
-    # editor puts in the body. It isn't tied to a message yet (a new one may not
-    # be saved), so saving the body attaches it (see
-    # Message#attach_images_in_body) and one that never is goes after a day.
+    # editor puts in the body (see Message::ImageUpload).
     def upload_image
       authorize current_event, :update?
 
-      file = params[:file]
-      unless file.is_a?(ActionDispatch::Http::UploadedFile)
-        render json: { error: "Please choose an image." }, status: :unprocessable_content
-        return
-      end
-
-      error = current_event.messages.new.image_upload_error(file)
-      if error
+      upload = Message::ImageUpload.new(params[:file], event: current_event)
+      if (error = upload.error)
         render json: { error: error }, status: :unprocessable_content
         return
       end
 
-      # Validation read the file, so upload it from the start.
-      file.tempfile.rewind
-      blob = ActiveStorage::Blob.create_and_upload!(
-        io: file.tempfile,
-        filename: file.original_filename,
-        content_type: file.content_type,
-        metadata: { Message::IMAGE_EVENT_KEY => current_event.id }
-      )
-      # Blob#purge leaves one that's been attached by then alone.
-      ActiveStorage::PurgeJob.set(wait: UNSAVED_IMAGE_TTL).perform_later(blob)
-      # Made now rather than on the first recipient's open, when everyone
-      # opening at once would each make it.
-      Message.image_variant(blob)&.processed
-
-      render json: { location: rails_blob_path(blob, only_path: true) }
+      render json: { location: rails_blob_path(upload.store!, only_path: true) }
     end
 
     def send_to_new_recipients

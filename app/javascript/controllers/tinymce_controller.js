@@ -10,6 +10,12 @@ export default class extends Controller {
   }
 
   async connect() {
+    this.pendingUploads = 0
+    this.boundHoldSubmit = this.holdSubmitForUploads.bind(this)
+    // Capture on the document so this runs before TinyMCE copies the content
+    // back into the textarea, and before Turbo or autosave see the submit.
+    document.addEventListener("submit", this.boundHoldSubmit, true)
+
     await this.loadTinymce()
     // Bail if turbo navigated away while the script was still downloading
     if (!this.element.isConnected) return
@@ -17,6 +23,7 @@ export default class extends Controller {
   }
 
   disconnect() {
+    document.removeEventListener("submit", this.boundHoldSubmit, true)
     if (this.editor) {
       this.editor.destroy()
       this.editor = null
@@ -85,20 +92,85 @@ export default class extends Controller {
       setup: (editor) => {
         this.editor = editor
         
-        editor.on('change keyup', () => {
-          editor.save()
-          target.dispatchEvent(new Event('input', { bubbles: true }))
-        })
-        
-        editor.on('blur', () => {
-          editor.save()
-          target.dispatchEvent(new Event('change', { bubbles: true }))
-        })
+        editor.on('change keyup', () => this.sync('input'))
+        editor.on('blur', () => this.sync('change'))
       }
     })
   }
 
+  // Copies the editor into the textarea and tells autosave. Not while an image
+  // is uploading: until the upload finishes the editor shows it from a
+  // temporary blob: address, and a draft saved with that would lose the
+  // picture. The textarea keeps the last good content meanwhile, and
+  // uploadImage syncs once the real address is in.
+  sync(eventName = 'input') {
+    if (!this.editor || this.pendingUploads > 0 || this.hasPendingImages()) return
+
+    this.editor.save()
+    this.editorTarget.dispatchEvent(new Event(eventName, { bubbles: true }))
+  }
+
+  // TinyMCE shows a pasted, dropped or picked image from a blob: address
+  // until its upload finishes and the server's address replaces it.
+  hasPendingImages() {
+    return Array.from(this.editor.getBody().querySelectorAll('img'))
+      .some((img) => /^blob:/i.test(img.getAttribute('src') || ''))
+  }
+
+  // Sending (or saving) while an image is still uploading would go out without
+  // it, so wait for the uploads, then submit again with the same button.
+  async holdSubmitForUploads(event) {
+    const form = event.target
+    if (!this.editor || form !== this.editorTarget.form) return
+    // The resubmit below goes through: whatever is left, the server rejects
+    // rather than this looping.
+    if (this.resubmitting) {
+      this.resubmitting = false
+      return
+    }
+    if (this.pendingUploads === 0 && !this.hasPendingImages()) return
+
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    if (this.waitingToSubmit) return
+    this.waitingToSubmit = true
+
+    try {
+      await this.editor.uploadImages()
+      await this.whenUploadsSettle()
+    } finally {
+      this.waitingToSubmit = false
+    }
+    // An image whose upload failed was removed and staff were told.
+    this.editor.save()
+    this.resubmitting = true
+    form.requestSubmit(event.submitter)
+  }
+
+  whenUploadsSettle() {
+    if (this.pendingUploads === 0) return Promise.resolve()
+    return new Promise((resolve) => { this.uploadsSettled = resolve })
+  }
+
   async uploadImage(blobInfo) {
+    this.pendingUploads += 1
+    try {
+      return await this.postImage(blobInfo)
+    } finally {
+      this.pendingUploads -= 1
+      if (this.pendingUploads === 0) {
+        // TinyMCE swaps in the returned address (or removes a failed image)
+        // after this promise settles, so sync on the next tick.
+        setTimeout(() => {
+          this.sync('input')
+          this.uploadsSettled?.()
+          this.uploadsSettled = null
+        }, 0)
+      }
+    }
+  }
+
+  async postImage(blobInfo) {
     const formData = new FormData()
     formData.append('file', blobInfo.blob(), blobInfo.filename())
 
