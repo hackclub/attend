@@ -74,5 +74,18 @@ RSpec.describe "Training declarations", type: :request do
       expect(row).not_to include("Not trained")
       expect(response.body).not_to include("Example declaration?")
     end
+
+    it "doesn't show staff who aren't event admins who is ineligible" do
+      create(:event_role_assignment, event: event, user: learner, role: "ops")
+      learner.training_disclosures.create!(course: course, question: "Example declaration?", answer: "yes")
+      colleague = create(:event_role_assignment, event: event, role: "limited").user
+
+      sign_in colleague
+      get select_admin_event_path(slug: event.slug)
+      get admin_event_staff_index_path(event_slug: event.slug)
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(learner.email)
+      expect(response.body).not_to include("Ineligible", "not eligible to work this event")
+    end
   end
 end

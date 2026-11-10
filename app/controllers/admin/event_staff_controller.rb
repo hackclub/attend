@@ -11,7 +11,8 @@ module Admin
         .includes(:user)
         .order("users.email")
       @volunteers = current_event.event_volunteers.includes(:user).order("users.email")
-      @training_status = TrainingStatus.for_event(current_event)
+      # Who's ineligible stays with the people who manage staff.
+      @training_status = TrainingStatus.for_event(current_event, include_ineligible: can_manage_staff?)
       # Series owners and organizers work every event in the series without a
       # role on each, so they're listed separately for their training.
       @series_team = User.where(id: TrainingStatus.series_member_ids(current_event))
