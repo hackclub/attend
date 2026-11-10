@@ -1,0 +1,21 @@
+<%# The event list inside the event switcher menu; see _admin_event_switcher. %>
+<div class="cs-menu-scroll">
+  <%# The current event leads the list, so it's never scrolled out of view. %>
+  <% current_first = switcher_events.partition { |e| current_event && e.id == current_event.id }.flatten %>
+  <% current_first.each do |event| %>
+    <% is_current = current_event && event.id == current_event.id %>
+    <% next if event.completed? && !is_current %>
+    <% if is_current %>
+      <div class="cs-menu-item" aria-current="true">
+        <%= render "admin/events/avatar", event: event, size: 20, rounded: "rounded" %>
+        <span class="cs-menu-item-label"><%= event.name %></span>
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+      </div>
+    <% else %>
+      <%= button_to select_admin_event_path(event), method: :post, data: { turbo: false }, class: "cs-menu-item", form: { class: "block" } do %>
+        <%= render "admin/events/avatar", event: event, size: 20, rounded: "rounded" %>
+        <span class="cs-menu-item-label"><%= event.name %></span>
+      <% end %>
+    <% end %>
+  <% end %>
+</div>
