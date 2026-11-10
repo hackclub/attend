@@ -1,5 +1,5 @@
 module Training
-  # Sign-in for training without a Hack Club account: we email a 6-digit code
+  # Sign-in for training without a Hack Club account: we email an 8-digit code
   # to the address, and entering it starts a session confined to /training
   # (see TrainingSignIn).
   #
@@ -9,14 +9,17 @@ module Training
   # attempt count, and nobody else asking for a code to the same address can
   # overwrite or burn this browser's code.
   #
-  # Codes sent to one address are capped per clock hour, which bounds guesses
-  # at that address (MAX_SENDS_PER_HOUR * MAX_ATTEMPTS an hour) however many
-  # browsers try. Someone who knows an address can use up the cap, but only
-  # until the hour turns, and Hack Club Auth still works meanwhile.
+  # Codes sent to one address are capped across this clock hour and the last,
+  # which bounds guesses at that address to MAX_SENDS_PER_HOUR * MAX_ATTEMPTS
+  # an hour however many browsers try: against an 8-digit code that's under
+  # 0.25% a year of non-stop guessing, every guess costing an email to the
+  # real inbox. Someone who knows an address can use up the cap, but only for
+  # up to two hours, and Hack Club Auth still works meanwhile.
   class SignInsController < ApplicationController
+    CODE_DIGITS = 8
     CODE_VALIDITY = 10.minutes
     MAX_ATTEMPTS = 5
-    MAX_SENDS_PER_HOUR = 10
+    MAX_SENDS_PER_HOUR = 5
 
     # Pinned in the widget's data-action and checked against siteverify's
     # response, so a token solved on another Turnstile form can't be replayed.
@@ -43,11 +46,12 @@ module Training
       end
 
       sends = Rails.cache.increment(sends_key(email), 1, expires_in: 2.hours)
-      if sends.nil? || sends > MAX_SENDS_PER_HOUR
+      previous_hour = Rails.cache.read(sends_key(email, 1.hour.ago)).to_i
+      if sends.nil? || sends + previous_hour > MAX_SENDS_PER_HOUR
         redirect_to training_sign_in_path, alert: "Too many codes requested for that address. Please wait a while and try again." and return
       end
 
-      code = SecureRandom.random_number(1_000_000).to_s.rjust(6, "0")
+      code = SecureRandom.random_number(10**CODE_DIGITS).to_s.rjust(CODE_DIGITS, "0")
       nonce = SecureRandom.urlsafe_base64(24)
       Rails.cache.write(pending_key(nonce, "code"), { "email" => email, "digest" => Digest::SHA256.hexdigest(code) }, expires_in: CODE_VALIDITY)
       session[:training_sign_in] = { "email" => email, "nonce" => nonce }
@@ -128,8 +132,8 @@ module Training
 
     # A fixed bucket per clock hour, so the cap's window can't be stretched by
     # requests that keep refreshing a sliding expiry.
-    def sends_key(email)
-      "training_sign_in/sends/#{Digest::SHA256.hexdigest(email)}/#{Time.current.to_i / 1.hour.to_i}"
+    def sends_key(email, at = Time.current)
+      "training_sign_in/sends/#{Digest::SHA256.hexdigest(email)}/#{at.to_i / 1.hour.to_i}"
     end
 
     def safe_training_path(location)

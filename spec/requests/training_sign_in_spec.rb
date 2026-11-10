@@ -23,7 +23,7 @@ RSpec.describe "Signing in to training with an emailed code", type: :request do
     allow(TurnstileVerifier).to receive(:verify).and_return(true)
     allow(TurnstileVerifier).to receive(:site_key).and_return(nil)
     allow(SecureRandom).to receive(:random_number).and_call_original
-    allow(SecureRandom).to receive(:random_number).with(1_000_000).and_return(123_456)
+    allow(SecureRandom).to receive(:random_number).with(100_000_000).and_return(12_345_678)
     create(:event_volunteer, event: event, user: volunteer)
     TrainingCourseInvitation.create!(course: course, user: volunteer)
   end
@@ -32,7 +32,7 @@ RSpec.describe "Signing in to training with an emailed code", type: :request do
     post training_sign_in_code_path, params: { email: email }
   end
 
-  def sign_in_with_code(email, code: "123456")
+  def sign_in_with_code(email, code: "12345678")
     request_code(email)
     post training_sign_in_verify_path, params: { code: code }
   end
@@ -58,9 +58,9 @@ RSpec.describe "Signing in to training with an emailed code", type: :request do
   end
 
   it "keeps the code out of the subject line" do
-    mail = TrainingMailer.sign_in_code(user: volunteer, code: "123456")
-    expect(mail.subject).not_to include("123456")
-    expect(mail.text_part.body.decoded).to include("123456")
+    mail = TrainingMailer.sign_in_code(user: volunteer, code: "12345678")
+    expect(mail.subject).not_to include("12345678")
+    expect(mail.text_part.body.decoded).to include("12345678")
   end
 
   {
@@ -100,11 +100,11 @@ RSpec.describe "Signing in to training with an emailed code", type: :request do
 
   it "rejects a wrong code, and gives up after too many" do
     request_code(volunteer.email)
-    post training_sign_in_verify_path, params: { code: "000000" }
+    post training_sign_in_verify_path, params: { code: "00000000" }
     expect(response).to redirect_to(training_sign_in_verify_path)
 
-    5.times { post training_sign_in_verify_path, params: { code: "000000" } }
-    post training_sign_in_verify_path, params: { code: "123456" }
+    5.times { post training_sign_in_verify_path, params: { code: "00000000" } }
+    post training_sign_in_verify_path, params: { code: "12345678" }
     expect(response).to redirect_to(training_sign_in_path)
     get training_path
     expect(response).to redirect_to(training_sign_in_path)
@@ -113,7 +113,7 @@ RSpec.describe "Signing in to training with an emailed code", type: :request do
   it "rejects an expired code" do
     request_code(volunteer.email)
     travel 11.minutes do
-      post training_sign_in_verify_path, params: { code: "123456" }
+      post training_sign_in_verify_path, params: { code: "12345678" }
     end
     expect(response).to redirect_to(training_sign_in_path)
     get training_path
@@ -124,9 +124,9 @@ RSpec.describe "Signing in to training with an emailed code", type: :request do
     request_code(volunteer.email)
     fresh_cookie = cookies.to_hash.dup
 
-    5.times { post training_sign_in_verify_path, params: { code: "000000" } }
+    5.times { post training_sign_in_verify_path, params: { code: "00000000" } }
     fresh_cookie.each { |name, value| cookies[name] = value }
-    post training_sign_in_verify_path, params: { code: "123456" }
+    post training_sign_in_verify_path, params: { code: "12345678" }
 
     expect(response).to redirect_to(training_sign_in_path)
     get training_path
@@ -135,7 +135,7 @@ RSpec.describe "Signing in to training with an emailed code", type: :request do
 
   it "caps how many codes one address gets, whichever browser asks, until the hour turns" do
     travel_to Time.zone.local(2030, 1, 1, 10, 5)
-    10.times do
+    5.times do
       reset!
       expect { request_code(volunteer.email) }.to have_enqueued_mail(TrainingMailer, :sign_in_code)
     end
@@ -144,7 +144,13 @@ RSpec.describe "Signing in to training with an emailed code", type: :request do
     expect(response).to redirect_to(training_sign_in_path)
     expect(flash[:alert]).to include("for that address")
 
+    # The last hour still counts just after it turns, so the cap can't be
+    # doubled across the boundary.
     travel_to Time.zone.local(2030, 1, 1, 11, 0)
+    reset!
+    expect { request_code(volunteer.email) }.not_to have_enqueued_mail(TrainingMailer, :sign_in_code)
+
+    travel_to Time.zone.local(2030, 1, 1, 12, 0)
     reset!
     expect { request_code(volunteer.email) }.to have_enqueued_mail(TrainingMailer, :sign_in_code)
   end
@@ -163,20 +169,20 @@ RSpec.describe "Signing in to training with an emailed code", type: :request do
     mine = cookies.to_hash.dup
 
     reset!
-    allow(SecureRandom).to receive(:random_number).with(1_000_000).and_return(654_321)
+    allow(SecureRandom).to receive(:random_number).with(100_000_000).and_return(87_654_321)
     request_code(volunteer.email)
-    6.times { post training_sign_in_verify_path, params: { code: "000000" } }
+    6.times { post training_sign_in_verify_path, params: { code: "00000000" } }
 
     reset!
     mine.each { |name, value| cookies[name] = value }
-    post training_sign_in_verify_path, params: { code: "123456" }
+    post training_sign_in_verify_path, params: { code: "12345678" }
     expect(response).to redirect_to(training_path)
   end
 
   it "won't sign in someone who was given a role after the code went out" do
     request_code(volunteer.email)
     create(:event_role_assignment, user: volunteer, event: event, role: "ops")
-    post training_sign_in_verify_path, params: { code: "123456" }
+    post training_sign_in_verify_path, params: { code: "12345678" }
 
     expect(response).to redirect_to(training_sign_in_path)
     get training_path
