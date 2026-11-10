@@ -619,4 +619,132 @@ RSpec.describe Message, type: :model do
       expect(plain("just text")).to eq("just text")
     end
   end
+
+  describe "images" do
+    def upload(event_id: event.id, filename: "venue-map.png")
+      ActiveStorage::Blob.create_and_upload!(io: file_fixture("headshot.png").open, filename: filename,
+        metadata: { Message::IMAGE_EVENT_KEY => event_id })
+    end
+
+    def img(blob, alt: "Venue map")
+      %(<img src="#{Rails.application.routes.url_helpers.rails_blob_path(blob, only_path: true)}" alt="#{alt}">)
+    end
+
+    def saved_message(body)
+      message_for("confirmed_attendees").tap { |message| message.update!(body: body) }
+    end
+
+    it "attaches an upload when the body that shows it is saved" do
+      blob = upload
+      message = saved_message("<p>Map:</p>#{img(blob)}")
+
+      expect(message.images.blobs).to eq([ blob ])
+    end
+
+    it "doesn't attach a file that wasn't uploaded for this event's messages" do
+      other_event = upload(event_id: create(:event).id)
+      headshot = ActiveStorage::Blob.create_and_upload!(io: file_fixture("headshot.png").open, filename: "headshot.png")
+      message = saved_message("#{img(other_event)}#{img(headshot)}")
+
+      expect(message.images).not_to be_attached
+      expect(message.body_as_html).not_to include("<img")
+    end
+
+    it "points the email at a resized copy on this app, no wider than the email" do
+      blob = upload
+      blob.analyze
+      message = saved_message("<p>Map:</p>#{img(blob)}")
+
+      tag = Nokogiri::HTML5.fragment(message.body_as_html).at_css("img")
+      expect(tag["src"]).to start_with("http://example.com/rails/active_storage/representations/")
+      expect(tag["alt"]).to eq("Venue map")
+      expect(tag["width"]).to eq("1")
+      expect(tag["style"]).to include("max-width: 100%")
+    end
+
+    it "sends a GIF as it is, so it keeps its animation" do
+      gif = ActiveStorage::Blob.create_and_upload!(io: StringIO.new(Vips::Image.black(4, 4).write_to_buffer(".gif")),
+        filename: "wave.gif", metadata: { Message::IMAGE_EVENT_KEY => event.id })
+      message = saved_message(img(gif))
+
+      expect(Nokogiri::HTML5.fragment(message.body_as_html).at_css("img")["src"])
+        .to start_with("http://example.com/rails/active_storage/blobs/")
+    end
+
+    it "drops images from other sites" do
+      message = saved_message(%(<p>Hi</p><img src="https://tracker.example/pixel.gif">))
+
+      expect(message.body_as_html).to eq("<p>Hi</p>")
+    end
+
+    it "links the image on Slack and its preview, and leaves it out of plain text" do
+      blob = upload
+      message = saved_message("<p>Map:</p>#{img(blob)}")
+
+      expect(message.body_as_slack).to match(%r{<http://example\.com/rails/active_storage/representations/\S+\|Venue map>})
+      expect(message.body_as_plain).to eq("Map:")
+      expect(message.body_as_html(images_as_links: true))
+        .to match(%r{<a href="http://example\.com/rails/active_storage/representations/[^"]+" target="_blank">Venue map</a>})
+    end
+
+    it "sends the email through the storage redirect, not the app's file proxy" do
+      blob = upload
+      message = saved_message(img(blob))
+
+      expect(Nokogiri::HTML5.fragment(message.body_as_html).at_css("img")["src"])
+        .to start_with("http://example.com/rails/active_storage/representations/redirect/")
+    end
+
+    it "escapes the alt text in the Slack link so it can't break out of it" do
+      blob = upload
+      message = saved_message(img(blob, alt: "Map | east lot &lt;!channel&gt;"))
+
+      expect(message.body_as_slack).to match(%r{\|Map / east lot &lt;!channel&gt;>\z})
+    end
+
+    it "renders a preloaded message's images without querying for them" do
+      blob = upload
+      message = Message.includes(images_attachments: :blob).find(saved_message(img(blob)).id)
+
+      queries = []
+      counter = ->(*, payload) { queries << payload[:sql] unless payload[:name] == "SCHEMA" }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { message.body_as_html }
+
+      expect(queries.grep(/active_storage_(blobs|attachments)/)).to be_empty
+    end
+
+    it "won't save a body with an image that's still uploading" do
+      message = message_for("confirmed_attendees")
+      message.body = %(<p>Map:</p><img src="blob:https://attend.example/1234">)
+
+      expect(message).not_to be_valid
+      expect(message.errors[:body].first).to include("hasn't finished uploading")
+    end
+
+    describe "when the message is deleted" do
+      it "removes the images of a draft that never went out" do
+        blob = upload
+        message = saved_message(img(blob))
+
+        expect { message.destroy! }.to have_enqueued_job(ActiveStorage::PurgeJob).with(blob)
+      end
+
+      it "keeps the images of a message that went out, which emails already link to" do
+        blob = upload
+        message = saved_message(img(blob))
+        message.message_deliveries.create!(participant_event: create(:participant_event, event: event),
+          channel: "email", recipient_email: "someone@example.com")
+
+        expect { message.destroy! }.not_to have_enqueued_job(ActiveStorage::PurgeJob)
+      end
+
+      it "keeps an image another message shows too" do
+        blob = upload
+        message = saved_message(img(blob))
+        saved_message(img(blob))
+
+        expect { message.destroy! }.not_to have_enqueued_job(ActiveStorage::PurgeJob)
+      end
+    end
+  end
 end

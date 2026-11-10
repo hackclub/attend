@@ -7,6 +7,13 @@ class Message < ApplicationRecord
   belongs_to :event
   belongs_to :sent_by_user, class_name: "User"
   has_many :message_deliveries, dependent: :destroy
+  # Pictures in the body. Staff upload them from the editor before the message
+  # is saved (see Message::ImageUpload), and saving the body attaches the ones
+  # it shows (see #attach_images_in_body). Not purged with the message: once it
+  # has gone out, emails already in inboxes load these files, so only a
+  # message that never reached anyone takes its images with it (see
+  # #purge_unsent_images).
+  has_many_attached :images, dependent: false
 
   AUDIENCES = {
     all_attendees: "All Attendees",
@@ -52,6 +59,25 @@ class Message < ApplicationRecord
   FIRST_NAME_FALLBACK = "there"
   PARTICIPANT_FIRST_NAME_FALLBACK = "your child"
 
+  IMAGE_CONTENT_TYPES = %w[image/jpeg image/png image/gif image/webp].freeze
+  MAX_IMAGE_SIZE = 10.megabytes
+  # Where an uploaded image is metadata-tagged with its event, so a body can
+  # only show pictures staff uploaded for that event's messages.
+  IMAGE_EVENT_KEY = "message_image_event_id"
+  # The address the editor writes for an upload: Active Storage's blob route,
+  # proxy or redirect depending on the environment, with or without a host.
+  IMAGE_SRC_PATTERN = %r{\A(?:https?://[^/]+)?/rails/active_storage/blobs/(?:proxy|redirect)/([^/]+)/}
+  # What the editor shows while an image is still uploading (blob:), or for a
+  # pasted one it couldn't upload (data:). Saved, it would match no upload and
+  # the picture would quietly go missing for everyone.
+  PENDING_IMAGE_SRC_PATTERN = /\A(?:blob|data):/i
+  # Recipients get a copy no wider than this, so a photo straight off a phone
+  # isn't downloaded at full size by everyone the message goes to.
+  IMAGE_VARIANT = { resize_to_limit: [ 1200, nil ] }.freeze
+  # The email layout's content width, which is also the widest an image is
+  # shown: Outlook ignores max-width, so the width attribute does the job.
+  IMAGE_DISPLAY_WIDTH = 560
+
   enum :status, {
     draft: "draft",
     scheduled: "scheduled",
@@ -68,9 +94,15 @@ class Message < ApplicationRecord
   # message with stray braces in it can't start failing.
   validate :placeholders_are_valid,
     if: -> { will_save_change_to_body? || will_save_change_to_subject? || will_save_change_to_audience? }
+  validate :images_finished_uploading, if: :will_save_change_to_body?
 
   # Typed on the event's clock (see EventLocalTimes).
   event_local_times :scheduled_at
+
+  after_save :attach_images_in_body, if: :saved_change_to_body?
+  # Prepended so it runs before the deliveries are destroyed.
+  before_destroy :remember_unsent_images, prepend: true
+  after_destroy_commit :purge_unsent_images
 
   scope :recent, -> { order(created_at: :desc) }
   scope :pending_scheduled, -> { scheduled.where("scheduled_at <= ?", Time.current) }
@@ -274,10 +306,13 @@ class Message < ApplicationRecord
   # Participant or Guardian) and fill in its placeholders for them. Without
   # one the tokens are left as written, which is what staff see on the
   # message's own page.
-  def body_as_html(recipient: nil)
+  # `images_as_links` shows each image as a link to it, the way Slack gets it,
+  # for the Slack preview.
+  def body_as_html(recipient: nil, images_as_links: false)
     # Sanitized after filling in, so nothing a recipient put in their name can
     # survive as markup.
-    sanitize_html(personalize(body.to_s, recipient) { |value| ERB::Util.html_escape(value) })
+    html = sanitize_html(personalize(body.to_s, recipient) { |value| ERB::Util.html_escape(value) })
+    with_image_urls(html, as_links: images_as_links)
   end
 
   def body_as_slack(recipient: nil)
@@ -312,8 +347,25 @@ class Message < ApplicationRecord
     placeholder_tokens.intersect?(PLACEHOLDERS)
   end
 
+  # The resized copy of an uploaded image recipients get, or nil to send the
+  # original. GIFs go as they are, since a variant would lose the animation.
+  def self.image_variant(blob)
+    blob.variant(IMAGE_VARIANT) if blob.variable? && blob.content_type != "image/gif"
+  end
+
+  # The id of the upload an <img> src points at, or nil when it isn't one.
+  # Read from the signed id itself, without a query, so rendering a body costs
+  # nothing per image beyond the message's own attachments.
+  def self.uploaded_image_blob_id(src)
+    signed_id = src.to_s[IMAGE_SRC_PATTERN, 1]
+    return unless signed_id
+
+    ActiveStorage::Blob.signed_id_verifier.verified(Rack::Utils.unescape_path(signed_id), purpose: "blob_id")
+  end
+
   def reload(...)
     @placeholder_values = nil
+    @image_blobs = nil
     super
   end
 
@@ -520,6 +572,11 @@ class Message < ApplicationRecord
       end
     when "br"
       "\n"
+    when "img"
+      blob = image_blob_for(element["src"])
+      # The label is staff's alt text: escaped so a "<" or "|" in it can't end
+      # the link early or turn into a Slack mention.
+      blob ? "<#{blob_image_url(blob)}|#{InlineMarkup.escape(image_alt(element)).tr("|", "/")}>\n" : ""
     when "p"
       "#{inner.strip}\n\n"
     when "ul"
@@ -557,9 +614,100 @@ class Message < ApplicationRecord
   def sanitize_html(html)
     ActionController::Base.helpers.sanitize(
       html,
-      tags: %w[p br strong b em i u s strike a ul ol li blockquote code pre],
-      attributes: %w[href target]
+      tags: %w[p br strong b em i u s strike a ul ol li blockquote code pre img],
+      attributes: %w[href target src alt]
     )
+  end
+
+  # Points each <img> at the copy recipients should load, sized for email, and
+  # drops any that isn't one of this message's uploads: a link to an outside
+  # image (a tracking pixel, say) or to some other record's file.
+  def with_image_urls(html, as_links: false)
+    return html unless html.include?("<img")
+
+    doc = Nokogiri::HTML5.fragment(html)
+    doc.css("img").each do |img|
+      blob = image_blob_for(img["src"])
+      next img.remove unless blob
+
+      if as_links
+        link = doc.document.create_element("a", image_alt(img), href: blob_image_url(blob), target: "_blank")
+        next img.replace(link)
+      end
+
+      img["src"] = blob_image_url(blob)
+      img["alt"] ||= ""
+      width = blob.metadata["width"]
+      img["width"] = [ width.to_i, IMAGE_DISPLAY_WIDTH ].min.to_s if width.to_i.positive?
+      img["style"] = "max-width: 100%; height: auto;"
+    end
+    doc.to_html.html_safe
+  end
+
+  def image_alt(img)
+    img["alt"].presence || "Image"
+  end
+
+  # The absolute address recipients load an image from. Through the redirect
+  # route rather than the app's default proxy: a send to hundreds of people
+  # has them all opening at once, and each open then costs the app a quick
+  # redirect to the storage service instead of streaming the file itself.
+  def blob_image_url(blob)
+    helpers = Rails.application.routes.url_helpers
+    options = Rails.application.config.action_mailer.default_url_options
+    helpers.rails_storage_redirect_url(self.class.image_variant(blob) || blob, **options)
+  end
+
+  # The attached upload `src` points at, or nil when it isn't one of this
+  # message's images.
+  def image_blob_for(src)
+    blob_id = self.class.uploaded_image_blob_id(src)
+    image_blobs[blob_id] if blob_id
+  end
+
+  # Uses the attachments when they were preloaded (pages listing messages do,
+  # with `images_attachments: :blob`), and one query for all of them when not.
+  def image_blobs
+    @image_blobs ||= begin
+      attachments = images_attachments.loaded? ? images_attachments : images_attachments.includes(:blob)
+      attachments.map(&:blob).index_by(&:id)
+    end
+  end
+
+  # Attaches every upload the body shows that isn't attached yet. Only images
+  # uploaded for this event count, so pasting the address of some other file
+  # (a participant's headshot, say) can't pull it into a message. Images taken
+  # back out of a draft stay attached until the message is deleted.
+  def attach_images_in_body
+    blob_ids = Nokogiri::HTML5.fragment(body.to_s).css("img")
+      .filter_map { |img| self.class.uploaded_image_blob_id(img["src"]) }.uniq
+    blob_ids -= images_attachments.pluck(:blob_id)
+    return if blob_ids.empty?
+
+    ActiveStorage::Blob.where(id: blob_ids).each do |blob|
+      images_attachments.create!(blob: blob) if blob.metadata[IMAGE_EVENT_KEY] == event_id
+    end
+    @image_blobs = nil
+  end
+
+  def images_finished_uploading
+    return unless body.to_s.include?("<img")
+
+    pending = Nokogiri::HTML5.fragment(body).css("img").any? { |img| img["src"].to_s.match?(PENDING_IMAGE_SRC_PATTERN) }
+    errors.add(:body, "has an image that hasn't finished uploading. Wait for it to finish, or remove it and add it again.") if pending
+  end
+
+  # A message that never reached anyone can take its images with it, unless
+  # another message shows them too (one copied from this one, say). Decided
+  # before the destroy, while its deliveries still exist.
+  def remember_unsent_images
+    @unsent_image_blob_ids = message_deliveries.exists? ? [] : images_attachments.pluck(:blob_id)
+  end
+
+  def purge_unsent_images
+    return if @unsent_image_blob_ids.blank?
+
+    ActiveStorage::Blob.where(id: @unsent_image_blob_ids).where.missing(:attachments).find_each(&:purge_later)
   end
 
   # Replaces each known placeholder in `text` with its value for `recipient`,

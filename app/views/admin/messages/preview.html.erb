@@ -76,7 +76,7 @@
                   <span class="font-bold text-white">Hack Club Attend</span>
                   <span class="text-xs text-gray-400">App</span>
                 </div>
-                <div class="mt-1 text-[15px] text-gray-100 whitespace-pre-wrap break-words"><%= @message.body_as_html(recipient: @preview_recipient) %></div>
+                <div class="mt-1 text-[15px] text-gray-100 whitespace-pre-wrap break-words"><%= @message.body_as_html(recipient: @preview_recipient, images_as_links: true) %></div>
               </div>
             </div>
           </div>
@@ -102,7 +102,7 @@
             </div>
             <div class="p-4 bg-white">
               <div class="text-sm leading-relaxed [&_p]:my-4 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_ul]:my-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_blockquote]:my-4 [&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-4 [&_a]:text-[#ec3750] [&_a]:underline">
-                <%= sanitize @message.body_as_html(recipient: @preview_recipient), tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
+                <%= sanitize @message.body_as_html(recipient: @preview_recipient), tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote img], attributes: %w[href target rel src alt width style] %>
               </div>
             </div>
           </div>

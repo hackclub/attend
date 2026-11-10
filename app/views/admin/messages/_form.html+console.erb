@@ -150,8 +150,11 @@
               **aria %>
         <% end %>
 
-        <%= cs_form_field f, :body, label: "Message", data: { controller: "tinymce" },
-              description: "Use the toolbar for links, bold, italic and lists. Formatting is adapted for each channel. " \
+        <%= cs_form_field f, :body, label: "Message",
+              data: { controller: "tinymce", tinymce_image_upload_url_value: upload_image_admin_event_messages_path(current_event) },
+              description: "Use the toolbar for links, bold, italic, lists and images. Formatting is adapted for each channel: " \
+                "images show in email, on Attend and in the app, are sent as a link on Slack, and are left out of SMS and push. " \
+                "Images must be uploaded here; pictures linked from other sites are left out. " \
                 "Personalize with {{first_name}} and {{event_name}}; messages to guardians can also use " \
                 "{{participant_first_name}} for their children's names. A missing first name becomes \"there\" (\"Hi there,\"), " \
                 "and a missing child's name becomes \"your child\".",

@@ -240,6 +240,43 @@ RSpec.describe "Admin::Messages", type: :request do
     end
   end
 
+  describe "POST upload_image" do
+    def upload(path, content_type)
+      post upload_image_admin_event_messages_path(event_slug: event.slug),
+        params: { file: Rack::Test::UploadedFile.new(path, content_type) }, as: :multipart
+    end
+
+    it "stores the image for this event and returns where the editor should show it" do
+      upload(file_fixture("headshot.png"), "image/png")
+
+      expect(response).to have_http_status(:ok)
+      location = response.parsed_body["location"]
+      blob = ActiveStorage::Blob.find_signed(location[Message::IMAGE_SRC_PATTERN, 1])
+      expect(location).to eq(rails_blob_path(blob, only_path: true))
+      expect(blob.metadata[Message::IMAGE_EVENT_KEY]).to eq(event.id)
+    end
+
+    it "cleans the image up later if no message ends up using it, and resizes it in the background" do
+      expect { upload(file_fixture("headshot.png"), "image/png") }
+        .to have_enqueued_job(ActiveStorage::PurgeJob)
+        .and have_enqueued_job(ActiveStorage::TransformJob)
+    end
+
+    it "turns away a request without a file" do
+      post upload_image_admin_event_messages_path(event_slug: event.slug), params: {}, as: :multipart
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["error"]).to eq("Please choose an image.")
+    end
+
+    it "turns away a file that isn't an image" do
+      expect { upload(file_fixture("evidence.txt"), "text/plain") }.not_to change(ActiveStorage::Blob, :count)
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["error"]).to eq("Choose a JPEG, PNG, GIF, or WebP image.")
+    end
+  end
+
   describe "GET show" do
     let(:message) do
       event.messages.create!(audience: "confirmed_attendees", channels: [ "email" ], body: "<p>Hello</p>",

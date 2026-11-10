@@ -199,6 +199,20 @@ module Admin
         notice: "Retrying delivery to #{delivery.recipient_name}..."
     end
 
+    # Stores an image dropped into the editor and returns the address the
+    # editor puts in the body (see Message::ImageUpload).
+    def upload_image
+      authorize current_event, :update?
+
+      upload = Message::ImageUpload.new(params[:file], event: current_event)
+      if (error = upload.error)
+        render json: { error: error }, status: :unprocessable_content
+        return
+      end
+
+      render json: { location: rails_blob_path(upload.store!, only_path: true) }
+    end
+
     def send_to_new_recipients
       authorize current_event, :update?
 
