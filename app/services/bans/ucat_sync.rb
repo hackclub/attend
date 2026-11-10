@@ -34,11 +34,16 @@ module Bans
     # then expires in Attend at that moment. A temp ban without a date is
     # ignored rather than mirrored as indefinite, and one already served is
     # not mirrored as an expired row.
-    #
-    # A perma ban with an "Action Until" date ends then too, the same way. One
-    # without a date (or with a date that won't parse) stays indefinite, so a
-    # typo in the field never lifts a ban.
     TEMP_SEGMENT = /\A\s*temp(orary)?\s+ban/i
+    # A perma ban (including telescreen's "ban") ends on its "Action Until"
+    # date too, but only a strict ISO 8601 date counts, which is what
+    # Airtable's date fields return. Anything else leaves the ban
+    # indefinite, so a typo or a partial date like "March" never lifts it.
+    ISO_DATE = /\A\d{4}-\d{2}-\d{2}\z/
+    # A date-only end means "until that day is over" wherever the moderator
+    # is, so it ends at the close of the day in the last time zone to finish
+    # it (UTC-12) rather than in the app's zone.
+    LAST_ZONE = "Etc/GMT+12".freeze
     EXCLUDED_STATUSES = %w[removed].freeze
 
     # Narrows the fetch server-side; qualifies? re-checks every row precisely.
@@ -52,7 +57,9 @@ module Bans
 
     class SafetyLimitExceeded < StandardError; end
 
-    Result = Struct.new(:added, :reinstated, :revoked, :unchanged, :cases_without_identity, keyword_init: true)
+    # expired: bans whose case end date has now passed (they lapse on their
+    # own, so they show as Expired and never count toward the revoke limit).
+    Result = Struct.new(:added, :reinstated, :revoked, :expired, :unchanged, :cases_without_identity, keyword_init: true)
 
     # cases: [{ id:, record_id:, until: }]. expires_at is nil while any case is
     # indefinite; otherwise the latest case end.
@@ -62,32 +69,59 @@ module Bans
       def identifiers = emails.map { "email:#{_1}" } + slack_ids.map { "slack:#{_1}" }
       def case_ids = cases.map { _1[:id] }
       def expires_at = cases.any? { _1[:until].nil? } ? nil : cases.map { _1[:until] }.max
+      def in_force? = expires_at.nil? || expires_at.future?
     end
 
-    def self.qualifies?(fields)
+    # Whether the case is a ban at all, in force or already over: a perma
+    # ban, or a temp ban with an end date. Cases whose date has passed still
+    # count here so the sync can let a mirrored ban lapse (Expired) instead
+    # of revoking it.
+    def self.ban_case?(fields)
       return false if EXCLUDED_STATUSES.include?(fields[STATUS_FIELD].to_s.downcase)
+      return true if perma?(fields)
 
-      segments = fields[ACTION_FIELD].to_s.split(",")
-      perma = segments.any? { |segment| segment.match?(PERMA_SEGMENT) || segment.match?(BAN_SEGMENT) }
-      return false unless perma || segments.any? { |segment| segment.match?(TEMP_SEGMENT) }
+      fields[ACTION_FIELD].to_s.split(",").any? { _1.match?(TEMP_SEGMENT) } && action_until(fields).present?
+    end
+
+    # Whether the case bans the person right now.
+    def self.qualifies?(fields)
+      return false unless ban_case?(fields)
 
       until_at = action_until(fields)
-      until_at.nil? ? perma : until_at.future?
+      until_at.nil? || until_at.future?
     end
 
-    # When the ban ends, or nil when the case gives no date that parses: an
-    # indefinite perma ban, or a temp ban that then doesn't qualify. A date
-    # with no time means the whole of that day, so it ends at the end of it.
+    def self.perma?(fields)
+      fields[ACTION_FIELD].to_s.split(",").any? { _1.match?(PERMA_SEGMENT) || _1.match?(BAN_SEGMENT) }
+    end
+
+    # When the ban ends, or nil for an indefinite perma ban (or a temp ban
+    # whose date won't parse, which then isn't a ban case).
     def self.action_until(fields)
       raw = fields[UNTIL_FIELD].to_s.strip
       return nil if raw.blank?
 
-      parsed = Time.zone.parse(raw)
-      return nil if parsed.nil?
+      perma?(fields) ? parse_strict(raw) : parse_lenient(raw)
+    end
 
-      raw.match?(/\A\d{4}-\d{2}-\d{2}\z/) ? parsed.end_of_day : parsed
+    def self.parse_strict(raw)
+      return end_of_day(Date.iso8601(raw)) if raw.match?(ISO_DATE)
+
+      Time.iso8601(raw).in_time_zone
     rescue ArgumentError
       nil
+    end
+
+    def self.parse_lenient(raw)
+      return parse_strict(raw) if raw.match?(ISO_DATE)
+
+      Time.zone.parse(raw)
+    rescue ArgumentError
+      nil
+    end
+
+    def self.end_of_day(date)
+      ActiveSupport::TimeZone[LAST_ZONE].local(date.year, date.month, date.day).end_of_day.in_time_zone
     end
 
     def initialize(client: nil, force: false)
@@ -100,7 +134,7 @@ module Bans
 
     def call
       people, cases_without_identity = fetch_people
-      result = Result.new(added: 0, reinstated: 0, revoked: 0, unchanged: 0, cases_without_identity: cases_without_identity)
+      result = Result.new(added: 0, reinstated: 0, revoked: 0, expired: 0, unchanged: 0, cases_without_identity: cases_without_identity)
 
       existing = Ban.ucat.includes(:ban_emails, :ban_slack_ids).to_a
       by_identifier = existing.each_with_object({}) { |ban, index| identifiers_of(ban).each { index[_1] = ban } }
@@ -133,7 +167,7 @@ module Bans
 
     private
 
-    # => [[Person, ...], count of qualifying cases with neither email nor Slack ID]
+    # => [[Person, ...], count of in-force cases with neither email nor Slack ID]
     def fetch_people
       cases = []
       without_identity = 0
@@ -144,7 +178,7 @@ module Bans
 
         page.fetch("records").each do |record|
           fields = record.fetch("fields", {})
-          next unless self.class.qualifies?(fields)
+          next unless self.class.ban_case?(fields)
 
           identifiers = identifiers_from(fields)
           if identifiers.any?
@@ -153,7 +187,7 @@ module Bans
             # record id, so mixed types would make the sort in
             # group_into_people raise.
             cases << { id: (fields[ID_FIELD].presence || record["id"]).to_s, record_id: record["id"], until: self.class.action_until(fields), identifiers: identifiers }
-          else
+          elsif self.class.qualifies?(fields)
             without_identity += 1
           end
         end
@@ -213,23 +247,34 @@ module Bans
       }
 
       if ban.nil?
+        # A ban that's already over isn't mirrored as an expired row.
+        return unless person.in_force?
+
         Ban.create!(source: :ucat, **attributes,
           ban_emails: person.emails.map { BanEmail.new(email: _1) }, ban_slack_ids: person.slack_ids.map { BanSlackId.new(slack_id: _1) })
         result.added += 1
         return
       end
 
-      # A matched person always qualifies now, so after this the ban is in
-      # force. If it wasn't before (revoked by an earlier sync, or a temp ban
-      # that had run out before UCAT extended it) that's a reinstatement, and
-      # the run should say so rather than file it under "unchanged".
-      reinstating = !ban.active? && ban.revoked_by_id.nil?
+      # A person in force who wasn't banned before (revoked by an earlier
+      # sync, or a temp ban that had run out before UCAT extended it) is a
+      # reinstatement, and the run should say so rather than file it under
+      # "unchanged". One whose cases have all ended keeps the row, now with
+      # the passed end date, so it lapses as Expired rather than Revoked.
+      was_active = ban.active?
+      reinstating = person.in_force? && !was_active && ban.revoked_by_id.nil?
       sync_identifiers(ban, person.emails, person.slack_ids)
       ban.assign_attributes(attributes)
       ban.revoked_at = nil if reinstating
       ban.save! if ban.changed?
 
-      reinstating ? result.reinstated += 1 : result.unchanged += 1
+      if reinstating
+        result.reinstated += 1
+      elsif was_active && !ban.active?
+        result.expired += 1
+      else
+        result.unchanged += 1
+      end
     end
 
     def sync_identifiers(ban, emails, slack_ids)
