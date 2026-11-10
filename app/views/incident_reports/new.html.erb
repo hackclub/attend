@@ -25,22 +25,77 @@
     </p>
   </div>
 
-  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
-    <div class="flex items-start gap-3 grow">
-      <svg class="w-5 h-5 shrink-0 text-amber-600 mt-0.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-        <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 5a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 5Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd" />
-      </svg>
-      <p class="text-sm text-amber-900">
-        <strong class="font-semibold">This form is not for support tickets.</strong>
-        If you need help with registration, travel, waivers, or anything else about your event,
-        please email our support team instead — reports filed here go to our incident response team.
-      </p>
+  <%# People skim past warning banners, so the form stays hidden until they say
+      what they need. A re-render after a failed submit skips the question:
+      they already answered it. Without JS the noscript style shows the form. %>
+  <% support_mailto = "mailto:attend@hackclub.com?subject=#{ERB::Util.url_encode("Support request")}" %>
+  <% skip_gate = request.post? %>
+
+  <section data-incident-report-target="gate"
+           aria-labelledby="incident-gate-heading"
+           class="mb-6 <%= "hidden" if skip_gate %>">
+    <h2 id="incident-gate-heading" class="text-lg font-semibold text-(--text-strong) mb-3">What do you need?</h2>
+    <div class="grid gap-3 sm:grid-cols-2">
+      <button type="button"
+              data-action="incident-report#chooseReport"
+              aria-controls="incident-report-section"
+              class="flex flex-col justify-start text-left border-2 border-gray-200 hover:border-red-400 rounded-lg p-4 bg-white transition-colors cursor-pointer">
+        <span class="block font-semibold text-gray-900">Report a safety concern</span>
+        <span class="block mt-1 text-sm text-gray-600">
+          Something unsafe, harmful, or inappropriate happened: someone's conduct, a medical
+          issue, or a concern about Hack Club staff.
+        </span>
+      </button>
+      <button type="button"
+              data-action="incident-report#chooseSupport"
+              aria-controls="incident-support-panel"
+              class="flex flex-col justify-start text-left border-2 border-gray-200 hover:border-blue-400 rounded-lg p-4 bg-white transition-colors cursor-pointer">
+        <span class="block font-semibold text-gray-900">Get help with my event</span>
+        <span class="block mt-1 text-sm text-gray-600">
+          Registration, travel, waivers, tickets, your account, or any other question.
+        </span>
+      </button>
     </div>
-    <a href="mailto:attend@hackclub.com?subject=<%= ERB::Util.url_encode("Support request") %>"
-       class="shrink-0 self-start sm:self-auto inline-flex items-center text-sm bg-white border border-amber-300 hover:border-amber-400 text-amber-900 font-medium px-3 py-1.5 rounded-lg transition-colors">
-      Get Support →
-    </a>
-  </div>
+
+    <div id="incident-support-panel"
+         data-incident-report-target="supportPanel"
+         tabindex="-1"
+         class="hidden mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900 space-y-3">
+      <p>
+        <strong class="font-semibold">This form can't help with that.</strong>
+        It only goes to our incident response team. Email our support team and they'll
+        sort you out.
+      </p>
+      <div class="flex flex-wrap items-center gap-3">
+        <a href="<%= support_mailto %>"
+           class="inline-flex items-center portal-btn-primary font-semibold px-4 py-2 rounded-lg">
+          Email support →
+        </a>
+        <button type="button"
+                data-action="incident-report#chooseReport"
+                class="underline text-blue-900 cursor-pointer">
+          Actually, I need to report a safety concern
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <noscript>
+    <style>
+      [data-incident-report-target~="gate"] { display: none !important; }
+      [data-incident-report-target~="reportSection"] { display: block !important; }
+    </style>
+  </noscript>
+
+  <div id="incident-report-section"
+       data-incident-report-target="reportSection"
+       class="<%= "hidden" unless skip_gate %>">
+
+  <p class="text-sm text-gray-600 mb-6">
+    Not a safety concern? This form only reaches our incident response team.
+    For registration, travel, waivers, or other questions,
+    <a href="<%= support_mailto %>" class="portal-link">email support</a>.
+  </p>
 
   <% unless user_signed_in? %>
     <div class="flex items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-6">
@@ -220,6 +275,21 @@
              data-action="<%= IncidentReportsController::TURNSTILE_ACTION %>"></div>
       <% end %>
 
+      <%# Aimed at support requests and bad-faith reports. The second sentence
+          matters: a young person unsure whether something "counts" must not
+          be scared off reporting it. %>
+      <div class="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-900 space-y-1">
+        <p>
+          <strong class="font-semibold">This form is for safety concerns only.</strong>
+          Using it for support requests, or filing false or bad-faith reports, can lead to a
+          permanent ban from all Hack Club events.
+        </p>
+        <p>
+          If you're not sure whether something counts, report it anyway. Nobody gets in trouble
+          for raising a genuine concern.
+        </p>
+      </div>
+
       <div>
         <%= f.submit "Submit report",
               data: { incident_report_target: "submit" },
@@ -227,6 +297,7 @@
       </div>
     </div>
   <% end %>
+  </div>
 </div>
 
 <% if TurnstileVerifier.site_key.present? && !user_signed_in? %>

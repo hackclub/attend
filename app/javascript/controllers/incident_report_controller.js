@@ -2,20 +2,27 @@ import { Controller } from "@hotwired/stimulus"
 
 // Persists the incident form across an OAuth login round-trip (via localStorage),
 // prompts HQ/Participant reporters to log in, and validates attachment sizes client-side.
+// The form sits behind a "what do you need?" question so support requests get sent
+// to support before anyone starts typing a report.
 export default class extends Controller {
   static targets = [
     "persist", "role", "loginPrompt", "fileInput", "fileError",
     "incidentType", "medicalQuestion", "emergencyServices", "priority", "priorityLock",
-    "eventSelect"
+    "eventSelect", "gate", "supportPanel", "reportSection"
   ]
   static values = { signedIn: Boolean }
 
   static STORAGE_KEY = "incident_report_draft"
+  static CHOICE_KEY = "incident_report_choice"
   static MAX_FILE_BYTES = 25 * 1024 * 1024
   static MAX_FILE_COUNT = 10
   static PROMPT_ROLES = ["hq_employee", "participant"]
 
   connect() {
+    // They already chose to report in this tab (e.g. coming back from the
+    // Hack Club login), so don't ask again. Not keyed off the draft: connect()
+    // saves prefilled identity fields, so signed-in users always have one.
+    if (this.choseReportThisSession()) this.showReport({ focus: false })
     this.restore()
     this.persistTargets.forEach((el) => {
       el.addEventListener("input", () => this.save())
@@ -24,6 +31,40 @@ export default class extends Controller {
     this.roleChanged()
     this.eventChanged()
     this.incidentTypeChanged()
+  }
+
+  chooseReport() {
+    try {
+      sessionStorage.setItem(this.constructor.CHOICE_KEY, "report")
+    } catch (_e) {
+      // ignore storage failures (private mode, quota)
+    }
+    this.showReport({ focus: true })
+  }
+
+  chooseSupport() {
+    if (!this.hasSupportPanelTarget) return
+    this.supportPanelTarget.classList.remove("hidden")
+    this.supportPanelTarget.focus()
+  }
+
+  showReport({ focus }) {
+    if (!this.hasReportSectionTarget) return
+    if (this.hasGateTarget) this.gateTarget.classList.add("hidden")
+    this.reportSectionTarget.classList.remove("hidden")
+    if (focus) {
+      const first = this.reportSectionTarget.querySelector("input:not([type=hidden]), select, textarea")
+      this.reportSectionTarget.scrollIntoView({ block: "start" })
+      first?.focus({ preventScroll: true })
+    }
+  }
+
+  choseReportThisSession() {
+    try {
+      return sessionStorage.getItem(this.constructor.CHOICE_KEY) === "report"
+    } catch (_e) {
+      return false
+    }
   }
 
   // Emergency priority is only offered for current/recent events (not custom/old ones).
