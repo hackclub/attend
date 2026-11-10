@@ -13,6 +13,11 @@
 // Both return a position to send the player back to, or null.
 export const MAX_RATE = 2
 
+// How close to the advertised length counts as the end. Players stop short of
+// it — YouTube by a second or more — so the last stretch is never played.
+// Matches TrainingVideoView::END_TOLERANCE_SECONDS.
+export const END_TOLERANCE = 3
+
 // How far past the frontier the playhead may sit before it's sent back: covers
 // the gap between ticks and keyframe-aligned seeks, and nothing more.
 const TOLERANCE = 0.5
@@ -49,8 +54,10 @@ export class WatchFrontier {
     return position > this.furthest + TOLERANCE ? this.furthest : null
   }
 
-  // At the end of the video, the last stretch may not have been ticked yet.
+  // When the player says the video ended: the last stretch may not have been
+  // ticked yet, and the player may have stopped short of the length it
+  // advertised.
   finish(duration) {
-    if (duration && this.furthest >= duration - TOLERANCE * 2) this.furthest = duration
+    if (duration && this.furthest >= duration - END_TOLERANCE) this.furthest = duration
   }
 }

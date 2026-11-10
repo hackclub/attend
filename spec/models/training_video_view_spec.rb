@@ -35,6 +35,30 @@ RSpec.describe TrainingVideoView do
     expect(view).to be_completed
   end
 
+  # Regression: YouTube's player ended a 524s video at 522.9s, just outside a
+  # 1s tolerance, leaving the learner at "99% watched" with the quiz locked.
+  it "completes when the player stops a little short of the advertised length" do
+    lesson.update!(video_duration_seconds: 524)
+    view.record_heartbeat!(position: 522.9, now: start + 530)
+    expect(view).to be_completed
+  end
+
+  it "still wants more than a few seconds off the end" do
+    lesson.update!(video_duration_seconds: 524)
+    view.record_heartbeat!(position: 515, now: start + 530)
+    expect(view).not_to be_completed
+  end
+
+  it "settles a view that reached the end under a tighter tolerance" do
+    view.update!(duration_seconds: 524, watched_seconds: 522.9)
+    expect(view.settle!).to be_completed
+  end
+
+  it "leaves an unfinished view alone when settling" do
+    view.update!(duration_seconds: 524, watched_seconds: 300)
+    expect(view.settle!).not_to be_completed
+  end
+
   it "never moves backwards" do
     view.record_heartbeat!(position: 20, now: start + 20)
     view.record_heartbeat!(position: 3, now: start + 25)

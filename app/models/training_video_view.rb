@@ -9,9 +9,11 @@ class TrainingVideoView < ApplicationRecord
   self.implicit_order_column = "created_at"
 
   MAX_PLAYBACK_RATE = 2.0
-  # Close enough to the end to count as watched: the last frame often never
-  # fires a timeupdate.
-  END_TOLERANCE_SECONDS = 1.0
+  # Close enough to the end to count as watched. Players stop short of the
+  # length the host advertises: YouTube's API rounds a video's length up to a
+  # whole second and its player can end a second or more before that, so a
+  # 1s tolerance left learners at "99% watched" with the quiz locked.
+  END_TOLERANCE_SECONDS = 3.0
 
   belongs_to :enrollment, class_name: "TrainingEnrollment", foreign_key: :training_enrollment_id
   belongs_to :lesson, class_name: "TrainingLesson", foreign_key: :training_lesson_id
@@ -41,6 +43,14 @@ class TrainingVideoView < ApplicationRecord
       self.completed_at ||= now if finished?
       save!
     end
+    self
+  end
+
+  # Closes a view that already reached the end but was never marked: one that
+  # stopped just short under an older, tighter tolerance. Called when the
+  # lesson page loads, so nobody has to rewatch anything.
+  def settle!
+    update!(completed_at: Time.current) if !completed? && finished?
     self
   end
 

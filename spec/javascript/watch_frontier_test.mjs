@@ -91,6 +91,12 @@ test("rounds up to the end only when it's genuinely reached", () => {
   near.finish(60)
   assert.equal(near.furthest, 60)
 
+  // Regression: YouTube ended a 524s video at 522.9s, which a 1s tolerance
+  // left stuck at "99% watched" with the quiz locked.
+  const short = new WatchFrontier(522.9, 0)
+  short.finish(524)
+  assert.equal(short.furthest, 524)
+
   const far = new WatchFrontier(40, 0)
   far.finish(60)
   assert.equal(far.furthest, 40)
