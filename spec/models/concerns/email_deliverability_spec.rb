@@ -64,4 +64,29 @@ RSpec.describe EmailDeliverability do
       expect(participant.reload.email_undeliverable_at).to be_present
     end
   end
+
+  describe "address shape" do
+    it "rejects an address whose domain has no top-level part, which Postmark refuses" do
+      participant = build(:participant, email: "someone@nowhere")
+      guardian = build(:guardian, email: "someone@nowhere")
+
+      expect(participant).not_to be_valid
+      expect(participant.errors.details[:email]).to eq([ { error: :invalid } ])
+      expect(guardian).not_to be_valid
+    end
+
+    it "accepts ordinary, subdomain and internationalised domains" do
+      %w[someone@example.com someone@mail.example.co.uk someone@example.xn--p1ai].each do |address|
+        expect(build(:participant, email: address)).to be_valid, address
+      end
+    end
+
+    it "leaves an existing row with a bad address editable until the address itself changes" do
+      participant = create(:participant)
+      participant.update_column(:email, "someone@nowhere")
+
+      expect(participant.reload.update(preferred_name: "Sky")).to be(true)
+      expect(participant.update(email: "someone@elsewhere")).to be(false)
+    end
+  end
 end
