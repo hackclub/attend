@@ -85,6 +85,29 @@
           <% end %>
         <% end %>
       </div>
+
+      <div class="<%= row_divider %>">
+        <%= form_with url: update_twilio_verify_admin_settings_path, method: :post, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+          <%= cs_field id: "twilio_verify_service_sid", label: "Verify service SID", optional: true,
+                description: "The Twilio Verify service that sends guardian portal sign-in codes. Without it, guardians can only sign in by email.",
+                constraint: "Starts with VA. Find it under Verify → Services in the Twilio console." do |aria| %>
+            <%= f.text_field :twilio_verify_service_sid,
+                  value: @twilio_verify_service_sid,
+                  autocomplete: "off", spellcheck: false,
+                  class: "cs-input max-w-md font-mono", **aria %>
+          <% end %>
+          <div class="cs-option mt-3">
+            <%= f.check_box :twilio_verify_whatsapp, { checked: @twilio_verify_whatsapp } %>
+            <div>
+              <%= f.label :twilio_verify_whatsapp, "Send codes on WhatsApp outside the US and Canada", class: "cs-option-label" %>
+              <p class="cs-option-description">Numbers that don't start with +1 get their code on WhatsApp, with a link to get it by text instead. Needs a WhatsApp sender attached to the Verify service.</p>
+            </div>
+          </div>
+          <div class="mt-3">
+            <%= f.button "Save", class: "cs-btn" %>
+          </div>
+        <% end %>
+      </div>
     </div>
   </section>
 

@@ -77,33 +77,73 @@ RSpec.describe "Guardian portal center", type: :request do
       expect(flash[:alert]).to include("valid email address or phone number")
     end
 
-    it "rejects phone numbers when SMS is unavailable" do
+    it "rejects phone numbers when Twilio Verify is unavailable" do
       request_code("+12025550123")
 
       expect(response).to redirect_to(guardian_portal_center_path)
-      expect(flash[:alert]).to include("SMS verification isn't available")
+      expect(flash[:alert]).to include("Phone verification isn't available")
     end
 
-    context "when Twilio is enabled" do
-      before do
-        allow(Setting).to receive(:twilio_enabled?).and_return(true)
-        allow_any_instance_of(TwilioService).to receive(:configured?).and_return(true)
-      end
+    context "when Twilio Verify is available" do
+      before { allow(TwilioVerifyService).to receive(:available?).and_return(true) }
 
-      it "texts a code when the phone number matches a guardian" do
+      it "starts an SMS verification when the phone number matches a guardian" do
         expect {
           request_code("+12025550123")
-        }.to have_enqueued_job(SendGuardianPortalCodeSmsJob).with("+12025550123", "123456")
+        }.to have_enqueued_job(StartGuardianPortalVerificationJob).with("+12025550123", "sms")
 
         expect(response).to redirect_to(guardian_portal_center_verify_path)
       end
 
-      it "sends no SMS for an unknown phone number" do
+      it "starts nothing for an unknown phone number but responds identically" do
         expect {
           request_code("+12025559999")
-        }.not_to have_enqueued_job(SendGuardianPortalCodeSmsJob)
+        }.not_to have_enqueued_job(StartGuardianPortalVerificationJob)
 
         expect(response).to redirect_to(guardian_portal_center_verify_path)
+      end
+
+      context "with WhatsApp switched on" do
+        before do
+          allow(Setting).to receive(:twilio_verify_whatsapp?).and_return(true)
+          guardian.update!(phone: "+447911123456")
+        end
+
+        it "sends the code on WhatsApp to a number outside +1 and offers a text instead" do
+          expect {
+            request_code("+447911123456")
+          }.to have_enqueued_job(StartGuardianPortalVerificationJob).with("+447911123456", "whatsapp")
+
+          follow_redirect!
+          expect(response.body).to include("Check your WhatsApp")
+          expect(response.body).to include("Text me the code instead")
+        end
+
+        it "shows the same WhatsApp page for a number we don't hold" do
+          request_code("+447911123999")
+          follow_redirect!
+
+          expect(response.body).to include("Check your WhatsApp")
+        end
+
+        it "texts the code when the guardian asks for SMS" do
+          request_code("+447911123456")
+
+          expect {
+            post guardian_portal_center_request_code_path, params: { contact: "+447911123456", channel: "sms" }
+          }.to have_enqueued_job(StartGuardianPortalVerificationJob).with("+447911123456", "sms")
+
+          follow_redirect!
+          expect(response.body).to include("Check your messages")
+        end
+
+        it "keeps +1 numbers on SMS" do
+          guardian.update!(phone: "+12025550123")
+
+          expect {
+            request_code("+12025550123")
+          }.to have_enqueued_job(StartGuardianPortalVerificationJob).with("+12025550123", "sms")
+        end
       end
     end
   end
@@ -150,6 +190,37 @@ RSpec.describe "Guardian portal center", type: :request do
     end
   end
 
+  describe "verifying a phone code" do
+    before { allow(TwilioVerifyService).to receive(:available?).and_return(true) }
+
+    it "rejects a code Twilio Verify doesn't approve" do
+      allow_any_instance_of(TwilioVerifyService).to receive(:check).and_return(false)
+
+      verify_as("+12025550123", code: "000000")
+
+      expect(response).to redirect_to(guardian_portal_center_verify_path)
+      expect(flash[:alert]).to include("doesn't match")
+    end
+
+    it "never asks Twilio about a number no code was sent to" do
+      expect_any_instance_of(TwilioVerifyService).not_to receive(:check)
+
+      verify_as("+12025559999")
+
+      expect(flash[:alert]).to include("doesn't match")
+    end
+
+    it "asks the guardian to retry when Twilio Verify errors" do
+      allow_any_instance_of(TwilioVerifyService).to receive(:check)
+        .and_raise(TwilioVerifyService::Error, "Twilio Verify error 20003: Authenticate")
+
+      verify_as("+12025550123")
+
+      expect(response).to redirect_to(guardian_portal_center_verify_path)
+      expect(flash[:alert]).to include("couldn't check that code")
+    end
+  end
+
   describe "portals overview" do
     it "requires verification" do
       get guardian_portal_center_portals_path
@@ -191,8 +262,9 @@ RSpec.describe "Guardian portal center", type: :request do
     end
 
     it "matches guardians by verified phone number" do
-      allow(Setting).to receive(:twilio_enabled?).and_return(true)
-      allow_any_instance_of(TwilioService).to receive(:configured?).and_return(true)
+      allow(TwilioVerifyService).to receive(:available?).and_return(true)
+      allow_any_instance_of(TwilioVerifyService).to receive(:check)
+        .with(to: "+12025550123", code: "123456").and_return(true)
 
       verify_as("+12025550123")
       follow_redirect!

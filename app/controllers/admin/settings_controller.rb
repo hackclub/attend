@@ -4,11 +4,14 @@ module Admin
     before_action :require_global_admin
 
     SLACK_CHANNEL_ID = /\A[CG][A-Z0-9]+\z/
+    TWILIO_VERIFY_SERVICE_SID = /\AVA[0-9a-f]{32}\z/
 
     def show
       @maintenance_mode = Setting.maintenance_mode?
       @twilio_enabled = Setting.twilio_enabled?
       @twilio_from_number = Setting.twilio_from_number
+      @twilio_verify_service_sid = Setting.twilio_verify_service_sid
+      @twilio_verify_whatsapp = Setting.twilio_verify_whatsapp?
       @waiver_sending_paused = Setting.waiver_sending_paused?
       @support_sms_notifications_enabled = Setting.support_sms_notifications_enabled?
       @support_sms_notification_numbers = Setting.support_sms_notification_number_list
@@ -49,6 +52,19 @@ module Admin
     def update_twilio_from_number
       Setting.twilio_from_number = params[:twilio_from_number]
       redirect_to admin_settings_path, notice: "Twilio phone number updated."
+    end
+
+    def update_twilio_verify
+      sid = params[:twilio_verify_service_sid].to_s.strip
+
+      if sid.present? && !sid.match?(TWILIO_VERIFY_SERVICE_SID)
+        redirect_to admin_settings_path, alert: "That doesn't look like a Verify service SID. It should start with VA."
+        return
+      end
+
+      Setting.twilio_verify_service_sid = sid
+      Setting.twilio_verify_whatsapp = params[:twilio_verify_whatsapp] == "1"
+      redirect_to admin_settings_path, notice: "Twilio Verify settings updated."
     end
 
     def toggle_waiver_sending

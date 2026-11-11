@@ -31,20 +31,29 @@ class GuardianPortalCenterController < ApplicationController
       redirect_to guardian_portal_center_path, alert: "Please enter a valid email address or phone number (including country code, e.g. +1 555 555 5555)." and return
     end
 
-    if contact_type == "phone" && !sms_available?
-      redirect_to guardian_portal_center_path, alert: "SMS verification isn't available right now — please use your email address instead." and return
+    if contact_type == "phone" && !TwilioVerifyService.available?
+      redirect_to guardian_portal_center_path, alert: "Phone verification isn't available right now — please use your email address instead." and return
     end
 
-    code = SecureRandom.random_number(1_000_000).to_s.rjust(6, "0")
-    session[:gpc_verification] = {
-      "digest" => Digest::SHA256.hexdigest(code),
+    pending = {
       "contact_type" => contact_type,
       "contact_value" => contact_value,
       "expires_at" => CODE_VALIDITY.from_now.to_i,
       "attempts" => 0
     }
 
-    deliver_code(contact_type, contact_value, code)
+    if contact_type == "email"
+      code = SecureRandom.random_number(1_000_000).to_s.rjust(6, "0")
+      pending["digest"] = Digest::SHA256.hexdigest(code)
+      pending["sent"] = deliver_email_code(contact_value, code)
+    else
+      # The channel depends only on the number and the admin setting, never on
+      # whether we hold it, so it's safe to show on the next page.
+      pending["channel"] = params[:channel] == "sms" ? "sms" : TwilioVerifyService.default_channel_for(contact_value)
+      pending["sent"] = start_phone_verification(contact_value, pending["channel"])
+    end
+
+    session[:gpc_verification] = pending
 
     redirect_to guardian_portal_center_verify_path
   end
@@ -79,7 +88,14 @@ class GuardianPortalCenterController < ApplicationController
 
     code = params[:code].to_s.gsub(/\D/, "")
 
-    unless code.present? && ActiveSupport::SecurityUtils.secure_compare(Digest::SHA256.hexdigest(code), pending["digest"].to_s)
+    begin
+      matched = code_matches?(pending, code)
+    rescue TwilioVerifyService::Error => e
+      Rails.logger.error("[GuardianPortalCenter] #{e.message}")
+      redirect_to guardian_portal_center_verify_path, alert: "We couldn't check that code just now. Please try again in a moment." and return
+    end
+
+    unless matched
       redirect_to guardian_portal_center_verify_path, alert: "That code doesn't match. Please check it and try again." and return
     end
 
@@ -174,24 +190,33 @@ class GuardianPortalCenterController < ApplicationController
 
   # Codes are only delivered when the contact matches a guardian on file, but
   # the response never says whether one matched — the portal center shouldn't
-  # be usable to probe which emails or phone numbers we hold.
-  def deliver_code(contact_type, contact_value, code)
-    guardian = if contact_type == "email"
-      Guardian.where("LOWER(email) = ?", contact_value).first
-    else
-      Guardian.find_by(phone: contact_value)
-    end
-    return unless guardian
+  # be usable to probe which emails or phone numbers we hold. Both return
+  # whether a code went out; that stays in the (encrypted) session.
+  def deliver_email_code(email, code)
+    guardian = Guardian.where("LOWER(email) = ?", email).first
+    return false unless guardian
 
-    if contact_type == "email"
-      GuardianMailer.portal_center_verification(email: contact_value, code: code, guardian: guardian).deliver_later
-    else
-      SendGuardianPortalCodeSmsJob.perform_later(contact_value, code)
-    end
+    GuardianMailer.portal_center_verification(email: email, code: code, guardian: guardian).deliver_later
+    true
   end
 
-  def sms_available?
-    Setting.twilio_enabled? && TwilioService.new.configured?
+  def start_phone_verification(phone, channel)
+    return false unless Guardian.exists?(phone: phone)
+
+    StartGuardianPortalVerificationJob.perform_later(phone, channel)
+    true
+  end
+
+  # Phone codes live in Twilio Verify. When nothing was sent there is no
+  # verification to check against, so skip the call and treat it as a miss.
+  def code_matches?(pending, code)
+    return false if code.blank? || !pending["sent"]
+
+    if pending["contact_type"] == "phone"
+      TwilioVerifyService.new.check(to: pending["contact_value"], code: code)
+    else
+      ActiveSupport::SecurityUtils.secure_compare(Digest::SHA256.hexdigest(code), pending["digest"].to_s)
+    end
   end
 
   # The Turnstile check gates the first code request in a session; resending a
