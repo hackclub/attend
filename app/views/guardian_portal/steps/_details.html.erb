@@ -25,7 +25,8 @@
 
         <div>
           <%= f.label :phone, label_text("Phone", required: true), class: "portal-label" %>
-          <%= f.telephone_field :phone, class: "portal-input", required: true, autocomplete: "tel" %>
+          <%= f.telephone_field :phone, class: "portal-input", required: true, autocomplete: "tel", aria: { describedby: "guardian-phone-contact-consent" } %>
+          <p id="guardian-phone-contact-consent" class="portal-hint text-sm mt-1">We may contact you about this event by text or WhatsApp.</p>
         </div>
       </div>
 

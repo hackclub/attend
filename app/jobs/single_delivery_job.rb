@@ -159,11 +159,17 @@ class SingleDeliveryJob < ApplicationJob
 
     sms_body = "#{truncated_body}\n\nView on Attend: #{message_url}"
 
-    sms_service = TwilioService.new
-    result = sms_service.send_sms(
+    result = TwilioService.new.send_message(
       to: phone,
-      body: sms_body,
-      source: "Broadcast message"
+      sms_body: sms_body,
+      whatsapp_template: WhatsappTemplates::BROADCAST,
+      whatsapp_variables: {
+        1 => WhatsappTemplates.variable(delivery.message.event.name),
+        2 => WhatsappTemplates.variable(plain_body),
+        3 => delivery.id
+      },
+      source: "Broadcast message",
+      message_delivery: delivery
     )
 
     if result[:skipped]

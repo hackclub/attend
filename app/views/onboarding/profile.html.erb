@@ -101,7 +101,8 @@
 
       <div>
         <%= f.label :phone, label_text("Phone Number", required: true), class: "portal-label" %>
-        <%= f.telephone_field :phone, class: "portal-input", required: true %>
+        <%= f.telephone_field :phone, class: "portal-input", required: true, aria: { describedby: "phone-contact-consent" } %>
+        <p id="phone-contact-consent" class="portal-hint text-sm mt-1">We may contact you about this event by text or WhatsApp.</p>
       </div>
 
       <div>

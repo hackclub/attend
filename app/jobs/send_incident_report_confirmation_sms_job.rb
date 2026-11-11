@@ -10,7 +10,12 @@ class SendIncidentReportConfirmationSmsJob < ApplicationJob
     report = IncidentReport.find(incident_report_id)
     return if report.reporter_phone.blank?
 
-    TwilioService.new.send_sms(to: report.reporter_phone, body: MESSAGE, source: "Incident reports")
+    TwilioService.new.send_message(
+      to: report.reporter_phone,
+      sms_body: MESSAGE,
+      whatsapp_template: WhatsappTemplates::INCIDENT_REPORT_RECEIVED,
+      source: "Incident reports"
+    )
   rescue TwilioService::Error => e
     Rails.logger.error("[IncidentReportSms] confirmation SMS failed for #{incident_report_id}: #{e.message}")
   end

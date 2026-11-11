@@ -22,6 +22,10 @@ module Support
 
       phone = PhoneNormalizer.normalize(from_raw)
       num_media = @payload["NumMedia"].to_i
+
+      # Tapping "Show it here" on a broadcast is answered automatically and
+      # shouldn't open a support ticket.
+      return if channel == "whatsapp" && phone.present? && Support::ShowFullBroadcast.call(phone:, payload: @payload)
       return unless phone.present? && (body.present? || num_media > 0)
 
       ticket = find_or_create_ticket(phone:, channel:, twilio_to: to_raw)
@@ -87,13 +91,14 @@ module Support
     BACKFILL_WINDOW = 7.days
     BACKFILL_LIMIT = 10
 
-    # When a reply opens a new ticket, pull in recent automated texts sent to
-    # this number so the agent can see what the person is responding to.
-    # Automated sends go out as plain SMS, so only SMS tickets get them.
+    # When a reply opens a new ticket, pull in recent automated messages sent
+    # to this number on the same channel, so the agent can see what the person
+    # is responding to.
     def backfill_automated_messages(ticket)
-      return unless ticket.sms?
+      return unless ticket.sms? || ticket.whatsapp?
 
       logs = AutomatedSmsLog.for_phone(ticket.phone_number)
+                            .where(channel: ticket.channel)
                             .where(sent_at: BACKFILL_WINDOW.ago..)
                             .order(sent_at: :desc)
                             .limit(BACKFILL_LIMIT)
@@ -109,7 +114,7 @@ module Support
         TicketMessage.create!(
           ticket: ticket,
           direction: "outbound",
-          channel: "sms",
+          channel: ticket.channel,
           automated: true,
           body: log.body,
           twilio_message_sid: log.twilio_sid,

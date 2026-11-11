@@ -107,6 +107,7 @@ class AuditLog < ApplicationRecord
     toggle_waiver_sending: "toggle_waiver_sending",
     update_twilio_from_number: "update_twilio_from_number",
     update_twilio_verify: "update_twilio_verify",
+    toggle_whatsapp: "toggle_whatsapp",
     update_admin_help_slack_channel: "update_admin_help_slack_channel",
     sync_admin_help_slack_channel: "sync_admin_help_slack_channel",
     update_org_support_slack_channel: "update_org_support_slack_channel",

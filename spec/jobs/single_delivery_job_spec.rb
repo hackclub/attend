@@ -117,4 +117,34 @@ RSpec.describe SingleDeliveryJob do
       expect(message.sent_count).to eq(1)
     end
   end
+
+  describe "text and WhatsApp deliveries" do
+    let(:twilio) { instance_double(TwilioService) }
+
+    before do
+      allow(TwilioService).to receive(:new).and_return(twilio)
+      allow(twilio).to receive(:send_message).and_return({ sid: "SM1", status: "queued", channel: "whatsapp" })
+      event.update!(name: "Example Hackathon")
+      message.update!(body: "<p>Doors open at 9am.</p>\n<p>Bring a charger.</p>")
+    end
+
+    it "sends the broadcast template with the event, a one-line preview and the delivery" do
+      delivery = message.message_deliveries.create!(
+        participant_event: create(:participant_event, event: event, status: :complete),
+        channel: "sms", recipient_phone: "+447911123456", status: :pending
+      )
+
+      described_class.perform_now(delivery_id: delivery.id)
+
+      expect(twilio).to have_received(:send_message).with(
+        to: "+447911123456",
+        sms_body: a_string_including("View on Attend:"),
+        whatsapp_template: WhatsappTemplates::BROADCAST,
+        whatsapp_variables: { 1 => "Example Hackathon", 2 => a_string_matching(/\ADoors open at 9am\. ?Bring a charger\.\z/), 3 => delivery.id },
+        source: "Broadcast message",
+        message_delivery: delivery
+      )
+      expect(delivery.reload).to have_attributes(status: "delivered", external_id: "SM1")
+    end
+  end
 end

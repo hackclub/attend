@@ -142,6 +142,37 @@ RSpec.describe "Admin::Settings", type: :request do
     end
   end
 
+  describe "WhatsApp switch" do
+    [ false, true ].each do |console|
+      it "shows the switch #{console ? "in the console" : "in the classic UI"}" do
+        global_admin.update!(admin_console_beta: console)
+        sign_in global_admin
+
+        get admin_settings_path
+
+        expect(response.body).to include("WhatsApp outside the US and Canada")
+      end
+    end
+
+    it "turns WhatsApp on and off" do
+      sign_in global_admin
+
+      post toggle_whatsapp_admin_settings_path
+      expect(Setting.whatsapp_enabled?).to be(true)
+
+      post toggle_whatsapp_admin_settings_path
+      expect(Setting.whatsapp_enabled?).to be(false)
+    end
+
+    it "denies non-global-admins" do
+      sign_in event_admin
+
+      post toggle_whatsapp_admin_settings_path
+
+      expect(Setting.whatsapp_enabled?).to be(false)
+    end
+  end
+
   describe "admin help Slack channel" do
     include ActiveJob::TestHelper
 
