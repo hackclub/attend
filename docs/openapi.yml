@@ -1676,8 +1676,9 @@ paths:
       x-mint:
         href: /api-reference/participants/minimal-roster
       description: >-
-        Identity-only roster (no sensitive PII), excluding withdrawn and
-        rejected registrations. Available to event API keys.
+        Identity-only roster (no sensitive PII) with each person's check-in
+        time, excluding withdrawn and rejected registrations. Available to
+        event API keys.
       parameters:
         - $ref: "#/components/parameters/EventId"
       responses:
@@ -3898,6 +3899,13 @@ components:
         last_name: { type: string, example: Doe }
         slack_user_id: { type: string, nullable: true }
         status: { $ref: "#/components/schemas/ParticipantStatus" }
+        checked_in_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            When they were first scanned at a check-in point, or null if they
+            haven't been.
 
     ScanContext:
       type: object
