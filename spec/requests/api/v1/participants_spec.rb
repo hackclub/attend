@@ -431,7 +431,7 @@ RSpec.describe "Api::V1::Participants", type: :request do
       { "Authorization" => "Bearer #{api_key}" }
     end
 
-    it "returns the registration id, email, name, Slack ID, and status only — nothing else" do
+    it "returns the registration id, email, name, Slack ID, status, and check-in time only — nothing else" do
       participant = create(:participant, email: "roster@example.com")
       pe = create(:participant_event, participant: participant, event: event)
 
@@ -445,8 +445,23 @@ RSpec.describe "Api::V1::Participants", type: :request do
         "first_name" => participant.legal_first_name,
         "last_name" => participant.legal_last_name,
         "slack_user_id" => participant.slack_user_id,
-        "status" => pe.status
+        "status" => pe.status,
+        "checked_in_at" => nil
       )
+    end
+
+    it "gives the earliest check-in scan as checked_in_at, ignoring other scans" do
+      pe = create(:participant_event, event: event)
+      check_in = event.scan_contexts.create!(name: "Check-in", checks_in: true)
+      lunch = event.scan_contexts.create!(name: "Lunch", checks_in: false)
+      pe.scans.create!(scan_context: lunch, user: admin, scanned_at: 3.hours.ago)
+      earliest = pe.scans.create!(scan_context: check_in, user: admin, scanned_at: 2.hours.ago)
+      pe.scans.create!(scan_context: check_in, user: admin, scanned_at: 1.hour.ago)
+
+      get "/api/v1/events/#{event.id}/participants/roster", headers: api_key_headers
+
+      entry = JSON.parse(response.body)["participants"].sole
+      expect(entry["checked_in_at"]).to eq(earliest.scanned_at.iso8601)
     end
 
     it "prefers the preferred name over the legal first name" do

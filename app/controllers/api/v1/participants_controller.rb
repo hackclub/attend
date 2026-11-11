@@ -279,7 +279,7 @@ module Api
       def roster
         participant_events = @event.participant_events
           .where.not(status: [ :withdrawn, :rejected ])
-          .includes(:participant)
+          .includes(:participant, scans: :scan_context)
 
         render json: {
           participants: participant_events.map { |pe|
@@ -294,7 +294,10 @@ module Api
               first_name: participant.preferred_name.presence || participant.legal_first_name,
               last_name: participant.legal_last_name,
               slack_user_id: participant.slack_user_id,
-              status: pe.status
+              status: pe.status,
+              # When they were first scanned in at a check-in point, so an
+              # integration can tell who actually showed up. A time, not PII.
+              checked_in_at: pe.check_in_time&.iso8601
             }
           },
           synced_at: Time.current.iso8601
