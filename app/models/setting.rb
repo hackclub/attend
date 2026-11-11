@@ -8,6 +8,8 @@ class Setting < ApplicationRecord
   MAINTENANCE_MODE = "maintenance_mode".freeze
   TWILIO_ENABLED = "twilio_enabled".freeze
   TWILIO_FROM_NUMBER = "twilio_from_number".freeze
+  TWILIO_VERIFY_SERVICE_SID = "twilio_verify_service_sid".freeze
+  TWILIO_VERIFY_WHATSAPP = "twilio_verify_whatsapp".freeze
   WAIVER_SENDING_PAUSED = "waiver_sending_paused".freeze
   INCIDENT_REPORTS_SLACK_CHANNEL_ID = "incident_reports_slack_channel_id".freeze
   INCIDENT_REPORTS_RESPONDER_USER_IDS = "incident_reports_responder_user_ids".freeze
@@ -51,6 +53,24 @@ class Setting < ApplicationRecord
 
     def twilio_from_number=(number)
       set(TWILIO_FROM_NUMBER, number.to_s.gsub(/\s/, ""))
+    end
+
+    def twilio_verify_service_sid
+      get(TWILIO_VERIFY_SERVICE_SID).presence
+    end
+
+    def twilio_verify_service_sid=(sid)
+      set(TWILIO_VERIFY_SERVICE_SID, sid.to_s.strip)
+    end
+
+    # Send verification codes to non-+1 numbers over WhatsApp instead of SMS.
+    # Needs a WhatsApp sender attached to the Verify service in Twilio.
+    def twilio_verify_whatsapp?
+      get(TWILIO_VERIFY_WHATSAPP) == "true"
+    end
+
+    def twilio_verify_whatsapp=(enabled)
+      set(TWILIO_VERIFY_WHATSAPP, enabled.to_s)
     end
 
     def waiver_sending_paused?

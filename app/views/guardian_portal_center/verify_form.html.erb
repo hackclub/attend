@@ -1,5 +1,6 @@
 <% content_for :title, "Enter your verification code – Attend" %>
 <% sent_to_phone = @pending&.dig("contact_type") == "phone" %>
+<% on_whatsapp = sent_to_phone && @pending&.dig("channel") == "whatsapp" %>
 
 <div class="w-full max-w-lg mx-auto">
   <%= render "shared/portal_masthead",
@@ -7,12 +8,12 @@
 
   <div class="mb-8">
     <h1 class="portal-title text-2xl mb-3">
-      Check your <%= sent_to_phone ? "messages" : "email" %>
+      Check your <%= on_whatsapp ? "WhatsApp" : (sent_to_phone ? "messages" : "email") %>
     </h1>
     <p class="portal-body text-lg">
       If any parent or guardian portals are linked to
       <strong class="portal-heading break-words"><%= @pending&.dig("contact_value") %></strong>,
-      we've just sent a 6-digit code there. It's good for 10 minutes.
+      we've just sent a 6-digit code there<%= " on WhatsApp" if on_whatsapp %>. It's good for 10 minutes.
     </p>
   </div>
 
@@ -32,6 +33,13 @@
     <%= form_with url: guardian_portal_center_request_code_path, method: :post do |f| %>
       <%= f.hidden_field :contact, value: @pending&.dig("contact_value") %>
       <button type="submit" class="portal-btn portal-btn-quiet">Send a new code</button>
+    <% end %>
+    <% if on_whatsapp %>
+      <%= form_with url: guardian_portal_center_request_code_path, method: :post do |f| %>
+        <%= f.hidden_field :contact, value: @pending&.dig("contact_value") %>
+        <%= f.hidden_field :channel, value: "sms" %>
+        <button type="submit" class="portal-btn portal-btn-quiet">Not on WhatsApp? Text me the code instead</button>
+      <% end %>
     <% end %>
     <%= link_to "Use a different email or phone number", guardian_portal_center_path, class: "portal-hint text-sm underline underline-offset-2" %>
   </div>

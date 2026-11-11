@@ -97,6 +97,28 @@
         </div>
       </div>
     </div>
+
+    <div class="p-6 border-t border-gray-200">
+      <h3 class="text-lg font-semibold">Twilio Verify</h3>
+      <p class="text-gray-600 text-sm mt-1 mb-3">
+        The Verify service that sends guardian portal sign-in codes (starts with VA). Without it, guardians can only sign in by email.
+      </p>
+      <%= form_with url: update_twilio_verify_admin_settings_path, method: :post, class: "space-y-3" do |f| %>
+        <%= f.text_field :twilio_verify_service_sid,
+              value: @twilio_verify_service_sid,
+              placeholder: "VA…",
+              autocomplete: "off", spellcheck: false,
+              class: "w-full max-w-md px-3 py-2 border border-gray-300 rounded-md text-sm font-mono focus:ring-2 focus:ring-[#ec3750] focus:border-[#ec3750]" %>
+        <label class="flex items-start gap-2 text-sm">
+          <%= f.check_box :twilio_verify_whatsapp, { checked: @twilio_verify_whatsapp, class: "mt-0.5" } %>
+          <span>
+            <span class="font-medium">Send codes on WhatsApp outside the US and Canada</span>
+            <span class="block text-gray-600">Numbers that don't start with +1 get their code on WhatsApp, with a link to get it by text instead. Needs a WhatsApp sender attached to the Verify service.</span>
+          </span>
+        </label>
+        <%= f.submit "Save", class: "px-4 py-2 bg-[#d42f46] hover:bg-[#b82840] text-white rounded-md font-medium transition-colors cursor-pointer" %>
+      <% end %>
+    </div>
   </div>
 
   <h2 class="text-xl font-bold mt-8 mb-4">Support Inbox Notifications</h2>

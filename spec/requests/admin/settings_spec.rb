@@ -85,6 +85,63 @@ RSpec.describe "Admin::Settings", type: :request do
     end
   end
 
+  describe "Twilio Verify settings" do
+    let(:service_sid) { "VA#{"0" * 32}" }
+
+    [ false, true ].each do |console|
+      it "renders the Verify fields #{console ? "in the console" : "in the classic UI"}" do
+        global_admin.update!(admin_console_beta: console)
+        Setting.twilio_verify_service_sid = service_sid
+        sign_in global_admin
+
+        get admin_settings_path
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include(service_sid)
+        expect(response.body).to include("Send codes on WhatsApp outside the US and Canada")
+      end
+    end
+
+    it "saves the service SID and WhatsApp switch" do
+      sign_in global_admin
+
+      post update_twilio_verify_admin_settings_path,
+        params: { twilio_verify_service_sid: " #{service_sid} ", twilio_verify_whatsapp: "1" }
+
+      expect(response).to redirect_to(admin_settings_path)
+      expect(Setting.twilio_verify_service_sid).to eq(service_sid)
+      expect(Setting.twilio_verify_whatsapp?).to be(true)
+    end
+
+    it "turns WhatsApp off when the box is unchecked" do
+      Setting.twilio_verify_whatsapp = true
+      sign_in global_admin
+
+      post update_twilio_verify_admin_settings_path,
+        params: { twilio_verify_service_sid: service_sid, twilio_verify_whatsapp: "0" }
+
+      expect(Setting.twilio_verify_whatsapp?).to be(false)
+    end
+
+    it "rejects something that isn't a Verify service SID" do
+      sign_in global_admin
+
+      post update_twilio_verify_admin_settings_path, params: { twilio_verify_service_sid: "MG#{"0" * 32}" }
+
+      expect(flash[:alert]).to include("Verify service SID")
+      expect(Setting.twilio_verify_service_sid).to be_nil
+    end
+
+    it "denies non-global-admins" do
+      sign_in event_admin
+
+      post update_twilio_verify_admin_settings_path, params: { twilio_verify_service_sid: service_sid }
+
+      expect(response).to redirect_to(admin_root_path)
+      expect(Setting.twilio_verify_service_sid).to be_nil
+    end
+  end
+
   describe "admin help Slack channel" do
     include ActiveJob::TestHelper
 
