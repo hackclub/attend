@@ -10,6 +10,7 @@ class Setting < ApplicationRecord
   TWILIO_FROM_NUMBER = "twilio_from_number".freeze
   TWILIO_VERIFY_SERVICE_SID = "twilio_verify_service_sid".freeze
   TWILIO_VERIFY_WHATSAPP = "twilio_verify_whatsapp".freeze
+  WHATSAPP_ENABLED = "whatsapp_enabled".freeze
   WAIVER_SENDING_PAUSED = "waiver_sending_paused".freeze
   INCIDENT_REPORTS_SLACK_CHANNEL_ID = "incident_reports_slack_channel_id".freeze
   INCIDENT_REPORTS_RESPONDER_USER_IDS = "incident_reports_responder_user_ids".freeze
@@ -71,6 +72,16 @@ class Setting < ApplicationRecord
 
     def twilio_verify_whatsapp=(enabled)
       set(TWILIO_VERIFY_WHATSAPP, enabled.to_s)
+    end
+
+    # Send automated messages to numbers outside +1 as WhatsApp templates,
+    # from the same number as SMS (twilio_from_number).
+    def whatsapp_enabled?
+      get(WHATSAPP_ENABLED) == "true"
+    end
+
+    def whatsapp_enabled=(enabled)
+      set(WHATSAPP_ENABLED, enabled.to_s)
     end
 
     def waiver_sending_paused?

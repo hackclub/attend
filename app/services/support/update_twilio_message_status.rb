@@ -16,6 +16,12 @@ module Support
 
       return unless message_sid.present?
 
+      begin
+        WhatsappSmsFallback.call(message_sid:, status:, error_code:)
+      rescue => e
+        Rails.logger.error("[Support::UpdateTwilioMessageStatus] fallback failed: #{e.class}: #{e.message}")
+      end
+
       message = TicketMessage.find_by(twilio_message_sid: message_sid)
       return unless message
 

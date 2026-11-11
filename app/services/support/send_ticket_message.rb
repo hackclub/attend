@@ -82,7 +82,7 @@ module Support
       end
 
       from = if @ticket.whatsapp?
-               "whatsapp:#{WHATSAPP_FROM_NUMBER}"
+               "whatsapp:#{@ticket.twilio_to_number.presence || WHATSAPP_FROM_NUMBER}"
       else
                @ticket.twilio_to_number || sms_from_number
       end

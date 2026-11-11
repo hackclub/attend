@@ -12,6 +12,7 @@ module Admin
       @twilio_from_number = Setting.twilio_from_number
       @twilio_verify_service_sid = Setting.twilio_verify_service_sid
       @twilio_verify_whatsapp = Setting.twilio_verify_whatsapp?
+      @whatsapp_enabled = Setting.whatsapp_enabled?
       @waiver_sending_paused = Setting.waiver_sending_paused?
       @support_sms_notifications_enabled = Setting.support_sms_notifications_enabled?
       @support_sms_notification_numbers = Setting.support_sms_notification_number_list
@@ -65,6 +66,14 @@ module Admin
       Setting.twilio_verify_service_sid = sid
       Setting.twilio_verify_whatsapp = params[:twilio_verify_whatsapp] == "1"
       redirect_to admin_settings_path, notice: "Twilio Verify settings updated."
+    end
+
+    def toggle_whatsapp
+      new_state = !Setting.whatsapp_enabled?
+      Setting.whatsapp_enabled = new_state
+
+      redirect_to admin_settings_path,
+        notice: "WhatsApp messages #{new_state ? 'enabled' : 'disabled'}."
     end
 
     def toggle_waiver_sending

@@ -542,6 +542,7 @@ Rails.application.routes.draw do
       post :toggle_twilio
       post :update_twilio_from_number
       post :update_twilio_verify
+      post :toggle_whatsapp
       post :toggle_waiver_sending
       post :toggle_support_sms
       post :update_support_sms_numbers

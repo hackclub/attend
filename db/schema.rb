@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_31_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_11_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -143,12 +143,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_31_120000) do
 
   create_table "automated_sms_logs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.text "body", null: false
+    t.string "channel", default: "sms", null: false
+    t.string "content_sid"
     t.datetime "created_at", null: false
+    t.string "error_code"
+    t.datetime "fell_back_at"
+    t.uuid "message_delivery_id"
     t.string "phone_number", null: false
     t.datetime "sent_at", null: false
+    t.text "sms_fallback_body"
     t.string "source"
     t.string "twilio_sid"
     t.datetime "updated_at", null: false
+    t.index ["message_delivery_id"], name: "index_automated_sms_logs_on_message_delivery_id"
     t.index ["phone_number", "sent_at"], name: "index_automated_sms_logs_on_phone_number_and_sent_at"
     t.index ["twilio_sid"], name: "index_automated_sms_logs_on_twilio_sid", unique: true, where: "(twilio_sid IS NOT NULL)"
   end
@@ -1745,6 +1752,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_31_120000) do
   add_foreign_key "airtable_connections", "users", column: "connected_by_id", on_delete: :nullify
   add_foreign_key "audit_logs", "events"
   add_foreign_key "audit_logs", "users", column: "actor_user_id"
+  add_foreign_key "automated_sms_logs", "message_deliveries", on_delete: :nullify
   add_foreign_key "badge_redirects", "users", on_delete: :nullify
   add_foreign_key "ban_emails", "bans"
   add_foreign_key "ban_slack_ids", "bans"

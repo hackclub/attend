@@ -26,8 +26,15 @@ class SendSupportTicketSmsNotificationJob < ApplicationJob
     body = "Attend: new support ticket from #{ticket.phone_number} via #{channel}: " \
            "\"#{preview(message)}\" #{ticket_url(ticket)}"
 
+    variables = {
+      1 => WhatsappTemplates.variable(ticket.phone_number),
+      2 => WhatsappTemplates.variable(channel),
+      3 => WhatsappTemplates.variable(preview(message)),
+      4 => ticket.id
+    }
+
     Setting.support_sms_notification_number_list.each do |number|
-      send_sms(to: number, body: body, ticket: ticket)
+      send_notification(to: number, body:, ticket:, template: WhatsappTemplates::SUPPORT_NEW_TICKET, variables:)
     end
   end
 
@@ -38,12 +45,24 @@ class SendSupportTicketSmsNotificationJob < ApplicationJob
 
     body = "Attend: new reply on your ticket ##{ticket.id[0..7]}: \"#{preview(message)}\" #{ticket_url(ticket)}"
 
-    send_sms(to: phone, body: body, ticket: ticket)
+    variables = {
+      1 => ticket.id[0..7],
+      2 => WhatsappTemplates.variable(preview(message)),
+      3 => ticket.id
+    }
+
+    send_notification(to: phone, body:, ticket:, template: WhatsappTemplates::SUPPORT_TICKET_REPLY, variables:)
     Rails.cache.write(throttle_key(ticket), true, expires_in: THROTTLE_WINDOW)
   end
 
-  def send_sms(to:, body:, ticket:)
-    TwilioService.new.send_sms(to: to, body: body, source: "Staff notifications")
+  def send_notification(to:, body:, ticket:, template:, variables:)
+    TwilioService.new.send_message(
+      to: to,
+      sms_body: body,
+      whatsapp_template: template,
+      whatsapp_variables: variables,
+      source: "Staff notifications"
+    )
   rescue TwilioService::Error => e
     Rails.logger.error("[SupportTicketSms] notification to #{to} failed for ticket #{ticket.id}: #{e.message}")
   end

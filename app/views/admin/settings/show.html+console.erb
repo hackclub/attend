@@ -87,6 +87,27 @@
       </div>
 
       <div class="<%= row_divider %>">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 class="cs-setting-title">WhatsApp outside the US and Canada</h3>
+            <p class="cs-setting-description">
+              Broadcasts, incident report texts and staff notifications go to numbers that don't start with +1
+              as WhatsApp messages from the number above. If WhatsApp fails, the message is sent as a text instead.
+            </p>
+          </div>
+          <div class="flex items-center gap-4 shrink-0">
+            <%= @whatsapp_enabled ? cs_status(:success, "Enabled") : cs_status(:stopped, "Disabled") %>
+            <%= button_to toggle_whatsapp_admin_settings_path,
+                  method: :post,
+                  class: "cs-btn",
+                  data: { turbo_confirm: @whatsapp_enabled ? "Stop sending WhatsApp messages? Everyone will get texts instead." : "Start sending WhatsApp messages to numbers outside the US and Canada?" } do %>
+              <%= @whatsapp_enabled ? 'Disable' : 'Enable' %>
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+      <div class="<%= row_divider %>">
         <%= form_with url: update_twilio_verify_admin_settings_path, method: :post, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
           <%= cs_field id: "twilio_verify_service_sid", label: "Verify service SID", optional: true,
                 description: "The Twilio Verify service that sends guardian portal sign-in codes. Without it, guardians can only sign in by email.",
