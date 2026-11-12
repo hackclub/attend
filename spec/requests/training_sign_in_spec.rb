@@ -46,6 +46,11 @@ RSpec.describe "Signing in to training with an emailed code", type: :request do
 
     sign_in_with_code("Volunteer@Example.com")
     expect(response).to redirect_to(training_course_path(course))
+    # Everyone gives their details first, then carries on to the course.
+    follow_redirect!
+    expect(response).to redirect_to(edit_training_profile_path)
+    patch training_profile_path, params: { training_profile: attributes_for(:training_profile) }
+    expect(response).to redirect_to(training_course_path(course))
     follow_redirect!
     expect(response).to have_http_status(:ok)
     expect(response.body).to include(course.title)
@@ -78,14 +83,32 @@ RSpec.describe "Signing in to training with an emailed code", type: :request do
   end
 
   it "keeps a code session to training" do
+    create(:training_profile, user: volunteer)
     sign_in_with_code(volunteer.email)
 
     get dashboard_path
+    expect(response).to redirect_to(training_path)
+    get dashboard_messages_path
+    expect(response).to redirect_to(training_path)
+    get dashboard_profile_path
+    expect(response).to redirect_to(training_path)
+    get incident_report_path
     expect(response).to redirect_to(training_path)
     get admin_root_path
     expect(response).to redirect_to(training_path)
     get training_path
     expect(response).to have_http_status(:ok)
+  end
+
+  it "only offers training in the header of a code session" do
+    create(:training_profile, user: volunteer)
+    sign_in_with_code(volunteer.email)
+
+    get training_path
+    header = Nokogiri::HTML(response.body).at_css("header")
+    links = header.css("a").map { |a| a["href"] }
+    expect(links).to include(training_path, edit_training_profile_path)
+    expect(links).not_to include(dashboard_path, dashboard_messages_path, dashboard_profile_path, incident_report_path, admin_root_path)
   end
 
   it "ends a code session once the person gets a role on an event" do

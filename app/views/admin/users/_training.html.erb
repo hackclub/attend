@@ -7,6 +7,14 @@
   <% if (disclosure = local_assigns[:disclosure]) %>
     <p class="px-6 py-3 border-b border-gray-100 text-sm">Safety review: <%= render "admin/training/disclosure_status", disclosure: disclosure %> <%= link_to "Open declaration", admin_training_disclosure_path(disclosure), class: "text-[#ec3750] hover:underline ml-2" %></p>
   <% end %>
+  <% if (profile = user.training_profile) %>
+    <dl class="px-6 py-4 border-b border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+      <div><dt class="text-gray-500">Full name</dt><dd class="text-gray-900"><%= profile.full_name %></dd></div>
+      <div><dt class="text-gray-500">Connection to the event</dt><dd class="text-gray-900"><%= profile.connection_label %>: <%= profile.connection_detail %></dd></div>
+      <div><dt class="text-gray-500">Phone</dt><dd><%= link_to profile.phone_display, "tel:#{profile.phone_number}", class: "text-[#ec3750] hover:underline" %></dd></div>
+      <div><dt class="text-gray-500">Mailing address</dt><dd class="text-gray-900"><%= safe_join(profile.address_lines, tag.br) %></dd></div>
+    </dl>
+  <% end %>
   <% if awards.empty? && enrollments.empty? && local_assigns[:disclosure].nil? %>
     <p class="px-6 py-6 text-sm text-gray-500">No training badges.</p>
   <% else %>

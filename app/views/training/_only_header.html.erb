@@ -1,0 +1,20 @@
+<%# The header for a session started with an emailed code (TrainingSignIn),
+    which can only reach /training: no dashboard, messages or profile. %>
+<% details_active = request.path.start_with?(edit_training_profile_path) %>
+<header class="bg-white shadow-sm border-b border-[#e0e6ed]">
+  <nav class="container mx-auto px-4 sm:px-6 lg:px-8" aria-label="Training">
+    <div class="flex flex-wrap justify-between items-center gap-x-4 gap-y-2 min-h-16 py-3">
+      <%= link_to training_path, class: "flex items-center gap-2.5", aria: { label: "Training home" } do %>
+        <img src="/icon-512.png" alt="" class="size-8">
+        <span class="text-xl font-bold text-[#1f2d3d]">Training</span>
+      <% end %>
+      <div class="flex items-center gap-1 sm:gap-3">
+        <%= link_to "Your details", edit_training_profile_path,
+              class: "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors #{details_active ? 'bg-[#ec3750]/10 text-[#ec3750]' : 'text-[#3c4858] hover:bg-[#f9fafc] hover:text-[#ec3750]'}",
+              aria: { current: ("page" if details_active) } %>
+        <span class="hidden sm:inline max-w-48 truncate text-sm text-[#8492a6]"><%= current_user.email %></span>
+        <%= button_to "Sign out", destroy_user_session_path, method: :delete, class: "px-3 py-1.5 text-sm font-medium text-[#8492a6] hover:text-[#ec3750] transition-colors" %>
+      </div>
+    </div>
+  </nav>
+</header>

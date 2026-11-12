@@ -15,6 +15,28 @@
       </p>
     </div>
   <% end %>
+  <% if (profile = user.training_profile) %>
+    <div class="cs-container-body border-b border-(--cs-border-divider-secondary)">
+      <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <dt class="cs-small cs-secondary">Full name</dt>
+          <dd><%= profile.full_name %></dd>
+        </div>
+        <div>
+          <dt class="cs-small cs-secondary">Connection to the event</dt>
+          <dd><%= profile.connection_label %>: <%= profile.connection_detail %></dd>
+        </div>
+        <div>
+          <dt class="cs-small cs-secondary">Phone</dt>
+          <dd><%= link_to profile.phone_display, "tel:#{profile.phone_number}", class: "cs-link" %></dd>
+        </div>
+        <div>
+          <dt class="cs-small cs-secondary">Mailing address</dt>
+          <dd><%= safe_join(profile.address_lines, tag.br) %></dd>
+        </div>
+      </dl>
+    </div>
+  <% end %>
   <% if awards.empty? && enrollments.empty? && local_assigns[:disclosure].nil? %>
     <div class="cs-empty"><p class="cs-empty-title">No training badges</p></div>
   <% else %>

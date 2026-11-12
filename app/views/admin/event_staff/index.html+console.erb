@@ -36,6 +36,7 @@
                 <td class="whitespace-nowrap">
                   <div><%= assignment.user.display_name_or_fallback %></div>
                   <div class="cs-small cs-secondary"><%= assignment.user.email %></div>
+                  <%= render "admin/event_staff/training_details", user: assignment.user %>
                 </td>
                 <%= render "admin/event_staff/role_cell", assignment: assignment %>
                 <td class="whitespace-nowrap"><%= training_status_flag(@training_status.for(assignment.user_id)) %></td>
@@ -87,6 +88,7 @@
                 <td class="whitespace-nowrap">
                   <div><%= user.display_name_or_fallback %></div>
                   <div class="cs-small cs-secondary"><%= user.email %></div>
+                  <%= render "admin/event_staff/training_details", user: user %>
                 </td>
                 <td class="whitespace-nowrap"><%= training_status_flag(@training_status.for(user.id)) %></td>
               </tr>
@@ -127,6 +129,7 @@
                 <td class="whitespace-nowrap">
                   <div><%= volunteer.user.display_name_or_fallback %></div>
                   <div class="cs-small cs-secondary"><%= volunteer.user.email %></div>
+                  <%= render "admin/event_staff/training_details", user: volunteer.user %>
                 </td>
                 <td class="whitespace-nowrap"><%= training_status_flag(@training_status.for(volunteer.user_id)) %></td>
                 <td class="whitespace-nowrap"><%= cs_relative_time(volunteer.created_at) %></td>

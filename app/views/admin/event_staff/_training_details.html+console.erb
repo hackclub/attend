@@ -1,0 +1,9 @@
+<%# How someone's connected to the event, from the details they gave before
+    training (TrainingProfile). Phone numbers stay with people who manage staff. %>
+<% profile = user.training_profile %>
+<% if profile %>
+  <div class="cs-small cs-secondary whitespace-normal"><%= profile.connection_label %>: <%= profile.connection_detail %></div>
+  <% if can_manage_staff? %>
+    <div class="cs-small cs-secondary"><%= link_to profile.phone_display, "tel:#{profile.phone_number}", class: "cs-link" %></div>
+  <% end %>
+<% end %>

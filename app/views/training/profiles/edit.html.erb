@@ -1,0 +1,104 @@
+<% content_for :title, "Your details – Training – Attend" %>
+<% first_time = @profile.new_record? %>
+<% required = tag.span("*", class: "portal-required", aria: { hidden: true }) %>
+
+<div class="w-full max-w-2xl mx-auto">
+  <% unless first_time %>
+    <%= link_to "← Training", training_path, class: "portal-link text-sm inline-block mb-6" %>
+  <% end %>
+
+  <%= form_with model: @profile, url: training_profile_path, method: :patch, scope: :training_profile,
+        class: "portal-card p-6 sm:p-8 space-y-5", data: { turbo: false, controller: "phone-input" } do |f| %>
+    <div>
+      <h1 class="portal-title text-2xl mb-2"><%= first_time ? "Before you start" : "Your details" %></h1>
+      <p class="portal-hint text-sm">
+        Everyone who works at a Hack Club event gives us these, so we know who's there and how to reach them.
+        Only Hack Club and the organizers of events you work can see them.
+      </p>
+      <% if @prefilled_from_hack_club %>
+        <p class="portal-hint text-sm mt-2">We've filled in what your Hack Club account has. Please check it's right.</p>
+      <% end %>
+    </div>
+
+    <% if @profile.errors.any? %>
+      <div class="portal-note portal-note-warn" role="alert">
+        <div class="text-sm portal-body">
+          <p class="font-semibold mb-1">Please fix these and try again:</p>
+          <ul class="list-disc pl-5">
+            <% @profile.errors.full_messages.each do |message| %>
+              <li><%= message %></li>
+            <% end %>
+          </ul>
+        </div>
+      </div>
+    <% end %>
+
+    <div>
+      <%= f.label :full_name, safe_join([ "Full name", required ], " "), class: "portal-label" %>
+      <%= f.text_field :full_name, class: "portal-input", required: true, autocomplete: "name", maxlength: 200 %>
+    </div>
+
+    <div>
+      <span class="portal-label">Email</span>
+      <p class="portal-body"><%= current_user.email %></p>
+      <p class="portal-hint text-sm mt-1">The address you signed in with.</p>
+    </div>
+
+    <fieldset class="space-y-4">
+      <legend class="portal-heading text-base mb-1">Your connection to the event</legend>
+      <div>
+        <%= f.label :connection_type, safe_join([ "You're there as", required ], " "), class: "portal-label" %>
+        <%= f.select :connection_type, TrainingProfile::CONNECTION_TYPES.invert, { include_blank: "Choose one" }, class: "portal-select", required: true %>
+      </div>
+      <div>
+        <%= f.label :connection_detail, safe_join([ "Tell us more", required ], " "), class: "portal-label" %>
+        <%= f.text_field :connection_detail, class: "portal-input", required: true, maxlength: 500,
+              aria: { describedby: "connection-detail-hint" } %>
+        <p id="connection-detail-hint" class="portal-hint text-sm mt-1">
+          Whose parent or guardian you are, which school you teach at, or which event you're helping run.
+        </p>
+      </div>
+    </fieldset>
+
+    <div>
+      <%= f.label :phone_number, safe_join([ "Phone number", required ], " "), class: "portal-label" %>
+      <%= f.telephone_field :phone_number, class: "portal-input", required: true, autocomplete: "tel" %>
+    </div>
+
+    <fieldset class="space-y-4" data-controller="address-autocomplete" data-address-autocomplete-fill-components-value="true">
+      <legend class="portal-heading text-base mb-1">Mailing address</legend>
+      <div>
+        <%= f.label :address_line_1, safe_join([ "Address line 1", required ], " "), class: "portal-label" %>
+        <%= f.text_field :address_line_1, class: "portal-input", required: true, autocomplete: "address-line1", data: { address_autocomplete_target: "input" } %>
+      </div>
+      <div>
+        <%= f.label :address_line_2, "Address line 2", class: "portal-label" %>
+        <%= f.text_field :address_line_2, class: "portal-input", autocomplete: "address-line2" %>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <%= f.label :city, safe_join([ "City", required ], " "), class: "portal-label" %>
+          <%= f.text_field :city, class: "portal-input", required: true, autocomplete: "address-level2", data: { address_autocomplete_target: "city" } %>
+        </div>
+        <div>
+          <%= f.label :state, "State / province / region", class: "portal-label" %>
+          <%= f.text_field :state, class: "portal-input", autocomplete: "address-level1", data: { address_autocomplete_target: "state" } %>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <%= f.label :postal_code, "Postal / ZIP code", class: "portal-label" %>
+          <%= f.text_field :postal_code, class: "portal-input", autocomplete: "postal-code", data: { address_autocomplete_target: "postalCode" } %>
+        </div>
+        <div>
+          <%= f.label :country, safe_join([ "Country", required ], " "), class: "portal-label" %>
+          <%= f.select :country, country_options_for_select(@profile.country, placeholder: false), { include_blank: "Select country" }, class: "portal-select", required: true, autocomplete: "country-name", data: { address_autocomplete_target: "country" } %>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="pt-2 flex justify-end">
+      <%= f.button first_time ? "Continue to training" : "Save details", type: "submit", class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+    </div>
+  <% end %>
+</div>

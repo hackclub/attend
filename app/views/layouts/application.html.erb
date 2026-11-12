@@ -40,13 +40,15 @@
         <%= button_to "Stop Impersonating", stop_impersonation_path, method: :delete, class: "ml-2 underline hover:no-underline font-semibold", style: "color: white;", form: { class: "inline" } %>
       </div>
     <% end %>
-    <% if user_signed_in? && user_needs_slack_link?(current_user) %>
+    <% if user_signed_in? && !training_only_session? && user_needs_slack_link?(current_user) %>
       <div class="text-center py-2 text-sm" style="background-color: #4A154B; color: #ffffff;">
         Link your Slack ID to receive updates sent from the event organizers.
         <%= link_to "Connect Slack", slack_oauth_url_for_user(current_user), class: "underline hover:no-underline font-semibold ml-1" %>
       </div>
     <% end %>
-    <% if user_signed_in? %>
+    <% if user_signed_in? && training_only_session? %>
+      <%= render "training/only_header" %>
+    <% elsif user_signed_in? %>
       <% unread_count = unread_messages_count(current_user) %>
       <header class="bg-white shadow-sm border-b border-[#e0e6ed]" data-controller="dropdown">
         <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
