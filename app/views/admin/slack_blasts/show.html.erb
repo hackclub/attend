@@ -3,10 +3,16 @@
     <%= link_to "← Back to Blast History", admin_event_slack_blasts_path(current_event), class: "text-gray-600 hover:text-gray-900" %>
   </div>
 
+  <%= render "admin/broadcast_reviews/status_banner", broadcastable: @slack_blast %>
+
   <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
     <div class="flex justify-between items-start mb-4">
       <h1 class="text-2xl font-bold">Slack Blast Details</h1>
       <% case @slack_blast.status %>
+      <% when "pending_review" %>
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800">Waiting for review</span>
+      <% when "rejected" %>
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-500">Rejected</span>
       <% when "pending" %>
         <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">Pending</span>
       <% when "in_progress" %>

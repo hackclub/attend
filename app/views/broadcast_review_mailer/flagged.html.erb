@@ -1,0 +1,16 @@
+<p>
+  A <%= @review.kind_label.downcase %> for <strong><%= @event.name %></strong>
+  <% if @sender %>from <strong><%= @sender.email %></strong><% end %>
+  was held before sending because it looks like
+  <strong><%= @review.category_labels.to_sentence.downcase %></strong>.
+</p>
+
+<p><%= @review.reason %></p>
+
+<blockquote style="margin: 16px 0; padding: 8px 12px; border-left: 3px solid #ccc; color: #444; white-space: pre-wrap;"><%= @excerpt %></blockquote>
+
+<p>Nothing goes out until someone approves it.</p>
+
+<p style="margin: 24px 0;">
+  <%= mail_button "Review it", @review_url %>
+</p>

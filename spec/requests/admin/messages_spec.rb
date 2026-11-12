@@ -119,12 +119,12 @@ RSpec.describe "Admin::Messages", type: :request do
       # Simulate a double-click: another request wins the row lock and sends
       # the message between this request's load and its send!.
       raced = false
-      allow_any_instance_of(Message).to receive(:send!).and_wrap_original do |original, *args|
+      allow_any_instance_of(Message).to receive(:send!).and_wrap_original do |original, *args, **kwargs|
         unless raced
           raced = true
           Message.find(original.receiver.id).send!
         end
-        original.call(*args)
+        original.call(*args, **kwargs)
       end
 
       expect {

@@ -1,0 +1,44 @@
+<div class="space-y-6">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Held Messages</h1>
+    <p class="text-sm text-gray-500">Messages and Slack blasts that looked like marketing, spam, or not about their event. Nothing here has been sent. Approve one to send it, or reject it to send it back to its author.</p>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg">
+    <div class="px-6 py-4 border-b border-gray-200">
+      <h2 class="text-lg font-semibold text-gray-900">Waiting for review (<%= @pending.size %>)</h2>
+    </div>
+    <% if @pending.empty? %>
+      <p class="px-6 py-8 text-center text-gray-500">Nothing is waiting for review.</p>
+    <% else %>
+      <ul class="divide-y divide-gray-100">
+        <% @pending.each do |review| %>
+          <li class="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-sm font-medium text-gray-900"><%= review.event.name %> · <%= review.kind_label %></div>
+              <div class="text-sm text-gray-500"><%= review.submitted_by_user&.email || "—" %> · <%= time_ago_in_words(review.created_at) %> ago</div>
+              <div class="text-sm text-gray-700 mt-1"><strong><%= review.category_labels.to_sentence %>:</strong> <%= review.reason %></div>
+            </div>
+            <%= link_to "Review", admin_broadcast_review_path(review), class: "px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] text-sm shrink-0" %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </div>
+
+  <% if @decided.any? %>
+    <div class="bg-white border border-gray-200 rounded-lg">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-lg font-semibold text-gray-900">Recently decided</h2>
+      </div>
+      <ul class="divide-y divide-gray-100">
+        <% @decided.each do |review| %>
+          <li class="px-6 py-3 text-sm">
+            <%= link_to "#{review.event.name} · #{review.kind_label}", admin_broadcast_review_path(review), class: "font-medium text-gray-900 hover:underline" %>
+            <span class="text-gray-500">— <%= review.status.humanize %><%= " by #{review.decided_by_user.email}" if review.decided_by_user %><%= ", #{time_ago_in_words(review.decided_at)} ago" if review.decided_at %></span>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+</div>

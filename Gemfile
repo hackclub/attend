@@ -68,6 +68,9 @@ gem "phonelib"
 # Twilio for SMS and WhatsApp
 gem "twilio-ruby"
 
+# Claude, for screening outgoing broadcasts (BroadcastScreener)
+gem "anthropic", "~> 2.8"
+
 # Rate limiting
 gem "rack-attack"
 

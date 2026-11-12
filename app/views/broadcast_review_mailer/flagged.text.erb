@@ -1,0 +1,11 @@
+A <%= @review.kind_label.downcase %> for <%= @event.name %><%= " from #{@sender.email}" if @sender %> was held before sending because it looks like <%= @review.category_labels.to_sentence.downcase %>.
+
+<%= @review.reason %>
+
+---
+<%= @excerpt %>
+---
+
+Nothing goes out until someone approves it.
+
+Review it: <%= @review_url %>

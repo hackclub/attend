@@ -6,7 +6,7 @@ class MessagesToolbox < ApplicationToolbox
     param :event_id, :string, "Event ID", optional: true
     param :event_slug, :string, "Event slug", optional: true
     param :status, :string, "Filter by status",
-      enum: %w[draft scheduled sending completed failed cancelled], optional: true
+      enum: %w[draft scheduled pending_review sending completed failed cancelled], optional: true
   end
   def index
     require_event!
@@ -44,9 +44,11 @@ class MessagesToolbox < ApplicationToolbox
       params.permit(:audience, :body, :subject, :scheduled_at, channels: []).to_h
     )
     @message.sent_by_user = current_user
-    @message.status = params[:scheduled_at].present? ? "scheduled" : "draft"
+    @message.status = "draft"
     @message.audience_filters = build_filters
     @message.save!
+    # Screened when scheduled, so a held message is reviewed before its time.
+    @message.schedule!(sender: current_user) if params[:scheduled_at].present?
     render json: serialize_message(@message, full: true)
     suggests :messages_send, "Send this draft once you've reviewed it"
   end
@@ -61,7 +63,13 @@ class MessagesToolbox < ApplicationToolbox
     unless @message.draft? || @message.scheduled?
       halt error: "Message is already #{@message.status}."
     end
-    halt error: "Message is already #{@message.status}." unless @message.send!
+    unless @message.send!(sender: current_user)
+      if @message.pending_review?
+        halt error: "Held for review: this message looks like it might be marketing, spam, or not about the event. " \
+          "A Hack Club admin has to approve it before it goes out."
+      end
+      halt error: "Message is already #{@message.status}."
+    end
     render json: serialize_message(@message, full: true)
   end
 

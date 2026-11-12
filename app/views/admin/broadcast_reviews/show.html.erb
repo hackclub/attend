@@ -1,0 +1,42 @@
+<% reviewable = @review.reviewable %>
+<div class="space-y-6">
+  <div>
+    <%= link_to "← Held messages", admin_broadcast_reviews_path, class: "text-sm text-gray-500 hover:text-gray-700" %>
+    <h1 class="text-2xl font-bold text-gray-900 mt-1">Held <%= @review.kind_label.downcase %></h1>
+    <p class="text-sm text-gray-500"><%= @review.event.name %> · from <%= @review.submitted_by_user&.email || "—" %></p>
+  </div>
+
+  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
+    <strong><%= @review.category_labels.to_sentence %>:</strong> <%= @review.reason %>
+    <span class="text-amber-700">(<%= @review.flagged_by == "model" ? "Claude" : "keyword rules" %>)</span>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-3">
+    <% if reviewable.is_a?(Message) %>
+      <p class="text-sm text-gray-500">To <%= reviewable.audience_label %> by <%= reviewable.channel_labels %></p>
+      <% if reviewable.subject.present? %><p class="font-medium"><%= reviewable.subject %></p><% end %>
+    <% else %>
+      <p class="text-sm text-gray-500">To <%= pluralize(reviewable.recipient_count, "attendee") %> by Slack DM</p>
+    <% end %>
+    <%= render "content", review: @review %>
+  </div>
+
+  <% if @review.pending? %>
+    <%= form_with url: approve_admin_broadcast_review_path(@review), method: :post, class: "bg-white border border-gray-200 rounded-lg p-6 space-y-4" do %>
+      <div>
+        <label for="decision_note" class="block text-sm font-medium text-gray-700">Note to the sender <span class="text-gray-400">(optional)</span></label>
+        <p class="text-xs text-gray-500">Shown on the message if you reject it, so they know what to change.</p>
+        <textarea id="decision_note" name="decision_note" rows="3" class="mt-1 w-full rounded-md border-gray-300"></textarea>
+      </div>
+      <div class="flex gap-2">
+        <button type="submit" class="px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840]" data-turbo-confirm="Send this <%= @review.kind_label.downcase %> to its recipients?">Approve and send</button>
+        <button type="submit" formaction="<%= reject_admin_broadcast_review_path(@review) %>" class="px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">Reject</button>
+      </div>
+    <% end %>
+  <% else %>
+    <div class="bg-white border border-gray-200 rounded-lg p-6 text-sm">
+      <p><strong><%= @review.status.humanize %></strong><%= " by #{@review.decided_by_user.email}" if @review.decided_by_user %><%= " on #{@review.decided_at.strftime("%b %d, %Y %H:%M")}" if @review.decided_at %>.</p>
+      <% if @review.decision_note.present? %><p class="mt-2 text-gray-700"><%= @review.decision_note %></p><% end %>
+    </div>
+  <% end %>
+</div>

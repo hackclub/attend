@@ -1,5 +1,8 @@
 module Admin
   class MessagesController < BaseController
+    HELD_FOR_REVIEW = "This message looks like it might be marketing, spam, or not about the event, " \
+      "so it's waiting for a Hack Club admin to review it before it goes out.".freeze
+
     before_action :require_event_selected
     before_action :set_message, only: [ :show, :edit, :update, :destroy, :preview, :send_now, :cancel, :retry_failed, :retry_delivery, :send_to_new_recipients ]
 
@@ -138,12 +141,17 @@ module Admin
       end
 
       if @message.scheduled_at.present? && @message.scheduled_at > Time.current
-        @message.update!(status: :scheduled)
-        redirect_to admin_event_message_path(current_event, @message),
-          notice: "Message scheduled for #{@message.local_scheduled_at.strftime("%B %d, %Y at %l:%M %p %Z")}."
-      elsif @message.send!
+        if @message.schedule!(sender: current_user)
+          redirect_to admin_event_message_path(current_event, @message),
+            notice: "Message scheduled for #{@message.local_scheduled_at.strftime("%B %d, %Y at %l:%M %p %Z")}."
+        else
+          redirect_to admin_event_message_path(current_event, @message), alert: HELD_FOR_REVIEW
+        end
+      elsif @message.send!(sender: current_user)
         redirect_to admin_event_message_path(current_event, @message),
           notice: "Message is being sent to #{helpers.pluralize(@message.recipient_count, "recipient")}."
+      elsif @message.pending_review?
+        redirect_to admin_event_message_path(current_event, @message), alert: HELD_FOR_REVIEW
       else
         # The lock inside send! found it already sent: a double-click or a
         # concurrent send beat us. Nothing changed, so nothing is audit-logged.
@@ -155,15 +163,15 @@ module Admin
     def cancel
       authorize current_event, :update?
 
-      unless @message.scheduled?
+      was_held = @message.pending_review?
+      unless @message.cancel!
         redirect_to admin_event_message_path(current_event, @message),
-          alert: "Only scheduled messages can be cancelled."
+          alert: "Only scheduled messages, or ones waiting for review, can be cancelled."
         return
       end
 
-      @message.update!(status: :cancelled)
       redirect_to admin_event_message_path(current_event, @message),
-        notice: "Scheduled message has been cancelled."
+        notice: was_held ? "Message withdrawn from review and cancelled." : "Scheduled message has been cancelled."
     end
 
     def retry_failed
