@@ -23,4 +23,67 @@ RSpec.describe "Admin search", type: :request do
     expect(response).to have_http_status(:ok)
     expect(JSON.parse(response.body)["participants"].map { |p| p["id"] }).to eq([ participant_event.id ])
   end
+
+  describe "parents and guardians" do
+    let(:guardian) do
+      create(:guardian, legal_first_name: "Charles", legal_last_name: "Babbage", email: "difference.engine@example.com")
+    end
+    let!(:link) { create(:guardian_participant_event, guardian: guardian, participant_event: participant_event) }
+    let(:other_event) { create(:event) }
+
+    def sign_in_with_role(role)
+      user = User.create!(email: "search-#{role}@example.com", name: "Staff", admin_console_beta: false)
+      EventRoleAssignment.create!(user: user, event: event, role: role)
+      sign_in user
+      user
+    end
+
+    def guardians_for(query)
+      get admin_search_path(q: query), headers: { "ACCEPT" => "application/json" }
+      expect(response).to have_http_status(:ok)
+      JSON.parse(response.body)["guardians"]
+    end
+
+    it "finds a guardian by part of their email and links to their child's registration" do
+      sign_in_with_role("ops")
+
+      results = guardians_for("difference.eng")
+
+      expect(results.size).to eq(1)
+      expect(results.first).to include(
+        "name" => "Charles Babbage",
+        "email" => "difference.engine@example.com",
+        "participant_name" => "Ada Lovelace",
+        "url" => admin_event_participant_path(event, participant_event)
+      )
+    end
+
+    it "finds a guardian by name" do
+      sign_in_with_role("event_admin")
+
+      expect(guardians_for("charles babbage").map { |g| g["id"] }).to eq([ link.id ])
+    end
+
+    it "leaves out guardians of children at events the staff member doesn't work" do
+      other_pe = create(:participant_event, event: other_event)
+      create(:guardian_participant_event, guardian: guardian, participant_event: other_pe)
+      sign_in_with_role("ops")
+
+      expect(guardians_for("difference.engine").map { |g| g["id"] }).to eq([ link.id ])
+    end
+
+    it "returns nothing to the limited role, which can't see guardian contact details" do
+      sign_in_with_role("limited")
+
+      expect(guardians_for("difference.engine")).to eq([])
+    end
+
+    it "lets global admins search across every event" do
+      other_pe = create(:participant_event, event: other_event)
+      create(:guardian_participant_event, guardian: guardian, participant_event: other_pe)
+      sign_in User.create!(email: "search-global@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false)
+
+      expect(guardians_for("difference.engine").size).to eq(2)
+    end
+  end
 end

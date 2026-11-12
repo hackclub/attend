@@ -148,6 +148,19 @@ export default class extends Controller {
       })
     }
 
+    if (data.guardians && data.guardians.length > 0) {
+      data.guardians.forEach(g => {
+        this.items.push({
+          type: "guardian",
+          label: g.name,
+          sublabel: `${g.email} · guardian of ${g.participant_name} · ${g.event_name}`,
+          url: g.url,
+          icon: "users",
+          category: "Parents & Guardians"
+        })
+      })
+    }
+
     if (data.events && data.events.length > 0) {
       data.events.forEach(e => {
         this.items.push({
@@ -202,33 +215,57 @@ export default class extends Controller {
         markup += html`<div class="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">${currentCategory}</div>`
       }
 
-      const isSelected = index === this.selectedIndex
-      const selectedClass = isSelected ? "bg-[#ec3750] text-white" : "text-gray-700 hover:bg-gray-100"
-      const sublabelClass = isSelected ? "text-white/70" : "text-gray-400"
-
       markup += html`
-        <a href="${item.url}" 
-           class="flex items-center px-3 py-2 mx-1 rounded-lg cursor-pointer ${selectedClass}"
+        <a href="${item.url}"
+           class="flex items-center px-3 py-2 mx-1 rounded-lg cursor-pointer"
            data-command-palette-target="item"
            data-index="${index}"
-           data-action="mouseenter->command-palette#selectByMouse click->command-palette#navigate">
-          <span class="flex-shrink-0 mr-3">${this.getIcon(item.icon, isSelected)}</span>
+           data-action="mousemove->command-palette#selectByMouse click->command-palette#navigate">
+          <span class="flex-shrink-0 mr-3" data-role="icon">${this.getIcon(item.icon)}</span>
           <span class="flex-1 truncate">
             <span class="font-medium">${item.label}</span>
-            ${item.sublabel ? html`<span class="ml-2 text-sm ${sublabelClass}">${item.sublabel}</span>` : ""}
+            ${item.sublabel ? html`<span class="ml-2 text-sm" data-role="sublabel">${item.sublabel}</span>` : ""}
           </span>
           <span class="flex-shrink-0 ml-2">
-            <kbd class="px-1.5 py-0.5 text-xs font-medium ${isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'} rounded">↵</kbd>
+            <kbd class="px-1.5 py-0.5 text-xs font-medium rounded" data-role="kbd">↵</kbd>
           </span>
         </a>
       `
     })
 
     this.resultsTarget.innerHTML = markup
+    this.applySelection()
   }
 
-  getIcon(type, isSelected) {
-    const color = isSelected ? "currentColor" : "#8492a6"
+  // Restyles the existing rows rather than re-rendering them. Rebuilding the
+  // list on hover swapped out the row under the pointer between mousedown and
+  // mouseup, so the browser never fired a click and only Enter worked.
+  applySelection() {
+    this.itemTargets.forEach(el => {
+      const selected = parseInt(el.dataset.index, 10) === this.selectedIndex
+      el.classList.toggle("bg-[#ec3750]", selected)
+      el.classList.toggle("text-white", selected)
+      el.classList.toggle("text-gray-700", !selected)
+      el.classList.toggle("hover:bg-gray-100", !selected)
+      el.setAttribute("aria-selected", selected ? "true" : "false")
+
+      const icon = el.querySelector('[data-role="icon"]')
+      icon?.classList.toggle("text-[#8492a6]", !selected)
+
+      const sublabel = el.querySelector('[data-role="sublabel"]')
+      sublabel?.classList.toggle("text-white/70", selected)
+      sublabel?.classList.toggle("text-gray-400", !selected)
+
+      const kbd = el.querySelector('[data-role="kbd"]')
+      kbd?.classList.toggle("bg-white/20", selected)
+      kbd?.classList.toggle("text-white", selected)
+      kbd?.classList.toggle("bg-gray-100", !selected)
+      kbd?.classList.toggle("text-gray-400", !selected)
+    })
+  }
+
+  getIcon(type) {
+    const color = "currentColor"
     const icons = {
       calendar: html`<svg class="h-5 w-5" fill="none" stroke="${color}" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`,
       users: html`<svg class="h-5 w-5" fill="none" stroke="${color}" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>`,
@@ -248,22 +285,22 @@ export default class extends Controller {
   selectNext() {
     if (this.items.length === 0) return
     this.selectedIndex = (this.selectedIndex + 1) % this.items.length
-    this.renderItems()
+    this.applySelection()
     this.scrollToSelected()
   }
 
   selectPrevious() {
     if (this.items.length === 0) return
     this.selectedIndex = this.selectedIndex <= 0 ? this.items.length - 1 : this.selectedIndex - 1
-    this.renderItems()
+    this.applySelection()
     this.scrollToSelected()
   }
 
   selectByMouse(event) {
     const index = parseInt(event.currentTarget.dataset.index, 10)
-    if (!isNaN(index)) {
+    if (!isNaN(index) && index !== this.selectedIndex) {
       this.selectedIndex = index
-      this.renderItems()
+      this.applySelection()
     }
   }
 
