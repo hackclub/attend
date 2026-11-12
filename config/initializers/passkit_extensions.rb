@@ -24,6 +24,12 @@ module PasskitGeneratorExtensions
   end
 
   def generate_json_pass
+    File.write(@temporary_path.join("pass.json"), pass_json.to_json)
+  end
+
+  # The pass.json contents, without building or signing anything.
+  # WalletPassContent fingerprints this to tell whether a pass really changed.
+  def pass_json
     pass = {
       formatVersion: @pass.format_version,
       teamIdentifier: @pass.apple_team_identifier,
@@ -91,7 +97,7 @@ module PasskitGeneratorExtensions
       backFields: @pass.back_fields
     }
 
-    File.write(@temporary_path.join("pass.json"), pass.to_json)
+    pass
   end
 end
 
@@ -101,8 +107,17 @@ module PasskitPassesControllerExtensions
   # before building (which used to be our own shortcut here), and a pass with
   # no generator falls back to its own updated_at, so without this check an
   # orphaned pass would be reported as unchanged forever.
+  #
+  # Otherwise re-check the pass's contents before the gem compares
+  # If-Modified-Since, so its last-modified moves exactly when what's on the
+  # pass changed, whatever did or didn't trigger WalletPassUpdateService.
   def show
-    return head(:gone) if requested_pass_orphaned?
+    pass = requested_pass
+    if pass
+      return head(:gone) if pass.generator.nil?
+
+      WalletPassContent.refresh!(pass, unknown: :unchanged)
+    end
 
     super
   rescue ActiveRecord::RecordNotFound
@@ -111,14 +126,13 @@ module PasskitPassesControllerExtensions
 
   private
 
-  # Anything this doesn't answer (no header, a bad token) falls through to
-  # the gem, which rejects it.
-  def requested_pass_orphaned?
+  # Anything this doesn't find (no header, a bad token) falls through to the
+  # gem, which rejects it.
+  def requested_pass
     token = request.headers["Authorization"]&.split(" ")&.last
-    return false if token.blank?
+    return if token.blank?
 
-    pass = Passkit::Pass.find_by(serial_number: params[:serial_number], authentication_token: token)
-    pass.present? && pass.generator.nil?
+    Passkit::Pass.find_by(serial_number: params[:serial_number], authentication_token: token)
   end
 
   # Both actions hand Passkit::PassDelivery#send_pass_file whatever
@@ -129,14 +143,17 @@ module PasskitPassesControllerExtensions
   end
 end
 
-# The gem dates a pass by its generator (the participant event) alone, but
-# WalletPassUpdateService touches the pass itself when the event or the
-# participant changes. Ignoring that touch meant Wallet was pushed an update,
-# asked for the pass and got 304 ("Server requested update ... but the pass
-# was unchanged"), so those edits never reached the device.
+# The gem dates a pass by its generator (the participant event), which moves
+# on every save of the registration or its participant whether or not
+# anything on the pass changed, so Wallet kept refetching identical passes
+# ("Server ignored the 'if-modified-since' header and returned the full
+# unchanged pass data"). Date it by when its contents last changed instead
+# (see WalletPassContent). Passes that haven't been fingerprinted yet keep
+# the old dating: the generator, or the pass's own updated_at, which older
+# code touched to signal a change.
 module PasskitPassExtensions
   def last_update
-    [ super, updated_at ].compact.max
+    content_updated_at || [ super, updated_at ].compact.max
   end
 end
 

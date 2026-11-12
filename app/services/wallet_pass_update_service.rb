@@ -18,8 +18,13 @@ class WalletPassUpdateService
     passes = Passkit::Pass.where(generator: @participant_event)
     return if passes.none?
 
+    # Every save of the event, registration, participant or safeguarding
+    # record lands here, but most change nothing on the pass. Pushing anyway
+    # had Wallet refetch identical passes ("Server requested update ... but
+    # the pass was unchanged"), so only push when the contents differ.
     passes.find_each do |pass|
-      pass.touch
+      next unless WalletPassContent.refresh!(pass)
+
       notify_apple_devices(pass)
     end
   ensure
