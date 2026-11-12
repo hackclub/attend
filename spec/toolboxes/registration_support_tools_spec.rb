@@ -39,7 +39,10 @@ RSpec.describe "registration support MCP tools" do
   end
 
   describe "ParticipantEventsToolbox#update_guardian" do
-    it "corrects a mistyped guardian email and clears the invite stamp so the next invite is fresh" do
+    it "corrects a mistyped guardian email and revokes the link sent to the old address" do
+      old_token = guardian_link.generate_invite_token!
+      guardian_link.update!(invite_token_sent_at: 1.day.ago, invite_last_used_at: 1.hour.ago)
+
       json, = run_tool(ParticipantEventsToolbox, :update_guardian,
         participant_event_id: participant_event.id,
         guardian_participant_event_id: guardian_link.id,
@@ -47,6 +50,8 @@ RSpec.describe "registration support MCP tools" do
 
       expect(guardian.reload.email).to eq("parent@example.com")
       expect(guardian_link.reload.invite_token_sent_at).to be_nil
+      expect { GuardianParticipantEvent.find_by_invite_token!(old_token) }.to raise_error(ActiveRecord::RecordNotFound)
+      expect(guardian_link.generate_invite_token!).not_to eq(old_token)
       expect(json[:also_linked_to_other_registrations]).to eq(0)
     end
 

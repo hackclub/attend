@@ -48,14 +48,17 @@ module RegistrationChangeRequests
 
     # The same person as the current guardian, with a typo fixed somewhere.
     #
-    # A matching name is enough. A matching email or phone on its own is not:
+    # A matching name is enough, unless both the email and the phone change.
+    # A matching email or phone on its own is not:
     # households share both, and "replace mum with my older sibling, same
     # email" is a real replacement whose new guardian has to sign. So a
     # different name only counts as the same person when it is a near-miss
     # spelling and another detail matches, or when both email and phone do.
     def same_person?
       return false unless current_guardian
-      return true if same_name?
+      # A matching name with a new email AND a new phone is someone else with
+      # the same name as far as we can tell, so it goes through replacement.
+      return !(email_changes? && phone_changes?) if same_name?
       return true if same_email? && same_phone?
 
       near_name? && (same_email? || same_phone?)
@@ -93,6 +96,14 @@ module RegistrationChangeRequests
     private
 
     NEAR_NAME_DISTANCE = 2
+
+    def email_changes?
+      changes["email"].present? && !same_email?
+    end
+
+    def phone_changes?
+      changes["phone"].present? && !same_phone?
+    end
 
     def near_name?
       requested = name_key(changes["legal_first_name"], changes["legal_last_name"])

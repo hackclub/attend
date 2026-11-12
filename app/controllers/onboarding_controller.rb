@@ -1133,7 +1133,11 @@ class OnboardingController < ApplicationController
 
       if guardian.save
         existing_gpe.relationship = relationship
-        existing_gpe.update!(invite_token_sent_at: nil) if guardian.email_previously_changed?
+        if guardian.email_previously_changed?
+          # A guardian who hasn't finished gets a fresh token, so the link
+          # already sent to the old address stops working.
+          existing_gpe.completed? ? existing_gpe.update!(invite_token_sent_at: nil) : existing_gpe.revoke_invite_token!
+        end
         existing_gpe.save
       else
         false

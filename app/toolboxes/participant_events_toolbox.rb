@@ -199,7 +199,10 @@ class ParticipantEventsToolbox < ApplicationToolbox
 
     old_email = @guardian.email
     @guardian.update!(attributes)
-    gpe.update!(invite_token_sent_at: nil) if @guardian.email != old_email && !gpe.completed?
+    # Revoke rather than just unstamp: the old link went to the wrong address,
+    # and clearing invite_token_sent_at alone leaves its token live (for a week
+    # after any use) and makes the next invite resend the same URL.
+    gpe.revoke_invite_token! if @guardian.email != old_email && !gpe.completed?
 
     render json: {
       guardian: serialize_guardian_link(gpe.reload),

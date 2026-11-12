@@ -174,6 +174,31 @@ RSpec.describe "Guardian and participant email collisions", type: :request do
     end
   end
 
+  describe "admin correcting a guardian's email" do
+    let(:admin) do
+      User.create!(email: "admin-guardian-fix@example.com", name: "Admin", global_role: "global_admin")
+    end
+    let(:participant_event) { create(:participant_event, event: event) }
+
+    before { sign_in admin }
+
+    it "revokes the portal link that went to the old address" do
+      gpe = create(:guardian_participant_event, participant_event: participant_event, invite_token_sent_at: 1.day.ago)
+      old_token = gpe.generate_invite_token!
+      gpe.update!(invite_last_used_at: 1.hour.ago)
+
+      patch admin_event_participant_guardian_path(event.slug, participant_event, gpe),
+        params: { guardian: {
+          legal_first_name: gpe.guardian.legal_first_name,
+          legal_last_name: gpe.guardian.legal_last_name,
+          email: "corrected-guardian@example.com"
+        } }
+
+      expect(gpe.guardian.reload.email).to eq("corrected-guardian@example.com")
+      expect { GuardianParticipantEvent.find_by_invite_token!(old_token) }.to raise_error(ActiveRecord::RecordNotFound)
+    end
+  end
+
   describe "the guardian portal" do
     let(:participant_event) { create(:participant_event, event: event) }
     let(:gpe) { create(:guardian_participant_event, participant_event: participant_event) }

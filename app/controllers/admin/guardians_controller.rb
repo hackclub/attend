@@ -27,8 +27,10 @@ module Admin
       end
 
       if @guardian.update(guardian_params)
+        # The old portal link went to the old address: kill it, so the next
+        # invite carries a fresh token (see GuardianParticipantEvent#revoke_invite_token!).
         if @guardian.email != old_email && !@guardian_participant_event.completed?
-          @guardian_participant_event.update!(invite_token_sent_at: nil)
+          @guardian_participant_event.revoke_invite_token!
         end
 
         redirect_to admin_event_participant_path(current_event, @participant_event),

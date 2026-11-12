@@ -86,13 +86,24 @@ module RegistrationChangeRequests
         )
       end
 
-      details = GuardianDetails.new(participant_event, request.requested_changes.slice(*GUARDIAN_FIELDS))
-      return correct_guardian_in_place(details) if details.same_person?
-
       if guardian_change_needs_manual_follow_up?
         return mark_follow_up(
           "A guardian-signed paper document is attached. Staff must preserve and replace it manually before changing the guardian."
         )
+      end
+
+      details = GuardianDetails.new(participant_event, request.requested_changes.slice(*GUARDIAN_FIELDS))
+      if details.same_person?
+        # The guardian row is shared with a sibling's registration: editing it
+        # here would silently change that registration's guardian too.
+        if details.current_guardian.guardian_participant_events.where.not(id: details.current_link.id).exists?
+          return mark_follow_up(
+            "This guardian is also linked to another registration. Staff must update their details manually " \
+            "so the other registration isn't changed by accident."
+          )
+        end
+
+        return correct_guardian_in_place(details)
       end
 
       attributes = details.normalized_changes
@@ -141,7 +152,9 @@ module RegistrationChangeRequests
       relationship = details.changes["relationship"].to_s.squish
       link.update!(relationship: relationship) if relationship.present?
       @resend_invite_to = link if email_changed && !link.completed?
-      link.update!(invite_token_sent_at: nil) if @resend_invite_to
+      # The old link went to the wrong address. Revoking (not just unstamping)
+      # kills it and makes the resent invite carry a fresh token.
+      link.revoke_invite_token! if @resend_invite_to
       mark_approved
     end
 
