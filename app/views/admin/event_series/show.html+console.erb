@@ -54,6 +54,11 @@
       </div>
     </div>
     <div class="cs-actions flex-wrap">
+      <% if policy(@series).view_change_requests? %>
+        <%= link_to admin_series_change_requests_path(@series), class: "cs-btn" do %>
+          Change requests<% if (pending = @dashboard.pending_change_request_count).positive? %> <span class="cs-counter">(<%= pending %>)</span><% end %>
+        <% end %>
+      <% end %>
       <% if policy(@series).manage_members? %>
         <%= link_to "Members", admin_series_members_path(@series), class: "cs-btn" %>
       <% end %>

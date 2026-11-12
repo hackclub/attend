@@ -1,0 +1,83 @@
+<% content_for :title, "#{@series.name} Change requests – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs(cs_gated_crumb("Event series", admin_series_index_path, policy(EventSeries).index?), [ @series.name, admin_series_path(@series) ], [ "Change requests", nil ]) %>
+<% status_types = { "pending" => :pending, "approved" => :success, "follow_up_needed" => :warning } %>
+<% status_labels = { "pending" => "Pending", "follow_up_needed" => "Follow-up needed", "approved" => "Approved", "all" => "All" } %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text flex items-center gap-3 min-w-0">
+      <%= render "admin/events/avatar", event: @series, size: 32, rounded: "rounded-lg" %>
+      <div class="min-w-0">
+        <h1 class="cs-h1 truncate"><%= @series.name %> change requests</h1>
+        <p class="cs-description">Registration change requests from every event in the series. Open one to review it on its event.</p>
+      </div>
+    </div>
+  </div>
+
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided flex flex-wrap items-center justify-between gap-3">
+      <h2 class="cs-h2">Requests <span class="cs-counter">(<%= @change_requests.size %>)</span></h2>
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="cs-segmented" role="group" aria-label="Status">
+          <% Admin::SeriesChangeRequestsController::STATUS_FILTERS.each do |status| %>
+            <% count = status == "all" ? @status_counts.values.sum : @status_counts.fetch(status, 0) %>
+            <%= link_to admin_series_change_requests_path(@series, status: status, event: @event_filter&.slug),
+                  class: "cs-segment", "aria-current": ("page" if @status_filter == status) do %>
+              <%= status_labels.fetch(status) %> <span class="cs-counter">(<%= count %>)</span>
+            <% end %>
+          <% end %>
+        </div>
+        <% if @events.size > 1 %>
+          <%= form_with url: admin_series_change_requests_path(@series), method: :get, local: true, class: "flex items-center gap-2", data: { controller: "auto-submit" } do %>
+            <%= hidden_field_tag :status, @status_filter %>
+            <%= select_tag :event,
+                  options_for_select(@events.map { |event| [ event.name, event.slug ] }, @event_filter&.slug),
+                  include_blank: "All events", class: "cs-select", "aria-label": "Filter by event",
+                  data: { action: "change->auto-submit#submit" } %>
+            <noscript><button type="submit" class="cs-btn">Apply</button></noscript>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+    <% if @change_requests.empty? %>
+      <div class="cs-empty">
+        <p class="cs-empty-title">
+          <% if @status_filter == "pending" %>No pending change requests.<% else %>No change requests match.<% end %>
+        </p>
+      </div>
+    <% else %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Participant</th>
+              <th scope="col">Event</th>
+              <th scope="col">Kind</th>
+              <th scope="col">Status</th>
+              <th scope="col">Submitted</th>
+              <th scope="col">Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @change_requests.each do |request_record| %>
+              <% event = request_record.participant_event.event %>
+              <tr>
+                <td class="whitespace-nowrap">
+                  <%= link_to request_record.participant_event.participant.display_name,
+                        admin_event_registration_change_request_path(event, request_record), class: "cs-link cs-link-strong" %>
+                </td>
+                <td class="whitespace-nowrap"><%= event.name %></td>
+                <td class="whitespace-nowrap"><%= request_record.kind.humanize %></td>
+                <td class="whitespace-nowrap"><%= cs_status(status_types.fetch(request_record.status, :info), request_record.status.humanize) %></td>
+                <td class="whitespace-nowrap"><%= cs_relative_time(request_record.created_at) %></td>
+                <td>
+                  <% if request_record.support? %><span class="cs-secondary"><%= truncate(request_record.requester_note, length: 160) %></span><% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </section>
+</div>

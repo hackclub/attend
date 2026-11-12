@@ -333,6 +333,13 @@ class SeriesDashboard
     @held_invitations ||= Invitation.where(event_id: event_ids).held.group(:event_id).count
   end
 
+  # Series members act as event admins on every event, so every audience's
+  # requests count here, as on the series change-requests page.
+  def pending_change_request_count
+    @pending_change_request_count ||= RegistrationChangeRequest.pending
+      .joins(:participant_event).where(participant_events: { event_id: event_ids }).count
+  end
+
   # Series membership does not by itself grant incident visibility — IncidentPolicy
   # keys off event_role_assignments and each incident's own visible_to_roles. So
   # this counts per event with that policy's own rules and returns nil (not zero)

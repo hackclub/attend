@@ -477,6 +477,9 @@ Rails.application.routes.draw do
         post "vote_event/:event_id", action: :create_vote_event, as: :create_vote_event
       end
       resources :members, only: [ :index, :new, :create, :destroy ], controller: "series_members"
+      # Every event's registration change requests in one list; each row opens
+      # the request on its own event, where it is approved or followed up.
+      resources :change_requests, only: [ :index ], controller: "series_change_requests"
       resources :api_tokens, only: [ :index, :create, :destroy ], controller: "series_api_tokens" do
         member do
           post :rotate
