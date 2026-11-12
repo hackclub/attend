@@ -7,6 +7,8 @@ module Api
       include Pundit::Authorization
       include Api::V1::ApiAuditing
 
+      HELD_FOR_REVIEW = Admin::MessagesController::HELD_FOR_REVIEW
+
       before_action :reject_api_key_auth
       before_action :set_paper_trail_whodunnit
       before_action :set_event
@@ -117,12 +119,16 @@ module Api
         return render_error("Message body cannot be empty.") if @message.body.blank?
 
         if scheduled_in_future?
-          @message.update!(status: :scheduled)
+          held = !@message.schedule!(sender: current_user)
           audit_api_change!(:send_now, @message)
-          render json: { message: message_json(@message), notice: "Message scheduled for #{@message.local_scheduled_at.strftime("%B %d, %Y at %l:%M %p %Z")}." }
-        elsif @message.send!
+          notice = held ? HELD_FOR_REVIEW : "Message scheduled for #{@message.local_scheduled_at.strftime("%B %d, %Y at %l:%M %p %Z")}."
+          render json: { message: message_json(@message), notice: notice, held_for_review: held }
+        elsif @message.send!(sender: current_user)
           audit_api_change!(:send_now, @message)
           render json: { message: message_json(@message.reload), notice: "Message is being sent to #{@message.recipient_count} recipients." }
+        elsif @message.pending_review?
+          audit_api_change!(:send_now, @message)
+          render json: { message: message_json(@message), notice: HELD_FOR_REVIEW, held_for_review: true }
         else
           # A double tap or a concurrent send beat us; nothing changed.
           render_error("This message has already been sent.")
@@ -130,9 +136,8 @@ module Api
       end
 
       def cancel
-        return render_error("Only scheduled messages can be cancelled.") unless @message.scheduled?
+        return render_error("Only scheduled messages, or ones waiting for review, can be cancelled.") unless @message.cancel!
 
-        @message.update!(status: :cancelled)
         audit_api_change!(:cancel, @message)
         render json: { message: message_json(@message), notice: "Scheduled message has been cancelled." }
       end
@@ -287,7 +292,7 @@ module Api
             edit: editable,
             send_now: editable,
             destroy: !(message.sending? || message.completed?),
-            cancel: message.scheduled?,
+            cancel: message.scheduled? || message.pending_review?,
             retry_failed: message.failed_count.to_i > 0,
             send_to_new_recipients: new_recipient_count > 0
           }

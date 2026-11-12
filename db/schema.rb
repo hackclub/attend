@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_11_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_12_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -261,6 +261,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_11_120000) do
     t.string "status"
     t.datetime "updated_at", null: false
     t.index ["creator_id"], name: "index_blazer_queries_on_creator_id"
+  end
+
+  create_table "broadcast_reviews", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "reviewable_type", null: false
+    t.uuid "reviewable_id", null: false
+    t.uuid "event_id", null: false
+    t.uuid "submitted_by_user_id"
+    t.string "status", default: "pending", null: false
+    t.string "flagged_by", null: false
+    t.string "categories", default: [], null: false, array: true
+    t.text "reason"
+    t.string "content_digest", null: false
+    t.uuid "decided_by_user_id"
+    t.datetime "decided_at"
+    t.text "decision_note"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["decided_by_user_id"], name: "index_broadcast_reviews_on_decided_by_user_id"
+    t.index ["event_id"], name: "index_broadcast_reviews_on_event_id"
+    t.index ["reviewable_type", "reviewable_id"], name: "index_broadcast_reviews_on_reviewable"
+    t.index ["status", "created_at"], name: "index_broadcast_reviews_on_status_and_created_at"
+    t.index ["submitted_by_user_id"], name: "index_broadcast_reviews_on_submitted_by_user_id"
   end
 
   create_table "connected_accounts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -856,6 +878,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_11_120000) do
     t.integer "failed_count", default: 0
     t.integer "recipient_count", default: 0
     t.datetime "scheduled_at"
+    t.string "screened_digest"
     t.datetime "sent_at"
     t.uuid "sent_by_user_id", null: false
     t.integer "sent_count", default: 0
@@ -1287,6 +1310,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_11_120000) do
     t.integer "failed_count", default: 0
     t.text "message"
     t.integer "recipient_count", default: 0
+    t.string "screened_digest"
     t.uuid "sent_by_user_id", null: false
     t.integer "sent_count", default: 0
     t.string "status", default: "pending"
@@ -1758,6 +1782,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_11_120000) do
   add_foreign_key "ban_slack_ids", "bans"
   add_foreign_key "bans", "users", column: "created_by_id"
   add_foreign_key "bans", "users", column: "revoked_by_id"
+  add_foreign_key "broadcast_reviews", "events"
+  add_foreign_key "broadcast_reviews", "users", column: "decided_by_user_id", on_delete: :nullify
+  add_foreign_key "broadcast_reviews", "users", column: "submitted_by_user_id", on_delete: :nullify
   add_foreign_key "connected_accounts", "participants"
   add_foreign_key "consents", "custom_documents"
   add_foreign_key "consents", "guardian_participant_events"

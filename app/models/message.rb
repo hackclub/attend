@@ -1,5 +1,6 @@
 class Message < ApplicationRecord
   include EventLocalTimes
+  include ScreenedBroadcast
   self.implicit_order_column = "created_at"
 
   has_paper_trail
@@ -81,6 +82,8 @@ class Message < ApplicationRecord
   enum :status, {
     draft: "draft",
     scheduled: "scheduled",
+    # Held by BroadcastScreener until a global admin approves it.
+    pending_review: "pending_review",
     sending: "sending",
     completed: "completed",
     failed: "failed",
@@ -260,11 +263,22 @@ class Message < ApplicationRecord
     reachable(recipients).where.not(id: message_deliveries.where.not(column => nil).select(column))
   end
 
-  # First send of a draft or scheduled message. Returns false if it had
-  # already gone out, e.g. a double-clicked Send Now.
-  def send!
+  # First send of a draft or scheduled message. Returns false if it didn't
+  # go out: it already had (e.g. a double-clicked Send Now), or the screener
+  # held it for review, in which case it is now #pending_review?.
+  #
+  # `sender` is who is sending it now; a scheduled send counts as its author.
+  def send!(sender: sent_by_user)
+    return false unless draft? || scheduled?
+
+    flagged = screen_for_review(sender: sender)
     sent = with_lock do
       next false unless draft? || scheduled?
+
+      if flagged
+        hold_for_review!(flagged, sender: sender)
+        next false
+      end
 
       update!(status: :sending, sent_at: Time.current)
       create_deliveries_for(recipients)
@@ -272,6 +286,57 @@ class Message < ApplicationRecord
     end
     MessageDeliveryJob.perform_later(message_id: id) if sent
     sent
+  end
+
+  # Schedules a draft for later, screening it now so a held message is
+  # reviewed before its send time rather than at it. Returns false if held.
+  def schedule!(sender:)
+    flagged = screen_for_review(sender: sender)
+    with_lock do
+      if flagged
+        hold_for_review!(flagged, sender: sender)
+        next false
+      end
+
+      update!(status: :scheduled)
+      true
+    end
+  end
+
+  # Cancels a scheduled message, or withdraws one waiting for review.
+  def cancel!
+    with_lock do
+      next false unless scheduled? || pending_review?
+
+      pending_broadcast_review&.withdraw!
+      update!(status: :cancelled)
+      true
+    end
+  end
+
+  # ScreenedBroadcast: an admin approved it. Back on its schedule if it has
+  # one still ahead, otherwise out now.
+  def release_after_review!(by:)
+    if scheduled_at.present? && scheduled_at > Time.current
+      update!(status: :scheduled)
+    else
+      update!(status: :draft)
+      send!(sender: by)
+    end
+  end
+
+  # ScreenedBroadcast: an admin rejected it. Back to its author as a draft;
+  # the review's note says why, and sending it again screens it again.
+  def return_after_rejection!
+    update!(status: :draft)
+  end
+
+  def screening_subject
+    subject
+  end
+
+  def screening_text
+    body_as_plain
   end
 
   # A catch-up send only makes sense once the original send has gone out and

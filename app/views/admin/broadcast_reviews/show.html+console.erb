@@ -1,0 +1,117 @@
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Held messages", admin_broadcast_reviews_path ], [ @review.event.name, nil ]) %>
+<% reviewable = @review.reviewable %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Held <%= @review.kind_label.downcase %></h1>
+      <p class="cs-description"><%= @review.event.name %></p>
+    </div>
+  </div>
+
+  <% if @review.pending? %>
+    <div class="cs-alert cs-alert-warning">
+      <%= cs_status_icon(:warning) %>
+      <p>This hasn't been sent to anyone. Approving it sends it now<%= " (or at its scheduled time)" if reviewable.is_a?(Message) && reviewable.scheduled_at&.future? %>.</p>
+    </div>
+  <% end %>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Why it was held</h2>
+    </div>
+    <div class="cs-container-body cs-stack">
+      <dl class="cs-kv cs-kv-3 cs-kv-divided">
+        <div>
+          <dt class="cs-kv-label">Looks like</dt>
+          <dd class="cs-kv-value"><%= @review.category_labels.to_sentence %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">From</dt>
+          <dd class="cs-kv-value"><%= @review.submitted_by_user&.email || "—" %></dd>
+        </div>
+        <div>
+          <dt class="cs-kv-label">Held</dt>
+          <dd class="cs-kv-value"><%= cs_absolute_time_tag(@review.created_at) %></dd>
+        </div>
+      </dl>
+      <dl class="cs-kv">
+        <div>
+          <dt class="cs-kv-label">Reason</dt>
+          <dd class="cs-kv-value"><%= @review.reason %> <span class="cs-muted">(<%= @review.flagged_by == "model" ? "Claude" : "keyword rules" %>)</span></dd>
+        </div>
+        <% if reviewable.is_a?(Message) %>
+          <div>
+            <dt class="cs-kv-label">Going to</dt>
+            <dd class="cs-kv-value"><%= reviewable.audience_label %> by <%= reviewable.channel_labels %></dd>
+          </div>
+          <% if reviewable.subject.present? %>
+            <div>
+              <dt class="cs-kv-label">Subject</dt>
+              <dd class="cs-kv-value"><%= reviewable.subject %></dd>
+            </div>
+          <% end %>
+        <% else %>
+          <div>
+            <dt class="cs-kv-label">Going to</dt>
+            <dd class="cs-kv-value"><%= pluralize(reviewable.recipient_count, "attendee") %> by Slack DM</dd>
+          </div>
+        <% end %>
+      </dl>
+    </div>
+  </section>
+
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <h2 class="cs-h2">Content</h2>
+    </div>
+    <div class="cs-container-body">
+      <%= render "content", review: @review %>
+    </div>
+  </section>
+
+  <% if @review.pending? %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Decision</h2>
+      </div>
+      <div class="cs-container-body">
+        <%= form_with url: approve_admin_broadcast_review_path(@review), method: :post, id: "broadcast-review-form", class: "cs-stack" do %>
+          <%= cs_field id: "decision_note", label: "Note to the sender", optional: true,
+                description: "Shown on the message if you reject it, so they know what to change." do |aria| %>
+            <textarea id="decision_note" name="decision_note" rows="3" class="cs-input" <%= tag.attributes(aria) %>></textarea>
+          <% end %>
+          <div class="cs-actions">
+            <button type="submit" class="cs-btn cs-btn-primary" data-turbo-confirm="Send this <%= @review.kind_label.downcase %> to its recipients?">Approve and send</button>
+            <button type="submit" class="cs-btn" formaction="<%= reject_admin_broadcast_review_path(@review) %>">Reject</button>
+          </div>
+        <% end %>
+      </div>
+    </section>
+  <% else %>
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Decision</h2>
+      </div>
+      <div class="cs-container-body">
+        <dl class="cs-kv cs-kv-3 cs-kv-divided">
+          <div>
+            <dt class="cs-kv-label">Outcome</dt>
+            <dd class="cs-kv-value"><%= @review.status.humanize %></dd>
+          </div>
+          <div>
+            <dt class="cs-kv-label">By</dt>
+            <dd class="cs-kv-value"><%= @review.decided_by_user&.email || "Author cancelled" %></dd>
+          </div>
+          <div>
+            <dt class="cs-kv-label">When</dt>
+            <dd class="cs-kv-value"><%= @review.decided_at ? cs_absolute_time_tag(@review.decided_at) : "—" %></dd>
+          </div>
+        </dl>
+        <% if @review.decision_note.present? %>
+          <p class="mt-3"><%= @review.decision_note %></p>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+</div>

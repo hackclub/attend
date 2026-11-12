@@ -1,4 +1,5 @@
 class SlackBlast < ApplicationRecord
+  include ScreenedBroadcast
   self.implicit_order_column = "created_at"
 
   has_paper_trail
@@ -9,12 +10,53 @@ class SlackBlast < ApplicationRecord
 
   enum :status, {
     pending: "pending",
+    # Held by BroadcastScreener until a global admin approves it.
+    pending_review: "pending_review",
+    # A global admin rejected it; it never goes out.
+    rejected: "rejected",
     in_progress: "in_progress",
     completed: "completed",
     failed: "failed"
   }
 
   validates :message, presence: true
+
+  # Starts sending a newly created blast, unless the screener holds it for
+  # review. Returns false when held.
+  def dispatch!(sender:)
+    flagged = screen_for_review(sender: sender)
+    if flagged
+      hold_for_review!(flagged, sender: sender)
+      return false
+    end
+
+    SlackBlastJob.perform_later(slack_blast_id: id)
+    true
+  end
+
+  # ScreenedBroadcast: an admin approved it.
+  def release_after_review!(by:)
+    update!(status: :pending)
+    SlackBlastJob.perform_later(slack_blast_id: id)
+  end
+
+  # ScreenedBroadcast: an admin rejected it. Blasts have no draft to go back
+  # to, so it stops here; its author can write a new one.
+  def return_after_rejection!
+    update!(status: :rejected)
+  end
+
+  def screening_subject
+    nil
+  end
+
+  # The visible text plus every link target, so a shortened URL behind
+  # friendly link text is still seen.
+  def screening_text
+    doc = Nokogiri::HTML.fragment(message.to_s)
+    links = doc.css("a[href]").map { |a| a["href"].to_s.strip }.reject(&:blank?).uniq
+    [ doc.text.squish, *links ].join("\n")
+  end
 
   def update_counts!
     update!(

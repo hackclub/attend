@@ -1,0 +1,22 @@
+<%# On a message or Slack blast page: why it's held, or why it was rejected. %>
+<% review = broadcastable.latest_broadcast_review %>
+<% if broadcastable.pending_review? && review %>
+  <div class="cs-alert cs-alert-warning mb-4">
+    <%= cs_status_icon(:warning) %>
+    <p>
+      <strong>Waiting for review.</strong>
+      This looks like it might be <%= review.category_labels.to_sentence.downcase %>: <%= review.reason %>
+      A Hack Club admin has to approve it before it goes out.
+      <% if current_user.global_admin? %><%= link_to "Review it", admin_broadcast_review_path(review), class: "cs-link" %><% end %>
+    </p>
+  </div>
+<% elsif review&.rejected? && (broadcastable.try(:draft?) || broadcastable.try(:rejected?)) %>
+  <div class="cs-alert cs-alert-error mb-4">
+    <%= cs_status_icon(:error) %>
+    <p>
+      <strong>Not approved.</strong>
+      A Hack Club admin didn't approve this<%= broadcastable.is_a?(Message) ? ", so it's back to a draft" : "" %>.
+      <%= review.decision_note.presence || review.reason %>
+    </p>
+  </div>
+<% end %>

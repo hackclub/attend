@@ -99,6 +99,8 @@
       <%= nav_link.call("Training", admin_training_path, request.path.start_with?("/admin/training"), :training) %>
 
       <%= nav_link.call("Incidents", admin_incident_reports_path, request.path.start_with?("/admin/incidents"), :incident_reports) %>
+      <% held_count = BroadcastReview.pending.count %>
+      <%= nav_link.call(held_count.positive? ? "Held messages (#{held_count})" : "Held messages", admin_broadcast_reviews_path, request.path.start_with?("/admin/broadcast_reviews"), :messages) %>
       <%= nav_link.call("Conduct bans", admin_bans_path, request.path.start_with?("/admin/bans"), :bans) %>
       <%= nav_link.call("Visa letter templates", admin_visa_letter_templates_path, request.path.start_with?("/admin/visa_letter_templates"), :visas) %>
 

@@ -1,0 +1,6 @@
+<%# The held broadcast as recipients would see it, with placeholders unfilled. %>
+<% reviewable = review.reviewable %>
+<% html = reviewable.is_a?(Message) ? reviewable.body_as_html : reviewable.message_as_html %>
+<div class="message-body text-sm">
+  <%= sanitize html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote img], attributes: %w[href target rel src alt width style] %>
+</div>

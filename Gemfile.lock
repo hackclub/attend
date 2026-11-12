@@ -81,6 +81,11 @@ GEM
     afm (1.0.0)
     anonymous_loader (0.1.3)
       version_gem (~> 1.1, >= 1.1.14)
+    anthropic (2.8.0)
+      base64 (~> 0.1)
+      connection_pool (>= 2, < 4)
+      opentelemetry-api (>= 1.2.4, < 2)
+      standardwebhooks (~> 1.0)
     apnotic (1.8.0)
       base64
       connection_pool (>= 2, < 4)
@@ -745,6 +750,7 @@ GEM
       fugit (~> 1.11)
       railties (>= 7.1)
       thor (>= 1.3.1)
+    standardwebhooks (1.1.0)
     stimulus-rails (1.3.4)
       railties (>= 6.0.0)
     tailwindcss-rails (4.6.0)
@@ -816,6 +822,7 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
+  anthropic (~> 2.8)
   apnotic
   appsignal
   aws-sdk-s3

@@ -53,10 +53,11 @@ module Api
           )
         end
 
-        SlackBlastJob.perform_later(slack_blast_id: slack_blast.id)
+        held = !slack_blast.dispatch!(sender: current_user)
 
         render json: {
-          slack_blast: slack_blast_json(slack_blast)
+          slack_blast: slack_blast_json(slack_blast),
+          held_for_review: held
         }, status: :created
       rescue ActiveRecord::RecordInvalid => e
         render json: { error: e.message }, status: :unprocessable_entity

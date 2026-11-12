@@ -72,10 +72,13 @@ module Admin
         )
       end
 
-      SlackBlastJob.perform_later(slack_blast_id: slack_blast.id)
-
-      redirect_to admin_event_slack_blast_path(current_event, slack_blast),
-        notice: "Slack blast queued! Sending to #{helpers.pluralize(participant_events.count, "participant")}."
+      if slack_blast.dispatch!(sender: current_user)
+        redirect_to admin_event_slack_blast_path(current_event, slack_blast),
+          notice: "Slack blast queued! Sending to #{helpers.pluralize(participant_events.count, "participant")}."
+      else
+        redirect_to admin_event_slack_blast_path(current_event, slack_blast),
+          alert: "This blast looks like it might be marketing, spam, or not about the event, so it's waiting for a Hack Club admin to review it before it goes out."
+      end
     end
 
     def retry_failed
