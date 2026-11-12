@@ -6,6 +6,7 @@ module Admin
 
       if query.present?
         results[:participants] = search_participants_fuzzy(query)
+        results[:guardians] = search_guardians(query)
         results[:events] = search_events(query)
         results[:users] = search_users(query) if current_user.global_admin?
       end
@@ -76,6 +77,56 @@ module Admin
           }
         end
       end.compact.first(10)
+    end
+
+    # Parents and guardians by email or name, one row per child registration so
+    # the result opens the participant they're attached to. Guardian contact
+    # details are hidden from PII-restricted roles, so those events are left
+    # out entirely rather than matching on an email the role can't see.
+    def search_guardians(query)
+      return [] if query.length < 3
+
+      event_ids = guardian_searchable_event_ids
+      return [] if event_ids == []
+
+      like = "%#{ActiveRecord::Base.sanitize_sql_like(query)}%"
+      scope = GuardianParticipantEvent
+        .joins(:guardian, :participant_event)
+        .where(
+          "guardians.email ILIKE :like OR guardians.legal_first_name ILIKE :like " \
+          "OR guardians.legal_last_name ILIKE :like " \
+          "OR CONCAT(guardians.legal_first_name, ' ', guardians.legal_last_name) ILIKE :like",
+          like: like
+        )
+      scope = scope.where(participant_events: { event_id: event_ids }) if event_ids
+
+      scope
+        .includes(:guardian, participant_event: [ :participant, :event ])
+        .order("guardians.email")
+        .limit(10)
+        .filter_map do |link|
+          pe = link.participant_event
+          next unless pe.event && pe.participant
+
+          {
+            id: link.id,
+            name: link.guardian.full_name,
+            email: link.guardian.email,
+            participant_name: pe.participant.full_name,
+            event_name: pe.event.name,
+            url: admin_event_participant_path(pe.event, pe)
+          }
+        end
+    end
+
+    # nil means every event (global admins).
+    def guardian_searchable_event_ids
+      return nil if current_user.global_admin?
+
+      unrestricted = current_user.event_role_assignments
+        .where.not(role: EventRoleAssignment::PII_RESTRICTED_ROLES)
+        .pluck(:event_id)
+      (unrestricted + (current_user.assigned_event_ids & current_user.series_event_ids)).uniq
     end
 
     # `phone` is encrypted deterministically, so it can't participate in the
