@@ -275,7 +275,10 @@ Devise.setup do |config|
   unless ENV["SECRET_KEY_BASE_DUMMY"]
     require_relative "../../lib/omniauth/strategies/hack_club"
     config.omniauth :hack_club,
-      Rails.application.credentials.dig(:hack_club, :client_id),
+      # omniauth-oauth2 >= 1.10 fails the request phase outright when the
+      # client id is blank. Tests run without credentials in CI, so give them
+      # a placeholder that lets specs follow the redirect to Hack Club Auth.
+      Rails.application.credentials.dig(:hack_club, :client_id) || ("test-client-id" if Rails.env.test?),
       Rails.application.credentials.dig(:hack_club, :client_secret),
       # `openid profile phone birthdate` are the scopes HCA advertises in its
       # discovery document; `email`, `slack_id` and `verification_status` are
