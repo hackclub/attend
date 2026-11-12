@@ -704,7 +704,10 @@ module Admin
         return
       end
 
-      gpe.update!(invite_token_sent_at: nil)
+      # A staff resend is usually because the old link went somewhere it
+      # shouldn't have (wrong inbox, forwarded on), so it stops working now and
+      # the email carries a fresh one.
+      gpe.revoke_invite_token!
 
       GuardianMailer.invitation(guardian_participant_event: gpe).deliver_later
       redirect_to admin_event_participant_path(current_event, @participant_event), notice: "Guardian invite resent to #{gpe.guardian.email}."

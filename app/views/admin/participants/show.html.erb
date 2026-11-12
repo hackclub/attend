@@ -359,6 +359,7 @@
                     <%= button_to "Resend Invite",
                         resend_guardian_invite_admin_event_participant_path(current_event, @participant_event, guardian_participant_event_id: gpe.id),
                         method: :post,
+                        form: { data: { turbo_confirm: "Send #{gpe.guardian.full_name} a new portal link? Their current link will stop working." } },
                         class: "text-xs text-[#ec3750] hover:text-blue-800 font-medium" %>
                     <button type="button"
                             data-controller="clipboard"

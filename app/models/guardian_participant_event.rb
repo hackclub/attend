@@ -50,6 +50,18 @@ class GuardianParticipantEvent < ApplicationRecord
     end
   end
 
+  # Kills the current portal link outright: the digest is what
+  # find_by_invite_token! looks up, so clearing it makes the old URL 404 on the
+  # next request. The next generate_invite_token! (the mailer) mints a new one.
+  def revoke_invite_token!
+    update!(
+      invite_token_ciphertext: nil,
+      invite_token_digest: nil,
+      invite_token_sent_at: nil,
+      invite_last_used_at: nil
+    )
+  end
+
   # Handing this link to someone counts as sending it: an unstamped invite is
   # treated as dead by #invite_expired?, so admins copying a link out of the
   # participant page would otherwise paste a URL that 404s on arrival. Only
