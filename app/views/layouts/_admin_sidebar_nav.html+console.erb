@@ -60,6 +60,14 @@
     <%= nav_link.call("Messages", admin_event_messages_path(current_event), request.path.include?("/messages"), :messages) %>
     <%# These two used to be reachable only from the dashboard's quick-actions grid. %>
     <%= nav_link.call("Exports", admin_event_exports_path(current_event), request.path.include?("/exports"), :exports) %>
+    <%# Every settings tab (General, Features, Waivers & documents,
+        Integrations, API access) lights this one link up. %>
+    <% if policy(current_event).update? %>
+      <% settings_paths = [ edit_admin_event_path(current_event), features_admin_event_path(current_event),
+                            admin_event_documents_path(current_event), admin_event_integrations_path(current_event),
+                            admin_event_api_access_path(current_event) ] %>
+      <%= nav_link.call("Settings", edit_admin_event_path(current_event), settings_paths.include?(request.path), :settings) %>
+    <% end %>
     <%# Same gate as AuditLogsController#require_audit_access, so the link never dead-ends. %>
     <% if current_user.global_admin? || current_user.event_role_assignments.exists?(role: :event_admin) %>
       <%= nav_link.call("Event audit log", admin_audit_logs_path(event_id: current_event.id), request.path.start_with?("/admin/audit_logs") && params[:event_id] == current_event.id.to_s, :event_audit) %>

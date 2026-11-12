@@ -1,22 +1,8 @@
 <% content_for :title, "#{@series.name} Integrations – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs(cs_gated_crumb("Event series", admin_series_index_path, policy(EventSeries).index?), [ @series.name, admin_series_path(@series) ], [ "Integrations", nil ]) %>
+<% content_for :breadcrumbs, cs_breadcrumbs(cs_gated_crumb("Event series", admin_series_index_path, policy(EventSeries).index?), [ @series.name, admin_series_path(@series) ], [ "Settings", (edit_admin_series_path(@series) if policy(@series).update?) ], [ "Integrations", nil ]) %>
 
 <div class="cs-stack">
-  <div class="cs-header">
-    <div class="cs-header-text">
-      <div class="flex items-center gap-3 min-w-0">
-        <%= render "admin/events/avatar", event: @series, size: 32, rounded: "rounded-lg" %>
-        <h1 class="cs-h1 truncate"><%= @series.name %> integrations</h1>
-      </div>
-      <p class="cs-description">
-        Where this series' events get their projects judged. A gallery is per event, so a series
-        running satellites gets one each — create them here rather than event by event.
-      </p>
-    </div>
-    <div class="cs-actions">
-      <%= link_to "API keys", admin_series_api_tokens_path(@series), class: "cs-btn cs-btn-full" %>
-    </div>
-  </div>
+  <%= render "admin/event_series/settings_header", series: @series, current_tab: :integrations %>
 
   <% unless @vote_client.configured? %>
     <div class="cs-alert cs-alert-warning">

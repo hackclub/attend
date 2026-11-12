@@ -1,16 +1,8 @@
 <% content_for :title, "#{@series.name} API Keys – Attend" %>
-<% content_for :breadcrumbs, cs_breadcrumbs(cs_gated_crumb("Event series", admin_series_index_path, policy(EventSeries).index?), [ @series.name, admin_series_path(@series) ], [ "API keys", nil ]) %>
+<% content_for :breadcrumbs, cs_breadcrumbs(cs_gated_crumb("Event series", admin_series_index_path, policy(EventSeries).index?), [ @series.name, admin_series_path(@series) ], [ "Settings", (edit_admin_series_path(@series) if policy(@series).update?) ], [ "API keys", nil ]) %>
 
 <div class="cs-stack">
-  <div class="cs-header">
-    <div class="cs-header-text flex items-center gap-3 min-w-0">
-      <%= render "admin/events/avatar", event: @series, size: 32, rounded: "rounded-lg" %>
-      <h1 class="cs-h1 truncate"><%= @series.name %> API keys</h1>
-    </div>
-    <div class="cs-actions">
-      <%= link_to "Members", admin_series_members_path(@series), class: "cs-btn cs-btn-full" %>
-    </div>
-  </div>
+  <%= render "admin/event_series/settings_header", series: @series, current_tab: :api %>
 
   <% if flash[:series_api_token] %>
     <div class="cs-alert cs-alert-success" role="status">

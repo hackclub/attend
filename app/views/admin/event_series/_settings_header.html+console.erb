@@ -1,0 +1,37 @@
+<%# Header and tabs shared by the series settings pages. Each tab is gated by
+    the policy its controller checks, so none of them dead-ends. %>
+<%# Locals: series, current_tab (:general, :members, :integrations, :api),
+    actions (optional HTML for the header's action area) %>
+<% series_policy = policy(series) %>
+<% tabs = [
+     [ :general, "General", edit_admin_series_path(series), series_policy.update?,
+       "Branding here is inherited by every event in #{series.name} that doesn't set its own." ],
+     [ :members, "Members", admin_series_members_path(series), series_policy.manage_members?,
+       "Series members can manage every event in #{series.name}." ],
+     [ :integrations, "Integrations", admin_series_integrations_path(series), series_policy.manage_integrations?,
+       "Where this series' events get their projects judged. A gallery is per event, so a series running satellites gets one each. Create them here rather than event by event." ],
+     [ :api, "API keys", admin_series_api_tokens_path(series), series_policy.manage_api_tokens?,
+       "Keys that act on every event in #{series.name}." ]
+   ].select { |tab| tab[3] } %>
+<% current = tabs.find { |tab| tab[0] == current_tab } %>
+
+<div class="cs-header">
+  <div class="cs-header-text">
+    <div class="flex items-center gap-3 min-w-0">
+      <%= render "admin/events/avatar", event: series, size: 32, rounded: "rounded-lg" %>
+      <h1 class="cs-h1 truncate">Series settings</h1>
+    </div>
+    <% if current %>
+      <p class="cs-description"><%= current[4] %></p>
+    <% end %>
+  </div>
+  <% if local_assigns[:actions].present? %>
+    <div class="cs-actions"><%= actions %></div>
+  <% end %>
+</div>
+
+<nav class="cs-tabs" aria-label="Series settings">
+  <% tabs.each do |key, label, path, _allowed, _description| %>
+    <%= link_to label, path, class: "cs-tab", "aria-current": cs_current(key == current_tab) %>
+  <% end %>
+</nav>

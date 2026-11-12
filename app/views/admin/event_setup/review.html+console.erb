@@ -103,7 +103,7 @@
             <p>
               Waivers aren't configured yet, and participants can't finish onboarding without them.
               <% if policy(@event).manage_integrations? %>
-                Set them up from the <%= link_to "waivers step", admin_event_setup_waivers_path(@event), class: "cs-link" %> or the <%= link_to "integrations page", admin_event_integrations_path(@event), class: "cs-link" %>.
+                Set them up from the <%= link_to "waivers step", admin_event_setup_waivers_path(@event), class: "cs-link" %> or the <%= link_to "Waivers & documents settings", admin_event_documents_path(@event), class: "cs-link" %>.
               <% else %>
                 Ask an event admin to set them up.
               <% end %>

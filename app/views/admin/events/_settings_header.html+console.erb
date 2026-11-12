@@ -1,0 +1,33 @@
+<%# Header and tabs shared by every event settings page. Each tab is its own
+    page and form, gated by the same policy that guards its controller
+    action, so a tab never links somewhere that turns the viewer away. %>
+<%# Locals: event, current_tab (:general, :features, :documents, :integrations, :api) %>
+<% event_policy = policy(event) %>
+<% tabs = [
+     [ :general, "General", edit_admin_event_path(event), event_policy.update?,
+       "Name, branding, venue and dates." ],
+     [ :features, "Features", features_admin_event_path(event), event_policy.update?,
+       "Choose which parts of Attend this event uses." ],
+     [ :documents, "Waivers & documents", admin_event_documents_path(event), event_policy.manage_integrations?,
+       "What participants and their guardians sign before the event." ],
+     [ :integrations, "Integrations", admin_event_integrations_path(event), event_policy.manage_integrations?,
+       "Connect this event to Slack, Airtable, GitHub, itch.io and vote.hackclub.com." ],
+     [ :api, "API access", admin_event_api_access_path(event), event_policy.manage_integrations?,
+       "Tokens for scripts and services that add or list participants." ]
+   ].select { |tab| tab[3] } %>
+<% current = tabs.find { |tab| tab[0] == current_tab } %>
+
+<div class="cs-header">
+  <div class="cs-header-text">
+    <h1 class="cs-h1">Settings</h1>
+    <% if current %>
+      <p class="cs-description"><%= current[4] %></p>
+    <% end %>
+  </div>
+</div>
+
+<nav class="cs-tabs" aria-label="Event settings">
+  <% tabs.each do |key, label, path, _allowed, _description| %>
+    <%= link_to label, path, class: "cs-tab", "aria-current": cs_current(key == current_tab) %>
+  <% end %>
+</nav>

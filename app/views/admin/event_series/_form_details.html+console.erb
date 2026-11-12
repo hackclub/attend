@@ -1,0 +1,35 @@
+<%# One box of the series form. Locals: f, save (true when the box saves on its own) %>
+<section class="cs-container">
+  <div class="cs-container-header">
+    <h2 class="cs-h2">Series details</h2>
+  </div>
+  <div class="cs-container-body">
+    <div class="cs-field-grid">
+      <%= cs_form_field f, :name, label: "Series name" do |aria| %>
+        <%= f.text_field :name, class: "cs-input", required: true, **aria %>
+      <% end %>
+      <%= cs_form_field f, :slug, label: "Slug", optional: true,
+            constraint: "Lowercase letters, numbers and hyphens (-) only. Leave blank to create one from the name.",
+            messages: {
+              blank: "Slug is required. Enter a slug or a series name.",
+              taken: "This slug is already in use.",
+              invalid: "Enter a valid slug. Use lowercase letters, numbers and hyphens (-) only.",
+              exclusion: "This slug is reserved. Enter a different slug."
+            } do |aria| %>
+        <%= f.text_field :slug, class: "cs-input", pattern: "[a-z0-9\\-]+", data: { cs_pattern_message: "Enter a valid slug. Use lowercase letters, numbers and hyphens (-) only." }, **aria %>
+      <% end %>
+    </div>
+
+    <%= cs_form_field f, :description, label: "Description", optional: true,
+          constraint: "A short line about what this series is." do |aria| %>
+      <%= f.text_area :description, rows: 2, class: "cs-input", **aria %>
+    <% end %>
+
+    <%= cs_form_field f, :contact_email, label: "Contact email", optional: true,
+          messages: { invalid: "Enter a valid email address." },
+          constraint: "The sender and reply-to for emails from events in this series that don't set their own support email. Defaults to team@hackclub.com when neither is set." do |aria| %>
+      <%= f.email_field :contact_email, class: "cs-input", **aria %>
+    <% end %>
+  </div>
+  <%= cs_settings_save f if local_assigns[:save] %>
+</section>

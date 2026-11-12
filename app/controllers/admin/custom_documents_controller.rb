@@ -13,15 +13,15 @@ module Admin
         else
           "\"#{custom_document.name}\" added. Sync its fields to configure pre-fill mappings."
         end
-        redirect_to admin_event_integrations_path(@event), notice: notice
+        redirect_to admin_event_documents_path(@event), notice: notice
       else
-        redirect_to admin_event_integrations_path(@event),
+        redirect_to admin_event_documents_path(@event),
                     alert: "Couldn't add document: #{custom_document.errors.full_messages.to_sentence}"
       end
     rescue ArgumentError => e
       # Enum setters (document_kind, signer_type) raise on values outside the
       # allowed set rather than adding a validation error.
-      redirect_to admin_event_integrations_path(@event), alert: "Couldn't add document: #{e.message}"
+      redirect_to admin_event_documents_path(@event), alert: "Couldn't add document: #{e.message}"
     end
 
     def edit
@@ -51,7 +51,7 @@ module Admin
           @custom_document.update_column(:template_page_count, nil)
         end
 
-        redirect_to admin_event_integrations_path(@event),
+        redirect_to admin_event_documents_path(@event),
                     notice: "\"#{@custom_document.name}\" updated.#{" Sync its fields again to reconfigure pre-fill." if template_id_changed && @custom_document.electronic?}"
       else
         # The console shows these errors under their fields instead.
@@ -71,12 +71,12 @@ module Admin
         # stay labelled, just hide it from participants and the add flow.
         custom_document.archive!
         remove_field_mappings(custom_document)
-        redirect_to admin_event_integrations_path(@event),
+        redirect_to admin_event_documents_path(@event),
                     notice: "\"#{custom_document.name}\" archived. Existing signatures are kept."
       else
         custom_document.destroy!
         remove_field_mappings(custom_document)
-        redirect_to admin_event_integrations_path(@event),
+        redirect_to admin_event_documents_path(@event),
                     notice: "\"#{custom_document.name}\" removed."
       end
     end

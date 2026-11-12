@@ -66,7 +66,7 @@ RSpec.describe "Admin console timestamps", type: :request do
     expect(expect_compliant(admin_event_incident_path(event, incident))).not_to be_empty
     expect_compliant(admin_event_setup_review_path(event.slug))
     expect(response.body).to match(/[A-Z][a-z]+ \d{1,2}( – [A-Z][a-z]+)? ?–? ?\d{1,2}, \d{4}/)
-    expect(expect_compliant(admin_event_integrations_path(event.slug))).not_to be_empty
+    expect(expect_compliant(admin_event_api_access_path(event.slug))).not_to be_empty
     expect_compliant(admin_event_staff_index_path(event))
   end
 

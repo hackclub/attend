@@ -115,7 +115,9 @@
       <div class="lg:col-span-3 min-w-0">
         <%= render "admin/event_series/events", event_rows: @paged_event_rows, series: @series %>
       </div>
-      <div class="lg:col-span-2 min-w-0">
+      <%# Sticky and self-start so a long events list scrolls past a map that
+          keeps its own height, instead of stretching it into a grey column. %>
+      <div class="lg:col-span-2 min-w-0 lg:self-start lg:sticky lg:top-6">
         <%= render "admin/event_series/map", dashboard: @dashboard, event_rows: @event_rows %>
       </div>
     </div>

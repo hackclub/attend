@@ -1,0 +1,10 @@
+<% content_for :title, "Features – #{@event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Settings", edit_admin_event_path(@event) ], [ "Features", nil ], event: @event) %>
+
+<div class="cs-stack">
+  <%= render "admin/events/settings_header", event: @event, current_tab: :features %>
+
+  <%= render "admin/events/feature_fields", event: @event %>
+
+  <%= cs_form_errors @event %>
+</div>

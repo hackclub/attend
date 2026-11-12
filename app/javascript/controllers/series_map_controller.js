@@ -68,6 +68,9 @@ export default class extends Controller {
       scrollWheelZoom: false,
       zoomControl: true,
       minZoom: 1,
+      // Quarter steps so the world-fitting floor below can land between
+      // whole zooms rather than leaving grey bars either side.
+      zoomSnap: 0.25,
       maxBounds: [[-85, -180], [85, 180]],
       maxBoundsViscosity: 1.0
     })
@@ -78,16 +81,17 @@ export default class extends Controller {
       noWrap: true
     }).addTo(this.map)
 
-    // The map shares a row with the funnel, so its height is settled by the
-    // taller of the two. Without this the canvas keeps the size it was built
-    // at and the tiles sit in the wrong place.
+    // The column width changes with the viewport. Without this the canvas
+    // keeps the size it was built at and the tiles sit in the wrong place.
     this.resizeObserver = new ResizeObserver(() => {
       if (!this.map) return
       this.map.invalidateSize()
+      this.applyWorldFloor()
       this.fitToBounds()
     })
     this.resizeObserver.observe(this.mapTarget)
 
+    this.applyWorldFloor()
     this.bounds = []
 
     for (const marker of this.markersValue) {
@@ -99,6 +103,9 @@ export default class extends Controller {
         // is what puts tabindex and role="button" on the icon, so the popup's
         // link to the event dashboard is reachable without a pointer.
         keyboard: true,
+        // Smaller dots stack above larger ones so a small venue is never
+        // buried under a big neighbour (Leaflet otherwise stacks by latitude).
+        zIndexOffset: -marker.radius * 1000,
         icon: L.divIcon({
           className: "",
           html: this.markerHtml(marker, size),
@@ -116,6 +123,17 @@ export default class extends Controller {
     }
 
     this.fitToBounds()
+  }
+
+  // With noWrap the world is one 256px tile wide at zoom 0, so any zoom that
+  // makes it narrower than the container leaves grey bands either side. Floor
+  // the zoom at the level where the world spans the full width.
+  applyWorldFloor() {
+    const width = this.mapTarget.clientWidth
+    if (!this.map || width === 0) return
+
+    const floor = Math.max(1, Math.ceil(Math.log2(width / 256) * 4) / 4)
+    this.map.setMinZoom(floor)
   }
 
   fitToBounds() {

@@ -47,6 +47,18 @@ RSpec.describe BroadcastScreener do
       expect(result.categories).to eq([ "spam" ])
     end
 
+    it "doesn't treat Google Maps share links as shorteners" do
+      [ "https://maps.app.goo.gl/AbC123xyz", "https://goo.gl/maps/AbC123xyz" ].each do |link|
+        result = screen("The venue is here: #{link}. Doors open at 9am.")
+
+        expect(result).not_to be_flagged, "expected #{link} not to be flagged"
+      end
+    end
+
+    it "still flags a plain goo.gl short link" do
+      expect(screen("Grab yours at https://goo.gl/AbC123")).to be_flagged
+    end
+
     it "lets ordinary logistics through" do
       result = screen("Doors open at 9am on Saturday. Bring a laptop, charger and your ID. Lunch and prizes provided!")
 
