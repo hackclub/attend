@@ -53,7 +53,10 @@ RSpec.describe "Badge verification", type: :request do
   end
 
   describe "sharing, as the holder" do
-    before { sign_in holder }
+    before do
+      create(:training_profile, user: holder)
+      sign_in holder
+    end
 
     it "turns a link on and off" do
       post share_training_award_path(award)

@@ -26,6 +26,7 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="text-sm font-medium text-gray-900"><%= assignment.user.display_name_or_fallback %></div>
                 <div class="text-sm text-gray-500"><%= assignment.user.email %></div>
+                <%= render "admin/event_staff/training_details", user: assignment.user %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <% refusal = role_change_refusal(assignment) %>
@@ -91,6 +92,7 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="text-sm font-medium text-gray-900"><%= user.display_name_or_fallback %></div>
                 <div class="text-sm text-gray-500"><%= user.email %></div>
+                <%= render "admin/event_staff/training_details", user: user %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap"><%= training_status_flag(@training_status.for(user.id)) %></td>
             </tr>
@@ -117,6 +119,7 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="text-sm font-medium text-gray-900"><%= volunteer.user.display_name_or_fallback %></div>
                 <div class="text-sm text-gray-500"><%= volunteer.user.email %></div>
+                <%= render "admin/event_staff/training_details", user: volunteer.user %>
               </td>
               <td class="px-6 py-4 whitespace-nowrap"><%= training_status_flag(@training_status.for(volunteer.user_id)) %></td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

@@ -18,6 +18,12 @@ module TrainingHelper
     sanitize(html, tags: LESSON_TAGS, attributes: LESSON_ATTRIBUTES)
   end
 
+  # Signed in with an emailed code (TrainingSignIn): the session reaches
+  # /training and nothing else, so the header only offers that.
+  def training_only_session?
+    user_signed_in? && session[TrainingSignIn::SESSION_KEY].present?
+  end
+
   # The learner nav shows Training to anyone who might need it: staff,
   # volunteers, invitees, anyone who has started a course or holds a badge.
   # Participants don't.

@@ -3,6 +3,7 @@ module Training
     include RestrictsBannedUsers
 
     before_action :require_sign_in
+    before_action :require_training_profile
 
     private
 
@@ -14,6 +15,15 @@ module Training
 
       session[:training_return_to] = request.fullpath if request.get? || request.head?
       redirect_to training_sign_in_path
+    end
+
+    # Everyone gives their contact details and how they're connected to the
+    # event before they see any course, and comes back to where they were.
+    def require_training_profile
+      return if current_user.training_profile
+
+      session[:training_return_to] = request.fullpath if request.get? || request.head?
+      redirect_to edit_training_profile_path
     end
 
     def training_access

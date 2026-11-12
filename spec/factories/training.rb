@@ -61,4 +61,17 @@ FactoryBot.define do
     event
     user
   end
+
+  factory :training_profile do
+    user
+    full_name { "Example Volunteer" }
+    connection_type { "parent_guardian" }
+    connection_detail { "Parent of Example Participant" }
+    phone_number { "+12025550143" }
+    address_line_1 { "1 Example Street" }
+    city { "Exampleton" }
+    state { "VT" }
+    postal_code { "05401" }
+    country { "United States" }
+  end
 end

@@ -314,7 +314,9 @@ def admin_tool(class_name = "", element = "div", **options, &block)
     "Zimbabwe"
   ].freeze
 
-  def country_options_for_select(selected = nil)
+  # A `required` select gets its own blank option from Rails, so pass
+  # `placeholder: false` there and name it with `include_blank:` instead.
+  def country_options_for_select(selected = nil, placeholder: true)
     options = COUNTRIES.map do |country|
       if country == "---"
         [ "─────────────", "", { disabled: true } ]
@@ -322,7 +324,8 @@ def admin_tool(class_name = "", element = "div", **options, &block)
         [ country, country ]
       end
     end
-    options_for_select([ [ "Select country", "" ] ] + options, selected)
+    options.unshift([ "Select country", "" ]) if placeholder
+    options_for_select(options, selected)
   end
 
   # Flight-leg times are entered manually. The picker defaults to "Auto", which

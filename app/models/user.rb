@@ -78,6 +78,7 @@ class User < ApplicationRecord
   has_many :training_badge_awards, dependent: :destroy
   has_many :training_course_invitations, dependent: :destroy
   has_many :training_disclosures, dependent: :destroy
+  has_one :training_profile, dependent: :destroy
   # The database nullifies these when a user goes; the privacy hub erases
   # them along with the user.
   has_many :visa_letter_applications

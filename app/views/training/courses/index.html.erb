@@ -1,9 +1,12 @@
 <% content_for :title, "Training – Attend" %>
 
 <div class="w-full max-w-3xl mx-auto">
-  <div class="mb-8">
-    <h1 class="portal-title text-3xl mb-2">Training</h1>
-    <p class="portal-hint">Courses everyone working at a Hack Club event needs to complete.</p>
+  <div class="mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+    <div>
+      <h1 class="portal-title text-3xl mb-2">Training</h1>
+      <p class="portal-hint">Courses everyone working at a Hack Club event needs to complete.</p>
+    </div>
+    <%= link_to "Your details", edit_training_profile_path, class: "portal-btn portal-btn-secondary shrink-0 self-start" unless training_only_session? %>
   </div>
 
   <% @requirements.each do |event, status| %>

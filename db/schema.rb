@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_12_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_12_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1552,6 +1552,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_130000) do
     t.index ["training_course_id"], name: "index_training_lessons_on_training_course_id"
   end
 
+  create_table "training_profiles", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "user_id", null: false
+    t.string "full_name", null: false
+    t.string "connection_type", null: false
+    t.text "connection_detail", null: false
+    t.text "phone_number", null: false
+    t.text "address_line_1", null: false
+    t.text "address_line_2"
+    t.text "city", null: false
+    t.text "state"
+    t.text "postal_code"
+    t.text "country", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_training_profiles_on_user_id", unique: true
+  end
+
   create_table "training_question_options", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "body", null: false
     t.boolean "correct", default: false, null: false
@@ -1925,6 +1942,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_130000) do
   add_foreign_key "training_lesson_completions", "training_enrollments", on_delete: :cascade
   add_foreign_key "training_lesson_completions", "training_lessons", on_delete: :cascade
   add_foreign_key "training_lessons", "training_courses", on_delete: :cascade
+  add_foreign_key "training_profiles", "users", on_delete: :cascade
   add_foreign_key "training_question_options", "training_questions", on_delete: :cascade
   add_foreign_key "training_questions", "training_lessons", on_delete: :cascade
   add_foreign_key "training_quiz_attempts", "training_enrollments", on_delete: :cascade

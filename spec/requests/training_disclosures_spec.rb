@@ -7,7 +7,10 @@ RSpec.describe "Training declarations", type: :request do
   let(:course) { create(:training_course, :published, disclosure_required: true, access: "open") }
   let(:first_lesson) { course.lessons.first }
 
-  before { sign_in learner }
+  before do
+    create(:training_profile, user: learner)
+    sign_in learner
+  end
 
   it "asks before the first lesson, and lets a no carry on" do
     post enroll_training_course_path(course)

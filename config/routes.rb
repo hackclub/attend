@@ -177,6 +177,8 @@ Rails.application.routes.draw do
     post "/verify", action: :verify
   end
   namespace :training do
+    # Contact details everyone gives before training (TrainingProfile).
+    resource :profile, only: [ :edit, :update ], path: "details", path_names: { edit: "" }
     resources :awards, only: :show, path: "badges" do
       member do
         post :share

@@ -29,3 +29,9 @@
 
 en:
   hello: "Hello world"
+  activerecord:
+    attributes:
+      training_profile:
+        connection_type: "How you're connected to the event"
+        connection_detail: "Tell us more"
+        address_line_1: "Address line 1"

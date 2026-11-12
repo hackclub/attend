@@ -13,6 +13,7 @@ RSpec.describe "Training", type: :request do
   let(:wrong) { question.options.reject(&:correct?).first }
 
   before do
+    create(:training_profile, user: learner)
     sign_in learner
     TrainingCourseInvitation.create!(course: course, user: learner)
   end
@@ -129,6 +130,7 @@ RSpec.describe "Training", type: :request do
       expect(reading.reload.video_duration_seconds).to be_nil
 
       admin = create(:user, global_role: "global_admin")
+      create(:training_profile, user: admin)
       sign_in admin
       post enroll_training_course_path(course)
       post video_progress_training_course_lesson_path(course, reading), params: { position: 0, duration: 212.5 }, as: :json
