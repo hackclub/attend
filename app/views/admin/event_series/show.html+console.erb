@@ -54,6 +54,11 @@
       </div>
     </div>
     <div class="cs-actions flex-wrap">
+      <% if policy(@series).view_change_requests? %>
+        <%= link_to admin_series_change_requests_path(@series), class: "cs-btn" do %>
+          Change requests<% if (pending = @dashboard.pending_change_request_count).positive? %> <span class="cs-counter">(<%= pending %>)</span><% end %>
+        <% end %>
+      <% end %>
       <%# Members, integrations and API keys are tabs of Settings. %>
       <% if policy(@series).update? %>
         <%= link_to "Settings", edit_admin_series_path(@series), class: "cs-btn" %>

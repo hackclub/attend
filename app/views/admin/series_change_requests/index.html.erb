@@ -1,0 +1,54 @@
+<% content_for :title, "#{@series.name} Change requests – Attend" %>
+<% status_labels = { "pending" => "Pending", "follow_up_needed" => "Follow-up needed", "approved" => "Approved", "all" => "All" } %>
+
+<div class="max-w-5xl mx-auto space-y-6">
+  <div class="flex items-center gap-3 min-w-0">
+    <%= render "admin/events/avatar", event: @series, size: 32, rounded: "rounded-lg" %>
+    <div class="min-w-0">
+      <h1 class="text-2xl font-bold text-gray-900 truncate"><%= @series.name %> change requests</h1>
+      <p class="text-sm text-gray-500">Registration change requests from every event in the series. Open one to review it on its event.</p>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <nav class="flex flex-wrap gap-2" aria-label="Status">
+      <% Admin::SeriesChangeRequestsController::STATUS_FILTERS.each do |status| %>
+        <% count = status == "all" ? @status_counts.values.sum : @status_counts.fetch(status, 0) %>
+        <% active = @status_filter == status %>
+        <%= link_to admin_series_change_requests_path(@series, status: status, event: @event_filter&.slug),
+              "aria-current": ("page" if active),
+              class: "px-3 py-1.5 text-sm rounded-md border #{active ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'}" do %>
+          <%= status_labels.fetch(status) %> (<%= count %>)
+        <% end %>
+      <% end %>
+    </nav>
+    <% if @events.size > 1 %>
+      <%= form_with url: admin_series_change_requests_path(@series), method: :get, local: true, data: { controller: "auto-submit" } do %>
+        <%= hidden_field_tag :status, @status_filter %>
+        <%= select_tag :event,
+              options_for_select(@events.map { |event| [ event.name, event.slug ] }, @event_filter&.slug),
+              include_blank: "All events", "aria-label": "Filter by event",
+              class: "rounded-md border-gray-300 text-sm",
+              data: { action: "change->auto-submit#submit" } %>
+        <noscript><button type="submit" class="px-3 py-1.5 text-sm rounded-md border border-gray-200">Apply</button></noscript>
+      <% end %>
+    <% end %>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+    <% @change_requests.each do |request_record| %>
+      <% event = request_record.participant_event.event %>
+      <%= link_to admin_event_registration_change_request_path(event, request_record), class: "block p-4 hover:bg-gray-50" do %>
+        <div class="flex justify-between gap-4">
+          <span class="font-medium"><%= request_record.participant_event.participant.display_name %> · <%= request_record.kind.titleize %></span>
+          <span class="text-sm whitespace-nowrap"><%= request_record.status.titleize %></span>
+        </div>
+        <p class="text-sm text-gray-500 mt-0.5"><%= event.name %> · <%= time_ago_in_words(request_record.created_at) %> ago</p>
+        <% if request_record.support? %><p class="text-sm text-gray-600 mt-1"><%= truncate(request_record.requester_note, length: 160) %></p><% end %>
+      <% end %>
+    <% end %>
+    <% if @change_requests.empty? %>
+      <p class="p-8 text-center text-gray-500"><% if @status_filter == "pending" %>No pending change requests.<% else %>No change requests match.<% end %></p>
+    <% end %>
+  </div>
+</div>

@@ -17,6 +17,12 @@ class EventSeriesPolicy < ApplicationPolicy
     user.series_owner_for?(record)
   end
 
+  # Series members act as event admins on every event in the series, so they
+  # can see every audience's change requests across it.
+  def view_change_requests?
+    show?
+  end
+
   def manage_members?
     user.series_owner_for?(record)
   end
