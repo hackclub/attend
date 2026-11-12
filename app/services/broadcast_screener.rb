@@ -42,6 +42,20 @@ class BroadcastScreener
     [ /\b(verify your account|confirm your (password|login)|your account (has been|will be) (suspended|locked))\b/i, "spam", "reads like phishing" ]
   ].freeze
 
+  # Content that never goes out, whoever sends it and whatever a reviewer
+  # decides: unlike HEURISTICS these don't hold a broadcast for review, they
+  # stop it being saved at all (see ScreenedBroadcast#blocked_content).
+  #
+  # A guardian portal link opens one family's portal without signing in, so
+  # broadcasting it hands that family's forms, waivers and contact details to
+  # every recipient. Each guardian already gets their own link.
+  BLOCKED = [
+    [ %r{/guardian/(?:portal|invite)/[A-Za-z0-9_-]{16,}}i,
+      "can't include a guardian portal link: each one opens a single family's portal " \
+      "without signing in, so everyone who gets the message could open it. " \
+      "Guardians already get their own link." ]
+  ].freeze
+
   SYSTEM_PROMPT = <<~PROMPT.freeze
     You screen broadcasts that organisers of Hack Club events send to attendees and their parents or guardians, by email, SMS and Slack DM. Attendees are mostly teenagers. Hack Club is a nonprofit, and these channels exist only for running the event.
 
@@ -74,6 +88,12 @@ class BroadcastScreener
 
   def self.api_key
     ENV["ANTHROPIC_API_KEY"].presence || Rails.application.credentials.dig(:anthropic, :api_key)
+  end
+
+  # Why the given text may never be sent (see BLOCKED), or an empty list.
+  def self.blocked_reasons(*texts)
+    text = texts.compact.join("\n")
+    BLOCKED.filter_map { |pattern, reason| reason if text.match?(pattern) }
   end
 
   def initialize(event:, text:, subject: nil, client: nil)

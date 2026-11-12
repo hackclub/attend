@@ -120,12 +120,16 @@ module Api
 
         if scheduled_in_future?
           held = !@message.schedule!(sender: current_user)
+          return render_error(@message.errors.full_messages.to_sentence) if @message.errors.any?
+
           audit_api_change!(:send_now, @message)
           notice = held ? HELD_FOR_REVIEW : "Message scheduled for #{@message.local_scheduled_at.strftime("%B %d, %Y at %l:%M %p %Z")}."
           render json: { message: message_json(@message), notice: notice, held_for_review: held }
         elsif @message.send!(sender: current_user)
           audit_api_change!(:send_now, @message)
           render json: { message: message_json(@message.reload), notice: "Message is being sent to #{@message.recipient_count} recipients." }
+        elsif @message.errors.any?
+          render_error(@message.errors.full_messages.to_sentence)
         elsif @message.pending_review?
           audit_api_change!(:send_now, @message)
           render json: { message: message_json(@message), notice: HELD_FOR_REVIEW, held_for_review: true }

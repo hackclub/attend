@@ -58,6 +58,14 @@ class SlackBlast < ApplicationRecord
     [ doc.text.squish, *links ].join("\n")
   end
 
+  def blocked_content_sources
+    [ message ]
+  end
+
+  def check_blocked_content?
+    will_save_change_to_message?
+  end
+
   def update_counts!
     update!(
       sent_count: slack_blast_recipients.where(status: "sent").count,

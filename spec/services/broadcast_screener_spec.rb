@@ -28,6 +28,20 @@ RSpec.describe BroadcastScreener do
     described_class.call(event: event, subject: subject, text: text, client: client)
   end
 
+  describe ".blocked_reasons" do
+    it "catches a guardian portal or invite link on any host" do
+      token = SecureRandom.urlsafe_base64(32)
+
+      [ "https://attend.example.com/guardian/portal/#{token}", "/guardian/invite/#{token}" ].each do |link|
+        expect(described_class.blocked_reasons("Here you go: #{link}")).to contain_exactly(a_string_including("guardian portal link"))
+      end
+    end
+
+    it "ignores ordinary text and the token-less portal page" do
+      expect(described_class.blocked_reasons("Sign in at https://attend.example.com/guardian/portals", nil)).to be_empty
+    end
+  end
+
   describe "heuristics" do
     it "flags a promo code without asking Claude" do
       client = fake_client_class.new(verdict: { hold: false, category: "ok", reason: "" })

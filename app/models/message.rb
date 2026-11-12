@@ -268,8 +268,12 @@ class Message < ApplicationRecord
   # held it for review, in which case it is now #pending_review?.
   #
   # `sender` is who is sending it now; a scheduled send counts as its author.
+  # Also false, with the reasons in #errors, for a draft saved before a
+  # BroadcastScreener::BLOCKED rule caught it; a scheduled one goes back to
+  # draft so it stops being picked up.
   def send!(sender: sent_by_user)
     return false unless draft? || scheduled?
+    return false if refuse_blocked_content!
 
     flagged = screen_for_review(sender: sender)
     sent = with_lock do
@@ -291,6 +295,8 @@ class Message < ApplicationRecord
   # Schedules a draft for later, screening it now so a held message is
   # reviewed before its send time rather than at it. Returns false if held.
   def schedule!(sender:)
+    return false if refuse_blocked_content!
+
     flagged = screen_for_review(sender: sender)
     with_lock do
       if flagged
@@ -337,6 +343,27 @@ class Message < ApplicationRecord
 
   def screening_text
     body_as_plain
+  end
+
+  def blocked_content_sources
+    [ body ]
+  end
+
+  def refuse_blocked_content!
+    reasons = blocked_content_reasons
+    return false if reasons.empty?
+
+    reasons.each { |reason| errors.add(:base, reason) }
+    update_columns(status: "draft") if scheduled?
+    true
+  end
+
+  # On every edit, and again on the way out, so a draft saved before a rule
+  # existed can't be sent either. Not on later status updates, so a message
+  # that already went out keeps working.
+  def check_blocked_content?
+    will_save_change_to_body? || will_save_change_to_subject? ||
+      (will_save_change_to_status? && (scheduled? || sending? || pending_review?))
   end
 
   # A catch-up send only makes sense once the original send has gone out and

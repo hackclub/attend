@@ -44,6 +44,11 @@ class BroadcastReview < ApplicationRecord
   end
 
   def approve!(user, note: nil)
+    # Held before a BroadcastScreener::BLOCKED rule existed: no approval can
+    # send it, so it has to be rejected (or edited by its author).
+    blocked = reviewable.blocked_content_reasons
+    raise DecisionError, blocked.first if blocked.any?
+
     decide!(:approved, user, note) do
       reviewable.update_columns(screened_digest: content_digest)
     end

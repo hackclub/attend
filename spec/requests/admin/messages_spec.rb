@@ -9,6 +9,36 @@ RSpec.describe "Admin::Messages", type: :request do
 
   before { sign_in admin }
 
+  describe "POST create with a guardian portal link" do
+    let(:portal_link) { "https://attend.example.com/guardian/portal/#{SecureRandom.urlsafe_base64(32)}" }
+
+    def create_message(body, format: nil)
+      post admin_event_messages_path(event_slug: event.slug, format: format),
+        params: { message: { subject: "Hi", body: body, audience: "all_guardians", channels: [ "email" ] } }
+    end
+
+    [ false, true ].each do |console|
+      it "refuses the draft and says why (console: #{console})" do
+        admin.update!(admin_console_beta: console)
+
+        expect { create_message(%(<p>Open <a href="#{portal_link}">your portal</a></p>)) }.not_to change(Message, :count)
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.body).to include("guardian portal link")
+      end
+    end
+
+    it "returns the reason to the JSON save too" do
+      expect { create_message("<p>#{portal_link}</p>", format: :json) }.not_to change(Message, :count)
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.parsed_body["errors"].to_sentence).to include("guardian portal link")
+    end
+
+    it "still saves an ordinary message" do
+      expect { create_message("<p>Doors open at 9am.</p>") }.to change(Message, :count).by(1)
+      expect(response).to have_http_status(:redirect)
+    end
+  end
+
   describe "GET new" do
     it "renders the compose form without creating a draft" do
       expect {
