@@ -281,6 +281,8 @@ Rails.application.routes.draw do
       member do
         get :select
         post :select
+        # The settings tabs after General (edit): which modules the event uses.
+        get :features
         post :regenerate_api_key
         patch :attach_image
         patch :clear_waiver_dates_warning
@@ -546,6 +548,9 @@ Rails.application.routes.draw do
     end
 
     resource :settings, only: [ :show ] do
+      # General (show) holds the app-wide switches; this tab holds Twilio,
+      # WhatsApp and the Slack channels.
+      get :integrations
       post :toggle_maintenance
       post :toggle_twilio
       post :update_twilio_from_number
@@ -580,6 +585,10 @@ Rails.application.routes.draw do
     # Slug-based routes must come last to avoid matching other routes
     get ":slug", to: "dashboard#show", as: :event_dashboard, constraints: { slug: /[a-z0-9-]+/ }
     get ":slug/integrations", to: "dashboard#integrations", as: :event_integrations, constraints: { slug: /[a-z0-9-]+/ }
+    # Settings tabs split out of the old all-in-one integrations page. Both
+    # save through dashboard#update_integrations.
+    get ":slug/documents", to: "dashboard#documents", as: :event_documents, constraints: { slug: /[a-z0-9-]+/ }
+    get ":slug/api", to: "dashboard#api_access", as: :event_api_access, constraints: { slug: /[a-z0-9-]+/ }
     patch ":slug/integrations", to: "dashboard#update_integrations", constraints: { slug: /[a-z0-9-]+/ }
     post ":slug/integrations/airtable_sync", to: "dashboard#trigger_airtable_sync", as: :event_trigger_airtable_sync, constraints: { slug: /[a-z0-9-]+/ }
     post ":slug/integrations/airtable/connection", to: "airtable_connections#create", as: :event_airtable_connection, constraints: { slug: /[a-z0-9-]+/ }

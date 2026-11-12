@@ -8,14 +8,14 @@ module Admin
 
       name = params[:name].to_s.strip
       if name.blank?
-        redirect_to admin_event_integrations_path(@event), alert: "Please enter a name for the API token."
+        redirect_to admin_event_api_access_path(@event), alert: "Please enter a name for the API token."
         return
       end
 
       token = EventApiToken.generate_for(@event, user: current_user, name: name)
       flash[:event_api_token] = token.token
       flash[:event_api_token_id] = token.id
-      redirect_to admin_event_integrations_path(@event),
+      redirect_to admin_event_api_access_path(@event),
         notice: "API token \"#{token.name}\" created. Copy it now — it won't be shown again."
     end
 
@@ -27,7 +27,7 @@ module Admin
       token.rotate!
       flash[:event_api_token] = token.token
       flash[:event_api_token_id] = token.id
-      redirect_to admin_event_integrations_path(@event),
+      redirect_to admin_event_api_access_path(@event),
         notice: "API token \"#{token.name}\" rotated. Copy the new value now — it won't be shown again."
     end
 
@@ -37,7 +37,7 @@ module Admin
 
       token = @event.event_api_tokens.active.find(params[:id])
       token.revoke!
-      redirect_to admin_event_integrations_path(@event),
+      redirect_to admin_event_api_access_path(@event),
         notice: "API token \"#{token.name}\" revoked."
     end
   end

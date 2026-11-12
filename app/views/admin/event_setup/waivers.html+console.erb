@@ -3,9 +3,9 @@
 <% description = "Participants and their guardians sign waivers digitally through DocuSeal during onboarding. Choose how to set them up." %>
 
 <% if params[:return_to] == "integrations" %>
-  <%# Reached from the integrations page, outside of setup: no step list. %>
+  <%# Reached from the Waivers & documents settings tab, outside of setup: no step list. %>
   <% content_for :breadcrumbs, cs_event_breadcrumbs(
-       cs_gated_crumb("Integrations", admin_event_integrations_path(@event), policy(@event).manage_integrations?),
+       cs_gated_crumb("Waivers & documents", admin_event_documents_path(@event), policy(@event).manage_integrations?),
        [ "Set up waivers", nil ],
        event: @event
      ) %>

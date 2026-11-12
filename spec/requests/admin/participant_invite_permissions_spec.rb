@@ -128,9 +128,9 @@ RSpec.describe "Participant invite permissions", type: :request do
         expect(response.body).not_to include(new_invite_admin_event_participants_path(event.slug))
         expect(response.body).not_to include(new_admin_event_import_path(event.slug))
 
-        get admin_event_integrations_path(event.slug)
+        get admin_event_api_access_path(event.slug)
         if role == "ops"
-          # Ops can open the page (manage_integrations?) but not touch tokens.
+          # Ops can open the API access tab (manage_integrations?) but not touch tokens.
           expect(response.body).not_to include(admin_event_api_tokens_path(event.slug))
           expect(response.body).to include("only event admins can create, rotate, or revoke them")
         else
@@ -181,7 +181,7 @@ RSpec.describe "Participant invite permissions", type: :request do
       expect(response.body).to include(new_invite_admin_event_participants_path(event.slug))
       expect(response.body).to include(new_admin_event_import_path(event.slug))
 
-      get admin_event_integrations_path(event.slug)
+      get admin_event_api_access_path(event.slug)
       expect(response.body).to include(admin_event_api_tokens_path(event.slug))
     end
   end

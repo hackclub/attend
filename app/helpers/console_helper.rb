@@ -477,6 +477,26 @@ module ConsoleHelper
     end.uniq
   end
 
+  # One box of a settings page as a form of its own, so each box carries its
+  # own Save button instead of the page sharing one at the bottom that's easy
+  # to miss. `tab` tells the controller which settings tab to go back to; a
+  # save from the setup wizard keeps its return_to.
+  def cs_settings_form(record, url: nil, method: :patch, tab: nil, multipart: false, &block)
+    form_with(model: record, url: url, method: method, multipart: multipart,
+      html: { novalidate: true }, data: { controller: "cs-form-validation" }) do |f|
+      safe_join([
+        (hidden_field_tag(:tab, tab, id: nil) if tab),
+        (hidden_field_tag(:return_to, params[:return_to], id: nil) if params[:return_to].in?(Admin::EventsController::SETUP_RETURNS)),
+        capture(f, &block)
+      ].compact)
+    end
+  end
+
+  # The footer holding a settings box's own Save button.
+  def cs_settings_save(form, label = "Save")
+    content_tag(:div, form.button(label, class: "cs-btn cs-btn-primary"), class: "cs-container-footer flex justify-end")
+  end
+
   # Errors that no cs_form_field on this form claimed (and anything on
   # :base), as a Cloudscape alert. Put it just before the form's actions.
   # `form_or_object` is a FormBuilder or a model; pass several to merge.

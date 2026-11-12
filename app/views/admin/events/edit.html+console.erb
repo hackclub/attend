@@ -1,13 +1,10 @@
-<% content_for :title, "Edit #{@event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Event settings", nil ], event: @event, event_name: @event.name_was.presence || @event.name, event_slug: @event.slug_was.presence || @event.slug) %>
-
-<div class="cs-header">
-  <div class="cs-header-text">
-    <h1 class="cs-h1">Edit <%= @event.name %></h1>
-  </div>
-</div>
+<% content_for :title, "Settings – #{@event.name_was.presence || @event.name} – Attend" %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Settings", nil ], event: @event, event_name: @event.name_was.presence || @event.name, event_slug: @event.slug_was.presence || @event.slug) %>
 
 <div class="cs-stack">
+  <%# A failed save re-renders with the typed (unsaved) slug, which no tab
+      route would find, so the tabs link from the saved one. %>
+  <%= render "admin/events/settings_header", event: @event.slug_changed? ? Event.find(@event.id) : @event, current_tab: :general %>
   <%= render "form", event: @event %>
 
   <% if policy(@event).destroy? %>

@@ -30,7 +30,7 @@ RSpec.describe "Admin::Settings", type: :request do
         Setting.support_sms_notification_numbers = [ "+14155551234" ]
         sign_in global_admin
 
-        get admin_settings_path
+        get integrations_admin_settings_path
 
         expect(response).to have_http_status(:ok)
         expect(response.body).to include("Support inbox notifications")
@@ -94,7 +94,7 @@ RSpec.describe "Admin::Settings", type: :request do
         Setting.twilio_verify_service_sid = service_sid
         sign_in global_admin
 
-        get admin_settings_path
+        get(console ? integrations_admin_settings_path : admin_settings_path)
 
         expect(response).to have_http_status(:ok)
         expect(response.body).to include(service_sid)
@@ -108,7 +108,7 @@ RSpec.describe "Admin::Settings", type: :request do
       post update_twilio_verify_admin_settings_path,
         params: { twilio_verify_service_sid: " #{service_sid} ", twilio_verify_whatsapp: "1" }
 
-      expect(response).to redirect_to(admin_settings_path)
+      expect(response).to redirect_to(integrations_admin_settings_path)
       expect(Setting.twilio_verify_service_sid).to eq(service_sid)
       expect(Setting.twilio_verify_whatsapp?).to be(true)
     end
@@ -148,7 +148,7 @@ RSpec.describe "Admin::Settings", type: :request do
         global_admin.update!(admin_console_beta: console)
         sign_in global_admin
 
-        get admin_settings_path
+        get(console ? integrations_admin_settings_path : admin_settings_path)
 
         expect(response.body).to include("WhatsApp outside the US and Canada")
       end
@@ -196,7 +196,7 @@ RSpec.describe "Admin::Settings", type: :request do
         event_admin
         sign_in global_admin
 
-        get admin_settings_path
+        get integrations_admin_settings_path
 
         expect(response.body).to include("Admin help Slack channel")
         expect(response.body).to include("CHELP")
@@ -266,7 +266,7 @@ RSpec.describe "Admin::Settings", type: :request do
         Setting.org_support_slack_channel_id = "CORG"
         sign_in global_admin
 
-        get admin_settings_path
+        get integrations_admin_settings_path
 
         expect(response.body).to include("Org support Slack channel")
         expect(response.body).to include("CORG")
@@ -302,5 +302,54 @@ RSpec.describe "Admin::Settings", type: :request do
       }.not_to have_enqueued_job(SyncOrgSupportSlackChannelJob)
       expect(response).to redirect_to(admin_root_path)
     end
+  end
+
+  describe "settings tabs in the console" do
+    before { global_admin.update!(admin_console_beta: true) }
+
+    it "keeps the app-wide switches on General and the connections on Integrations" do
+      sign_in global_admin
+
+      get admin_settings_path
+      expect(response.body).to include("Maintenance mode")
+      expect(response.body).not_to include("Twilio SMS")
+      expect(response.body).to include(integrations_admin_settings_path)
+
+      get integrations_admin_settings_path
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Twilio SMS", "Admin help Slack channel")
+      expect(response.body).not_to include("Maintenance mode")
+    end
+
+    it "goes back to General after an app-wide switch and to Integrations after a connection change" do
+      sign_in global_admin
+
+      post toggle_maintenance_admin_settings_path
+      expect(response).to redirect_to(admin_settings_path)
+
+      post update_admin_help_slack_channel_admin_settings_path, params: { admin_help_slack_channel_id: "C0123ABCD" }
+      expect(response).to redirect_to(integrations_admin_settings_path)
+    ensure
+      Setting.maintenance_mode = false
+    end
+  end
+
+  it "sends the original admin's Integrations tab back to its single settings page, flash and all" do
+    sign_in global_admin
+
+    post update_admin_help_slack_channel_admin_settings_path, params: { admin_help_slack_channel_id: "C0123ABCD" }
+    follow_redirect!
+
+    expect(response).to redirect_to(admin_settings_path)
+    follow_redirect!
+    expect(response.body).to include("Admin help channel updated.")
+  end
+
+  it "keeps the Integrations tab to global admins" do
+    sign_in event_admin
+
+    get integrations_admin_settings_path
+
+    expect(response).to redirect_to(admin_root_path)
   end
 end

@@ -71,7 +71,7 @@
 
   <div class="cs-wizard-actions">
     <% if return_to == "integrations" %>
-      <%= link_to "Cancel", admin_event_integrations_path(event), class: "cs-btn cs-btn-link" %>
+      <%= link_to "Cancel", admin_event_documents_path(event), class: "cs-btn cs-btn-link" %>
       <%= f.button "Save waivers", class: "cs-btn cs-btn-primary" %>
     <% else %>
       <%= link_to "Exit setup", admin_event_dashboard_path(event.slug), class: "cs-btn cs-btn-link" %>

@@ -87,10 +87,14 @@ RSpec.describe "Admin::Integrations", type: :request do
           expect(response.body).to include("3 failed attempts in a row. Attend keeps retrying every 5 minutes.")
         end
 
+        # The console moved the token list to the API access tab; the original
+        # admin still lists tokens on its single integrations page.
+        let(:token_page) { console ? admin_event_api_access_path(event) : admin_event_integrations_path(event) }
+
         it "lists the event's active API tokens" do
           EventApiToken.generate_for(event, user: admin, name: "fictional-widget-sync")
 
-          get admin_event_integrations_path(event)
+          get token_page
 
           expect(response.body).to include("admin-integrations@fictional-widget-sync")
           expect(response.body).not_to include("No API tokens yet")
@@ -100,7 +104,7 @@ RSpec.describe "Admin::Integrations", type: :request do
           EventApiToken.generate_for(event, user: admin, name: "fictional-retired-sync").revoke!
           EventApiToken.generate_for(create(:event), user: admin, name: "fictional-elsewhere-sync")
 
-          get admin_event_integrations_path(event)
+          get token_page
 
           expect(response.body).not_to include("fictional-retired-sync")
           expect(response.body).not_to include("fictional-elsewhere-sync")
@@ -108,7 +112,7 @@ RSpec.describe "Admin::Integrations", type: :request do
         end
 
         it "shows the empty state when the event has no API tokens" do
-          get admin_event_integrations_path(event)
+          get token_page
 
           expect(response.body).to include("No API tokens yet")
         end

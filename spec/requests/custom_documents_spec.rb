@@ -30,7 +30,7 @@ RSpec.describe "Custom documents", type: :request do
       doc = event.custom_documents.last
       expect(doc.name).to eq("Hotel Waiver")
       expect(doc.signer_type).to eq("participant_and_guardian")
-      expect(response).to redirect_to(admin_event_integrations_path(event))
+      expect(response).to redirect_to(admin_event_documents_path(event))
     end
 
     it "links to the edit page from the integrations list" do
@@ -58,7 +58,7 @@ RSpec.describe "Custom documents", type: :request do
         custom_document: { name: "Hotel Indemnity", description: "Sign page 2", signer_type: "participant_and_guardian" }
       }
 
-      expect(response).to redirect_to(admin_event_integrations_path(event))
+      expect(response).to redirect_to(admin_event_documents_path(event))
       expect(doc.reload).to have_attributes(
         name: "Hotel Indemnity",
         description: "Sign page 2",

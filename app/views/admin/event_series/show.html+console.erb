@@ -54,15 +54,7 @@
       </div>
     </div>
     <div class="cs-actions flex-wrap">
-      <% if policy(@series).manage_members? %>
-        <%= link_to "Members", admin_series_members_path(@series), class: "cs-btn" %>
-      <% end %>
-      <% if policy(@series).manage_api_tokens? %>
-        <%= link_to "API keys", admin_series_api_tokens_path(@series), class: "cs-btn" %>
-      <% end %>
-      <% if policy(@series).manage_integrations? %>
-        <%= link_to "Integrations", admin_series_integrations_path(@series), class: "cs-btn" %>
-      <% end %>
+      <%# Members, integrations and API keys are tabs of Settings. %>
       <% if policy(@series).update? %>
         <%= link_to "Settings", edit_admin_series_path(@series), class: "cs-btn" %>
       <% end %>

@@ -77,8 +77,10 @@ RSpec.describe "Admin branding and account linking settings", type: :request do
         expect(series.reload.brand).to be_blank
       end
 
-      it "shows account linking on the event form, inheriting from the series" do
-        get edit_admin_event_path(event)
+      # The console moved account linking to the Integrations settings tab; the
+      # original admin keeps it on the event form.
+      it "shows account linking on the event's settings, inheriting from the series" do
+        get(console ? admin_event_integrations_path(event) : edit_admin_event_path(event))
 
         expect(response).to have_http_status(:ok)
         names = form_names
@@ -88,7 +90,7 @@ RSpec.describe "Admin branding and account linking settings", type: :request do
       end
 
       it "lets an event outside any series ask for accounts" do
-        patch admin_event_path(standalone_event), params: { event: { github_linking: "optional", itch_help_url: "https://example.com/itch-howto" } }
+        patch (console ? admin_event_integrations_path(standalone_event) : admin_event_path(standalone_event)), params: { event: { github_linking: "optional", itch_help_url: "https://example.com/itch-howto" } }
 
         standalone_event.reload
         expect(standalone_event.linked_account_providers).to eq(%w[github])

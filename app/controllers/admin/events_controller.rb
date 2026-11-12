@@ -33,6 +33,19 @@ module Admin
       set_current_event(@event) unless current_event&.id == @event.id
     end
 
+    # The Features settings tab. The original admin has no tabs: its edit
+    # form still carries every one of these fields.
+    def features
+      @event = Event.find_by!(slug: params[:slug])
+      authorize @event, :update?
+      set_current_event(@event) unless current_event&.id == @event.id
+
+      unless helpers.console_ui?
+        flash.keep
+        redirect_to edit_admin_event_path(@event)
+      end
+    end
+
     # Where a save from the setup wizard's Basics step goes back to. It rides
     # on the form as a hidden field, so a later plain edit isn't affected and
     # a slug change on the same save still lands in setup.
@@ -45,7 +58,7 @@ module Admin
       if @event.update(event_params)
         redirect_to after_update_path, notice: params[:return_to].in?(SETUP_RETURNS) ? "Basics saved." : "Event was successfully updated."
       else
-        render :edit, status: :unprocessable_entity
+        render(features_tab? ? :features : :edit, status: :unprocessable_entity)
       end
     end
 
@@ -97,7 +110,7 @@ module Admin
 
       api_key = @event.generate_api_key!
       flash[:api_key] = api_key
-      redirect_to admin_event_integrations_path(@event), notice: "API key generated successfully."
+      redirect_to admin_event_api_access_path(@event), notice: "API key generated successfully."
     end
 
     def clear_waiver_dates_warning
@@ -134,8 +147,20 @@ module Admin
       case params[:return_to]
       when "setup" then admin_event_setup_schedule_path(@event)
       when "review" then admin_event_setup_review_path(@event)
-      else admin_event_dashboard_path(@event)
+      else
+        case params[:tab]
+        when "features" then features_admin_event_path(@event)
+        when "general" then edit_admin_event_path(@event)
+        # The original admin's single form sends no tab and goes back to the overview.
+        else admin_event_dashboard_path(@event)
+        end
       end
+    end
+
+    # Every box on a settings tab saves on its own, so a save goes back to the
+    # tab it came from.
+    def features_tab?
+      params[:tab] == "features"
     end
 
     # Series members created this event themselves — give them an explicit

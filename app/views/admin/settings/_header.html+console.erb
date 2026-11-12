@@ -1,0 +1,20 @@
+<%# Header and tabs shared by the global settings pages. %>
+<%# Locals: current_tab (:general or :integrations) %>
+<% descriptions = {
+     general: "App-wide switches that affect every event.",
+     integrations: "The Twilio, WhatsApp and Slack connections Attend uses for every event."
+   } %>
+<div class="cs-header">
+  <div class="cs-header-text">
+    <h1 class="cs-h1">Global settings</h1>
+    <p class="cs-description"><%= descriptions.fetch(current_tab) %></p>
+  </div>
+  <div class="cs-actions">
+    <%= link_to "Incident report settings", admin_incident_report_settings_path, class: "cs-btn" %>
+  </div>
+</div>
+
+<nav class="cs-tabs" aria-label="Global settings">
+  <%= link_to "General", admin_settings_path, class: "cs-tab", "aria-current": cs_current(current_tab == :general) %>
+  <%= link_to "Integrations", integrations_admin_settings_path, class: "cs-tab", "aria-current": cs_current(current_tab == :integrations) %>
+</nav>
