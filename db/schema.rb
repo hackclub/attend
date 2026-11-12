@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_12_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_12_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1022,6 +1022,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_120000) do
     t.string "serial_number"
     t.datetime "updated_at", null: false
     t.integer "version"
+    t.string "content_digest"
+    t.datetime "content_updated_at"
     t.index ["generator_type", "generator_id"], name: "index_passkit_passes_on_generator"
   end
 

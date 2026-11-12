@@ -324,6 +324,13 @@ module Passkit
       write_images(path, event.effective_logo, LOGO_IMAGES, :resize_to_fit)
     end
 
+    # Identifies the artwork add_other_files renders, so swapping an event's
+    # (or its series') banner or logo counts as a change to the pass. See
+    # WalletPassContent.
+    def artwork_checksums
+      [ event.effective_banner, event.effective_logo ].map { |attachment| attachment&.blob&.checksum }
+    end
+
     private
 
     def write_images(path, attachment, images, mode)
