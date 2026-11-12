@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 
-const ITI_VERSION = "25.3.1"
+const ITI_VERSION = "25.15.1"
 const ITI_BASE = `https://cdn.jsdelivr.net/npm/intl-tel-input@${ITI_VERSION}/build`
 
 export default class extends Controller {
