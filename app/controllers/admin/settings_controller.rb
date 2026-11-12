@@ -16,6 +16,7 @@ module Admin
       @waiver_sending_paused = Setting.waiver_sending_paused?
       @support_sms_notifications_enabled = Setting.support_sms_notifications_enabled?
       @support_sms_notification_numbers = Setting.support_sms_notification_number_list
+      @support_email_notification_addresses = Setting.support_email_notification_address_list
       @admin_help_slack_channel_id = Setting.admin_help_slack_channel_id
       admin_help_members = User.admin_help_channel_members
       @admin_help_member_count = admin_help_members.count
@@ -114,6 +115,19 @@ module Admin
 
       Setting.support_sms_notification_numbers = numbers
       redirect_to admin_settings_path, notice: "Support SMS notification numbers updated."
+    end
+
+    def update_support_email_addresses
+      addresses = params[:support_email_notification_addresses].to_s.split(/[\s,;]+/).reject(&:blank?)
+
+      invalid = addresses.reject { |a| a.match?(URI::MailTo::EMAIL_REGEXP) }
+      if invalid.any?
+        redirect_to admin_settings_path, alert: "Invalid email address: #{invalid.join(', ')}."
+        return
+      end
+
+      Setting.support_email_notification_addresses = addresses
+      redirect_to admin_settings_path, notice: "Support email notification addresses updated."
     end
 
     def update_admin_help_slack_channel
