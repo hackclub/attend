@@ -406,19 +406,56 @@ class SeriesDashboard
     { stage: stage, count: best[:count] }
   end
 
-  # One pass over the series. Everything above reads the tallies it fills in.
+  # How long a series' tallies are reused. The pass in #compute_tallies decrypts
+  # and walks every registration in the series, which on a series the size of
+  # Haven is many seconds of a web thread; a series lead reloading the page, or
+  # several leads looking at once, shouldn't each pay that. Two minutes is well
+  # inside how fast anyone acts on a funnel, and a status change or a new
+  # registration moves the key and recomputes sooner (see #tallies_cache_key).
+  TALLIES_TTL = 2.minutes
+
+  TALLY_KEYS = %i[
+    active_by_event inactive_by_event cleared_by_event stalled_totals
+    applicable_totals stalled_by_event stage_event_counts
+    arrival_applicable arrival_cleared
+  ].freeze
+
+  # Everything above reads the tallies this fills in. They depend only on the
+  # series' events and registrations, never on the viewer (incident counts,
+  # which do, are worked out separately), so one cached copy serves every user.
   def load!
     return if @loaded
 
-    @active_by_event = Hash.new(0)
-    @inactive_by_event = Hash.new(0)
-    @cleared_by_event = Hash.new(0)
-    @stalled_totals = Hash.new(0)
-    @applicable_totals = Hash.new(0)
-    @stalled_by_event = {}
-    @stage_event_counts = Hash.new(0)
-    @arrival_applicable = 0
-    @arrival_cleared = 0
+    tallies = Rails.cache.fetch(tallies_cache_key, expires_in: TALLIES_TTL) { compute_tallies }
+    TALLY_KEYS.each { |key| instance_variable_set(:"@#{key}", tallies.fetch(key)) }
+
+    @loaded = true
+  end
+
+  # The cheap part of the key: one aggregate over the series' registrations, so
+  # a withdrawal, a status change or a new import invalidates straight away
+  # instead of waiting out the TTL. Changes that don't touch the registration
+  # row itself (a medical form saved, a scan) wait at most TALLIES_TTL.
+  def tallies_cache_key
+    count, latest = ParticipantEvent.where(event_id: event_ids)
+      .pick(Arel.sql("COUNT(*)"), Arel.sql("MAX(updated_at)"))
+    [ "series_dashboard/v1", series.id, Digest::SHA256.hexdigest(event_ids.sort.join(",")),
+      count, latest&.utc&.to_fs(:usec) ]
+  end
+
+  # One pass over the series. Returns plain hashes (no default procs) so the
+  # result can go through the cache; every reader above already coerces a
+  # missing key with #to_i or `|| {}`.
+  def compute_tallies
+    active_by_event = Hash.new(0)
+    inactive_by_event = Hash.new(0)
+    cleared_by_event = Hash.new(0)
+    stalled_totals = Hash.new(0)
+    applicable_totals = Hash.new(0)
+    stalled_by_event = {}
+    stage_event_counts = Hash.new(0)
+    arrival_applicable = 0
+    arrival_cleared = 0
 
     checked_in_ids = checked_in_participant_event_ids
     sent_emails_by_event = Invitation.sent_emails_by_event(events)
@@ -431,11 +468,11 @@ class SeriesDashboard
 
       participant_events_by_event.fetch(event.id, []).each do |pe|
         if INACTIVE_STATUSES.include?(pe.status)
-          @inactive_by_event[event.id] += 1
+          inactive_by_event[event.id] += 1
           next
         end
 
-        @active_by_event[event.id] += 1
+        active_by_event[event.id] += 1
 
         blocking = self.class.blocking_stage(pe, sent_emails: sent_emails)
 
@@ -443,33 +480,44 @@ class SeriesDashboard
         applicable = pe.onboarding_progress[:steps].filter_map { |step| STEP_TO_STAGE[step[:name]] }.uniq
         applicable << blocking if blocking && STAGES[STAGE_INDEX.fetch(blocking)].lead?
         applicable.each do |key|
-          @applicable_totals[key] += 1
+          applicable_totals[key] += 1
           stages_seen_here << key
         end
 
         if blocking
-          @stalled_totals[blocking] += 1
-          (@stalled_by_event[blocking] ||= Hash.new(0))[event.id] += 1
+          stalled_totals[blocking] += 1
+          (stalled_by_event[blocking] ||= Hash.new(0))[event.id] += 1
           next
         end
 
         # Onboarding-complete. Whether they've walked through the door is the
         # arrival stage's business, not the funnel's.
-        @cleared_by_event[event.id] += 1
+        cleared_by_event[event.id] += 1
         next unless arrivals_expected
 
-        @arrival_applicable += 1
+        arrival_applicable += 1
         if checked_in_ids.include?(pe.id)
-          @arrival_cleared += 1
+          arrival_cleared += 1
         else
-          (@stalled_by_event[ARRIVAL_STAGE.key] ||= Hash.new(0))[event.id] += 1
+          (stalled_by_event[ARRIVAL_STAGE.key] ||= Hash.new(0))[event.id] += 1
         end
       end
 
-      stages_seen_here.each { |key| @stage_event_counts[key] += 1 }
+      stages_seen_here.each { |key| stage_event_counts[key] += 1 }
     end
 
-    @loaded = true
+    plain = ->(hash) { {}.merge(hash) }
+    {
+      active_by_event: plain.(active_by_event),
+      inactive_by_event: plain.(inactive_by_event),
+      cleared_by_event: plain.(cleared_by_event),
+      stalled_totals: plain.(stalled_totals),
+      applicable_totals: plain.(applicable_totals),
+      stalled_by_event: stalled_by_event.transform_values(&plain),
+      stage_event_counts: plain.(stage_event_counts),
+      arrival_applicable: arrival_applicable,
+      arrival_cleared: arrival_cleared
+    }
   end
 
   # Every registration in the series in one preloaded load, grouped by event.

@@ -314,6 +314,47 @@ RSpec.describe SeriesDashboard do
     end
   end
 
+  # The tallies are the expensive part of the page, so they're cached per
+  # series. Test env uses :null_store, so these swap in a real cache.
+  describe "caching the tallies" do
+    let(:event) { create(:event, event_series: series, starts_at: 2.weeks.from_now) }
+    let(:memory_store) { ActiveSupport::Cache::MemoryStore.new }
+
+    before { allow(Rails).to receive(:cache).and_return(memory_store) }
+
+    it "reuses one pass across dashboards and viewers" do
+      3.times { create(:participant_event, event: event) }
+      first = dashboard_for(event)
+      expect(first.totals[:active]).to eq(3)
+
+      second = dashboard_for(event, user: User.create!(email: "lead-cache@example.com", name: "Lead"))
+      expect(second).not_to receive(:compute_tallies)
+      expect(second.totals[:active]).to eq(3)
+      expect(second.stage_rows.sum { |row| row[:stalled] } + second.totals[:cleared]).to eq(3)
+    end
+
+    it "recomputes as soon as a registration is added or changes status" do
+      pe = create(:participant_event, event: event)
+      expect(dashboard_for(event).totals[:active]).to eq(1)
+
+      create(:participant_event, event: event)
+      expect(dashboard_for(event).totals[:active]).to eq(2)
+
+      pe.update!(status: :withdrawn, updated_at: 1.minute.from_now)
+      expect(dashboard_for(event).totals).to include(active: 1, inactive: 1)
+    end
+
+    it "round-trips through a serializing cache" do
+      create(:participant_event, event: event)
+      fresh = dashboard_for(event)
+      rows = fresh.stage_rows.map { |row| row.except(:stage, :by_event) }
+
+      cached = dashboard_for(event)
+      expect(cached.stage_rows.map { |row| row.except(:stage, :by_event) }).to eq(rows)
+      expect(cached.event_rows.first.except(:event)).to eq(fresh.event_rows.first.except(:event))
+    end
+  end
+
   describe "totals" do
     it "reports how many active participants are still blocked" do
       event = create(:event, event_series: series, starts_at: 2.weeks.from_now)
