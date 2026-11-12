@@ -1,7 +1,7 @@
 <% content_for :title, "#{@series.name} Change requests – Attend" %>
 <% content_for :breadcrumbs, cs_breadcrumbs(cs_gated_crumb("Event series", admin_series_index_path, policy(EventSeries).index?), [ @series.name, admin_series_path(@series) ], [ "Change requests", nil ]) %>
-<% status_types = { "pending" => :pending, "approved" => :success, "follow_up_needed" => :warning } %>
-<% status_labels = { "pending" => "Pending", "follow_up_needed" => "Follow-up needed", "approved" => "Approved", "all" => "All" } %>
+<% status_types = { "pending" => :pending, "approved" => :success, "follow_up_needed" => :warning, "dismissed" => :stopped } %>
+<% status_labels = { "pending" => "Pending", "follow_up_needed" => "Follow-up needed", "approved" => "Approved", "dismissed" => "Dismissed", "all" => "All" } %>
 
 <div class="cs-stack">
   <div class="cs-header">

@@ -167,6 +167,80 @@ RSpec.describe RegistrationChangeRequests::Approve do
     expect(participant_event.guardian_participant_events.sole.invite_token_sent_at).to be_nil
   end
 
+  describe "guardian corrections for the same person" do
+    let(:old_guardian) do
+      create(:guardian, legal_first_name: "Robin", legal_last_name: "Testparent",
+        email: "robin.testparent@example.con", phone: "+61412345678")
+    end
+
+    it "fixes a signed guardian's details in place and keeps their signed waiver" do
+      participant_event.update!(status: :complete)
+      link = create(:guardian_participant_event, participant_event: participant_event, guardian: old_guardian,
+        status: :completed, is_primary_guardian: true)
+      consent = Consent.create!(participant_event: participant_event, guardian_participant_event: link,
+        consent_type: :waiver, status: :signed, guardian_signed_at: 1.day.ago, signed_at: 1.day.ago)
+      request = create_request(kind: :guardian, requested_changes: {
+        "legal_first_name" => "Robin", "legal_last_name" => "Testparent",
+        "email" => "robin.testparent@example.com", "phone" => "0412 345 678", "relationship" => "Parent"
+      })
+
+      expect {
+        expect(described_class.call(request: request, reviewer: reviewer)).to eq(:approved)
+      }.not_to have_enqueued_job(SendPendingGuardianInvitesJob)
+
+      expect(participant_event.guardian_participant_events.reload.sole).to eq(link)
+      expect(old_guardian.reload.email).to eq("robin.testparent@example.com")
+      expect(old_guardian.phone).to eq("+61412345678")
+      expect(consent.reload).to be_signed
+      expect(consent.guardian_signed_at).to be_present
+      expect(participant_event.reload).to be_complete
+    end
+
+    it "reads a national-format phone against the current guardian's country" do
+      create(:guardian_participant_event, participant_event: participant_event, guardian: old_guardian,
+        is_primary_guardian: true)
+      request = create_request(kind: :guardian, requested_changes: {
+        "legal_first_name" => "Robin", "legal_last_name" => "Testparent",
+        "email" => "robin.testparent@example.con", "phone" => "0498 765 432", "relationship" => "Parent"
+      })
+
+      described_class.call(request: request, reviewer: reviewer)
+
+      expect(old_guardian.reload.phone).to eq("+61498765432")
+    end
+
+    it "re-sends the invite when an unsigned guardian's email was wrong" do
+      link = create(:guardian_participant_event, participant_event: participant_event, guardian: old_guardian,
+        status: :pending, is_primary_guardian: true, invite_token_sent_at: 1.day.ago)
+      request = create_request(kind: :guardian, requested_changes: {
+        "legal_first_name" => "Robyn", "legal_last_name" => "Testparent",
+        "email" => "robin.testparent@example.com", "phone" => "+61412345678", "relationship" => "Parent"
+      })
+
+      expect {
+        described_class.call(request: request, reviewer: reviewer)
+      }.to have_enqueued_mail(GuardianMailer, :invitation)
+
+      expect(link.reload.invite_token_sent_at).to be_nil
+      expect(old_guardian.reload).to have_attributes(legal_first_name: "Robyn", email: "robin.testparent@example.com")
+    end
+
+    it "treats a different person who shares the email as a replacement" do
+      old_link = create(:guardian_participant_event, participant_event: participant_event, guardian: old_guardian,
+        status: :completed, is_primary_guardian: true)
+      request = create_request(kind: :guardian, requested_changes: {
+        "legal_first_name" => "Sam", "legal_last_name" => "Testsibling",
+        "email" => "robin.testparent@example.con", "phone" => "+61498765432", "relationship" => "Sibling"
+      })
+
+      described_class.call(request: request, reviewer: reviewer)
+
+      expect(GuardianParticipantEvent.exists?(old_link.id)).to be(false)
+      expect(participant_event.guardian_participant_events.reload.sole.guardian.legal_first_name).to eq("Sam")
+      expect(old_guardian.reload.legal_first_name).to eq("Robin")
+    end
+  end
+
   it "resolves support requests without mutating registration data" do
     request = create_request(
       kind: :support,

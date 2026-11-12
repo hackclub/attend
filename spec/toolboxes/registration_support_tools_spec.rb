@@ -192,6 +192,23 @@ RSpec.describe "registration support MCP tools" do
       expect(halted).to be_present
     end
 
+    it "dismisses a request without emailing anyone" do
+      expect {
+        json, = run_tool(described_class, :dismiss, change_request_id: change_request.id)
+        expect(json[:status]).to eq("dismissed")
+      }.not_to have_enqueued_mail
+
+      expect(change_request.reload).to have_attributes(status: "dismissed", resolved_by: admin)
+      expect(guardian.reload.email).to eq("parent@example.con")
+    end
+
+    it "refuses to dismiss a request that is already resolved" do
+      run_tool(described_class, :dismiss, change_request_id: change_request.id)
+      _, halted = run_tool(described_class, :dismiss, change_request_id: change_request.id)
+
+      expect(halted).to be_present
+    end
+
     it "sends a request back for more information" do
       expect {
         run_tool(described_class, :request_follow_up,

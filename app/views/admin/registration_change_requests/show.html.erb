@@ -9,6 +9,7 @@
     <div class="border-t pt-5 space-y-4">
       <% if @change_request.signed_identity? || @change_request.guardian? %><p class="text-sm text-amber-800 bg-amber-50 p-3 rounded">Approval may reset signed documents and make the registration incomplete. A replacement guardian must verify and sign again.</p><%= button_to "Approve request", approve_admin_event_registration_change_request_path(current_event, @change_request), method: :patch, class: "px-4 py-2 bg-green-700 text-white rounded", data: { turbo_confirm: "Approve this request and apply the documented resets?" } %><% else %><%= button_to "Mark resolved", approve_admin_event_registration_change_request_path(current_event, @change_request), method: :patch, class: "px-4 py-2 bg-green-700 text-white rounded" %><% end %>
       <%= form_with url: request_follow_up_admin_event_registration_change_request_path(current_event, @change_request), scope: :registration_change_request, method: :patch, class: "space-y-2" do |f| %><%= f.text_area :staff_response, class: "w-full border rounded p-2", required: true, placeholder: "Explain what the attendee needs to provide" %><%= f.submit "Request follow-up", class: "px-4 py-2 bg-amber-600 text-white rounded" %><% end %>
+      <%= button_to "Dismiss request", dismiss_admin_event_registration_change_request_path(current_event, @change_request), method: :patch, class: "px-4 py-2 border border-gray-300 text-gray-700 rounded", data: { turbo_confirm: "Dismiss this request? Nothing is changed and the attendee isn't emailed." } %>
     </div>
   <% end %>
 </div>

@@ -9,7 +9,7 @@ class ChangeRequestsToolbox < ApplicationToolbox
     access: :read, scope: "participants:read" do
     param :event_id, :string, "Event ID", optional: true
     param :event_slug, :string, "Event slug", optional: true
-    param :status, :string, "Filter by status", enum: %w[pending approved follow_up_needed], optional: true
+    param :status, :string, "Filter by status", enum: %w[pending approved follow_up_needed dismissed], optional: true
     param :participant_event_id, :string, "Only requests for this registration", optional: true
     param :limit, :integer, "Max results (default 50, max 200)", optional: true, default: 50
   end
@@ -83,6 +83,25 @@ class ChangeRequestsToolbox < ApplicationToolbox
         resolved_by: current_user, resolved_at: Time.current)
     end
     RegistrationCorrectionMailer.participant_follow_up(change_request: @change_request).deliver_later
+
+    render json: serialize_request(@change_request, full: true)
+  end
+
+  tool "Dismiss a change request: close it without applying anything and without emailing the " \
+       "participant. Use for requests that change nothing, duplicates, or requests on registrations " \
+       "that are withdrawn or rejected.",
+    access: :write, scope: "participants:write" do
+    param :change_request_id, :string, "Change request ID"
+  end
+  def dismiss
+    load_request!
+    authorize! @change_request, :dismiss?
+
+    begin
+      RegistrationChangeRequests::Dismiss.call(request: @change_request, reviewer: current_user)
+    rescue ArgumentError => e
+      halt error: e.message
+    end
 
     render json: serialize_request(@change_request, full: true)
   end

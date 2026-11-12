@@ -86,13 +86,16 @@ module RegistrationChangeRequests
         )
       end
 
+      details = GuardianDetails.new(participant_event, request.requested_changes.slice(*GUARDIAN_FIELDS))
+      return correct_guardian_in_place(details) if details.same_person?
+
       if guardian_change_needs_manual_follow_up?
         return mark_follow_up(
           "A guardian-signed paper document is attached. Staff must preserve and replace it manually before changing the guardian."
         )
       end
 
-      attributes = request.requested_changes.slice(*GUARDIAN_FIELDS)
+      attributes = details.normalized_changes
       relationship = attributes.delete("relationship")
       guardian = Guardian.new(attributes)
       validate_guardian_separation!(guardian, participant_event.participant)
@@ -116,6 +119,29 @@ module RegistrationChangeRequests
       participant_event.safeguarding_info&.update!(freedom_waiver_granted: false)
       old_link&.destroy!
       participant_event.update!(status: :awaiting_guardian)
+      mark_approved
+    end
+
+    # The participant mistyped their own guardian's details. Fix the guardian
+    # record and keep everything they have already signed: the person who
+    # signed is the person on file. Only an unsigned guardian with a new email
+    # address needs the invite sending again.
+    def correct_guardian_in_place(details)
+      @corrected_in_place = true
+      link = details.current_link
+      guardian = link.guardian
+      attributes = details.normalized_changes.slice("legal_first_name", "legal_last_name", "email", "phone")
+        .transform_values { |value| value.to_s.squish }
+        .compact_blank
+      guardian.assign_attributes(attributes)
+      validate_guardian_separation!(guardian, request.participant_event.participant)
+      email_changed = guardian.email_changed?
+      guardian.save!
+
+      relationship = details.changes["relationship"].to_s.squish
+      link.update!(relationship: relationship) if relationship.present?
+      @resend_invite_to = link if email_changed && !link.completed?
+      link.update!(invite_token_sent_at: nil) if @resend_invite_to
       mark_approved
     end
 
@@ -167,6 +193,11 @@ module RegistrationChangeRequests
 
     def enqueue_guardian_work
       return if request.event.guardian_invites_locked?
+
+      if @corrected_in_place
+        GuardianMailer.invitation(guardian_participant_event: @resend_invite_to).deliver_later if @resend_invite_to
+        return
+      end
 
       SendPendingGuardianInvitesJob.perform_later(request.participant_event.event_id)
       guardian_dependent_consents.each do |consent|

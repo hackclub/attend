@@ -51,6 +51,16 @@ module Admin
       redirect_to admin_event_registration_change_request_path(current_event, @change_request), alert: e.message
     end
 
+    # Closes a request without applying it or emailing the participant.
+    def dismiss
+      authorize @change_request, :dismiss?
+      RegistrationChangeRequests::Dismiss.call(request: @change_request, reviewer: current_user)
+      redirect_to admin_event_registration_change_request_path(current_event, @change_request),
+        notice: "Change request dismissed."
+    rescue ArgumentError => e
+      redirect_to admin_event_registration_change_request_path(current_event, @change_request), alert: e.message
+    end
+
     private
 
     def render_not_found

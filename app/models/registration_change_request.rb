@@ -21,7 +21,11 @@ class RegistrationChangeRequest < ApplicationRecord
   enum :status, {
     pending: "pending",
     approved: "approved",
-    follow_up_needed: "follow_up_needed"
+    follow_up_needed: "follow_up_needed",
+    # Closed by staff without applying anything or emailing the participant:
+    # a duplicate, a request that changes nothing, or one on a registration
+    # that is no longer active.
+    dismissed: "dismissed"
   }
 
   enum :staff_audience, {
@@ -51,6 +55,12 @@ class RegistrationChangeRequest < ApplicationRecord
   # not written anything for the participant yet.
   def awaiting_staff_reset?
     follow_up_needed? && follow_up_reason == "shared_identity"
+  end
+
+  # What the participant sees. "Dismissed" reads as a brush-off to someone
+  # who asked for help, and nothing more is needed from them either way.
+  def participant_status_label
+    dismissed? ? "Closed" : status.titleize
   end
 
   private

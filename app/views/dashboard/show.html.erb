@@ -886,7 +886,7 @@
           <%= link_to dashboard_event_registration_change_request_path(@participant_event, request_record),
               class: "flex items-center justify-between gap-3 rounded-xl border border-(--border-card) bg-(--bg-elev) px-4 py-3 hover:bg-(--bg-elev-2)" do %>
             <span class="text-sm font-medium text-(--text-strong)"><%= request_record.kind.titleize %> request</span>
-            <span class="text-xs font-semibold text-(--text-muted)"><%= request_record.status.titleize %></span>
+            <span class="text-xs font-semibold text-(--text-muted)"><%= request_record.participant_status_label %></span>
           <% end %>
         <% end %>
       </div>
