@@ -139,10 +139,10 @@
                   <div class="cs-small cs-muted"><%= participant.email %></div>
                 </td>
                 <td>
-                  <% if participant.events.any? %>
+                  <% if participant.participant_events.any? %>
                     <div class="cs-token-group">
-                      <% participant.events.each do |event| %>
-                        <span class="cs-token cs-token-readonly"><%= event.name %></span>
+                      <% participant.participant_events.each do |registration| %>
+                        <%= link_to registration.event.name, admin_event_participant_path(registration.event, registration), class: "cs-token cs-token-readonly cs-token-link" %>
                       <% end %>
                     </div>
                   <% else %>
