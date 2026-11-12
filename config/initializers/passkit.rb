@@ -47,5 +47,12 @@ else
   ENV["PASSKIT_PRIVATE_P12_CERTIFICATE"] ||= "tmp/certs/missing-certificate.p12"
   ENV["PASSKIT_APPLE_INTERMEDIATE_CERTIFICATE"] ||= "tmp/certs/missing-WWDR.cer"
 
+  # Since passkit 0.8 everything (pass fields, wallet URLs, the generator's
+  # certificate paths) reads Passkit.configuration, which stays nil until
+  # configure runs. Configure from whatever ENV holds so those calls behave as
+  # they did when the gem read ENV directly; skip the gem's check, since an
+  # incomplete config is exactly what this branch expects.
+  Passkit.configure { |config| config.skip_verification = true }
+
   Rails.logger&.warn("[passkit] no :passkit credentials — wallet passes are disabled") unless ENV["SECRET_KEY_BASE_DUMMY"]
 end

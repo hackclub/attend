@@ -6,13 +6,13 @@ module PasskitGeneratorExtensions
   # A built pass, held in memory. See generate_and_sign.
   Pkpass = Data.define(:filename, :data)
 
-  # The gem builds each pass in tmp/passkit/<uuid>/, zips it to
-  # tmp/passkit/<uuid>.pkpass and deletes neither (file_name is a fresh UUID
-  # per pass, so its own rm_rf never matches an earlier build). Return the
-  # zip's bytes rather than its path, and delete both here, so no build
-  # leaves anything behind however it ends: a send_file'd path is only read
-  # after the action returns, too late for the controller to delete it.
-  # PasskitPassesControllerExtensions#send_file sends the bytes.
+  # The gem builds each pass in tmp/passkit/<uuid>/ and zips it to
+  # tmp/passkit/<uuid>.pkpass. Since 0.9 it removes the directory itself and
+  # its controllers delete the archive after sending, but anything else that
+  # calls generate_and_sign (or a build that fails after zipping) would still
+  # leave the archive behind. Return the zip's bytes rather than its path and
+  # delete both here, so no build leaves anything on disk however it ends.
+  # PasskitPassesControllerExtensions#send_pass_file sends the bytes.
   def generate_and_sign
     path = super
     Pkpass.new(filename: File.basename(path), data: File.binread(path))
@@ -52,19 +52,19 @@ module PasskitGeneratorExtensions
       pass[:barcodes] = @pass.barcodes
     end
 
+    # passkit 0.9 dropped coupon/event_ticket/generic/store_card from
+    # Passkit::Pass (they were always nil, and the pass_type block below
+    # writes the real eventTicket dictionary), so they're no longer read here.
+    # boarding_pass is gone too: 0.9's default is {}, which is truthy and
+    # would put an empty boardingPass key on every event ticket.
     pass[:appLaunchURL] = @pass.app_launch_url if @pass.app_launch_url
     pass[:associatedStoreIdentifiers] = @pass.associated_store_identifiers unless @pass.associated_store_identifiers.empty?
     pass[:beacons] = @pass.beacons unless @pass.beacons.empty?
-    pass[:boardingPass] = @pass.boarding_pass if @pass.boarding_pass
-    pass[:coupon] = @pass.coupon if @pass.coupon
-    pass[:eventTicket] = @pass.event_ticket if @pass.event_ticket
     pass[:expirationDate] = @pass.expiration_date if @pass.expiration_date
-    pass[:generic] = @pass.generic if @pass.generic
     pass[:groupingIdentifier] = @pass.grouping_identifier if @pass.grouping_identifier
     pass[:nfc] = @pass.nfc if @pass.nfc
     pass[:relevantDate] = @pass.relevant_date if @pass.relevant_date
     pass[:semantics] = @pass.semantics if @pass.semantics
-    pass[:store_card] = @pass.store_card if @pass.store_card
     pass[:userInfo] = @pass.user_info if @pass.user_info
 
     # Passkit::Pass only delegates the gem's own attribute list, so anything
@@ -96,12 +96,13 @@ module PasskitGeneratorExtensions
 end
 
 module PasskitPassesControllerExtensions
-  # Wallet asks with If-Modified-Since whenever it checks a pass for changes,
-  # but the gem builds, signs and zips the whole bundle (images and all)
-  # before comparing, so an unchanged pass cost as much as a new one: a 304
-  # once took 36s while it rendered that event's images.
+  # A pass whose participant event is gone can never be built again, so tell
+  # Wallet it's gone. Since 0.9 the gem answers If-Modified-Since with a 304
+  # before building (which used to be our own shortcut here), and a pass with
+  # no generator falls back to its own updated_at, so without this check an
+  # orphaned pass would be reported as unchanged forever.
   def show
-    return head(:not_modified) if pass_unchanged_since_request?
+    return head(:gone) if requested_pass_orphaned?
 
     super
   rescue ActiveRecord::RecordNotFound
@@ -110,26 +111,21 @@ module PasskitPassesControllerExtensions
 
   private
 
-  # The gem's own lookup and comparison from #show, done before building.
-  # Anything this doesn't answer (no header, a bad token, a pass whose
-  # participant event is gone) falls through to the gem unchanged.
-  def pass_unchanged_since_request?
-    since = request.if_modified_since
+  # Anything this doesn't answer (no header, a bad token) falls through to
+  # the gem, which rejects it.
+  def requested_pass_orphaned?
     token = request.headers["Authorization"]&.split(" ")&.last
-    return false if since.nil? || token.blank?
+    return false if token.blank?
 
     pass = Passkit::Pass.find_by(serial_number: params[:serial_number], authentication_token: token)
-    return false unless pass&.generator
-
-    last_update = pass.last_update
-    response.headers["last-modified"] = last_update.httpdate
-    last_update.to_i <= since.to_i
+    pass.present? && pass.generator.nil?
   end
 
-  # Both actions send_file whatever Passkit::Generator#generate_and_sign
-  # returned, which PasskitGeneratorExtensions makes the pass itself.
-  def send_file(pkpass, options = {})
-    send_data(pkpass.data, options.reverse_merge(filename: pkpass.filename))
+  # Both actions hand Passkit::PassDelivery#send_pass_file whatever
+  # Passkit::Generator#generate_and_sign returned, which
+  # PasskitGeneratorExtensions makes the pass itself rather than a path.
+  def send_pass_file(pkpass, type:, filename: nil)
+    send_data(pkpass.data, type: type, disposition: "attachment", filename: filename || pkpass.filename)
   end
 end
 
