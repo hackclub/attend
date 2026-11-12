@@ -2346,6 +2346,13 @@
 
   .cs-token-readonly { padding-right: 10px; }
 
+  a.cs-token-link {
+    text-decoration: none;
+
+    &:hover { border-color: var(--cs-accent); color: var(--cs-accent); }
+    &:focus-visible { outline: 2px solid var(--cs-focus); outline-offset: 1px; }
+  }
+
   .cs-steps {
     list-style: none;
     margin: 0;

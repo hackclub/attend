@@ -111,6 +111,19 @@ RSpec.describe "Admin::Bans", type: :request do
         expect(response.body).to include("https://airtable.com/#{Bans::UcatSync::BASE_ID}/#{Bans::UcatSync::TABLE_ID}/recC1000000000000")
         expect(response.body).to include("C2")
       end
+
+      it "links each existing enrollment to its registration (console=#{console_variant})" do
+        global_admin.update!(admin_console_beta: console_variant)
+        event = create(:event, name: "Fictional Hackathon")
+        participant = create(:participant, email: "banned-enrollee@example.com")
+        registration = create(:participant_event, participant: participant, event: event)
+        ban = create(:ban, email: "banned-enrollee@example.com")
+
+        get admin_ban_path(ban)
+
+        link = Nokogiri::HTML(response.body).at_css("a[href='#{admin_event_participant_path(event, registration)}']")
+        expect(link&.text&.strip).to eq("Fictional Hackathon")
+      end
     end
   end
 

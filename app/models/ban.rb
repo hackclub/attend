@@ -162,7 +162,7 @@ class Ban < ApplicationRecord
 
     Participant.left_joins(:user)
       .where("LOWER(participants.email) IN (?) OR UPPER(participants.slack_user_id) IN (?) OR users.verified_slack_id IN (?)", emails, slack_ids, slack_ids)
-      .includes(:events)
+      .includes(participant_events: :event)
   end
 
   private
