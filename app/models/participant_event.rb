@@ -100,6 +100,19 @@ class ParticipantEvent < ApplicationRecord
   after_commit :invite_to_slack_channel, on: %i[create update],
     if: -> { (saved_change_to_status? || saved_change_to_participant_id?) && complete? }
 
+  # Statuses that mean the participant has opened the wizard themselves, so
+  # whatever invitation they were sent has done its job.
+  STARTED_STATUSES = %w[in_progress awaiting_guardian complete].freeze
+
+  # An invitation only gets stamped accepted when its own link is clicked, so
+  # someone who signs in and starts from their dashboard instead leaves it
+  # "pending" forever: staff see them on the pending invitations tab, the
+  # series chase counts them, and the invite form will happily mint them
+  # another one. Hooked on status, like the Slack invite, so every route into
+  # the wizard (link, dashboard, admin status edit) closes it.
+  after_commit :accept_invitations, on: %i[create update],
+    if: -> { saved_change_to_status? && STARTED_STATUSES.include?(status) }
+
   # Registrations still on the books. Withdrawn and rejected rows stay for the
   # audit trail, but dashboard totals, headcounts and "who still needs X"
   # arithmetic must leave them out.
@@ -627,6 +640,10 @@ class ParticipantEvent < ApplicationRecord
 
   def participant_events_to_update
     [ self ]
+  end
+
+  def accept_invitations
+    event.invitations.where(accepted_at: nil).for_email(participant.email).find_each(&:accept!)
   end
 
   def invite_to_slack_channel

@@ -223,7 +223,9 @@ RSpec.describe "onboarding invitation entry", type: :request do
     user = create(:user, email: invitation.email)
     participant = create(:participant, email: invitation.email, user: user)
     create(:participant_event, participant: participant, event: event, onboarding_step: 0)
-    invitation.update_column(:expires_at, 1.day.ago)
+    # Starting a registration accepts its invitation; this is one started
+    # before that, so only the expired link could accept it here.
+    invitation.update_columns(expires_at: 1.day.ago, accepted_at: nil)
     sign_in user
 
     get onboarding_path(invite: invitation.token)
