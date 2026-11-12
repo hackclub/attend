@@ -798,6 +798,16 @@ module Admin
         return
       end
 
+      # Someone who has already started registering needs no invitation: the
+      # new one would only email them a link to a wizard they're already in,
+      # and sit on the pending tab making them look unregistered. `invited`
+      # rows stay allowed — that's the per-row Resend.
+      if current_event.participant_events.where(status: ParticipantEvent::STARTED_STATUSES)
+                      .joins(:participant).where("LOWER(participants.email) = ?", email).exists?
+        redirect_to new_invite_admin_event_participants_path(current_event), alert: "#{email} is already registered for this event."
+        return
+      end
+
       begin
         if params[:invite][:send_now].present?
           # The pending-invitations tab's per-row Send/Resend. It emails even

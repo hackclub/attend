@@ -557,6 +557,39 @@ RSpec.describe ParticipantEvent, type: :model do
     end
   end
 
+  describe "accepting invitations once registration starts" do
+    let(:event) { create(:event) }
+    let(:participant) { create(:participant, email: "Juniper.Vale@example.com") }
+
+    it "accepts the invitation when someone starts from their dashboard instead of the link" do
+      invitation = create(:invitation, event: event, email: "juniper.vale@example.com", sent_at: Time.current)
+
+      create(:participant_event, participant: participant, event: event, status: :in_progress)
+
+      expect(invitation.reload).to be_accepted
+    end
+
+    it "accepts it when an imported registration moves off invited" do
+      invitation = create(:invitation, event: event, email: "juniper.vale@example.com", sent_at: Time.current)
+      pe = create(:participant_event, participant: participant, event: event, status: :invited)
+      expect(invitation.reload).not_to be_accepted
+
+      pe.update!(status: :in_progress)
+
+      expect(invitation.reload).to be_accepted
+    end
+
+    it "leaves an invited registration's invitation pending, and other events' invitations alone" do
+      held = create(:invitation, event: event, email: "juniper.vale@example.com", sent_at: nil)
+      elsewhere = create(:invitation, event: create(:event), email: "juniper.vale@example.com", sent_at: Time.current)
+
+      create(:participant_event, participant: participant, event: event, status: :invited)
+
+      expect(held.reload).not_to be_accepted
+      expect(elsewhere.reload).not_to be_accepted
+    end
+  end
+
   describe "Slack channel invite on completion" do
     include ActiveJob::TestHelper
 

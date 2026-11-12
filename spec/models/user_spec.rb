@@ -170,7 +170,7 @@ RSpec.describe User, type: :model do
     # The release job would otherwise mail the address the person just left.
     it "moves the participant's held invitation to the new address" do
       invitation = create(:invitation, email: "old@example.com", sent_at: nil)
-      create(:participant_event, event: invitation.event, participant: participant)
+      create(:participant_event, event: invitation.event, participant: participant, status: :invited)
 
       user.sync_email_to_participant
 
