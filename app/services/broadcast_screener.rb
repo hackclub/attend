@@ -36,7 +36,9 @@ class BroadcastScreener
     [ /\b(referral|affiliate) link\b|\buse my (link|code)\b/i, "marketing", "includes a referral or affiliate link" ],
     [ /\bunsubscribe\b/i, "marketing", "has an unsubscribe line, like a marketing email" ],
     [ /\b(airdrop|crypto(currency)?|bitcoin|ethereum|nft|seed phrase|token sale)\b/i, "spam", "mentions crypto" ],
-    [ %r{\b(bit\.ly|tinyurl\.com|goo\.gl|t\.co|is\.gd|cutt\.ly|rebrand\.ly|ow\.ly|shorturl\.at)/}i, "spam", "hides a link behind a URL shortener" ],
+    # Google Maps share links (maps.app.goo.gl/…, goo.gl/maps/…) are how
+    # organisers send directions to the venue, so they don't count.
+    [ %r{\b(bit\.ly|tinyurl\.com|(?<!maps\.app\.)goo\.gl(?!/maps/)|t\.co|is\.gd|cutt\.ly|rebrand\.ly|ow\.ly|shorturl\.at)/}i, "spam", "hides a link behind a URL shortener" ],
     [ /\b(verify your account|confirm your (password|login)|your account (has been|will be) (suspended|locked))\b/i, "spam", "reads like phishing" ]
   ].freeze
 
