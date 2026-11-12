@@ -144,12 +144,16 @@ module Admin
         if @message.schedule!(sender: current_user)
           redirect_to admin_event_message_path(current_event, @message),
             notice: "Message scheduled for #{@message.local_scheduled_at.strftime("%B %d, %Y at %l:%M %p %Z")}."
+        elsif @message.errors.any?
+          redirect_to edit_admin_event_message_path(current_event, @message), alert: @message.errors.full_messages.to_sentence
         else
           redirect_to admin_event_message_path(current_event, @message), alert: HELD_FOR_REVIEW
         end
       elsif @message.send!(sender: current_user)
         redirect_to admin_event_message_path(current_event, @message),
           notice: "Message is being sent to #{helpers.pluralize(@message.recipient_count, "recipient")}."
+      elsif @message.errors.any?
+        redirect_to edit_admin_event_message_path(current_event, @message), alert: @message.errors.full_messages.to_sentence
       elsif @message.pending_review?
         redirect_to admin_event_message_path(current_event, @message), alert: HELD_FOR_REVIEW
       else

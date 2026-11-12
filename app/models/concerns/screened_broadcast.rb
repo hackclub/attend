@@ -15,6 +15,20 @@ module ScreenedBroadcast
 
   included do
     has_many :broadcast_reviews, as: :reviewable, dependent: :destroy
+
+    validate :blocked_content, if: :check_blocked_content?
+  end
+
+  # BroadcastScreener::BLOCKED content can't be saved, so it can't be sent,
+  # even by a global admin or after an approval. Raw HTML is checked as well
+  # as the screened text, which is where a link's address ends up.
+  def blocked_content
+    blocked_content_reasons.each { |reason| errors.add(:base, reason) }
+  end
+
+  def blocked_content_reasons
+    BroadcastScreener.blocked_reasons(screening_subject, screening_text, *blocked_content_sources)
+      .map { |reason| "#{model_name.human} #{reason}" }
   end
 
   def content_digest
