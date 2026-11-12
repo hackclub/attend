@@ -25,7 +25,17 @@ module Admin::SeriesHelper
 
   # Marker geometry and colour are computed here so the Stimulus controller stays
   # a renderer: it places what it is given and owns no thresholds.
+  # Past this many venues the full-size dots pile into one blob at world zoom,
+  # so every radius shrinks by sqrt(threshold / count). Applied uniformly, it
+  # keeps area proportional to head count within the map — only the overall
+  # scale changes — and the floor still keeps the smallest dot clickable.
+  MAP_CROWD_THRESHOLD = 24
+  MAP_MIN_CROWD_SCALE = 0.4
+
   def series_map_markers(rows)
+    plotted = rows.count { |row| row[:event].venue_coordinates }
+    scale = plotted > MAP_CROWD_THRESHOLD ? Math.sqrt(MAP_CROWD_THRESHOLD.to_f / plotted).clamp(MAP_MIN_CROWD_SCALE, 1.0) : 1.0
+
     rows.filter_map do |row|
       event = row[:event]
       coordinates = event.venue_coordinates
@@ -50,7 +60,7 @@ module Admin::SeriesHelper
         # base — an offset would flatten the scale and make a 40-person event
         # look barely bigger than a 12-person one. The floor only lifts events
         # too small to be clickable otherwise.
-        radius: (Math.sqrt(row[:active]) * 3.6).clamp(10, 34).round
+        radius: [ (Math.sqrt(row[:active]) * 3.6).clamp(10, 34) * scale, 6 ].max.round
       }
     end
   end
