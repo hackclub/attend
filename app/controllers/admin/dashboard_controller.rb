@@ -2,7 +2,7 @@ class Admin::DashboardController < Admin::BaseController
   include IncidentAuditVisibility
 
   global_page only: :index
-  skip_before_action :set_current_event_from_session, only: [ :show, :integrations, :update_integrations, :trigger_airtable_sync, :create_vote_event ]
+  skip_before_action :set_current_event_from_session, only: [ :show, :integrations, :documents, :api_access, :update_integrations, :trigger_airtable_sync, :create_vote_event ]
 
   def index
     # The picker's "All events" link deselects the current event.
@@ -38,16 +38,36 @@ class Admin::DashboardController < Admin::BaseController
     load_event_details
   end
 
+  # The Integrations settings tab. In the original admin this page still holds
+  # every integration, documents and API access included.
   def integrations
     @event = Event.find_by!(slug: params[:slug])
     authorize @event, :manage_integrations?
 
     set_current_event(@event)
     @events = Event.order(starts_at: :desc)
-    # Revoking is permanent (rotate/destroy only find active tokens), so revoked
-    # rows stay out of the list. The view reads only token columns, no associations.
-    @event_api_tokens = @event.event_api_tokens.active.order(created_at: :desc)
+    load_event_api_tokens
     load_airtable_sync_status
+  end
+
+  # The Waivers & documents settings tab: DocuSeal waivers and custom documents.
+  def documents
+    @event = Event.find_by!(slug: params[:slug])
+    authorize @event, :manage_integrations?
+
+    set_current_event(@event)
+    redirect_to_classic_integrations unless helpers.console_ui?
+  end
+
+  # The API access settings tab: named tokens and the legacy key.
+  def api_access
+    @event = Event.find_by!(slug: params[:slug])
+    authorize @event, :manage_integrations?
+
+    set_current_event(@event)
+    return redirect_to_classic_integrations unless helpers.console_ui?
+
+    load_event_api_tokens
   end
 
   def trigger_airtable_sync
@@ -104,18 +124,47 @@ class Admin::DashboardController < Admin::BaseController
 
       if airtable_settings_saved? && @event.airtable_sync_configured?
         AirtableJobs::SyncAllJob.perform_later(@event.id)
-        redirect_to admin_event_integrations_path(@event), notice: "Integration settings updated. Airtable sync started."
+        redirect_to settings_tab_path, notice: "Integration settings updated. Airtable sync started."
+      elsif documents_tab?
+        redirect_to settings_tab_path, notice: "Waiver settings updated."
       else
-        redirect_to admin_event_integrations_path(@event), notice: "Integration settings updated."
+        redirect_to settings_tab_path, notice: "Integration settings updated."
       end
+    elsif documents_tab?
+      render :documents, status: :unprocessable_entity
     else
       @events = Event.order(starts_at: :desc)
+      load_event_api_tokens
       load_airtable_sync_status
       render :integrations, status: :unprocessable_entity
     end
   end
 
   private
+
+  # Both the Integrations and the Waivers & documents tabs save through
+  # update_integrations; the form says which one to go back to.
+  def documents_tab?
+    params[:tab] == "documents"
+  end
+
+  def settings_tab_path
+    documents_tab? ? admin_event_documents_path(@event) : admin_event_integrations_path(@event)
+  end
+
+  # The original admin has no settings tabs: its integrations page still holds
+  # documents and API access. The flash is kept so a one-time token or key
+  # shown after a redirect here isn't lost on the way.
+  def redirect_to_classic_integrations
+    flash.keep
+    redirect_to admin_event_integrations_path(@event)
+  end
+
+  # Revoking is permanent (rotate/destroy only find active tokens), so revoked
+  # rows stay out of the list. The view reads only token columns, no associations.
+  def load_event_api_tokens
+    @event_api_tokens = @event.event_api_tokens.active.order(created_at: :desc)
+  end
 
   AIRTABLE_SETTINGS = %i[
     airtable_api_key
@@ -159,7 +208,13 @@ class Admin::DashboardController < Admin::BaseController
     permitted = params.require(:event).permit(
       :docuseal_waiver_template_id,
       :docuseal_freedom_waiver_template_id,
+      :freedom_waivers_enabled,
+      :guardian_invites_locked,
       :slack_channel_id,
+      :github_linking,
+      :itch_linking,
+      :github_help_url,
+      :itch_help_url,
       :airtable_api_key,
       :airtable_sync_endpoint_url,
       :airtable_base_id,

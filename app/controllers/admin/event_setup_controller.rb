@@ -180,8 +180,10 @@ module Admin
     end
 
     def after_waivers_path
+      # "integrations" is what the old all-in-one page sent; the Waivers &
+      # documents tab sends it too (the original admin still lands there).
       if params[:return_to] == "integrations" || @event.setup_complete?
-        admin_event_integrations_path(@event)
+        admin_event_documents_path(@event)
       else
         admin_event_setup_team_path(@event)
       end

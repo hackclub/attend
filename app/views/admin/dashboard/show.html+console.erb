@@ -9,10 +9,10 @@
     <h1 class="cs-h1"><%= @event.name %></h1>
   </div>
   <div class="cs-actions">
-    <% if policy(@event).manage_integrations? %>
-      <%= link_to "Integrations", admin_event_integrations_path(@event.slug), class: "cs-btn" %>
+    <%# Integrations, waivers and API access are tabs of Settings now. %>
+    <% if policy(@event).update? %>
+      <%= link_to "Settings", edit_admin_event_path(@event), class: "cs-btn" %>
     <% end %>
-    <%= link_to "Settings", edit_admin_event_path(@event), class: "cs-btn" %>
   </div>
 </div>
 
@@ -343,7 +343,7 @@
             <%= link_to "Export data", admin_event_exports_path(@event), class: "cs-btn cs-btn-full" %>
             <%= link_to "Manage staff", admin_event_staff_index_path(@event), class: "cs-btn cs-btn-full" %>
             <% if policy(@event).manage_integrations? %>
-              <%= link_to "Integrations & API", admin_event_integrations_path(@event.slug), class: "cs-btn cs-btn-full" %>
+              <%= link_to "API access", admin_event_api_access_path(@event.slug), class: "cs-btn cs-btn-full" %>
             <% end %>
           </div>
         </div>

@@ -1,0 +1,25 @@
+<%# One box of the series form. Locals: f, save (true when the box saves on its own) %>
+<section class="cs-container">
+  <div class="cs-container-header">
+    <h2 class="cs-h2">Branding</h2>
+  </div>
+  <div class="cs-container-body">
+    <div class="cs-field-grid">
+      <%= cs_form_field f, :logo, label: "Logo", optional: true,
+            constraint: "JPEG, PNG, GIF, WebP or SVG, up to 5 MB. Events in this series without their own logo inherit it." do |aria| %>
+        <% if @series.logo.attached? %>
+          <div class="mb-2"><%= render "admin/events/avatar", event: @series, size: 48, rounded: "rounded-lg" %></div>
+        <% end %>
+        <%= f.file_field :logo, accept: "image/jpeg,image/png,image/gif,image/webp,image/svg+xml", class: "cs-file", **aria %>
+      <% end %>
+      <%= cs_form_field f, :banner, label: "Banner", optional: true,
+            constraint: "PNG or JPEG, up to 5 MB. Inherited by events in this series too." do |aria| %>
+        <% if @series.banner.attached? %>
+          <div class="mb-2"><%= image_tag @series.banner, alt: "Current banner", class: "h-16 rounded-md object-cover" %></div>
+        <% end %>
+        <%= f.file_field :banner, accept: "image/jpeg,image/png", class: "cs-file", **aria %>
+      <% end %>
+    </div>
+  </div>
+  <%= cs_settings_save f if local_assigns[:save] %>
+</section>

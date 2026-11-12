@@ -82,8 +82,11 @@ RSpec.describe "Admin console breadcrumbs", type: :request do
       expect_trail admin_event_registration_change_request_path(event, change_request), *e, "Change requests", participant_label
       expect_trail admin_event_staff_index_path(event), *e, "Staff"
       expect_trail admin_event_exports_path(event), *e, "Exports"
-      expect_trail admin_event_integrations_path(event.slug), *e, "Integrations"
-      expect_trail edit_admin_event_path(event), *e, "Event settings"
+      expect_trail edit_admin_event_path(event), *e, "Settings"
+      expect_trail features_admin_event_path(event), *e, "Settings", "Features"
+      expect_trail admin_event_documents_path(event), *e, "Settings", "Waivers & documents"
+      expect_trail admin_event_integrations_path(event.slug), *e, "Settings", "Integrations"
+      expect_trail admin_event_api_access_path(event), *e, "Settings", "API access"
       expect_trail admin_event_setup_schedule_path(event), *e, "Setup"
       expect_trail admin_audit_logs_path(event_id: event.id), *e, "Event audit log"
     end
@@ -123,9 +126,9 @@ RSpec.describe "Admin console breadcrumbs", type: :request do
     before { sign_in ops }
 
     it "only links crumbs whose targets they can open" do
-      # Integrations is gated on manage_integrations?, which ops passes.
+      # Waivers & documents is gated on manage_integrations?, which ops passes.
       trail = expect_trail admin_event_setup_waivers_path(event, return_to: "integrations"),
-        "Events", event.name, "Integrations", "Set up waivers"
+        "Events", event.name, "Waivers & documents", "Set up waivers"
 
       trail.filter_map { |c| c[:link] }.each do |href|
         get href

@@ -221,11 +221,11 @@ RSpec.describe "Admin::EventSetup", type: :request do
       end
     end
 
-    context "standalone entry from integrations" do
-      it "returns to the integrations page after saving" do
+    context "standalone entry from the waivers settings tab" do
+      it "returns to the Waivers & documents tab after saving" do
         patch admin_event_setup_waivers_path(event, return_to: "integrations"), params: { waiver_mode: "skip" }
 
-        expect(response).to redirect_to(admin_event_integrations_path(event))
+        expect(response).to redirect_to(admin_event_documents_path(event))
       end
     end
   end

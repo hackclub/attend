@@ -1,5 +1,5 @@
 <% content_for :title, "#{@display_name} Mappings – #{current_event.name} – Attend" %>
-<% content_for :breadcrumbs, cs_event_breadcrumbs(cs_gated_crumb("Integrations", admin_event_integrations_path(current_event), policy(current_event).manage_integrations?), [ "#{@display_name} field mappings", nil ]) %>
+<% content_for :breadcrumbs, cs_event_breadcrumbs(cs_gated_crumb("Waivers & documents", admin_event_documents_path(current_event), policy(current_event).manage_integrations?), [ "#{@display_name} field mappings", nil ]) %>
 
 <div class="cs-stack">
   <div class="cs-header">
@@ -15,7 +15,7 @@
       <div>
         <p class="cs-alert-title">No template configured</p>
         <p>You need to use the default template first before configuring field mappings.</p>
-        <p class="mt-2"><%= link_to "Back to integrations", admin_event_integrations_path(current_event), class: "cs-link" %></p>
+        <p class="mt-2"><%= link_to "Back to waivers & documents", admin_event_documents_path(current_event), class: "cs-link" %></p>
       </div>
     </div>
   <% elsif @template_snapshot.blank? %>
@@ -233,7 +233,7 @@
       </section>
 
       <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-        <%= link_to "Cancel", admin_event_integrations_path(current_event), class: "cs-btn cs-btn-link cs-btn-full" %>
+        <%= link_to "Cancel", admin_event_documents_path(current_event), class: "cs-btn cs-btn-link cs-btn-full" %>
         <button type="submit" class="cs-btn cs-btn-primary cs-btn-full">Save mappings</button>
       </div>
     <% end %>

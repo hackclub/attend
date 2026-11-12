@@ -9,16 +9,16 @@ module Admin
 
     def use_default
       if custom_template_type?
-        redirect_to admin_event_integrations_path(@event), alert: "Custom documents don't have a default template."
+        redirect_to admin_event_documents_path(@event), alert: "Custom documents don't have a default template."
         return
       end
 
       result = Docuseal::DefaultTemplateSetup.new(@event).call(@template_type)
 
       if result.success?
-        redirect_to admin_event_integrations_path(@event), notice: result.message
+        redirect_to admin_event_documents_path(@event), notice: result.message
       else
-        redirect_to admin_event_integrations_path(@event), alert: result.message
+        redirect_to admin_event_documents_path(@event), alert: result.message
       end
     end
 
@@ -26,7 +26,7 @@ module Admin
       template_id = template_id_for_type
 
       if template_id.blank?
-        redirect_to admin_event_integrations_path(@event),
+        redirect_to admin_event_documents_path(@event),
                     alert: "No template configured. Please create one first."
         return
       end
@@ -121,9 +121,9 @@ module Admin
 
       if @template_type&.start_with?("custom_")
         @custom_document = @event.custom_documents.find_by(id: @template_type.delete_prefix("custom_"))
-        redirect_to admin_event_integrations_path(@event), alert: "Custom document not found" if @custom_document.nil?
+        redirect_to admin_event_documents_path(@event), alert: "Custom document not found" if @custom_document.nil?
       elsif !VALID_TEMPLATE_TYPES.include?(@template_type)
-        redirect_to admin_event_integrations_path(@event), alert: "Invalid template type"
+        redirect_to admin_event_documents_path(@event), alert: "Invalid template type"
       end
     end
 
