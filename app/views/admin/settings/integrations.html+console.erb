@@ -126,6 +126,22 @@
           </div>
         <% end %>
       </div>
+
+      <div class="<%= row_divider %>">
+        <%= form_with url: update_support_email_addresses_admin_settings_path, method: :post, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+          <%= cs_field id: "support_email_notification_addresses", label: "Email notifications", optional: true,
+                description: "Addresses emailed when a new SMS, WhatsApp, or Signal ticket is opened. Leave empty to send no emails.",
+                constraint: "One per line or comma-separated." do |aria| %>
+            <%= f.text_area :support_email_notification_addresses,
+                  value: @support_email_notification_addresses.join("\n"),
+                  rows: 4,
+                  class: "cs-input max-w-md font-mono", **aria %>
+          <% end %>
+          <div class="mt-2">
+            <%= f.button "Save", class: "cs-btn" %>
+          </div>
+        <% end %>
+      </div>
     </div>
   </section>
 

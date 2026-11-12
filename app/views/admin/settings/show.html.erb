@@ -188,6 +188,26 @@
         <% end %>
       </div>
     </div>
+
+    <div class="p-6 border-t border-gray-200">
+      <div>
+        <h3 class="text-lg font-semibold">Email Notifications</h3>
+        <p class="text-gray-600 text-sm mt-1 mb-3">
+          Addresses emailed when a new SMS, WhatsApp, or Signal ticket is opened. One per line (or comma-separated).
+          Leave empty to send no emails.
+        </p>
+        <%= form_with url: update_support_email_addresses_admin_settings_path, method: :post, class: "space-y-2" do |f| %>
+          <%= f.text_area :support_email_notification_addresses,
+                value: @support_email_notification_addresses.join("\n"),
+                rows: 4,
+                placeholder: "someone@example.com",
+                class: "w-full max-w-md px-3 py-2 border border-gray-300 rounded-md text-sm font-mono focus:ring-2 focus:ring-[#ec3750] focus:border-[#ec3750]" %>
+          <div>
+            <%= f.submit "Save", class: "px-4 py-2 bg-[#d42f46] hover:bg-[#b82840] text-white rounded-md font-medium transition-colors cursor-pointer" %>
+          </div>
+        <% end %>
+      </div>
+    </div>
   </div>
 
   <h2 class="text-xl font-bold mt-8 mb-4">Admin Help Slack Channel</h2>

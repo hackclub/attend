@@ -85,6 +85,67 @@ RSpec.describe "Admin::Settings", type: :request do
     end
   end
 
+  describe "support email notification settings" do
+    [ false, true ].each do |console|
+      it "renders the saved addresses #{console ? "in the console" : "in the classic UI"}" do
+        global_admin.update!(admin_console_beta: console)
+        Setting.support_email_notification_addresses = [ "inbox-watcher@example.com" ]
+        sign_in global_admin
+
+        # The console keeps it on the Integrations tab; the classic page has everything.
+        get console ? integrations_admin_settings_path : admin_settings_path
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("support_email_notification_addresses")
+        expect(response.body).to include("inbox-watcher@example.com")
+      end
+
+      it "saves a list of addresses #{console ? "in the console" : "in the classic UI"}" do
+        global_admin.update!(admin_console_beta: console)
+        sign_in global_admin
+
+        post update_support_email_addresses_admin_settings_path,
+          params: { support_email_notification_addresses: "First@example.com\nsecond@example.com, first@example.com" }
+
+        expect(response).to redirect_to(integrations_admin_settings_path)
+        expect(Setting.support_email_notification_address_list).to eq([ "first@example.com", "second@example.com" ])
+      end
+    end
+
+    it "starts empty" do
+      expect(Setting.support_email_notification_address_list).to be_empty
+    end
+
+    it "clears the list when saved blank" do
+      Setting.support_email_notification_addresses = [ "inbox-watcher@example.com" ]
+      sign_in global_admin
+
+      post update_support_email_addresses_admin_settings_path, params: { support_email_notification_addresses: "" }
+
+      expect(Setting.support_email_notification_address_list).to be_empty
+    end
+
+    it "rejects invalid addresses without saving" do
+      sign_in global_admin
+
+      post update_support_email_addresses_admin_settings_path,
+        params: { support_email_notification_addresses: "ok@example.com\nnot-an-email" }
+
+      expect(flash[:alert]).to include("Invalid email address")
+      expect(Setting.support_email_notification_address_list).to be_empty
+    end
+
+    it "denies non-global-admins" do
+      sign_in event_admin
+
+      post update_support_email_addresses_admin_settings_path,
+        params: { support_email_notification_addresses: "ok@example.com" }
+
+      expect(response).to redirect_to(admin_root_path)
+      expect(Setting.support_email_notification_address_list).to be_empty
+    end
+  end
+
   describe "Twilio Verify settings" do
     let(:service_sid) { "VA#{"0" * 32}" }
 

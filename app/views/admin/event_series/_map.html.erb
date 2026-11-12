@@ -1,5 +1,5 @@
 <% markers = series_map_markers(event_rows) %>
-<section class="bg-(--bg-elev) border border-(--border-card) rounded-lg overflow-hidden h-full flex flex-col">
+<section class="bg-(--bg-elev) border border-(--border-card) rounded-lg overflow-hidden flex flex-col">
   <div class="px-4 py-3 border-b border-(--border)">
     <h2 class="text-sm font-semibold text-(--text-strong)">Venue locations</h2>
   </div>
@@ -14,10 +14,10 @@
   <% else %>
     <%# Markers travel as JSON rather than interpolated markup so an event name
         is never parsed as HTML on its way onto the map. %>
-    <div class="p-3 flex-1 flex flex-col"
+    <div class="p-3"
          data-controller="series-map"
          data-series-map-markers-value="<%= markers.to_json %>">
-      <div class="series-map flex-1 bg-(--bg-elev-2)" data-series-map-target="map" role="group" aria-label="Map of this series' event venues. Each venue is also listed, with the same details, in the Events list on this page."></div>
+      <div class="series-map bg-(--bg-elev-2)" data-series-map-target="map" role="group" aria-label="Map of this series' event venues. Each venue is also listed, with the same details, in the Events list on this page."></div>
     </div>
 
     <%# Swatches come from the same ramp the markers do, so the legend cannot

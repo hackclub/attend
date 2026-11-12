@@ -88,4 +88,28 @@ RSpec.describe Admin::SeriesHelper, type: :helper do
       expect(helper.series_blocked_fill(-0.5)).to eq(helper.series_blocked_fill(0.0))
     end
   end
+
+  describe "#series_map_markers" do
+    def rows(count, active:)
+      Array.new(count) do |i|
+        event = build_stubbed(:event, slug: "mapped-#{i}", location_latitude: 51.5, location_longitude: -0.1)
+        { event: event, active: active, cleared: 0, percent: 0 }
+      end
+    end
+
+    it "keeps full-size dots for a small series" do
+      radii = helper.series_map_markers(rows(5, active: 100)).map { |m| m[:radius] }
+
+      expect(radii).to all(eq(34))
+    end
+
+    it "shrinks every dot when the map is crowded, keeping a clickable floor" do
+      big = helper.series_map_markers(rows(300, active: 100)).map { |m| m[:radius] }
+      tiny = helper.series_map_markers(rows(300, active: 0)).map { |m| m[:radius] }
+
+      expect(big).to all(be < 34)
+      expect(tiny).to all(eq(6))
+      expect(big.first).to be > tiny.first
+    end
+  end
 end

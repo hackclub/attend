@@ -17,6 +17,7 @@ class Setting < ApplicationRecord
   INCIDENT_REPORTS_CUSTOM_EVENTS = "incident_reports_custom_events".freeze
   SUPPORT_SMS_NOTIFICATIONS_ENABLED = "support_sms_notifications_enabled".freeze
   SUPPORT_SMS_NOTIFICATION_NUMBERS = "support_sms_notification_numbers".freeze
+  SUPPORT_EMAIL_NOTIFICATION_ADDRESSES = "support_email_notification_addresses".freeze
   ADMIN_HELP_SLACK_CHANNEL_ID = "admin_help_slack_channel_id".freeze
   ADMIN_HELP_SLACK_LAST_SYNC = "admin_help_slack_last_sync".freeze
 
@@ -166,6 +167,19 @@ class Setting < ApplicationRecord
     # E.164 numbers texted when a new inbound support ticket is opened.
     def support_sms_notification_number_list
       get(SUPPORT_SMS_NOTIFICATION_NUMBERS).to_s.split(",").map(&:strip).reject(&:blank?)
+    end
+
+    def support_email_notification_addresses=(addresses)
+      list = Array(addresses).flat_map { |a| a.to_s.split(/[\s,;]+/) }
+                             .map { |a| a.strip.downcase }
+                             .reject(&:blank?).uniq
+      set(SUPPORT_EMAIL_NOTIFICATION_ADDRESSES, list.join(","))
+    end
+
+    # Addresses emailed when a new inbound support ticket is opened. Empty by
+    # default, so nobody gets these until a global admin opts them in.
+    def support_email_notification_address_list
+      get(SUPPORT_EMAIL_NOTIFICATION_ADDRESSES).to_s.split(",").map(&:strip).reject(&:blank?)
     end
 
     def admin_help_slack_channel_id

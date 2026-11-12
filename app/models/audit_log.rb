@@ -73,6 +73,7 @@ class AuditLog < ApplicationRecord
     ticket_merge: "merge",
     toggle_support_sms: "toggle_support_sms",
     update_support_sms_numbers: "update_support_sms_numbers",
+    update_support_email_addresses: "update_support_email_addresses",
     trigger_airtable_sync: "trigger_airtable_sync",
     create_vote_event: "create_vote_event",
     dismiss_pickup: "dismiss_pickup",
