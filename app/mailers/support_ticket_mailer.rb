@@ -1,7 +1,8 @@
 class SupportTicketMailer < ApplicationMailer
-  NOTIFICATION_RECIPIENT = "leo@hackclub.com".freeze
-
   def new_chat(ticket_id:, message_id:)
+    recipients = Setting.support_email_notification_address_list
+    return if recipients.empty?
+
     @ticket = Ticket.find(ticket_id)
     @message = TicketMessage.find(message_id)
     @ticket_url = Rails.application.routes.url_helpers.support_ticket_url(
@@ -14,7 +15,7 @@ class SupportTicketMailer < ApplicationMailer
     subject_line = "New #{channel_label} chat from #{@ticket.phone_number}"
 
     mail(
-      to: NOTIFICATION_RECIPIENT,
+      to: recipients,
       subject: subject_line,
       reply_to: "team@hackclub.com"
     )
