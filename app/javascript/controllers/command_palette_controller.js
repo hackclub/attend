@@ -187,13 +187,17 @@ export default class extends Controller {
       })
     }
 
-    const defaultItems = this.getDefaultItems().filter(item => 
-      item.label.toLowerCase().includes(this.inputTarget.value.toLowerCase())
-    )
+    const query = this.fold(this.inputTarget.value)
+    const defaultItems = this.getDefaultItems().filter(item => this.fold(item.label).includes(query))
     this.items = [...this.items, ...defaultItems]
 
     this.selectedIndex = this.items.length > 0 ? 0 : -1
     this.renderItems()
+  }
+
+  // Lowercase and strip accents, so "montreal" matches "Montréal".
+  fold(text) {
+    return text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase()
   }
 
   renderItems() {
