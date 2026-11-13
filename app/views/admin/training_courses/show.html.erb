@@ -38,6 +38,45 @@
     </table>
   </div>
 
+  <% if @funnel %>
+    <div class="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+      <div class="px-6 py-4 border-b border-gray-100">
+        <h2 class="text-lg font-medium text-gray-900">Progress</h2>
+        <p class="text-sm text-gray-500 mt-1"><%= pluralize(@funnel.started, "person") %> started · <%= @funnel.finished %> finished (<%= @funnel.percent_of_started(@funnel.finished) %>%). Counted by Attend, so these are reliable where YouTube's view counts aren't. Restarting a course clears that person's progress.</p>
+      </div>
+      <table class="min-w-full divide-y divide-gray-100">
+        <thead class="text-xs text-gray-500 text-left">
+          <tr>
+            <th scope="col" class="px-6 py-3 font-medium">#</th>
+            <th scope="col" class="px-6 py-3 font-medium">Lesson</th>
+            <th scope="col" class="px-6 py-3 font-medium text-right" title="Opened the lesson page, which loads the video">Opened</th>
+            <th scope="col" class="px-6 py-3 font-medium text-right" title="Watched the video to the end, timed by Attend so skipping ahead doesn't count">Watched to end</th>
+            <th scope="col" class="px-6 py-3 font-medium text-right" title="Finished the lesson, including passing its quiz">Completed</th>
+            <th scope="col" class="px-6 py-3 font-medium text-right" title="Started the course, haven't finished it, and this is the next lesson they need to do">Stopped here</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 text-sm">
+          <% @funnel.steps.each_with_index do |step, index| %>
+            <tr>
+              <td class="px-6 py-4 text-gray-400"><%= index + 1 %></td>
+              <td class="px-6 py-4 text-gray-900"><%= step.lesson.title %></td>
+              <% [ step.opened, step.watched, step.completed ].each do |count| %>
+                <td class="px-6 py-4 text-right tabular-nums whitespace-nowrap text-gray-900">
+                  <% if count.nil? %>
+                    <span class="text-gray-400" title="No video, so opening this lesson isn't recorded">—</span>
+                  <% else %>
+                    <%= count %> <span class="text-gray-500">(<%= @funnel.percent_of_started(count) %>%)</span>
+                  <% end %>
+                </td>
+              <% end %>
+              <td class="px-6 py-4 text-right tabular-nums text-gray-900"><%= step.stopped %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+
   <%= render "admin/training_courses/invitations", course: @course, invitations: @invitations %>
 
   <div class="bg-white border border-gray-200 rounded-lg overflow-x-auto">
