@@ -1,0 +1,54 @@
+<%= form_with url: recipients_admin_broadcast_reviews_path, method: :patch, id: "review-recipients", class: "cs-stack" do %>
+  <section class="cs-container">
+    <div class="cs-container-header">
+      <div>
+        <h2 class="cs-h2">Who gets emailed</h2>
+        <p class="cs-container-description">
+          The global admins emailed when something is held. Owners of an event's series are always
+          emailed about their own events too, unless they sent it.
+          <% if @selected_user_ids.empty? %>
+            Nobody is picked yet, so it goes to <%= @fallback_emails.any? ? pluralize(@fallback_emails.size, "address") : "nobody" %> by default.
+          <% end %>
+        </p>
+      </div>
+    </div>
+    <% if @selectable_users.any? %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col"><span class="sr-only">Emailed</span></th>
+              <th scope="col">Name</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @selectable_users.each do |user| %>
+              <tr>
+                <td class="w-8">
+                  <%= check_box_tag "recipient_user_ids[]", user.id, @selected_user_ids.include?(user.id.to_s),
+                        id: "recipient_#{user.id}", class: "size-4 accent-(--cs-accent)" %>
+                </td>
+                <td>
+                  <label for="recipient_<%= user.id %>">
+                    <span class="block"><%= user.display_name_or_fallback %></span>
+                    <span class="block cs-small cs-muted"><%= user.email %></span>
+                  </label>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+      <div class="cs-container-footer">
+        <%= hidden_field_tag "recipient_user_ids[]", "", id: nil %>
+        <button type="submit" class="cs-btn cs-btn-primary">Save recipients</button>
+      </div>
+    <% else %>
+      <div class="cs-container-body">
+        <div class="cs-empty">
+          <p class="cs-empty-title">No global admins found.</p>
+        </div>
+      </div>
+    <% end %>
+  </section>
+<% end %>

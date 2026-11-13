@@ -167,6 +167,14 @@
         </svg>
         Event Series
       <% end %>
+      <%# Global admins get this link under Administration. %>
+      <% if !current_user.global_admin? && policy(BroadcastReview).index? %>
+        <% series_held_count = policy_scope(BroadcastReview).pending.count %>
+        <%= link_to admin_broadcast_reviews_path, class: "nav-item #{request.path.start_with?('/admin/broadcast_reviews') ? 'nav-item-active' : ''}", data: close_action ? { action: close_action } : {} do %>
+          <%= cs_icon(:messages, class: "h-4 w-4") %>
+          Held Messages<%= " (#{series_held_count})" if series_held_count.positive? %>
+        <% end %>
+      <% end %>
     </div>
   </div>
 <% end %>

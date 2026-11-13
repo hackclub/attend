@@ -21,7 +21,9 @@
     <%= render "content", review: @review %>
   </div>
 
-  <% if @review.pending? %>
+  <% if @review.pending? && !policy(@review).decide? %>
+    <%= render "own_submission" %>
+  <% elsif @review.pending? %>
     <%= form_with url: approve_admin_broadcast_review_path(@review), method: :post, class: "bg-white border border-gray-200 rounded-lg p-6 space-y-4" do %>
       <div>
         <label for="decision_note" class="block text-sm font-medium text-gray-700">Note to the sender <span class="text-gray-400">(optional)</span></label>

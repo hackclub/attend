@@ -18,6 +18,7 @@ class Setting < ApplicationRecord
   SUPPORT_SMS_NOTIFICATIONS_ENABLED = "support_sms_notifications_enabled".freeze
   SUPPORT_SMS_NOTIFICATION_NUMBERS = "support_sms_notification_numbers".freeze
   SUPPORT_EMAIL_NOTIFICATION_ADDRESSES = "support_email_notification_addresses".freeze
+  BROADCAST_REVIEW_RECIPIENT_USER_IDS = "broadcast_review_recipient_user_ids".freeze
   ADMIN_HELP_SLACK_CHANNEL_ID = "admin_help_slack_channel_id".freeze
   ADMIN_HELP_SLACK_LAST_SYNC = "admin_help_slack_last_sync".freeze
 
@@ -180,6 +181,24 @@ class Setting < ApplicationRecord
     # default, so nobody gets these until a global admin opts them in.
     def support_email_notification_address_list
       get(SUPPORT_EMAIL_NOTIFICATION_ADDRESSES).to_s.split(",").map(&:strip).reject(&:blank?)
+    end
+
+    def broadcast_review_recipient_user_ids=(ids)
+      set(BROADCAST_REVIEW_RECIPIENT_USER_IDS, Array(ids).reject(&:blank?).uniq.join(","))
+    end
+
+    def broadcast_review_recipient_user_id_list
+      get(BROADCAST_REVIEW_RECIPIENT_USER_IDS).to_s.split(",").map(&:strip).reject(&:blank?)
+    end
+
+    # Global admins picked to get "held for review" emails. Anyone picked who
+    # has since stopped being a global admin drops out, since they could no
+    # longer open the review. Empty means nobody has been picked.
+    def broadcast_review_recipients
+      ids = broadcast_review_recipient_user_id_list
+      return User.none if ids.empty?
+
+      User.where(id: ids, global_role: "global_admin")
     end
 
     def admin_help_slack_channel_id

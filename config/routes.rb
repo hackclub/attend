@@ -532,8 +532,12 @@ Rails.application.routes.draw do
       end
     end
 
-    # Broadcasts BroadcastScreener held back, for global admins to decide.
+    # Broadcasts BroadcastScreener held back, for global admins and series
+    # owners to decide.
     resources :broadcast_reviews, only: [ :index, :show ] do
+      collection do
+        patch :recipients, action: :update_review_recipients
+      end
       member do
         post :approve, action: :approve_broadcast
         post :reject, action: :reject_broadcast

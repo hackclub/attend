@@ -1,7 +1,7 @@
 <div class="space-y-6">
   <div>
     <h1 class="text-2xl font-bold text-gray-900">Held Messages</h1>
-    <p class="text-sm text-gray-500">Messages and Slack blasts that looked like marketing, spam, or not about their event. Nothing here has been sent. Approve one to send it, or reject it to send it back to its author.</p>
+    <p class="text-sm text-gray-500">Messages and Slack blasts that looked like marketing, spam, or not about their event<%= " in a series you own" unless current_user.global_admin? %>. Nothing here has been sent. Approve one to send it, or reject it to send it back to its author.</p>
   </div>
 
   <div class="bg-white border border-gray-200 rounded-lg">
@@ -40,5 +40,9 @@
         <% end %>
       </ul>
     </div>
+  <% end %>
+
+  <% if @selectable_users %>
+    <%= render "recipients" %>
   <% end %>
 </div>

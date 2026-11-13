@@ -93,6 +93,11 @@
   <div class="cs-sidenav-section">
     <p class="cs-sidenav-section-title">Series</p>
     <%= nav_link.call("Event series", admin_series_index_path, request.path.start_with?("/admin/series"), :series) %>
+    <%# Global admins get this link under Administration. %>
+    <% if !current_user.global_admin? && policy(BroadcastReview).index? %>
+      <% series_held_count = policy_scope(BroadcastReview).pending.count %>
+      <%= nav_link.call(series_held_count.positive? ? "Held messages (#{series_held_count})" : "Held messages", admin_broadcast_reviews_path, request.path.start_with?("/admin/broadcast_reviews"), :messages) %>
+    <% end %>
   </div>
 <% end %>
 
