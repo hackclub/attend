@@ -4,7 +4,7 @@
   <div class="cs-header">
     <div class="cs-header-text">
       <h1 class="cs-h1">Held messages <span class="cs-counter">(<%= @pending.size %>)</span></h1>
-      <p class="cs-description">Messages and Slack blasts that looked like marketing, spam, or not about their event. Nothing here has been sent. Approve one to send it, or reject it to send it back to its author.</p>
+      <p class="cs-description">Messages and Slack blasts that looked like marketing, spam, or not about their event<%= " in a series you own" unless current_user.global_admin? %>. Nothing here has been sent. Approve one to send it, or reject it to send it back to its author.</p>
     </div>
   </div>
 
@@ -89,5 +89,9 @@
         </table>
       </div>
     </section>
+  <% end %>
+
+  <% if @selectable_users %>
+    <%= render "recipients" %>
   <% end %>
 </div>

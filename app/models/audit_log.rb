@@ -91,6 +91,7 @@ class AuditLog < ApplicationRecord
     send_now: "send_now",
     approve_broadcast: "approve_broadcast",
     reject_broadcast: "reject_broadcast",
+    update_review_recipients: "update_review_recipients",
     retry_delivery: "retry_delivery",
     retry_failed: "retry_failed",
     send_to_new_recipients: "send_to_new_recipients",

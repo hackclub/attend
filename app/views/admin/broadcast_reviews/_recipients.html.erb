@@ -1,0 +1,30 @@
+<%= form_with url: recipients_admin_broadcast_reviews_path, method: :patch, id: "review-recipients", class: "bg-white border border-gray-200 rounded-lg" do %>
+  <div class="px-6 py-4 border-b border-gray-200">
+    <h2 class="text-lg font-semibold text-gray-900">Who gets emailed</h2>
+    <p class="text-sm text-gray-500">
+      The global admins emailed when something is held. Owners of an event's series are always
+      emailed about their own events too, unless they sent it.
+      <% if @selected_user_ids.empty? %>
+        Nobody is picked yet, so it goes to <%= @fallback_emails.any? ? pluralize(@fallback_emails.size, "address") : "nobody" %> by default.
+      <% end %>
+    </p>
+  </div>
+  <ul class="divide-y divide-gray-100">
+    <% @selectable_users.each do |user| %>
+      <li class="px-6 py-3">
+        <label class="flex items-center gap-3 text-sm">
+          <%= check_box_tag "recipient_user_ids[]", user.id, @selected_user_ids.include?(user.id.to_s),
+                id: "recipient_#{user.id}", class: "h-4 w-4" %>
+          <span>
+            <span class="block text-gray-900"><%= user.display_name_or_fallback %></span>
+            <span class="block text-gray-500"><%= user.email %></span>
+          </span>
+        </label>
+      </li>
+    <% end %>
+  </ul>
+  <div class="px-6 py-4 border-t border-gray-200">
+    <%= hidden_field_tag "recipient_user_ids[]", "", id: nil %>
+    <button type="submit" class="px-4 py-2 bg-[#d42f46] text-white rounded-md hover:bg-[#b82840] text-sm">Save recipients</button>
+  </div>
+<% end %>
