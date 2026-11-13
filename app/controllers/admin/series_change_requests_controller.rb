@@ -6,7 +6,7 @@ module Admin
     global_page
     before_action :set_series
 
-    STATUS_FILTERS = %w[pending follow_up_needed approved all].freeze
+    STATUS_FILTERS = %w[pending follow_up_needed approved dismissed all].freeze
 
     def index
       authorize @series, :view_change_requests?

@@ -76,6 +76,42 @@ RSpec.describe "Admin registration change requests", type: :request do
     expect(request_record.reload).to be_follow_up_needed
   end
 
+  [ false, true ].each do |console|
+    context "dismissing #{console ? 'in the admin console' : 'in the original admin'}" do
+      let(:ops) { create(:user, admin_console_beta: console) }
+
+      before do
+        create(:event_role_assignment, event: event, user: ops, role: :ops)
+        sign_in ops
+      end
+
+      it "offers a dismiss action on a pending request" do
+        get admin_event_registration_change_request_path(event, request_record)
+
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("Dismiss request")
+      end
+
+      it "closes the request without emailing the attendee" do
+        # Warm-up request: the first write after sign-in audits Devise's
+        # sign-in tracking on the user instead of the request.
+        get admin_event_registration_change_request_path(event, request_record)
+
+        expect {
+          patch dismiss_admin_event_registration_change_request_path(event, request_record)
+        }.not_to have_enqueued_mail(RegistrationCorrectionMailer)
+
+        expect(response).to redirect_to(admin_event_registration_change_request_path(event, request_record))
+        expect(request_record.reload).to have_attributes(status: "dismissed", resolved_by: ops)
+        expect(AuditLog.where(record: request_record, action: :dismiss_registration_change_request)).to exist
+
+        get admin_event_registration_change_request_path(event, request_record)
+        expect(response.body).to include("Dismissed")
+        expect(response.body).not_to include("Dismiss request")
+      end
+    end
+  end
+
   it "does not expose a consequential request to ops" do
     request_record.update!(kind: :signed_identity, staff_audience: :event_admin,
       requested_changes: { "legal_first_name" => "Corrected" })

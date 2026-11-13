@@ -16,14 +16,28 @@ class RegistrationChangeRequestsController < ApplicationController
         alert: "A guardian can only be replaced for a minor registration with an existing guardian."
     end
 
+    changes = permitted_changes
+    if request_params[:kind] == "guardian"
+      details = RegistrationChangeRequests::GuardianDetails.new(@participant_event, changes)
+      if details.phone_unreadable?
+        return redirect_to return_path(failed: true),
+          alert: "We couldn't read that phone number. Enter it with the country code, for example +44 7911 123456."
+      end
+      changes = details.normalized_changes
+    end
+
     @change_request = @participant_event.registration_change_requests.build(
       requested_by: current_user,
       kind: request_params[:kind],
       staff_audience: staff_audience,
-      requested_changes: permitted_changes,
+      requested_changes: changes,
       requester_note: request_params[:requester_note]
     )
     authorize @change_request
+
+    if (message = no_op_message(details))
+      return redirect_to return_path, notice: message
+    end
 
     if @change_request.save
       RegistrationCorrectionNotifications.change_request(@change_request)
@@ -71,6 +85,33 @@ class RegistrationChangeRequestsController < ApplicationController
     # back to a plain Hash. A support request sends no changes at all.
     changes = request_params[:requested_changes] || {}
     changes.to_h.slice(*fields)
+  end
+
+  # A request that would change nothing only sits in the staff queue. Say so
+  # straight away instead, which is also what the participant needs to hear.
+  def no_op_message(guardian_details)
+    case @change_request.kind
+    when "guardian"
+      return unless guardian_details&.identical?
+
+      "Those guardian details already match what we have on file, so there's nothing to change. " \
+        "If your guardian hasn't received their email, ask them to check their spam folder."
+    when "signed_identity"
+      return unless identity_unchanged?
+
+      "Your legal name and date of birth already match what you sent, so there's nothing to change."
+    end
+  end
+
+  def identity_unchanged?
+    participant = @participant_event.participant
+    changes = @change_request.requested_changes.to_h.stringify_keys.compact_blank
+    return false if changes.empty?
+
+    changes.all? do |field, value|
+      current = participant.public_send(field)
+      field == "date_of_birth" ? value.to_s == current.to_s : value.to_s.squish == current.to_s.squish
+    end
   end
 
   def staff_audience

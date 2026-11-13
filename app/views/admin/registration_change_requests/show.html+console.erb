@@ -1,6 +1,6 @@
 <% content_for :title, "Change request – #{current_event.name} – Attend" %>
 <% content_for :breadcrumbs, cs_event_breadcrumbs([ "Change requests", admin_event_registration_change_requests_path(current_event) ], [ @change_request.participant.display_name, nil ]) %>
-<% change_request_status_types = { "pending" => :pending, "approved" => :success, "follow_up_needed" => :warning } %>
+<% change_request_status_types = { "pending" => :pending, "approved" => :success, "follow_up_needed" => :warning, "dismissed" => :stopped } %>
 
 <div class="cs-stack max-w-3xl">
   <div class="cs-header">
@@ -87,6 +87,11 @@
             <%= f.button "Request follow-up", class: "cs-btn" %>
           </div>
         <% end %>
+
+        <div>
+          <p class="cs-secondary mb-2">Close without changing anything or emailing the attendee.</p>
+          <%= button_to "Dismiss request", dismiss_admin_event_registration_change_request_path(current_event, @change_request), method: :patch, class: "cs-btn", data: { turbo_confirm: "Dismiss this request? Nothing is changed and the attendee isn't emailed." } %>
+        </div>
       </div>
     </section>
   <% end %>

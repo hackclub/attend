@@ -367,6 +367,7 @@ Rails.application.routes.draw do
         member do
           patch :approve
           patch :request_follow_up
+          patch :dismiss
         end
       end
       resources :slack_blasts, only: [ :index, :show, :new, :create ] do

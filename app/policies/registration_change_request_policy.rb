@@ -15,6 +15,10 @@ class RegistrationChangeRequestPolicy < ApplicationPolicy
     staff_can_view?
   end
 
+  def dismiss?
+    staff_can_view?
+  end
+
   class Scope < ApplicationPolicy::Scope
     def resolve
       if (event = Current.event)

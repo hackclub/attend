@@ -123,6 +123,71 @@ RSpec.describe "Registration corrections", type: :request do
     )
   end
 
+  describe "guardian requests against the guardian on file" do
+    let(:guardian) do
+      create(:guardian, legal_first_name: "Robin", legal_last_name: "Testparent",
+        email: "robin.testparent@example.com", phone: "+61412345678")
+    end
+
+    before do
+      participant.update!(date_of_birth: 15.years.ago)
+      create(:guardian_participant_event, participant_event: participant_event, guardian: guardian,
+        is_primary_guardian: true, relationship: "Parent")
+    end
+
+    def submit_guardian(**changes)
+      post dashboard_event_registration_change_requests_path(participant_event), params: {
+        registration_change_request: {
+          kind: "guardian",
+          requested_changes: {
+            legal_first_name: "Robin", legal_last_name: "Testparent",
+            email: "robin.testparent@example.com", phone: "+61412345678", relationship: "Parent"
+          }.merge(changes)
+        }
+      }
+    end
+
+    it "stores a national-format phone in E.164 using the guardian's country" do
+      expect {
+        submit_guardian(email: "robin.t@example.com", phone: "0498 765 432")
+      }.to change(RegistrationChangeRequest, :count).by(1)
+
+      expect(RegistrationChangeRequest.last.requested_changes["phone"]).to eq("+61498765432")
+    end
+
+    it "turns away a phone number it can't read instead of queueing an unapprovable request" do
+      expect {
+        submit_guardian(email: "robin.t@example.com", phone: "12345")
+      }.not_to change(RegistrationChangeRequest, :count)
+
+      expect(flash[:alert]).to include("country code")
+    end
+
+    it "doesn't queue a request that matches the guardian on file" do
+      expect {
+        submit_guardian(phone: "0412 345 678")
+      }.not_to change(RegistrationChangeRequest, :count)
+
+      expect(response).to redirect_to(dashboard_event_path(participant_event))
+      expect(flash[:notice]).to include("already match")
+    end
+  end
+
+  it "doesn't queue an identity request that matches the details on file" do
+    participant.update!(legal_first_name: "Alex", legal_last_name: "Testperson", date_of_birth: Date.new(2010, 3, 4))
+
+    expect {
+      post dashboard_event_registration_change_requests_path(participant_event), params: {
+        registration_change_request: {
+          kind: "signed_identity",
+          requested_changes: { legal_first_name: "Alex ", legal_last_name: "Testperson", date_of_birth: "2010-03-04" }
+        }
+      }
+    }.not_to change(RegistrationChangeRequest, :count)
+
+    expect(flash[:notice]).to include("already match")
+  end
+
   it "rejects guardian replacement requests for an adult registration" do
     participant_event
     participant.update!(date_of_birth: 25.years.ago)
