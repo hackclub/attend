@@ -152,13 +152,23 @@ RSpec.describe "Admin::BroadcastReviews", type: :request do
 
           get admin_broadcast_review_path(review)
           expect(response).to have_http_status(:ok)
-          expect(response.body).to include("You sent this")
+          expect(response.body).to include("You wrote, edited or sent this")
           expect(response.body).not_to include("Approve and send")
 
           post approve_admin_broadcast_review_path(review)
           expect(own.reload).to be_pending_review
         end
       end
+    end
+
+    it "doesn't let a series owner approve a message they edited but someone else sent" do
+      PaperTrail.request(whodunnit: owner.id.to_s) { message.update!(subject: "Weekend sale, tweaked") }
+      message.send!(sender: organizer)
+      review = message.pending_broadcast_review
+      sign_in owner
+
+      post approve_admin_broadcast_review_path(review)
+      expect(message.reload).to be_pending_review
     end
 
     it "keeps series organizers out of the queue" do

@@ -1,9 +1,10 @@
 # Who sees and decides broadcasts BroadcastScreener held back.
 #
 # Global admins review everything. Series owners review held broadcasts for
-# events in their series, but not their own: the screen is a second pair of
-# eyes, so an owner can't wave their own message through. Organizers, event
-# staff and everyone else only see a held message from the message's own page.
+# events in their series, but not ones they wrote, edited or sent: the screen
+# is a second pair of eyes, so an owner can't wave their own message through.
+# Organizers, event staff and everyone else only see a held message from the
+# message's own page.
 class BroadcastReviewPolicy < ApplicationPolicy
   def index?
     user.global_admin? || owned_series_ids.exists?
@@ -16,7 +17,21 @@ class BroadcastReviewPolicy < ApplicationPolicy
   def decide?
     return true if user.global_admin?
 
-    series_owner_for_review? && record.submitted_by_user_id != user.id
+    series_owner_for_review? && !had_a_hand_in_it?
+  end
+
+  # Whether this user wrote, edited or sent the held broadcast. Pressing Send
+  # isn't the only way in: an owner could draft it and have someone else send
+  # it, or edit an organizer's draft, so any PaperTrail version they made
+  # counts too.
+  def had_a_hand_in_it?
+    return true if record.submitted_by_user_id == user.id
+
+    reviewable = record.reviewable
+    return false unless reviewable
+
+    reviewable.sent_by_user_id == user.id ||
+      reviewable.versions.where(whodunnit: user.id.to_s).exists?
   end
 
   def approve_broadcast?
