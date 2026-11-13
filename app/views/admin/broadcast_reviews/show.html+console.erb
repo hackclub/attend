@@ -1,18 +1,18 @@
-<% content_for :breadcrumbs, cs_breadcrumbs([ "Held messages", admin_broadcast_reviews_path ], [ @review.event.name, nil ]) %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Held messages", admin_broadcast_reviews_path ], [ @review.target_name, nil ]) %>
 <% reviewable = @review.reviewable %>
 
 <div class="cs-stack">
   <div class="cs-header">
     <div class="cs-header-text">
       <h1 class="cs-h1">Held <%= @review.kind_label.downcase %></h1>
-      <p class="cs-description"><%= @review.event.name %></p>
+      <p class="cs-description"><%= @review.target_name %></p>
     </div>
   </div>
 
   <% if @review.pending? %>
     <div class="cs-alert cs-alert-warning">
       <%= cs_status_icon(:warning) %>
-      <p>This hasn't been sent to anyone. Approving it sends it now<%= " (or at its scheduled time)" if reviewable.is_a?(Message) && reviewable.scheduled_at&.future? %>.</p>
+      <p>This hasn't been sent to anyone. Approving it sends it now<%= " (or at its scheduled time)" if reviewable.respond_to?(:audience_label) && reviewable.scheduled_at&.future? %>.</p>
     </div>
   <% end %>
 
@@ -40,7 +40,7 @@
           <dt class="cs-kv-label">Reason</dt>
           <dd class="cs-kv-value"><%= @review.reason %> <span class="cs-muted">(<%= @review.flagged_by == "model" ? "Claude" : "keyword rules" %>)</span></dd>
         </div>
-        <% if reviewable.is_a?(Message) %>
+        <% if reviewable.respond_to?(:audience_label) %>
           <div>
             <dt class="cs-kv-label">Going to</dt>
             <dd class="cs-kv-value"><%= reviewable.audience_label %> by <%= reviewable.channel_labels %></dd>

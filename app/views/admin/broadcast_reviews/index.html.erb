@@ -15,7 +15,7 @@
         <% @pending.each do |review| %>
           <li class="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="min-w-0">
-              <div class="text-sm font-medium text-gray-900"><%= review.event.name %> · <%= review.kind_label %></div>
+              <div class="text-sm font-medium text-gray-900"><%= review.target_name %> · <%= review.kind_label %></div>
               <div class="text-sm text-gray-500"><%= review.submitted_by_user&.email || "—" %> · <%= time_ago_in_words(review.created_at) %> ago</div>
               <div class="text-sm text-gray-700 mt-1"><strong><%= review.category_labels.to_sentence %>:</strong> <%= review.reason %></div>
             </div>
@@ -34,7 +34,7 @@
       <ul class="divide-y divide-gray-100">
         <% @decided.each do |review| %>
           <li class="px-6 py-3 text-sm">
-            <%= link_to "#{review.event.name} · #{review.kind_label}", admin_broadcast_review_path(review), class: "font-medium text-gray-900 hover:underline" %>
+            <%= link_to "#{review.target_name} · #{review.kind_label}", admin_broadcast_review_path(review), class: "font-medium text-gray-900 hover:underline" %>
             <span class="text-gray-500">— <%= review.status.humanize %><%= " by #{review.decided_by_user.email}" if review.decided_by_user %><%= ", #{time_ago_in_words(review.decided_at)} ago" if review.decided_at %></span>
           </li>
         <% end %>

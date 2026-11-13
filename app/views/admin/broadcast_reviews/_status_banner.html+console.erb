@@ -15,7 +15,7 @@
     <%= cs_status_icon(:error) %>
     <p>
       <strong>Not approved.</strong>
-      A Hack Club admin didn't approve this<%= broadcastable.is_a?(Message) ? ", so it's back to a draft" : "" %>.
+      A Hack Club admin didn't approve this<%= broadcastable.try(:draft?) ? ", so it's back to a draft" : "" %>.
       <%= review.decision_note.presence || review.reason %>
     </p>
   </div>

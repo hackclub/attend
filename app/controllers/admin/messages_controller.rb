@@ -10,7 +10,7 @@ module Admin
       authorize current_event, :update?
 
       @messages = current_event.messages
-        .includes(:sent_by_user)
+        .includes(:sent_by_user, series_broadcast: :event_series)
         .order(created_at: :desc)
     end
 

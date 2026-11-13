@@ -59,6 +59,9 @@
           Change requests<% if (pending = @dashboard.pending_change_request_count).positive? %> <span class="cs-counter">(<%= pending %>)</span><% end %>
         <% end %>
       <% end %>
+      <% if policy(SeriesBroadcast.new(event_series: @series)).index? %>
+        <%= link_to "Broadcasts", admin_series_broadcasts_path(@series), class: "cs-btn" %>
+      <% end %>
       <%# Members, integrations and API keys are tabs of Settings. %>
       <% if policy(@series).update? %>
         <%= link_to "Settings", edit_admin_series_path(@series), class: "cs-btn" %>

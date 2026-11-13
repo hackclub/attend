@@ -1,11 +1,13 @@
 # Holds broadcasts that look like marketing, spam or off-topic for a global
 # admin to review before they go out (see BroadcastScreener, BroadcastReview).
 #
-# Included by Message and SlackBlast, which provide:
+# Included by Message, SlackBlast and SeriesBroadcast, which provide:
 #   screening_subject / screening_text  what the screener reads
 #   release_after_review!(by:)          send it once an admin approves
 #   return_after_rejection!             what a rejection does to it
-# and a `pending_review` status.
+# and a `pending_review` status. One that doesn't belong to a single event
+# (SeriesBroadcast) also overrides #screening_event and
+# #broadcast_review_owner.
 #
 # `screened_digest` remembers the content last cleared (by the screener, a
 # global admin sending it, or an approval), so it isn't screened again until
@@ -46,7 +48,7 @@ module ScreenedBroadcast
   def screen_for_review(sender:)
     return if screening_cleared?
 
-    result = sender&.global_admin? ? nil : BroadcastScreener.call(event: event, subject: screening_subject, text: screening_text)
+    result = sender&.global_admin? ? nil : BroadcastScreener.call(event: screening_event, subject: screening_subject, text: screening_text)
     return result if result&.flagged?
 
     update_columns(screened_digest: content_digest)
@@ -56,13 +58,25 @@ module ScreenedBroadcast
   def hold_for_review!(result, sender:)
     update!(status: :pending_review)
     broadcast_reviews.create!(
-      event: event,
+      **broadcast_review_owner,
       submitted_by_user: sender,
       flagged_by: result.flagged_by,
       categories: result.categories,
       reason: result.reason,
       content_digest: content_digest
     )
+  end
+
+  # What the screener judges the broadcast against: its event's name, dates
+  # and venue.
+  def screening_event
+    event
+  end
+
+  # Where a held review is filed, which decides who may review it (see
+  # BroadcastReviewPolicy).
+  def broadcast_review_owner
+    { event: event }
   end
 
   def pending_broadcast_review

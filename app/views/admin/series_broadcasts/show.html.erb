@@ -1,0 +1,110 @@
+<% content_for :title, "#{@broadcast.subject.presence || 'Broadcast'} – #{@series.name} – Attend" %>
+
+<div class="max-w-5xl mx-auto space-y-6">
+  <div>
+    <%= link_to "← Broadcasts", admin_series_broadcasts_path(@series), class: "text-sm text-gray-500 hover:text-gray-700" %>
+    <div class="flex flex-wrap justify-between items-start gap-3 mt-1">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900"><%= @broadcast.subject.presence || "No subject" %></h1>
+        <p class="text-sm text-gray-500">
+          <%= @series.name %> ·
+          <% if @broadcast.sent_at.present? %>
+            Sent <%= time_ago_in_words(@broadcast.sent_at) %> ago by <%= @broadcast.sent_by_user.display_name_or_fallback %>
+          <% elsif @broadcast.scheduled_at.present? %>
+            Scheduled for <%= @broadcast.scheduled_at.utc.strftime("%b %d, %Y %H:%M UTC") %> by <%= @broadcast.sent_by_user.display_name_or_fallback %>
+          <% else %>
+            Written by <%= @broadcast.sent_by_user.display_name_or_fallback %> · Draft
+          <% end %>
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <% if @broadcast.scheduled? || @broadcast.pending_review? %>
+          <%= button_to "Cancel", cancel_admin_series_broadcast_path(@series, @broadcast),
+              method: :post,
+              form: { data: { turbo_confirm: "Are you sure you want to cancel this broadcast?" } },
+              class: "px-4 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50" %>
+        <% end %>
+        <% if @broadcast.draft? || @broadcast.scheduled? %>
+          <%= link_to "Edit", edit_admin_series_broadcast_path(@series, @broadcast),
+              class: "px-4 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50" %>
+          <%= link_to "Preview & Send", preview_admin_series_broadcast_path(@series, @broadcast),
+              class: "px-4 py-2 bg-[#d42f46] text-white rounded-md text-sm hover:bg-[#b82840]" %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%= render "admin/broadcast_reviews/status_banner", broadcastable: @broadcast %>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+    <div><div class="text-gray-500">Status</div><div class="mt-1"><%= render "status", broadcast: @broadcast %></div></div>
+    <div><div class="text-gray-500">Events</div><div class="mt-1 text-gray-900"><%= @broadcast.event_scope_label %></div></div>
+    <div><div class="text-gray-500">Audience</div><div class="mt-1 text-gray-900"><%= @broadcast.audience_label %></div></div>
+    <div><div class="text-gray-500">Channels</div><div class="mt-1 text-gray-900"><%= @broadcast.channel_labels %></div></div>
+    <% if @broadcast.sent_at.present? %>
+      <div><div class="text-gray-500">Events reached</div><div class="mt-1 text-2xl font-semibold text-gray-900"><%= @totals[:events] %></div></div>
+      <div><div class="text-gray-500">Recipients</div><div class="mt-1 text-2xl font-semibold text-gray-900"><%= @totals[:recipients] %></div></div>
+      <div><div class="text-gray-500">Delivered</div><div class="mt-1 text-2xl font-semibold text-gray-900"><%= @totals[:delivered] %></div></div>
+      <div><div class="text-gray-500">Failed</div><div class="mt-1 text-2xl font-semibold text-gray-900"><%= @totals[:failed] %></div></div>
+    <% end %>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <h2 class="text-lg font-semibold mb-3">Message content</h2>
+    <div class="prose prose-sm max-w-none">
+      <%= sanitize @broadcast.body_as_html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
+    </div>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+    <div class="px-6 py-4 border-b border-gray-100">
+      <h2 class="text-lg font-semibold">By event (<%= @messages.size %>)</h2>
+      <p class="text-sm text-gray-500">Each event's copy is an ordinary message on its messages page: open one for its deliveries, retries and late sends.</p>
+    </div>
+    <% if @messages.any? %>
+      <table class="min-w-full divide-y divide-gray-100 text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Recipients</th>
+            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Delivered</th>
+            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Failed</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <% @messages.each do |message| %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-6 py-3">
+                <%= link_to message.event.name, admin_event_message_path(message.event, message), class: "text-gray-900 hover:underline" %>
+                <div class="text-xs text-gray-400"><%= message.event.starts_at&.strftime("%b %d, %Y") %></div>
+              </td>
+              <td class="px-6 py-3 text-gray-600"><%= message.status.titleize %></td>
+              <td class="px-6 py-3 text-right"><%= message.recipient_count %></td>
+              <td class="px-6 py-3 text-right"><%= message.sent_count %></td>
+              <td class="px-6 py-3 text-right <%= 'text-red-600' if message.failed_count.positive? %>"><%= message.failed_count %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% elsif @broadcast.sending? %>
+      <p class="px-6 py-8 text-sm text-gray-500 text-center">Creating each event's copy. They appear here as they go out; refresh in a moment.</p>
+    <% elsif @target_event_count %>
+      <p class="px-6 py-8 text-sm text-gray-500 text-center">Not sent yet. It will go to <%= pluralize(@target_event_count, "event") %> (<%= @broadcast.event_scope_label.downcase %>), skipping any where nobody matches the audience.</p>
+    <% else %>
+      <p class="px-6 py-8 text-sm text-gray-500 text-center">No event received a copy.</p>
+    <% end %>
+  </div>
+
+  <% if @skipped_events.any? %>
+    <div class="bg-white border border-gray-200 rounded-lg p-6">
+      <h2 class="text-lg font-semibold">Skipped (<%= @skipped_events.size %>)</h2>
+      <p class="text-sm text-gray-500 mb-3">Nobody at these events matched the audience when it was sent.</p>
+      <div class="flex flex-wrap gap-2">
+        <% @skipped_events.each do |event| %>
+          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700"><%= event.name %></span>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>

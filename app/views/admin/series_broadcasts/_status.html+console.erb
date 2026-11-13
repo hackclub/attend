@@ -1,0 +1,10 @@
+<%# A series broadcast's status, as Cloudscape status indicators. %>
+<% types = {
+     "draft" => :stopped,
+     "scheduled" => :pending,
+     "pending_review" => :warning,
+     "sending" => :in_progress,
+     "completed" => :success,
+     "cancelled" => :stopped
+   } %>
+<%= cs_status(types.fetch(broadcast.status, :info), broadcast.status.titleize) %>

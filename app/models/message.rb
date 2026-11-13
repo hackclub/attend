@@ -7,6 +7,8 @@ class Message < ApplicationRecord
 
   belongs_to :event
   belongs_to :sent_by_user, class_name: "User"
+  # Set on the per-event copies a SeriesBroadcast creates when it is sent.
+  belongs_to :series_broadcast, optional: true
   has_many :message_deliveries, dependent: :destroy
   # Pictures in the body. Staff upload them from the editor before the message
   # is saved (see Message::ImageUpload), and saving the body attaches the ones
@@ -106,6 +108,7 @@ class Message < ApplicationRecord
   # Prepended so it runs before the deliveries are destroyed.
   before_destroy :remember_unsent_images, prepend: true
   after_destroy_commit :purge_unsent_images
+  after_update_commit :settle_series_broadcast, if: -> { series_broadcast_id.present? && saved_change_to_status? }
 
   scope :recent, -> { order(created_at: :desc) }
   scope :pending_scheduled, -> { scheduled.where("scheduled_at <= ?", Time.current) }
@@ -135,32 +138,32 @@ class Message < ApplicationRecord
       # their recipient has not been contacted yet (see
       # ParticipantEvent#onboarding_held?), so broadcasting event detail to
       # them is precisely what the hold exists to prevent.
-      event.participant_events
+      audience_participant_events
         .where(status: %w[in_progress awaiting_guardian complete])
-        .or(event.participant_events.where(id: notified_invitee_ids))
+        .or(audience_participant_events.where(id: notified_invitee_ids))
     when :all_attendees_and_held
       # The same audience plus held invitees, for when staff decide a message
       # should reach people before their invitation has gone out.
-      event.participant_events
+      audience_participant_events
         .where(status: %w[in_progress awaiting_guardian complete])
-        .or(event.participant_events.where(id: notified_invitee_ids))
-        .or(event.participant_events.where(id: held_invitee_ids))
+        .or(audience_participant_events.where(id: notified_invitee_ids))
+        .or(audience_participant_events.where(id: held_invitee_ids))
     when :confirmed_attendees
-      event.participant_events.complete
+      audience_participant_events.complete
     when :attendees_with_flights
-      event.participant_events.complete
+      audience_participant_events.complete
         .joins("INNER JOIN travels ON travels.participant_event_id = participant_events.id")
         .joins("INNER JOIN travel_legs ON travel_legs.travel_id = travels.id")
         .distinct
     when :attendees_incomplete
-      event.participant_events.where(status: %w[invited in_progress awaiting_guardian])
+      audience_participant_events.where(status: %w[invited in_progress awaiting_guardian])
     when :specific_participants
       ids = audience_filters["participant_event_ids"] || []
-      event.participant_events.where(id: ids)
+      audience_participant_events.where(id: ids)
     when :attendees_in_groups
       group_ids = audience_filters["group_ids"] || []
       return ParticipantEvent.none if group_ids.empty?
-      event.participant_events
+      audience_participant_events
         .where(status: %w[in_progress awaiting_guardian complete])
         .joins(:group_memberships)
         .where(group_memberships: { group_id: group_ids })
@@ -191,7 +194,7 @@ class Message < ApplicationRecord
       .where("invitations.event_id = participant_events.event_id")
       .where("LOWER(invitations.email) = LOWER(participants.email)")
 
-    event.participant_events
+    audience_participant_events
       .invited
       .joins(:participant)
       .where(matching.arel.exists)
@@ -202,7 +205,7 @@ class Message < ApplicationRecord
   # included: a guardian is in the audience through the children listed here,
   # which is also who {{participant_first_name}} names.
   def guardian_links
-    links = GuardianParticipantEvent.joins(:participant_event).where(participant_events: { event_id: event_id })
+    links = GuardianParticipantEvent.joins(:participant_event).where(participant_events: { event_id: audience_event_ids })
     links = case audience.to_sym
     when :guardians_of_confirmed then links.where(participant_events: { status: "complete" })
     when :guardians_pending then links.where.not(status: "completed").or(links.where(status: nil))
@@ -233,6 +236,32 @@ class Message < ApplicationRecord
 
   def guardian_audience?
     audience.to_s.in?(%w[all_guardians guardians_of_confirmed guardians_pending])
+  end
+
+  # The events the audience is drawn from: this message's own, unless
+  # SeriesBroadcast set several to estimate across them in one query (see
+  # #recipient_counts_by_event). Only for counting and previews: a message
+  # that is sent always has its own event.
+  attr_writer :audience_event_ids
+
+  def audience_event_ids
+    @audience_event_ids || event_id
+  end
+
+  def audience_participant_events
+    ParticipantEvent.where(event_id: audience_event_ids)
+  end
+
+  # How many people the audience matches at each of #audience_event_ids, as
+  # { event_id => count }, in one grouped query however many events there
+  # are. Counted per event the way #recipient_count_estimate counts one
+  # event's: a guardian with children at two events is in both.
+  def recipient_counts_by_event
+    if guardian_audience?
+      guardian_links.group("participant_events.event_id").distinct.count(:guardian_id)
+    else
+      ParticipantEvent.where(id: recipients.select(:id)).group(:event_id).count
+    end
   end
 
   def preview_recipients(limit: 10)
@@ -462,12 +491,19 @@ class Message < ApplicationRecord
   end
 
   def reload(...)
+    @audience_event_ids = nil
     @placeholder_values = nil
     @image_blobs = nil
     super
   end
 
   private
+
+  # A series broadcast's copy settled (or was cancelled): the broadcast may
+  # be done too.
+  def settle_series_broadcast
+    series_broadcast&.settle!
+  end
 
   # Creates a pending delivery per reachable channel for everyone in `scope`,
   # in batches so a large audience doesn't hold the message lock for one

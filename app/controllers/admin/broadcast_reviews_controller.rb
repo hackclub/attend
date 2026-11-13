@@ -11,10 +11,10 @@ module Admin
     def index
       reviews = policy_scope(BroadcastReview)
       @pending = reviews.pending
-        .includes(:event, :submitted_by_user, :reviewable)
+        .includes(:event, :event_series, :submitted_by_user, :reviewable)
         .order(:created_at)
       @decided = reviews.where.not(status: :pending)
-        .includes(:event, :submitted_by_user, :decided_by_user)
+        .includes(:event, :event_series, :submitted_by_user, :decided_by_user)
         .order(decided_at: :desc)
         .limit(50)
       load_recipients if policy(BroadcastReview).manage_recipients?
@@ -55,7 +55,7 @@ module Admin
     private
 
     def set_review
-      @review = BroadcastReview.includes(:event, :reviewable).find(params[:id])
+      @review = BroadcastReview.includes(:event, :event_series, :reviewable).find(params[:id])
       authorize @review
     end
 

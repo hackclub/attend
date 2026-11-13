@@ -7,5 +7,11 @@ class ProcessScheduledMessagesJob < ApplicationJob
 
       message.send!
     end
+
+    SeriesBroadcast.pending_scheduled.find_each do |broadcast|
+      Rails.logger.info("[ScheduledMessages] Processing scheduled series broadcast #{broadcast.id}")
+
+      broadcast.send!
+    end
   end
 end

@@ -1,0 +1,89 @@
+<% content_for :title, "#{@series.name} Broadcasts – Attend" %>
+
+<div class="max-w-5xl mx-auto space-y-6">
+  <div class="flex flex-wrap justify-between items-center gap-3">
+    <div class="flex items-center gap-3 min-w-0">
+      <%= render "admin/events/avatar", event: @series, size: 32, rounded: "rounded-lg" %>
+      <div class="min-w-0">
+        <%= link_to "← #{@series.name}", admin_series_path(@series), class: "text-sm text-gray-500 hover:text-gray-700" %>
+        <h1 class="text-2xl font-bold text-gray-900 truncate"><%= @series.name %> broadcasts</h1>
+        <p class="text-sm text-gray-500">One message to attendees or guardians across many of the series' events. Each event gets its own copy, on its messages page.</p>
+      </div>
+    </div>
+    <%= link_to "New Broadcast", new_admin_series_broadcast_path(@series),
+        class: "bg-[#d42f46] hover:bg-[#b82840] text-white font-semibold py-2 px-4 rounded-lg" %>
+  </div>
+
+  <% if @broadcasts.any? %>
+    <div class="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-100">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Broadcast</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Audience</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Events</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sent</th>
+            <th class="px-6 py-3"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-100">
+          <% @broadcasts.each do |broadcast| %>
+            <% totals = @totals.fetch(broadcast.id, { events: 0, recipients: 0, delivered: 0, failed: 0 }) %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-6 py-4">
+                <% link = broadcast.draft? ? edit_admin_series_broadcast_path(@series, broadcast) : admin_series_broadcast_path(@series, broadcast) %>
+                <%= link_to link, class: "block" do %>
+                  <% if broadcast.subject.present? %>
+                    <div class="text-sm font-medium text-gray-900"><%= broadcast.subject %></div>
+                  <% end %>
+                  <div class="text-sm text-gray-500 truncate max-w-xs"><%= truncate(broadcast.body_as_plain.squish.presence || "(empty)", length: 60) %></div>
+                <% end %>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-600">
+                <%= broadcast.audience_label %>
+                <div class="text-xs text-gray-400"><%= broadcast.channel_labels %></div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap"><%= render "status", broadcast: broadcast %></td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                <%= broadcast.sent_at.present? ? pluralize(totals[:events], "event") : broadcast.event_scope_label %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <% if broadcast.sent_at.present? %>
+                  <%= broadcast.sent_at.strftime("%b %d, %H:%M") %>
+                  <div class="text-xs text-gray-400"><%= totals[:delivered] %>/<%= totals[:recipients] %> delivered<% if totals[:failed].positive? %>, <%= totals[:failed] %> failed<% end %></div>
+                <% elsif broadcast.scheduled_at.present? %>
+                  <span class="text-yellow-600">Scheduled: <%= broadcast.scheduled_at.utc.strftime("%b %d, %H:%M UTC") %></span>
+                <% else %>
+                  <span class="text-gray-400">Draft</span>
+                <% end %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <% if broadcast.draft? || broadcast.scheduled? %>
+                  <%= button_to admin_series_broadcast_path(@series, broadcast),
+                      method: :delete,
+                      form: { data: { turbo_confirm: "Delete this draft?" } },
+                      class: "text-red-600 hover:text-red-800",
+                      "aria-label": "Delete draft" do %>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                  <% end %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <div class="bg-white border border-gray-200 rounded-lg p-12 text-center">
+      <h3 class="text-sm font-medium text-gray-900">No broadcasts yet</h3>
+      <p class="mt-1 text-sm text-gray-500">Message everyone still to finish signing up, or every guardian, across the series in one go.</p>
+      <div class="mt-6">
+        <%= link_to "New Broadcast", new_admin_series_broadcast_path(@series),
+            class: "inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-[#d42f46] hover:bg-[#b82840]" %>
+      </div>
+    </div>
+  <% end %>
+</div>

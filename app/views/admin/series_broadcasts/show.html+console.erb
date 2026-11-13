@@ -1,0 +1,163 @@
+<% content_for :title, "#{@broadcast.subject.presence || 'Broadcast'} – #{@series.name} – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs(cs_gated_crumb("Event series", admin_series_index_path, policy(EventSeries).index?), [ @series.name, admin_series_path(@series) ], [ "Broadcasts", admin_series_broadcasts_path(@series) ], [ @broadcast.subject.presence || "No subject", nil ]) %>
+
+<% message_status_types = {
+     "draft" => :stopped,
+     "scheduled" => :pending,
+     "pending_review" => :warning,
+     "sending" => :in_progress,
+     "completed" => :success,
+     "failed" => :error,
+     "cancelled" => :stopped
+   } %>
+<% channel_badge_colors = { "email" => "blue", "sms" => "green" } %>
+
+<div class="max-w-5xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <% if @broadcast.subject.present? %>
+        <h1 class="cs-h1"><%= @broadcast.subject %></h1>
+      <% else %>
+        <h1 class="cs-h1 cs-muted">No subject</h1>
+      <% end %>
+      <p class="cs-description">
+        <% if @broadcast.sent_at.present? %>
+          Sent <%= cs_relative_time(@broadcast.sent_at) %> by <%= @broadcast.sent_by_user.display_name_or_fallback %>
+        <% elsif @broadcast.scheduled_at.present? %>
+          Scheduled for <%= cs_absolute_time_tag(@broadcast.scheduled_at) %> by <%= @broadcast.sent_by_user.display_name_or_fallback %>
+        <% else %>
+          Written by <%= @broadcast.sent_by_user.display_name_or_fallback %> · Draft
+        <% end %>
+      </p>
+    </div>
+    <div class="cs-actions">
+      <% if @broadcast.scheduled? || @broadcast.pending_review? %>
+        <%= button_to "Cancel", cancel_admin_series_broadcast_path(@series, @broadcast),
+            method: :post,
+            form: { data: { turbo_confirm: "Are you sure you want to cancel this broadcast?" } },
+            class: "cs-btn" %>
+      <% end %>
+      <% if @broadcast.draft? || @broadcast.scheduled? %>
+        <%= link_to "Edit", edit_admin_series_broadcast_path(@series, @broadcast), class: "cs-btn" %>
+        <%= link_to "Preview and send", preview_admin_series_broadcast_path(@series, @broadcast), class: "cs-btn cs-btn-primary" %>
+      <% end %>
+    </div>
+  </div>
+
+  <%= render "admin/broadcast_reviews/status_banner", broadcastable: @broadcast %>
+
+  <div class="cs-stack">
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Overview</h2>
+      </div>
+      <div class="cs-container-body cs-stack">
+        <dl class="cs-kv cs-kv-4">
+          <div><dt class="cs-kv-label">Status</dt><dd class="cs-kv-value"><%= render "status", broadcast: @broadcast %></dd></div>
+          <div><dt class="cs-kv-label">Events</dt><dd class="cs-kv-value"><%= @broadcast.event_scope_label %></dd></div>
+          <div><dt class="cs-kv-label">Audience</dt><dd class="cs-kv-value"><%= @broadcast.audience_label %></dd></div>
+          <div>
+            <dt class="cs-kv-label">Channels</dt>
+            <dd class="cs-kv-value flex flex-wrap gap-1">
+              <% @broadcast.channels.each do |channel| %>
+                <%= cs_badge(channel.titleize, channel_badge_colors[channel]) %>
+              <% end %>
+            </dd>
+          </div>
+        </dl>
+
+        <% if @broadcast.sent_at.present? %>
+          <dl class="cs-kv cs-kv-4 cs-kv-divided">
+            <div><dt class="cs-kv-label">Events reached</dt><dd class="cs-kv-value-lg"><%= @totals[:events] %></dd></div>
+            <div><dt class="cs-kv-label">Recipients</dt><dd class="cs-kv-value-lg"><%= @totals[:recipients] %></dd></div>
+            <div><dt class="cs-kv-label">Delivered</dt><dd class="cs-kv-value-lg"><%= @totals[:delivered] %></dd></div>
+            <div><dt class="cs-kv-label">Failed</dt><dd class="cs-kv-value-lg"><%= @totals[:failed] %></dd></div>
+          </dl>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Message content</h2>
+      </div>
+      <div class="cs-container-body">
+        <div class="message-body text-sm">
+          <%= sanitize @broadcast.body_as_html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
+        </div>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <div>
+          <h2 class="cs-h2">By event <span class="cs-counter">(<%= @messages.size %>)</span></h2>
+          <p class="cs-container-description">Each event's copy is an ordinary message on its messages page: open one for its deliveries, retries and late sends.</p>
+        </div>
+      </div>
+      <% if @messages.any? %>
+        <div class="cs-table-wrap">
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th scope="col">Event</th>
+                <th scope="col">Status</th>
+                <th scope="col" class="text-right">Recipients</th>
+                <th scope="col" class="text-right">Delivered</th>
+                <th scope="col" class="text-right">Failed</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @messages.each do |message| %>
+                <tr>
+                  <td>
+                    <%= link_to message.event.name, admin_event_message_path(message.event, message), class: "cs-link" %>
+                    <% if message.event.starts_at %>
+                      <div class="cs-small cs-muted"><%= cs_absolute_time_tag(message.event.starts_at, zone: message.event.event_time_zone, date_only: true) %></div>
+                    <% end %>
+                  </td>
+                  <td><%= cs_status(message_status_types.fetch(message.status, :info), message.status.titleize) %></td>
+                  <td class="text-right"><%= message.recipient_count %></td>
+                  <td class="text-right"><%= message.sent_count %></td>
+                  <td class="text-right"><%= message.failed_count.positive? ? message.failed_count : "–" %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% elsif @broadcast.sending? %>
+        <div class="cs-empty">
+          <p class="cs-empty-title">Creating each event's copy</p>
+          <p>They appear here as they go out. Refresh in a moment.</p>
+        </div>
+      <% else %>
+        <div class="cs-empty">
+          <p class="cs-empty-title">Not sent yet</p>
+          <p>
+            <% if @target_event_count %>
+              It will go to <%= pluralize(@target_event_count, "event") %> (<%= @broadcast.event_scope_label.downcase %>), skipping any where nobody matches the audience.
+            <% else %>
+              No event received a copy.
+            <% end %>
+          </p>
+        </div>
+      <% end %>
+    </section>
+
+    <% if @skipped_events.any? %>
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">Skipped <span class="cs-counter">(<%= @skipped_events.size %>)</span></h2>
+          <p class="cs-container-description">Nobody at these events matched the audience when it was sent.</p>
+        </div>
+        <div class="cs-container-body">
+          <div class="cs-token-group">
+            <% @skipped_events.each do |event| %>
+              <span class="cs-token cs-token-readonly"><%= event.name %></span>
+            <% end %>
+          </div>
+        </div>
+      </section>
+    <% end %>
+  </div>
+</div>

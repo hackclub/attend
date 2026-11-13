@@ -1,0 +1,167 @@
+<% content_for :title, "New broadcast – #{@series.name} – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs(cs_gated_crumb("Event series", admin_series_index_path, policy(EventSeries).index?), [ @series.name, admin_series_path(@series) ], [ "Broadcasts", admin_series_broadcasts_path(@series) ], [ "Compose broadcast", nil ]) %>
+
+<%= render layout: "wizard", locals: { current_step: "compose", title: "Compose broadcast" } do %>
+  <%= form_with model: @broadcast,
+      url: @broadcast.persisted? ? admin_series_broadcast_path(@series, @broadcast) : admin_series_broadcasts_path(@series),
+      method: @broadcast.persisted? ? :patch : :post,
+      id: "series-broadcast-form",
+      html: { novalidate: true },
+      data: { controller: "cs-form-validation" },
+      class: "cs-stack" do |f| %>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Events</h2>
+      </div>
+      <div class="cs-container-body">
+        <%= cs_form_field f, :event_scope, label: "Send to", group: true, error_keys: [ :selected_event_ids ],
+              description: "Each event gets its own copy, on its messages page. Events where nobody matches the audience are skipped." do |aria| %>
+          <div class="cs-tiles cs-tiles-row">
+            <% SeriesBroadcast::EVENT_SCOPES.each do |key, label| %>
+              <label class="cs-tile">
+                <span class="cs-option">
+                  <%= f.radio_button :event_scope, key, **aria %>
+                  <span>
+                    <span class="cs-option-label block"><%= label %></span>
+                    <span class="cs-option-description block">
+                      <%= case key
+                          when "upcoming" then "Every event that hasn't ended yet, including ones under way."
+                          when "all" then "Past events too, for a follow-up or a survey."
+                          else "Only the events you tick below."
+                          end %>
+                    </span>
+                  </span>
+                </span>
+              </label>
+            <% end %>
+          </div>
+        <% end %>
+
+        <% selected_ids = @broadcast.selected_event_ids.map(&:to_s) %>
+        <details class="mt-4" <%= "open" if @broadcast.event_scope == "selected" %>>
+          <summary class="cs-link cursor-pointer">Pick events (<%= selected_ids.size %> picked)</summary>
+          <p class="cs-field-description mt-2">Only used with "<%= SeriesBroadcast::EVENT_SCOPES["selected"] %>".</p>
+          <%= hidden_field_tag "series_broadcast[selected_event_ids][]", "", id: nil %>
+          <div class="cs-container mt-2">
+            <div class="max-h-64 overflow-y-auto">
+              <% @series_events.each do |event| %>
+                <label class="flex items-center gap-3 px-5 py-2 cursor-pointer border-b border-(--cs-border-divider-secondary) last:border-0 hover:bg-(--cs-bg-hover)">
+                  <%= check_box_tag "series_broadcast[selected_event_ids][]", event.id, selected_ids.include?(event.id.to_s), id: "series_broadcast_event_#{event.id}" %>
+                  <span class="flex-1 min-w-0">
+                    <span class="block truncate"><%= event.name %></span>
+                    <span class="block truncate cs-small cs-muted">
+                      <%= cs_absolute_time(event.starts_at, zone: event.event_time_zone, date_only: true) if event.starts_at %>
+                      <%= " · #{[ event.location_city, event.location_country ].compact_blank.join(", ")}" if event.location_city.present? || event.location_country.present? %>
+                    </span>
+                  </span>
+                </label>
+              <% end %>
+            </div>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Recipients</h2>
+      </div>
+      <div class="cs-container-body">
+        <%= cs_form_field f, :audience, label: "Audience", description: "Matched at each event separately: a guardian with children at two events gets each event's copy." do |aria| %>
+          <%= f.select :audience,
+              SeriesBroadcast::AUDIENCES.map { |k, v| [ v, k ] },
+              {},
+              class: "cs-select max-w-md",
+              required: true,
+              **aria %>
+        <% end %>
+
+        <% channel_notes = {
+             slack: "Attendees only.",
+             email: "Uses the subject line.",
+             sms: "Text only.",
+             push: "Shows the subject, or the start of the message."
+           } %>
+        <%= cs_form_field f, :channels, label: "Channels", group: true,
+              messages: { blank: "Select at least one channel." } do |aria| %>
+          <%= hidden_field_tag "series_broadcast[channels][]", "", id: nil %>
+          <div class="cs-tiles cs-tiles-row">
+            <% Message::CHANNELS.each do |key, label| %>
+              <% sms_disabled = key == :sms && !Setting.twilio_enabled? %>
+              <label class="cs-tile">
+                <span class="cs-option">
+                  <%= check_box_tag "series_broadcast[channels][]", key, @broadcast.channels.include?(key.to_s),
+                      id: "channel_#{key}",
+                      disabled: sms_disabled,
+                      **aria %>
+                  <span>
+                    <span class="cs-option-label block"><%= label %></span>
+                    <span class="cs-option-description block"><%= sms_disabled ? "Turned off in settings." : channel_notes[key] %></span>
+                  </span>
+                </span>
+              </label>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Content</h2>
+      </div>
+      <div class="cs-container-body">
+        <div class="cs-alert mb-4">
+          <%= cs_status_icon(:info) %>
+          <p>This goes to several events, so say which one it's about: <code>{{event_name}}</code> becomes each event's own name, and <code>{{first_name}}</code> each recipient's.</p>
+        </div>
+
+        <%= cs_form_field f, :subject, label: "Subject", optional: true,
+              description: "The email subject line and the push notification text. Slack and SMS use the event name." do |aria| %>
+          <%= f.text_field :subject,
+              class: "cs-input",
+              placeholder: "An update about {{event_name}}",
+              **aria %>
+        <% end %>
+
+        <%= cs_form_field f, :body, label: "Message",
+              data: { controller: "tinymce", tinymce_placeholders_value: Message::PLACEHOLDERS.to_json },
+              description: "Type {{ to add a recipient's name or the event's name. Images can't go in a series broadcast: link to them instead." do |aria| %>
+          <%= f.text_area :body,
+              rows: 10,
+              class: "cs-input",
+              data: { tinymce_target: "editor" },
+              **aria %>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Delivery</h2>
+      </div>
+      <div class="cs-container-body">
+        <div class="max-w-xs">
+          <%= cs_form_field f, :scheduled_at, label: "Send at", optional: true,
+                description: "In UTC, since the series' events are in different time zones. Leave empty to send from the preview." do |aria| %>
+            <%= f.datetime_local_field :scheduled_at,
+                value: @broadcast.scheduled_at&.utc&.strftime("%Y-%m-%dT%H:%M"),
+                lang: "en-GB",
+                class: "cs-input",
+                min: Time.current.utc.strftime("%Y-%m-%dT%H:%M"),
+                data: { cs_range_message: "Enter a time in the future." },
+                **aria %>
+          <% end %>
+        </div>
+      </div>
+    </section>
+
+    <%= cs_form_errors f %>
+
+    <div class="cs-wizard-actions">
+      <%= link_to "Cancel", admin_series_broadcasts_path(@series), class: "cs-btn cs-btn-link" %>
+      <%= f.button "Next: Preview", class: "cs-btn cs-btn-primary", name: "commit", value: "Next: Preview" %>
+    </div>
+  <% end %>
+<% end %>
