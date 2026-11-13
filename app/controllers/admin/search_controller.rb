@@ -40,17 +40,19 @@ module Admin
         .select(
           "participants.*",
           "GREATEST(
-            COALESCE(similarity(legal_first_name, #{quoted_query}), 0),
-            COALESCE(similarity(legal_last_name, #{quoted_query}), 0),
+            COALESCE(similarity(unaccent(legal_first_name), unaccent(#{quoted_query})), 0),
+            COALESCE(similarity(unaccent(legal_last_name), unaccent(#{quoted_query})), 0),
             COALESCE(similarity(email, #{quoted_query}), 0),
-            COALESCE(similarity(preferred_name, #{quoted_query}), 0),
-            COALESCE(similarity(CONCAT(legal_first_name, ' ', legal_last_name), #{quoted_query}), 0)
+            COALESCE(similarity(unaccent(preferred_name), unaccent(#{quoted_query})), 0),
+            COALESCE(similarity(unaccent(CONCAT(legal_first_name, ' ', legal_last_name)), unaccent(#{quoted_query})), 0)
           ) AS relevance"
         )
         .where(
-          "legal_first_name % :q OR legal_last_name % :q OR email % :q OR preferred_name % :q " \
-          "OR CONCAT(legal_first_name, ' ', legal_last_name) % :q " \
-          "OR legal_first_name ILIKE :like OR legal_last_name ILIKE :like OR email ILIKE :like",
+          "unaccent(legal_first_name) % unaccent(:q) OR unaccent(legal_last_name) % unaccent(:q) " \
+          "OR email % :q OR unaccent(preferred_name) % unaccent(:q) " \
+          "OR unaccent(CONCAT(legal_first_name, ' ', legal_last_name)) % unaccent(:q) " \
+          "OR unaccent(legal_first_name) ILIKE unaccent(:like) OR unaccent(legal_last_name) ILIKE unaccent(:like) " \
+          "OR email ILIKE :like",
           q: query,
           like: sanitized_like
         )
@@ -93,9 +95,9 @@ module Admin
       scope = GuardianParticipantEvent
         .joins(:guardian, :participant_event)
         .where(
-          "guardians.email ILIKE :like OR guardians.legal_first_name ILIKE :like " \
-          "OR guardians.legal_last_name ILIKE :like " \
-          "OR CONCAT(guardians.legal_first_name, ' ', guardians.legal_last_name) ILIKE :like",
+          "guardians.email ILIKE :like OR unaccent(guardians.legal_first_name) ILIKE unaccent(:like) " \
+          "OR unaccent(guardians.legal_last_name) ILIKE unaccent(:like) " \
+          "OR unaccent(CONCAT(guardians.legal_first_name, ' ', guardians.legal_last_name)) ILIKE unaccent(:like)",
           like: like
         )
       scope = scope.where(participant_events: { event_id: event_ids }) if event_ids
@@ -150,7 +152,11 @@ module Admin
       end
 
       sanitized_like = "%#{ActiveRecord::Base.sanitize_sql_like(query)}%"
-      scope.where("name ILIKE :q OR location_city ILIKE :q OR location_country ILIKE :q", q: sanitized_like)
+      scope.where(
+        "unaccent(name) ILIKE unaccent(:q) OR unaccent(location_city) ILIKE unaccent(:q) " \
+        "OR unaccent(location_country) ILIKE unaccent(:q)",
+        q: sanitized_like
+      )
            .limit(5)
            .map do |e|
         {

@@ -24,6 +24,46 @@ RSpec.describe "Admin search", type: :request do
     expect(JSON.parse(response.body)["participants"].map { |p| p["id"] }).to eq([ participant_event.id ])
   end
 
+  describe "accents" do
+    let(:admin) do
+      User.create!(email: "search-accents@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false)
+    end
+
+    def results_for(query, key)
+      get admin_search_path(q: query), headers: { "ACCEPT" => "application/json" }
+      expect(response).to have_http_status(:ok)
+      JSON.parse(response.body)[key]
+    end
+
+    before { sign_in admin }
+
+    it "finds an accented event name from an unaccented query" do
+      accented = create(:event, name: "Harbour Montréal", location_city: "Montréal")
+
+      expect(results_for("montreal", "events").map { |e| e["id"] }).to eq([ accented.id ])
+    end
+
+    it "finds an event from an accented query against an unaccented name" do
+      plain = create(:event, name: "Harbour Sao Paulo")
+
+      expect(results_for("São Paulo", "events").map { |e| e["id"] }).to eq([ plain.id ])
+    end
+
+    it "finds an accented participant name from an unaccented query" do
+      accented = create(:participant, legal_first_name: "Zoë", legal_last_name: "Éclair")
+      pe = create(:participant_event, event: event, participant: accented)
+
+      expect(results_for("zoe eclair", "participants").map { |p| p["id"] }).to include(pe.id)
+    end
+
+    it "finds an accented guardian name from an unaccented query" do
+      guardian = create(:guardian, legal_first_name: "Inès", legal_last_name: "Gonçalves")
+      link = create(:guardian_participant_event, guardian: guardian, participant_event: participant_event)
+
+      expect(results_for("goncalves", "guardians").map { |g| g["id"] }).to eq([ link.id ])
+    end
+  end
+
   describe "parents and guardians" do
     let(:guardian) do
       create(:guardian, legal_first_name: "Charles", legal_last_name: "Babbage", email: "difference.engine@example.com")
