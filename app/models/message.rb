@@ -100,6 +100,11 @@ class Message < ApplicationRecord
   validate :placeholders_are_valid,
     if: -> { will_save_change_to_body? || will_save_change_to_subject? || will_save_change_to_audience? }
   validate :images_finished_uploading, if: :will_save_change_to_body?
+  # A series broadcast's copy carries the content that was screened for the
+  # whole series, so it can't be rewritten on one event's page.
+  validate :series_copy_content_unchanged, on: :update, if: :series_broadcast_id?
+
+  SERIES_COPY_CONTENT = %w[subject body channels audience audience_filters].freeze
 
   # Typed on the event's clock (see EventLocalTimes).
   event_local_times :scheduled_at
@@ -929,6 +934,12 @@ class Message < ApplicationRecord
     if guardian_only.any? && !guardian_audience?
       errors.add(:base, "#{guardian_only.map { |t| "{{#{t}}}" }.to_sentence} only works when sending to guardians.")
     end
+  end
+
+  def series_copy_content_unchanged
+    return unless SERIES_COPY_CONTENT.any? { |attribute| will_save_change_to_attribute?(attribute) }
+
+    errors.add(:base, "This message is a copy of a series broadcast. Edit the series broadcast instead.")
   end
 
   def channels_are_valid

@@ -73,6 +73,31 @@ RSpec.describe SeriesBroadcastJob do
       expect(MessageDeliveryJob).to have_been_enqueued.with(message_id: copy.id)
     end
 
+    it "screens a copy whose content no longer matches what was cleared, even from a global admin's broadcast" do
+      owner.update!(global_role: "global_admin")
+      allow(BroadcastScreener).to receive(:call).and_return(
+        BroadcastScreener::Result.new(flagged: true, categories: [ "marketing" ], reason: "Sells something.", flagged_by: "model")
+      )
+      SeriesBroadcastJob.perform_now(series_broadcast_id: broadcast.id)
+      copy = broadcast.messages.find_by!(event: second_event)
+      copy.update_columns(body: "<p>Buy our merch</p>")
+
+      SeriesBroadcastMessageJob.perform_now(message_id: copy.id)
+
+      expect(BroadcastScreener).to have_received(:call).once
+      expect(copy.reload).to be_pending_review
+      expect(copy.message_deliveries).to be_empty
+    end
+
+    it "won't let a copy's content be edited on its event" do
+      SeriesBroadcastJob.perform_now(series_broadcast_id: broadcast.id)
+      copy = broadcast.messages.find_by!(event: second_event)
+
+      expect(copy.update(body: "<p>Something else</p>")).to be(false)
+      expect(copy.errors.full_messages.join).to include("copy of a series broadcast")
+      expect(copy.reload.update(scheduled_at: 1.day.from_now)).to be(true)
+    end
+
     it "leaves an ordinary message alone" do
       message = first_event.messages.create!(audience: "confirmed_attendees", channels: [ "email" ], body: "<p>Hi</p>", sent_by_user: owner)
 

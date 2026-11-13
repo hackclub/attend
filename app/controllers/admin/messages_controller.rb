@@ -64,9 +64,12 @@ module Admin
     def edit
       authorize current_event, :update?
 
-      unless @message.draft? || @message.scheduled?
+      if !(@message.draft? || @message.scheduled?)
         redirect_to admin_event_message_path(current_event, @message),
           alert: "Cannot edit a message that has already been sent."
+      elsif @message.series_broadcast_id?
+        redirect_to admin_event_message_path(current_event, @message),
+          alert: "This message is a copy of a series broadcast. Edit the series broadcast instead."
       end
     end
 
