@@ -146,11 +146,11 @@ class SeriesBroadcast < ApplicationRecord
   # fan-out to a job. Returns false if it didn't go out: it already had, or
   # the screener held it (now #pending_review?), or it holds content that may
   # never be sent (reasons in #errors).
-  def send!(sender: sent_by_user)
+  def send!(sender: sent_by_user, trust_sender: true)
     return false unless draft? || scheduled?
     return false if refuse_blocked_content!
 
-    flagged = screen_for_review(sender: sender)
+    flagged = screen_for_review(sender: sender, trust_sender: trust_sender)
     sent = with_lock do
       next false unless draft? || scheduled?
 

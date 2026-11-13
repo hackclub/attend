@@ -9,10 +9,10 @@ class SeriesBroadcastMessageJob < ApplicationJob
     message = Message.find_by(id: message_id)
     return unless message&.series_broadcast
 
-    # No sender, so nobody's global-admin standing skips screening: the copy
-    # goes straight out only while it still holds the content the series
-    # broadcast was cleared with.
-    message.send!(sender: nil)
+    # Credited to the series sender, but their global-admin standing can't
+    # skip screening: the copy goes straight out only while it still holds
+    # the content the series broadcast was cleared with.
+    message.send!(sender: message.series_broadcast.sent_by_user, trust_sender: false)
 
     # Nobody on the event could be reached on the chosen channels, so no
     # delivery will ever settle it: it is done now.

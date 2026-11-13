@@ -40,6 +40,7 @@ RSpec.describe ProcessScheduledMessagesJob do
 
     expect(BroadcastScreener).to have_received(:call).once
     expect(message.reload).to be_pending_review
+    expect(message.pending_broadcast_review.submitted_by_user).to eq(admin)
     expect(message.message_deliveries).to be_empty
   end
 

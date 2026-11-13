@@ -305,11 +305,11 @@ class Message < ApplicationRecord
   # Also false, with the reasons in #errors, for a draft saved before a
   # BroadcastScreener::BLOCKED rule caught it; a scheduled one goes back to
   # draft so it stops being picked up.
-  def send!(sender: sent_by_user)
+  def send!(sender: sent_by_user, trust_sender: true)
     return false unless draft? || scheduled?
     return false if refuse_blocked_content!
 
-    flagged = screen_for_review(sender: sender)
+    flagged = screen_for_review(sender: sender, trust_sender: trust_sender)
     sent = with_lock do
       next false unless draft? || scheduled?
 

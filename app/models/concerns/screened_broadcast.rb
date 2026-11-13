@@ -43,12 +43,15 @@ module ScreenedBroadcast
 
   # Screens unless already cleared. Returns nil when the broadcast may go out
   # (recording that, so it isn't screened again), or the screener's flagged
-  # Result. Global admins are the reviewers, so what they send isn't screened.
+  # Result. Global admins are the reviewers, so what they send isn't screened,
+  # unless trust_sender is false: a send nobody is making right now (a
+  # scheduled send, a series broadcast's copy) is credited to its author but
+  # mustn't ride on their exemption, since someone else may have edited it.
   # Makes a network call: run it outside any row lock.
-  def screen_for_review(sender:)
+  def screen_for_review(sender:, trust_sender: true)
     return if screening_cleared?
 
-    result = sender&.global_admin? ? nil : BroadcastScreener.call(event: screening_event, subject: screening_subject, text: screening_text)
+    result = trust_sender && sender&.global_admin? ? nil : BroadcastScreener.call(event: screening_event, subject: screening_subject, text: screening_text)
     return result if result&.flagged?
 
     update_columns(screened_digest: content_digest)
