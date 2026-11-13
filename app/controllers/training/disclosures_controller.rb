@@ -18,6 +18,14 @@ module Training
         return
       end
 
+      # A yes locks the person out of all training until the Safety Team
+      # reviews it, so a stray tap mustn't be enough: ask them to check it
+      # before anything is recorded.
+      if answer == "yes" && params[:yes_confirmed] != "1"
+        render :confirm_yes
+        return
+      end
+
       disclosure = current_user.training_disclosures.create!(
         course: @course,
         enrollment: @enrollment,

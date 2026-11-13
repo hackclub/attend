@@ -40,7 +40,7 @@ RSpec.describe "Training declarations", type: :request do
     post enroll_training_course_path(course)
 
     expect {
-      post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1" }
+      post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1", yes_confirmed: "1" }
     }.to have_enqueued_mail(TrainingMailer, :disclosure_review_needed)
     expect(response.body).to include("Thanks for telling us", TrainingDisclosure::SAFETY_TEAM_EMAIL)
     expect(response.body).not_to match(/ineligible/i)
@@ -51,6 +51,23 @@ RSpec.describe "Training declarations", type: :request do
     expect(response).to have_http_status(:forbidden)
     get training_course_lesson_path(course, first_lesson)
     expect(response).to have_http_status(:forbidden)
+  end
+
+  it "checks a yes before recording it, so a stray tap can be undone" do
+    post enroll_training_course_path(course)
+
+    expect {
+      post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1" }
+    }.not_to change(TrainingDisclosure, :count)
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Check your answer", "No, change my answer")
+    expect(response.body).not_to include("Thanks for telling us")
+
+    get new_training_course_disclosure_path(course)
+    expect(response).to have_http_status(:ok)
+    post training_course_disclosure_path(course), params: { answer: "no", confirm: "1" }
+    expect(response).to redirect_to(training_course_lesson_path(course, first_lesson))
+    expect(learner.training_disclosures.last).to be_review_not_required
   end
 
   it "uses the course's own wording, and keeps a copy of what was asked" do

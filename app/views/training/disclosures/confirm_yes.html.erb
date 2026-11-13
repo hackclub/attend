@@ -1,0 +1,25 @@
+<% content_for :title, "Check your answer – #{@course.title} – Attend" %>
+
+<div class="w-full max-w-2xl mx-auto">
+  <%= link_to "← #{@course.title}", training_course_path(@course), class: "portal-link text-sm inline-block mb-6" %>
+
+  <div class="portal-card p-6 sm:p-8">
+    <h1 class="portal-title text-2xl mb-2">Check your answer</h1>
+    <p class="portal-body mb-4">You answered <strong>Yes</strong> to:</p>
+    <blockquote class="portal-inset rounded-lg p-3 mb-4 text-sm"><%= @course.disclosure_question_text %></blockquote>
+    <p class="portal-hint text-sm mb-6">
+      If that's right, the <%= TrainingDisclosure::SAFETY_TEAM_NAME %> will be in touch before you can carry on with training or work at an event.
+      If you picked Yes by mistake, go back and change it.
+    </p>
+
+    <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+      <%= link_to "No, change my answer", new_training_course_disclosure_path(@course), class: "portal-btn portal-btn-secondary w-full sm:w-auto" %>
+      <%= form_with url: training_course_disclosure_path(@course), method: :post, data: { turbo: false } do %>
+        <%= hidden_field_tag :answer, "yes" %>
+        <%= hidden_field_tag :confirm, "1" %>
+        <%= hidden_field_tag :yes_confirmed, "1" %>
+        <%= button_tag "Yes, that's right", type: "submit", class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+      <% end %>
+    </div>
+  </div>
+</div>
