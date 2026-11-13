@@ -19,6 +19,7 @@ module Admin
       @invitations = @course.invitations.includes(:user, :invited_by).order("users.email")
       @completed_counts = TrainingLessonCompletion.where(training_enrollment_id: @enrollments.map(&:id))
         .group(:training_enrollment_id).count
+      @funnel = TrainingFunnel.new(@course, @lessons.to_a) if @enrollments.any? && @lessons.any?
     end
 
     def new

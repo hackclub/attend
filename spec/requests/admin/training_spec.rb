@@ -35,6 +35,16 @@ RSpec.describe "Admin training", type: :request do
           expect(response).to have_http_status(:ok), "#{path} returned #{response.status}"
         end
       end
+
+      it "shows lesson-by-lesson progress once someone has started" do
+        course = create(:training_course, :with_lessons)
+        enrollment = create(:training_enrollment, course: course)
+        enrollment.lesson_completions.create!(lesson: course.lessons.first, completed_at: Time.current)
+
+        get admin_training_course_path(course)
+
+        expect(response.body).to include("Progress", "Stopped here", "1 person")
+      end
     end
   end
 

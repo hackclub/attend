@@ -87,6 +87,49 @@
     <% end %>
   </section>
 
+  <% if @funnel %>
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <div>
+          <h2 class="cs-h2">Progress</h2>
+          <p class="cs-description"><%= pluralize(@funnel.started, "person") %> started · <%= @funnel.finished %> finished (<%= @funnel.percent_of_started(@funnel.finished) %>%). Counted by Attend, so these are reliable where YouTube's view counts aren't. Restarting a course clears that person's progress.</p>
+        </div>
+      </div>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Lesson</th>
+              <th scope="col" class="text-right" title="Opened the lesson page, which loads the video">Opened</th>
+              <th scope="col" class="text-right" title="Watched the video to the end, timed by Attend so skipping ahead doesn't count">Watched to end</th>
+              <th scope="col" class="text-right" title="Finished the lesson, including passing its quiz">Completed</th>
+              <th scope="col" class="text-right" title="Started the course, haven't finished it, and this is the next lesson they need to do">Stopped here</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @funnel.steps.each_with_index do |step, index| %>
+              <tr>
+                <td class="cs-secondary"><%= index + 1 %></td>
+                <td><%= step.lesson.title %></td>
+                <% [ step.opened, step.watched, step.completed ].each do |count| %>
+                  <td class="whitespace-nowrap text-right tabular-nums">
+                    <% if count.nil? %>
+                      <span class="cs-muted" title="No video, so opening this lesson isn't recorded">—</span>
+                    <% else %>
+                      <%= count %> <span class="cs-secondary">(<%= @funnel.percent_of_started(count) %>%)</span>
+                    <% end %>
+                  </td>
+                <% end %>
+                <td class="whitespace-nowrap text-right tabular-nums"><%= step.stopped.zero? ? tag.span("0", class: "cs-muted") : step.stopped %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% end %>
+
   <%= render "admin/training_courses/invitations", course: @course, invitations: @invitations %>
 
   <section class="cs-container">
