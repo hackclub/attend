@@ -6,7 +6,7 @@
 class BroadcastReviewMailer < ApplicationMailer
   def flagged(broadcast_review:)
     @review = broadcast_review
-    @event = broadcast_review.event
+    @target_name = broadcast_review.target_name
     @sender = broadcast_review.submitted_by_user
     @excerpt = broadcast_review.reviewable.screening_text.to_s.truncate(600)
     @review_url = Rails.application.routes.url_helpers.admin_broadcast_review_url(
@@ -16,7 +16,7 @@ class BroadcastReviewMailer < ApplicationMailer
     to = self.class.reviewer_emails(broadcast_review)
     return if to.empty?
 
-    mail(to: to, subject: "Review a held #{@review.kind_label.downcase} for #{@event.name}")
+    mail(to: to, subject: "Review a held #{@review.kind_label.downcase} for #{@target_name}")
   end
 
   def self.reviewer_emails(review = nil)
@@ -35,7 +35,7 @@ class BroadcastReviewMailer < ApplicationMailer
   end
 
   def self.series_owner_emails(review)
-    series_id = review&.event&.event_series_id
+    series_id = review&.series_id
     return [] if series_id.blank?
 
     User.joins(:series_role_assignments)

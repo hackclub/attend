@@ -1,0 +1,188 @@
+<% content_for :title, "Preview broadcast – #{@series.name} – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs(cs_gated_crumb("Event series", admin_series_index_path, policy(EventSeries).index?), [ @series.name, admin_series_path(@series) ], [ "Broadcasts", admin_series_broadcasts_path(@series) ], [ "Compose broadcast", edit_admin_series_broadcast_path(@series, @broadcast) ], [ "Preview and send", nil ]) %>
+<% sample_html = @broadcast.body_as_html(recipient: @preview_recipient, event: @preview_event) %>
+
+<%= render layout: "wizard", locals: { current_step: "preview", title: "Preview and send" } do %>
+  <div class="cs-stack">
+    <%= render "admin/broadcast_reviews/status_banner", broadcastable: @broadcast %>
+
+    <section class="cs-container">
+      <div class="cs-container-header">
+        <h2 class="cs-h2">Audience: <%= @broadcast.audience_label %></h2>
+      </div>
+      <div class="cs-container-body">
+        <p class="mb-3">
+          <strong><%= @total_count %></strong> recipient<%= @total_count == 1 ? '' : 's' %> across
+          <strong><%= pluralize(@reached_events.size, "event") %></strong> will receive this via
+          <strong><%= @broadcast.channel_labels %></strong>.
+          <% skipped = @events.size - @reached_events.size %>
+          <% if skipped.positive? %>
+            <span class="cs-secondary"><%= pluralize(skipped, "event") %> with nobody in the audience will be skipped.</span>
+          <% end %>
+        </p>
+
+        <% if @recipients.any? %>
+          <div class="cs-token-group">
+            <% @recipients.each do |recipient| %>
+              <span class="cs-token cs-token-readonly">
+                <% if recipient.respond_to?(:participant) %>
+                  <%= recipient.participant.display_name %> <span class="cs-muted">· <%= recipient.event.name %></span>
+                <% else %>
+                  <%= recipient.full_name %>
+                <% end %>
+              </span>
+            <% end %>
+            <% if @total_count > @recipients.size %>
+              <span class="cs-token cs-token-readonly cs-muted">+<%= @total_count - @recipients.size %> more</span>
+            <% end %>
+          </div>
+        <% else %>
+          <div class="cs-alert cs-alert-warning">
+            <%= cs_status_icon(:warning) %>
+            <p>Nobody at these events matches this audience. The broadcast won't be sent to anyone.</p>
+          </div>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="cs-container">
+      <div class="cs-container-header cs-container-header-divided">
+        <h2 class="cs-h2">Events <span class="cs-counter">(<%= @events.size %>)</span></h2>
+      </div>
+      <% if @events.any? %>
+        <div class="cs-table-wrap max-h-96 overflow-y-auto">
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th scope="col">Event</th>
+                <th scope="col">Starts</th>
+                <th scope="col" class="text-right">Recipients</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @events.each do |event| %>
+                <% count = @counts[event.id].to_i %>
+                <tr>
+                  <td><%= event.name %></td>
+                  <td class="whitespace-nowrap cs-secondary"><%= event.starts_at ? cs_absolute_time_tag(event.starts_at, zone: event.event_time_zone, date_only: true) : "—" %></td>
+                  <td class="text-right">
+                    <% if count.positive? %>
+                      <%= count %>
+                    <% else %>
+                      <span class="cs-muted">Skipped</span>
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <div class="cs-empty">
+          <p class="cs-empty-title">No events</p>
+          <p>No event in the series matches "<%= @broadcast.event_scope_label %>".</p>
+        </div>
+      <% end %>
+    </section>
+
+    <% if @preview_recipient && @broadcast.uses_placeholders? %>
+      <div class="cs-alert">
+        <%= cs_status_icon(:info) %>
+        <p>Placeholders are filled in as they will be for <strong><%= @preview_recipient.try(:display_name) || @preview_recipient.full_name %></strong> at <strong><%= @preview_event&.name %></strong>.</p>
+      </div>
+    <% end %>
+
+    <% if @broadcast.channels.include?("slack") %>
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">Slack preview</h2>
+        </div>
+        <div class="cs-container-body">
+          <%# A mock of Slack's own dark message view, so it keeps Slack's colours. %>
+          <div class="bg-[#1a1d21] rounded-lg p-4 text-white">
+            <div class="flex items-start gap-3">
+              <div class="w-9 h-9 rounded bg-[#d42f46] flex items-center justify-center flex-shrink-0">
+                <span class="text-white font-bold text-sm">HC</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline gap-2">
+                  <span class="font-bold text-white">Hack Club Attend</span>
+                  <span class="text-xs text-gray-400">App</span>
+                </div>
+                <div class="mt-1 text-[15px] text-gray-100 whitespace-pre-wrap break-words"><%= sample_html %></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    <% end %>
+
+    <% if @broadcast.channels.include?("email") %>
+      <section class="cs-container">
+        <div class="cs-container-header cs-container-header-divided">
+          <div>
+            <h2 class="cs-h2">Email preview</h2>
+            <p class="cs-container-description">
+              Subject: <strong><%= @broadcast.subject_for(@preview_recipient, event: @preview_event) || "You have a new message from #{@preview_event&.name || "the event"}" %></strong>
+            </p>
+          </div>
+        </div>
+        <div class="cs-container-body">
+          <div class="message-body text-sm">
+            <%= sanitize sample_html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
+          </div>
+        </div>
+      </section>
+    <% end %>
+
+    <% if @broadcast.channels.include?("sms") %>
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">SMS preview</h2>
+        </div>
+        <div class="cs-container-body">
+          <%# A mock of a phone's message bubble. %>
+          <% sms_text = @broadcast.body_as_plain(recipient: @preview_recipient, event: @preview_event) %>
+          <div class="max-w-xs">
+            <div class="bg-green-500 text-white rounded-2xl rounded-bl-sm px-4 py-2 text-sm whitespace-pre-line">
+              <%= sms_text %>
+            </div>
+            <p class="cs-small cs-muted mt-2 text-right">
+              <%= pluralize(sms_text.length, "character") %>
+              <% if sms_text.length > 160 %>
+                <%= cs_status(:warning, "(~#{(sms_text.length / 160.0).ceil} segments)") %>
+              <% end %>
+            </p>
+          </div>
+        </div>
+      </section>
+    <% end %>
+
+    <% if @broadcast.scheduled_at.present? %>
+      <div class="cs-alert cs-alert-warning">
+        <%= cs_status_icon(:pending) %>
+        <p>
+          <strong>Scheduled:</strong> This broadcast will be sent on
+          <strong><%= cs_absolute_time_tag(@broadcast.scheduled_at) %></strong>
+        </p>
+      </div>
+    <% end %>
+
+    <div class="cs-wizard-actions">
+      <%= link_to "Edit broadcast", edit_admin_series_broadcast_path(@series, @broadcast), class: "cs-btn cs-btn-link" %>
+      <% if @broadcast.scheduled_at.present? && @broadcast.scheduled_at > Time.current %>
+        <%= button_to "Schedule broadcast", send_now_admin_series_broadcast_path(@series, @broadcast),
+            method: :post,
+            form: { data: { turbo_confirm: "Schedule this broadcast to go to #{pluralize(@reached_events.size, "event")} on #{cs_absolute_time(@broadcast.scheduled_at)}?" } },
+            class: "cs-btn cs-btn-primary",
+            disabled: @total_count == 0 %>
+      <% else %>
+        <%= button_to "Send now", send_now_admin_series_broadcast_path(@series, @broadcast),
+            method: :post,
+            form: { data: { turbo_confirm: "Send this to #{pluralize(@total_count, "recipient")} across #{pluralize(@reached_events.size, "event")} now?" } },
+            class: "cs-btn cs-btn-primary",
+            disabled: @total_count == 0 %>
+      <% end %>
+    </div>
+  </div>
+<% end %>

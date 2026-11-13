@@ -66,6 +66,13 @@
 
   <%= render "admin/broadcast_reviews/status_banner", broadcastable: @message %>
 
+  <% if @message.series_broadcast %>
+    <div class="cs-alert mb-4">
+      <%= cs_status_icon(:info) %>
+      <p>This event's copy of a broadcast to several events in the series. <%= render "admin/series_broadcasts/origin", message: @message %></p>
+    </div>
+  <% end %>
+
   <div class="cs-stack">
     <section class="cs-container">
       <div class="cs-container-header">

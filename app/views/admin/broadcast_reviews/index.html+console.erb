@@ -32,7 +32,7 @@
             <% @pending.each do |review| %>
               <tr>
                 <td>
-                  <div><%= review.event.name %></div>
+                  <div><%= review.target_name %></div>
                   <div class="cs-small cs-muted"><%= review.kind_label %></div>
                 </td>
                 <td><%= review.submitted_by_user&.email || "—" %></td>
@@ -76,7 +76,7 @@
             <% @decided.each do |review| %>
               <tr>
                 <td>
-                  <%= link_to review.event.name, admin_broadcast_review_path(review), class: "cs-link" %>
+                  <%= link_to review.target_name, admin_broadcast_review_path(review), class: "cs-link" %>
                   <div class="cs-small cs-muted"><%= review.kind_label %></div>
                 </td>
                 <td><%= review.submitted_by_user&.email || "—" %></td>

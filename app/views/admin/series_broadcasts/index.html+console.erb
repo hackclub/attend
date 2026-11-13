@@ -1,0 +1,107 @@
+<% content_for :title, "#{@series.name} Broadcasts – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs(cs_gated_crumb("Event series", admin_series_index_path, policy(EventSeries).index?), [ @series.name, admin_series_path(@series) ], [ "Broadcasts", nil ]) %>
+
+<% channel_badge_colors = { "email" => "blue", "sms" => "green" } %>
+
+<div class="cs-stack">
+  <div class="cs-header">
+    <div class="cs-header-text flex items-center gap-3 min-w-0">
+      <%= render "admin/events/avatar", event: @series, size: 32, rounded: "rounded-lg" %>
+      <div class="min-w-0">
+        <h1 class="cs-h1 truncate"><%= @series.name %> broadcasts</h1>
+        <p class="cs-description">One message to attendees or guardians across many of the series' events. Each event gets its own copy, on its messages page.</p>
+      </div>
+    </div>
+    <div class="cs-actions">
+      <%= link_to "New broadcast", new_admin_series_broadcast_path(@series), class: "cs-btn cs-btn-primary" %>
+    </div>
+  </div>
+
+  <section class="cs-container">
+    <div class="cs-container-header cs-container-header-divided">
+      <h2 class="cs-h2">Broadcasts <span class="cs-counter">(<%= @broadcasts.size %>)</span></h2>
+    </div>
+    <% if @broadcasts.any? %>
+      <div class="cs-table-wrap">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th scope="col">Broadcast</th>
+              <th scope="col">Audience</th>
+              <th scope="col">Channels</th>
+              <th scope="col">Status</th>
+              <th scope="col">Events</th>
+              <th scope="col">Sent</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @broadcasts.each do |broadcast| %>
+              <% totals = @totals.fetch(broadcast.id, { events: 0, recipients: 0, delivered: 0, failed: 0 }) %>
+              <tr>
+                <td>
+                  <% link = broadcast.draft? ? edit_admin_series_broadcast_path(@series, broadcast) : admin_series_broadcast_path(@series, broadcast) %>
+                  <%= link_to link, class: "block cs-link" do %>
+                    <% if broadcast.subject.present? %>
+                      <span class="block cs-link-strong"><%= broadcast.subject %></span>
+                    <% end %>
+                    <span class="block truncate max-w-xs cs-secondary"><%= truncate(broadcast.body_as_plain.squish.presence || "(empty)", length: 60) %></span>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap"><%= broadcast.audience_label %></td>
+                <td class="whitespace-nowrap">
+                  <div class="flex gap-1">
+                    <% broadcast.channels.each do |channel| %>
+                      <%= cs_badge(channel.titleize, channel_badge_colors[channel]) %>
+                    <% end %>
+                  </div>
+                </td>
+                <td><%= render "status", broadcast: broadcast %></td>
+                <td class="whitespace-nowrap">
+                  <% if broadcast.sent_at.present? %>
+                    <%= pluralize(totals[:events], "event") %>
+                  <% else %>
+                    <span class="cs-secondary"><%= broadcast.event_scope_label %></span>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap">
+                  <% if broadcast.sent_at.present? %>
+                    <%= cs_relative_time(broadcast.sent_at) %>
+                    <div class="cs-small cs-muted">
+                      <%= totals[:delivered] %>/<%= totals[:recipients] %> delivered<% if totals[:failed].positive? %>, <%= totals[:failed] %> failed<% end %>
+                    </div>
+                  <% elsif broadcast.scheduled_at.present? %>
+                    <%= cs_status(:pending, safe_join([ "Scheduled for ", cs_absolute_time_tag(broadcast.scheduled_at) ])) %>
+                  <% else %>
+                    <span class="cs-muted">Draft</span>
+                  <% end %>
+                </td>
+                <td class="text-right">
+                  <% if broadcast.draft? || broadcast.scheduled? %>
+                    <%= button_to admin_series_broadcast_path(@series, broadcast),
+                        method: :delete,
+                        form: { data: { turbo_confirm: "Delete this draft?" } },
+                        class: "cs-btn-inline-icon",
+                        "aria-label": "Delete draft" do %>
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                      </svg>
+                    <% end %>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="cs-empty">
+        <p class="cs-empty-title">No broadcasts yet</p>
+        <p>Message everyone still to finish signing up, or every guardian, across the series in one go.</p>
+        <div class="cs-actions">
+          <%= link_to "New broadcast", new_admin_series_broadcast_path(@series), class: "cs-btn" %>
+        </div>
+      </div>
+    <% end %>
+  </section>
+</div>

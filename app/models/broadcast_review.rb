@@ -1,5 +1,6 @@
-# A broadcast (Message or SlackBlast) that BroadcastScreener held back as
-# possible marketing, spam, or off-topic, waiting on a global admin.
+# A broadcast (Message, SlackBlast or SeriesBroadcast) that BroadcastScreener
+# held back as possible marketing, spam, or off-topic, waiting on a global
+# admin. Filed against its event, or for a SeriesBroadcast, its series.
 #
 # Approving releases it: the broadcast goes out (or back to its schedule).
 # Rejecting sends a Message back to draft for its author to fix, or retires a
@@ -10,7 +11,8 @@ class BroadcastReview < ApplicationRecord
   has_paper_trail
 
   belongs_to :reviewable, polymorphic: true
-  belongs_to :event
+  belongs_to :event, optional: true
+  belongs_to :event_series, optional: true
   belongs_to :submitted_by_user, class_name: "User", optional: true
   belongs_to :decided_by_user, class_name: "User", optional: true
 
@@ -30,6 +32,7 @@ class BroadcastReview < ApplicationRecord
 
   validates :flagged_by, inclusion: { in: FLAGGED_BY }
   validates :content_digest, presence: true
+  validate :filed_against_event_or_series
 
   scope :recent, -> { order(created_at: :desc) }
 
@@ -40,7 +43,22 @@ class BroadcastReview < ApplicationRecord
   end
 
   def kind_label
-    reviewable_type == "SlackBlast" ? "Slack blast" : "Message"
+    case reviewable_type
+    when "SlackBlast" then "Slack blast"
+    when "SeriesBroadcast" then "Series broadcast"
+    else "Message"
+    end
+  end
+
+  # The series whose owners may review it: the event's, or the series a
+  # SeriesBroadcast went to.
+  def series_id
+    event_series_id || event&.event_series_id
+  end
+
+  # What it was going to: an event, or every chosen event in a series.
+  def target_name
+    event&.name || "#{event_series&.name} (series)"
   end
 
   def approve!(user, note: nil)
@@ -64,6 +82,10 @@ class BroadcastReview < ApplicationRecord
   end
 
   private
+
+  def filed_against_event_or_series
+    errors.add(:base, "needs an event or a series") if event_id.blank? && event_series_id.blank?
+  end
 
   # Locks the review so two admins can't both decide it, and refuses if the
   # broadcast moved on meanwhile (cancelled, or edited since it was held).

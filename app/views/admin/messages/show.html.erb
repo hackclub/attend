@@ -7,6 +7,12 @@
 
   <%= render "admin/broadcast_reviews/status_banner", broadcastable: @message %>
 
+  <% if @message.series_broadcast %>
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 text-sm text-blue-900">
+      This event's copy of a broadcast to several events in the series. <%= render "admin/series_broadcasts/origin", message: @message %>
+    </div>
+  <% end %>
+
   <!-- Message Header -->
   <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
     <div class="flex justify-between items-start mb-4">

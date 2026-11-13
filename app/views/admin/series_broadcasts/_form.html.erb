@@ -1,0 +1,132 @@
+<% content_for :title, "New broadcast – #{@series.name} – Attend" %>
+
+<div class="max-w-3xl mx-auto">
+  <div class="mb-6">
+    <%= link_to "← Back to broadcasts", admin_series_broadcasts_path(@series), class: "text-gray-600 hover:text-gray-900" %>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6">
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold">Compose Broadcast</h1>
+      <p class="text-gray-600"><%= @series.name %> · Step 1 of 2 — Write your broadcast</p>
+    </div>
+
+    <%= form_with model: @broadcast,
+        url: @broadcast.persisted? ? admin_series_broadcast_path(@series, @broadcast) : admin_series_broadcasts_path(@series),
+        method: @broadcast.persisted? ? :patch : :post,
+        id: "series-broadcast-form",
+        class: "space-y-6" do |f| %>
+
+      <% if @broadcast.errors.any? %>
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+          <ul class="text-sm text-red-700 list-disc list-inside">
+            <% @broadcast.errors.full_messages.each do |error| %>
+              <li><%= error %></li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+
+      <fieldset>
+        <legend class="block text-sm font-medium text-gray-700 mb-1">Send to</legend>
+        <div class="space-y-2">
+          <% SeriesBroadcast::EVENT_SCOPES.each do |key, label| %>
+            <label class="flex items-center gap-2">
+              <%= f.radio_button :event_scope, key, class: "border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+              <span class="text-sm text-gray-700"><%= label %></span>
+            </label>
+          <% end %>
+        </div>
+        <p class="mt-1 text-xs text-gray-500">Each event gets its own copy, on its messages page. Events where nobody matches the audience are skipped.</p>
+
+        <% selected_ids = @broadcast.selected_event_ids.map(&:to_s) %>
+        <details class="mt-3" <%= "open" if @broadcast.event_scope == "selected" %>>
+          <summary class="text-sm text-[#d42f46] cursor-pointer">Pick events (<%= selected_ids.size %> picked)</summary>
+          <%= hidden_field_tag "series_broadcast[selected_event_ids][]", "", id: nil %>
+          <div class="mt-2 max-h-64 overflow-y-auto border border-gray-200 rounded-md divide-y divide-gray-100">
+            <% @series_events.each do |event| %>
+              <label class="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50">
+                <%= check_box_tag "series_broadcast[selected_event_ids][]", event.id, selected_ids.include?(event.id.to_s),
+                    id: "series_broadcast_event_#{event.id}",
+                    class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]" %>
+                <span class="text-sm text-gray-900"><%= event.name %></span>
+                <span class="text-xs text-gray-500"><%= event.starts_at&.strftime("%b %d, %Y") %></span>
+              </label>
+            <% end %>
+          </div>
+          <p class="mt-1 text-xs text-gray-500">Only used with "<%= SeriesBroadcast::EVENT_SCOPES["selected"] %>".</p>
+        </details>
+      </fieldset>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <%= f.label :audience, "Audience", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.select :audience,
+              SeriesBroadcast::AUDIENCES.map { |k, v| [ v, k ] },
+              {},
+              class: "w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750]" %>
+          <p class="mt-1 text-xs text-gray-500">Matched at each event separately.</p>
+        </div>
+
+        <div>
+          <span class="block text-sm font-medium text-gray-700 mb-1">Channels</span>
+          <%= hidden_field_tag "series_broadcast[channels][]", "", id: nil %>
+          <div class="space-y-2">
+            <% Message::CHANNELS.each do |key, label| %>
+              <label class="flex items-center gap-2 <%= key == :sms && !Setting.twilio_enabled? ? 'opacity-50' : '' %>">
+                <%= check_box_tag "series_broadcast[channels][]", key, @broadcast.channels.include?(key.to_s),
+                    class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]",
+                    id: "channel_#{key}",
+                    disabled: key == :sms && !Setting.twilio_enabled? %>
+                <span class="text-sm text-gray-700"><%= label %></span>
+                <% if key == :slack %>
+                  <span class="text-xs text-gray-400">(attendees only)</span>
+                <% end %>
+              </label>
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900">
+        This goes to several events, so say which one it's about: <code>{{event_name}}</code> becomes each event's own name,
+        and <code>{{first_name}}</code> each recipient's.
+      </div>
+
+      <div>
+        <%= f.label :subject, "Subject (optional)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.text_field :subject,
+            class: "w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2",
+            placeholder: "e.g., An update about {{event_name}}" %>
+        <p class="mt-1 text-sm text-gray-500">Used as the email subject line. Slack and SMS will use the event name.</p>
+      </div>
+
+      <div data-controller="tinymce" data-tinymce-placeholders-value="<%= Message::PLACEHOLDERS.to_json %>">
+        <%= f.label :body, "Message", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.text_area :body,
+            rows: 10,
+            class: "w-full rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750] px-3 py-2",
+            data: { tinymce_target: "editor" } %>
+        <p class="mt-1 text-sm text-gray-500">
+          Links, bold, italic and lists are supported. Images can't go in a series broadcast: link to them instead.
+          Messages to guardians can also use <code>{{participant_first_name}}</code> for their children's names.
+        </p>
+      </div>
+
+      <div class="border border-gray-200 rounded-lg p-4">
+        <%= f.label :scheduled_at, "Send at (optional)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.datetime_local_field :scheduled_at,
+            value: @broadcast.scheduled_at&.utc&.strftime("%Y-%m-%dT%H:%M"),
+            lang: "en-GB",
+            class: "rounded-md border-gray-300 focus:border-[#ec3750] focus:ring-[#ec3750]",
+            min: Time.current.utc.strftime("%Y-%m-%dT%H:%M") %>
+        <p class="mt-1 text-sm text-gray-500">In UTC, since the series' events are in different time zones. Leave empty to send from the preview.</p>
+      </div>
+
+      <div class="flex justify-end items-center pt-4 border-t border-gray-200">
+        <%= f.submit "Next: Preview →",
+            class: "bg-[#d42f46] hover:bg-[#b82840] text-white font-semibold py-2 px-6 rounded-lg cursor-pointer" %>
+      </div>
+    <% end %>
+  </div>
+</div>

@@ -485,6 +485,15 @@ Rails.application.routes.draw do
       # Every event's registration change requests in one list; each row opens
       # the request on its own event, where it is approved or followed up.
       resources :change_requests, only: [ :index ], controller: "series_change_requests"
+      # One message to many of the series' events at once; each event gets
+      # its own copy on its messages page (see SeriesBroadcast).
+      resources :broadcasts, controller: "series_broadcasts" do
+        member do
+          get :preview
+          post :send_now
+          post :cancel
+        end
+      end
       resources :api_tokens, only: [ :index, :create, :destroy ], controller: "series_api_tokens" do
         member do
           post :rotate

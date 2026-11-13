@@ -1,5 +1,5 @@
 <p>
-  A <%= @review.kind_label.downcase %> for <strong><%= @event.name %></strong>
+  A <%= @review.kind_label.downcase %> for <strong><%= @target_name %></strong>
   <% if @sender %>from <strong><%= @sender.email %></strong><% end %>
   was held before sending because it looks like
   <strong><%= @review.category_labels.to_sentence.downcase %></strong>.

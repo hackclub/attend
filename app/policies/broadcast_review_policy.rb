@@ -53,6 +53,7 @@ class BroadcastReviewPolicy < ApplicationPolicy
 
       owned = user.series_role_assignments.owner.select(:event_series_id)
       scope.where(event_id: Event.where(event_series_id: owned).select(:id))
+        .or(scope.where(event_series_id: owned))
     end
   end
 
@@ -63,7 +64,7 @@ class BroadcastReviewPolicy < ApplicationPolicy
   end
 
   def series_owner_for_review?
-    series_id = record.event&.event_series_id
+    series_id = record.series_id
     series_id.present? && owned_series_ids.exists?(event_series_id: series_id)
   end
 end

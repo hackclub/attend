@@ -1,0 +1,155 @@
+<% content_for :title, "Preview broadcast – #{@series.name} – Attend" %>
+<% sample_html = @broadcast.body_as_html(recipient: @preview_recipient, event: @preview_event) %>
+
+<div class="max-w-4xl mx-auto">
+  <div class="mb-6">
+    <%= link_to "← Back to Edit", edit_admin_series_broadcast_path(@series, @broadcast), class: "text-gray-600 hover:text-gray-900" %>
+  </div>
+
+  <%= render "admin/broadcast_reviews/status_banner", broadcastable: @broadcast %>
+
+  <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold">Preview & Send</h1>
+      <p class="text-gray-600"><%= @series.name %> · Step 2 of 2 — Review and send your broadcast</p>
+    </div>
+
+    <div class="mb-8">
+      <h2 class="text-lg font-semibold mb-3">Audience: <%= @broadcast.audience_label %></h2>
+      <div class="bg-gray-50 rounded-lg p-4">
+        <p class="text-sm text-gray-600 mb-3">
+          <strong class="text-gray-900"><%= @total_count %></strong> recipient<%= @total_count == 1 ? '' : 's' %> across
+          <strong class="text-gray-900"><%= pluralize(@reached_events.size, "event") %></strong> will receive this via
+          <strong class="text-gray-900"><%= @broadcast.channel_labels %></strong>.
+          <% skipped = @events.size - @reached_events.size %>
+          <% if skipped.positive? %>
+            <%= pluralize(skipped, "event") %> with nobody in the audience will be skipped.
+          <% end %>
+        </p>
+
+        <% if @recipients.any? %>
+          <div class="flex flex-wrap gap-2">
+            <% @recipients.each do |recipient| %>
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-gray-200">
+                <% if recipient.respond_to?(:participant) %>
+                  <%= recipient.participant.display_name %>&nbsp;<span class="text-gray-400">· <%= recipient.event.name %></span>
+                <% else %>
+                  <%= recipient.full_name %>
+                <% end %>
+              </span>
+            <% end %>
+            <% if @total_count > @recipients.size %>
+              <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-600">
+                +<%= @total_count - @recipients.size %> more
+              </span>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-amber-600">Nobody at these events matches this audience. The broadcast won't be sent to anyone.</p>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="mb-8">
+      <h2 class="text-lg font-semibold mb-3">Events (<%= @events.size %>)</h2>
+      <% if @events.any? %>
+        <div class="max-h-96 overflow-y-auto border border-gray-200 rounded-lg">
+          <table class="min-w-full divide-y divide-gray-100 text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Starts</th>
+                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Recipients</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <% @events.each do |event| %>
+                <% count = @counts[event.id].to_i %>
+                <tr>
+                  <td class="px-4 py-2 text-gray-900"><%= event.name %></td>
+                  <td class="px-4 py-2 text-gray-500 whitespace-nowrap"><%= event.starts_at&.strftime("%b %d, %Y") || "—" %></td>
+                  <td class="px-4 py-2 text-right <%= count.positive? ? 'text-gray-900' : 'text-gray-400' %>"><%= count.positive? ? count : "Skipped" %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <p class="text-sm text-amber-600">No event in the series matches "<%= @broadcast.event_scope_label %>".</p>
+      <% end %>
+    </div>
+
+    <div class="space-y-6">
+      <% if @preview_recipient && @broadcast.uses_placeholders? %>
+        <p class="text-sm text-gray-600">
+          Placeholders are filled in as they will be for <strong class="text-gray-900"><%= @preview_recipient.try(:display_name) || @preview_recipient.full_name %></strong>
+          at <strong class="text-gray-900"><%= @preview_event&.name %></strong>.
+        </p>
+      <% end %>
+
+      <% if @broadcast.channels.include?("email") %>
+        <div>
+          <h3 class="text-sm font-semibold text-gray-700 mb-2">Email preview</h3>
+          <div class="border border-gray-200 rounded-lg overflow-hidden">
+            <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 text-sm">
+              <span class="text-gray-500">Subject:</span>
+              <strong><%= @broadcast.subject_for(@preview_recipient, event: @preview_event) || "You have a new message from #{@preview_event&.name || "the event"}" %></strong>
+            </div>
+            <div class="p-4 prose prose-sm max-w-none">
+              <%= sanitize sample_html, tags: %w[p br strong em b i a ul ol li h1 h2 h3 h4 code pre blockquote], attributes: %w[href target rel] %>
+            </div>
+          </div>
+        </div>
+      <% end %>
+
+      <% if @broadcast.channels.include?("slack") %>
+        <div>
+          <h3 class="text-sm font-semibold text-gray-700 mb-2">Slack preview</h3>
+          <div class="bg-[#1a1d21] rounded-lg p-4 text-[15px] text-gray-100 whitespace-pre-wrap break-words"><%= sample_html %></div>
+        </div>
+      <% end %>
+
+      <% if @broadcast.channels.include?("sms") %>
+        <% sms_text = @broadcast.body_as_plain(recipient: @preview_recipient, event: @preview_event) %>
+        <div>
+          <h3 class="text-sm font-semibold text-gray-700 mb-2">SMS preview</h3>
+          <div class="max-w-xs">
+            <div class="bg-green-500 text-white rounded-2xl rounded-bl-sm px-4 py-2 text-sm whitespace-pre-line"><%= sms_text %></div>
+            <p class="text-xs text-gray-400 mt-2 text-right">
+              <%= pluralize(sms_text.length, "character") %>
+              <% if sms_text.length > 160 %>
+                <span class="text-amber-500">(~<%= (sms_text.length / 160.0).ceil %> segments)</span>
+              <% end %>
+            </p>
+          </div>
+        </div>
+      <% end %>
+    </div>
+
+    <% if @broadcast.scheduled_at.present? %>
+      <div class="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <p class="text-yellow-800">
+          <strong>Scheduled:</strong> This broadcast will be sent on
+          <strong><%= @broadcast.scheduled_at.utc.strftime("%B %d, %Y at %H:%M UTC") %></strong>
+        </p>
+      </div>
+    <% end %>
+
+    <div class="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
+      <%= link_to "← Edit Broadcast", edit_admin_series_broadcast_path(@series, @broadcast), class: "text-gray-600 hover:text-gray-900" %>
+      <% if @broadcast.scheduled_at.present? && @broadcast.scheduled_at > Time.current %>
+        <%= button_to "Schedule Broadcast", send_now_admin_series_broadcast_path(@series, @broadcast),
+            method: :post,
+            form: { data: { turbo_confirm: "Schedule this broadcast to go to #{pluralize(@reached_events.size, "event")}?" } },
+            class: "bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-6 rounded-lg",
+            disabled: @total_count == 0 %>
+      <% else %>
+        <%= button_to "Send Now", send_now_admin_series_broadcast_path(@series, @broadcast),
+            method: :post,
+            form: { data: { turbo_confirm: "Send this to #{pluralize(@total_count, "recipient")} across #{pluralize(@reached_events.size, "event")} now?" } },
+            class: "bg-[#d42f46] hover:bg-[#b82840] text-white font-semibold py-2 px-6 rounded-lg",
+            disabled: @total_count == 0 %>
+      <% end %>
+    </div>
+  </div>
+</div>

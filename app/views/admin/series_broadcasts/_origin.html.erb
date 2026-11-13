@@ -1,0 +1,9 @@
+<%# Marks one event's copy of a series broadcast, linking back to the broadcast
+    for those who can open it (series owners and global admins). %>
+<% broadcast = message.series_broadcast %>
+<% label = "From a #{broadcast.event_series.name} series broadcast" %>
+<% if policy(broadcast).show? %>
+  <%= link_to label, admin_series_broadcast_path(broadcast.event_series, broadcast), class: "text-xs text-[#d42f46] hover:underline" %>
+<% else %>
+  <span class="text-xs text-gray-500"><%= label %></span>
+<% end %>

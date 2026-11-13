@@ -8,7 +8,7 @@ RSpec.describe BroadcastReviewMailer do
   let(:owner) { User.create!(email: "owner@example.com", name: "Owner") }
   let(:sender_owner) { User.create!(email: "sender-owner@example.com", name: "Sender Owner") }
   let(:organizer) { User.create!(email: "organizer@example.com", name: "Organizer") }
-  let(:review) { instance_double(BroadcastReview, event: event, submitted_by_user_id: sender_owner.id) }
+  let(:review) { instance_double(BroadcastReview, series_id: event.event_series_id, submitted_by_user_id: sender_owner.id) }
 
   before do
     allow(ENV).to receive(:[]).and_call_original
@@ -46,6 +46,23 @@ RSpec.describe BroadcastReviewMailer do
       event.update!(event_series: nil)
 
       expect(described_class.reviewer_emails(review)).to contain_exactly("admin-a@example.com", "admin-b@example.com")
+    end
+  end
+
+  describe ".flagged" do
+    it "names the series for a held series broadcast, and emails its other owners" do
+      series.update!(name: "Heron")
+      broadcast = SeriesBroadcast.create!(event_series: series, sent_by_user: sender_owner, audience: "confirmed_attendees",
+        channels: [ "email" ], body: "<p>Big sale</p>", event_scope: "all")
+      review = broadcast.broadcast_reviews.create!(event_series: series, submitted_by_user: sender_owner,
+        flagged_by: "heuristics", categories: [ "marketing" ], reason: "Sells.", content_digest: broadcast.content_digest)
+
+      mail = described_class.flagged(broadcast_review: review)
+
+      expect(mail.subject).to eq("Review a held series broadcast for Heron (series)")
+      expect(mail.to).to include("owner@example.com")
+      expect(mail.to).not_to include("sender-owner@example.com")
+      expect(mail.text_part.body.to_s).to include("Heron (series)", "Big sale")
     end
   end
 end

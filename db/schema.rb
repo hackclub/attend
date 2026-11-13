@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_13_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_13_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -267,7 +267,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_120000) do
   create_table "broadcast_reviews", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "reviewable_type", null: false
     t.uuid "reviewable_id", null: false
-    t.uuid "event_id", null: false
+    t.uuid "event_id"
     t.uuid "submitted_by_user_id"
     t.string "status", default: "pending", null: false
     t.string "flagged_by", null: false
@@ -279,8 +279,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_120000) do
     t.text "decision_note"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.uuid "event_series_id"
     t.index ["decided_by_user_id"], name: "index_broadcast_reviews_on_decided_by_user_id"
     t.index ["event_id"], name: "index_broadcast_reviews_on_event_id"
+    t.index ["event_series_id"], name: "index_broadcast_reviews_on_event_series_id"
     t.index ["reviewable_type", "reviewable_id"], name: "index_broadcast_reviews_on_reviewable"
     t.index ["status", "created_at"], name: "index_broadcast_reviews_on_status_and_created_at"
     t.index ["submitted_by_user_id"], name: "index_broadcast_reviews_on_submitted_by_user_id"
@@ -886,9 +888,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_120000) do
     t.string "status", default: "draft"
     t.string "subject"
     t.datetime "updated_at", null: false
+    t.uuid "series_broadcast_id"
     t.index ["event_id"], name: "index_messages_on_event_id"
     t.index ["scheduled_at"], name: "index_messages_on_scheduled_at"
     t.index ["sent_by_user_id"], name: "index_messages_on_sent_by_user_id"
+    t.index ["series_broadcast_id", "event_id"], name: "index_messages_on_series_broadcast_id_and_event_id", unique: true, where: "(series_broadcast_id IS NOT NULL)"
     t.index ["status"], name: "index_messages_on_status"
   end
 
@@ -1260,6 +1264,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_120000) do
     t.index ["event_series_id"], name: "index_series_api_tokens_on_event_series_id"
     t.index ["token_digest"], name: "index_series_api_tokens_on_token_digest", unique: true
     t.index ["user_id"], name: "index_series_api_tokens_on_user_id"
+  end
+
+  create_table "series_broadcasts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "event_series_id", null: false
+    t.uuid "sent_by_user_id", null: false
+    t.string "subject"
+    t.text "body", default: "", null: false
+    t.string "channels", default: [], null: false, array: true
+    t.string "audience", null: false
+    t.jsonb "audience_filters", default: {}, null: false
+    t.string "event_scope", default: "upcoming", null: false
+    t.uuid "selected_event_ids", default: [], null: false, array: true
+    t.uuid "skipped_event_ids", default: [], null: false, array: true
+    t.string "status", default: "draft", null: false
+    t.string "screened_digest"
+    t.datetime "scheduled_at"
+    t.datetime "sent_at"
+    t.datetime "fanned_out_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["event_series_id"], name: "index_series_broadcasts_on_event_series_id"
+    t.index ["sent_by_user_id"], name: "index_series_broadcasts_on_sent_by_user_id"
+    t.index ["status", "scheduled_at"], name: "index_series_broadcasts_on_status_and_scheduled_at"
   end
 
   create_table "series_role_assignments", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1802,6 +1829,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_120000) do
   add_foreign_key "ban_slack_ids", "bans"
   add_foreign_key "bans", "users", column: "created_by_id"
   add_foreign_key "bans", "users", column: "revoked_by_id"
+  add_foreign_key "broadcast_reviews", "event_series"
   add_foreign_key "broadcast_reviews", "events"
   add_foreign_key "broadcast_reviews", "users", column: "decided_by_user_id", on_delete: :nullify
   add_foreign_key "broadcast_reviews", "users", column: "submitted_by_user_id", on_delete: :nullify
@@ -1860,6 +1888,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_120000) do
   add_foreign_key "message_deliveries", "messages"
   add_foreign_key "message_deliveries", "participant_events"
   add_foreign_key "messages", "events"
+  add_foreign_key "messages", "series_broadcasts"
   add_foreign_key "messages", "users", column: "sent_by_user_id"
   add_foreign_key "mobile_tokens", "users"
   add_foreign_key "notes", "events"
@@ -1905,6 +1934,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_120000) do
   add_foreign_key "scans", "users"
   add_foreign_key "series_api_tokens", "event_series"
   add_foreign_key "series_api_tokens", "users", on_delete: :nullify
+  add_foreign_key "series_broadcasts", "event_series"
+  add_foreign_key "series_broadcasts", "users", column: "sent_by_user_id"
   add_foreign_key "series_role_assignments", "event_series"
   add_foreign_key "series_role_assignments", "users"
   add_foreign_key "sibling_memberships", "participants"
