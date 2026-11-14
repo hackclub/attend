@@ -205,4 +205,21 @@ RSpec.describe RegistrationCompletionPresenter do
     expect(presenter).not_to be_entry_pass_eligible
     expect(presenter.state).to eq(:action_needed)
   end
+
+  # A guardian can finish the portal and countersign the waiver before the
+  # attendee submits (and agrees to the code of conduct), e.g. when staff resend
+  # the invite at the door. Their page must not read as done.
+  it "tells a finished guardian the attendee still has to submit and agree to the code of conduct" do
+    participant.update!(legal_first_name: "Robin")
+    participant_event.update!(status: :in_progress, code_of_conduct_accepted_at: nil)
+    create(:consent, :signed, participant_event: participant_event)
+
+    guardian_presentation = presentation(:guardian, guardian_participant_event: guardian_participant_event)
+
+    expect(guardian_presentation.state).to eq(:information_needed)
+    expect(guardian_presentation.headline).to eq("Waiting on Robin")
+    expect(guardian_presentation.body).to include("Your part is done, but Robin hasn't submitted their registration yet")
+    expect(guardian_presentation.body).to include("Code of Conduct")
+    expect(presentation(:participant).body).to include("agree to the Code of Conduct")
+  end
 end

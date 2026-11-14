@@ -123,5 +123,22 @@ RSpec.describe "Guardian portal automatic completion", type: :request do
 
       expect(response).to redirect_to(guardian_portal_path(token: token))
     end
+
+    it "tells a finished guardian the attendee hasn't submitted yet and links back to their registration" do
+      participant.update!(legal_first_name: "Robin")
+      participant_event.update!(status: :in_progress, code_of_conduct_accepted_at: nil)
+      waiver.update!(status: :signed, signed_at: Time.current, guardian_signed_at: Time.current, pending_on: nil)
+      freedom_waiver.update!(status: :signed, signed_at: Time.current, guardian_signed_at: Time.current)
+      gpe.update!(status: :completed, completed_at: Time.current)
+
+      get guardian_portal_confirmed_path(token: token)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Waiting on Robin")
+      expect(response.body).to match(/is\s+saved\./)
+      expect(response.body).not_to include("is submitted.")
+      expect(response.body).to include("Continue Robin&#39;s registration")
+      expect(response.body).to include(onboarding_path(event_id: event.id))
+    end
   end
 end
