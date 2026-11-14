@@ -12,12 +12,12 @@
     <fieldset>
       <legend class="portal-heading text-base mb-3"><%= @course.disclosure_question_text %></legend>
       <label class="portal-check-row">
-        <%= radio_button_tag :answer, "no", params[:answer] == "no", class: "portal-check mt-1", required: true %>
-        <span>No</span>
+        <%= radio_button_tag :answer, "yes", params[:answer] == "yes", class: "portal-check mt-1", required: true %>
+        <span><strong>Yes</strong>, this applies to me</span>
       </label>
       <label class="portal-check-row">
-        <%= radio_button_tag :answer, "yes", params[:answer] == "yes", class: "portal-check mt-1", required: true %>
-        <span>Yes</span>
+        <%= radio_button_tag :answer, "no", params[:answer] == "no", class: "portal-check mt-1", required: true %>
+        <span><strong>No</strong>, none of this applies to me</span>
       </label>
     </fieldset>
 
