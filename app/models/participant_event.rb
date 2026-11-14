@@ -399,13 +399,16 @@ class ParticipantEvent < ApplicationRecord
   # Single source of truth for registration completion, shared by the DocuSeal
   # webhook and the guardian portal so neither path can complete a participant
   # the other would still consider blocked.
-  def eligible_for_completion?
+  #
+  # ignoring_submission: answers "would this complete if the participant hit
+  # submit?", which #remind_to_submit_if_only_step_left uses.
+  def eligible_for_completion?(ignoring_submission: false)
     # A withdrawn or rejected registration is closed: a still-open DocuSeal
     # link finishing later must not flip it back to complete.
     return false if withdrawn? || rejected?
     # Signing can now happen before the participant submits their registration
     # (documents step) — never complete someone who hasn't hit submit yet.
-    return false unless code_of_conduct_accepted_at.present?
+    return false unless ignoring_submission || code_of_conduct_accepted_at.present?
     return false unless waiver_signed?
     return false unless custom_documents_signed?
 
@@ -419,7 +422,11 @@ class ParticipantEvent < ApplicationRecord
 
   def mark_complete_if_eligible!
     return false if complete?
-    return false unless eligible_for_completion?
+
+    unless eligible_for_completion?
+      remind_to_submit_if_only_step_left
+      return false
+    end
 
     # Concurrent webhooks (or a webhook racing a guardian's commit hook) can
     # both get this far. Re-check under a row lock so only one of them
@@ -434,6 +441,30 @@ class ParticipantEvent < ApplicationRecord
 
     ParticipantMailer.registration_confirmed(participant_event: self).deliver_later if completed_now
     completed_now
+  end
+
+  SUBMISSION_REMINDER_DELAY = 15.minutes
+
+  # Everything else can finish before the participant submits: they sign on
+  # the documents step, and a guardian can reach the portal early (a staff
+  # resend, the portal center) and do their whole part. Submitting, the review
+  # step where they agree to the code of conduct, is then the only thing left,
+  # and nothing else would ever prompt them, so the registration sat
+  # in_progress with every signature in. Every completion hook comes through
+  # #mark_complete_if_eligible!, so this is where we notice and email them,
+  # once.
+  def remind_to_submit_if_only_step_left
+    return false if code_of_conduct_accepted_at.present?
+    return false unless eligible_for_completion?(ignoring_submission: true)
+
+    claimed = self.class.where(id: id, submission_reminder_sent_at: nil)
+      .update_all(submission_reminder_sent_at: Time.current, updated_at: Time.current)
+    return false unless claimed == 1
+
+    # Someone signing on the documents step usually clicks straight through to
+    # submit; give them time, and the mailer skips anyone who did.
+    ParticipantMailer.submission_needed(participant_event: self).deliver_later(wait: SUBMISSION_REMINDER_DELAY)
+    true
   end
 
   # Computed display status for the UI. Maps the DB status + actual progress

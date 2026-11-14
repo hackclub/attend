@@ -70,6 +70,32 @@ RSpec.describe ParticipantMailer, type: :mailer do
     end
   end
 
+  describe "#submission_needed" do
+    let(:event) { create(:event, name: "Trailblazer") }
+    let(:participant_event) do
+      create(:participant_event, event: event, status: :in_progress, code_of_conduct_accepted_at: nil,
+        participant: create(:participant, email: "attendee@example.com"))
+    end
+
+    it "asks the attendee to submit and agree to the code of conduct, linking to their registration" do
+      mail = described_class.submission_needed(participant_event: participant_event)
+      body = [ mail.html_part.body.decoded, mail.text_part.body.decoded ].join("\n")
+
+      expect(mail.to).to eq([ "attendee@example.com" ])
+      expect(mail.subject).to eq("One step left: submit your registration for Trailblazer")
+      expect(body).to include("Code of Conduct")
+      expect(body).to include("/onboarding?event_id=#{event.id}")
+    end
+
+    it "sends nothing if they submitted before it went out" do
+      participant_event.update!(code_of_conduct_accepted_at: Time.current)
+
+      mail = described_class.submission_needed(participant_event: participant_event)
+
+      expect(mail.message).to be_a(ActionMailer::Base::NullMail)
+    end
+  end
+
   describe "#invitation" do
     def decoded_parts(mail)
       [ mail.html_part.body.decoded, mail.text_part.body.decoded ]

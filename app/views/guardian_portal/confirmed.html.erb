@@ -18,7 +18,8 @@
       <% else %>
         Your information for
         <strong class="portal-heading"><%= @participant.legal_first_name %> <%= @participant.legal_last_name %></strong>'s
-        registration for <strong class="portal-heading"><%= @event.name %></strong> is submitted.
+        registration for <strong class="portal-heading"><%= @event.name %></strong> is
+        <%= @completion.information_submitted? ? "submitted" : "saved" %>.
       <% end %>
     </p>
 
@@ -30,9 +31,10 @@
   </div>
 
   <% unless @completion.confirmed? %>
-    <div class="portal-note <%= @completion.state.in?([:action_needed, :paused, :staff_attention]) ? 'portal-note-warn' : 'portal-note-success' %> mb-6">
+    <% warn = @completion.state.in?([ :action_needed, :paused, :staff_attention, :information_needed ]) %>
+    <div class="portal-note <%= warn ? 'portal-note-warn' : 'portal-note-success' %> mb-6">
       <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
-        <% if @completion.state.in?([ :action_needed, :paused, :staff_attention ]) %>
+        <% if warn %>
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
         <% else %>
           <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
@@ -46,7 +48,12 @@
             <%= @completion.headline %>
           <% end %>
         </h2>
-        <p class="portal-body text-sm mt-1 <%= 'mb-3' if @completion.state == :action_needed %>"><%= @completion.body %></p>
+        <p class="portal-body text-sm mt-1 <%= 'mb-3' if @completion.state.in?([ :action_needed, :information_needed ]) %>"><%= @completion.body %></p>
+        <% if @completion.state == :information_needed %>
+          <%# Guardians often finish on the attendee's phone; this hands it back to the attendee's own sign-in. %>
+          <%= link_to "Continue #{@participant.legal_first_name}'s registration", onboarding_path(event_id: @event.id),
+                class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+        <% end %>
         <% if @completion.state == :action_needed && @completion.next_task.kind == :waiver %>
           <%= link_to "Sign the waiver", guardian_portal_waiver_path(token: @token), class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
         <% elsif @completion.state == :action_needed && @completion.next_task.kind == :freedom_waiver %>

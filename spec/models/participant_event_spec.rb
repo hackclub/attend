@@ -322,6 +322,55 @@ RSpec.describe ParticipantEvent, type: :model do
       expect(pe.mark_complete_if_eligible!).to be true
     end
 
+    # Signatures (and a guardian's whole part) can all land before the
+    # participant submits, and nothing else would prompt them to come back.
+    it "emails the participant once when submitting is the only thing left" do
+      pe = adult_pe
+      pe.update!(code_of_conduct_accepted_at: nil)
+
+      expect {
+        expect(pe.mark_complete_if_eligible!).to be false
+      }.not_to have_enqueued_mail(ParticipantMailer, :submission_needed)
+
+      create(:consent, :signed, participant_event: pe)
+      expect {
+        expect(pe.reload.mark_complete_if_eligible!).to be false
+      }.to have_enqueued_mail(ParticipantMailer, :submission_needed)
+      expect(pe.reload.submission_reminder_sent_at).to be_present
+
+      expect {
+        pe.mark_complete_if_eligible!
+      }.not_to have_enqueued_mail(ParticipantMailer, :submission_needed)
+    end
+
+    it "doesn't send the submit reminder once the participant has submitted" do
+      pe = adult_pe
+      create(:consent, :signed, participant_event: pe)
+
+      expect {
+        pe.mark_complete_if_eligible!
+      }.not_to have_enqueued_mail(ParticipantMailer, :submission_needed)
+      expect(pe.reload.submission_reminder_sent_at).to be_nil
+    end
+
+    it "sends the submit reminder for a minor once their guardian has finished" do
+      no_freedom_event = create(:event, freedom_waivers_enabled: false)
+      pe = create(:participant_event, event: no_freedom_event, status: :in_progress)
+      pe.participant.update!(date_of_birth: 15.years.ago)
+      gpe = create(:guardian_participant_event, participant_event: pe, status: :pending)
+      create(:consent, :signed, participant_event: pe)
+
+      expect {
+        pe.reload.mark_complete_if_eligible!
+      }.not_to have_enqueued_mail(ParticipantMailer, :submission_needed)
+
+      # The guardian finishing runs the completion check itself.
+      expect {
+        gpe.update!(status: :completed, completed_at: Time.current)
+      }.to have_enqueued_mail(ParticipantMailer, :submission_needed)
+      expect(pe.reload).to be_in_progress
+    end
+
     it "requires signed custom documents" do
       pe = adult_pe
       create(:consent, :signed, participant_event: pe)

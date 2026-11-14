@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_13_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_14_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -950,6 +950,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_150000) do
     t.datetime "um_verified_at"
     t.uuid "um_verified_by_id"
     t.datetime "updated_at", null: false
+    t.datetime "submission_reminder_sent_at"
     t.index ["event_id"], name: "index_participant_events_on_event_id"
     t.index ["nfc_badge_token"], name: "index_participant_events_on_nfc_badge_token", unique: true
     t.index ["participant_id", "event_id"], name: "index_participant_events_on_participant_id_and_event_id", unique: true

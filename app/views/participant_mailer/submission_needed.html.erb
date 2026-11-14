@@ -1,0 +1,11 @@
+<p>Hi <%= @preferred_name %>,</p>
+
+<p>Your documents for <%= @event_name %> are signed<%= " and your parent/guardian has finished their part" if @participant_event.requires_guardian? %>, but you haven't submitted your registration yet, so it isn't confirmed.</p>
+
+<p>To finish, review your information, agree to the Code of Conduct and Safeguarding Policy, and hit submit. It takes a minute.</p>
+
+<p style="margin: 24px 0;">
+  <%= mail_button "Submit Your Registration", @submit_link %>
+</p>
+
+<p>If you have any questions, reach out to <%= mail_to @support_email %>.</p>

@@ -149,6 +149,32 @@ class ParticipantMailer < ApplicationMailer
     )
   end
 
+  # Every signature is in but the participant never hit submit (see
+  # ParticipantEvent#remind_to_submit_if_only_step_left).
+  def submission_needed(participant_event:)
+    participant_event.reload
+    return if participant_event.code_of_conduct_accepted_at.present? ||
+      participant_event.complete? || participant_event.withdrawn? || participant_event.rejected?
+
+    @participant_event = participant_event
+    @participant = participant_event.participant
+    @event = participant_event.event
+    @emailable = @participant
+    @preferred_name = @participant.greeting_name || "there"
+    @event_name = @event.name
+    @submit_link = Rails.application.routes.url_helpers.onboarding_url(
+      event_id: @event.id, host: default_host, protocol: default_protocol
+    )
+    @support_email = @event.effective_support_email
+
+    mail(
+      to: @participant.email,
+      from: "Hack Club #{@event_name} <#{@support_email}>",
+      subject: "One step left: submit your registration for #{@event_name}",
+      reply_to: @support_email
+    )
+  end
+
   def new_document_ready(participant_event:)
     @participant_event = participant_event
     @participant = participant_event.participant

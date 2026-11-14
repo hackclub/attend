@@ -97,6 +97,7 @@ class RegistrationCompletionPresenter
 
   def headline
     return "Documents are being prepared" if state == :preparing
+    return "Waiting on #{first_name}" if state == :information_needed && viewer == :guardian
     return label unless state == :processing && viewer == :guardian
 
     "Signatures received"
@@ -107,7 +108,7 @@ class RegistrationCompletionPresenter
     when :confirmed
       confirmed_body
     when :information_needed
-      "Finish your information and submit it to continue your registration."
+      information_needed_body
     when :action_needed
       action_needed_body
     when :paused
@@ -284,6 +285,21 @@ class RegistrationCompletionPresenter
 
   def first_name
     participant.legal_first_name
+  end
+
+  # The participant hasn't hit submit on the review step, which is where they
+  # agree to the code of conduct. A guardian can finish the whole portal
+  # before that (an early invite, or staff resending it at the door), often on
+  # the participant's own phone, so their page has to say the registration
+  # still needs the participant rather than reading as done.
+  def information_needed_body
+    unless viewer == :guardian
+      return "Review your information, agree to the Code of Conduct and submit it to continue your registration."
+    end
+
+    prefix = viewer_tasks_complete? ? "Your part is done, but " : ""
+    "#{prefix}#{first_name} hasn't submitted their registration yet. They still need to review it and agree to " \
+      "the Code of Conduct, and it isn't confirmed until they do."
   end
 
   def action_needed_body
