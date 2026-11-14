@@ -1,0 +1,9 @@
+Hi <%= @preferred_name %>,
+
+Your documents for <%= @event_name %> are signed<%= " and your parent/guardian has finished their part" if @participant_event.requires_guardian? %>, but you haven't submitted your registration yet, so it isn't confirmed.
+
+To finish, review your information, agree to the Code of Conduct and Safeguarding Policy, and hit submit. It takes a minute.
+
+Submit your registration here: <%= @submit_link %>
+
+If you have any questions, reach out to <%= @support_email %>.
