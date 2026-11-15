@@ -81,16 +81,18 @@
       <% if policy(@participant_event).withdraw? || policy(@participant_event).destroy? %>
         <div class="border-t border-gray-100 my-1"></div>
       <% end %>
-      <% if policy(@participant_event).withdraw? && !@participant_event.withdrawn? %>
+      <% inactive = @participant_event.withdrawn? || @participant_event.rejected? %>
+      <% can_reinstate = @participant_event.rejected? ? policy(@participant_event).unreject? : (policy(@participant_event).withdraw? && @participant_event.withdrawn?) %>
+      <% if policy(@participant_event).withdraw? && !inactive %>
         <%= button_to "Withdraw", withdraw_admin_event_participant_path(current_event, @participant_event),
             method: :post,
             data: { turbo_confirm: "Are you sure you want to mark #{@participant.display_name} as withdrawn?" },
             class: "w-full text-left px-4 py-2 text-sm text-amber-700 hover:bg-gray-50 cursor-pointer" %>
       <% end %>
-      <% if policy(@participant_event).withdraw? && @participant_event.withdrawn? %>
+      <% if can_reinstate %>
         <%= button_to "Reinstate", unwithdraw_admin_event_participant_path(current_event, @participant_event),
             method: :post,
-            data: { turbo_confirm: "Are you sure you want to reinstate #{@participant.display_name}?" },
+            data: { turbo_confirm: @participant_event.rejected? ? "#{@participant.display_name} was rejected for this event. Are you sure you want to reinstate them?" : "Are you sure you want to reinstate #{@participant.display_name}?" },
             class: "w-full text-left px-4 py-2 text-sm text-emerald-700 hover:bg-gray-50 cursor-pointer" %>
       <% end %>
       <% if policy(@participant_event).destroy? %>

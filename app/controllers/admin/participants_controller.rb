@@ -611,6 +611,12 @@ module Admin
 
     def withdraw
       authorize @participant_event, :withdraw?
+      # Rejected stays rejected: withdrawing it would turn it into something
+      # the looser withdraw? bar can reinstate, side-stepping unreject?.
+      if @participant_event.rejected? || @participant_event.withdrawn?
+        return redirect_to admin_event_participant_path(current_event, @participant_event),
+          alert: "#{@participant_event.participant.display_name} is already #{@participant_event.status}, so there's nothing to withdraw."
+      end
       @participant_event.withdrawn!
       redirect_to admin_event_participant_path(current_event, @participant_event),
         notice: "#{@participant_event.participant.display_name} has been marked as withdrawn."
@@ -619,8 +625,15 @@ module Admin
         alert: "Couldn't withdraw #{@participant_event.participant.display_name} — nothing was changed: #{e.message}"
     end
 
+    # Reinstates both withdrawn and rejected registrations. Rejection has no
+    # button of its own (it's set via the API or MCP), but undoing it needs
+    # one, at the stricter unreject? bar.
     def unwithdraw
-      authorize @participant_event, :withdraw?
+      authorize @participant_event, @participant_event.rejected? ? :unreject? : :withdraw?
+      unless @participant_event.withdrawn? || @participant_event.rejected?
+        return redirect_to admin_event_participant_path(current_event, @participant_event),
+          alert: "#{@participant_event.participant.display_name} isn't withdrawn or rejected, so there's nothing to reinstate."
+      end
       # Reset to a non-terminal status; #display_status recomputes the real state
       # (Awaiting Participant / Awaiting Parent / Complete) from onboarding progress.
       @participant_event.in_progress!

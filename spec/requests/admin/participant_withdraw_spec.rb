@@ -83,6 +83,84 @@ RSpec.describe "Admin::Participants withdraw authorization", type: :request do
     end
   end
 
+  # Rejection has no button of its own (it arrives via the API or MCP), so
+  # Reinstate is the only way back from it in the UI. Undoing a rejection
+  # overrides someone's decision, so it's held to event admins via unreject?.
+  describe "rejected registrations" do
+    before { participant_event.rejected! }
+
+    let(:reinstate_path) { unwithdraw_admin_event_participant_path(event.slug, participant_event) }
+    let(:withdraw_path) { withdraw_admin_event_participant_path(event.slug, participant_event) }
+
+    [ true, false ].each do |console|
+      context "in the #{console ? 'console' : 'classic'} admin UI" do
+        it "offers event admins Reinstate and no Withdraw" do
+          sign_in_with_role("event_admin").update!(admin_console_beta: console)
+
+          get admin_event_participant_path(event.slug, participant_event)
+
+          expect(response).to have_http_status(:ok)
+          expect(response.body).to include(reinstate_path)
+          expect(response.body).not_to include(withdraw_path)
+          expect(response.body).to include("was rejected for this event")
+        end
+
+        it "offers ops neither button" do
+          sign_in_with_role("ops").update!(admin_console_beta: console)
+
+          get admin_event_participant_path(event.slug, participant_event)
+
+          expect(response).to have_http_status(:ok)
+          expect(response.body).not_to include(reinstate_path)
+          expect(response.body).not_to include(withdraw_path)
+        end
+      end
+    end
+
+    it "lets an event admin reinstate them" do
+      sign_in_with_role("event_admin")
+
+      post reinstate_path
+
+      expect(participant_event.reload.status).to eq("in_progress")
+      expect(flash[:notice]).to include("has been reinstated")
+    end
+
+    %w[ops limited].each do |role|
+      it "does not let #{role} reinstate them by posting directly" do
+        sign_in_with_role(role)
+
+        post reinstate_path
+
+        expect(participant_event.reload.status).to eq("rejected")
+        expect(flash[:alert]).to include("not authorized")
+      end
+
+      # Withdraw-then-reinstate would launder a rejection through the looser
+      # withdraw? bar, so withdraw must refuse a rejected registration.
+      it "does not let #{role} launder the rejection through withdraw" do
+        sign_in_with_role(role)
+
+        post withdraw_path
+        expect(participant_event.reload.status).to eq("rejected")
+        expect(flash[:alert]).to include("nothing to withdraw")
+
+        post reinstate_path
+        expect(participant_event.reload.status).to eq("rejected")
+      end
+    end
+  end
+
+  it "leaves an active registration alone when asked to reinstate it" do
+    sign_in_with_role("event_admin")
+    participant_event.complete!
+
+    post unwithdraw_admin_event_participant_path(event.slug, participant_event)
+
+    expect(participant_event.reload.status).to eq("complete")
+    expect(flash[:alert]).to include("nothing to reinstate")
+  end
+
   # A failed save used to fall through to the exception page, which at the
   # door read as "did that work or not?". It now comes back as an alert.
   describe "when the status change can't be saved" do
