@@ -34,9 +34,9 @@
     </div>
     <div class="cs-actions">
       <% if @message.scheduled? || @message.pending_review? %>
-        <%= button_to "Cancel", cancel_admin_event_message_path(current_event, @message),
+        <%= button_to @message.pending_review? ? "Withdraw" : "Cancel", cancel_admin_event_message_path(current_event, @message),
             method: :post,
-            form: { data: { turbo_confirm: "Are you sure you want to cancel this message?" } },
+            form: { data: { turbo_confirm: @message.pending_review? ? "Withdraw this message from review? It goes back to a draft so you can amend it." : "Are you sure you want to cancel this message?" } },
             class: "cs-btn" %>
       <% end %>
 

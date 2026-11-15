@@ -77,7 +77,7 @@ module Admin
           notice: "Slack blast queued! Sending to #{helpers.pluralize(participant_events.count, "participant")}."
       else
         redirect_to admin_event_slack_blast_path(current_event, slack_blast),
-          alert: "This blast looks like it might be marketing, spam, or not about the event, so it's waiting for a Hack Club admin to review it before it goes out."
+          alert: slack_blast.held_notice
       end
     end
 

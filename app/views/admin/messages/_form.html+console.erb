@@ -147,6 +147,7 @@
               **aria %>
         <% end %>
 
+        <%= render "admin/broadcast_reviews/logistics_only" %>
         <%= cs_form_field f, :body, label: "Message",
               data: { controller: "tinymce", tinymce_image_upload_url_value: upload_image_admin_event_messages_path(current_event), tinymce_placeholders_value: Message::PLACEHOLDERS.to_json },
               description: "Type {{ to add a recipient's name or the event name. Images have to be uploaded here; ones linked from other sites are left out." do |aria| %>

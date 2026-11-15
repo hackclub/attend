@@ -7,8 +7,6 @@ module Api
       include Pundit::Authorization
       include Api::V1::ApiAuditing
 
-      HELD_FOR_REVIEW = Admin::MessagesController::HELD_FOR_REVIEW
-
       before_action :reject_api_key_auth
       before_action :set_paper_trail_whodunnit
       before_action :set_event
@@ -123,7 +121,7 @@ module Api
           return render_error(@message.errors.full_messages.to_sentence) if @message.errors.any?
 
           audit_api_change!(:send_now, @message)
-          notice = held ? HELD_FOR_REVIEW : "Message scheduled for #{@message.local_scheduled_at.strftime("%B %d, %Y at %l:%M %p %Z")}."
+          notice = held ? @message.held_notice : "Message scheduled for #{@message.local_scheduled_at.strftime("%B %d, %Y at %l:%M %p %Z")}."
           render json: { message: message_json(@message), notice: notice, held_for_review: held }
         elsif @message.send!(sender: current_user)
           audit_api_change!(:send_now, @message)
@@ -132,7 +130,7 @@ module Api
           render_error(@message.errors.full_messages.to_sentence)
         elsif @message.pending_review?
           audit_api_change!(:send_now, @message)
-          render json: { message: message_json(@message), notice: HELD_FOR_REVIEW, held_for_review: true }
+          render json: { message: message_json(@message), notice: @message.held_notice, held_for_review: true }
         else
           # A double tap or a concurrent send beat us; nothing changed.
           render_error("This message has already been sent.")
@@ -140,10 +138,12 @@ module Api
       end
 
       def cancel
+        was_held = @message.pending_review?
         return render_error("Only scheduled messages, or ones waiting for review, can be cancelled.") unless @message.cancel!
 
         audit_api_change!(:cancel, @message)
-        render json: { message: message_json(@message), notice: "Scheduled message has been cancelled." }
+        notice = was_held ? Admin::MessagesController::WITHDRAWN : "Scheduled message has been cancelled."
+        render json: { message: message_json(@message), notice: notice }
       end
 
       def retry_failed

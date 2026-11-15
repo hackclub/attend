@@ -189,8 +189,14 @@ class SeriesBroadcast < ApplicationRecord
     with_lock do
       next false unless scheduled? || pending_review?
 
-      pending_broadcast_review&.withdraw!
-      update!(status: :cancelled)
+      if pending_review?
+        # Withdrawn from review so its author can amend it: back to a draft,
+        # and sending it again screens it again.
+        pending_broadcast_review&.withdraw!
+        update!(status: :draft)
+      else
+        update!(status: :cancelled)
+      end
       true
     end
   end

@@ -66,8 +66,7 @@ class MessagesToolbox < ApplicationToolbox
     unless @message.send!(sender: current_user)
       halt error: @message.errors.full_messages.to_sentence if @message.errors.any?
       if @message.pending_review?
-        halt error: "Held for review: this message looks like it might be marketing, spam, or not about the event. " \
-          "A Hack Club admin has to approve it before it goes out."
+        halt error: "Held for review. #{@message.held_notice}"
       end
       halt error: "Message is already #{@message.status}."
     end

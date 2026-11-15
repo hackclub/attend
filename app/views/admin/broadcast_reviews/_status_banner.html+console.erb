@@ -5,8 +5,8 @@
     <%= cs_status_icon(:warning) %>
     <p>
       <strong>Waiting for review.</strong>
-      This looks like it might be <%= review.category_labels.to_sentence.downcase %>: <%= review.reason %>
-      A Hack Club admin has to approve it before it goes out.
+      <%= review.sender_notice %>
+      <% if review.reason.present? %><span class="block mt-1">Why: <%= review.reason %></span><% end %>
       <% if current_user.global_admin? %><%= link_to "Review it", admin_broadcast_review_path(review), class: "cs-link" %><% end %>
     </p>
   </div>

@@ -69,6 +69,23 @@ RSpec.describe BroadcastScreener do
       end
     end
 
+    it "doesn't treat Google Photos album links as shorteners" do
+      expect(screen("Upload your pictures here: https://photos.app.goo.gl/AbC123xyz")).not_to be_flagged
+    end
+
+    it "lets the event's own invite-a-friend referral links through" do
+      text = "You should have received a referral link when you signed up: send it to friends for a chance to win a keyboard!"
+
+      expect(screen(text)).not_to be_flagged
+    end
+
+    it "still flags an affiliate link" do
+      result = screen("Grab the course with my affiliate link: example.com/course")
+
+      expect(result).to be_flagged
+      expect(result.categories).to eq([ "marketing" ])
+    end
+
     it "still flags a plain goo.gl short link" do
       expect(screen("Grab yours at https://goo.gl/AbC123")).to be_flagged
     end
@@ -81,6 +98,14 @@ RSpec.describe BroadcastScreener do
   end
 
   describe "Claude" do
+    it "accepts a personal_contact hold" do
+      client = fake_client_class.new(verdict: { hold: true, category: "personal_contact", reason: "Asks for photos at a personal Gmail address." })
+      result = screen("Send your photos to my gmail!", client: client)
+
+      expect(result).to be_flagged
+      expect(result.categories).to eq([ "personal_contact" ])
+    end
+
     it "flags what the model holds, with its category and reason" do
       client = fake_client_class.new(verdict: { hold: true, category: "off_topic", reason: "Announces an unrelated summer camp." })
       result = screen("Sign up for our summer coding camp in July!", client: client)

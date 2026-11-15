@@ -86,6 +86,13 @@ module ScreenedBroadcast
     broadcast_reviews.pending.order(:created_at).last
   end
 
+  # What to tell the sender when it's held (see BroadcastReview#sender_notice).
+  def held_notice
+    (pending_broadcast_review || latest_broadcast_review)&.sender_notice ||
+      "Attend flagged this message for review. A Hack Club HQ staffer will review your message, " \
+      "and either approve, or reject it. You can withdraw it if you'd like to make an amendment."
+  end
+
   def latest_broadcast_review
     broadcast_reviews.order(:created_at).last
   end

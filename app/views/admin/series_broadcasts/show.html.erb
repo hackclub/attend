@@ -19,9 +19,9 @@
       </div>
       <div class="flex flex-wrap gap-2">
         <% if @broadcast.scheduled? || @broadcast.pending_review? %>
-          <%= button_to "Cancel", cancel_admin_series_broadcast_path(@series, @broadcast),
+          <%= button_to @broadcast.pending_review? ? "Withdraw" : "Cancel", cancel_admin_series_broadcast_path(@series, @broadcast),
               method: :post,
-              form: { data: { turbo_confirm: "Are you sure you want to cancel this broadcast?" } },
+              form: { data: { turbo_confirm: @broadcast.pending_review? ? "Withdraw this broadcast from review? It goes back to a draft so you can amend it." : "Are you sure you want to cancel this broadcast?" } },
               class: "px-4 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50" %>
         <% end %>
         <% if @broadcast.draft? || @broadcast.scheduled? %>

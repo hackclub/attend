@@ -1,7 +1,6 @@
 module Admin
   class MessagesController < BaseController
-    HELD_FOR_REVIEW = "This message looks like it might be marketing, spam, or not about the event, " \
-      "so it's waiting for a Hack Club admin to review it before it goes out.".freeze
+    WITHDRAWN = "Withdrawn from review and back to a draft, so you can amend it and send it again.".freeze
 
     before_action :require_event_selected
     before_action :set_message, only: [ :show, :edit, :update, :destroy, :preview, :send_now, :cancel, :retry_failed, :retry_delivery, :send_to_new_recipients ]
@@ -150,7 +149,7 @@ module Admin
         elsif @message.errors.any?
           redirect_to edit_admin_event_message_path(current_event, @message), alert: @message.errors.full_messages.to_sentence
         else
-          redirect_to admin_event_message_path(current_event, @message), alert: HELD_FOR_REVIEW
+          redirect_to admin_event_message_path(current_event, @message), alert: @message.held_notice
         end
       elsif @message.send!(sender: current_user)
         redirect_to admin_event_message_path(current_event, @message),
@@ -158,7 +157,7 @@ module Admin
       elsif @message.errors.any?
         redirect_to edit_admin_event_message_path(current_event, @message), alert: @message.errors.full_messages.to_sentence
       elsif @message.pending_review?
-        redirect_to admin_event_message_path(current_event, @message), alert: HELD_FOR_REVIEW
+        redirect_to admin_event_message_path(current_event, @message), alert: @message.held_notice
       else
         # The lock inside send! found it already sent: a double-click or a
         # concurrent send beat us. Nothing changed, so nothing is audit-logged.
@@ -178,7 +177,7 @@ module Admin
       end
 
       redirect_to admin_event_message_path(current_event, @message),
-        notice: was_held ? "Message withdrawn from review and cancelled." : "Scheduled message has been cancelled."
+        notice: was_held ? WITHDRAWN : "Scheduled message has been cancelled."
     end
 
     def retry_failed

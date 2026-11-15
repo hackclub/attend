@@ -27,7 +27,8 @@ class BroadcastReview < ApplicationRecord
   CATEGORY_LABELS = {
     "marketing" => "Marketing",
     "spam" => "Spam",
-    "off_topic" => "Not about the event"
+    "off_topic" => "Not about the event",
+    "personal_contact" => "Personal contact details"
   }.freeze
 
   validates :flagged_by, inclusion: { in: FLAGGED_BY }
@@ -37,6 +38,24 @@ class BroadcastReview < ApplicationRecord
   scope :recent, -> { order(created_at: :desc) }
 
   after_create_commit :notify_reviewers
+
+  # How the sender's notice describes each category ("flagged this message
+  # as promotional").
+  FLAGGED_AS = {
+    "marketing" => "promotional",
+    "spam" => "spam",
+    "off_topic" => "off-topic",
+    "personal_contact" => "sharing personal contact details"
+  }.freeze
+
+  # What the sender sees while it's held.
+  def sender_notice
+    flagged_as = categories.map { |c| FLAGGED_AS.fetch(c, c.humanize.downcase) }.to_sentence.presence || "needing a check"
+    notice = "Attend flagged this message as #{flagged_as}. A Hack Club HQ staffer will review your message, " \
+      "and either approve, or reject it."
+    # Slack blasts can't be withdrawn, only messages and series broadcasts.
+    reviewable.respond_to?(:cancel!) ? "#{notice} You can withdraw it if you'd like to make an amendment." : notice
+  end
 
   def category_labels
     categories.map { |c| CATEGORY_LABELS.fetch(c, c.humanize) }

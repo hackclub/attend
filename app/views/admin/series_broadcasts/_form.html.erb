@@ -101,6 +101,7 @@
         <p class="mt-1 text-sm text-gray-500">Used as the email subject line. Slack and SMS will use the event name.</p>
       </div>
 
+      <%= render "admin/broadcast_reviews/logistics_only" %>
       <div data-controller="tinymce" data-tinymce-placeholders-value="<%= Message::PLACEHOLDERS.to_json %>">
         <%= f.label :body, "Message", class: "block text-sm font-medium text-gray-700 mb-1" %>
         <%= f.text_area :body,
