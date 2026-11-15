@@ -145,4 +145,41 @@ RSpec.describe Support::ProcessIncomingTwilioMessage do
       expect(service.send(:valid_twilio_media_url?, "https://api.twilio.com/%zz")).to be(false)
     end
   end
+
+  describe "opt-out keywords" do
+    let(:twilio) { instance_double(TwilioService, send_whatsapp_text: { sid: "SMok" }) }
+
+    before { allow(TwilioService).to receive(:new).and_return(twilio) }
+
+    def inbound(body, channel: "sms", **extra)
+      prefix = channel == "whatsapp" ? "whatsapp:" : ""
+      described_class.call({ "From" => "#{prefix}+447911123456", "To" => "#{prefix}+15075550100",
+                             "Body" => body, "MessageSid" => "SM#{SecureRandom.hex(4)}", "NumMedia" => "0" }.merge(extra))
+    end
+
+    it "opts the number out on STOP without opening a ticket" do
+      expect { inbound("STOP") }.not_to change(Ticket, :count)
+
+      expect(SmsOptOut.opted_out?("+447911123456")).to be(true)
+      expect(twilio).not_to have_received(:send_whatsapp_text)
+    end
+
+    it "confirms on WhatsApp, which has no STOP handling of its own" do
+      inbound("stop", channel: "whatsapp")
+
+      expect(SmsOptOut.opted_out?("+447911123456")).to be(true)
+      expect(twilio).to have_received(:send_whatsapp_text).with(hash_including(body: a_string_including("Reply START")))
+    end
+
+    it "opts back in on START" do
+      SmsOptOut.opt_out!("+447911123456", source: :keyword)
+
+      expect { inbound("Start") }.not_to change(Ticket, :count)
+      expect(SmsOptOut.opted_out?("+447911123456")).to be(false)
+    end
+
+    it "treats YES from someone who never opted out as an ordinary reply" do
+      expect { inbound("Yes") }.to change(Ticket, :count).by(1)
+    end
+  end
 end

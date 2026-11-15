@@ -1,8 +1,18 @@
 class TwilioService
-  class Error < StandardError; end
+  class Error < StandardError
+    # Twilio's numeric error code, when the API returned one.
+    attr_reader :code
+
+    def initialize(message = nil, code: nil)
+      super(message)
+      @code = code&.to_s
+    end
+  end
 
   # Twilio rejects message bodies longer than this.
   MAX_BODY_LENGTH = 1600
+
+  OPTED_OUT = { skipped: true, reason: "They opted out of texts" }.freeze
 
   def initialize(account_sid: nil, auth_token: nil, from_number: nil)
     @account_sid = account_sid || ENV["TWILIO_ACCOUNT_SID"] || Rails.application.credentials.dig(:twilio, :account_sid)
@@ -34,11 +44,35 @@ class TwilioService
   # log_body: alternative body to record in support chat history (e.g. with
   # sensitive codes redacted). source: short label for where the automated
   # message came from, shown to support agents.
+  #
+  # The sender depends on the destination country (see SmsRoute), and some
+  # numbers aren't texted at all: countries we can't reach, and numbers whose
+  # last text failed for good (see SmsSuppression), and people who opted out
+  # (see SmsOptOut). These come back as `skipped` rather than raising, since
+  # there's nothing to retry.
+  #
+  # Every text ends with how to opt out: "Reply STOP" from the long code, or a
+  # link from the "Hack Club" sender, which can't take replies.
   def send_sms(to:, body:, log_body: nil, source: nil)
     return { skipped: true, reason: "Twilio disabled" } unless Setting.twilio_enabled?
     raise Error, "Twilio not configured" unless configured?
+    return OPTED_OUT if SmsOptOut.opted_out?(to)
 
-    parsed = create_message(To: to, From: @from_number, Body: body)
+    from = SmsRoute.sender_for(to, long_code: @from_number)
+    return { skipped: true, reason: "We don't send texts to this country" } unless from
+    return { skipped: true, reason: "Texts to this number recently failed for good" } if SmsSuppression.active?(to)
+
+    footer = opt_out_footer(to, from)
+    body = "#{body}\n\n#{footer}"
+    log_body &&= "#{log_body}\n\n#{footer}"
+
+    begin
+      parsed = create_message(To: to, From: from, Body: body, StatusCallback: status_callback_url)
+    rescue Error => e
+      SmsSuppression.record(phone: to, error_code: e.code)
+      raise
+    end
+
     record_automated_message(to:, body: log_body || body, sid: parsed["sid"], source:, channel: "sms")
     { sid: parsed["sid"], status: parsed["status"], channel: "sms" }
   end
@@ -46,6 +80,7 @@ class TwilioService
   def send_whatsapp_template(to:, content_sid:, variables: {}, sms_body: nil, log_body: nil, source: nil, message_delivery: nil)
     return { skipped: true, reason: "Twilio disabled" } unless Setting.twilio_enabled?
     raise Error, "Twilio not configured" unless configured?
+    return OPTED_OUT if SmsOptOut.opted_out?(to)
 
     params = {
       To: "whatsapp:#{to}",
@@ -90,7 +125,7 @@ class TwilioService
     unless response.success?
       parsed = JSON.parse(response.body) rescue {}
       error_message = parsed.dig("message") || "Message send failed with status #{response.status}"
-      raise Error, error_message
+      raise Error.new(error_message, code: parsed["code"])
     end
 
     JSON.parse(response.body)
@@ -108,10 +143,18 @@ class TwilioService
   end
 
   def status_callback_url
-    Rails.application.routes.url_helpers.twilio_status_url(
-      host: Rails.application.credentials.dig(:app, :host) || ENV.fetch("APP_HOST", "attend.hackclub.com"),
-      protocol: "https"
-    )
+    Rails.application.routes.url_helpers.twilio_status_url(host: public_host, protocol: "https")
+  end
+
+  def opt_out_footer(to, from)
+    return "Reply STOP to opt out" if from == @from_number
+
+    url = Rails.application.routes.url_helpers.sms_opt_out_url(SmsOptOut.token_for(to), host: public_host, protocol: "https")
+    "Stop texts: #{url}"
+  end
+
+  def public_host
+    Rails.application.credentials.dig(:app, :host) || ENV.fetch("APP_HOST", "attend.hackclub.com")
   end
 
   def connection

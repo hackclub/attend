@@ -76,5 +76,13 @@ RSpec.describe WhatsappSmsFallback do
 
       expect(delivery.reload).to have_attributes(status: "failed", error_message: a_string_including("63003", "unreachable"))
     end
+
+    it "marks the delivery failed when there's no SMS route to the number" do
+      allow(twilio).to receive(:send_sms).and_return({ skipped: true, reason: "We don't send texts to this country" })
+
+      described_class.call(message_sid: "SMwa1", status: "failed", error_code: "63024")
+
+      expect(delivery.reload).to have_attributes(status: "failed", error_message: a_string_including("63024", "don't send texts"))
+    end
   end
 end

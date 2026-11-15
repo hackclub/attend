@@ -27,6 +27,9 @@ module Support
       # shouldn't open a support ticket.
       return if channel == "whatsapp" && phone.present? && Support::ShowFullBroadcast.call(phone:, payload: @payload)
       return unless phone.present? && (body.present? || num_media > 0)
+      # STOP and START only change whether we text them; they aren't support
+      # questions, so they don't open a ticket.
+      return if handle_opt_out_keyword(phone:, channel:, body:)
 
       ticket = find_or_create_ticket(phone:, channel:, twilio_to: to_raw)
       new_chat = ticket.previously_new_record?
@@ -61,6 +64,31 @@ module Support
     end
 
     private
+
+    # Twilio answers STOP and START on SMS itself (and blocks the number at
+    # its end); WhatsApp has no such handling, so we confirm there.
+    def handle_opt_out_keyword(phone:, channel:, body:)
+      action = SmsOptOut.keyword_action(body, opt_out_type: @payload["OptOutType"])
+      return false unless action
+      # "Yes" is a start word, but from someone who never opted out it's just
+      # an answer, and support should see it.
+      return false if action == :start && !SmsOptOut.opted_out?(phone)
+
+      if action == :stop
+        SmsOptOut.opt_out!(phone, source: :keyword)
+        confirm_on_whatsapp(phone, "You won't get any more automated messages from Hack Club events here. Reply START to turn them back on.") if channel == "whatsapp"
+      else
+        SmsOptOut.opt_in!(phone)
+        confirm_on_whatsapp(phone, "You'll get automated messages from Hack Club events here again. Reply STOP to turn them off.") if channel == "whatsapp"
+      end
+      true
+    end
+
+    def confirm_on_whatsapp(phone, text)
+      TwilioService.new.send_whatsapp_text(to: phone, body: text, source: "Opt-out")
+    rescue TwilioService::Error => e
+      Rails.logger.error("[Support::ProcessIncomingTwilioMessage] opt-out confirmation failed: #{e.message}")
+    end
 
     def infer_channel(from_raw)
       from_raw.to_s.start_with?("whatsapp:") ? "whatsapp" : "sms"
