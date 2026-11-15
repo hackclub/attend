@@ -125,6 +125,7 @@
               **aria %>
         <% end %>
 
+        <%= render "admin/broadcast_reviews/logistics_only" %>
         <%= cs_form_field f, :body, label: "Message",
               data: { controller: "tinymce", tinymce_placeholders_value: Message::PLACEHOLDERS.to_json },
               description: "Type {{ to add a recipient's name or the event's name. Images can't go in a series broadcast: link to them instead." do |aria| %>

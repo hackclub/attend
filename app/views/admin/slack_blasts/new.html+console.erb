@@ -28,6 +28,7 @@
           <h2 class="cs-h2">Message</h2>
         </div>
         <div class="cs-container-body">
+          <%= render "admin/broadcast_reviews/logistics_only" %>
           <%= cs_field id: "message", label: "Message", errors: @message_errors,
                 data: { controller: "tinymce", tinymce_slack_mode_value: "true" },
                 description: "Use the toolbar for bold, italic, strikethrough, links, lists and code. Slack supports all of them." do |aria| %>

@@ -32,6 +32,17 @@ RSpec.describe ScreenedBroadcast do
       expect(enqueued_jobs.map { _1["job_class"] }).not_to include("MessageDeliveryJob")
     end
 
+    it "tells the sender what it was flagged as and what happens next" do
+      allow(BroadcastScreener).to receive(:call).and_return(flagged)
+      message = build_message
+      message.send!(sender: organizer)
+
+      expect(message.held_notice).to eq(
+        "Attend flagged this message as promotional. A Hack Club HQ staffer will review your message, " \
+        "and either approve, or reject it. You can withdraw it if you'd like to make an amendment."
+      )
+    end
+
     it "sends a clear message and remembers it was cleared" do
       allow(BroadcastScreener).to receive(:call).and_return(clear)
       message = build_message
@@ -134,11 +145,11 @@ RSpec.describe ScreenedBroadcast do
       expect(message.reload).to be_draft
     end
 
-    it "is withdrawn when the author cancels the message" do
+    it "is withdrawn when the author cancels the message, which goes back to a draft to amend" do
       held = review
       expect(message.cancel!).to be(true)
 
-      expect(message.reload).to be_cancelled
+      expect(message.reload).to be_draft
       expect(held.reload).to be_withdrawn
       expect { held.approve!(admin) }.to raise_error(BroadcastReview::DecisionError)
     end

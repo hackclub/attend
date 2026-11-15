@@ -20,6 +20,7 @@
       </div>
 
       <%= form_with url: admin_event_slack_blasts_path(current_event), method: :post, class: "space-y-4" do |f| %>
+        <%= render "admin/broadcast_reviews/logistics_only" %>
         <div data-controller="tinymce" data-tinymce-slack-mode-value="true">
           <%= label_tag :message, "Message", class: "block text-sm font-medium text-gray-700 mb-1" %>
           <%= text_area_tag :message, nil, 

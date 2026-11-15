@@ -32,11 +32,30 @@ RSpec.describe "Admin::BroadcastReviews", type: :request do
         post send_now_admin_event_message_path(event_slug: event.slug, id: message)
 
         expect(message.reload).to be_pending_review
-        expect(flash[:alert]).to include("waiting for a Hack Club admin")
+        expect(flash[:alert]).to include("A Hack Club HQ staffer will review your message")
 
         get admin_event_message_path(event_slug: event.slug, id: message)
         expect(response).to have_http_status(:ok)
-        expect(response.body).to include("Waiting for review", "Advertises a sponsor&#39;s sale.")
+        expect(response.body).to include("Waiting for review", "Advertises a sponsor&#39;s sale.", "Withdraw")
+      end
+
+      it "lets the organizer withdraw a held message back to a draft to amend it" do
+        sign_in organizer
+        post send_now_admin_event_message_path(event_slug: event.slug, id: message)
+        review = message.reload.pending_broadcast_review
+
+        post cancel_admin_event_message_path(event_slug: event.slug, id: message)
+
+        expect(message.reload).to be_draft
+        expect(review.reload).to be_withdrawn
+        expect(flash[:notice]).to include("back to a draft")
+      end
+
+      it "tells organizers on the compose form that broadcasts can't carry promotional material" do
+        sign_in organizer
+        get new_admin_event_message_path(event_slug: event.slug)
+
+        expect(response.body).to include("no promotional material")
       end
 
       it "lists held messages and lets a global admin approve one" do
@@ -95,7 +114,7 @@ RSpec.describe "Admin::BroadcastReviews", type: :request do
 
     blast = SlackBlast.last
     expect(blast).to be_pending_review
-    expect(flash[:alert]).to include("waiting for a Hack Club admin")
+    expect(flash[:alert]).to include("A Hack Club HQ staffer will review your message")
   end
 
   context "when the event is in a series" do

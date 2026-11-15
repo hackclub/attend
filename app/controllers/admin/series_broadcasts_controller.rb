@@ -4,8 +4,6 @@ module Admin
   # messages; sending creates a copy on each event's messages page, which is
   # where per-event delivery detail, retries and late sends live.
   class SeriesBroadcastsController < BaseController
-    HELD_FOR_REVIEW = "This broadcast looks like it might be marketing, spam, or not about the events, " \
-      "so it's waiting for a Hack Club admin to review it before it goes out.".freeze
     EDITABLE_ONLY = "This broadcast has already been sent, so it can't be changed.".freeze
 
     global_page
@@ -115,7 +113,7 @@ module Admin
         elsif @broadcast.errors.any?
           redirect_to edit_admin_series_broadcast_path(@series, @broadcast), alert: @broadcast.errors.full_messages.to_sentence
         else
-          redirect_to admin_series_broadcast_path(@series, @broadcast), alert: HELD_FOR_REVIEW
+          redirect_to admin_series_broadcast_path(@series, @broadcast), alert: @broadcast.held_notice
         end
       elsif @broadcast.send!(sender: current_user)
         redirect_to admin_series_broadcast_path(@series, @broadcast),
@@ -123,7 +121,7 @@ module Admin
       elsif @broadcast.errors.any?
         redirect_to edit_admin_series_broadcast_path(@series, @broadcast), alert: @broadcast.errors.full_messages.to_sentence
       elsif @broadcast.pending_review?
-        redirect_to admin_series_broadcast_path(@series, @broadcast), alert: HELD_FOR_REVIEW
+        redirect_to admin_series_broadcast_path(@series, @broadcast), alert: @broadcast.held_notice
       else
         # A double-click or a concurrent send beat us to it.
         redirect_to admin_series_broadcast_path(@series, @broadcast), alert: "This broadcast has already been sent."
@@ -139,7 +137,7 @@ module Admin
       end
 
       redirect_to admin_series_broadcast_path(@series, @broadcast),
-        notice: was_held ? "Broadcast withdrawn from review and cancelled." : "Scheduled broadcast has been cancelled."
+        notice: was_held ? Admin::MessagesController::WITHDRAWN : "Scheduled broadcast has been cancelled."
     end
 
     private
