@@ -113,7 +113,8 @@ RSpec.describe "Onboarding welcome and done screens", type: :request do
     end
 
     it "sends rejected registrations to the dashboard" do
-      participant_event.update!(status: :rejected, code_of_conduct_accepted_at: Time.current)
+      participant_event.update!(code_of_conduct_accepted_at: Time.current)
+      participant_event.update_status!(:rejected, rejection_authorized: true)
       participant_event.emergency_contacts.create!(name: "Erin", phone: "+14155550100")
 
       get onboarding_done_path(event_id: event.id)

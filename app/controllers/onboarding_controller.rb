@@ -377,9 +377,12 @@ class OnboardingController < ApplicationController
         return
       end
 
-      # Staff may already have marked the registration complete by hand;
-      # submitting late shouldn't undo that.
-      @participant_event.update!(status: :awaiting_guardian) unless @participant_event.complete?
+      # Staff may already have marked the registration complete by hand, or
+      # withdrawn or rejected it while the participant still had the wizard
+      # open; submitting late shouldn't undo any of that.
+      unless @participant_event.complete? || @participant_event.inactive?
+        @participant_event.update!(status: :awaiting_guardian)
+      end
 
       # The guardian can finish everything — waiver and portal — before the
       # participant hits submit. Every other completion hook already ran and

@@ -636,6 +636,8 @@ module Admin
       end
       # Reset to a non-terminal status; #display_status recomputes the real state
       # (Awaiting Participant / Awaiting Parent / Complete) from onboarding progress.
+      # unreject? was checked above for a rejected registration.
+      @participant_event.rejection_change_authorized = true
       @participant_event.in_progress!
       redirect_to admin_event_participant_path(current_event, @participant_event),
         notice: "#{@participant_event.participant.display_name} has been reinstated."

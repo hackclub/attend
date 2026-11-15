@@ -119,6 +119,25 @@ class ParticipantEvent < ApplicationRecord
   INACTIVE_STATUSES = %w[withdrawn rejected].freeze
   scope :active, -> { where.not(status: INACTIVE_STATUSES) }
 
+  def inactive?
+    INACTIVE_STATUSES.include?(status)
+  end
+
+  # Rejecting someone, or undoing it, is an event-admin decision (see
+  # ParticipantEventPolicy#unreject?). The general update? bar lets ops,
+  # limited and even the participant themselves through, so every path that
+  # writes status must check the stricter policy and then opt in here.
+  # Anything that forgets fails validation instead of silently flipping it.
+  attr_accessor :rejection_change_authorized
+  validate :rejection_change_must_be_authorized, on: :update
+
+  def update_status!(new_status, rejection_authorized: false)
+    self.rejection_change_authorized = rejection_authorized
+    update!(status: new_status)
+  ensure
+    self.rejection_change_authorized = nil
+  end
+
   # SQL mirror of !onboarding_complete? so list filters don't have to load
   # every row into Ruby. Keep in sync with #onboarding_complete?.
   scope :missing_onboarding_data, ->(accommodation_required:, travel_required: true) {
@@ -687,6 +706,14 @@ class ParticipantEvent < ApplicationRecord
     return unless too_old_for_event?
 
     errors.add(:base, "You will be 19 or older during this event. Please contact event staff for assistance.")
+  end
+
+  def rejection_change_must_be_authorized
+    return unless will_save_change_to_status?
+    return unless status_in_database == "rejected" || rejected?
+    return if rejection_change_authorized
+
+    errors.add(:status, "can only be changed to or from rejected by an event admin")
   end
 
   def participant_not_banned

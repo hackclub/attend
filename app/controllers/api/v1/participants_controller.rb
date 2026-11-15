@@ -218,6 +218,14 @@ module Api
           return render_error("Nothing to update. Send a `participant` object and/or a `status`.")
         end
 
+        # update? admits ops, limited and the participant themselves; moving
+        # into or out of rejected is held to event admins. Event and series
+        # API keys are issued by event admins and can already create and
+        # delete registrations outright, so they keep this.
+        if status && !api_key_request? && !policy(@participant_event).change_status?(status)
+          return render json: { error: "Only event admins can reject a registration or undo a rejection." }, status: :forbidden
+        end
+
         if attributes[:country_of_residence].present?
           country = CountryCodes.normalize(attributes[:country_of_residence])
           return render_error(unknown_country_error(attributes[:country_of_residence])) unless country
@@ -240,7 +248,7 @@ module Api
 
         ActiveRecord::Base.transaction do
           participant.update!(attributes) if attributes.any?
-          @participant_event.update!(status: status) if status
+          @participant_event.update_status!(status, rejection_authorized: true) if status
         end
 
         audit_api_change!(:record_update, participant) if attributes.any?

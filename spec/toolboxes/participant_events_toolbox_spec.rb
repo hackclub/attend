@@ -23,6 +23,48 @@ RSpec.describe ParticipantEventsToolbox do
     toolbox
   end
 
+  describe "#set_status" do
+    def run_set_status(pe, status, actor:)
+      toolbox = described_class.new(params: { "participant_event_id" => pe.id, "status" => status })
+      allow(toolbox).to receive(:current_user).and_return(actor)
+      allow(toolbox).to receive(:authorize!).and_return(true)
+      allow(toolbox).to receive(:render)
+      catch(:halt) { toolbox.set_status }
+    end
+
+    let(:ops) { create(:user).tap { |u| EventRoleAssignment.create!(user: u, event: event, role: "ops") } }
+    let(:global_admin) { create(:user, global_role: "global_admin") }
+
+    it "doesn't let a non-event-admin reject or un-reject" do
+      pe = create(:participant_event, event: event, status: :in_progress)
+
+      Current.set(event: event) { run_set_status(pe, "rejected", actor: ops) }
+      expect(pe.reload.status).to eq("in_progress")
+
+      pe.update_status!(:rejected, rejection_authorized: true)
+      Current.set(event: event) { run_set_status(pe, "in_progress", actor: ops) }
+      expect(pe.reload.status).to eq("rejected")
+    end
+
+    it "still lets a non-event-admin make other status changes" do
+      pe = create(:participant_event, event: event, status: :in_progress)
+
+      Current.set(event: event) { run_set_status(pe, "withdrawn", actor: ops) }
+
+      expect(pe.reload.status).to eq("withdrawn")
+    end
+
+    it "lets a global admin reject and un-reject" do
+      pe = create(:participant_event, event: event, status: :in_progress)
+
+      run_set_status(pe, "rejected", actor: global_admin)
+      expect(pe.reload.status).to eq("rejected")
+
+      run_set_status(pe, "in_progress", actor: global_admin)
+      expect(pe.reload.status).to eq("in_progress")
+    end
+  end
+
   it "reports a scanner check-in as checked in" do
     pe = create(:participant_event, event: event)
     pe.scans.create!(scan_context: check_in, user: user, scanned_at: 1.hour.ago)
