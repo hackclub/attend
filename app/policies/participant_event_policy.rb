@@ -47,6 +47,19 @@ class ParticipantEventPolicy < ApplicationPolicy
     has_role?("event_admin")
   end
 
+  # Rejecting is the same decision in the other direction.
+  def reject?
+    unreject?
+  end
+
+  # Whether this user may move the registration to new_status. Anything into
+  # or out of rejected needs the event-admin bar on top of update?.
+  def change_status?(new_status)
+    return true unless record.rejected? || new_status.to_s == "rejected"
+
+    unreject?
+  end
+
   # Merging pulls another Participant row's data (possibly from other events)
   # into this one and destroys it, so it stays global-admin-only.
   def merge_duplicate?

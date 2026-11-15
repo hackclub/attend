@@ -985,6 +985,51 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(AuditLog.where(action: "unwithdraw", event: event)).to exist
     end
 
+    describe "rejecting and un-rejecting" do
+      let(:ops) do
+        User.create!(email: "api-ops@example.com", name: "API Ops").tap do |user|
+          EventRoleAssignment.create!(user: user, event: event, role: "ops")
+        end
+      end
+
+      def ops_headers
+        { "Authorization" => "Bearer #{MobileToken.generate_for(ops).token}" }
+      end
+
+      it "doesn't let ops reject, though they can still withdraw" do
+        patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+          params: { status: "rejected" }, headers: ops_headers
+        expect(response).to have_http_status(:forbidden)
+        expect(participant_event.reload.status).to eq("in_progress")
+
+        patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+          params: { status: "withdrawn" }, headers: ops_headers
+        expect(response).to have_http_status(:ok)
+        expect(participant_event.reload.status).to eq("withdrawn")
+      end
+
+      it "doesn't let ops undo a rejection" do
+        participant_event.update_status!(:rejected, rejection_authorized: true)
+
+        patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+          params: { status: "in_progress" }, headers: ops_headers
+
+        expect(response).to have_http_status(:forbidden)
+        expect(participant_event.reload.status).to eq("rejected")
+      end
+
+      it "lets an admin and an event API key reject and un-reject" do
+        patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+          params: { status: "rejected" }, headers: auth_headers
+        expect(participant_event.reload.status).to eq("rejected")
+
+        patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+          params: { status: "in_progress" }, headers: api_key_headers
+        expect(response).to have_http_status(:ok)
+        expect(participant_event.reload.status).to eq("in_progress")
+      end
+    end
+
     it "rejects a status that isn't one of the registration states" do
       patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
         params: { status: "vibing" }, headers: auth_headers

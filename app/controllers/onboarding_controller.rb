@@ -377,7 +377,9 @@ class OnboardingController < ApplicationController
         return
       end
 
-      @participant_event.update!(status: :awaiting_guardian)
+      # A withdrawn or rejected registration stays closed even if the
+      # participant still has the wizard open and hits submit.
+      @participant_event.update!(status: :awaiting_guardian) unless @participant_event.inactive?
 
       # The guardian can finish everything — waiver and portal — before the
       # participant hits submit. Every other completion hook already ran and

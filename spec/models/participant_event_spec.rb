@@ -306,7 +306,7 @@ RSpec.describe ParticipantEvent, type: :model do
 
       pe.withdrawn!
       expect(pe.mark_complete_if_eligible!).to be false
-      pe.rejected!
+      pe.update_status!(:rejected, rejection_authorized: true)
       expect(pe.mark_complete_if_eligible!).to be false
       expect(pe.reload).to be_rejected
     end

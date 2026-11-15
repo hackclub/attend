@@ -61,7 +61,12 @@ class ParticipantEventsToolbox < ApplicationToolbox
   def set_status
     @participant_event = ParticipantEvent.find(params[:participant_event_id])
     authorize! @participant_event, :update?
-    @participant_event.update!(status: params[:status])
+    # update? admits ops, limited and the participant themselves; rejecting
+    # or un-rejecting is held to event admins.
+    unless Pundit.policy!(current_user, @participant_event).change_status?(params[:status])
+      halt error: "Only event admins can reject a registration or undo a rejection."
+    end
+    @participant_event.update_status!(params[:status], rejection_authorized: true)
     render json: serialize_registration(@participant_event)
   end
 
