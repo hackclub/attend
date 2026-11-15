@@ -47,23 +47,31 @@
         <!-- Channel Selection -->
          <div>
            <span class="block text-sm font-medium text-gray-700 mb-1">Channels</span>
+           <% coverage = sms_coverage(current_event) %>
            <div class="space-y-2">
              <% Message::CHANNELS.each do |key, label| %>
-               <label class="flex items-center gap-2 <%= key == :sms && !Setting.twilio_enabled? ? 'opacity-50' : '' %>">
-                 <%= check_box_tag "message[channels][]", key, @message.channels.include?(key.to_s),
+               <% sms_off = key == :sms && !Setting.twilio_enabled? %>
+               <% sms_disabled = key == :sms && (sms_off || coverage.channel_disabled?) %>
+               <label class="flex items-center gap-2 <%= sms_disabled ? 'opacity-50' : '' %>">
+                 <%= check_box_tag "message[channels][]", key, !sms_disabled && @message.channels.include?(key.to_s),
                      class: "rounded border-gray-300 text-[#ec3750] focus:ring-[#ec3750]",
                      id: "channel_#{key}",
-                     disabled: key == :sms && !Setting.twilio_enabled?,
+                     disabled: sms_disabled,
                      data: { action: "change->autosave#save" } %>
-                 <span class="text-sm text-gray-700"><%= label %></span>
+                 <span class="text-sm text-gray-700"><%= key == :sms ? sms_channel_label(label) : label %></span>
                  <% if key == :slack %>
                    <span class="text-xs text-gray-400">(attendees only)</span>
-                 <% elsif key == :sms && !Setting.twilio_enabled? %>
+                 <% elsif sms_off %>
                    <span class="text-xs text-gray-500">(disabled in settings)</span>
+                 <% elsif key == :sms && coverage.event_country %>
+                   <span class="text-xs text-gray-500">(<%= sms_event_country_notice(coverage) %>)</span>
                  <% end %>
                </label>
              <% end %>
            </div>
+           <% if Setting.twilio_enabled? && coverage.any_people? %>
+             <p class="mt-2 text-xs text-gray-600" id="sms-coverage-notice"><%= sms_coverage_notice(coverage) %></p>
+           <% end %>
          </div>
       </div>
 

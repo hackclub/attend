@@ -28,7 +28,11 @@ class WhatsappSmsFallback
     return if claimed.zero?
 
     result = TwilioService.new.send_sms(to: log.phone_number, body: log.sms_fallback_body, source: log.source)
-    log.message_delivery&.update!(external_id: result[:sid]) if result[:sid]
+    if result[:sid]
+      log.message_delivery&.update!(external_id: result[:sid])
+    elsif result[:skipped]
+      log.message_delivery&.update!(status: :failed, error_message: "WhatsApp failed (#{@error_code}), and no SMS was sent: #{result[:reason]}")
+    end
   rescue TwilioService::Error => e
     Rails.logger.error("[WhatsappSmsFallback] SMS fallback for #{@message_sid} failed: #{e.message}")
     log&.message_delivery&.update!(status: :failed, error_message: "WhatsApp failed (#{@error_code}), then SMS failed: #{e.message}")

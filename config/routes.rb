@@ -72,6 +72,12 @@ Rails.application.routes.draw do
 
   # Public verification of a training badge its holder chose to share
   # (attend.hackclub.com/verify/:token). Unauthenticated by design.
+  # The "Stop texts" link at the bottom of texts from the Hack Club sender.
+  scope "stop/:token", constraints: { token: /[0-9]{6,15}-[A-Za-z0-9_-]{1,20}/ } do
+    get "", to: "sms_opt_outs#show", as: :sms_opt_out
+    post "", to: "sms_opt_outs#create"
+    delete "", to: "sms_opt_outs#destroy"
+  end
   get "verify/:token", to: "badge_verifications#show", as: :badge_verification, constraints: { token: /[A-Za-z0-9_-]{20,64}/ }
 
   # Public incident reporting (attend.hackclub.com/incident)

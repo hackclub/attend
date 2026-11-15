@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_14_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_15_230000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1358,6 +1358,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_14_140000) do
     t.uuid "user_id"
     t.index ["channel_id", "slack_user_id"], name: "index_slack_channel_invites_on_channel_id_and_slack_user_id", unique: true
     t.index ["user_id"], name: "index_slack_channel_invites_on_user_id"
+  end
+
+  create_table "sms_opt_outs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "phone_number", null: false
+    t.string "source", null: false
+    t.datetime "opted_out_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["phone_number"], name: "index_sms_opt_outs_on_phone_number", unique: true
+  end
+
+  create_table "sms_suppressions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "phone_number", null: false
+    t.string "error_code", null: false
+    t.datetime "failed_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["phone_number"], name: "index_sms_suppressions_on_phone_number", unique: true
   end
 
   create_table "ticket_messages", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

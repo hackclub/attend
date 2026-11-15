@@ -18,7 +18,7 @@ RSpec.describe TwilioService do
     it "records the send for support chat history, preferring the redacted log body" do
       expect(Support::RecordAutomatedSms).to receive(:call).with(
         phone: "+14155551234",
-        body: "redacted body",
+        body: "redacted body\n\nReply STOP to opt out",
         twilio_sid: "SM200",
         source: "Guardian portal",
         channel: "sms"
@@ -30,7 +30,7 @@ RSpec.describe TwilioService do
     it "records the actual body when no log body is given" do
       expect(Support::RecordAutomatedSms).to receive(:call).with(
         phone: "+14155551234",
-        body: "hello",
+        body: "hello\n\nReply STOP to opt out",
         twilio_sid: "SM200",
         source: nil,
         channel: "sms"
@@ -97,7 +97,7 @@ RSpec.describe TwilioService do
       result = send_to("+14155551234")
 
       expect(result[:channel]).to eq("sms")
-      expect(posted.last).to include("To" => "+14155551234", "From" => "+15075550100", "Body" => "Plain text version")
+      expect(posted.last).to include("To" => "+14155551234", "From" => "+15075550100", "Body" => "Plain text version\n\nReply STOP to opt out")
     end
 
     it "texts everyone while WhatsApp is switched off" do
@@ -125,6 +125,129 @@ RSpec.describe TwilioService do
                               error_code: "63016", sent_at: 1.day.ago)
 
       expect(send_to("+447911123456")[:channel]).to eq("whatsapp")
+    end
+  end
+
+  describe "#send_sms routing" do
+    subject(:service) { described_class.new(account_sid: "AC123", auth_token: "token", from_number: "+15075550100") }
+
+    let(:posted) { [] }
+    let(:failure) { nil }
+
+    before do
+      allow(Setting).to receive(:twilio_enabled?).and_return(true)
+      connection = instance_double(Faraday::Connection)
+      allow(connection).to receive(:post) do |_path, &block|
+        request = Struct.new(:body).new
+        block.call(request)
+        posted << URI.decode_www_form(request.body).to_h
+        if failure
+          instance_double(Faraday::Response, success?: false, status: 400, body: failure.to_json)
+        else
+          instance_double(Faraday::Response, success?: true, body: { sid: "SM#{posted.size}", status: "queued" }.to_json)
+        end
+      end
+      allow(service).to receive(:connection).and_return(connection)
+    end
+
+    it "texts +1 numbers from the long code and asks for status callbacks" do
+      service.send_sms(to: "+14155551234", body: "hi")
+
+      expect(posted.last).to include("From" => "+15075550100", "StatusCallback" => a_string_ending_with("/twilio/status"))
+    end
+
+    it "texts countries where the long code delivers from the long code" do
+      service.send_sms(to: "+919876543210", body: "hi")
+
+      expect(posted.last["From"]).to eq("+15075550100")
+    end
+
+    it "texts the UK from the Hack Club sender" do
+      service.send_sms(to: "+447911123456", body: "hi")
+
+      expect(posted.last["From"]).to eq("Hack Club")
+    end
+
+    it "skips countries we have no working sender for" do
+      result = service.send_sms(to: "+923001234567", body: "hi")
+
+      expect(result).to include(skipped: true)
+      expect(posted).to be_empty
+    end
+
+    it "skips a number whose last text failed for good" do
+      SmsSuppression.record(phone: "+14155551234", error_code: "21610")
+
+      expect(service.send_sms(to: "+14155551234", body: "hi")).to include(skipped: true)
+      expect(posted).to be_empty
+    end
+
+    it "texts that number again once the suppression runs out" do
+      SmsSuppression.record(phone: "+14155551234", error_code: "21610")
+      SmsSuppression.update_all(failed_at: 31.days.ago)
+
+      service.send_sms(to: "+14155551234", body: "hi")
+
+      expect(posted.size).to eq(1)
+    end
+
+    context "when Twilio rejects the send for good" do
+      let(:failure) { { code: 21612, message: "cannot be sent with the current combination of To and From" } }
+
+      it "raises with the code and suppresses the number" do
+        expect { service.send_sms(to: "+14155551234", body: "hi") }
+          .to raise_error(TwilioService::Error) { |e| expect(e.code).to eq("21612") }
+        expect(SmsSuppression.active?("+14155551234")).to be(true)
+      end
+    end
+
+    context "when Twilio rejects the send for a passing reason" do
+      let(:failure) { { code: 20429, message: "Too many requests" } }
+
+      it "does not suppress the number" do
+        expect { service.send_sms(to: "+14155551234", body: "hi") }.to raise_error(TwilioService::Error)
+        expect(SmsSuppression.active?("+14155551234")).to be(false)
+      end
+    end
+  end
+
+  describe "opt-outs" do
+    subject(:service) { described_class.new(account_sid: "AC123", auth_token: "token", from_number: "+15075550100") }
+
+    let(:posted) { [] }
+
+    before do
+      allow(Setting).to receive(:twilio_enabled?).and_return(true)
+      allow(Setting).to receive(:whatsapp_enabled?).and_return(true)
+      connection = instance_double(Faraday::Connection)
+      allow(connection).to receive(:post) do |_path, &block|
+        request = Struct.new(:body).new
+        block.call(request)
+        posted << URI.decode_www_form(request.body).to_h
+        instance_double(Faraday::Response, success?: true, body: { sid: "SM#{posted.size}", status: "queued" }.to_json)
+      end
+      allow(service).to receive(:connection).and_return(connection)
+    end
+
+    it "tells long-code recipients to reply STOP" do
+      service.send_sms(to: "+14155551234", body: "Doors open at 9")
+
+      expect(posted.last["Body"]).to eq("Doors open at 9\n\nReply STOP to opt out")
+    end
+
+    it "gives Hack Club sender recipients a link, since they can't reply" do
+      service.send_sms(to: "+447911123456", body: "Doors open at 9")
+
+      expect(posted.last["Body"]).to match(%r{\n\nStop texts: https://[^/\s]+/stop/#{SmsOptOut.token_for("+447911123456")}\z})
+    end
+
+    it "sends nothing, by SMS or WhatsApp, to someone who opted out" do
+      SmsOptOut.opt_out!("+447911123456", source: :link)
+      SmsOptOut.opt_out!("+14155551234", source: :keyword)
+
+      expect(service.send_message(to: "+447911123456", sms_body: "x", whatsapp_template: "HX1")).to include(skipped: true)
+      expect(service.send_sms(to: "+14155551234", body: "x")).to include(skipped: true)
+      expect(posted).to be_empty
     end
   end
 end

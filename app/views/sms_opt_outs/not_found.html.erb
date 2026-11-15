@@ -1,0 +1,11 @@
+<% content_for :title, "Text messages – Attend" %>
+
+<div class="w-full max-w-lg mx-auto">
+  <%= render "shared/portal_masthead" %>
+
+  <h1 class="portal-title text-2xl mb-3">This link doesn't work</h1>
+  <p class="portal-body">
+    Check it was copied in full from the text. You can also reply STOP to any text from us, or email
+    <%= mail_to "attend@hackclub.com", class: "portal-link" %> and we'll turn texts off for you.
+  </p>
+</div>

@@ -39,24 +39,36 @@
            } %>
         <%= cs_form_field f, :channels, label: "Channels", group: true,
               messages: { blank: "Select at least one channel." } do |aria| %>
+          <% coverage = sms_coverage(current_event) %>
           <div class="cs-tiles cs-tiles-row">
             <% Message::CHANNELS.each do |key, label| %>
-              <% sms_disabled = key == :sms && !Setting.twilio_enabled? %>
+              <% sms_off = key == :sms && !Setting.twilio_enabled? %>
+              <% sms_disabled = key == :sms && (sms_off || coverage.channel_disabled?) %>
+              <% description = if sms_off
+                   "Turned off in settings."
+                 elsif key == :sms && coverage.event_country
+                   sms_event_country_notice(coverage)
+                 else
+                   channel_notes[key]
+                 end %>
               <label class="cs-tile">
                 <span class="cs-option">
-                  <%= check_box_tag "message[channels][]", key, @message.channels.include?(key.to_s),
+                  <%= check_box_tag "message[channels][]", key, !sms_disabled && @message.channels.include?(key.to_s),
                       id: "channel_#{key}",
                       disabled: sms_disabled,
                       data: { action: "change->autosave#save" },
                       **aria %>
                   <span>
-                    <span class="cs-option-label block"><%= label %></span>
-                    <span class="cs-option-description block"><%= sms_disabled ? "Turned off in settings." : channel_notes[key] %></span>
+                    <span class="cs-option-label block"><%= key == :sms ? sms_channel_label(label) : label %></span>
+                    <span class="cs-option-description block"><%= description %></span>
                   </span>
                 </span>
               </label>
             <% end %>
           </div>
+          <% if Setting.twilio_enabled? && coverage.any_people? %>
+            <p class="cs-field-description mt-2" id="sms-coverage-notice"><%= sms_coverage_notice(coverage) %></p>
+          <% end %>
         <% end %>
 
         <% selected_ids = @message.audience_filters["participant_event_ids"] || [] %>
