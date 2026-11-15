@@ -82,4 +82,64 @@ RSpec.describe "Onboarding completion for minors", type: :request do
       expect { submit }.to change { participant_event.reload.status }.to("awaiting_guardian")
     end
   end
+
+  # Staff sometimes move a registration on by hand before the participant has
+  # submitted. The onboarding lock used to treat that as "already submitted"
+  # and bounce them to the dashboard, so they could never reach the code of
+  # conduct and the registration could never complete.
+  context "when staff set the status before the participant submitted" do
+    before do
+      create(:guardian_participant_event, participant_event: participant_event, status: :completed)
+      create(:consent, :signed, participant_event: participant_event)
+      create(:consent, :freedom_waiver, :signed, participant_event: participant_event)
+    end
+
+    it "lets an awaiting_guardian participant back in to submit, then completes them" do
+      participant_event.update!(status: :awaiting_guardian)
+
+      get onboarding_step_path(step: "review", event_id: event.id)
+      expect(response).to have_http_status(:ok)
+
+      expect { submit }.to change { participant_event.reload.status }.to("complete")
+      expect(participant_event.code_of_conduct_accepted_at).to be_present
+    end
+
+    it "lets a hand-completed participant sign without undoing the completion" do
+      participant_event.update!(status: :complete)
+
+      get onboarding_step_path(step: "review", event_id: event.id)
+      expect(response).to have_http_status(:ok)
+
+      submit
+      expect(participant_event.reload).to be_complete
+      expect(participant_event.code_of_conduct_accepted_at).to be_present
+    end
+
+    it "keeps a hand-completed participant out of the other steps" do
+      participant_event.update!(status: :complete)
+
+      get onboarding_step_path(step: "profile", event_id: event.id)
+      expect(response).to redirect_to(onboarding_step_path(step: "review", event_id: event.id))
+
+      patch onboarding_step_path(step: "profile", event_id: event.id),
+        params: { participant: { date_of_birth: 30.years.ago.to_date } }
+      expect(response).to redirect_to(onboarding_step_path(step: "review", event_id: event.id))
+      expect(participant.reload.date_of_birth).to eq(15.years.ago.to_date)
+    end
+  end
+
+  context "when the participant has already submitted" do
+    before do
+      create(:guardian_participant_event, participant_event: participant_event, status: :pending)
+      participant_event.update!(status: :awaiting_guardian, code_of_conduct_accepted_at: 1.day.ago,
+        code_of_conduct_signature: "Test Minor")
+    end
+
+    it "still locks the registration" do
+      get onboarding_step_path(step: "review", event_id: event.id)
+
+      expect(response).to redirect_to(dashboard_path)
+      expect(flash[:alert]).to include("cannot be edited")
+    end
+  end
 end

@@ -377,7 +377,9 @@ class OnboardingController < ApplicationController
         return
       end
 
-      @participant_event.update!(status: :awaiting_guardian)
+      # Staff may already have marked the registration complete by hand;
+      # submitting late shouldn't undo that.
+      @participant_event.update!(status: :awaiting_guardian) unless @participant_event.complete?
 
       # The guardian can finish everything — waiver and portal — before the
       # participant hits submit. Every other completion hook already ran and
@@ -1629,6 +1631,22 @@ class OnboardingController < ApplicationController
 
   def redirect_if_locked
     return unless @participant_event.awaiting_guardian? || @participant_event.complete?
+
+    # Staff can set either status by hand before the participant has
+    # submitted. Accepting the code of conduct is what submitting means, and
+    # only the participant can do it, so locking them out here would leave the
+    # registration stuck for good.
+    if @participant_event.code_of_conduct_accepted_at.blank?
+      # Awaiting guardian is safe to reopen in full: submitting re-runs every
+      # check. A hand-set "complete" survives submit, so only let those
+      # participants sign, not edit answers the completion was based on.
+      return unless @participant_event.complete?
+      return if action_name == "complete" || (action_name == "show" && params[:step] == REVIEW_STEP)
+
+      redirect_to onboarding_step_path(step: REVIEW_STEP, event_id: current_event.id),
+                  alert: "Please agree to the Code of Conduct to finish your registration."
+      return
+    end
 
     # Allow minors whose guardian was never linked to go back and add one
     if @participant_event.awaiting_guardian? && @participant_event.guardian_participant_events.empty?
