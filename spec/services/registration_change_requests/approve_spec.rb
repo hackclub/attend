@@ -193,6 +193,26 @@ RSpec.describe RegistrationChangeRequests::Approve do
     expect(participant_event.reload).to be_in_progress
   end
 
+  it "does not leave an unsubmitted registration complete when replacing the guardian" do
+    participant_event.update!(status: :complete, code_of_conduct_accepted_at: nil)
+    create(:guardian_participant_event, participant_event: participant_event,
+      status: :completed, is_primary_guardian: true)
+    request = create_request(
+      kind: :guardian,
+      requested_changes: {
+        "legal_first_name" => "New",
+        "legal_last_name" => "Guardian",
+        "email" => "hand-completed-guardian@example.com",
+        "phone" => "+12025550995",
+        "relationship" => "Parent"
+      }
+    )
+
+    expect(described_class.call(request: request, reviewer: reviewer)).to eq(:approved)
+
+    expect(participant_event.reload).to be_in_progress
+  end
+
   describe "guardian corrections for the same person" do
     let(:old_guardian) do
       create(:guardian, legal_first_name: "Robin", legal_last_name: "Testparent",
