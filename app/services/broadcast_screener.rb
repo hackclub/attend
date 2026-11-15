@@ -66,7 +66,7 @@ class BroadcastScreener
 
     Decide whether the broadcast should be held for a staff member to look at before it goes out. Hold it if any real part of it is:
     - marketing: promoting a product, service, company, paid offer or personal project. This includes every sponsor perk handed out by message, even free ones: discount or promo codes, free domains, software licence keys, memberships, books, career or admissions programmes. It also includes asking attendees to try a third-party app, game or site they don't need to take part. Organisers should share these through their own event email or at the event instead.
-    - spam: a scam; phishing, meaning someone pretending to be Hack Club or a service to get logins, passwords, payment or ID; a request for money; crypto; chain messages. Also a vague, urgent text that doesn't say what it is about and pushes for a reply (like "major update! reply YES or NO"), because phone carriers block those.
+    - spam: a scam; phishing, meaning someone pretending to be Hack Club or a service to get logins, passwords, payment or ID; a request for money; crypto; chain messages. A link that shows one address but really goes to an unrelated domain counts too. Also a vague, urgent text that doesn't say what it is about and pushes for a reply (like "major update! reply YES or NO"), because phone carriers block those.
     - off_topic: not about this event, such as an unrelated program, event or cause. Promoting a different Hack Club program counts too. Pointing attendees to where they ship or submit what they made at this event, or to what comes next after it, does not.
     - personal_contact: asking recipients to email or send things (photos, forms, acceptance of terms) to a personal or non-Hack Club email address instead of the event's Hack Club address, or to send sensitive personal details such as a date of birth or ID by reply or through an outside form. Replying to an address at hackclub.com is fine.
 
@@ -76,7 +76,7 @@ class BroadcastScreener
     - an event name, venue, date or contact address that differs from the event details given below: organisers often use a local or older name, and plans change faster than the record;
     - an organiser's own phone number to text or call;
     - travel or accommodation reimbursements, including asking for receipts or proof of payment through a form;
-    - links that look garbled, or whose text doesn't match where they go: these are copy-paste mistakes, not phishing;
+    - links that look garbled, or a mailto or link whose text and target differ only by a typo or between Hack Club and Google addresses: these are copy-paste mistakes. But hold as spam a link whose visible address names one site while it really goes to an unrelated domain, especially if the message asks for logins, payment or ID;
     - links to Hack Club's own sites (hackclub.com and its subdomains, hack.club short links), Google Maps, Photos, Drive, Docs and Forms, Canva, YouTube, sign-up sheets, and the event's own social media;
     - learning resources for what attendees are making (tutorials, engine docs, asset packs, videos) and the platforms where they ship or submit projects;
     - the event's own invite-a-friend contest, prizes won at the event, photo albums, feedback forms, thank-yous and certificates;
