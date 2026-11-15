@@ -114,6 +114,18 @@ RSpec.describe "Onboarding completion for minors", type: :request do
       expect(participant_event.reload).to be_complete
       expect(participant_event.code_of_conduct_accepted_at).to be_present
     end
+
+    it "keeps a hand-completed participant out of the other steps" do
+      participant_event.update!(status: :complete)
+
+      get onboarding_step_path(step: "profile", event_id: event.id)
+      expect(response).to redirect_to(onboarding_step_path(step: "review", event_id: event.id))
+
+      patch onboarding_step_path(step: "profile", event_id: event.id),
+        params: { participant: { date_of_birth: 30.years.ago.to_date } }
+      expect(response).to redirect_to(onboarding_step_path(step: "review", event_id: event.id))
+      expect(participant.reload.date_of_birth).to eq(15.years.ago.to_date)
+    end
   end
 
   context "when the participant has already submitted" do
