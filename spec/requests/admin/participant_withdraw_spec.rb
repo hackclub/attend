@@ -135,6 +135,19 @@ RSpec.describe "Admin::Participants withdraw authorization", type: :request do
         expect(participant_event.reload.status).to eq("rejected")
         expect(flash[:alert]).to include("not authorized")
       end
+
+      # Withdraw-then-reinstate would launder a rejection through the looser
+      # withdraw? bar, so withdraw must refuse a rejected registration.
+      it "does not let #{role} launder the rejection through withdraw" do
+        sign_in_with_role(role)
+
+        post withdraw_path
+        expect(participant_event.reload.status).to eq("rejected")
+        expect(flash[:alert]).to include("nothing to withdraw")
+
+        post reinstate_path
+        expect(participant_event.reload.status).to eq("rejected")
+      end
     end
   end
 

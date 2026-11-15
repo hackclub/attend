@@ -611,6 +611,12 @@ module Admin
 
     def withdraw
       authorize @participant_event, :withdraw?
+      # Rejected stays rejected: withdrawing it would turn it into something
+      # the looser withdraw? bar can reinstate, side-stepping unreject?.
+      if @participant_event.rejected? || @participant_event.withdrawn?
+        return redirect_to admin_event_participant_path(current_event, @participant_event),
+          alert: "#{@participant_event.participant.display_name} is already #{@participant_event.status}, so there's nothing to withdraw."
+      end
       @participant_event.withdrawn!
       redirect_to admin_event_participant_path(current_event, @participant_event),
         notice: "#{@participant_event.participant.display_name} has been marked as withdrawn."
