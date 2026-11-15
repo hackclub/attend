@@ -37,6 +37,8 @@
 <% can_merge = participant_policy.merge_duplicate? %>
 <% slack_user_id = @participant_event.participant.slack_user_id.presence %>
 <% can_withdraw = participant_policy.withdraw? %>
+<% inactive = @participant_event.withdrawn? || @participant_event.rejected? %>
+<% can_reinstate = @participant_event.rejected? ? participant_policy.unreject? : (can_withdraw && @participant_event.withdrawn?) %>
 <% can_destroy = participant_policy.destroy? %>
 
 <div class="cs-header">
@@ -108,7 +110,7 @@
           <% if (can_withdraw || can_destroy) && (can_resend_invitation || can_merge || slack_user_id) %>
             <div class="cs-menu-divider"></div>
           <% end %>
-          <% if can_withdraw && !@participant_event.withdrawn? %>
+          <% if can_withdraw && !inactive %>
             <%= button_to withdraw_admin_event_participant_path(current_event, @participant_event),
                 method: :post,
                 data: { turbo_confirm: "Are you sure you want to mark #{@participant.display_name} as withdrawn?" },
@@ -116,10 +118,10 @@
               <span class="cs-menu-item-label">Withdraw</span>
             <% end %>
           <% end %>
-          <% if can_withdraw && @participant_event.withdrawn? %>
+          <% if can_reinstate %>
             <%= button_to unwithdraw_admin_event_participant_path(current_event, @participant_event),
                 method: :post,
-                data: { turbo_confirm: "Are you sure you want to reinstate #{@participant.display_name}?" },
+                data: { turbo_confirm: @participant_event.rejected? ? "#{@participant.display_name} was rejected for this event. Are you sure you want to reinstate them?" : "Are you sure you want to reinstate #{@participant.display_name}?" },
                 class: "cs-menu-item" do %>
               <span class="cs-menu-item-label">Reinstate</span>
             <% end %>

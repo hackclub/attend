@@ -37,6 +37,16 @@ class ParticipantEventPolicy < ApplicationPolicy
     has_role?("event_admin", "ops", "limited")
   end
 
+  # Reinstating a rejected registration overrides someone's decision to turn
+  # the participant away (sometimes for safeguarding reasons), so it sits at
+  # the event-admin bar rather than withdraw?'s ops/limited one.
+  def unreject?
+    return true if user.global_admin?
+    return false unless record.event == Current.event
+
+    has_role?("event_admin")
+  end
+
   # Merging pulls another Participant row's data (possibly from other events)
   # into this one and destroys it, so it stays global-admin-only.
   def merge_duplicate?
