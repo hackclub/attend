@@ -146,6 +146,7 @@ RSpec.describe RegistrationChangeRequests::Approve do
 
   it "does not enqueue guardian delivery while invitations are locked" do
     event.update!(guardian_invites_locked: true)
+    participant_event.update!(status: :complete, code_of_conduct_accepted_at: 1.day.ago)
     old_link = create(:guardian_participant_event, participant_event: participant_event)
     request = create_request(
       kind: :guardian,
@@ -165,6 +166,51 @@ RSpec.describe RegistrationChangeRequests::Approve do
     expect(GuardianParticipantEvent.exists?(old_link.id)).to be(false)
     expect(participant_event.reload).to be_awaiting_guardian
     expect(participant_event.guardian_participant_events.sole.invite_token_sent_at).to be_nil
+  end
+
+  # Approving a guardian replacement used to move every registration to
+  # awaiting_guardian. For a participant who hadn't submitted yet, that locked
+  # them out of onboarding before they could accept the code of conduct.
+  it "leaves an unsubmitted registration in progress when replacing the guardian" do
+    participant_event.update!(status: :in_progress, code_of_conduct_accepted_at: nil)
+    old_link = create(:guardian_participant_event, participant_event: participant_event,
+      status: :completed, is_primary_guardian: true)
+    request = create_request(
+      kind: :guardian,
+      requested_changes: {
+        "legal_first_name" => "New",
+        "legal_last_name" => "Guardian",
+        "email" => "unsubmitted-guardian@example.com",
+        "phone" => "+12025550997",
+        "relationship" => "Parent"
+      }
+    )
+
+    expect(described_class.call(request: request, reviewer: reviewer)).to eq(:approved)
+
+    expect(GuardianParticipantEvent.exists?(old_link.id)).to be(false)
+    expect(participant_event.guardian_participant_events.sole).to be_pending
+    expect(participant_event.reload).to be_in_progress
+  end
+
+  it "does not leave an unsubmitted registration complete when replacing the guardian" do
+    participant_event.update!(status: :complete, code_of_conduct_accepted_at: nil)
+    create(:guardian_participant_event, participant_event: participant_event,
+      status: :completed, is_primary_guardian: true)
+    request = create_request(
+      kind: :guardian,
+      requested_changes: {
+        "legal_first_name" => "New",
+        "legal_last_name" => "Guardian",
+        "email" => "hand-completed-guardian@example.com",
+        "phone" => "+12025550995",
+        "relationship" => "Parent"
+      }
+    )
+
+    expect(described_class.call(request: request, reviewer: reviewer)).to eq(:approved)
+
+    expect(participant_event.reload).to be_in_progress
   end
 
   describe "guardian corrections for the same person" do
