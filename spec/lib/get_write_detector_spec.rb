@@ -1,0 +1,126 @@
+require "rails_helper"
+
+# The suite-wide check lives in spec/support/get_write_detector.rb: any example
+# whose GET writes outside config/get_write_allowlist.yml fails. These examples
+# cover the detector itself, and drain what they record so that check doesn't
+# fire on them.
+RSpec.describe GetWriteDetector do
+  def rack_request(method, path = "/detector-example", &work)
+    app = lambda do |_env|
+      work.call
+      [ 200, {}, [ "ok" ] ]
+    end
+    described_class::Middleware.new(app).call(Rack::MockRequest.env_for(path, method: method))
+    described_class.drain
+  end
+
+  let!(:user) { create(:user) }
+
+  describe "recording" do
+    it "records a write made while serving a GET, with what was hit and where" do
+      writes = rack_request("GET") { User.where(id: user.id).update_all(name: "Example Name") }
+
+      expect(writes.sole).to have_attributes(
+        http_method: "GET", path: "/detector-example", endpoint: "(rack) /detector-example", table: "users"
+      )
+      expect(writes.sole.sql).to start_with('UPDATE "users"')
+    end
+
+    it "records HEAD requests too" do
+      expect(rack_request("HEAD") { user.update!(name: "Example Name") }.map(&:table)).to include("users")
+    end
+
+    it "ignores reads" do
+      expect(rack_request("GET") { User.find(user.id) }).to be_empty
+    end
+
+    it "counts a row lock, which a standby refuses just like a write" do
+      writes = rack_request("GET") { user.with_lock { nil } }
+
+      expect(writes.map(&:table)).to eq([ "users" ])
+      expect(writes.sole.sql).to include("FOR UPDATE")
+    end
+
+    it "leaves POSTs alone" do
+      expect(rack_request("POST") { user.update!(name: "Example Name") }).to be_empty
+    end
+
+    it "doesn't count what a job run inline wrote: in production that is a worker's write" do
+      job = Class.new(ApplicationJob) do
+        def self.name = "DetectorExampleJob"
+
+        def perform(user)
+          user.update!(name: "Written By A Job")
+        end
+      end
+
+      writes = rack_request("GET") { job.perform_now(user) }
+
+      expect(user.reload.name).to eq("Written By A Job")
+      expect(writes).to be_empty
+    end
+
+    it "records nothing outside a request" do
+      user.update!(name: "Example Name")
+
+      expect(described_class.drain).to be_empty
+    end
+  end
+
+  describe "naming the endpoint", type: :request do
+    include Devise::Test::IntegrationHelpers
+
+    it "uses controller#action for a routed request" do
+      sign_in create(:user, global_role: "global_admin")
+
+      # Devise stamps the sign-in on the first request of the session.
+      get admin_bans_path
+
+      expect(described_class.drain.map { |write| [ write.endpoint, write.table ] }).to eq([ [ "admin/bans#index", "users" ] ])
+    end
+  end
+
+  describe "the allowlist" do
+    def write(endpoint:, sql:)
+      described_class::Write.new(endpoint: endpoint, sql: sql, table: "examples", http_method: "GET", path: "/")
+    end
+
+    let(:allowlist) do
+      described_class::Allowlist.new(
+        global: [ { "sql" => 'UPDATE "tokens" SET "last_used_at"', "reason" => "throttled stamp" } ],
+        actions: { "examples#show" => "creates the example on first view" }
+      )
+    end
+
+    it "accepts anything a listed action writes" do
+      expect(allowlist.allowed?(write(endpoint: "examples#show", sql: 'INSERT INTO "examples" DEFAULT VALUES'))).to be(true)
+    end
+
+    it "accepts a listed statement wherever it happens" do
+      sql = %(UPDATE "tokens" SET "last_used_at" = $1 WHERE "tokens"."id" = $2)
+
+      expect(allowlist.allowed?(write(endpoint: "anything#index", sql: sql))).to be(true)
+    end
+
+    it "rejects everything else" do
+      expect(allowlist.allowed?(write(endpoint: "examples#index", sql: 'INSERT INTO "examples" DEFAULT VALUES'))).to be(false)
+      expect(allowlist.allowed?(write(endpoint: "anything#index", sql: 'UPDATE "tokens" SET "revoked_at" = $1'))).to be(false)
+    end
+
+    it "gives every entry in the real file a reason" do
+      data = YAML.safe_load_file(described_class::ALLOWLIST_PATH)
+
+      expect(data.fetch("global")).to all(include("sql" => be_present, "reason" => be_present))
+      expect(data.fetch("actions")).to all(satisfy { |endpoint, reason| endpoint.include?("#") && reason.present? })
+    end
+
+    it "only lists actions that exist" do
+      missing = described_class.allowlist.actions.reject do |endpoint|
+        controller_path, action = endpoint.split("#")
+        "#{controller_path}_controller".camelize.safe_constantize&.action_methods&.include?(action)
+      end
+
+      expect(missing).to be_empty
+    end
+  end
+end

@@ -2,6 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Admin visa letters", type: :request do
   include Devise::Test::IntegrationHelpers
+  include ActiveJob::TestHelper
 
   let(:event) { create(:event, name: "Fictional Hackathon", visa_letters: "open", visa_letter_rejection_reasons: [ "The name doesn't match your passport." ]) }
   let(:admin) { create(:user, email: "visa-admin@example.com", admin_console_beta: false).tap { |user| create(:event_role_assignment, user: user, event: event, role: "event_admin") } }
@@ -32,10 +33,14 @@ RSpec.describe "Admin visa letters", type: :request do
         expect(response.body).not_to include("Ada Example")
       end
 
+      # The entry is written by a job, so the page view itself is a read.
       it "shows an application and records that it was opened" do
         expect {
           get admin_event_visa_letter_path(event, application)
-        }.to change { AuditLog.where(action: "view", record_id: application.id).count }.by(1)
+        }.to have_enqueued_job(AuditViewJob).and(not_change(AuditLog, :count))
+
+        expect { perform_enqueued_jobs(only: AuditViewJob) }
+          .to change { AuditLog.where(action: "view", record_id: application.id, actor: admin, event: event).count }.by(1)
 
         expect(response).to have_http_status(:ok)
         expect(response.body).to include("Exampleland")

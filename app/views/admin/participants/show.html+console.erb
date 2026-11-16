@@ -384,13 +384,21 @@
                           resend_guardian_invite_admin_event_participant_path(current_event, @participant_event, guardian_participant_event_id: gpe.id),
                           method: :post,
                           class: "cs-btn cs-btn-link" %>
-                      <button type="button"
-                              data-controller="clipboard"
-                              data-clipboard-content-value="<%= gpe.invite_url %>"
-                              data-action="click->clipboard#copy"
-                              class="cs-btn cs-btn-link">
-                        Copy portal link
-                      </button>
+                      <% if (portal_url = gpe.portal_url) %>
+                        <button type="button"
+                                data-controller="clipboard"
+                                data-clipboard-content-value="<%= portal_url %>"
+                                data-action="click->clipboard#copy"
+                                class="cs-btn cs-btn-link">
+                          Copy portal link
+                        </button>
+                      <% else %>
+                        <%# No link minted yet: a page view must not write, so the first click makes one. %>
+                        <%= button_to "Copy portal link",
+                            guardian_portal_link_admin_event_participant_path(current_event, @participant_event, guardian_participant_event_id: gpe.id),
+                            method: :post,
+                            class: "cs-btn cs-btn-link" %>
+                      <% end %>
                     <% end %>
                   </div>
                 </li>

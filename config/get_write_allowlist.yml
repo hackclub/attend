@@ -1,0 +1,80 @@
+# GET and HEAD requests that are allowed to write to the database.
+#
+# Read by GetWriteDetector (lib/middleware/get_write_detector.rb): a spec in
+# which a GET writes anything not listed here fails. Every action under
+# `actions` is one that could not be served from a read replica as it stands.
+#
+# Before adding an entry, try to get rid of the write: do it in the POST that
+# caused it, or queue a job. Every entry needs its reason.
+#
+# To see everything the suite observes (for pruning entries that no longer
+# write):  GET_WRITE_REPORT=tmp/get_writes.txt bundle exec rspec
+
+# Writes that can ride along on any GET. Matched by the start of the SQL.
+# All of these happen while the request authenticates, which always runs on
+# the primary, before any switch to the reading role.
+global:
+  - sql: 'UPDATE "users" SET "current_sign_in_at"'
+    reason: >-
+      Devise trackable. Fires on whichever request authenticates the session:
+      the OAuth callback, or the first page after a remember-me cookie signs
+      someone back in. (In specs, the first request after sign_in.)
+  - sql: 'UPDATE "mobile_tokens" SET "last_used_at"'
+    reason: API credential last-used stamp, at most once per 15 minutes per token (LastUsedTracking).
+  - sql: 'UPDATE "global_api_tokens" SET "last_used_at"'
+    reason: API credential last-used stamp, at most once per 15 minutes per token (LastUsedTracking).
+  - sql: 'UPDATE "event_api_tokens" SET "last_used_at"'
+    reason: API credential last-used stamp, at most once per 15 minutes per token (LastUsedTracking).
+  - sql: 'UPDATE "series_api_tokens" SET "last_used_at"'
+    reason: API credential last-used stamp, at most once per 15 minutes per token (LastUsedTracking).
+  - sql: 'UPDATE "guardian_participant_events" SET "invite_last_used_at"'
+    reason: >-
+      Guardian portal: using a link slides its expiry window, stamped at most
+      hourly (GuardianParticipantEvent#touch_invite_use!).
+
+# controller/path#action: reason
+actions:
+  # --- OAuth callbacks. The provider redirects back with a GET, and landing
+  # --- here is the write: the account, link or connection is saved.
+  users/omniauth_callbacks#hack_club: Sign-in callback. Creates or updates the user and syncs claims to the participant.
+  slack_oauth#callback: Saves the Slack id the participant just authorised.
+  connected_accounts#callback: Saves the GitHub/itch account the participant just connected.
+  admin/airtable_connections#callback: Saves the Airtable connection an admin just authorised, and audit-logs it.
+
+  # --- Onboarding. Arriving is what creates and repairs the registration;
+  # --- the before_actions find-or-create it, so these stay on the primary.
+  onboarding#index: Accepts the invitation and creates the participant and registration on arrival.
+  onboarding#show: Creates the consent rows for the step being opened and records signatures on return from signing.
+  dashboard#sign_document: Creates the consent row for a custom document the first time it is opened to sign.
+
+  # --- Guardian portal. Same shape as onboarding: opening a step creates or
+  # --- heals the consent it shows, and returning from signing completes it.
+  guardian_portal#step: Creates or heals the consent rows for the step being opened.
+  guardian_portal#waiver: Records the signature on return from signing and completes the registration, under row locks.
+  guardian_portal#custom_document: Creates the consent row for the document and records its signature on return.
+
+  # --- Visa letters (applicant side).
+  visa_letters#index: Claims an application imported under the signed-in person's email (sets user_id).
+  visa_letters#new: Claims an application imported under the signed-in person's email (sets user_id).
+  visa_letters#show: Claims an application imported under the signed-in person's email (sets user_id).
+
+  # --- Read state the person expects to change at once. Only the first open
+  # --- of a message writes; opening it again is a plain read.
+  dashboard/messages#show: Marks the message's deliveries read on first open.
+  api/v1/inbox_messages#show: Marks the message's deliveries read on first open.
+
+  # --- Training. Watching is the record.
+  training/lessons#show: Starts or updates the video view record under a row lock.
+
+  # --- Admin pages that find-or-create or cache on view. Candidates for a
+  # --- later fix; until then they stay on the primary.
+  admin/rooming_wizard#setup: Creates the event's rooming plan the first time the wizard is opened.
+  admin/rooming_wizard#preferences: Creates the event's rooming plan the first time the wizard is opened.
+  admin/rooming_wizard#assignments: Creates the event's rooming plan the first time the wizard is opened.
+  admin/rooming_wizard#export_csv: Creates the event's rooming plan if the export is the first thing opened.
+  admin/participants#consent_document: Saves the signed document URLs fetched from DocuSeal onto the consent.
+
+  # --- Gem controllers.
+  passkit/api/v1/passes#show: Wallet pass fetch. Stamps the content digest and updated time the device asked about.
+  passkit/api/v1/passes#create: Wallet pass download link. Creates the pass row on first download.
+  active_storage/representations/redirect#show: Processes and stores an image variant the first time it is requested.

@@ -72,20 +72,41 @@ class GuardianParticipantEvent < ApplicationRecord
   end
 
   # Handing this link to someone counts as sending it: an unstamped invite is
-  # treated as dead by #invite_expired?, so admins copying a link out of the
+  # treated as dead by #invite_expired?, so an admin copying a link out of the
   # participant page would otherwise paste a URL that 404s on arrival. Only
-  # stamp a link that is actually dead -- this renders inside the admin
-  # participant page, and refreshing a live invite on every page load would
-  # write (and record a PaperTrail version) for every guardian shown.
+  # stamp a link that is actually dead: refreshing a live invite every time
+  # would write (and record a PaperTrail version) for nothing.
+  #
+  # This mints and stamps, so it is for POSTs and jobs. Pages render
+  # #portal_url, which never writes.
   def invite_url
-    host = ENV.fetch("APP_HOST") { Rails.application.config.action_mailer.default_url_options[:host] || "localhost:3000" }
     token = generate_invite_token!
     update!(invite_token_sent_at: Time.current) if invite_expired?
 
-    Rails.application.routes.url_helpers.guardian_portal_url(
-      token: token,
-      host: host
-    )
+    portal_url_for(token)
+  end
+
+  # The portal link as it stands, or nil when no token has been minted yet.
+  # Read-only, so safe to call from a view. The link it returns may be dead
+  # (see #invite_link_stale?); whoever shows it is responsible for reviving it.
+  def portal_url
+    token = invite_token
+    portal_url_for(token) if token.present?
+  end
+
+  # A link exists but its window has lapsed, so it would 404 if handed out now.
+  def invite_link_stale?
+    invite_token_ciphertext.present? && invite_expired?
+  end
+
+  # Reopens the window on a stale link (RefreshGuardianInviteWindowJob, queued
+  # when the admin participant page shows one). Never mints: a link revoked
+  # since the page rendered must stay dead, and re-checking under the row lock
+  # keeps this from stamping over a revoke or a resend that got there first.
+  def refresh_stale_invite_window!
+    with_lock do
+      update!(invite_token_sent_at: Time.current) if invite_link_stale?
+    end
   end
 
   INVITE_VALIDITY = 7.days
@@ -137,6 +158,12 @@ class GuardianParticipantEvent < ApplicationRecord
   end
 
   private
+
+  def portal_url_for(token)
+    host = ENV.fetch("APP_HOST") { Rails.application.config.action_mailer.default_url_options[:host] || "localhost:3000" }
+
+    Rails.application.routes.url_helpers.guardian_portal_url(token: token, host: host)
+  end
 
   def guardian_email_differs_from_participant
     guardian_email = guardian&.email.to_s.strip.downcase

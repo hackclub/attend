@@ -19,7 +19,7 @@ module Admin
     def show
       @disclosure = TrainingDisclosure.includes(:user, :course, :reviewed_by).find(params[:id])
       @history = @disclosure.user.training_disclosures.includes(:course).newest_first.where.not(id: @disclosure.id)
-      AuditLog.log!(action: :view, record: @disclosure, actor: current_user, metadata: { what: "training_disclosure" })
+      AuditLog.log_view_later(record: @disclosure, actor: current_user, metadata: { what: "training_disclosure" })
     end
 
     def update

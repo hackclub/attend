@@ -150,7 +150,7 @@ module Admin
     def show
       authorize @participant_event
       @participant = @participant_event.participant
-      @participant.user&.sync_slack_id_to_participant
+      show_pending_slack_id
       @travel_inbound = @participant_event.travel_inbound&.tap { |t| t.travel_legs.load }
       @travel_outbound = @participant_event.travel_outbound&.tap { |t| t.travel_legs.load }
       @accommodation = @participant_event.accommodation
@@ -161,6 +161,7 @@ module Admin
       @safeguarding_info = @participant_event.safeguarding_info
       @consents = @participant_event.consents
       @guardian_participant_events = @participant_event.guardian_participant_events.includes(:guardian)
+      refresh_stale_guardian_links
       @scans = @participant_event.scans.includes(:user, :scan_context).recent.limit(3)
       @emergency_contacts = emergency_contacts_for_profile
       @visa_letter_application = @participant_event.visa_letter_application
@@ -727,6 +728,26 @@ module Admin
       redirect_to admin_event_participant_path(current_event, @participant_event), notice: "Guardian invite resent to #{gpe.guardian.email}."
     end
 
+    # "Copy Portal Link" for a guardian who has no link yet. The page used to
+    # mint one while rendering; now that takes this POST, and the page comes
+    # back with the link in the button. Open to anyone who can see the page,
+    # as the link itself always was.
+    def guardian_portal_link
+      authorize @participant_event, :show?
+
+      if current_event.guardian_invites_locked?
+        redirect_to admin_event_participant_path(current_event, @participant_event), alert: "Guardian invites are currently locked for this event."
+        return
+      end
+
+      gpe = @participant_event.guardian_participant_events.find(params[:guardian_participant_event_id])
+      gpe.invite_url
+      @record = gpe
+
+      redirect_to admin_event_participant_path(current_event, @participant_event),
+        notice: "Portal link for #{gpe.guardian.full_name} is ready to copy."
+    end
+
     # Re-send the participant's onboarding invitation. The mailer reuses the
     # pending Invitation when there is one, so the link they were already sent
     # keeps working; an expired one is replaced with a fresh token.
@@ -980,6 +1001,33 @@ module Admin
     end
 
     private
+
+    # The participant's Slack id can trail their account's (they signed in
+    # before the two were linked). Viewing the page used to save it; now the
+    # page shows the id it is about to have and a job does the saving.
+    def show_pending_slack_id
+      user = @participant.user
+      slack_id = user&.pending_participant_slack_id
+      return if slack_id.blank?
+
+      @participant.slack_user_id = slack_id
+      SyncParticipantSlackIdJob.perform_later(user)
+    end
+
+    # "Copy Portal Link" hands staff the guardian's link, and a link whose
+    # window has lapsed 404s on arrival. Rendering it used to restamp it;
+    # the button now carries the link as it stands (#portal_url) and a job
+    # reopens the window, well inside the time it takes to paste a link
+    # anywhere. Same guard as the button itself.
+    def refresh_stale_guardian_links
+      return if current_event.guardian_invites_locked?
+
+      @guardian_participant_events.each do |gpe|
+        next if gpe.completed? || !gpe.invite_link_stale?
+
+        RefreshGuardianInviteWindowJob.perform_later(gpe)
+      end
+    end
 
     # `blocked_on=<stage key>` — the series dashboard's chase links. A stage's
     # count is "whose *first* uncleared onboarding step maps to this stage", so

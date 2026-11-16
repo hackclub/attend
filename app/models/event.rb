@@ -167,7 +167,12 @@ class Event < ApplicationRecord
   # email, so it has to be an address we actually control. Required from setup
   # onwards; older events created before this rule keep passing validation until
   # someone edits the field (hence allow_blank on the format check).
-  SUPPORT_EMAIL_DOMAINS = %w[hackclub.com events.hackclub.com haven.hackclub.com].freeze
+  #
+  # Which domains count is configuration, not code: config/support_email.yml,
+  # or SUPPORT_EMAIL_DOMAINS (comma-separated) to replace the list outright.
+  SUPPORT_EMAIL_DOMAINS = (
+    ENV["SUPPORT_EMAIL_DOMAINS"].presence&.split(",") || Rails.application.config_for(:support_email)[:domains]
+  ).map { |domain| domain.to_s.strip.downcase }.compact_blank.uniq.freeze
   SUPPORT_EMAIL_DOMAINS_SENTENCE = SUPPORT_EMAIL_DOMAINS.map { |d| "@#{d}" }
     .to_sentence(two_words_connector: " or ", last_word_connector: ", or ").freeze
   SUPPORT_EMAIL_FORMAT = /\A[^@\s]+@(?:#{SUPPORT_EMAIL_DOMAINS.map { |d| Regexp.escape(d) }.join("|")})\z/i

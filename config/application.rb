@@ -20,6 +20,7 @@ Bundler.require(*Rails.groups)
 
 require_relative "../lib/middleware/malformed_request_guard"
 require_relative "../lib/middleware/strip_client_forwarded_header"
+require_relative "../lib/middleware/get_write_detector"
 
 module Attend
   class Application < Rails::Application
@@ -53,5 +54,8 @@ module Attend
 
     # Ahead of everything that reads the client's IP, host or scheme.
     config.middleware.insert_before 0, StripClientForwardedHeader
+
+    # Records SQL writes made while serving a GET (test, or GET_WRITE_DETECTOR=1).
+    GetWriteDetector.install!(self)
   end
 end

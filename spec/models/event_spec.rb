@@ -14,6 +14,10 @@ RSpec.describe Event, type: :model do
       expect(build(:event, support_email: "sunbeam@haven.hackclub.com")).to be_valid
     end
 
+    it "takes its allowed domains from config/support_email.yml" do
+      expect(Event::SUPPORT_EMAIL_DOMAINS).to eq(Rails.application.config_for(:support_email)[:domains])
+    end
+
     it "rejects addresses on any other domain" do
       event = build(:event, support_email: "sunbeam@gmail.com")
       expect(event).not_to be_valid

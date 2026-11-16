@@ -120,6 +120,53 @@ RSpec.describe GuardianParticipantEvent do
     end
   end
 
+  describe "#portal_url" do
+    it "is the link as it stands, without minting or stamping anything" do
+      gpe = create(:guardian_participant_event, :never_sent)
+      expect(gpe.portal_url).to be_nil
+
+      token = gpe.generate_invite_token!
+
+      expect { expect(gpe.portal_url).to end_with("/guardian/portal/#{token}") }
+        .not_to change { gpe.reload.attributes }
+      expect(gpe.invite_expired?).to be(true)
+    end
+  end
+
+  describe "#refresh_stale_invite_window!" do
+    it "reopens the window on a link that has lapsed" do
+      gpe = create(:guardian_participant_event, invite_token_sent_at: 30.days.ago)
+      token = gpe.generate_invite_token!
+      expect(gpe.invite_link_stale?).to be(true)
+
+      gpe.refresh_stale_invite_window!
+
+      expect(gpe.reload.invite_link_stale?).to be(false)
+      expect(described_class.find_by_invite_token!(token)).to eq(gpe)
+    end
+
+    it "leaves a live link's stamp alone" do
+      sent_at = 1.day.ago.change(usec: 0)
+      gpe = create(:guardian_participant_event, invite_token_sent_at: sent_at)
+      gpe.generate_invite_token!
+
+      expect { gpe.refresh_stale_invite_window! }.not_to change { gpe.reload.invite_token_sent_at }
+    end
+
+    # The job runs a moment after the page that queued it. A resend in
+    # between revokes the link, and this must not bring it (or any link) back.
+    it "never mints a link, and never revives one revoked since it was queued" do
+      gpe = create(:guardian_participant_event, invite_token_sent_at: 30.days.ago)
+      gpe.generate_invite_token!
+      stale_copy = described_class.find(gpe.id)
+      gpe.revoke_invite_token!
+
+      stale_copy.refresh_stale_invite_window!
+
+      expect(gpe.reload).to have_attributes(invite_token: nil, invite_token_digest: nil, invite_token_sent_at: nil)
+    end
+  end
+
   describe "guardian email vs participant email" do
     it "refuses to link a guardian who shares the participant's email" do
       participant_event = create(:participant_event)

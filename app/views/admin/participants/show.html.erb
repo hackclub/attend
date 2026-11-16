@@ -361,13 +361,21 @@
                         method: :post,
                         form: { data: { turbo_confirm: "Send #{gpe.guardian.full_name} a new portal link? Their current link will stop working." } },
                         class: "text-xs text-[#ec3750] hover:text-blue-800 font-medium" %>
-                    <button type="button"
-                            data-controller="clipboard"
-                            data-clipboard-content-value="<%= gpe.invite_url %>"
-                            data-action="click->clipboard#copy"
-                            class="text-xs text-[#ec3750] hover:text-blue-800 font-medium">
-                      Copy Portal Link
-                    </button>
+                    <% if (portal_url = gpe.portal_url) %>
+                      <button type="button"
+                              data-controller="clipboard"
+                              data-clipboard-content-value="<%= portal_url %>"
+                              data-action="click->clipboard#copy"
+                              class="text-xs text-[#ec3750] hover:text-blue-800 font-medium">
+                        Copy Portal Link
+                      </button>
+                    <% else %>
+                      <%# No link minted yet: a page view must not write, so the first click makes one. %>
+                      <%= button_to "Copy Portal Link",
+                          guardian_portal_link_admin_event_participant_path(current_event, @participant_event, guardian_participant_event_id: gpe.id),
+                          method: :post,
+                          class: "text-xs text-[#ec3750] hover:text-blue-800 font-medium" %>
+                    <% end %>
                   <% end %>
                 </div>
               </li>
