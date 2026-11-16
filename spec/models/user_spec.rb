@@ -111,6 +111,25 @@ RSpec.describe User, type: :model do
       user.sync_slack_id_to_participant
       expect(participant.reload.slack_user_id).to be_nil
     end
+
+    it "syncs the row it is given when the account is linked to more than one" do
+      duplicate = create(:participant)
+      duplicate.update_columns(user_id: user.id)
+
+      expect(user.pending_participant_slack_id(duplicate)).to eq("U123ABC")
+      user.sync_slack_id_to_participant(duplicate)
+
+      expect(duplicate.reload.slack_user_id).to eq("U123ABC")
+    end
+
+    it "leaves a participant that belongs to someone else alone" do
+      stranger = create(:participant, user: create(:user))
+
+      expect(user.pending_participant_slack_id(stranger)).to be_nil
+      user.sync_slack_id_to_participant(stranger)
+
+      expect(stranger.reload.slack_user_id).to be_nil
+    end
   end
 
   describe "#verified_slack_id" do

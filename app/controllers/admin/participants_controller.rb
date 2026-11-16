@@ -1011,14 +1011,18 @@ module Admin
 
     # The participant's Slack id can trail their account's (they signed in
     # before the two were linked). Viewing the page used to save it; now the
-    # page shows the id it is about to have and a job does the saving.
+    # page shows the id it is about to have and a job does the saving. Both
+    # are about this participant row, whichever row the account's own
+    # association happens to name.
     def show_pending_slack_id
-      user = @participant.user
-      slack_id = user&.pending_participant_slack_id
+      slack_id = @participant.user&.pending_participant_slack_id(@participant)
       return if slack_id.blank?
 
+      # Shown, not changed: nothing later in the request should find the
+      # record dirty and save it on the page view's behalf.
       @participant.slack_user_id = slack_id
-      SyncParticipantSlackIdJob.perform_later(user)
+      @participant.clear_attribute_changes([ :slack_user_id ])
+      SyncParticipantSlackIdJob.perform_later(@participant)
     end
 
     # `blocked_on=<stage key>` — the series dashboard's chase links. A stage's

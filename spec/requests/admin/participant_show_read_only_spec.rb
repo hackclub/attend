@@ -144,11 +144,26 @@ RSpec.describe "Admin participant page is read-only", type: :request do
         before { participant.update_columns(user_id: account.id, slack_user_id: nil) }
 
         it "shows the id from their account straight away and saves it in a job" do
-          expect { get show_path }.to have_enqueued_job(SyncParticipantSlackIdJob).with(account)
+          expect { get show_path }.to have_enqueued_job(SyncParticipantSlackIdJob).with(participant)
 
           expect(response.body).to include("U0EXAMPLE01")
           expect(GetWriteDetector.drain).to be_empty
           expect(participant.reload.slack_user_id).to be_nil
+
+          perform_enqueued_jobs(only: SyncParticipantSlackIdJob)
+
+          expect(participant.reload.slack_user_id).to eq("U0EXAMPLE01")
+        end
+
+        # One account linked to two participant rows (a corrected import).
+        # The page is about this row, so this row is shown the id and this
+        # row gets it, whichever one the account's association names.
+        it "shows and saves the id on the row being viewed when the account has another row too" do
+          other = create(:participant, slack_user_id: "U0EXAMPLE01")
+          other.update_columns(user_id: account.id, created_at: 1.year.ago)
+
+          expect { get show_path }.to have_enqueued_job(SyncParticipantSlackIdJob).with(participant)
+          expect(response.body).to include("U0EXAMPLE01")
 
           perform_enqueued_jobs(only: SyncParticipantSlackIdJob)
 
