@@ -35,7 +35,7 @@ class SeriesDashboard
   end
 
   # The funnel spine, in the order a participant actually clears it. This
-  # mirrors ParticipantEvent#compute_onboarding_progress; STEP_TO_STAGE maps its
+  # mirrors Registration::Requirements; STEP_TO_STAGE maps its
   # step names on. Guardian details and an adult's emergency contacts are the
   # same question — who do we call — asked of two populations, so they share one
   # stage and the funnel stays readable across a mixed-age series.

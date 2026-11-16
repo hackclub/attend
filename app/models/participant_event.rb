@@ -346,6 +346,16 @@ class ParticipantEvent < ApplicationRecord
     signed_consent_of_type?("freedom_waiver")
   end
 
+  # Uses the already-loaded consents when eager-loaded, like the predicates
+  # above.
+  def consent_of_type(type)
+    if consents.loaded?
+      consents.find { |c| c.consent_type == type }
+    else
+      consents.find_by(consent_type: type)
+    end
+  end
+
   def applicable_custom_documents
     @applicable_custom_documents ||= event.active_custom_documents.select { |doc| doc.applies_to?(self) }
   end
@@ -395,7 +405,7 @@ class ParticipantEvent < ApplicationRecord
   # derived from the consent set, none of which #reload touches.
   def reset_document_memoisation!
     @applicable_custom_documents = nil
-    @onboarding_progress = nil
+    @registration_requirements = nil
     self
   end
 
@@ -422,21 +432,10 @@ class ParticipantEvent < ApplicationRecord
   # ignoring_submission: answers "would this complete if the participant hit
   # submit?", which #remind_to_submit_if_only_step_left uses.
   def eligible_for_completion?(ignoring_submission: false)
-    # A withdrawn or rejected registration is closed: a still-open DocuSeal
-    # link finishing later must not flip it back to complete.
-    return false if withdrawn? || rejected?
-    # Signing can now happen before the participant submits their registration
-    # (documents step) — never complete someone who hasn't hit submit yet.
-    return false unless ignoring_submission || code_of_conduct_accepted_at.present?
-    return false unless waiver_signed?
-    return false unless custom_documents_signed?
-
-    if requires_guardian?
-      return false unless guardian_participant_events.any? && guardian_participant_events.all?(&:completed?)
-      return false if event.freedom_waivers_enabled? && !freedom_waiver_signed?
-    end
-
-    true
+    # Built fresh rather than read from #registration_requirements: this is
+    # asked right after signatures and guardian rows change, and must not
+    # answer from a list memoised earlier in the request.
+    Registration::Requirements.new(self).completable?(ignoring_submission: ignoring_submission)
   end
 
   def mark_complete_if_eligible!
@@ -495,56 +494,21 @@ class ParticipantEvent < ApplicationRecord
   DISPLAY_STATUSES = [ "Awaiting Participant", "Awaiting Parent", "Complete", "Withdrawn", "Rejected" ].freeze
 
   def display_status
-    return "Withdrawn" if withdrawn?
-    return "Rejected" if rejected?
-
-    progress = onboarding_progress
-    all_done = progress[:blocking_step].nil?
-
-    return "Complete" if all_done
-    return "Awaiting Parent" if blocked_on_parent?(progress)
-
-    "Awaiting Participant"
+    registration_requirements.display_status
   end
 
   # Returns a hash describing exactly where this participant is in the onboarding process.
   # { steps: [{ name:, done: }], blocking_step: "waiver" | nil }
-  # Memoized: list views compute this several times per row. Reload the record
-  # if consents/travel/etc change mid-request and a fresh answer is needed.
   def onboarding_progress
-    @onboarding_progress ||= compute_onboarding_progress
+    registration_requirements.progress
   end
 
-  def compute_onboarding_progress
-    steps = []
-
-    steps << { name: "profile", done: participant.legal_first_name.present? && participant.legal_last_name.present? && participant.date_of_birth.present? }
-    steps << { name: "travel", done: travel_inbound.present? && travel_outbound.present? } if event.travel_enabled?
-    steps << { name: "accommodation", done: accommodation.present? } if event.accommodation_enabled?
-    steps << { name: "health", done: medical.present? && dietary.present? && accessibility.present? }
-    # Accepting the code of conduct is what "submitted" means — it gates
-    # `eligible_for_completion?`, so leaving it out of the progress list let
-    # display_status report Complete for registrations the DB could never
-    # complete (imported participants whose guardian did everything while they
-    # never signed in). It sits before the guardian steps because the guardian
-    # isn't even invited until the participant has submitted.
-    steps << { name: "code_of_conduct", done: code_of_conduct_accepted_at.present? }
-
-    if requires_guardian?
-      steps << { name: "guardian_details", done: guardian_participant_events.any? }
-      steps << { name: "guardian_portal", done: guardian_participant_events.any? && guardian_participant_events.all?(&:completed?) }
-      steps << { name: "waiver", done: waiver_signed? }
-      steps << { name: "freedom_waiver", done: freedom_waiver_signed? } if event.freedom_waivers_enabled?
-    else
-      steps << { name: "emergency_contacts", done: emergency_contacts.any? || guardian_participant_events.flat_map(&:emergency_contacts).any? }
-      steps << { name: "waiver", done: waiver_signed? }
-    end
-
-    steps << { name: "custom_documents", done: custom_documents_signed? } if applicable_custom_documents.any?
-
-    blocking = steps.find { |s| !s[:done] }
-
-    { steps: steps, blocking_step: blocking&.dig(:name) }
+  # What this registration still needs and who it's waiting on. Memoized: list
+  # views ask several times per row. #reload doesn't clear it, so call
+  # #reset_document_memoisation! if consents/travel/etc change mid-request and
+  # a fresh answer is needed.
+  def registration_requirements
+    @registration_requirements ||= Registration::Requirements.new(self)
   end
 
   def food_safety_summary
@@ -652,39 +616,6 @@ class ParticipantEvent < ApplicationRecord
       consents.any? { |c| c.consent_type == type && c.status == "signed" }
     else
       consents.where(consent_type: type, status: "signed").exists?
-    end
-  end
-
-  def consent_of_type(type)
-    if consents.loaded?
-      consents.find { |c| c.consent_type == type }
-    else
-      consents.find_by(consent_type: type)
-    end
-  end
-
-  # True when the blocking step is something only a guardian/parent can resolve
-  def blocked_on_parent?(progress)
-    return false unless requires_guardian?
-
-    blocking = progress[:blocking_step]
-    return false if blocking.blank?
-
-    case blocking
-    when "guardian_portal"
-      true
-    when "waiver", "freedom_waiver"
-      # Dual-sign: guardian signs first, then participant countersigns.
-      # Once the guardian has signed, we're waiting on the participant.
-      consent = consent_of_type(blocking)
-      !consent&.guardian_signed?
-    when "custom_documents"
-      # Only "Awaiting Parent" when nothing is left for the participant to do.
-      pending_custom_documents.none? do |doc|
-        doc.participant_signs? && !consents.find { |c| c.custom_document_id == doc.id }&.participant_signed?
-      end
-    else
-      false
     end
   end
 

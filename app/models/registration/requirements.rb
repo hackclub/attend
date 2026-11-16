@@ -2,16 +2,11 @@ module Registration
   # The one list of what a registration needs before it is complete, and who
   # each item is waiting on.
   #
-  # Today three places answer that question and disagree:
-  # ParticipantEvent#compute_onboarding_progress (the badge),
-  # #eligible_for_completion? (the status column) and #onboarding_complete?
-  # (list filters). This is the replacement for all three. For now it runs in
-  # shadow: nothing reads it except `rake registration:shadow`, which reports
-  # where it and the stored status disagree.
-  #
-  # #progress and #display_status are a faithful port of the model's current
-  # behaviour (the spec holds them equal). #stage is the new part: the value
-  # the status column should hold.
+  # ParticipantEvent's badge (#display_status, #onboarding_progress) and its
+  # completion gate (#eligible_for_completion?) both read this, so they can't
+  # disagree about what's outstanding. #stage, the value the status column
+  # should hold, isn't written anywhere yet: `rake registration:shadow`
+  # reports where it and the stored status differ.
   class Requirements
     # kind:  :data (something the participant fills in), :submission (the code
     #        of conduct, which is what "submitted" means) or :document
@@ -51,6 +46,24 @@ module Registration
 
     def met?
       blocking.nil?
+    end
+
+    # Whether the registration may be marked complete. Data requirements
+    # don't gate this yet: completion is only attempted when someone submits,
+    # signs or finishes the guardian portal, so a registration whose last gap
+    # was data would have nothing to complete it afterwards.
+    #
+    # ignoring_submission: "would this complete if the participant hit
+    # submit?"
+    def completable?(ignoring_submission: false)
+      return false if closed?
+
+      all.none? do |r|
+        next false if r.met? || r.kind == :data
+        next false if ignoring_submission && r.kind == :submission
+
+        true
+      end
     end
 
     # :participant, :guardian, or nil when nothing is outstanding.
@@ -157,7 +170,7 @@ module Registration
     # A minor's waivers are signed by the guardian first, then countersigned
     # by the participant. Until the guardian has signed, it's theirs to do.
     def dual_signed(type, signed)
-      guardian_signed = pe.consents.find { |c| c.consent_type == type }&.guardian_signed?
+      guardian_signed = pe.consent_of_type(type)&.guardian_signed?
       requirement(type, :document, guardian_signed ? :participant : :guardian, signed)
     end
 
@@ -166,7 +179,7 @@ module Registration
       return :participant unless pe.requires_guardian?
 
       participant_owes = pe.pending_custom_documents.any? do |doc|
-        doc.participant_signs? && !pe.consents.find { |c| c.custom_document_id == doc.id }&.participant_signed?
+        doc.participant_signs? && !pe.custom_document_consent(doc)&.participant_signed?
       end
       participant_owes ? :participant : :guardian
     end

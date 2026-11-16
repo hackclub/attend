@@ -1,17 +1,11 @@
 namespace :registration do
   desc <<~DESC
-    Read-only report comparing Registration::Requirements with what's stored.
+    Read-only report of where the status column differs from the status
+    Registration::Requirements says it should hold. This is the backlog the
+    state machine will close.
 
-    Two checks per registration:
-
-      parity  Requirements#display_status and #progress against the model's
-              own #display_status and #onboarding_progress. These should never
-              differ; a non-zero count means the port is wrong.
-
-      drift   the status column against the status Requirements says it
-              should hold. This is the backlog the state machine will close.
-              Split by whether the event is upcoming, under way or ended;
-              ended events will be left as they are.
+    Split by whether the event is upcoming, under way or ended; ended events
+    will be left as they are.
 
     Writes nothing.
 
@@ -38,17 +32,11 @@ namespace :registration do
     end
 
     total = 0
-    parity = []
     drift = Hash.new { |h, k| h[k] = [] }
 
     scope.find_each do |pe|
       total += 1
-      requirements = Registration::Requirements.new(pe)
-
-      if requirements.display_status != pe.display_status || requirements.progress != pe.onboarding_progress
-        parity << pe.id
-      end
-
+      requirements = pe.registration_requirements
       expected = requirements.computed_stage(now: now)
       next if expected == pe.status
 
@@ -56,12 +44,7 @@ namespace :registration do
     end
 
     puts "#{total} registrations checked."
-    puts
-    puts "Parity mismatches: #{parity.size}#{' (expected 0)' if parity.any?}"
-    parity.each { |id| puts "  #{id}" } if verbose
-
     drifted = drift.values.sum(&:size)
-    puts
     puts "Status drift: #{drifted}"
     [ "upcoming", "under way", "ended" ].each do |bucket|
       rows = drift.select { |key, _| key.first == bucket }

@@ -25,41 +25,28 @@ RSpec.describe Registration::Requirements do
     pe.update!(code_of_conduct_accepted_at: Time.current)
   end
 
-  # The port has to agree with the model it will replace, at every point a
-  # registration passes through.
-  def expect_parity(pe)
-    fresh = ParticipantEvent.find(pe.id)
-    subject = described_class.new(fresh)
-    expect(subject.progress).to eq(fresh.onboarding_progress)
-    expect(subject.display_status).to eq(fresh.display_status)
-  end
-
   describe "an adult's registration" do
     let(:pe) { create(:participant_event, participant: adult, event: event, status: :invited) }
 
     it "walks from invited to complete" do
       expect(requirements(pe).stage).to eq("invited")
       expect(requirements(pe).blocking.key).to eq("travel")
-      expect_parity(pe)
 
       pe.update!(status: :in_progress)
       fill_in_data(pe)
       expect(requirements(pe).blocking.key).to eq("code_of_conduct")
       expect(requirements(pe).stage).to eq("in_progress")
-      expect_parity(pe)
 
       submit(pe)
       expect(requirements(pe).blocking.key).to eq("emergency_contacts")
       add_emergency_contact(pe)
       expect(requirements(pe).blocking.key).to eq("waiver")
       expect(requirements(pe).waiting_on).to eq(:participant)
-      expect_parity(pe)
 
       create(:consent, :signed, participant_event: pe)
       expect(requirements(pe)).to be_met
       expect(requirements(pe).stage).to eq("complete")
       expect(requirements(pe).display_status).to eq("Complete")
-      expect_parity(pe)
     end
 
     it "leaves out the steps for modules the event has switched off" do
@@ -81,21 +68,18 @@ RSpec.describe Registration::Requirements do
     it "waits on the participant for guardian details" do
       expect(requirements(pe).blocking.key).to eq("guardian_details")
       expect(requirements(pe).stage).to eq("in_progress")
-      expect_parity(pe)
     end
 
     it "waits on the guardian for the portal and their signature" do
       link = create(:guardian_participant_event, participant_event: pe, status: :pending)
       expect(requirements(pe).blocking.key).to eq("guardian_portal")
       expect(requirements(pe).stage).to eq("awaiting_guardian")
-      expect_parity(pe)
 
       link.update!(status: :completed)
       create(:consent, participant_event: pe, status: :sent)
       expect(requirements(pe).blocking.key).to eq("waiver")
       expect(requirements(pe).stage).to eq("awaiting_guardian")
       expect(requirements(pe).display_status).to eq("Awaiting Parent")
-      expect_parity(pe)
     end
 
     it "hands the waiver back to the participant once the guardian has signed" do
@@ -104,7 +88,6 @@ RSpec.describe Registration::Requirements do
 
       expect(requirements(pe).waiting_on).to eq(:participant)
       expect(requirements(pe).stage).to eq("in_progress")
-      expect_parity(pe)
     end
 
     it "is complete once the guardian has finished and the waiver is signed" do
@@ -112,7 +95,6 @@ RSpec.describe Registration::Requirements do
       create(:consent, :signed, participant_event: pe)
 
       expect(requirements(pe).stage).to eq("complete")
-      expect_parity(pe)
     end
 
     it "requires the freedom waiver when the event uses them" do
@@ -121,7 +103,6 @@ RSpec.describe Registration::Requirements do
       create(:consent, :signed, participant_event: pe)
 
       expect(requirements(pe).blocking.key).to eq("freedom_waiver")
-      expect_parity(pe)
     end
   end
 
@@ -164,6 +145,55 @@ RSpec.describe Registration::Requirements do
     end
   end
 
+  describe "#completable?" do
+    let(:pe) { create(:participant_event, participant: adult, event: event) }
+
+    it "needs the submission and the signature" do
+      expect(requirements(pe)).not_to be_completable
+
+      submit(pe)
+      expect(requirements(pe)).not_to be_completable
+
+      create(:consent, :signed, participant_event: pe)
+      expect(requirements(pe)).to be_completable
+    end
+
+    it "doesn't wait on data, which nothing would complete afterwards" do
+      submit(pe)
+      create(:consent, :signed, participant_event: pe)
+
+      expect(requirements(pe).blocking.key).to eq("travel")
+      expect(requirements(pe)).to be_completable
+    end
+
+    it "can answer as if the participant had submitted" do
+      create(:consent, :signed, participant_event: pe)
+
+      expect(requirements(pe)).not_to be_completable
+      expect(requirements(pe).completable?(ignoring_submission: true)).to be(true)
+    end
+
+    it "needs every guardian to have finished for a minor" do
+      minor_pe = create(:participant_event, participant: minor, event: event, code_of_conduct_accepted_at: Time.current)
+      create(:consent, :signed, participant_event: minor_pe)
+      expect(requirements(minor_pe)).not_to be_completable
+
+      link = create(:guardian_participant_event, participant_event: minor_pe, status: :in_progress)
+      expect(requirements(minor_pe)).not_to be_completable
+
+      link.update_columns(status: "completed")
+      expect(requirements(minor_pe)).to be_completable
+    end
+
+    it "is never true for a withdrawn registration" do
+      submit(pe)
+      create(:consent, :signed, participant_event: pe)
+      pe.update_columns(status: "withdrawn")
+
+      expect(requirements(pe)).not_to be_completable
+    end
+  end
+
   describe "staff decisions" do
     %w[withdrawn rejected].each do |status|
       it "keeps a #{status} registration #{status} whatever its progress" do
@@ -172,8 +202,7 @@ RSpec.describe Registration::Requirements do
 
         expect(requirements(pe).stage).to eq(status)
         expect(requirements(pe).display_status).to eq(status.capitalize)
-        expect_parity(pe)
-      end
+        end
     end
   end
 end
