@@ -45,9 +45,9 @@ module Api
 
       def set_ticket
         # Preloads mirror what ticket_json(detailed: true) actually reads:
-        # display_status walks onboarding progress (travel, accommodation,
+        # onboarding progress walks travel, accommodation,
         # medical/dietary/accessibility, guardians + their emergency contacts,
-        # consents, custom documents), checked_in? reads scans + scan contexts,
+        # consents and custom documents, checked_in? reads scans + scan contexts,
         # travel_json renders inbound legs, and event_json builds logo/banner
         # URLs. message_deliveries is intentionally absent — messages_json
         # builds its own filtered query.
@@ -71,7 +71,7 @@ module Api
 
         # "Confirmed" = the attendee has finished onboarding. Only confirmed
         # tickets get a scannable check-in QR; others are sent to onboarding.
-        confirmed = participant_event.display_status == "Complete"
+        confirmed = participant_event.complete?
 
         json = {
           id: participant_event.id,

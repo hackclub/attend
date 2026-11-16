@@ -48,7 +48,6 @@ RSpec.describe Registration::Requirements, fiat_registrations: true do
       create(:consent, :signed, participant_event: pe)
       expect(requirements(pe)).to be_met
       expect(requirements(pe).stage).to eq("complete")
-      expect(requirements(pe).display_status).to eq("Complete")
     end
 
     it "leaves out the steps for modules the event has switched off" do
@@ -81,7 +80,6 @@ RSpec.describe Registration::Requirements, fiat_registrations: true do
       create(:consent, participant_event: pe, status: :sent)
       expect(requirements(pe).blocking.key).to eq("waiver")
       expect(requirements(pe).stage).to eq("awaiting_guardian")
-      expect(requirements(pe).display_status).to eq("Awaiting Parent")
     end
 
     it "hands the waiver back to the participant once the guardian has signed" do
@@ -214,7 +212,6 @@ RSpec.describe Registration::Requirements, fiat_registrations: true do
         pe.update_columns(status: status)
 
         expect(requirements(pe).stage).to eq(status)
-        expect(requirements(pe).display_status).to eq(status.capitalize)
         end
     end
   end

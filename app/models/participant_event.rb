@@ -278,12 +278,8 @@ class ParticipantEvent < ApplicationRecord
   # Resending the onboarding invitation only helps while the participant still
   # owes us their own information. Once they've submitted, what's outstanding
   # is the guardian's part, chased by resending the guardian invite instead.
-  #
-  # Deliberately keyed off display_status rather than the status column: the
-  # column lags behind reality, and the menu item has to agree with the badge
-  # staff are looking at on the same page.
   def invitation_resendable?
-    display_status == "Awaiting Participant"
+    invited? || in_progress?
   end
 
   # Removing someone from an event has to take their invitation with it. An
@@ -547,16 +543,33 @@ class ParticipantEvent < ApplicationRecord
     true
   end
 
-  # Computed display status for the UI. Maps the DB status + actual progress
-  # into one of 3 user-facing labels (plus withdrawn/rejected for admin states).
+  # The status in the words staff and participants see. The status column
+  # already follows what the registration needs (#sync_status!), so this is
+  # only a label for it, and lists, filters and counts can all work from the
+  # column.
   #
-  # - "Awaiting Participant" — participant has steps to complete (includes invited)
-  # - "Awaiting Parent"      — participant done, blocked on guardian/waiver
+  # - "Awaiting Participant" — the next step is the participant's (includes invited)
+  # - "Awaiting Parent"      — the next step is their guardian's
   # - "Complete"             — everything done
-  DISPLAY_STATUSES = [ "Awaiting Participant", "Awaiting Parent", "Complete", "Withdrawn", "Rejected" ].freeze
+  DISPLAY_STATUS = {
+    "invited" => "Awaiting Participant",
+    "in_progress" => "Awaiting Participant",
+    "awaiting_guardian" => "Awaiting Parent",
+    "complete" => "Complete",
+    "withdrawn" => "Withdrawn",
+    "rejected" => "Rejected"
+  }.freeze
+  DISPLAY_STATUSES = DISPLAY_STATUS.values.uniq.freeze
 
   def display_status
-    registration_requirements.display_status
+    DISPLAY_STATUS.fetch(status)
+  end
+
+  # { "Complete" => 12, "Awaiting Parent" => 3, ... } for a scope, in one query.
+  def self.display_status_counts(scope = all)
+    scope.group(:status).count.each_with_object(Hash.new(0)) do |(status, count), counts|
+      counts[DISPLAY_STATUS.fetch(status)] += count
+    end
   end
 
   # Returns a hash describing exactly where this participant is in the onboarding process.

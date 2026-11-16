@@ -2,10 +2,9 @@ module Registration
   # The one list of what a registration needs before it is complete, and who
   # each item is waiting on.
   #
-  # ParticipantEvent's badge (#display_status, #onboarding_progress) and its
-  # completion gate (#eligible_for_completion?) both read this, so they can't
-  # disagree about what's outstanding, and the status column follows it
-  # through ParticipantEvent#sync_status!.
+  # ParticipantEvent's status column follows this through #sync_status!, and
+  # #onboarding_progress and #eligible_for_completion? read it too, so the
+  # status, the badge and the list of what's outstanding can't disagree.
   class Requirements
     # kind:  :data (something the participant fills in), :submission (the code
     #        of conduct, which is what "submitted" means) or :document
@@ -15,12 +14,6 @@ module Registration
       def met? = met
       def unmet? = !met
     end
-
-    DISPLAY = {
-      complete: "Complete",
-      guardian: "Awaiting Parent",
-      participant: "Awaiting Participant"
-    }.freeze
 
     attr_reader :participant_event
 
@@ -87,14 +80,6 @@ module Registration
       return "awaiting_guardian" if waiting_on == :guardian
 
       "in_progress"
-    end
-
-    # Same labels as ParticipantEvent#display_status.
-    def display_status
-      return "Withdrawn" if pe.withdrawn?
-      return "Rejected" if pe.rejected?
-
-      DISPLAY.fetch(waiting_on || :complete)
     end
 
     # Same shape as ParticipantEvent#onboarding_progress.

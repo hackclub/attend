@@ -23,7 +23,8 @@ module RegistrationRequirementsHelpers
       end
     end
 
-    participant_event.reload
+    # reload leaves the record's memoised requirements behind
+    participant_event.reload.reset_document_memoisation!
   end
 
   # Meets every requirement (bar `except`) and lets the status follow, quietly:
@@ -31,7 +32,8 @@ module RegistrationRequirementsHelpers
   def complete_registration(participant_event, except: [])
     meet_registration_requirements(participant_event, except: except)
     participant_event.sync_status!(cause: :requirements_met, notify: false)
-    participant_event.reload
+    # reload leaves the record's memoised requirements behind
+    participant_event.reload.reset_document_memoisation!
   end
 
   ANSWERS = %w[travel accommodation health emergency_contacts].freeze
@@ -45,7 +47,8 @@ module RegistrationRequirementsHelpers
       end
     end
 
-    participant_event.reload
+    # reload leaves the record's memoised requirements behind
+    participant_event.reload.reset_document_memoisation!
   end
 
   def self.meet(participant_event, key)

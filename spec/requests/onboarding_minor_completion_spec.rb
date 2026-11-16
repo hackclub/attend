@@ -119,13 +119,45 @@ RSpec.describe "Onboarding completion for minors", type: :request do
       expect(flash[:alert]).to include("cannot be edited")
     end
 
-    it "lets them back in when one of their answers has gone missing" do
+    context "and one of their answers has gone missing" do
+      before do
+        participant_event.travel_inbound.destroy!
+        expect(participant_event.reload).to be_in_progress
+      end
+
+      it "lets them back in to that step" do
+        get onboarding_step_path(step: "travel", event_id: event.id)
+
+        expect(response).to have_http_status(:ok)
+      end
+
+      # Everything else is still what they submitted, and what their guardian
+      # is signing for. A date of birth edit here could drop the guardian
+      # requirement altogether.
+      it "keeps every other step shut, pointing them at the one that's missing" do
+        get onboarding_step_path(step: "profile", event_id: event.id)
+        expect(response).to redirect_to(onboarding_step_path(step: "travel", event_id: event.id))
+
+        patch onboarding_step_path(step: "profile", event_id: event.id),
+          params: { participant: { date_of_birth: 30.years.ago.to_date } }
+        expect(response).to redirect_to(onboarding_step_path(step: "travel", event_id: event.id))
+        expect(participant.reload.date_of_birth).to eq(15.years.ago.to_date)
+
+        post complete_onboarding_path(event_id: event.id),
+          params: { code_of_conduct_accepted: "1", code_of_conduct_signature: "Test Minor" }
+        expect(response).to redirect_to(onboarding_step_path(step: "travel", event_id: event.id))
+      end
+    end
+
+    it "stays shut for a complete registration, whatever has gone missing since the event began" do
+      complete_registration(participant_event)
+      event.update_columns(starts_at: 1.hour.ago, ends_at: 2.days.from_now)
       participant_event.travel_inbound.destroy!
-      expect(participant_event.reload).to be_in_progress
+      expect(participant_event.reload).to be_complete
 
       get onboarding_step_path(step: "travel", event_id: event.id)
 
-      expect(response).to have_http_status(:ok)
+      expect(response).to redirect_to(dashboard_path)
     end
   end
 end

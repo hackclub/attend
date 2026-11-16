@@ -1628,18 +1628,45 @@ class OnboardingController < ApplicationController
     redirect_to dashboard_path, alert: "Your registration has been withdrawn from this event."
   end
 
+  # The wizard step that fills in each requirement a participant can be
+  # missing after they've submitted.
+  STEP_FOR_MISSING_REQUIREMENT = {
+    "profile" => "profile",
+    "travel" => "travel",
+    "accommodation" => "accommodation",
+    "health" => "health",
+    "guardian_details" => GUARDIAN_STEP
+  }.freeze
+
   # Once submitted, a minor's answers are what their guardian is signing
   # for, and a complete registration is what the ticket was issued on.
   def redirect_if_locked
     # Accepting the code of conduct is what submitting means.
     return if @participant_event.code_of_conduct_accepted_at.blank?
     return unless @participant_event.complete? || @participant_event.requires_guardian?
+
     # Something of theirs is missing (a guardian never linked, an answer
-    # removed, a module the event switched on since): let them back in to
-    # fix it.
-    return if @participant_event.registration_requirements.blocking&.kind == :data
+    # removed, a module the event switched on since). They get that one step
+    # back and nothing else: the rest is still what they submitted.
+    if (step = missing_step_after_submission)
+      return if params[:step] == step && %w[show update].include?(action_name)
+
+      redirect_to onboarding_step_path(step: step, event_id: current_event.id),
+                  alert: "One part of your registration needs another look before it can be confirmed."
+      return
+    end
 
     redirect_to dashboard_path, alert: "Your registration has been submitted and cannot be edited."
+  end
+
+  def missing_step_after_submission
+    return if @participant_event.complete?
+
+    blocking = @participant_event.registration_requirements.blocking
+    return unless blocking&.kind == :data
+
+    step = STEP_FOR_MISSING_REQUIREMENT[blocking.key]
+    step if steps.include?(step)
   end
 
   def store_invitation_token

@@ -1184,8 +1184,8 @@ module Admin
       end
     end
 
-    # What grouping reads: display_status walks most of onboarding, and the
-    # other group keys read a single association each.
+    # What grouping reads: the blocking-step and onboarding groups walk most
+    # of onboarding, and the other group keys read a single association each.
     TABLE_GROUPING_INCLUDES = [
       :participant, :travel_inbound, :travel_outbound, :accommodation, :medical,
       :dietary, :accessibility, :safeguarding_info, :consents, :emergency_contacts,
@@ -1199,7 +1199,7 @@ module Admin
       { room_assignments: { room: [ :rooming_context, { participant_events: :participant } ] } }
     ].freeze
 
-    # Groups are Ruby (display_status and friends aren't SQL), so a grouped
+    # Groups are Ruby (most group keys aren't SQL), so a grouped
     # table still loads every matching row to bucket it — but only the page it
     # renders gets the cell-only preloads. A participant in several groups
     # (group_by "group") is a row in each, so pages count rows, not people.
@@ -1768,7 +1768,7 @@ module Admin
     # Why there's nothing to invite them to, in the words of the status badge
     # the admin is looking at.
     def nothing_to_invite_error(participant)
-      if @participant_event.display_status == "Awaiting Parent"
+      if @participant_event.awaiting_guardian?
         "#{participant.display_name} has submitted their information — what's outstanding is their guardian's. Resend the guardian invite instead."
       else
         "#{participant.display_name} has already finished onboarding."

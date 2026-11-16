@@ -192,13 +192,15 @@ RSpec.describe RegistrationCompletionPresenter do
     expect(confirmed.state).to eq(:confirmed)
   end
 
-  it "does not confirm a stale complete row with a newly outstanding document" do
-    create(:consent, :signed, participant_event: participant_event)
-    participant_event.update!(status: :complete)
+  # The status follows the requirements, so a new document reopens a complete
+  # registration and takes the confirmation with it.
+  it "does not confirm a complete registration once a new document is outstanding" do
+    complete_registration(participant_event)
     document = create(:custom_document, event: event)
     create(:consent, participant_event: participant_event, consent_type: :custom_document,
       custom_document: document, docuseal_participant_slug: "participant")
 
+    expect(participant_event.reload).not_to be_complete
     presenter = presentation(:participant)
 
     expect(presenter).not_to be_confirmed

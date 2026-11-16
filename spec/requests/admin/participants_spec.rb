@@ -346,10 +346,9 @@ RSpec.describe "Admin::Participants", type: :request do
   describe "POST resend_invitation" do
     before { sign_in global_admin }
 
-    # display_status is computed from the data, not the status column, so each
-    # case has to be built out of the real onboarding shape — code of conduct
-    # included, since accepting it is what "the participant has submitted"
-    # means.
+    # The status follows the data, so each case has to be built out of the
+    # real onboarding shape — code of conduct included, since accepting it is
+    # what "the participant has submitted" means.
     def onboarded!(pe, waiver: :pending)
       pe.update!(code_of_conduct_accepted_at: Time.current)
       pe.travels.create!(direction: "inbound", mode: "car")

@@ -235,7 +235,7 @@ class Admin::DashboardController < Admin::BaseController
 
     @total_participants = @active_participant_events.count
     @status_counts = @participant_events.group(:status).count
-    @display_status_counts = compute_display_status_counts
+    @display_status_counts = ParticipantEvent.display_status_counts(@participant_events)
     @pending_invitations_count = current_event.invitations.pending.count
 
     # Travel stats
@@ -274,17 +274,6 @@ class Admin::DashboardController < Admin::BaseController
 
     # Staff count
     @staff_count = current_event.event_role_assignments.count
-  end
-
-  def compute_display_status_counts
-    counts = Hash.new(0)
-    @participant_events.includes(:consents, :travel_inbound, :travel_outbound,
-                                  :accommodation, :medical, :dietary, :accessibility, :safeguarding_info,
-                                  :emergency_contacts, :participant, { event: :custom_documents },
-                                  guardian_participant_events: :emergency_contacts).find_each do |pe|
-      counts[pe.display_status] += 1
-    end
-    counts
   end
 
   def compute_travel_stats

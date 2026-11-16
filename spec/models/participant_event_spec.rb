@@ -275,6 +275,34 @@ RSpec.describe ParticipantEvent, type: :model do
     end
   end
 
+  describe "#display_status" do
+    it "is a label for the stored status" do
+      expect(ParticipantEvent.statuses.keys.index_with { |status| build(:participant_event, status: status).display_status }).to eq(
+        "invited" => "Awaiting Participant", "in_progress" => "Awaiting Participant",
+        "awaiting_guardian" => "Awaiting Parent", "complete" => "Complete",
+        "withdrawn" => "Withdrawn", "rejected" => "Rejected"
+      )
+    end
+
+    it "counts a scope by label in one query" do
+      event = create(:event)
+      create(:participant_event, event: event, status: :invited)
+      create(:participant_event, event: event, status: :in_progress)
+      create(:participant_event, event: event, status: :awaiting_guardian)
+      create(:participant_event, status: :complete)
+
+      queries = []
+      counter = ->(*, payload) { queries << payload[:sql] unless payload[:name] == "SCHEMA" }
+      counts = ActiveSupport::Notifications.subscribed(counter, "sql.active_record") do
+        ParticipantEvent.display_status_counts(event.participant_events)
+      end
+
+      expect(counts).to eq("Awaiting Participant" => 2, "Awaiting Parent" => 1)
+      expect(counts["Complete"]).to eq(0)
+      expect(queries.size).to eq(1)
+    end
+  end
+
   describe "status following requirements" do
     let(:event) { create(:event) }
 
