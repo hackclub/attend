@@ -201,6 +201,7 @@ class Event < ApplicationRecord
   after_save :geocode_location, if: :should_geocode?
   after_save :queue_place_id_resolution, if: :should_resolve_place_ids?
   after_save :send_pending_guardian_invites, if: :guardian_invites_just_unlocked?
+  after_update_commit :resync_registrations, if: :registration_requirements_just_changed?
   after_save :send_held_onboarding_invites, if: :onboarding_invites_just_released?
   after_save :mark_hotel_scan_context_as_lodging, if: :saved_change_to_hotel_scan_context_id?
 
@@ -953,6 +954,25 @@ class Event < ApplicationRecord
   # so by the time this fires the job can read them off the fresh record.
   def queue_place_id_resolution
     ResolveVenuePlaceIdsJob.perform_later(id)
+  end
+
+  # The settings Registration::Requirements reads. Changing one changes what
+  # every registration here needs, so their statuses are re-derived.
+  REGISTRATION_REQUIREMENT_SETTINGS = %w[travel_enabled accommodation_enabled freedom_waivers_enabled].freeze
+
+  def registration_requirements_just_changed?
+    # The start date decides who is a minor at the event.
+    return true if saved_change_to_starts_at?
+    return false unless saved_change_to_config?
+
+    old_config = config_before_last_save || {}
+    REGISTRATION_REQUIREMENT_SETTINGS.any? do |setting|
+      ActiveModel::Type::Boolean.new.cast(old_config[setting]) != ActiveModel::Type::Boolean.new.cast(config[setting])
+    end
+  end
+
+  def resync_registrations
+    ResyncRegistrationsJob.perform_later(id)
   end
 
   def guardian_invites_just_unlocked?

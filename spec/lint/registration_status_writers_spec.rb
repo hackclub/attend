@@ -1,7 +1,7 @@
 require "rails_helper"
 
 # A registration's status is only written by ParticipantEvent#transition_to!
-# (and #reopen! / #mark_complete_if_eligible!, which go through it), so every
+# (and #sync_status! / #set_by_staff!, which go through it), so every
 # change carries a cause. The model records anything that slips past as
 # "untracked", but that's a safety net: this keeps new ones out of app code.
 RSpec.describe "Registration status writers" do
@@ -26,9 +26,19 @@ RSpec.describe "Registration status writers" do
 
     expect(offenders).to be_empty, <<~MESSAGE
       These write a registration's status directly. Use
-      ParticipantEvent#transition_to!(status, cause: ...) instead:
+      ParticipantEvent#sync_status!(cause: ...) to follow requirements, or
+      #set_by_staff! to withdraw, reject or reinstate:
 
       #{offenders.join("\n")}
     MESSAGE
+  end
+
+  # A cause that isn't in the enum only fails when that path first runs.
+  it "only names causes Registration::Transition knows" do
+    used = Dir[Rails.root.join("{app,lib}/**/*.{rb,rake}")].flat_map do |path|
+      File.read(path).scan(/cause(?::| =) [:"](\w+)/).flatten
+    end
+
+    expect(used.uniq - Registration::Transition.causes.keys).to be_empty
   end
 end

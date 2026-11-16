@@ -20,6 +20,10 @@ default: &default
   sync_org_support_slack_channel:
     class: SyncOrgSupportSlackChannelJob
     schedule: every day at 9am
+  # Should always find nothing; see the job.
+  registration_drift_check:
+    class: RegistrationDriftCheckJob
+    schedule: every day at 4am
   # Photos uploaded straight to storage from a form that was never submitted.
   purge_unattached_blobs:
     class: PurgeUnattachedBlobsJob

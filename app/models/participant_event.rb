@@ -154,12 +154,61 @@ class ParticipantEvent < ApplicationRecord
     self.rejection_change_authorized = nil
   end
 
-  # Something this registration had is gone or newly owed (a signature
-  # discarded, a document added), so it isn't complete any more.
-  def reopen!(cause:, actor: Current.user)
-    return false unless complete?
+  # The statuses staff may set by hand. Everything else follows what the
+  # registration still needs, so there is nothing to set: fix the missing
+  # requirement and the status moves by itself.
+  STAFF_SETTABLE_STATUSES = %w[withdrawn rejected in_progress].freeze
 
-    transition_to!(:in_progress, cause: cause, actor: actor)
+  # Withdraw or reject, or with in_progress undo either. The caller checks
+  # ParticipantEventPolicy#change_status? first.
+  def set_by_staff!(new_status, actor: Current.user, metadata: {})
+    new_status = new_status.to_s
+    raise ArgumentError, "#{new_status} can't be set by hand" unless STAFF_SETTABLE_STATUSES.include?(new_status)
+
+    if new_status == "in_progress"
+      reinstate!(actor: actor, metadata: metadata)
+    else
+      transition_to!(new_status, cause: new_status, actor: actor, rejection_authorized: true, metadata: metadata)
+    end
+  end
+
+  # Back from withdrawn or rejected to wherever its requirements put it.
+  # For a registration that's neither, this is just a sync.
+  def reinstate!(actor: Current.user, metadata: {})
+    transition_to!(:in_progress, cause: :reinstated, actor: actor, rejection_authorized: true, metadata: metadata) if inactive?
+    sync_status!(cause: :reinstated, actor: actor)
+  end
+
+  # Brings the status in line with what the registration still needs (see
+  # Registration::Requirements#stage). Called whenever something a
+  # requirement reads has changed; safe to call at any time.
+  #
+  # Returns true when the status changed. notify: false keeps it quiet, for
+  # backfills.
+  def sync_status!(cause:, actor: Current.user, notify: true)
+    return false if new_record? || destroyed?
+
+    # Concurrent webhooks (or a webhook racing a guardian's commit hook) can
+    # both get here. Deriving under a row lock means only one of them makes
+    # the change and sends the email.
+    changed = with_lock do
+      reset_document_memoisation!
+      target = Registration::Requirements.new(self).stage
+      next false if target == status
+
+      self.onboarding_completed_at ||= Time.current if target == "complete"
+      transition_to!(target, cause: cause, actor: actor)
+    end
+
+    if notify
+      if changed && complete?
+        ParticipantMailer.registration_confirmed(participant_event: self).deliver_later unless reopened_for_data_only?
+      elsif !complete?
+        remind_to_submit_if_only_step_left
+      end
+    end
+
+    changed
   end
 
   # SQL mirror of !onboarding_complete? so list filters don't have to load
@@ -329,7 +378,12 @@ class ParticipantEvent < ApplicationRecord
   # document reopens a completed participant, so in_progress on its own
   # doesn't mean this.
   def in_onboarding?
-    invited? || (in_progress? && onboarding_completed_at.nil?)
+    return true if invited?
+    return false if complete? || inactive? || onboarding_completed_at.present?
+
+    # A minor who has submitted is waiting on their guardian's side, or on
+    # their own countersignature, not on the wizard.
+    !(code_of_conduct_accepted_at.present? && requires_guardian?)
   end
 
   def assigned_to_room?
@@ -462,29 +516,12 @@ class ParticipantEvent < ApplicationRecord
     Registration::Requirements.new(self).completable?(ignoring_submission: ignoring_submission)
   end
 
+  # Syncs, and says whether that completed the registration just now.
+  #
   # cause: what just happened that might have been the last piece, for the
   # transition record.
   def mark_complete_if_eligible!(cause: :requirements_met)
-    return false if complete?
-
-    unless eligible_for_completion?
-      remind_to_submit_if_only_step_left
-      return false
-    end
-
-    # Concurrent webhooks (or a webhook racing a guardian's commit hook) can
-    # both get this far. Re-check under a row lock so only one of them
-    # completes the registration and sends the confirmation email.
-    completed_now = with_lock do
-      reset_document_memoisation!
-      next false if complete? || !eligible_for_completion?
-
-      self.onboarding_completed_at ||= Time.current
-      transition_to!(:complete, cause: cause)
-    end
-
-    ParticipantMailer.registration_confirmed(participant_event: self).deliver_later if completed_now
-    completed_now
+    sync_status!(cause: cause) && complete?
   end
 
   SUBMISSION_REMINDER_DELAY = 15.minutes
@@ -494,9 +531,8 @@ class ParticipantEvent < ApplicationRecord
   # resend, the portal center) and do their whole part. Submitting, the review
   # step where they agree to the code of conduct, is then the only thing left,
   # and nothing else would ever prompt them, so the registration sat
-  # in_progress with every signature in. Every completion hook comes through
-  # #mark_complete_if_eligible!, so this is where we notice and email them,
-  # once.
+  # in_progress with every signature in. Every change comes through
+  # #sync_status!, so that is where we notice and email them, once.
   def remind_to_submit_if_only_step_left
     return false if code_of_conduct_accepted_at.present?
     return false unless eligible_for_completion?(ignoring_submission: true)
@@ -663,6 +699,13 @@ class ParticipantEvent < ApplicationRecord
     return unless too_old_for_event?
 
     errors.add(:base, "You will be 19 or older during this event. Please contact event staff for assistance.")
+  end
+
+  # Whether the last thing to take this registration out of complete was an
+  # answer going missing. Filling it back in isn't news: they were confirmed
+  # before, so they don't get the confirmation email a second time.
+  def reopened_for_data_only?
+    registration_transitions.where(from_status: "complete").order(created_at: :desc).first&.caused_by_data_changed? || false
   end
 
   def record_initial_transition

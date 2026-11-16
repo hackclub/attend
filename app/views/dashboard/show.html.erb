@@ -200,7 +200,7 @@
               Invitation sent <%= time_ago_in_words(gpe.invite_token_sent_at) %> ago — waiting on them to complete their portion
             <% elsif guardian_invites_paused %>
               Guardian invitations are currently paused. No invitation was sent, and your ticket remains unavailable until the required guardian steps can be completed.
-            <% elsif @participant_event.in_progress? || @participant_event.invited? %>
+            <% elsif @participant_event.code_of_conduct_accepted_at.blank? %>
               Not invited yet — we'll email them once you submit your registration
             <% else %>
               Invitation hasn't gone out yet.
@@ -210,7 +210,7 @@
             <p class="text-sm text-(--text-muted) mt-2">Remaining before your ticket is ready: <%= other_remaining_tasks.map(&:name).uniq.to_sentence %>.</p>
           <% end %>
         </div>
-        <% if guardian_pending && !guardian_invites_paused && !@participant_event.in_progress? && !@participant_event.invited? %>
+        <% if guardian_pending && !guardian_invites_paused && @participant_event.code_of_conduct_accepted_at.present? %>
           <%= button_to gpe.invite_token_sent_at ? "Resend invitation" : "Send invitation",
               dashboard_resend_guardian_invite_path(@participant_event),
               method: :post,

@@ -7,6 +7,9 @@ class Travel < ApplicationRecord
   self.implicit_order_column = "created_at"
 
   belongs_to :participant_event
+
+  include SyncsRegistration
+  syncs_registration cause: :data_changed
   has_one :participant, through: :participant_event
   has_one :event, through: :participant_event
   has_many :travel_legs, -> { order(position: :asc) }, dependent: :destroy

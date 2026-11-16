@@ -9,8 +9,10 @@ RSpec.describe "Guardian portal automatic completion", type: :request do
   let(:event) { create(:event, freedom_waivers_enabled: true) }
   let(:participant) { create(:participant, date_of_birth: 15.years.ago) }
   let(:participant_event) do
-    create(:participant_event, participant: participant, event: event,
-      status: :awaiting_guardian, code_of_conduct_accepted_at: Time.current)
+    fill_in_registration_answers(
+      create(:participant_event, participant: participant, event: event,
+        status: :awaiting_guardian, code_of_conduct_accepted_at: Time.current)
+    )
   end
   let!(:gpe) do
     create(:guardian_participant_event, :details_reviewed, participant_event: participant_event, status: :in_progress,

@@ -6,6 +6,9 @@ class Consent < ApplicationRecord
   has_paper_trail
 
   belongs_to :participant_event
+
+  include SyncsRegistration
+  syncs_registration cause: :documents_changed
   belongs_to :guardian_participant_event, optional: true
   belongs_to :custom_document, optional: true
 

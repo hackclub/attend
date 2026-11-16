@@ -370,6 +370,10 @@ class OnboardingController < ApplicationController
     update_user_name_from_participant
     request_um_review
 
+    # Submitting is a requirement like any other: a minor moves on to waiting
+    # for their guardian, and someone whose signatures are already in is done.
+    @participant_event.sync_status!(cause: :submitted)
+
     if @participant_event.requires_guardian?
       if @participant_event.guardian_participant_events.empty?
         redirect_to onboarding_step_path(step: GUARDIAN_STEP, event_id: current_event.id),
@@ -377,18 +381,10 @@ class OnboardingController < ApplicationController
         return
       end
 
-      # Staff may already have marked the registration complete by hand, or
-      # withdrawn or rejected it while the participant still had the wizard
-      # open; submitting late shouldn't undo any of that.
-      unless @participant_event.complete? || @participant_event.inactive?
-        @participant_event.transition_to!(:awaiting_guardian, cause: :submitted)
-      end
-
-      # The guardian can finish everything — waiver and portal — before the
-      # participant hits submit. Every other completion hook already ran and
-      # bailed on the missing code of conduct, so accepting it here can be the
-      # last piece; nothing else would re-check.
-      if @participant_event.mark_complete_if_eligible!(cause: :submitted)
+      # The guardian can finish everything, waiver and portal, before the
+      # participant hits submit, so accepting the code of conduct just now
+      # may have been the last piece.
+      if @participant_event.complete?
         redirect_after_submit
       elsif current_event.guardian_invites_locked? || Setting.waiver_sending_paused?
         redirect_after_submit
@@ -1446,7 +1442,7 @@ class OnboardingController < ApplicationController
     return false if @participant_event.code_of_conduct_accepted_at.blank?
 
     if @participant_event.requires_guardian?
-      @participant_event.awaiting_guardian? || @participant_event.complete?
+      @participant_event.guardian_participant_events.any?
     else
       @participant_event.emergency_contacts.any?
     end
@@ -1632,30 +1628,16 @@ class OnboardingController < ApplicationController
     redirect_to dashboard_path, alert: "Your registration has been withdrawn from this event."
   end
 
+  # Once submitted, a minor's answers are what their guardian is signing
+  # for, and a complete registration is what the ticket was issued on.
   def redirect_if_locked
-    return unless @participant_event.awaiting_guardian? || @participant_event.complete?
-
-    # Staff can set either status by hand before the participant has
-    # submitted. Accepting the code of conduct is what submitting means, and
-    # only the participant can do it, so locking them out here would leave the
-    # registration stuck for good.
-    if @participant_event.code_of_conduct_accepted_at.blank?
-      # Awaiting guardian is safe to reopen in full: submitting re-runs every
-      # check. A hand-set "complete" survives submit, so only let those
-      # participants sign, not edit answers the completion was based on.
-      return unless @participant_event.complete?
-      return if action_name == "complete" || (action_name == "show" && params[:step] == REVIEW_STEP)
-
-      redirect_to onboarding_step_path(step: REVIEW_STEP, event_id: current_event.id),
-                  alert: "Please agree to the Code of Conduct to finish your registration."
-      return
-    end
-
-    # Allow minors whose guardian was never linked to go back and add one
-    if @participant_event.awaiting_guardian? && @participant_event.guardian_participant_events.empty?
-      @participant_event.transition_to!(:in_progress, cause: :guardian_missing)
-      return
-    end
+    # Accepting the code of conduct is what submitting means.
+    return if @participant_event.code_of_conduct_accepted_at.blank?
+    return unless @participant_event.complete? || @participant_event.requires_guardian?
+    # Something of theirs is missing (a guardian never linked, an answer
+    # removed, a module the event switched on since): let them back in to
+    # fix it.
+    return if @participant_event.registration_requirements.blocking&.kind == :data
 
     redirect_to dashboard_path, alert: "Your registration has been submitted and cannot be edited."
   end

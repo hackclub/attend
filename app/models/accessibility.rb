@@ -13,6 +13,9 @@ class Accessibility < ApplicationRecord
                             :distance_limitations, :unavailable_times
 
   belongs_to :participant_event
+
+  include SyncsRegistration
+  syncs_registration cause: :data_changed
   has_one :participant, through: :participant_event
   has_one :event, through: :participant_event
 

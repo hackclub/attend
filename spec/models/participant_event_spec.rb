@@ -275,66 +275,137 @@ RSpec.describe ParticipantEvent, type: :model do
     end
   end
 
-  describe "#mark_complete_if_eligible!" do
+  describe "status following requirements" do
     let(:event) { create(:event) }
 
-    def adult_pe(evt = event)
-      create(:participant_event, event: evt, code_of_conduct_accepted_at: Time.current)
-        .tap { |pe| pe.participant.update!(date_of_birth: 18.years.ago - 1.month) }
+    def adult_pe(evt = event, **attributes)
+      pe = create(:participant_event, event: evt, code_of_conduct_accepted_at: Time.current,
+        participant: create(:participant, date_of_birth: 18.years.ago - 1.month), **attributes)
+      fill_in_registration_answers(pe)
     end
 
-    it "requires a signed waiver" do
+    def minor_pe(evt, **attributes)
+      pe = create(:participant_event, event: evt, code_of_conduct_accepted_at: Time.current,
+        participant: create(:participant, date_of_birth: 15.years.ago), **attributes)
+      fill_in_registration_answers(pe)
+    end
+
+    it "completes when the waiver is signed, and confirms once" do
       pe = adult_pe
 
       expect(pe.mark_complete_if_eligible!).to be false
       expect(pe.reload).not_to be_complete
 
-      create(:consent, :signed, participant_event: pe)
       expect {
-        expect(pe.reload.mark_complete_if_eligible!).to be true
+        create(:consent, :signed, participant_event: pe)
       }.to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
       expect(pe.reload).to be_complete
       expect(pe.onboarding_completed_at).to be_present
+      expect(pe.registration_transitions.chronological.last.cause).to eq("documents_changed")
+
       expect {
-        pe.reload.mark_complete_if_eligible!
+        expect(pe.mark_complete_if_eligible!).to be false
       }.not_to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
     end
 
-    it "never completes a withdrawn or rejected registration" do
+    it "waits for the participant's answers" do
+      pe = create(:participant_event, event: event, code_of_conduct_accepted_at: Time.current,
+        participant: create(:participant, date_of_birth: 18.years.ago - 1.month))
+      create(:consent, :signed, participant_event: pe)
+      expect(pe.reload).not_to be_complete
+
+      meet_registration_requirements(pe, except: "travel")
+      expect(pe.mark_complete_if_eligible!).to be false
+
+      pe.travels.create!(direction: "inbound", mode: "car")
+      expect(pe.reload).not_to be_complete
+      pe.travels.create!(direction: "outbound", mode: "car")
+      expect(pe.reload).to be_complete
+    end
+
+    it "reopens when an answer goes missing, and doesn't confirm again when it's back" do
       pe = adult_pe
       create(:consent, :signed, participant_event: pe)
+      expect(pe.reload).to be_complete
 
-      pe.withdrawn!
-      expect(pe.mark_complete_if_eligible!).to be false
-      pe.transition_to!(:rejected, cause: :staff_set, rejection_authorized: true)
+      pe.travel_inbound.destroy!
+      expect(pe.reload).to be_in_progress
+      expect(pe.registration_transitions.chronological.last).to have_attributes(cause: "data_changed", blocking_requirement: "travel")
+
+      expect {
+        pe.travels.create!(direction: "inbound", mode: "car")
+      }.not_to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
+      expect(pe.reload).to be_complete
+    end
+
+    it "confirms again when a signature had to be redone" do
+      pe = adult_pe
+      consent = create(:consent, :signed, participant_event: pe)
+
+      consent.update!(status: :sent)
+      expect(pe.reload).to be_in_progress
+
+      expect {
+        consent.update!(status: :signed)
+      }.to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
+    end
+
+    it "leaves a complete registration alone for missing answers once the event has started" do
+      pe = adult_pe
+      create(:consent, :signed, participant_event: pe)
+      event.update_columns(starts_at: 1.hour.ago, ends_at: 2.days.from_now)
+
+      pe.travel_inbound.destroy!
+
+      expect(pe.reload).to be_complete
+    end
+
+    it "never moves a withdrawn or rejected registration" do
+      pe = adult_pe
+      pe.set_by_staff!(:withdrawn)
+      create(:consent, :signed, participant_event: pe)
+      expect(pe.reload).to be_withdrawn
+
+      pe.set_by_staff!(:rejected)
       expect(pe.mark_complete_if_eligible!).to be false
       expect(pe.reload).to be_rejected
     end
 
-    it "refuses to complete before the registration is submitted" do
+    it "lands a reinstated registration wherever its requirements put it" do
       pe = adult_pe
-      pe.update!(code_of_conduct_accepted_at: nil)
       create(:consent, :signed, participant_event: pe)
+      pe.set_by_staff!(:withdrawn)
 
-      expect(pe.mark_complete_if_eligible!).to be false
+      pe.set_by_staff!(:in_progress)
+
+      expect(pe.reload).to be_complete
+      expect(pe.registration_transitions.chronological.last(2).map(&:cause)).to eq(%w[reinstated reinstated])
+    end
+
+    it "refuses any other status set by hand" do
+      expect { adult_pe.set_by_staff!(:complete) }.to raise_error(ArgumentError, /can't be set by hand/)
+    end
+
+    it "doesn't complete before the registration is submitted" do
+      pe = adult_pe(event, code_of_conduct_accepted_at: nil)
+      create(:consent, :signed, participant_event: pe)
+      expect(pe.reload).not_to be_complete
 
       pe.update!(code_of_conduct_accepted_at: Time.current)
-      expect(pe.mark_complete_if_eligible!).to be true
+      expect(pe.mark_complete_if_eligible!(cause: :submitted)).to be true
     end
 
     # Signatures (and a guardian's whole part) can all land before the
     # participant submits, and nothing else would prompt them to come back.
     it "emails the participant once when submitting is the only thing left" do
-      pe = adult_pe
-      pe.update!(code_of_conduct_accepted_at: nil)
+      pe = adult_pe(event, code_of_conduct_accepted_at: nil)
 
       expect {
         expect(pe.mark_complete_if_eligible!).to be false
       }.not_to have_enqueued_mail(ParticipantMailer, :submission_needed)
 
-      create(:consent, :signed, participant_event: pe)
       expect {
-        expect(pe.reload.mark_complete_if_eligible!).to be false
+        create(:consent, :signed, participant_event: pe)
       }.to have_enqueued_mail(ParticipantMailer, :submission_needed)
       expect(pe.reload.submission_reminder_sent_at).to be_present
 
@@ -345,26 +416,21 @@ RSpec.describe ParticipantEvent, type: :model do
 
     it "doesn't send the submit reminder once the participant has submitted" do
       pe = adult_pe
-      create(:consent, :signed, participant_event: pe)
 
       expect {
-        pe.mark_complete_if_eligible!
+        create(:consent, :signed, participant_event: pe)
       }.not_to have_enqueued_mail(ParticipantMailer, :submission_needed)
       expect(pe.reload.submission_reminder_sent_at).to be_nil
     end
 
     it "sends the submit reminder for a minor once their guardian has finished" do
-      no_freedom_event = create(:event, freedom_waivers_enabled: false)
-      pe = create(:participant_event, event: no_freedom_event, status: :in_progress)
-      pe.participant.update!(date_of_birth: 15.years.ago)
+      pe = minor_pe(create(:event, freedom_waivers_enabled: false), code_of_conduct_accepted_at: nil)
       gpe = create(:guardian_participant_event, participant_event: pe, status: :pending)
-      create(:consent, :signed, participant_event: pe)
 
       expect {
-        pe.reload.mark_complete_if_eligible!
+        create(:consent, :signed, participant_event: pe)
       }.not_to have_enqueued_mail(ParticipantMailer, :submission_needed)
 
-      # The guardian finishing runs the completion check itself.
       expect {
         gpe.update!(status: :completed, completed_at: Time.current)
       }.to have_enqueued_mail(ParticipantMailer, :submission_needed)
@@ -373,65 +439,75 @@ RSpec.describe ParticipantEvent, type: :model do
 
     it "requires signed custom documents" do
       pe = adult_pe
-      create(:consent, :signed, participant_event: pe)
       doc = create(:custom_document, event: event)
-
-      expect(pe.mark_complete_if_eligible!).to be false
+      create(:consent, :signed, participant_event: pe)
+      expect(pe.reload).not_to be_complete
 
       create(:consent, :signed, participant_event: pe, consent_type: :custom_document, custom_document: doc)
-      expect(pe.reload.mark_complete_if_eligible!).to be true
+      expect(pe.reload).to be_complete
     end
 
     context "for minors" do
-      it "requires completed guardians but not a freedom waiver when the event has them disabled" do
-        no_freedom_event = create(:event, freedom_waivers_enabled: false)
-        pe = create(:participant_event, event: no_freedom_event, code_of_conduct_accepted_at: Time.current)
+      let(:no_freedom_event) { create(:event, freedom_waivers_enabled: false) }
+
+      it "waits on the guardian, then completes when they finish" do
+        pe = minor_pe(no_freedom_event)
         create(:consent, :signed, participant_event: pe)
+        expect(pe.reload).to be_in_progress
 
-        expect(pe.mark_complete_if_eligible!).to be false
-
-        create(:guardian_participant_event, participant_event: pe, status: :completed, completed_at: Time.current)
-        expect(pe.reload.mark_complete_if_eligible!).to be true
-      end
-
-      it "completes the participant when the guardian finishes last" do
-        no_freedom_event = create(:event, freedom_waivers_enabled: false)
-        pe = create(:participant_event, event: no_freedom_event, code_of_conduct_accepted_at: Time.current)
-        create(:consent, :signed, participant_event: pe)
         gpe = create(:guardian_participant_event, participant_event: pe, status: :in_progress)
+        expect(pe.reload).to be_awaiting_guardian
 
         # Load the association so it holds a stale copy of the guardian, which
         # is exactly the state GuardianPortalController#complete used to be in.
         pe.guardian_participant_events.load
-
         gpe.update!(status: :completed, completed_at: Time.current)
 
         expect(pe.reload).to be_complete
       end
 
       it "does not complete the participant when another guardian is still pending" do
-        no_freedom_event = create(:event, freedom_waivers_enabled: false)
-        pe = create(:participant_event, event: no_freedom_event, code_of_conduct_accepted_at: Time.current)
+        pe = minor_pe(no_freedom_event)
         create(:consent, :signed, participant_event: pe)
         first = create(:guardian_participant_event, participant_event: pe, status: :in_progress)
         create(:guardian_participant_event, participant_event: pe, status: :in_progress)
 
         first.update!(status: :completed, completed_at: Time.current)
 
-        expect(pe.reload).not_to be_complete
+        expect(pe.reload).to be_awaiting_guardian
+      end
+
+      it "hands the waiver back to the participant once the guardian has signed it" do
+        pe = minor_pe(no_freedom_event)
+        create(:guardian_participant_event, participant_event: pe, status: :completed, completed_at: Time.current)
+        consent = create(:consent, participant_event: pe, status: :sent)
+        expect(pe.reload).to be_awaiting_guardian
+
+        consent.update!(guardian_signed_at: Time.current)
+        expect(pe.reload).to be_in_progress
       end
 
       it "requires a signed freedom waiver when the event has them enabled" do
-        freedom_event = create(:event, freedom_waivers_enabled: true)
-        pe = create(:participant_event, event: freedom_event, code_of_conduct_accepted_at: Time.current)
+        pe = minor_pe(create(:event, freedom_waivers_enabled: true))
         create(:consent, :signed, participant_event: pe)
         create(:guardian_participant_event, participant_event: pe, status: :completed, completed_at: Time.current)
-
-        expect(pe.mark_complete_if_eligible!).to be false
+        expect(pe.reload).not_to be_complete
 
         create(:consent, :signed, participant_event: pe, consent_type: :freedom_waiver)
-        expect(pe.reload.mark_complete_if_eligible!).to be true
+        expect(pe.reload).to be_complete
       end
+    end
+
+    it "re-derives every registration when the event switches a module on" do
+      event.update!(travel_enabled: false)
+      pe = adult_pe
+      create(:consent, :signed, participant_event: pe)
+      expect(pe.reload).to be_complete
+
+      perform_enqueued_jobs(only: ResyncRegistrationsJob) { event.update!(travel_enabled: true) }
+
+      expect(pe.reload).to be_in_progress
+      expect(pe.registration_transitions.chronological.last.cause).to eq("settings_changed")
     end
   end
 

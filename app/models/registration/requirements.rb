@@ -4,9 +4,8 @@ module Registration
   #
   # ParticipantEvent's badge (#display_status, #onboarding_progress) and its
   # completion gate (#eligible_for_completion?) both read this, so they can't
-  # disagree about what's outstanding. #stage, the value the status column
-  # should hold, isn't written anywhere yet: `rake registration:shadow`
-  # reports where it and the stored status differ.
+  # disagree about what's outstanding, and the status column follows it
+  # through ParticipantEvent#sync_status!.
   class Requirements
     # kind:  :data (something the participant fills in), :submission (the code
     #        of conduct, which is what "submitted" means) or :document
@@ -48,22 +47,13 @@ module Registration
       blocking.nil?
     end
 
-    # Whether the registration may be marked complete. Data requirements
-    # don't gate this yet: completion is only attempted when someone submits,
-    # signs or finishes the guardian portal, so a registration whose last gap
-    # was data would have nothing to complete it afterwards.
+    # Whether the registration has everything.
     #
-    # ignoring_submission: "would this complete if the participant hit
-    # submit?"
+    # ignoring_submission: "would it, if the participant hit submit?"
     def completable?(ignoring_submission: false)
       return false if closed?
 
-      all.none? do |r|
-        next false if r.met? || r.kind == :data
-        next false if ignoring_submission && r.kind == :submission
-
-        true
-      end
+      all.none? { |r| r.unmet? && !(ignoring_submission && r.kind == :submission) }
     end
 
     # :participant, :guardian, or nil when nothing is outstanding.
@@ -71,26 +61,29 @@ module Registration
       blocking&.owner
     end
 
-    # The value the status column should hold.
+    # The value the status column should hold. ParticipantEvent#sync_status!
+    # is what writes it.
     #
     # Withdrawn and rejected are staff decisions and stay put. A registration
     # for an event that has ended is frozen as it stands. Otherwise the status
-    # follows the requirements, with one exception: once the event has
-    # started, a complete registration is only reopened by a document or
-    # submission going missing, never by data alone.
+    # follows the requirements, except that a complete registration isn't
+    # reopened by something it can't act on yet (see #deferred?).
     def stage(now: Time.current)
       return pe.status if closed? || event_ended?(now)
 
       computed_stage(now: now)
     end
 
-    # #stage without the freeze on ended events, so the shadow report can show
-    # how far past events have drifted even though they'll be left alone.
+    # #stage without the freeze on ended events, so reports can show how far
+    # past events have drifted even though they're left alone.
     def computed_stage(now: Time.current)
       return pe.status if closed?
-      return "complete" if met?
-      return "complete" if pe.complete? && event_started?(now) && unmet.all? { |r| r.kind == :data }
+      # Opening the wizard is what moves someone on from invited
+      # (OnboardingController). Imported data can meet every other
+      # requirement, but until they've been in they haven't started.
       return "invited" if pe.invited?
+      return "complete" if met?
+      return "complete" if pe.complete? && unmet.all? { |r| deferred?(r, now) }
       return "awaiting_guardian" if waiting_on == :guardian
 
       "in_progress"
@@ -127,6 +120,20 @@ module Registration
 
     def event_ended?(now)
       event.ends_at.present? && event.ends_at < now
+    end
+
+    # Whether an unmet requirement should leave a complete registration alone
+    # for now:
+    # - data, once the event has started. Missing answers reopen a
+    #   registration beforehand, but not someone already at the door.
+    # - a new document while guardian invites are locked. Nobody can sign it
+    #   yet; ReopenParticipantsForCustomDocumentsJob reopens and emails them
+    #   when the lock lifts.
+    def deferred?(requirement, now)
+      return event_started?(now) if requirement.kind == :data
+      return event.guardian_invites_locked? if requirement.key == "custom_documents"
+
+      false
     end
 
     def build

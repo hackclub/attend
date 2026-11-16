@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe Exports::CsvBuilder do
+RSpec.describe Exports::CsvBuilder, fiat_registrations: true do
   let(:event) { create(:event) }
 
   def build_csv(columns:, filters: [], row_mode: "participant")

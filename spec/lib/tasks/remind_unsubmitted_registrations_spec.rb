@@ -9,7 +9,10 @@ RSpec.describe "backfill:remind_unsubmitted_registrations" do
   def adult_registration(evt, code_of_conduct_accepted_at: nil)
     create(:participant_event, event: evt, status: :in_progress, code_of_conduct_accepted_at: code_of_conduct_accepted_at).tap do |pe|
       pe.participant.update!(date_of_birth: 20.years.ago)
-      create(:consent, :signed, participant_event: pe)
+      fill_in_registration_answers(pe)
+      # Rows from before a signature re-checked the registration, which is
+      # what would have sent this reminder at the time.
+      SyncsRegistration.suspended { create(:consent, :signed, participant_event: pe) }
     end
   end
 

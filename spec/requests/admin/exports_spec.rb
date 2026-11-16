@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Admin::Exports", type: :request do
+RSpec.describe "Admin::Exports", type: :request, fiat_registrations: true do
   include Devise::Test::IntegrationHelpers
 
   let(:event) { create(:event) }

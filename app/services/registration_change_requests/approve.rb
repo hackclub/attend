@@ -129,17 +129,10 @@ module RegistrationChangeRequests
       end
       participant_event.safeguarding_info&.update!(freedom_waiver_granted: false)
       old_link&.destroy!
-      # A submitted registration goes back to waiting on the new guardian.
-      # One the participant hasn't submitted yet stays where it is: they still
-      # have to accept the code of conduct, and onboarding locks anyone at
-      # awaiting_guardian. The new guardian is invited when they submit.
-      # A registration can't stay complete once its guardian consents are
-      # reset, so one completed without a submit drops back to in progress.
-      if participant_event.code_of_conduct_accepted_at.present?
-        participant_event.transition_to!(:awaiting_guardian, cause: :guardian_replaced)
-      else
-        participant_event.reopen!(cause: :guardian_replaced)
-      end
+      # A submitted registration goes back to waiting on the new guardian;
+      # one the participant hasn't submitted yet is still theirs to finish,
+      # and the new guardian is invited when they do.
+      participant_event.sync_status!(cause: :guardian_replaced)
       mark_approved
     end
 

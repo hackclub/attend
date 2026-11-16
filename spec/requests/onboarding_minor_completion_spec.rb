@@ -1,11 +1,10 @@
 require "rails_helper"
 
 # A guardian can finish their whole side — waiver plus portal — before the
-# participant gets round to hitting submit. Every `mark_complete_if_eligible!`
-# hook fires on the guardian's actions and bails on the not-yet-accepted code
-# of conduct, so submitting has to be the thing that re-checks. When it didn't,
-# these rows sat at `awaiting_guardian` forever and the dashboard hid their
-# boarding pass (it gates the QR on the raw `complete?` enum, not display_status).
+# participant gets round to hitting submit. Nothing completes a registration
+# without the code of conduct, so submitting has to re-derive the status.
+# When it didn't, these rows sat at `awaiting_guardian` forever and the
+# dashboard hid their boarding pass (it gates the QR on `complete?`).
 RSpec.describe "Onboarding completion for minors", type: :request do
   include Devise::Test::IntegrationHelpers
 
@@ -15,8 +14,10 @@ RSpec.describe "Onboarding completion for minors", type: :request do
     create(:participant, user: user, email: user.email, date_of_birth: 15.years.ago.to_date)
   end
   let(:participant_event) do
-    create(:participant_event, participant: participant, event: event,
-      status: :in_progress, onboarding_step: 99)
+    # Everything the wizard collects is in; what's left is the submit.
+    fill_in_registration_answers(
+      create(:participant_event, participant: participant, event: event, status: :in_progress, onboarding_step: 99)
+    )
   end
 
   before { sign_in user }
@@ -83,48 +84,24 @@ RSpec.describe "Onboarding completion for minors", type: :request do
     end
   end
 
-  # Staff sometimes move a registration on by hand before the participant has
-  # submitted. The onboarding lock used to treat that as "already submitted"
-  # and bounce them to the dashboard, so they could never reach the code of
-  # conduct and the registration could never complete.
-  context "when staff set the status before the participant submitted" do
+  # Submitting is what locks the wizard, not the status. A registration left
+  # at awaiting_guardian without one (staff used to be able to set that by
+  # hand) was bounced to the dashboard, so it could never reach the code of
+  # conduct and could never complete.
+  context "when the status says awaiting guardian but the participant never submitted" do
     before do
       create(:guardian_participant_event, participant_event: participant_event, status: :completed)
       create(:consent, :signed, participant_event: participant_event)
       create(:consent, :freedom_waiver, :signed, participant_event: participant_event)
+      participant_event.update_columns(status: "awaiting_guardian")
     end
 
-    it "lets an awaiting_guardian participant back in to submit, then completes them" do
-      participant_event.update!(status: :awaiting_guardian)
-
+    it "lets them in to submit, then completes them" do
       get onboarding_step_path(step: "review", event_id: event.id)
       expect(response).to have_http_status(:ok)
 
       expect { submit }.to change { participant_event.reload.status }.to("complete")
       expect(participant_event.code_of_conduct_accepted_at).to be_present
-    end
-
-    it "lets a hand-completed participant sign without undoing the completion" do
-      participant_event.update!(status: :complete)
-
-      get onboarding_step_path(step: "review", event_id: event.id)
-      expect(response).to have_http_status(:ok)
-
-      submit
-      expect(participant_event.reload).to be_complete
-      expect(participant_event.code_of_conduct_accepted_at).to be_present
-    end
-
-    it "keeps a hand-completed participant out of the other steps" do
-      participant_event.update!(status: :complete)
-
-      get onboarding_step_path(step: "profile", event_id: event.id)
-      expect(response).to redirect_to(onboarding_step_path(step: "review", event_id: event.id))
-
-      patch onboarding_step_path(step: "profile", event_id: event.id),
-        params: { participant: { date_of_birth: 30.years.ago.to_date } }
-      expect(response).to redirect_to(onboarding_step_path(step: "review", event_id: event.id))
-      expect(participant.reload.date_of_birth).to eq(15.years.ago.to_date)
     end
   end
 
@@ -140,6 +117,15 @@ RSpec.describe "Onboarding completion for minors", type: :request do
 
       expect(response).to redirect_to(dashboard_path)
       expect(flash[:alert]).to include("cannot be edited")
+    end
+
+    it "lets them back in when one of their answers has gone missing" do
+      participant_event.travel_inbound.destroy!
+      expect(participant_event.reload).to be_in_progress
+
+      get onboarding_step_path(step: "travel", event_id: event.id)
+
+      expect(response).to have_http_status(:ok)
     end
   end
 end

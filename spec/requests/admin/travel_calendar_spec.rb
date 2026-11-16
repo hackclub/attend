@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Admin::TravelCalendar", type: :request do
+RSpec.describe "Admin::TravelCalendar", type: :request, fiat_registrations: true do
   include Devise::Test::IntegrationHelpers
 
   let(:admin) { User.create!(email: "admin-travel-calendar@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }

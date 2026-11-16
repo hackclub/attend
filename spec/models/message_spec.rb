@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe Message, type: :model do
+RSpec.describe Message, type: :model, fiat_registrations: true do
   let(:event) { create(:event) }
   let(:sender) { create(:user) }
 

@@ -4,7 +4,7 @@ require "rails_helper"
 # patterns: applied filters as dismissible tokens, "N matches", a
 # "Clear filters" link button and the "No matches" empty state. The
 # original admin keeps its plain filter bar.
-RSpec.describe "Admin console participant filters", type: :request do
+RSpec.describe "Admin console participant filters", type: :request, fiat_registrations: true do
   include Devise::Test::IntegrationHelpers
 
   let(:event) { create(:event, accommodation_enabled: false) }

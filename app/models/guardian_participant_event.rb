@@ -5,6 +5,9 @@ class GuardianParticipantEvent < ApplicationRecord
 
   belongs_to :guardian
   belongs_to :participant_event
+
+  include SyncsRegistration
+  syncs_registration cause: :guardian_changed
   has_one :participant, through: :participant_event
   has_one :event, through: :participant_event
   has_many :emergency_contacts, dependent: :destroy

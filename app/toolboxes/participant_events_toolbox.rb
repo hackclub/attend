@@ -52,11 +52,12 @@ class ParticipantEventsToolbox < ApplicationToolbox
     )
   end
 
-  tool "Change a registration's status (e.g. confirm, withdraw, reject).",
+  tool "Withdraw or reject a registration, or (with in_progress) undo either. No other status can be set: " \
+       "it follows what the registration still needs, so fix the missing requirement instead.",
     access: :write, scope: "participants:write" do
     param :participant_event_id, :string, "ParticipantEvent ID"
-    param :status, :string, "New status",
-      enum: %w[invited in_progress awaiting_guardian complete withdrawn rejected]
+    param :status, :string, "withdrawn, rejected, or in_progress to reinstate",
+      enum: ParticipantEvent::STAFF_SETTABLE_STATUSES
   end
   def set_status
     @participant_event = ParticipantEvent.find(params[:participant_event_id])
@@ -66,9 +67,10 @@ class ParticipantEventsToolbox < ApplicationToolbox
     unless Pundit.policy!(current_user, @participant_event).change_status?(params[:status])
       halt error: "Only event admins can reject a registration or undo a rejection."
     end
-    @participant_event.transition_to!(params[:status],
-      cause: Registration::Transition.staff_cause_for(params[:status], from: @participant_event.status),
-      actor: current_user, rejection_authorized: true, metadata: { via: "mcp" })
+    unless ParticipantEvent::STAFF_SETTABLE_STATUSES.include?(params[:status].to_s)
+      halt error: "#{params[:status]} can't be set: a registration's status follows what it still needs."
+    end
+    @participant_event.set_by_staff!(params[:status], actor: current_user, metadata: { via: "mcp" })
     render json: serialize_registration(@participant_event)
   end
 

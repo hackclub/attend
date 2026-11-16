@@ -202,13 +202,17 @@ module Api
       # Edits the person (name, contact details, sizing) and, with `status`,
       # where their registration stands. Sending status=withdrawn is the
       # withdraw button; status=in_progress is the reinstate button, after
-      # which #display_status recomputes the real state from their progress.
+      # which the status lands wherever their requirements put it. Nothing
+      # else can be set: see ParticipantEvent::STAFF_SETTABLE_STATUSES.
       def update
         authorize @participant_event, :update? unless api_key_request?
 
         status = params[:status].presence
-        if status && !ParticipantEvent.statuses.key?(status.to_s)
-          return render_error("#{status} is not a valid status. Valid statuses: #{ParticipantEvent.statuses.keys.join(', ')}")
+        if status && !ParticipantEvent::STAFF_SETTABLE_STATUSES.include?(status.to_s)
+          return render_error(
+            "#{status} can't be set. A registration's status follows what it still needs, so the only ones " \
+            "to send are withdrawn, rejected, and in_progress (which undoes either)."
+          )
         end
 
         participant = @participant_event.participant
@@ -248,11 +252,7 @@ module Api
 
         ActiveRecord::Base.transaction do
           participant.update!(attributes) if attributes.any?
-          if status
-            @participant_event.transition_to!(status,
-              cause: Registration::Transition.staff_cause_for(status, from: @participant_event.status),
-              rejection_authorized: true, metadata: { via: "api" })
-          end
+          @participant_event.set_by_staff!(status, metadata: { via: "api" }) if status
         end
 
         audit_api_change!(:record_update, participant) if attributes.any?

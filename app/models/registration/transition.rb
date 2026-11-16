@@ -17,7 +17,8 @@ module Registration
       submitted: "submitted",
       document_signed: "document_signed",
       guardian_completed: "guardian_completed",
-      # A backlog task found the registration already had everything.
+      # A check with no more specific reason found the registration had
+      # everything (a backlog task, an explicit re-check).
       requirements_met: "requirements_met",
       # A new document applies, or the participant added an optional one.
       document_added: "document_added",
@@ -27,13 +28,18 @@ module Registration
       # The event's dates changed, so its waivers went out again.
       waiver_reissued: "waiver_reissued",
       guardian_replaced: "guardian_replaced",
-      # A minor reached "awaiting guardian" with no guardian on file.
-      guardian_missing: "guardian_missing",
+      # A record the requirements read changed, with nothing more specific
+      # known: an answer (travel, health, contacts), a consent, a guardian.
+      data_changed: "data_changed",
+      documents_changed: "documents_changed",
+      guardian_changed: "guardian_changed",
+      # The event switched a module on or off, or moved its dates.
+      settings_changed: "settings_changed",
       withdrawn: "withdrawn",
       rejected: "rejected",
       reinstated: "reinstated",
-      # Staff set the status directly, through the API or MCP.
-      staff_set: "staff_set",
+      # `rake registration:sync` brought a status in line with requirements.
+      backfill: "backfill",
       # Something wrote the status column without going through
       # #transition_to!. Recorded so the history stays complete; a new one of
       # these in app code is a bug.
@@ -41,16 +47,6 @@ module Registration
     }, prefix: :caused_by, validate: true
 
     validates :to_status, presence: true
-
-    # The cause for a status staff picked by hand: withdrawing, rejecting and
-    # undoing either have their own; anything else is just "staff set it".
-    def self.staff_cause_for(to_status, from:)
-      to_status = to_status.to_s
-      return to_status.to_sym if ParticipantEvent::INACTIVE_STATUSES.include?(to_status)
-      return :reinstated if ParticipantEvent::INACTIVE_STATUSES.include?(from.to_s)
-
-      :staff_set
-    end
 
     scope :chronological, -> { order(:created_at) }
   end

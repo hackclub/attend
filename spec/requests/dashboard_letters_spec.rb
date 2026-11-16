@@ -6,9 +6,7 @@ RSpec.describe "Dashboard letters", type: :request do
   let(:user) { create(:user) }
   let(:participant) { create(:participant, user: user, date_of_birth: 18.years.ago - 1.day) }
   let(:registration) do
-    create(:participant_event, participant: participant, status: :complete, code_of_conduct_accepted_at: Time.current).tap do |registration|
-      create(:consent, :signed, participant_event: registration)
-    end
+    complete_registration(create(:participant_event, participant: participant))
   end
 
   before { sign_in user }

@@ -12,10 +12,7 @@ RSpec.describe "Custom document reopening", type: :request do
   # A participant who finished onboarding before the new document existed.
   def create_complete_participant(event, date_of_birth: 18.years.ago - 1.month)
     participant = create(:participant, date_of_birth: date_of_birth)
-    participant_event = create(:participant_event, participant: participant, event: event,
-      status: :complete, code_of_conduct_accepted_at: Time.current)
-    create(:consent, :signed, participant_event: participant_event)
-    participant_event
+    complete_registration(create(:participant_event, participant: participant, event: event))
   end
 
   def add_document(event, attrs = {})

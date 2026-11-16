@@ -1,6 +1,8 @@
 require "rails_helper"
 
-RSpec.describe Registration::Requirements do
+# Tagged fiat_registrations: this is about what the list derives from a
+# registration as it stands, so nothing here should re-derive it mid-setup.
+RSpec.describe Registration::Requirements, fiat_registrations: true do
   let(:event) { create(:event, travel_enabled: true, accommodation_enabled: false, freedom_waivers_enabled: false) }
   let(:adult) { create(:participant, date_of_birth: 18.years.ago - 1.month) }
   let(:minor) { create(:participant, date_of_birth: 15.years.ago) }
@@ -148,25 +150,19 @@ RSpec.describe Registration::Requirements do
   describe "#completable?" do
     let(:pe) { create(:participant_event, participant: adult, event: event) }
 
-    it "needs the submission and the signature" do
-      expect(requirements(pe)).not_to be_completable
-
+    it "needs the answers, the submission and the signature" do
+      create(:consent, :signed, participant_event: pe)
       submit(pe)
       expect(requirements(pe)).not_to be_completable
 
-      create(:consent, :signed, participant_event: pe)
-      expect(requirements(pe)).to be_completable
-    end
-
-    it "doesn't wait on data, which nothing would complete afterwards" do
-      submit(pe)
-      create(:consent, :signed, participant_event: pe)
-
-      expect(requirements(pe).blocking.key).to eq("travel")
+      fill_in_data(pe)
+      add_emergency_contact(pe)
       expect(requirements(pe)).to be_completable
     end
 
     it "can answer as if the participant had submitted" do
+      fill_in_data(pe)
+      add_emergency_contact(pe)
       create(:consent, :signed, participant_event: pe)
 
       expect(requirements(pe)).not_to be_completable
@@ -175,6 +171,7 @@ RSpec.describe Registration::Requirements do
 
     it "needs every guardian to have finished for a minor" do
       minor_pe = create(:participant_event, participant: minor, event: event, code_of_conduct_accepted_at: Time.current)
+      fill_in_data(minor_pe)
       create(:consent, :signed, participant_event: minor_pe)
       expect(requirements(minor_pe)).not_to be_completable
 
@@ -186,12 +183,28 @@ RSpec.describe Registration::Requirements do
     end
 
     it "is never true for a withdrawn registration" do
+      fill_in_data(pe)
+      add_emergency_contact(pe)
       submit(pe)
       create(:consent, :signed, participant_event: pe)
       pe.update_columns(status: "withdrawn")
 
       expect(requirements(pe)).not_to be_completable
     end
+  end
+
+  it "leaves a complete registration alone for a new document while guardian invites are locked" do
+    pe = create(:participant_event, participant: adult, event: event, status: :complete)
+    fill_in_data(pe)
+    add_emergency_contact(pe)
+    submit(pe)
+    create(:consent, :signed, participant_event: pe)
+    create(:custom_document, event: event)
+
+    expect(requirements(pe).stage).to eq("in_progress")
+
+    event.update!(guardian_invites_locked: true)
+    expect(requirements(pe).stage).to eq("complete")
   end
 
   describe "staff decisions" do

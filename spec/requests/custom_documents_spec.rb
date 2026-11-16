@@ -625,8 +625,10 @@ RSpec.describe "Custom documents", type: :request do
   describe "completion gating via webhook" do
     let(:secret) { "test-webhook-secret" }
     let(:participant_event) do
-      create(:participant_event, event: event, code_of_conduct_accepted_at: Time.current)
-        .tap { |pe| pe.participant.update!(date_of_birth: 18.years.ago - 1.month) }
+      fill_in_registration_answers(
+        create(:participant_event, event: event, code_of_conduct_accepted_at: Time.current,
+          participant: create(:participant, date_of_birth: 18.years.ago - 1.month))
+      )
     end
 
     before { allow(Docuseal::HostConfig).to receive(:webhook_secrets).and_return([ secret ]) }
@@ -663,7 +665,9 @@ RSpec.describe "Custom documents", type: :request do
 
     it "completes a minor when the freedom waiver is the last signature" do
       freedom_event = create(:event, freedom_waivers_enabled: true)
-      minor_pe = create(:participant_event, event: freedom_event, code_of_conduct_accepted_at: Time.current)
+      minor_pe = fill_in_registration_answers(
+        create(:participant_event, event: freedom_event, code_of_conduct_accepted_at: Time.current)
+      )
       create(:guardian_participant_event, participant_event: minor_pe, status: :completed, completed_at: Time.current)
       create(:consent, :signed, participant_event: minor_pe)
       freedom = create(:consent, :freedom_waiver, participant_event: minor_pe, status: :sent)

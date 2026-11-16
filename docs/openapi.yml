@@ -1737,8 +1737,10 @@ paths:
         you send are written.
 
         `status` is the API form of the withdraw and reinstate buttons:
-        `withdrawn` withdraws them, `in_progress` reinstates them — after which
-        the displayed status is recomputed from their onboarding progress.
+        `withdrawn` withdraws them, `rejected` rejects them, and `in_progress`
+        undoes either, after which the status lands wherever their onboarding
+        progress puts it. No other status can be set: the rest follow what the
+        registration still needs, so a request for one is refused with a 422.
 
         Date of birth, phone number and address are writable by every caller
         that gets this far, including API keys and PII-restricted roles, which
@@ -1765,7 +1767,8 @@ paths:
               properties:
                 status:
                   type: string
-                  enum: [invited, in_progress, awaiting_guardian, complete, withdrawn, rejected]
+                  enum: [withdrawn, rejected, in_progress]
+                  description: Withdraw or reject the registration, or with `in_progress` undo either.
                 fill_blanks:
                   type: boolean
                   default: false

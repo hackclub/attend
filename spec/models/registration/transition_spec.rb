@@ -36,7 +36,7 @@ RSpec.describe Registration::Transition do
     end
 
     it "does nothing when the registration is already there" do
-      expect(participant_event.transition_to!(:invited, cause: :staff_set)).to be(false)
+      expect(participant_event.transition_to!(:invited, cause: :reinstated)).to be(false)
       expect(history.size).to eq(1)
     end
 
@@ -60,41 +60,6 @@ RSpec.describe Registration::Transition do
     participant_event.update!(status: :complete)
 
     expect(history.last).to eq([ "invited", "complete", "untracked" ])
-  end
-
-  describe "ParticipantEvent#reopen!" do
-    it "sends a complete registration back to in progress" do
-      participant_event.update_columns(status: "complete")
-
-      expect(participant_event.reopen!(cause: :document_added)).to be(true)
-      expect(history.last).to eq([ "complete", "in_progress", "document_added" ])
-    end
-
-    it "leaves anything that isn't complete alone" do
-      expect(participant_event.reopen!(cause: :document_added)).to be(false)
-      expect(participant_event.reload).to be_invited
-    end
-  end
-
-  describe "ParticipantEvent#mark_complete_if_eligible!" do
-    it "records what completed the registration" do
-      participant_event.update_columns(status: "in_progress", code_of_conduct_accepted_at: Time.current)
-      create(:consent, :signed, participant_event: participant_event)
-
-      expect(participant_event.reload.mark_complete_if_eligible!(cause: :submitted)).to be(true)
-      expect(history.last).to eq([ "in_progress", "complete", "submitted" ])
-      expect(participant_event.reload.onboarding_completed_at).to be_present
-    end
-  end
-
-  describe ".staff_cause_for" do
-    it "names withdrawing, rejecting and undoing either; anything else is staff_set" do
-      expect(described_class.staff_cause_for("withdrawn", from: "complete")).to eq(:withdrawn)
-      expect(described_class.staff_cause_for("rejected", from: "in_progress")).to eq(:rejected)
-      expect(described_class.staff_cause_for("in_progress", from: "withdrawn")).to eq(:reinstated)
-      expect(described_class.staff_cause_for("complete", from: "rejected")).to eq(:reinstated)
-      expect(described_class.staff_cause_for("complete", from: "in_progress")).to eq(:staff_set)
-    end
   end
 
   it "goes when the registration does" do

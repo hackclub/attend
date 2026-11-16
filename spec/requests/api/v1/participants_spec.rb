@@ -985,6 +985,15 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(AuditLog.where(action: "unwithdraw", event: event)).to exist
     end
 
+    it "refuses a status that follows the registration's requirements, and says which can be sent" do
+      patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
+        params: { status: "complete" }, headers: auth_headers
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.body).to include("withdrawn, rejected, and in_progress")
+      expect(participant_event.reload.status).not_to eq("complete")
+    end
+
     describe "rejecting and un-rejecting" do
       let(:ops) do
         User.create!(email: "api-ops@example.com", name: "API Ops").tap do |user|
@@ -1009,7 +1018,7 @@ RSpec.describe "Api::V1::Participants", type: :request do
       end
 
       it "doesn't let ops undo a rejection" do
-        participant_event.transition_to!(:rejected, cause: :staff_set, rejection_authorized: true)
+        participant_event.transition_to!(:rejected, cause: :rejected, rejection_authorized: true)
 
         patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
           params: { status: "in_progress" }, headers: ops_headers

@@ -185,7 +185,7 @@ RSpec.describe RegistrationCompletionPresenter do
     expect(pending).not_to be_entry_pass_eligible
     expect(pending.state).to eq(:processing)
 
-    participant_event.update!(status: :complete)
+    complete_registration(participant_event)
     confirmed = presentation(:participant)
     expect(confirmed).to be_confirmed
     expect(confirmed).to be_entry_pass_eligible
