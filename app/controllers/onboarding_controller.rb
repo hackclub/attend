@@ -384,6 +384,15 @@ class OnboardingController < ApplicationController
   # resumes after the lock reopened a step (see #resume_submission), so
   # everything here has to be safe to run twice.
   def finish_submission
+    # An adult has no use for guardian links left over from before their
+    # date of birth was corrected. They go before the status is derived: a
+    # guardian's emergency contacts count towards an adult's registration,
+    # so deriving it first could complete (and confirm by email) someone who
+    # is about to be sent back for a contact of their own.
+    unless @participant_event.requires_guardian?
+      SyncsRegistration.suspended { @participant_event.guardian_participant_events.destroy_all }
+    end
+
     # Submitting is a requirement like any other: a minor moves on to waiting
     # for their guardian, and someone whose signatures are already in is done.
     @participant_event.sync_status!(cause: :submitted)
@@ -412,8 +421,6 @@ class OnboardingController < ApplicationController
         redirect_to onboarding_waiver_path(event_id: current_event.id), notice: completion_notice("Almost done! Please sign your waiver, then we'll send it to your guardian.")
       end
     else
-      @participant_event.guardian_participant_events.destroy_all if @participant_event.guardian_participant_events.any?
-
       if @participant_event.emergency_contacts.empty?
         redirect_to onboarding_step_path(step: EMERGENCY_STEP, event_id: current_event.id),
                     alert: "Please add at least one emergency contact before submitting."
@@ -425,9 +432,8 @@ class OnboardingController < ApplicationController
       if current_event.guardian_invites_locked? || Setting.waiver_sending_paused?
         redirect_after_submit
       elsif waiver_participant_portion_signed?
-        # Already signed during the documents step — completion lands via
-        # webhook/sync now that the code of conduct is accepted.
-        @participant_event.mark_complete_if_eligible!(cause: :submitted)
+        # Already signed during the documents step. If DocuSeal has finished
+        # with it the sync above completed them; if not, its webhook will.
         redirect_after_submit
       else
         trigger_adult_waiver

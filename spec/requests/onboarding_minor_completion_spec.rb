@@ -84,6 +84,27 @@ RSpec.describe "Onboarding completion for minors", type: :request do
     end
   end
 
+  # Staff corrected the date of birth to an adult's after a guardian was
+  # linked. An adult's registration counts a guardian's emergency contacts,
+  # but submitting removes the guardian, so it can't complete on them.
+  context "when a participant who turned out to be an adult still has a guardian on file" do
+    before do
+      link = create(:guardian_participant_event, participant_event: participant_event, status: :completed)
+      link.emergency_contacts.create!(name: "Ada Example", phone: "+14155550123")
+      create(:consent, :signed, participant_event: participant_event)
+      SyncsRegistration.suspended { participant.update!(date_of_birth: (18.years.ago - 1.month).to_date) }
+    end
+
+    it "asks for a contact of their own instead of confirming and then reopening them" do
+      expect { submit }.not_to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
+
+      expect(response).to redirect_to(onboarding_step_path(step: "emergency", event_id: event.id))
+      expect(participant_event.reload).to be_in_progress
+      expect(participant_event.guardian_participant_events).to be_empty
+      expect(participant_event.registration_transitions.pluck(:to_status)).not_to include("complete")
+    end
+  end
+
   # Submitting is what locks the wizard, not the status. A registration left
   # at awaiting_guardian without one (staff used to be able to set that by
   # hand) was bounced to the dashboard, so it could never reach the code of
