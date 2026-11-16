@@ -8,6 +8,7 @@ require "rails_helper"
 RSpec.describe "Admin participant page is read-only", type: :request do
   include Devise::Test::IntegrationHelpers
   include ActiveJob::TestHelper
+  include ActiveSupport::Testing::TimeHelpers
 
   let(:event) { create(:event) }
   let(:participant) { create(:participant) }
@@ -168,6 +169,19 @@ RSpec.describe "Admin participant page is read-only", type: :request do
           perform_enqueued_jobs(only: SyncParticipantSlackIdJob)
 
           expect(participant.reload.slack_user_id).to eq("U0EXAMPLE01")
+        end
+
+        # The suite's cache is a null store, which remembers nothing; give
+        # this one a real cache to see the throttle.
+        it "queues one job however many times the page is viewed before it runs" do
+          allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+
+          expect { 3.times { get show_path } }.to have_enqueued_job(SyncParticipantSlackIdJob).exactly(:once)
+          expect(response.body).to include("U0EXAMPLE01")
+
+          travel_to(SyncParticipantSlackIdJob::ENQUEUE_INTERVAL.from_now + 1.second) do
+            expect { get show_path }.to have_enqueued_job(SyncParticipantSlackIdJob).exactly(:once)
+          end
         end
 
         it "queues nothing once the two agree" do

@@ -1022,7 +1022,7 @@ module Admin
       # record dirty and save it on the page view's behalf.
       @participant.slack_user_id = slack_id
       @participant.clear_attribute_changes([ :slack_user_id ])
-      SyncParticipantSlackIdJob.perform_later(@participant)
+      SyncParticipantSlackIdJob.perform_later_once(@participant)
     end
 
     # `blocked_on=<stage key>` — the series dashboard's chase links. A stage's
