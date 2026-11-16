@@ -205,6 +205,19 @@ RSpec.describe Registration::Requirements, fiat_registrations: true do
     expect(requirements(pe).stage).to eq("complete")
   end
 
+  it "reopens for a document whose signature was discarded, even while guardian invites are locked" do
+    pe = create(:participant_event, participant: adult, event: event, status: :complete)
+    fill_in_data(pe)
+    add_emergency_contact(pe)
+    submit(pe)
+    create(:consent, :signed, participant_event: pe)
+    document = create(:custom_document, event: event)
+    event.update!(guardian_invites_locked: true)
+    create(:consent, :custom_document, participant_event: pe, custom_document: document, status: :pending)
+
+    expect(requirements(pe).stage).to eq("in_progress")
+  end
+
   describe "staff decisions" do
     %w[withdrawn rejected].each do |status|
       it "keeps a #{status} registration #{status} whatever its progress" do

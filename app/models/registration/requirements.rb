@@ -113,12 +113,19 @@ module Registration
     #   registration beforehand, but not someone already at the door.
     # - a new document while guardian invites are locked. Nobody can sign it
     #   yet; ReopenParticipantsForCustomDocumentsJob reopens and emails them
-    #   when the lock lifts.
+    #   when the lock lifts. Only a document that was never issued to them
+    #   counts: one whose signature staff discarded has a consent on file,
+    #   and that registration is no longer complete, lock or no lock.
     def deferred?(requirement, now)
       return event_started?(now) if requirement.kind == :data
-      return event.guardian_invites_locked? if requirement.key == "custom_documents"
+      return new_documents_held_by_lock? if requirement.key == "custom_documents"
 
       false
+    end
+
+    def new_documents_held_by_lock?
+      event.guardian_invites_locked? &&
+        pe.pending_custom_documents.none? { |document| pe.custom_document_consent(document) }
     end
 
     def build
