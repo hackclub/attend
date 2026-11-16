@@ -569,6 +569,27 @@ RSpec.describe Message, type: :model do
       expect(message.body_as_plain(recipient: guardian)).to eq("Hi Pat, Alex and Sam are all set.")
     end
 
+    it "names children to guardians by their legal first name, not their preferred one" do
+      guardian = guardian_of(create(:participant, legal_first_name: "Alexander", preferred_name: "Lex"))
+      message = message_with("<p>{{participant_first_name}}</p>", audience: "all_guardians")
+
+      expect(message.body_as_plain(recipient: guardian)).to eq("Alexander")
+    end
+
+    it "addresses a participant reading a guardian message by their preferred name" do
+      participant = create(:participant, legal_first_name: "Alexander", preferred_name: "Lex")
+      message = message_with("<p>{{participant_first_name}}</p>", audience: "all_guardians")
+
+      expect(message.body_as_plain(recipient: participant)).to eq("Lex")
+    end
+
+    it "falls back to 'your child' when no child's legal name is on file" do
+      guardian = guardian_of(create(:participant, legal_first_name: Participant::NAME_PLACEHOLDER, preferred_name: "Lex"))
+      message = message_with("<p>{{participant_first_name}}</p>", audience: "all_guardians")
+
+      expect(message.body_as_plain(recipient: guardian)).to eq("your child")
+    end
+
     it "names all of a guardian's children when none match the audience any more" do
       guardian = guardian_of(create(:participant, legal_first_name: "Alex"), statuses: [ :in_progress ])
       message = message_with("<p>{{participant_first_name}}</p>", audience: "guardians_of_confirmed")
