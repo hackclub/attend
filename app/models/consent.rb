@@ -116,7 +116,7 @@ class Consent < ApplicationRecord
     end
 
     update!(updates) if updates.any?
-    participant_event&.mark_complete_if_eligible! if signed?
+    participant_event&.mark_complete_if_eligible!(cause: :document_signed) if signed?
   rescue Docuseal::Error, ArgumentError, Faraday::Error => e
     # ArgumentError covers environments with no DocuSeal credentials configured,
     # Faraday::Error a DocuSeal that timed out or couldn't be reached. Signing
@@ -255,7 +255,7 @@ class Consent < ApplicationRecord
     end
 
     update!(updates)
-    participant_event.mark_complete_if_eligible! if signed?
+    participant_event.mark_complete_if_eligible!(cause: :document_signed) if signed?
   end
 
   # A guardian uploaded the signed form themselves (guardian-only documents) —
@@ -272,7 +272,7 @@ class Consent < ApplicationRecord
       status: :signed,
       pending_on: nil
     )
-    participant_event.mark_complete_if_eligible!
+    participant_event.mark_complete_if_eligible!(cause: :document_signed)
   end
 
   # Every upload was removed before the document was confirmed — wind the
@@ -296,7 +296,7 @@ class Consent < ApplicationRecord
       status: :signed,
       pending_on: nil
     )
-    participant_event.mark_complete_if_eligible!
+    participant_event.mark_complete_if_eligible!(cause: :document_signed)
   end
 
   private

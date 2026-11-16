@@ -41,7 +41,7 @@ RSpec.describe ParticipantEventsToolbox do
       Current.set(event: event) { run_set_status(pe, "rejected", actor: ops) }
       expect(pe.reload.status).to eq("in_progress")
 
-      pe.update_status!(:rejected, rejection_authorized: true)
+      pe.transition_to!(:rejected, cause: :staff_set, rejection_authorized: true)
       Current.set(event: event) { run_set_status(pe, "in_progress", actor: ops) }
       expect(pe.reload.status).to eq("rejected")
     end

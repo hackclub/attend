@@ -53,6 +53,7 @@ class ParticipantEvent < ApplicationRecord
   has_many :slack_blast_recipients, dependent: :destroy
   has_many :message_deliveries, dependent: :destroy
   has_many :registration_change_requests, dependent: :destroy
+  has_many :registration_transitions, class_name: "Registration::Transition", dependent: :delete_all
   has_many :group_memberships, dependent: :destroy
   has_many :groups, through: :group_memberships
   # The latest scan that placed this participant somewhere, for their status.
@@ -100,6 +101,11 @@ class ParticipantEvent < ApplicationRecord
   after_commit :invite_to_slack_channel, on: %i[create update],
     if: -> { (saved_change_to_status? || saved_change_to_participant_id?) && complete? }
 
+  # Hooked on the column rather than #transition_to!, so a status change that
+  # didn't come through it still lands in the history, marked untracked.
+  after_create :record_initial_transition
+  after_update :record_status_transition, if: :saved_change_to_status?
+
   # Statuses that mean the participant has opened the wizard themselves, so
   # whatever invitation they were sent has done its job.
   STARTED_STATUSES = %w[in_progress awaiting_guardian complete].freeze
@@ -131,11 +137,29 @@ class ParticipantEvent < ApplicationRecord
   attr_accessor :rejection_change_authorized
   validate :rejection_change_must_be_authorized, on: :update
 
-  def update_status!(new_status, rejection_authorized: false)
+  # The one place the status column is written. Every change is recorded as
+  # a Registration::Transition with its cause and whoever made it.
+  #
+  # rejection_authorized: the caller checked ParticipantEventPolicy#change_status?
+  # (see above). Returns false, writing nothing, when it's already there.
+  def transition_to!(new_status, cause:, actor: Current.user, rejection_authorized: false, metadata: {})
+    return false if status == new_status.to_s
+
+    @pending_transition = { cause: cause, actor: actor, metadata: metadata }
     self.rejection_change_authorized = rejection_authorized
     update!(status: new_status)
+    true
   ensure
+    @pending_transition = nil
     self.rejection_change_authorized = nil
+  end
+
+  # Something this registration had is gone or newly owed (a signature
+  # discarded, a document added), so it isn't complete any more.
+  def reopen!(cause:, actor: Current.user)
+    return false unless complete?
+
+    transition_to!(:in_progress, cause: cause, actor: actor)
   end
 
   # SQL mirror of !onboarding_complete? so list filters don't have to load
@@ -438,7 +462,9 @@ class ParticipantEvent < ApplicationRecord
     Registration::Requirements.new(self).completable?(ignoring_submission: ignoring_submission)
   end
 
-  def mark_complete_if_eligible!
+  # cause: what just happened that might have been the last piece, for the
+  # transition record.
+  def mark_complete_if_eligible!(cause: :requirements_met)
     return false if complete?
 
     unless eligible_for_completion?
@@ -453,8 +479,8 @@ class ParticipantEvent < ApplicationRecord
       reset_document_memoisation!
       next false if complete? || !eligible_for_completion?
 
-      update!(status: :complete, onboarding_completed_at: onboarding_completed_at || Time.current)
-      true
+      self.onboarding_completed_at ||= Time.current
+      transition_to!(:complete, cause: cause)
     end
 
     ParticipantMailer.registration_confirmed(participant_event: self).deliver_later if completed_now
@@ -637,6 +663,44 @@ class ParticipantEvent < ApplicationRecord
     return unless too_old_for_event?
 
     errors.add(:base, "You will be 19 or older during this event. Please contact event staff for assistance.")
+  end
+
+  def record_initial_transition
+    pending = @pending_transition || {}
+    registration_transitions.create!(
+      to_status: status,
+      cause: pending[:cause] || :created,
+      actor: pending.key?(:actor) ? pending[:actor] : Current.user,
+      metadata: pending[:metadata] || {}
+    )
+  end
+
+  def record_status_transition
+    pending = @pending_transition || {}
+    from, to = saved_change_to_status
+    cause = pending[:cause] || :untracked
+
+    registration_transitions.create!(
+      from_status: from,
+      to_status: to,
+      cause: cause,
+      actor: pending.key?(:actor) ? pending[:actor] : Current.user,
+      blocking_requirement: blocking_requirement_for_transition,
+      metadata: pending[:metadata] || {}
+    )
+
+    if cause.to_s == "untracked"
+      Rails.logger.warn("[Registration] #{id} went #{from} -> #{to} outside #transition_to!")
+    end
+  end
+
+  # What the registration is stuck on as it lands in its new status. Read
+  # from a fresh copy: asking this one would load and cache associations the
+  # caller may be about to change.
+  def blocking_requirement_for_transition
+    return if complete? || inactive?
+
+    Registration::Requirements.new(self.class.find(id)).blocking&.key
   end
 
   def rejection_change_must_be_authorized

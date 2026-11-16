@@ -517,7 +517,7 @@ module Admin
       # A signature just vanished, so the participant isn't done any more and a
       # guardian who had finished needs their portal back to sign again.
       reopen_guardian_portal_access
-      @participant_event.update!(status: :in_progress) if @participant_event.complete?
+      @participant_event.reopen!(cause: :document_reset)
 
       redirect_to consents_admin_event_participant_path(current_event, @participant_event),
         notice: "The previous signature has been discarded. #{custom_document_resend_notice(custom_document)}"
@@ -617,7 +617,7 @@ module Admin
         return redirect_to admin_event_participant_path(current_event, @participant_event),
           alert: "#{@participant_event.participant.display_name} is already #{@participant_event.status}, so there's nothing to withdraw."
       end
-      @participant_event.withdrawn!
+      @participant_event.transition_to!(:withdrawn, cause: :withdrawn)
       redirect_to admin_event_participant_path(current_event, @participant_event),
         notice: "#{@participant_event.participant.display_name} has been marked as withdrawn."
     rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
@@ -637,8 +637,7 @@ module Admin
       # Reset to a non-terminal status; #display_status recomputes the real state
       # (Awaiting Participant / Awaiting Parent / Complete) from onboarding progress.
       # unreject? was checked above for a rejected registration.
-      @participant_event.rejection_change_authorized = true
-      @participant_event.in_progress!
+      @participant_event.transition_to!(:in_progress, cause: :reinstated, rejection_authorized: true)
       redirect_to admin_event_participant_path(current_event, @participant_event),
         notice: "#{@participant_event.participant.display_name} has been reinstated."
     rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e

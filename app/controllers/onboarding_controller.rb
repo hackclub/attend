@@ -381,14 +381,14 @@ class OnboardingController < ApplicationController
       # withdrawn or rejected it while the participant still had the wizard
       # open; submitting late shouldn't undo any of that.
       unless @participant_event.complete? || @participant_event.inactive?
-        @participant_event.update!(status: :awaiting_guardian)
+        @participant_event.transition_to!(:awaiting_guardian, cause: :submitted)
       end
 
       # The guardian can finish everything — waiver and portal — before the
       # participant hits submit. Every other completion hook already ran and
       # bailed on the missing code of conduct, so accepting it here can be the
       # last piece; nothing else would re-check.
-      if @participant_event.mark_complete_if_eligible!
+      if @participant_event.mark_complete_if_eligible!(cause: :submitted)
         redirect_after_submit
       elsif current_event.guardian_invites_locked? || Setting.waiver_sending_paused?
         redirect_after_submit
@@ -417,7 +417,7 @@ class OnboardingController < ApplicationController
       elsif waiver_participant_portion_signed?
         # Already signed during the documents step — completion lands via
         # webhook/sync now that the code of conduct is accepted.
-        @participant_event.mark_complete_if_eligible!
+        @participant_event.mark_complete_if_eligible!(cause: :submitted)
         redirect_after_submit
       else
         trigger_adult_waiver
@@ -515,7 +515,7 @@ class OnboardingController < ApplicationController
 
     # CSV-imported participants start with status "invited" — transition to
     # "in_progress" now that they've actually begun onboarding.
-    @participant_event.update!(status: :in_progress) if @participant_event.invited?
+    @participant_event.transition_to!(:in_progress, cause: :started) if @participant_event.invited?
   end
 
   def load_step_data
@@ -1653,7 +1653,7 @@ class OnboardingController < ApplicationController
 
     # Allow minors whose guardian was never linked to go back and add one
     if @participant_event.awaiting_guardian? && @participant_event.guardian_participant_events.empty?
-      @participant_event.update!(status: :in_progress)
+      @participant_event.transition_to!(:in_progress, cause: :guardian_missing)
       return
     end
 

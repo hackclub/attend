@@ -1009,7 +1009,7 @@ RSpec.describe "Api::V1::Participants", type: :request do
       end
 
       it "doesn't let ops undo a rejection" do
-        participant_event.update_status!(:rejected, rejection_authorized: true)
+        participant_event.transition_to!(:rejected, cause: :staff_set, rejection_authorized: true)
 
         patch "/api/v1/events/#{event.id}/participants/#{participant_event.id}",
           params: { status: "in_progress" }, headers: ops_headers

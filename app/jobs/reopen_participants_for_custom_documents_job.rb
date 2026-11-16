@@ -24,7 +24,7 @@ class ReopenParticipantsForCustomDocumentsJob < ApplicationJob
       end
       next unless needs_signature
 
-      participant_event.update!(status: :in_progress)
+      participant_event.reopen!(cause: :document_added)
       ParticipantMailer.new_document_ready(participant_event: participant_event).deliver_later
       reopened += 1
     end

@@ -66,7 +66,9 @@ class ParticipantEventsToolbox < ApplicationToolbox
     unless Pundit.policy!(current_user, @participant_event).change_status?(params[:status])
       halt error: "Only event admins can reject a registration or undo a rejection."
     end
-    @participant_event.update_status!(params[:status], rejection_authorized: true)
+    @participant_event.transition_to!(params[:status],
+      cause: Registration::Transition.staff_cause_for(params[:status], from: @participant_event.status),
+      actor: current_user, rejection_authorized: true, metadata: { via: "mcp" })
     render json: serialize_registration(@participant_event)
   end
 

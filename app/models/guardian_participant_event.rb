@@ -151,7 +151,7 @@ class GuardianParticipantEvent < ApplicationRecord
   def complete_participant_event_if_eligible
     return unless saved_change_to_status? && completed?
 
-    participant_event.reload.mark_complete_if_eligible!
+    participant_event.reload.mark_complete_if_eligible!(cause: :guardian_completed)
   rescue ActiveRecord::RecordNotFound
     # The participant_event was destroyed in the same transaction.
     nil

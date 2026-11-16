@@ -283,7 +283,7 @@ module Api
         # doesn't send the confirmation email a second time.
         participant_event.reload
 
-        if participant_event.mark_complete_if_eligible!
+        if participant_event.mark_complete_if_eligible!(cause: :document_signed)
           Rails.logger.info("[Docuseal] Participant #{participant_event.id} marked complete after #{consent.consent_type} signed")
         end
       end

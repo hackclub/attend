@@ -14,7 +14,7 @@ RSpec.describe ParticipantEvent, "rejection guard" do
   end
 
   it "refuses to move out of rejected without authorization" do
-    participant_event.update_status!(:rejected, rejection_authorized: true)
+    participant_event.transition_to!(:rejected, cause: :staff_set, rejection_authorized: true)
 
     expect { participant_event.in_progress! }.to raise_error(ActiveRecord::RecordInvalid)
     expect { participant_event.update!(status: :withdrawn) }.to raise_error(ActiveRecord::RecordInvalid)
@@ -22,15 +22,15 @@ RSpec.describe ParticipantEvent, "rejection guard" do
   end
 
   it "allows both directions once authorized" do
-    participant_event.update_status!(:rejected, rejection_authorized: true)
+    participant_event.transition_to!(:rejected, cause: :staff_set, rejection_authorized: true)
     expect(participant_event.reload.status).to eq("rejected")
 
-    participant_event.update_status!(:in_progress, rejection_authorized: true)
+    participant_event.transition_to!(:in_progress, cause: :staff_set, rejection_authorized: true)
     expect(participant_event.reload.status).to eq("in_progress")
   end
 
   it "doesn't carry the authorization over to the next save" do
-    participant_event.update_status!(:rejected, rejection_authorized: true)
+    participant_event.transition_to!(:rejected, cause: :staff_set, rejection_authorized: true)
 
     expect(participant_event.rejection_change_authorized).to be_nil
     expect { participant_event.in_progress! }.to raise_error(ActiveRecord::RecordInvalid)
@@ -41,7 +41,7 @@ RSpec.describe ParticipantEvent, "rejection guard" do
     participant_event.in_progress!
     expect(participant_event.reload.status).to eq("in_progress")
 
-    participant_event.update_status!(:rejected, rejection_authorized: true)
+    participant_event.transition_to!(:rejected, cause: :staff_set, rejection_authorized: true)
     participant_event.update!(onboarding_step: 3)
     expect(participant_event.reload.onboarding_step).to eq(3)
   end

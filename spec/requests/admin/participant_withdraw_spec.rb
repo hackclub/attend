@@ -87,7 +87,7 @@ RSpec.describe "Admin::Participants withdraw authorization", type: :request do
   # Reinstate is the only way back from it in the UI. Undoing a rejection
   # overrides someone's decision, so it's held to event admins via unreject?.
   describe "rejected registrations" do
-    before { participant_event.update_status!(:rejected, rejection_authorized: true) }
+    before { participant_event.transition_to!(:rejected, cause: :staff_set, rejection_authorized: true) }
 
     let(:reinstate_path) { unwithdraw_admin_event_participant_path(event.slug, participant_event) }
     let(:withdraw_path) { withdraw_admin_event_participant_path(event.slug, participant_event) }
@@ -167,7 +167,7 @@ RSpec.describe "Admin::Participants withdraw authorization", type: :request do
     before { sign_in_with_role("event_admin") }
 
     it "alerts instead of erroring on withdraw" do
-      allow_any_instance_of(ParticipantEvent).to receive(:withdrawn!)
+      allow_any_instance_of(ParticipantEvent).to receive(:transition_to!)
         .and_raise(ActiveRecord::RecordInvalid.new(participant_event))
 
       post withdraw_admin_event_participant_path(event.slug, participant_event)
@@ -179,8 +179,8 @@ RSpec.describe "Admin::Participants withdraw authorization", type: :request do
     end
 
     it "alerts instead of erroring on reinstate" do
-      participant_event.withdrawn!
-      allow_any_instance_of(ParticipantEvent).to receive(:in_progress!)
+      participant_event.update_columns(status: "withdrawn")
+      allow_any_instance_of(ParticipantEvent).to receive(:transition_to!)
         .and_raise(ActiveRecord::RecordNotSaved.new("Failed to save the record", participant_event))
 
       post unwithdraw_admin_event_participant_path(event.slug, participant_event)

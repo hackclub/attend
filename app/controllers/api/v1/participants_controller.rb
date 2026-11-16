@@ -248,7 +248,11 @@ module Api
 
         ActiveRecord::Base.transaction do
           participant.update!(attributes) if attributes.any?
-          @participant_event.update_status!(status, rejection_authorized: true) if status
+          if status
+            @participant_event.transition_to!(status,
+              cause: Registration::Transition.staff_cause_for(status, from: @participant_event.status),
+              rejection_authorized: true, metadata: { via: "api" })
+          end
         end
 
         audit_api_change!(:record_update, participant) if attributes.any?
