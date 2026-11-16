@@ -1,5 +1,6 @@
 NEW INCIDENT REPORT
 Filed <%= @incident_report.created_at.strftime("%B %-d, %Y at %H:%M %Z") %>
+View on Attend: <%= @incident_url %>
 
 Priority:          <%= @incident_report.priority_label %>
 Incident type:     <%= @incident_report.incident_type_label %>

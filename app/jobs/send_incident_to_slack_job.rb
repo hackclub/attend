@@ -112,6 +112,17 @@ class SendIncidentToSlackJob < ApplicationJob
         }
       },
       {
+        type: "actions",
+        elements: [
+          {
+            type: "button",
+            text: { type: "plain_text", text: "View on Attend", emoji: true },
+            url: IncidentLinks.incident_url(incident),
+            style: "primary"
+          }
+        ]
+      },
+      {
         type: "context",
         elements: [
           {
