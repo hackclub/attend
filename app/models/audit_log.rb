@@ -158,7 +158,8 @@ class AuditLog < ApplicationRecord
 
   # A "view" entry for a GET, written by a job so the request doesn't write.
   # The enqueue is still part of the request: if it fails, so does the page,
-  # and the entry carries the time of the view, not of the job.
+  # and the entry carries the time of the view, not of the job. The job
+  # retries until the entry is written (see AuditViewJob).
   def self.log_view_later(record:, actor:, event: nil, metadata: {})
     AuditViewJob.perform_later(
       record_type: record.class.polymorphic_name,

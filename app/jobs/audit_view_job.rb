@@ -6,6 +6,14 @@
 class AuditViewJob < ApplicationJob
   queue_as :default
 
+  # The page has already been served by the time this runs, so nothing else
+  # will write the entry if this gives up. A database blip (the primary
+  # restarting, a failover) must not cost the record of who looked at what:
+  # keep trying for a few hours before landing in the failed jobs. The entry
+  # is only ever written by the attempt that succeeds, so a retry can't
+  # double it.
+  retry_on StandardError, wait: :polynomially_longer, attempts: 10
+
   def perform(record_type:, record_id:, actor_user_id:, viewed_at:, event_id: nil, metadata: {})
     AuditLog.create!(
       action: :view,
