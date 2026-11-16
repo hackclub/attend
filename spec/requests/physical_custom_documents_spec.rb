@@ -368,6 +368,17 @@ RSpec.describe "Physical custom documents", type: :request do
       create(:consent, participant_event: participant_event, consent_type: :custom_document,
         custom_document: doc, status: :sent, docuseal_envelope_id: "env-1",
         docuseal_participant_slug: "part-slug", docuseal_guardian_slug: "guard-slug")
+      # The page asks DocuSeal whether the guardian already signed. Answer for
+      # it, so the spec doesn't depend on whether credentials are loaded: with
+      # them loaded it would call the real DocuSeal API.
+      client = instance_double(Docuseal::Client)
+      allow(Docuseal::Client).to receive(:for).and_return(client)
+      allow(client).to receive(:get_submission).with("env-1").and_return(
+        "submitters" => [
+          { "slug" => "part-slug", "completed_at" => nil },
+          { "slug" => "guard-slug", "completed_at" => nil }
+        ]
+      )
 
       get guardian_portal_custom_document_path(token: token, custom_document_id: doc.id)
 
