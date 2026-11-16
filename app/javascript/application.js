@@ -5,11 +5,13 @@ import { startToggleHidden } from "utils/toggle_hidden"
 import { startConsoleConfirm } from "utils/console_confirm"
 import { startTurboScriptNonce } from "utils/turbo_script_nonce"
 import { startIncompleteDateTimeMessages } from "utils/incomplete_date_time"
+import { startLoadingStates } from "utils/loading"
 
 startToggleHidden()
 startConsoleConfirm()
 startTurboScriptNonce()
 startIncompleteDateTimeMessages()
+startLoadingStates()
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/service-worker", { scope: "/" })

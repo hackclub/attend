@@ -1,28 +1,28 @@
 module Admin
   class EventSeriesController < BaseController
     global_page
-    before_action :set_series, only: [ :show, :edit, :update, :send_held_invitations ]
+    before_action :set_series, only: [ :show, :dashboard, :edit, :update, :send_held_invitations ]
 
     def index
       authorize EventSeries, :index?
       @series_list = policy_scope(EventSeries).order(:name)
     end
 
+    # The page shell: the header and the series' own details. Everything that
+    # tallies registrations (the funnel, chase list, events table and map)
+    # can take seconds on a cold cache for a large series, so it loads into
+    # the page afterwards from #dashboard.
     def show
       authorize @series
+      load_dashboard
+    end
 
-      # scan_contexts and custom_documents are preloaded because the dashboard's
-      # single pass over participants asks every event whether it records
-      # check-ins and which documents apply — per event, not per participant.
-      @events = SeriesDashboard.order_events(
-        @series.events
-          .includes(:scan_contexts, :custom_documents, logo_attachment: :blob, event_series: { logo_attachment: :blob })
-          .to_a
-      )
-
-      @dashboard = SeriesDashboard.new(@series, events: @events, user: current_user)
+    def dashboard
+      authorize @series, :show?
+      load_dashboard
       @event_rows = @dashboard.event_rows
       paginate_event_rows
+      render layout: false
     end
 
     # The series HQ button: every event that is holding onboarding
@@ -99,6 +99,19 @@ module Admin
       @events_page = (params[:events_page] || 1).to_i.clamp(1, @events_total_pages)
       @events_per_page = EVENTS_PER_PAGE
       @paged_event_rows = rows.slice((@events_page - 1) * EVENTS_PER_PAGE, EVENTS_PER_PAGE) || []
+    end
+
+    # scan_contexts and custom_documents are preloaded because the dashboard's
+    # single pass over participants asks every event whether it records
+    # check-ins and which documents apply — per event, not per participant.
+    def load_dashboard
+      @events = SeriesDashboard.order_events(
+        @series.events
+          .includes(:scan_contexts, :custom_documents, logo_attachment: :blob, event_series: { logo_attachment: :blob })
+          .to_a
+      )
+
+      @dashboard = SeriesDashboard.new(@series, events: @events, user: current_user)
     end
 
     def set_series

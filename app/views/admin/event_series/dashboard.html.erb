@@ -1,0 +1,40 @@
+<% totals = @dashboard.totals %>
+<% chase_rows = @dashboard.chase_rows %>
+<% stage_rows = @dashboard.stage_rows %>
+<% arrival_row = @dashboard.arrival_row %>
+
+<%= lazy_frame_response "series_dashboard" do %>
+  <% if totals[:held_invitations].positive? || totals[:holding_events].positive? %>
+    <%= render "admin/event_series/held_invitations", series: @series, totals: totals, event_rows: @event_rows %>
+  <% end %>
+
+  <%# The chase list leads: it is the page's point of view, so it opens the
+      page rather than sitting under a row of figures the funnel already owns. %>
+  <%= render "admin/event_series/chase", chase_rows: chase_rows, totals: totals, event_rows: @event_rows %>
+
+  <%# The ribbon needs the full width to hold every stage, so the map moves
+      down beside the events table it indexes. %>
+  <div class="mt-6">
+    <%= render "admin/event_series/funnel", stage_rows: stage_rows, arrival_row: arrival_row, totals: totals %>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+    <div class="lg:col-span-3 min-w-0">
+      <%= render "admin/event_series/events", event_rows: @paged_event_rows, series: @series %>
+    </div>
+    <%# Sticky and self-start so a long events list scrolls past a map that
+        keeps its own height, instead of stretching it into a grey column. %>
+    <div class="lg:col-span-2 min-w-0 lg:self-start lg:sticky lg:top-6">
+      <%= render "admin/event_series/map", dashboard: @dashboard, event_rows: @event_rows %>
+    </div>
+  </div>
+
+  <%# The header's withdrawn count needs the same tallies, so it arrives with
+      them rather than holding the header back. %>
+  <% if totals[:inactive].positive? %>
+    <%= turbo_stream.update "series-withdrawn" do %>
+      <span aria-hidden="true">·</span>
+      <span><%= totals[:inactive] %> withdrawn</span>
+    <% end %>
+  <% end %>
+<% end %>

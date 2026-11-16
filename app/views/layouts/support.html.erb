@@ -124,7 +124,8 @@
         <% end %>
 
         <!-- Main content -->
-        <main class="flex-1 overflow-hidden">
+        <main class="flex-1 overflow-hidden" data-page-content>
+          <%= render "shared/page_loading" %>
           <%= yield %>
         </main>
       </div>

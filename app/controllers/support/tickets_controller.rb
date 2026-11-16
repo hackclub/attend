@@ -13,7 +13,8 @@ module Support
 
     def index
       authorize Ticket
-      @tickets = filtered_tickets.includes(:event, :assigned_to)
+      # subject is in every row (_ticket_row), so it's preloaded with the rest.
+      @tickets = filtered_tickets.includes(:event, :assigned_to, :subject)
       @assignees = assignee_options
       @filtering = ticket_filter_params.any?
     end

@@ -163,7 +163,8 @@
             </div>
           <% end %>
 
-          <main class="cs-main" id="main" data-controller="cs-date-picker">
+          <main class="cs-main" id="main" data-controller="cs-date-picker" data-page-content>
+            <%= render "shared/page_loading" %>
             <% if show_waiver_dates_banner? %>
               <%= render "layouts/waiver_dates_banner", event: current_event %>
             <% end %>

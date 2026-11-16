@@ -23,12 +23,18 @@
     <% end %>
     <div class="cs-menu-divider"></div>
     <p class="cs-menu-group-label">Running and upcoming</p>
-    <%# The topnav and the mobile drawer both carry this menu. The list is the
-        same in both, and with a few hundred events its avatars and per-row forms
-        are most of the layout's render time, so it is rendered once per request.
-        The drawer closes on any click inside the list via the wrapper below. %>
+    <%# With a few hundred events, this list's avatars and per-row forms were
+        most of the admin layout's render time on every page, for a menu that
+        is usually never opened. It loads when the menu is first opened
+        (loading: :lazy waits until the frame is visible). The topnav and the
+        mobile drawer each carry a copy, so each needs its own frame id. The
+        drawer closes on any click inside the list via the wrapper below. %>
     <div <%= tag.attributes(data: item_data) %>>
-      <%= @admin_event_switcher_items ||= render("layouts/admin_event_switcher_items") %>
+      <%= lazy_frame "event_switcher_items_#{variant}", src: admin_event_switcher_path, loading: :lazy do %>
+        <div class="cs-menu-scroll px-3 py-2">
+          <%= render "shared/skeleton", shape: :lines, lines: 5, label: "Loading events" %>
+        </div>
+      <% end %>
     </div>
   </div>
 </div>

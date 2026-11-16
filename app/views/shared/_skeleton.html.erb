@@ -1,0 +1,61 @@
+<%#
+  Placeholder for a section that's still loading (see LazyFrameHelper).
+
+  shape:  :panel  — a titled box of text lines (default)
+          :table  — a titled box of rows
+          :stats  — a row of figures
+          :lines  — bare text lines, for inline use
+  lines:  how many lines/rows to draw
+  label:  what's loading, for screen readers ("Loading series dashboard")
+
+  The box matches whichever admin UI is rendering it, so the swap from
+  skeleton to content doesn't jump. Widths vary a little row to row, which
+  reads as text rather than a grid of bars.
+%>
+<% shape = local_assigns.fetch(:shape, :panel).to_sym %>
+<% lines = local_assigns.fetch(:lines, shape == :table ? 6 : 3) %>
+<% label = local_assigns.fetch(:label, "Loading") %>
+<% console = respond_to?(:console_ui?) && console_ui? %>
+<% box_class = console ? "cs-container" : "bg-(--bg-elev) border border-(--border-card) rounded-lg" %>
+<% widths = %w[92% 78% 85% 64% 88% 72% 80% 58%] %>
+
+<div class="skeleton-group" role="status" aria-live="polite">
+  <span class="sr-only"><%= label %>…</span>
+  <% case shape %>
+  <% when :lines %>
+    <div class="space-y-2.5" aria-hidden="true">
+      <% lines.times do |i| %>
+        <span class="skeleton skeleton-line" style="width: <%= widths[i % widths.length] %>"></span>
+      <% end %>
+    </div>
+  <% when :stats %>
+    <div class="<%= box_class %> grid grid-cols-2 sm:grid-cols-4 gap-4 p-5" aria-hidden="true">
+      <% [ lines, 2 ].max.times do %>
+        <div class="space-y-2">
+          <span class="skeleton skeleton-line" style="width: 60%"></span>
+          <span class="skeleton skeleton-figure"></span>
+        </div>
+      <% end %>
+    </div>
+  <% when :table %>
+    <div class="<%= box_class %> overflow-hidden" aria-hidden="true">
+      <div class="px-5 py-4"><span class="skeleton skeleton-title"></span></div>
+      <% lines.times do |i| %>
+        <div class="flex items-center gap-4 px-5 py-3 border-t border-current/10">
+          <span class="skeleton skeleton-line" style="width: 28%"></span>
+          <span class="skeleton skeleton-line flex-1" style="max-width: <%= widths[i % widths.length] %>"></span>
+          <span class="skeleton skeleton-line hidden sm:block" style="width: 12%"></span>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
+    <div class="<%= box_class %> p-5 space-y-4" aria-hidden="true">
+      <span class="skeleton skeleton-title"></span>
+      <div class="space-y-2.5">
+        <% lines.times do |i| %>
+          <span class="skeleton skeleton-line" style="width: <%= widths[i % widths.length] %>"></span>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>

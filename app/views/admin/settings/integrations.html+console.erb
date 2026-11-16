@@ -165,29 +165,13 @@
         <% end %>
       <% end %>
 
-      <div class="<%= row_divider %> flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h3 class="cs-setting-title">Sync global and active event admins</h3>
-          <p class="cs-setting-description">
-            <%= pluralize(@admin_help_member_count, "eligible person", plural: "eligible people") %>,
-            <%= @admin_help_members_without_slack %> without a Slack account linked through Hack Club Auth (they can't be invited).
-          </p>
-          <% if @admin_help_last_sync["at"].present? %>
-            <p class="cs-field-description mt-1">
-              Last synced <%= cs_relative_time(Time.zone.parse(@admin_help_last_sync["at"])) %>:
-              <%= @admin_help_last_sync["added"] %> added,
-              <%= @admin_help_last_sync["already_member"] %> already in the channel,
-              <%= @admin_help_last_sync["failed"] %> failed,
-              <%= @admin_help_last_sync["no_slack"] %> without Slack.
-            </p>
-          <% end %>
+      <%# Counting who's eligible scans every user and role, which can take
+          seconds, so the rest of the page doesn't wait for it. %>
+      <%= lazy_frame "admin_help_slack_sync", src: slack_channel_sync_admin_settings_path(channel: "admin_help") do %>
+        <div class="border-t border-(--cs-border-divider-secondary) mt-4 pt-4">
+          <%= render "shared/skeleton", shape: :lines, lines: 2, label: "Counting who can be synced" %>
         </div>
-        <%= button_to "Sync to channel", sync_admin_help_slack_channel_admin_settings_path,
-              method: :post,
-              disabled: @admin_help_slack_channel_id.blank?,
-              class: "cs-btn shrink-0",
-              data: { turbo_confirm: "Invite #{pluralize(@admin_help_member_count - @admin_help_members_without_slack, "person", plural: "people")} with Slack accounts to the channel?" } %>
-      </div>
+      <% end %>
     </div>
   </section>
 
@@ -211,31 +195,13 @@
         <% end %>
       <% end %>
 
-      <div class="<%= row_divider %> flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h3 class="cs-setting-title">Sync all admins</h3>
-          <p class="cs-setting-description">
-            <%= pluralize(@org_support_member_count, "eligible person", plural: "eligible people") %>,
-            <%= @org_support_members_without_slack %> without a Slack account linked through Hack Club Auth (they can't be invited).
-          </p>
-          <% if @org_support_last_sync["at"].present? %>
-            <p class="cs-field-description mt-1">
-              Last synced <%= cs_relative_time(Time.zone.parse(@org_support_last_sync["at"])) %>:
-              <%= @org_support_last_sync["added"] %> added,
-              <%= @org_support_last_sync["already_member"] %> already in the channel,
-              <%= @org_support_last_sync["removed"] %> removed,
-              <%= @org_support_last_sync["failed"] %> failed,
-              <%= @org_support_last_sync["no_slack"] %> without Slack<% if @org_support_last_sync["not_in_workspace"].to_i.positive? %>,
-              <%= @org_support_last_sync["not_in_workspace"] %> not in this Slack workspace<% end %>.
-            </p>
-          <% end %>
+      <%# Counting who's eligible scans every user and role, which can take
+          seconds, so the rest of the page doesn't wait for it. %>
+      <%= lazy_frame "org_support_slack_sync", src: slack_channel_sync_admin_settings_path(channel: "org_support") do %>
+        <div class="border-t border-(--cs-border-divider-secondary) mt-4 pt-4">
+          <%= render "shared/skeleton", shape: :lines, lines: 2, label: "Counting who can be synced" %>
         </div>
-        <%= button_to "Sync to channel", sync_org_support_slack_channel_admin_settings_path,
-              method: :post,
-              disabled: @org_support_slack_channel_id.blank?,
-              class: "cs-btn shrink-0",
-              data: { turbo_confirm: "Invite #{pluralize(@org_support_member_count - @org_support_members_without_slack, "person", plural: "people")} with Slack accounts to the channel, and remove anyone Attend added whose events ended over 7 days ago?" } %>
-      </div>
+      <% end %>
     </div>
   </section>
 </div>

@@ -5,6 +5,7 @@ module Admin
 
     SLACK_CHANNEL_ID = /\A[CG][A-Z0-9]+\z/
     TWILIO_VERIFY_SERVICE_SID = /\AVA[0-9a-f]{32}\z/
+    SLACK_SYNC_CHANNELS = { "admin_help" => "admin_help", "org_support" => "org_support" }.freeze
 
     # The General tab: the app-wide switches. The original admin keeps
     # everything on this one page.
@@ -21,6 +22,19 @@ module Admin
       end
 
       load_settings
+    end
+
+    # One Slack channel's "who would a sync invite" row. Counting the eligible
+    # people scans every user against every role, which runs to seconds, so
+    # the settings page renders without it and loads this into its place.
+    def slack_channel_sync
+      @channel = SLACK_SYNC_CHANNELS.fetch(params[:channel]) { raise ActionController::BadRequest, "unknown channel" }
+      members = User.public_send(:"#{@channel}_channel_members")
+      instance_variable_set(:"@#{@channel}_slack_channel_id", Setting.public_send(:"#{@channel}_slack_channel_id"))
+      instance_variable_set(:"@#{@channel}_member_count", members.count)
+      instance_variable_set(:"@#{@channel}_members_without_slack", members.where(verified_slack_id: nil).count)
+      instance_variable_set(:"@#{@channel}_last_sync", Setting.public_send(:"#{@channel}_slack_last_sync"))
+      render layout: false
     end
 
     def toggle_maintenance
@@ -182,15 +196,7 @@ module Admin
       @support_sms_notification_numbers = Setting.support_sms_notification_number_list
       @support_email_notification_addresses = Setting.support_email_notification_address_list
       @admin_help_slack_channel_id = Setting.admin_help_slack_channel_id
-      admin_help_members = User.admin_help_channel_members
-      @admin_help_member_count = admin_help_members.count
-      @admin_help_members_without_slack = admin_help_members.where(verified_slack_id: nil).count
-      @admin_help_last_sync = Setting.admin_help_slack_last_sync
       @org_support_slack_channel_id = Setting.org_support_slack_channel_id
-      org_support_members = User.org_support_channel_members
-      @org_support_member_count = org_support_members.count
-      @org_support_members_without_slack = org_support_members.where(verified_slack_id: nil).count
-      @org_support_last_sync = Setting.org_support_slack_last_sync
     end
 
     def require_global_admin

@@ -15,7 +15,13 @@ module Admin
 
     def setup
       @participant_stats = calculate_participant_stats
+    end
+
+    # Setup's surname-matched sibling suggestions, loaded into the step after
+    # it renders: matching every participant by surname is the slow part.
+    def suggested_siblings
       @suggested_siblings = find_suggested_siblings
+      render layout: false
     end
 
     def create_setup

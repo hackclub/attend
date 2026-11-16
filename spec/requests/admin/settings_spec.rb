@@ -246,7 +246,30 @@ RSpec.describe "Admin::Settings", type: :request do
 
       expect(response.body).to include("Admin Help Slack Channel")
       expect(response.body).to include("CHELP")
+      # Counting is slow, so the count loads into the page separately.
+      expect(response.body).to include(slack_channel_sync_admin_settings_path(channel: "admin_help"))
+      expect(response.body).not_to include("eligible people")
+
+      get slack_channel_sync_admin_settings_path(channel: "admin_help"), headers: { "Turbo-Frame" => "admin_help_slack_sync" }
+
+      expect(response.body).to include('id="admin_help_slack_sync"')
       expect(response.body).to include("2 eligible people") # the event admin plus the signed-in global admin
+    end
+
+    it "only counts the channels it knows" do
+      sign_in global_admin
+
+      get slack_channel_sync_admin_settings_path(channel: "users")
+
+      expect(response).to have_http_status(:bad_request)
+    end
+
+    it "keeps the counts to global admins" do
+      sign_in event_admin
+
+      get slack_channel_sync_admin_settings_path(channel: "admin_help")
+
+      expect(response).to redirect_to(admin_root_path)
     end
 
     context "with the admin console beta" do
@@ -261,6 +284,10 @@ RSpec.describe "Admin::Settings", type: :request do
 
         expect(response.body).to include("Admin help Slack channel")
         expect(response.body).to include("CHELP")
+
+        get slack_channel_sync_admin_settings_path(channel: "admin_help")
+
+        expect(response.body).to include("Sync global and active event admins")
         expect(response.body).to include("2 eligible people")
       end
     end
@@ -315,7 +342,7 @@ RSpec.describe "Admin::Settings", type: :request do
       Setting.org_support_slack_last_sync = { "at" => Time.current.iso8601, "added" => 3, "failed" => 0, "not_in_workspace" => 2 }
       sign_in global_admin
 
-      get admin_settings_path
+      get slack_channel_sync_admin_settings_path(channel: "org_support")
 
       expect(response.body).to include("2 not in this Slack workspace")
     end
