@@ -9,6 +9,10 @@ class Consent < ApplicationRecord
 
   include SyncsRegistration
   syncs_registration cause: :documents_changed
+
+  def registration_sync_cause
+    saved_change_to_status? && signed? ? :document_signed : super
+  end
   belongs_to :guardian_participant_event, optional: true
   belongs_to :custom_document, optional: true
 
@@ -118,8 +122,9 @@ class Consent < ApplicationRecord
       updates[:pending_on] = "guardian"
     end
 
+    # Saving re-syncs the registration (SyncsRegistration), which is what
+    # completes it when this was the last signature.
     update!(updates) if updates.any?
-    participant_event&.mark_complete_if_eligible!(cause: :document_signed) if signed?
   rescue Docuseal::Error, ArgumentError, Faraday::Error => e
     # ArgumentError covers environments with no DocuSeal credentials configured,
     # Faraday::Error a DocuSeal that timed out or couldn't be reached. Signing
@@ -258,7 +263,6 @@ class Consent < ApplicationRecord
     end
 
     update!(updates)
-    participant_event.mark_complete_if_eligible!(cause: :document_signed) if signed?
   end
 
   # A guardian uploaded the signed form themselves (guardian-only documents) —
@@ -275,7 +279,6 @@ class Consent < ApplicationRecord
       status: :signed,
       pending_on: nil
     )
-    participant_event.mark_complete_if_eligible!(cause: :document_signed)
   end
 
   # Every upload was removed before the document was confirmed — wind the
@@ -299,7 +302,6 @@ class Consent < ApplicationRecord
       status: :signed,
       pending_on: nil
     )
-    participant_event.mark_complete_if_eligible!(cause: :document_signed)
   end
 
   private

@@ -6,7 +6,10 @@
 #   syncs_registration cause: :data_changed
 #
 # Override #registration_ids_to_sync when the record isn't a direct child of
-# one registration.
+# one registration, and #registration_sync_cause when the change itself says
+# something more specific (a consent becoming signed, a guardian finishing).
+# The sync on commit is the one that moves the status, so the cause it
+# records is the one the history shows.
 module SyncsRegistration
   extend ActiveSupport::Concern
 
@@ -24,15 +27,23 @@ module SyncsRegistration
     ActiveSupport::IsolatedExecutionState[:registration_sync_suspended] == true
   end
 
+  included do
+    class_attribute :default_registration_sync_cause, instance_writer: false
+  end
+
   class_methods do
     def syncs_registration(cause:, **options)
-      define_method(:registration_sync_cause) { cause }
+      self.default_registration_sync_cause = cause
       after_commit :sync_registration_status, **options
     end
   end
 
   def registration_ids_to_sync
     [ participant_event_id ]
+  end
+
+  def registration_sync_cause
+    default_registration_sync_cause
   end
 
   private

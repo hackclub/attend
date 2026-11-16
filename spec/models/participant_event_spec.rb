@@ -329,11 +329,23 @@ RSpec.describe ParticipantEvent, type: :model do
       }.to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
       expect(pe.reload).to be_complete
       expect(pe.onboarding_completed_at).to be_present
-      expect(pe.registration_transitions.chronological.last.cause).to eq("documents_changed")
+      expect(pe.registration_transitions.chronological.last.cause).to eq("document_signed")
 
       expect {
         expect(pe.mark_complete_if_eligible!).to be false
       }.not_to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
+    end
+
+    it "records a guardian finishing as what completed it" do
+      pe = minor_pe(create(:event, freedom_waivers_enabled: false))
+      link = create(:guardian_participant_event, participant_event: pe, status: :in_progress)
+      create(:consent, :signed, participant_event: pe)
+      expect(pe.reload).to be_awaiting_guardian
+
+      link.update!(status: :completed, completed_at: Time.current)
+
+      expect(pe.reload).to be_complete
+      expect(pe.registration_transitions.chronological.last.cause).to eq("guardian_completed")
     end
 
     it "waits for the participant's answers" do
