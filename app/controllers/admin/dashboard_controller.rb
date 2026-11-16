@@ -235,7 +235,7 @@ class Admin::DashboardController < Admin::BaseController
 
     @total_participants = @active_participant_events.count
     @status_counts = @participant_events.group(:status).count
-    @display_status_counts = ParticipantEvent.display_status_counts(@participant_events)
+    @display_status_counts = ParticipantEvent.display_counts_from(@status_counts)
     @pending_invitations_count = current_event.invitations.pending.count
 
     # Travel stats

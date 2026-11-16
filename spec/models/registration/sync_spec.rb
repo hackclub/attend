@@ -73,6 +73,24 @@ RSpec.describe "Registration status sync" do
       expect(other.reload).to be_complete
     end
 
+    it "derives the requirements once per sync" do
+      pe = complete_adult
+      pe.travel_inbound.destroy!
+      expect(pe.reload).to be_in_progress
+      allow(Registration::Requirements).to receive(:new).and_call_original
+
+      # Not complete, not yet reminded, and about to change status: every
+      # question a sync can ask.
+      pe.update_columns(code_of_conduct_accepted_at: nil)
+      pe.sync_status!(cause: :requirements_met)
+      SyncsRegistration.suspended { pe.travels.create!(direction: "inbound", mode: "car") }
+      pe.update_columns(code_of_conduct_accepted_at: Time.current)
+      expect(Registration::Requirements).to have_received(:new).once
+
+      expect(pe.sync_status!(cause: :requirements_met)).to be(true)
+      expect(Registration::Requirements).to have_received(:new).twice
+    end
+
     it "leaves the other registrations of a destroyed one's records alone" do
       pe = complete_adult
 

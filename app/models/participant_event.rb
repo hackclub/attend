@@ -142,10 +142,14 @@ class ParticipantEvent < ApplicationRecord
   #
   # rejection_authorized: the caller checked ParticipantEventPolicy#change_status?
   # (see above). Returns false, writing nothing, when it's already there.
-  def transition_to!(new_status, cause:, actor: Current.user, rejection_authorized: false, metadata: {})
+  #
+  # requirements: the Registration::Requirements this change was derived
+  # from, when the caller has one, so the record of what the registration is
+  # now stuck on doesn't derive them all over again.
+  def transition_to!(new_status, cause:, actor: Current.user, rejection_authorized: false, metadata: {}, requirements: nil)
     return false if status == new_status.to_s
 
-    @pending_transition = { cause: cause, actor: actor, metadata: metadata }
+    @pending_transition = { cause: cause, actor: actor, metadata: metadata, requirements: requirements }
     self.rejection_change_authorized = rejection_authorized
     update!(status: new_status)
     true
@@ -192,6 +196,10 @@ class ParticipantEvent < ApplicationRecord
     # both get here. Deriving under a row lock means only one of them makes
     # the change and sends the email.
     previous = nil
+    # Derived once, under the lock, and reused for everything this sync
+    # goes on to ask: where the status lands, what it is stuck on, and
+    # whether submitting is all that's left.
+    requirements = nil
     changed = with_lock do
       reset_document_memoisation!
       requirements = Registration::Requirements.new(self)
@@ -201,7 +209,7 @@ class ParticipantEvent < ApplicationRecord
       if moved
         previous = status
         self.onboarding_completed_at ||= Time.current if target == "complete"
-        transition_to!(target, cause: cause, actor: actor)
+        transition_to!(target, cause: cause, actor: actor, requirements: requirements)
       end
       note_signature_outstanding(requirements) unless complete?
       moved
@@ -222,7 +230,7 @@ class ParticipantEvent < ApplicationRecord
             ParticipantMailer.information_needed(participant_event: self).deliver_later
           end
         end
-        remind_to_submit_if_only_step_left
+        remind_to_submit_if_only_step_left(requirements)
       end
     end
 
@@ -573,9 +581,14 @@ class ParticipantEvent < ApplicationRecord
   # and nothing else would ever prompt them, so the registration sat
   # in_progress with every signature in. Every change comes through
   # #sync_status!, so that is where we notice and email them, once.
-  def remind_to_submit_if_only_step_left
+  #
+  # requirements: the ones #sync_status! just derived. Anything else asks
+  # afresh.
+  def remind_to_submit_if_only_step_left(requirements = nil)
     return false if code_of_conduct_accepted_at.present?
-    return false unless eligible_for_completion?(ignoring_submission: true)
+
+    requirements ||= Registration::Requirements.new(self)
+    return false unless requirements.completable?(ignoring_submission: true)
 
     claimed = self.class.where(id: id, submission_reminder_sent_at: nil)
       .update_all(submission_reminder_sent_at: Time.current, updated_at: Time.current)
@@ -611,7 +624,12 @@ class ParticipantEvent < ApplicationRecord
 
   # { "Complete" => 12, "Awaiting Parent" => 3, ... } for a scope, in one query.
   def self.display_status_counts(scope = all)
-    scope.group(:status).count.each_with_object(Hash.new(0)) do |(status, count), counts|
+    display_counts_from(scope.group(:status).count)
+  end
+
+  # The same, from status counts the caller already has.
+  def self.display_counts_from(status_counts)
+    status_counts.each_with_object(Hash.new(0)) do |(status, count), counts|
       counts[DISPLAY_STATUS.fetch(status)] += count
     end
   end
@@ -813,7 +831,7 @@ class ParticipantEvent < ApplicationRecord
       to_status: to,
       cause: cause,
       actor: pending.key?(:actor) ? pending[:actor] : Current.user,
-      blocking_requirement: blocking_requirement_for_transition,
+      blocking_requirement: blocking_requirement_for_transition(pending[:requirements]),
       metadata: pending[:metadata] || {}
     )
 
@@ -822,13 +840,15 @@ class ParticipantEvent < ApplicationRecord
     end
   end
 
-  # What the registration is stuck on as it lands in its new status. Read
-  # from a fresh copy: asking this one would load and cache associations the
-  # caller may be about to change.
-  def blocking_requirement_for_transition
+  # What the registration is stuck on as it lands in its new status. A sync
+  # hands over the requirements it derived. Anything else reads a fresh
+  # copy: asking this one would load and cache associations the caller may
+  # be about to change.
+  def blocking_requirement_for_transition(requirements = nil)
     return if complete? || inactive?
 
-    Registration::Requirements.new(self.class.find(id)).blocking&.key
+    requirements ||= Registration::Requirements.new(self.class.find(id))
+    requirements.blocking&.key
   end
 
   def rejection_change_must_be_authorized
