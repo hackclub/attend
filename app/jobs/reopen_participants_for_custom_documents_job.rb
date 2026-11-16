@@ -5,8 +5,9 @@ class ReopenParticipantsForCustomDocumentsJob < ApplicationJob
   # their db status 'complete' while the live display shows a blocking
   # custom_documents step — so message audiences, Airtable sync, and raw-status
   # filters disagree with the admin list. Regress those participants to
-  # in_progress and tell them a new document is waiting; signing it re-completes
-  # them through ParticipantEvent#mark_complete_if_eligible!.
+  # in_progress; signing it re-completes them. ParticipantEvent#sync_status!
+  # tells them a new document is waiting as it reopens them, so the email
+  # also reaches anyone another sync reopened before this job ran.
   def perform(event_id)
     event = Event.find(event_id)
 
@@ -24,10 +25,7 @@ class ReopenParticipantsForCustomDocumentsJob < ApplicationJob
       end
       next unless needs_signature
 
-      next unless participant_event.sync_status!(cause: :document_added)
-
-      ParticipantMailer.new_document_ready(participant_event: participant_event).deliver_later
-      reopened += 1
+      reopened += 1 if participant_event.sync_status!(cause: :document_added)
     end
 
     Rails.logger.info("[ReopenParticipantsForCustomDocumentsJob] Reopened #{reopened} complete participants for event #{event.id}")

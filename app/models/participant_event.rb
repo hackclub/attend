@@ -191,11 +191,13 @@ class ParticipantEvent < ApplicationRecord
     # Concurrent webhooks (or a webhook racing a guardian's commit hook) can
     # both get here. Deriving under a row lock means only one of them makes
     # the change and sends the email.
+    previous = nil
     changed = with_lock do
       reset_document_memoisation!
       target = Registration::Requirements.new(self).stage
       next false if target == status
 
+      previous = status
       self.onboarding_completed_at ||= Time.current if target == "complete"
       transition_to!(target, cause: cause, actor: actor)
     end
@@ -204,11 +206,28 @@ class ParticipantEvent < ApplicationRecord
       if changed && complete?
         ParticipantMailer.registration_confirmed(participant_event: self).deliver_later unless reopened_for_data_only?
       elsif !complete?
+        # Sent here rather than by ReopenParticipantsForCustomDocumentsJob:
+        # whichever sync gets to a registration first is the one that reopens
+        # it, and the job would find it already reopened and tell nobody.
+        if changed && previous == "complete" && new_document_to_sign?
+          ParticipantMailer.new_document_ready(participant_event: self).deliver_later
+        end
         remind_to_submit_if_only_step_left
       end
     end
 
     changed
+  end
+
+  # A document that applies to them and was never issued to them: one the
+  # event added after they finished. A document they opted into, or whose
+  # signature staff discarded, has a consent on file and they already know
+  # about it. Nobody can sign while guardian invites are locked, so there is
+  # nothing to tell them until those unlock.
+  def new_document_to_sign?
+    return false if event.guardian_invites_locked?
+
+    pending_custom_documents.any? { |document| custom_document_consent(document).nil? }
   end
 
   # SQL mirror of !onboarding_complete? so list filters don't have to load
