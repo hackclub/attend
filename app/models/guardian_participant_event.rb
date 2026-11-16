@@ -78,7 +78,9 @@ class GuardianParticipantEvent < ApplicationRecord
   # would write (and record a PaperTrail version) for nothing.
   #
   # This mints and stamps, so it is for POSTs and jobs. Pages render
-  # #portal_url, which never writes.
+  # #portal_url, which never writes, and send staff here (through
+  # Admin::ParticipantsController#guardian_portal_link) when it has nothing
+  # live to show.
   def invite_url
     token = generate_invite_token!
     update!(invite_token_sent_at: Time.current) if invite_expired?
@@ -86,27 +88,14 @@ class GuardianParticipantEvent < ApplicationRecord
     portal_url_for(token)
   end
 
-  # The portal link as it stands, or nil when no token has been minted yet.
-  # Read-only, so safe to call from a view. The link it returns may be dead
-  # (see #invite_link_stale?); whoever shows it is responsible for reviving it.
+  # The portal link, when there is one that works right now. nil when no token
+  # has been minted yet or its window has lapsed: a link that would 404 on
+  # arrival is never handed out. Read-only, so safe to call from a view.
   def portal_url
+    return if invite_expired?
+
     token = invite_token
     portal_url_for(token) if token.present?
-  end
-
-  # A link exists but its window has lapsed, so it would 404 if handed out now.
-  def invite_link_stale?
-    invite_token_ciphertext.present? && invite_expired?
-  end
-
-  # Reopens the window on a stale link (RefreshGuardianInviteWindowJob, queued
-  # when the admin participant page shows one). Never mints: a link revoked
-  # since the page rendered must stay dead, and re-checking under the row lock
-  # keeps this from stamping over a revoke or a resend that got there first.
-  def refresh_stale_invite_window!
-    with_lock do
-      update!(invite_token_sent_at: Time.current) if invite_link_stale?
-    end
   end
 
   INVITE_VALIDITY = 7.days

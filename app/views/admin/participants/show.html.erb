@@ -370,7 +370,7 @@
                         Copy Portal Link
                       </button>
                     <% else %>
-                      <%# No link minted yet: a page view must not write, so the first click makes one. %>
+                      <%# No working link (none minted, or its window lapsed): a page view must not write, so the click makes or revives one. %>
                       <%= button_to "Copy Portal Link",
                           guardian_portal_link_admin_event_participant_path(current_event, @participant_event, guardian_participant_event_id: gpe.id),
                           method: :post,

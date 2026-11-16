@@ -161,7 +161,6 @@ module Admin
       @safeguarding_info = @participant_event.safeguarding_info
       @consents = @participant_event.consents
       @guardian_participant_events = @participant_event.guardian_participant_events.includes(:guardian)
-      refresh_stale_guardian_links
       @scans = @participant_event.scans.includes(:user, :scan_context).recent.limit(3)
       @emergency_contacts = emergency_contacts_for_profile
       @visa_letter_application = @participant_event.visa_letter_application
@@ -728,10 +727,11 @@ module Admin
       redirect_to admin_event_participant_path(current_event, @participant_event), notice: "Guardian invite resent to #{gpe.guardian.email}."
     end
 
-    # "Copy Portal Link" for a guardian who has no link yet. The page used to
-    # mint one while rendering; now that takes this POST, and the page comes
-    # back with the link in the button. Open to anyone who can see the page,
-    # as the link itself always was.
+    # "Copy Portal Link" for a guardian who has no working link: none minted
+    # yet, or one whose window has lapsed. The page used to mint or restamp it
+    # while rendering; now that takes this POST, and the page comes back with
+    # a live link in the button. Open to anyone who can see the page, as the
+    # link itself always was.
     def guardian_portal_link
       authorize @participant_event, :show?
 
@@ -1012,21 +1012,6 @@ module Admin
 
       @participant.slack_user_id = slack_id
       SyncParticipantSlackIdJob.perform_later(user)
-    end
-
-    # "Copy Portal Link" hands staff the guardian's link, and a link whose
-    # window has lapsed 404s on arrival. Rendering it used to restamp it;
-    # the button now carries the link as it stands (#portal_url) and a job
-    # reopens the window, well inside the time it takes to paste a link
-    # anywhere. Same guard as the button itself.
-    def refresh_stale_guardian_links
-      return if current_event.guardian_invites_locked?
-
-      @guardian_participant_events.each do |gpe|
-        next if gpe.completed? || !gpe.invite_link_stale?
-
-        RefreshGuardianInviteWindowJob.perform_later(gpe)
-      end
     end
 
     # `blocked_on=<stage key>` — the series dashboard's chase links. A stage's

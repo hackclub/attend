@@ -42,33 +42,39 @@ RSpec.describe "Admin participant page is read-only", type: :request do
         it "is in the copy button as it stands when it is live, with nothing written or queued" do
           token = gpe.generate_invite_token!
 
-          expect { get show_path }.not_to have_enqueued_job(RefreshGuardianInviteWindowJob)
+          expect { get show_path }.not_to have_enqueued_job
 
           expect(copy_button["data-clipboard-content-value"]).to end_with("/guardian/portal/#{token}")
           expect(portal_link_form).to be_nil
           expect(GetWriteDetector.drain).to be_empty
         end
 
-        it "is still in the copy button when its window has lapsed, and a job reopens the window" do
+        # A lapsed link 404s on arrival. The page never puts one in the copy
+        # button: the button is the POST that revives it, so whatever staff
+        # end up copying works.
+        it "isn't in the copy button once its window has lapsed: the button revives it with a POST" do
           token = gpe.generate_invite_token!
           gpe.update!(invite_token_sent_at: 30.days.ago, invite_last_used_at: nil)
 
-          expect { get show_path }.to have_enqueued_job(RefreshGuardianInviteWindowJob).with(gpe)
+          expect { get show_path }.not_to have_enqueued_job
 
-          expect(copy_button["data-clipboard-content-value"]).to end_with("/guardian/portal/#{token}")
+          expect(copy_button).to be_nil
+          expect(response.body).not_to include(token)
+          expect(portal_link_form["method"]).to eq("post")
           expect(GetWriteDetector.drain).to be_empty
           expect(gpe.reload.invite_expired?).to be(true)
 
-          perform_enqueued_jobs(only: RefreshGuardianInviteWindowJob)
+          post guardian_portal_link_admin_event_participant_path(event, participant_event, guardian_participant_event_id: gpe.id)
+          follow_redirect!
 
-          expect(gpe.reload.invite_expired?).to be(false)
+          expect(copy_button["data-clipboard-content-value"]).to end_with("/guardian/portal/#{token}")
           expect(GuardianParticipantEvent.find_by_invite_token!(token)).to eq(gpe)
         end
 
         it "isn't minted by viewing the page: the same button asks for one with a POST" do
           expect(gpe.invite_token).to be_nil
 
-          expect { get show_path }.not_to have_enqueued_job(RefreshGuardianInviteWindowJob)
+          expect { get show_path }.not_to have_enqueued_job
 
           expect(gpe.reload.invite_token).to be_nil
           expect(copy_button).to be_nil
@@ -104,8 +110,9 @@ RSpec.describe "Admin participant page is read-only", type: :request do
           gpe.update!(invite_token_sent_at: 30.days.ago)
           allow_any_instance_of(Event).to receive(:guardian_invites_locked?).and_return(true)
 
-          expect { get show_path }.not_to have_enqueued_job(RefreshGuardianInviteWindowJob)
+          get show_path
           expect(copy_button).to be_nil
+          expect(portal_link_form).to be_nil
 
           post guardian_portal_link_admin_event_participant_path(event, participant_event, guardian_participant_event_id: gpe.id)
           expect(flash[:alert]).to include("locked")
