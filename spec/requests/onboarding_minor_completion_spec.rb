@@ -105,6 +105,61 @@ RSpec.describe "Onboarding completion for minors", type: :request do
     end
   end
 
+  # Submitting records the code of conduct before it finds there's no
+  # guardian, and sends them to the guardian step. Saving that step is then
+  # the end of the submission: nothing else would prepare the waiver or
+  # invite the guardian, and the wizard is locked from there on.
+  context "when the participant submitted without a guardian on file" do
+    let(:guardian_params) do
+      {
+        guardian_first_name: "Jo", guardian_last_name: "Example", guardian_email: "jo.guardian@example.com",
+        guardian_phone: "+14155550199", guardian_relationship: "Parent"
+      }
+    end
+
+    before do
+      participant_event
+      submit
+    end
+
+    it "sends them to the guardian step" do
+      expect(response).to redirect_to(onboarding_step_path(step: "guardian", event_id: event.id))
+      expect(participant_event.reload).to be_in_progress
+    end
+
+    it "finishes the submission once the guardian is saved" do
+      expect {
+        patch onboarding_step_path(step: "guardian", event_id: event.id), params: guardian_params
+      }.to have_enqueued_job(DocusealJobs::CreateMinorWaiverJob)
+        .and have_enqueued_mail(GuardianMailer, :invitation)
+
+      expect(response).to redirect_to(onboarding_waiver_path(event_id: event.id))
+      expect(participant_event.reload).to be_awaiting_guardian
+    end
+
+    # Autosave creates the guardian while the form is still being typed, so
+    # by the time they press continue the requirement is already met.
+    it "still finishes it when autosave got to the guardian first" do
+      patch onboarding_step_path(step: "guardian", event_id: event.id), params: guardian_params.merge(autosave: "true")
+      expect(participant_event.guardian_participant_events.reload).to be_present
+
+      get onboarding_step_path(step: "review", event_id: event.id)
+      expect(response).to redirect_to(onboarding_step_path(step: "guardian", event_id: event.id))
+
+      expect {
+        patch onboarding_step_path(step: "guardian", event_id: event.id), params: guardian_params
+      }.to have_enqueued_job(DocusealJobs::CreateMinorWaiverJob)
+        .and have_enqueued_mail(GuardianMailer, :invitation)
+      expect(response).to redirect_to(onboarding_waiver_path(event_id: event.id))
+    end
+
+    it "keeps them on the guardian step while it's still empty" do
+      patch onboarding_step_path(step: "guardian", event_id: event.id), params: { guardian_first_name: "" }
+
+      expect(response).to redirect_to(onboarding_step_path(step: "guardian", event_id: event.id))
+    end
+  end
+
   context "when the participant has already submitted" do
     before do
       create(:guardian_participant_event, participant_event: participant_event, status: :pending)

@@ -124,6 +124,11 @@ class OnboardingController < ApplicationController
         return
       end
 
+      # Already submitted, and back for the one step the lock reopened (see
+      # #redirect_if_locked). Walking on to the next step would only meet the
+      # lock again, so the submission picks up where it stopped.
+      return resume_submission if reopened_after_submission?
+
       advance_to_next_step
       next_step = steps[@participant_event.onboarding_step]
 
@@ -369,7 +374,16 @@ class OnboardingController < ApplicationController
 
     update_user_name_from_participant
     request_um_review
+    finish_submission
+  end
 
+  private
+
+  # What follows the code of conduct being accepted: the status moves on, the
+  # waiver is prepared and the guardian is invited. Also where a submission
+  # resumes after the lock reopened a step (see #resume_submission), so
+  # everything here has to be safe to run twice.
+  def finish_submission
     # Submitting is a requirement like any other: a minor moves on to waiting
     # for their guardian, and someone whose signatures are already in is done.
     @participant_event.sync_status!(cause: :submitted)
@@ -422,7 +436,26 @@ class OnboardingController < ApplicationController
     end
   end
 
-  private
+  # The lock only applies to these (see #redirect_if_locked), so a request
+  # that got past it to save a step is one it reopened.
+  def reopened_after_submission?
+    @participant_event.code_of_conduct_accepted_at.present? && @participant_event.requires_guardian?
+  end
+
+  # A submitted minor has just saved the step they were sent back to. If
+  # something is still missing they go there next; otherwise the submission
+  # finishes, which is what prepares the waiver and invites a guardian who
+  # was only added now.
+  def resume_submission
+    @participant_event.reload.reset_document_memoisation!
+
+    if (step = missing_step_after_submission)
+      redirect_to onboarding_step_path(step: step, event_id: current_event.id),
+                  alert: "One part of your registration needs another look before it can be confirmed."
+    else
+      finish_submission
+    end
+  end
 
   def apply_event_brand
     @page_brand = current_event.brand_theme
@@ -1648,7 +1681,7 @@ class OnboardingController < ApplicationController
     # Something of theirs is missing (a guardian never linked, an answer
     # removed, a module the event switched on since). They get that one step
     # back and nothing else: the rest is still what they submitted.
-    if (step = missing_step_after_submission)
+    if (step = step_reopened_after_submission)
       return if params[:step] == step && %w[show update].include?(action_name)
 
       redirect_to onboarding_step_path(step: step, event_id: current_event.id),
@@ -1659,14 +1692,35 @@ class OnboardingController < ApplicationController
     redirect_to dashboard_path, alert: "Your registration has been submitted and cannot be edited."
   end
 
-  def missing_step_after_submission
+  def step_reopened_after_submission
     return if @participant_event.complete?
 
+    missing_step_after_submission || (GUARDIAN_STEP if guardian_never_contacted?)
+  end
+
+  def missing_step_after_submission
     blocking = @participant_event.registration_requirements.blocking
     return unless blocking&.kind == :data
 
     step = STEP_FOR_MISSING_REQUIREMENT[blocking.key]
     step if steps.include?(step)
+  end
+
+  # A guardian is on file but nothing has gone to them: no waiver was
+  # prepared and no invitation sent. That is a guardian added after the
+  # participant submitted whose step was never saved for real. Autosave
+  # creates the guardian as the form is typed, which meets the requirement
+  # before the participant presses continue, so the step has to stay open
+  # past that point or the submission could never resume. Not while sending
+  # is on hold, though: nothing goes out to anyone's guardian then.
+  def guardian_never_contacted?
+    return false unless @participant_event.requires_guardian?
+    return false if current_event.guardian_invites_locked? || Setting.waiver_sending_paused?
+
+    links = @participant_event.guardian_participant_events
+    links.any? &&
+      links.none? { |link| link.invite_token_sent_at.present? || link.completed? } &&
+      @participant_event.consent_of_type("waiver").nil?
   end
 
   def store_invitation_token
