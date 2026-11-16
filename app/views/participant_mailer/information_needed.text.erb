@@ -1,0 +1,12 @@
+Hi <%= @preferred_name %>,
+
+You'd already finished your registration for <%= @event_name %>, but the event team has since changed what the event needs from everyone. Before your registration is confirmed again, we need:
+
+<% @missing.each do |item| %>- <%= item %>
+<% end %>
+
+Everything else you gave us is still saved. Your entry ticket will be back as soon as this is filled in.
+
+Update your registration here: <%= @link %>
+
+If you have any questions, reach out to <%= @support_email %>.

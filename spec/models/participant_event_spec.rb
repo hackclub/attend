@@ -566,10 +566,22 @@ RSpec.describe ParticipantEvent, type: :model do
       create(:consent, :signed, participant_event: pe)
       expect(pe.reload).to be_complete
 
-      perform_enqueued_jobs(only: ResyncRegistrationsJob) { event.update!(travel_enabled: true) }
+      expect {
+        perform_enqueued_jobs(only: ResyncRegistrationsJob) { event.update!(travel_enabled: true) }
+      }.to have_enqueued_mail(ParticipantMailer, :information_needed).once
 
       expect(pe.reload).to be_in_progress
       expect(pe.registration_transitions.chronological.last.cause).to eq("settings_changed")
+    end
+
+    it "doesn't email anyone the change leaves where they were" do
+      event.update!(travel_enabled: false)
+      unfinished = adult_pe
+      expect(unfinished.reload).to be_in_progress
+
+      expect {
+        perform_enqueued_jobs(only: ResyncRegistrationsJob) { event.update!(travel_enabled: true) }
+      }.not_to have_enqueued_mail(ParticipantMailer, :information_needed)
     end
   end
 

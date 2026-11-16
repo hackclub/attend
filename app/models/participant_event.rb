@@ -214,8 +214,13 @@ class ParticipantEvent < ApplicationRecord
         # Sent here rather than by ReopenParticipantsForCustomDocumentsJob:
         # whichever sync gets to a registration first is the one that reopens
         # it, and the job would find it already reopened and tell nobody.
-        if changed && previous == "complete" && new_document_to_sign?
-          ParticipantMailer.new_document_ready(participant_event: self).deliver_later
+        if changed && previous == "complete"
+          ParticipantMailer.new_document_ready(participant_event: self).deliver_later if new_document_to_sign?
+          # The event switched something on, or moved its dates, and they
+          # now owe an answer they were never asked for.
+          if cause.to_s == "settings_changed"
+            ParticipantMailer.information_needed(participant_event: self).deliver_later
+          end
         end
         remind_to_submit_if_only_step_left
       end

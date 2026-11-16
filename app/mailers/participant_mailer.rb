@@ -195,6 +195,49 @@ class ParticipantMailer < ApplicationMailer
     )
   end
 
+  # The answers a participant can be asked for after they had finished, in
+  # the email's words, with the wizard step that collects each.
+  INFORMATION_NEEDED = {
+    "profile" => [ "your name and date of birth", "profile" ],
+    "travel" => [ "your travel plans", "travel" ],
+    "accommodation" => [ "your accommodation details", "accommodation" ],
+    "health" => [ "your health, dietary and accessibility information", "health" ],
+    "guardian_details" => [ "your parent or guardian's details", "guardian" ],
+    "emergency_contacts" => [ "an emergency contact", "emergency" ]
+  }.freeze
+
+  # A finished registration was reopened by a change to the event (see
+  # ResyncRegistrationsJob): it now needs an answer they were never asked
+  # for. Checked again at send time, in case it's been filled in since.
+  def information_needed(participant_event:)
+    participant_event.reload
+    return if participant_event.complete? || participant_event.inactive?
+
+    missing = participant_event.registration_requirements.unmet
+      .select { |requirement| requirement.kind == :data }
+      .filter_map { |requirement| INFORMATION_NEEDED[requirement.key] }
+    return if missing.empty?
+
+    @participant_event = participant_event
+    @participant = participant_event.participant
+    @event = participant_event.event
+    @emailable = @participant
+    @preferred_name = @participant.greeting_name || "there"
+    @event_name = @event.name
+    @missing = missing.map(&:first)
+    @link = Rails.application.routes.url_helpers.onboarding_step_url(
+      step: missing.first.last, event_id: @event.id, host: default_host, protocol: default_protocol
+    )
+    @support_email = @event.effective_support_email
+
+    mail(
+      to: @participant.email,
+      from: "Hack Club #{@event_name} <#{@support_email}>",
+      subject: "We need a little more information for #{@event_name}",
+      reply_to: @support_email
+    )
+  end
+
   def slack_link_reminder(participant_event:)
     @participant_event = participant_event
     @participant = participant_event.participant
