@@ -14,8 +14,30 @@ RSpec.describe Event, type: :model do
       expect(build(:event, support_email: "sunbeam@haven.hackclub.com")).to be_valid
     end
 
-    it "takes its allowed domains from config/support_email.yml" do
-      expect(Event::SUPPORT_EMAIL_DOMAINS).to eq(Rails.application.config_for(:support_email)[:domains])
+    describe ".support_email_domains" do
+      let(:configured) { %w[hackclub.com events.hackclub.com] }
+
+      it "takes the allowed domains from config/support_email.yml" do
+        expect(Event.support_email_domains(override: nil)).to eq(Rails.application.config_for(:support_email)[:domains])
+      end
+
+      it "lets SUPPORT_EMAIL_DOMAINS replace the list" do
+        expect(Event.support_email_domains(override: " Example.org ,example.net,", configured: configured))
+          .to eq(%w[example.org example.net])
+      end
+
+      it "ignores an override that names no domain" do
+        [ "", " ", ",", " , " ].each do |override|
+          expect(Event.support_email_domains(override: override, configured: configured)).to eq(configured)
+        end
+      end
+
+      it "fails with a message that says what to fix when no domain is configured at all" do
+        [ nil, [], [ " " ] ].each do |nothing|
+          expect { Event.support_email_domains(override: nil, configured: nothing) }
+            .to raise_error(ArgumentError, /config\/support_email\.yml/)
+        end
+      end
     end
 
     it "rejects addresses on any other domain" do

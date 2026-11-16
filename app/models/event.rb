@@ -170,9 +170,22 @@ class Event < ApplicationRecord
   #
   # Which domains count is configuration, not code: config/support_email.yml,
   # or SUPPORT_EMAIL_DOMAINS (comma-separated) to replace the list outright.
-  SUPPORT_EMAIL_DOMAINS = (
-    ENV["SUPPORT_EMAIL_DOMAINS"].presence&.split(",") || Rails.application.config_for(:support_email)[:domains]
-  ).map { |domain| domain.to_s.strip.downcase }.compact_blank.uniq.freeze
+  #
+  # An override that names no domain (" ", ",") is ignored rather than
+  # trusted: an empty list would turn the format check below into one that
+  # accepts "team@" and rejects every real address. With no domain from
+  # either place there is nothing sensible to validate against, so say so.
+  def self.support_email_domains(override: ENV["SUPPORT_EMAIL_DOMAINS"], configured: Rails.application.config_for(:support_email)[:domains])
+    clean = ->(domains) { Array(domains).map { |domain| domain.to_s.strip.downcase }.compact_blank.uniq }
+    domains = clean.call(override.to_s.split(",")).presence || clean.call(configured)
+    if domains.empty?
+      raise ArgumentError, "No support email domains configured: list at least one under `domains` in config/support_email.yml"
+    end
+
+    domains.freeze
+  end
+
+  SUPPORT_EMAIL_DOMAINS = support_email_domains
   SUPPORT_EMAIL_DOMAINS_SENTENCE = SUPPORT_EMAIL_DOMAINS.map { |d| "@#{d}" }
     .to_sentence(two_words_connector: " or ", last_word_connector: ", or ").freeze
   SUPPORT_EMAIL_FORMAT = /\A[^@\s]+@(?:#{SUPPORT_EMAIL_DOMAINS.map { |d| Regexp.escape(d) }.join("|")})\z/i
