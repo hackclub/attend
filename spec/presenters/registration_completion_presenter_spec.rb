@@ -192,6 +192,23 @@ RSpec.describe RegistrationCompletionPresenter do
     expect(confirmed.state).to eq(:confirmed)
   end
 
+  # Rows from before statuses were derived, or one whose sync was missed.
+  describe "when the stored status has fallen behind" do
+    it "does not hand an entry pass to a stale complete" do
+      participant_event.update_columns(status: "complete")
+
+      expect(presentation(:participant)).not_to be_confirmed
+      expect(presentation(:participant)).not_to be_entry_pass_eligible
+    end
+
+    it "leaves an ended event's as stored" do
+      participant_event.update_columns(status: "complete")
+      event.update_columns(starts_at: 3.days.ago, ends_at: 1.day.ago)
+
+      expect(presentation(:participant)).to be_confirmed
+    end
+  end
+
   # The status follows the requirements, so a new document reopens a complete
   # registration and takes the confirmation with it.
   it "does not confirm a complete registration once a new document is outstanding" do

@@ -18,11 +18,13 @@ class RegistrationCompletionPresenter
     participant_event.code_of_conduct_accepted_at.present?
   end
 
-  # The status is derived from what the registration needs, so complete is
-  # the whole answer. Re-checking the requirements here would take the ticket
-  # away from someone at the door whose answers changed after the event began.
+  # Complete, and still so by what the registration needs: a stored status
+  # that has fallen behind can't hand out an entry pass (see
+  # ParticipantEvent#confirmed?).
   def confirmed?
-    participant_event.complete?
+    return @confirmed if defined?(@confirmed)
+
+    @confirmed = participant_event.complete? && participant_event.confirmed?
   end
 
   alias_method :entry_pass_eligible?, :confirmed?

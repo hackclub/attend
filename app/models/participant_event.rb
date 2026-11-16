@@ -541,6 +541,21 @@ class ParticipantEvent < ApplicationRecord
     Registration::Requirements.new(self).completable?(ignoring_submission: ignoring_submission)
   end
 
+  # Whether they hold a ticket: complete by what the registration needs
+  # right now, not by the stored status. The two agree whenever every sync
+  # has run. This is for the rows where one hasn't: statuses stored before
+  # they were derived (until `rake registration:sync` has run), and any path
+  # that misses its sync. A stale "complete" must not get a scannable QR
+  # from the ticket API, and someone who has everything shouldn't be sent
+  # back to onboarding by it. Answers changing once the event has started
+  # still don't take a ticket away, and ended events stay as stored
+  # (Requirements#stage).
+  #
+  # Derived fresh for the same reason as #eligible_for_completion?.
+  def confirmed?
+    Registration::Requirements.new(self).stage == "complete"
+  end
+
   # Syncs, and says whether that completed the registration just now.
   #
   # cause: what just happened that might have been the last piece, for the

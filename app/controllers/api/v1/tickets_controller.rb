@@ -71,7 +71,7 @@ module Api
 
         # "Confirmed" = the attendee has finished onboarding. Only confirmed
         # tickets get a scannable check-in QR; others are sent to onboarding.
-        confirmed = participant_event.complete?
+        confirmed = participant_event.confirmed?
 
         json = {
           id: participant_event.id,

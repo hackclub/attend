@@ -560,6 +560,40 @@ RSpec.describe ParticipantEvent, type: :model do
       end
     end
 
+    # What the ticket API goes by. Rows from before statuses were derived,
+    # or one whose sync was missed, hold a status the requirements don't back.
+    describe "#confirmed?" do
+      it "is false for a stale complete" do
+        pe = adult_pe
+        pe.update_columns(status: "complete")
+
+        expect(pe).not_to be_confirmed
+      end
+
+      it "is true for a registration that has everything, whatever is stored" do
+        pe = meet_registration_requirements(adult_pe)
+        expect(pe).to be_in_progress
+
+        expect(pe).to be_confirmed
+      end
+
+      it "is false for a withdrawn registration that has everything" do
+        pe = meet_registration_requirements(adult_pe)
+        pe.set_by_staff!(:withdrawn)
+
+        expect(pe).not_to be_confirmed
+      end
+
+      it "keeps a ticket through answers going missing once the event has started" do
+        pe = adult_pe
+        create(:consent, :signed, participant_event: pe)
+        event.update_columns(starts_at: 1.hour.ago, ends_at: 2.days.from_now)
+        pe.travel_inbound.destroy!
+
+        expect(pe.reload).to be_confirmed
+      end
+    end
+
     it "re-derives every registration when the event switches a module on" do
       event.update!(travel_enabled: false)
       pe = adult_pe
