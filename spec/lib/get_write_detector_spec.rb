@@ -81,12 +81,13 @@ RSpec.describe GetWriteDetector do
   end
 
   describe "the allowlist" do
-    def write(endpoint:, sql:)
-      described_class::Write.new(endpoint: endpoint, sql: sql, table: "examples", http_method: "GET", path: "/")
+    def write(endpoint:, sql:, database: "primary")
+      described_class::Write.new(endpoint: endpoint, sql: sql, table: "examples", http_method: "GET", path: "/", database: database)
     end
 
     let(:allowlist) do
       described_class::Allowlist.new(
+        databases: { "queue" => "jobs are queued from GETs" },
         global: [ { "sql" => 'UPDATE "tokens" SET "last_used_at"', "reason" => "throttled stamp" } ],
         actions: { "examples#show" => "creates the example on first view" }
       )
@@ -102,6 +103,15 @@ RSpec.describe GetWriteDetector do
       expect(allowlist.allowed?(write(endpoint: "anything#index", sql: sql))).to be(true)
     end
 
+    # Production queues jobs and fills its cache through Active Record, on
+    # connections of their own. A GET that queues a job hasn't written.
+    it "accepts any write to a listed database, and the same write to the application's own is still caught" do
+      sql = 'INSERT INTO "solid_queue_jobs" ("queue_name") VALUES ($1)'
+
+      expect(allowlist.allowed?(write(endpoint: "examples#index", sql: sql, database: "queue"))).to be(true)
+      expect(allowlist.allowed?(write(endpoint: "examples#index", sql: sql, database: "primary"))).to be(false)
+    end
+
     it "rejects everything else" do
       expect(allowlist.allowed?(write(endpoint: "examples#index", sql: 'INSERT INTO "examples" DEFAULT VALUES'))).to be(false)
       expect(allowlist.allowed?(write(endpoint: "anything#index", sql: 'UPDATE "tokens" SET "revoked_at" = $1'))).to be(false)
@@ -110,8 +120,20 @@ RSpec.describe GetWriteDetector do
     it "gives every entry in the real file a reason" do
       data = YAML.safe_load_file(described_class::ALLOWLIST_PATH)
 
+      expect(data.fetch("databases")).to all(satisfy { |database, reason| database.present? && reason.present? })
       expect(data.fetch("global")).to all(include("sql" => be_present, "reason" => be_present))
       expect(data.fetch("actions")).to all(satisfy { |endpoint, reason| endpoint.include?("#") && reason.present? })
+    end
+
+    it "lists the queue, cache and cable databases, and never the application's own" do
+      expect(described_class.allowlist.databases).to include("queue", "cache", "cable")
+      expect(described_class.allowlist.databases).not_to include("primary", "primary_replica")
+    end
+
+    it "records which database a write went to" do
+      writes = rack_request("GET") { User.where(id: user.id).update_all(name: "Example Name") }
+
+      expect(writes.sole.database).to eq(User.connection_db_config.name)
     end
 
     it "only lists actions that exist" do

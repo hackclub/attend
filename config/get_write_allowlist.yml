@@ -10,6 +10,14 @@
 # To see everything the suite observes (for pruning entries that no longer
 # write):  GET_WRITE_REPORT=tmp/get_writes.txt bundle exec rspec
 
+# Databases a GET may always write to, by their name in config/database.yml.
+# These have their own writing connection, which stays on the primary whatever
+# role the request's own queries run in.
+databases:
+  queue: Solid Queue. Queueing a job is how a GET hands its write to a worker.
+  cache: Solid Cache. Filling the cache is a write to the cache's own tables.
+  cable: Solid Cable. A broadcast is a row in the cable's own table.
+
 # Writes that can ride along on any GET. Matched by the start of the SQL.
 # All of these happen while the request authenticates, which always runs on
 # the primary, before any switch to the reading role.

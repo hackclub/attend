@@ -44,24 +44,31 @@ module GetWriteDetector
     end
   end
 
-  # The accepted GET writes: `global` entries match a write by the start of its
-  # SQL wherever it happens, `actions` entries accept anything one
-  # controller#action writes.
+  # The accepted GET writes: `databases` entries accept every write to a
+  # database that isn't the application's own (the job queue, the cache),
+  # `global` entries match a write by the start of its SQL wherever it
+  # happens, `actions` entries accept anything one controller#action writes.
   class Allowlist
-    attr_reader :global, :actions
+    attr_reader :databases, :global, :actions
 
     def self.load(path = ALLOWLIST_PATH)
       data = File.exist?(path) ? YAML.safe_load_file(path) : nil
-      new(**(data || {}).slice("global", "actions").transform_keys(&:to_sym))
+      new(**(data || {}).slice("databases", "global", "actions").transform_keys(&:to_sym))
     end
 
-    def initialize(global: nil, actions: nil)
+    def initialize(databases: nil, global: nil, actions: nil)
+      @databases = (databases || {}).keys.to_set(&:to_s).freeze
       @global = (global || []).map { |entry| entry.fetch("sql").squish }.freeze
       @actions = (actions || {}).keys.to_set.freeze
     end
 
     def allowed?(write)
-      action?(write.endpoint) || global?(write.sql)
+      database?(write.database) || action?(write.endpoint) || global?(write.sql)
+    end
+
+    # database is the name of the connection's entry in config/database.yml
+    def database?(database)
+      databases.include?(database.to_s)
     end
 
     def global?(sql)
