@@ -961,8 +961,13 @@ class Event < ApplicationRecord
   REGISTRATION_REQUIREMENT_SETTINGS = %w[travel_enabled accommodation_enabled freedom_waivers_enabled].freeze
 
   def registration_requirements_just_changed?
-    # The start date decides who is a minor at the event.
-    return true if saved_change_to_starts_at?
+    # The start date decides who is a minor at the event, and it is read in
+    # the event's timezone, so moving the zone can move the date.
+    return true if saved_change_to_starts_at? || saved_change_to_timezone?
+    # Registrations at an event that has ended are frozen as they stand. An
+    # end moved back into the future thaws them, with whatever changed while
+    # they were frozen still to be accounted for.
+    return true if saved_change_to_ends_at? && ends_at_before_last_save&.past?
     return false unless saved_change_to_config?
 
     old_config = config_before_last_save || {}

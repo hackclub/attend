@@ -608,6 +608,29 @@ RSpec.describe ParticipantEvent, type: :model do
       expect(pe.registration_transitions.chronological.last.cause).to eq("settings_changed")
     end
 
+    # Everything else on the event that the requirements read.
+    describe "event changes that re-derive its registrations" do
+      it "includes the timezone, which can move the start date and with it who is a minor" do
+        expect { event.update!(timezone: "Pacific/Auckland") }
+          .to have_enqueued_job(ResyncRegistrationsJob).with(event.id)
+      end
+
+      it "includes an end moved back into the future, which thaws an ended event" do
+        event.update_columns(starts_at: 5.days.ago, ends_at: 1.day.ago)
+        pe = adult_pe
+        pe.update_columns(status: "complete")
+
+        expect {
+          perform_enqueued_jobs(only: ResyncRegistrationsJob) { event.update!(ends_at: 2.days.from_now) }
+        }.to change { pe.reload.status }.from("complete").to("in_progress")
+      end
+
+      it "leaves out an end that only moves later" do
+        expect { event.update!(ends_at: event.ends_at + 1.day) }
+          .not_to have_enqueued_job(ResyncRegistrationsJob)
+      end
+    end
+
     it "doesn't email anyone the change leaves where they were" do
       event.update!(travel_enabled: false)
       unfinished = adult_pe
