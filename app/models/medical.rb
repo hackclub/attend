@@ -14,7 +14,7 @@ class Medical < ApplicationRecord
   belongs_to :participant_event
 
   include SyncsRegistration
-  syncs_registration cause: :data_changed
+  syncs_registration cause: :data_changed, presence_only: true
   belongs_to :last_updated_by, class_name: "User", foreign_key: "last_updated_by_user_id", optional: true
   has_one :participant, through: :participant_event
   has_one :event, through: :participant_event

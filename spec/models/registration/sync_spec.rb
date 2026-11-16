@@ -36,6 +36,43 @@ RSpec.describe "Registration status sync" do
       expect(pe.registration_transitions.chronological.last.blocking_requirement).to eq("guardian_details")
     end
 
+    # The requirements only ask whether these exist, and they are saved on
+    # every autosave of a wizard step.
+    it "doesn't re-derive anything when an answer is only edited" do
+      pe = complete_adult
+      expect_any_instance_of(ParticipantEvent).not_to receive(:sync_status!)
+
+      pe.medical.update!(updated_at: 1.minute.from_now)
+      pe.travel_inbound.update!(mode: "train")
+      pe.accommodation&.update!(updated_at: 1.minute.from_now)
+    end
+
+    it "still follows a travel record changing direction" do
+      pe = complete_adult
+
+      pe.travel_inbound.update!(direction: "outbound")
+
+      expect(pe.reload).to be_in_progress
+      expect(pe.registration_transitions.chronological.last.blocking_requirement).to eq("travel")
+    end
+
+    it "follows a record moving to another registration, at both ends" do
+      pe = complete_adult
+      other = meet_registration_requirements(
+        create(:participant_event, event: event, participant: create(:participant, date_of_birth: 18.years.ago - 2.months)),
+        except: "health"
+      )
+      other.medical&.destroy!
+      other.dietary || other.create_dietary!
+      other.accessibility || other.create_accessibility!
+      expect(other.reload).to be_in_progress
+
+      pe.medical.update!(participant_event: other)
+
+      expect(pe.reload).to be_in_progress
+      expect(other.reload).to be_complete
+    end
+
     it "leaves the other registrations of a destroyed one's records alone" do
       pe = complete_adult
 

@@ -13,7 +13,7 @@ class Dietary < ApplicationRecord
   belongs_to :participant_event
 
   include SyncsRegistration
-  syncs_registration cause: :data_changed
+  syncs_registration cause: :data_changed, presence_only: true
   has_one :participant, through: :participant_event
   has_one :event, through: :participant_event
 

@@ -9,7 +9,12 @@ class Travel < ApplicationRecord
   belongs_to :participant_event
 
   include SyncsRegistration
-  syncs_registration cause: :data_changed
+  syncs_registration cause: :data_changed, presence_only: true
+
+  # The travel requirement wants one inbound and one outbound.
+  def counts_towards_another_requirement?
+    super || saved_change_to_direction?
+  end
   has_one :participant, through: :participant_event
   has_one :event, through: :participant_event
   has_many :travel_legs, -> { order(position: :asc) }, dependent: :destroy

@@ -32,14 +32,36 @@ module SyncsRegistration
   end
 
   class_methods do
-    def syncs_registration(cause:, **options)
+    # presence_only: the requirements only ask whether this record exists
+    # (travel, health, accommodation), so editing one can't change the
+    # answer. It syncs when it is created or destroyed, or when an update
+    # changes which requirement it counts towards (see
+    # #counts_towards_another_requirement?). Without this every autosave of
+    # a wizard step, and every flight refresh, locked the registration and
+    # re-derived everything for a result that couldn't differ.
+    def syncs_registration(cause:, presence_only: false, **options)
       self.default_registration_sync_cause = cause
-      after_commit :sync_registration_status, **options
+
+      if presence_only
+        after_commit :sync_registration_status, on: %i[create destroy]
+        after_commit :sync_registration_status_after_move, on: :update, if: :counts_towards_another_requirement?
+      else
+        after_commit :sync_registration_status, **options
+      end
     end
   end
 
+  # Both of them when the record has just moved from one registration to
+  # another (a participant merge).
   def registration_ids_to_sync
-    [ participant_event_id ]
+    [ participant_event_id, *saved_change_to_participant_event_id ].uniq
+  end
+
+  # For presence_only records: whether the update just saved moved this
+  # record to another registration. Override to add anything else that
+  # decides which requirement the record meets.
+  def counts_towards_another_requirement?
+    saved_change_to_participant_event_id?
   end
 
   def registration_sync_cause
@@ -57,5 +79,10 @@ module SyncsRegistration
     ParticipantEvent.where(id: registration_ids_to_sync.compact).find_each do |participant_event|
       participant_event.sync_status!(cause: registration_sync_cause)
     end
+  end
+
+  # Callbacks are keyed by method name, so the second one needs its own.
+  def sync_registration_status_after_move
+    sync_registration_status
   end
 end
