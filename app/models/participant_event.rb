@@ -194,12 +194,17 @@ class ParticipantEvent < ApplicationRecord
     previous = nil
     changed = with_lock do
       reset_document_memoisation!
-      target = Registration::Requirements.new(self).stage
-      next false if target == status
+      requirements = Registration::Requirements.new(self)
+      target = requirements.stage
 
-      previous = status
-      self.onboarding_completed_at ||= Time.current if target == "complete"
-      transition_to!(target, cause: cause, actor: actor)
+      moved = target != status
+      if moved
+        previous = status
+        self.onboarding_completed_at ||= Time.current if target == "complete"
+        transition_to!(target, cause: cause, actor: actor)
+      end
+      note_signature_outstanding(requirements) unless complete?
+      moved
     end
 
     if notify
@@ -733,11 +738,39 @@ class ParticipantEvent < ApplicationRecord
     errors.add(:base, "You will be 19 or older during this event. Please contact event staff for assistance.")
   end
 
-  # Whether the last thing to take this registration out of complete was an
-  # answer going missing. Filling it back in isn't news: they were confirmed
-  # before, so they don't get the confirmation email a second time.
+  # Whether an answer going missing is all that has kept this registration
+  # out of complete since it was last there. Filling it back in isn't news:
+  # they were confirmed before, so they don't get the confirmation email a
+  # second time. Anything signed in the meantime is (see
+  # #note_signature_outstanding).
   def reopened_for_data_only?
-    registration_transitions.where(from_status: "complete").order(created_at: :desc).first&.caused_by_data_changed? || false
+    reopening = last_transition_out_of_complete
+    return false unless reopening&.caused_by_data_changed?
+
+    !reopening.metadata[SIGNATURE_OUTSTANDING]
+  end
+
+  SIGNATURE_OUTSTANDING = "signature_outstanding".freeze
+
+  def last_transition_out_of_complete
+    registration_transitions.where(from_status: "complete").order(created_at: :desc).first
+  end
+
+  # The cause of a reopening only says what happened first. A waiver reset
+  # or reissued while an answer is missing moves no status, so it leaves no
+  # transition, and a date of birth change that brings in a guardian's whole
+  # part is recorded as an answer changing. Every such change does come
+  # through #sync_status!, so that is where it's noticed: once a signature
+  # or the guardian's portal has been outstanding, the reopening is marked,
+  # and completing again is confirmed by email.
+  def note_signature_outstanding(requirements)
+    return if onboarding_completed_at.blank?
+    return unless requirements.unmet.any? { |requirement| requirement.kind == :document }
+
+    reopening = last_transition_out_of_complete
+    return if reopening.nil? || reopening.metadata[SIGNATURE_OUTSTANDING]
+
+    reopening.update_columns(metadata: reopening.metadata.merge(SIGNATURE_OUTSTANDING => true))
   end
 
   def record_initial_transition

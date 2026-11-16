@@ -378,6 +378,40 @@ RSpec.describe ParticipantEvent, type: :model do
       }.to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
     end
 
+    # Discarding the signature moves no status while an answer is already
+    # missing, so nothing but the first cause is in the history.
+    it "confirms again when a signature was discarded while an answer was missing" do
+      pe = adult_pe
+      consent = create(:consent, :signed, participant_event: pe)
+      pe.travel_inbound.destroy!
+      expect(pe.reload).to be_in_progress
+
+      consent.update!(status: :sent)
+      pe.travels.create!(direction: "inbound", mode: "car")
+      expect(pe.reload).to be_in_progress
+
+      expect {
+        consent.update!(status: :signed)
+      }.to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
+      expect(pe.reload).to be_complete
+    end
+
+    it "confirms again when a date of birth change brought in a guardian's part" do
+      pe = adult_pe
+      create(:consent, :signed, participant_event: pe)
+      expect(pe.reload).to be_complete
+
+      pe.participant.update!(date_of_birth: 15.years.ago)
+      expect(pe.reload).to be_in_progress
+      expect(pe.registration_transitions.chronological.last.cause).to eq("data_changed")
+
+      meet_registration_requirements(pe)
+      expect {
+        pe.sync_status!(cause: :guardian_completed)
+      }.to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
+      expect(pe.reload).to be_complete
+    end
+
     it "leaves a complete registration alone for missing answers once the event has started" do
       pe = adult_pe
       create(:consent, :signed, participant_event: pe)
