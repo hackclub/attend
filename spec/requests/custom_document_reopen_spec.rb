@@ -12,10 +12,7 @@ RSpec.describe "Custom document reopening", type: :request do
   # A participant who finished onboarding before the new document existed.
   def create_complete_participant(event, date_of_birth: 18.years.ago - 1.month)
     participant = create(:participant, date_of_birth: date_of_birth)
-    participant_event = create(:participant_event, participant: participant, event: event,
-      status: :complete, code_of_conduct_accepted_at: Time.current)
-    create(:consent, :signed, participant_event: participant_event)
-    participant_event
+    complete_registration(create(:participant_event, participant: participant, event: event))
   end
 
   def add_document(event, attrs = {})
@@ -36,6 +33,32 @@ RSpec.describe "Custom document reopening", type: :request do
       }.to change { participant_event.reload.status }.from("complete").to("in_progress")
         .and change { participant_event.versions.count }.by(1)
         .and have_enqueued_mail(ParticipantMailer, :new_document_ready)
+    end
+
+    # Saving anything a requirement reads re-syncs the registration, so
+    # another change can reopen it before the job gets there.
+    it "still emails a participant some other change reopened first" do
+      participant_event = create_complete_participant(event)
+      add_document(event)
+
+      expect {
+        participant_event.travel_inbound.destroy!
+      }.to change { participant_event.reload.status }.from("complete").to("in_progress")
+        .and have_enqueued_mail(ParticipantMailer, :new_document_ready).once
+
+      expect {
+        perform_enqueued_jobs(only: ReopenParticipantsForCustomDocumentsJob)
+      }.not_to have_enqueued_mail(ParticipantMailer, :new_document_ready)
+    end
+
+    it "says nothing about documents when one wasn't added" do
+      participant_event = create_complete_participant(event)
+
+      expect {
+        participant_event.travel_inbound.destroy!
+      }.not_to have_enqueued_mail(ParticipantMailer, :new_document_ready)
+
+      expect(participant_event.reload.status).to eq("in_progress")
     end
 
     it "skips adults for minor_and_guardian documents" do

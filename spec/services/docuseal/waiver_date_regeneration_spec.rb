@@ -230,6 +230,7 @@ RSpec.describe Docuseal::WaiverDateRegeneration do
     it "skips a guardian-signed waiver when there's no guardian to re-issue it to" do
       guardian_participant_event.destroy!
       freedom = create(:consent, :freedom_waiver, participant_event: participant_event, status: :sent, docuseal_envelope_id: "sub_f")
+      status = participant_event.reload.status
 
       expect {
         regeneration.reissue!(participant_event.reload, [ waiver, freedom ])
@@ -239,11 +240,12 @@ RSpec.describe Docuseal::WaiverDateRegeneration do
       expect(waiver.reload).to be_signed
       expect(waiver.docuseal_envelope_id).to eq("sub_old")
       expect(freedom.reload).to be_sent
-      expect(participant_event.reload).to be_complete
+      expect(participant_event.reload.status).to eq(status)
     end
 
     it "changes nothing in the db, and sends nothing, if a db update fails partway" do
       freedom = create(:consent, :freedom_waiver, participant_event: participant_event, status: :sent, docuseal_envelope_id: "sub_f")
+      status = participant_event.reload.status
       allow(participant_event).to receive(:reopen_guardian_portal_access!).and_raise(ActiveRecord::RecordInvalid)
 
       expect {
@@ -253,7 +255,7 @@ RSpec.describe Docuseal::WaiverDateRegeneration do
       expect(waiver.reload).to be_signed
       expect(waiver.docuseal_envelope_id).to eq("sub_old")
       expect(freedom.reload).to be_sent
-      expect(participant_event.reload).to be_complete
+      expect(participant_event.reload.status).to eq(status)
     end
 
     it "still re-issues when DocuSeal won't archive the old submission" do

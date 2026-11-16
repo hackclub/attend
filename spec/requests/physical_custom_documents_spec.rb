@@ -433,6 +433,7 @@ RSpec.describe "Physical custom documents", type: :request do
 
     it "completes the participant when guardian confirmation is the last blocker" do
       participant_event.update!(code_of_conduct_accepted_at: Time.current)
+      fill_in_registration_answers(participant_event)
       gpe.update!(status: :completed, completed_at: Time.current)
       create(:consent, :signed, participant_event: participant_event) # waiver
 

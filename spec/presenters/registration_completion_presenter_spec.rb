@@ -185,20 +185,39 @@ RSpec.describe RegistrationCompletionPresenter do
     expect(pending).not_to be_entry_pass_eligible
     expect(pending.state).to eq(:processing)
 
-    participant_event.update!(status: :complete)
+    complete_registration(participant_event)
     confirmed = presentation(:participant)
     expect(confirmed).to be_confirmed
     expect(confirmed).to be_entry_pass_eligible
     expect(confirmed.state).to eq(:confirmed)
   end
 
-  it "does not confirm a stale complete row with a newly outstanding document" do
-    create(:consent, :signed, participant_event: participant_event)
-    participant_event.update!(status: :complete)
+  # Rows from before statuses were derived, or one whose sync was missed.
+  describe "when the stored status has fallen behind" do
+    it "does not hand an entry pass to a stale complete" do
+      participant_event.update_columns(status: "complete")
+
+      expect(presentation(:participant)).not_to be_confirmed
+      expect(presentation(:participant)).not_to be_entry_pass_eligible
+    end
+
+    it "leaves an ended event's as stored" do
+      participant_event.update_columns(status: "complete")
+      event.update_columns(starts_at: 3.days.ago, ends_at: 1.day.ago)
+
+      expect(presentation(:participant)).to be_confirmed
+    end
+  end
+
+  # The status follows the requirements, so a new document reopens a complete
+  # registration and takes the confirmation with it.
+  it "does not confirm a complete registration once a new document is outstanding" do
+    complete_registration(participant_event)
     document = create(:custom_document, event: event)
     create(:consent, participant_event: participant_event, consent_type: :custom_document,
       custom_document: document, docuseal_participant_slug: "participant")
 
+    expect(participant_event.reload).not_to be_complete
     presenter = presentation(:participant)
 
     expect(presenter).not_to be_confirmed

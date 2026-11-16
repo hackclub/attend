@@ -18,8 +18,13 @@ class RegistrationCompletionPresenter
     participant_event.code_of_conduct_accepted_at.present?
   end
 
+  # Complete, and still so by what the registration needs: a stored status
+  # that has fallen behind can't hand out an entry pass (see
+  # ParticipantEvent#confirmed?).
   def confirmed?
-    participant_event.complete? && participant_event.eligible_for_completion?
+    return @confirmed if defined?(@confirmed)
+
+    @confirmed = participant_event.complete? && participant_event.confirmed?
   end
 
   alias_method :entry_pass_eligible?, :confirmed?

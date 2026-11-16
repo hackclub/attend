@@ -41,7 +41,7 @@ RSpec.describe ParticipantEventsToolbox do
       Current.set(event: event) { run_set_status(pe, "rejected", actor: ops) }
       expect(pe.reload.status).to eq("in_progress")
 
-      pe.update_status!(:rejected, rejection_authorized: true)
+      pe.transition_to!(:rejected, cause: :rejected, rejection_authorized: true)
       Current.set(event: event) { run_set_status(pe, "in_progress", actor: ops) }
       expect(pe.reload.status).to eq("rejected")
     end
@@ -52,6 +52,24 @@ RSpec.describe ParticipantEventsToolbox do
       Current.set(event: event) { run_set_status(pe, "withdrawn", actor: ops) }
 
       expect(pe.reload.status).to eq("withdrawn")
+    end
+
+    it "refuses a status that isn't staff's to set" do
+      pe = create(:participant_event, event: event, status: :in_progress)
+
+      run_set_status(pe, "complete", actor: global_admin)
+
+      expect(pe.reload.status).to eq("in_progress")
+      expect(pe.registration_transitions.count).to eq(1)
+    end
+
+    it "records who withdrew a registration, and that it came through MCP" do
+      pe = create(:participant_event, event: event, status: :in_progress)
+
+      run_set_status(pe, "withdrawn", actor: global_admin)
+
+      expect(pe.registration_transitions.chronological.last)
+        .to have_attributes(to_status: "withdrawn", cause: "withdrawn", actor: global_admin, metadata: { "via" => "mcp" })
     end
 
     it "lets a global admin reject and un-reject" do
@@ -90,7 +108,7 @@ RSpec.describe ParticipantEventsToolbox do
   end
 
   describe "#check_in" do
-    it "invalidates the journey cache after toolbox check-in" do
+    it "invalidates the journey cache after toolbox check-in", :fiat_registrations do
       memory_store = ActiveSupport::Cache::MemoryStore.new
       allow(Rails).to receive(:cache).and_return(memory_store)
       pe = create(:participant_event, event: event, status: :complete)

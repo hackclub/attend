@@ -97,7 +97,7 @@ module Docuseal
         # A signed waiver going back to pending is a new blocking step, so the
         # db status has to follow the live display (see
         # ReopenParticipantsForCustomDocumentsJob for the same move).
-        participant_event.update!(status: :in_progress) if participant_event.complete?
+        participant_event.sync_status!(cause: :waiver_reissued)
         participant_event.reopen_guardian_portal_access!(guardian_participant_events)
       end
 

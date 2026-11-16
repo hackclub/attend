@@ -53,6 +53,7 @@ class ParticipantEvent < ApplicationRecord
   has_many :slack_blast_recipients, dependent: :destroy
   has_many :message_deliveries, dependent: :destroy
   has_many :registration_change_requests, dependent: :destroy
+  has_many :registration_transitions, class_name: "Registration::Transition", dependent: :delete_all
   has_many :group_memberships, dependent: :destroy
   has_many :groups, through: :group_memberships
   # The latest scan that placed this participant somewhere, for their status.
@@ -100,6 +101,11 @@ class ParticipantEvent < ApplicationRecord
   after_commit :invite_to_slack_channel, on: %i[create update],
     if: -> { (saved_change_to_status? || saved_change_to_participant_id?) && complete? }
 
+  # Hooked on the column rather than #transition_to!, so a status change that
+  # didn't come through it still lands in the history, marked untracked.
+  after_create :record_initial_transition
+  after_update :record_status_transition, if: :saved_change_to_status?
+
   # Statuses that mean the participant has opened the wizard themselves, so
   # whatever invitation they were sent has done its job.
   STARTED_STATUSES = %w[in_progress awaiting_guardian complete].freeze
@@ -131,11 +137,115 @@ class ParticipantEvent < ApplicationRecord
   attr_accessor :rejection_change_authorized
   validate :rejection_change_must_be_authorized, on: :update
 
-  def update_status!(new_status, rejection_authorized: false)
+  # The one place the status column is written. Every change is recorded as
+  # a Registration::Transition with its cause and whoever made it.
+  #
+  # rejection_authorized: the caller checked ParticipantEventPolicy#change_status?
+  # (see above). Returns false, writing nothing, when it's already there.
+  #
+  # requirements: the Registration::Requirements this change was derived
+  # from, when the caller has one, so the record of what the registration is
+  # now stuck on doesn't derive them all over again.
+  def transition_to!(new_status, cause:, actor: Current.user, rejection_authorized: false, metadata: {}, requirements: nil)
+    return false if status == new_status.to_s
+
+    @pending_transition = { cause: cause, actor: actor, metadata: metadata, requirements: requirements }
     self.rejection_change_authorized = rejection_authorized
     update!(status: new_status)
+    true
   ensure
+    @pending_transition = nil
     self.rejection_change_authorized = nil
+  end
+
+  # The statuses staff may set by hand. Everything else follows what the
+  # registration still needs, so there is nothing to set: fix the missing
+  # requirement and the status moves by itself.
+  STAFF_SETTABLE_STATUSES = %w[withdrawn rejected in_progress].freeze
+
+  # Withdraw or reject, or with in_progress undo either. The caller checks
+  # ParticipantEventPolicy#change_status? first.
+  def set_by_staff!(new_status, actor: Current.user, metadata: {})
+    new_status = new_status.to_s
+    raise ArgumentError, "#{new_status} can't be set by hand" unless STAFF_SETTABLE_STATUSES.include?(new_status)
+
+    if new_status == "in_progress"
+      reinstate!(actor: actor, metadata: metadata)
+    else
+      transition_to!(new_status, cause: new_status, actor: actor, rejection_authorized: true, metadata: metadata)
+    end
+  end
+
+  # Back from withdrawn or rejected to wherever its requirements put it.
+  # For a registration that's neither, this is just a sync.
+  def reinstate!(actor: Current.user, metadata: {})
+    transition_to!(:in_progress, cause: :reinstated, actor: actor, rejection_authorized: true, metadata: metadata) if inactive?
+    sync_status!(cause: :reinstated, actor: actor)
+  end
+
+  # Brings the status in line with what the registration still needs (see
+  # Registration::Requirements#stage). Called whenever something a
+  # requirement reads has changed; safe to call at any time.
+  #
+  # Returns true when the status changed. notify: false keeps it quiet, for
+  # backfills.
+  def sync_status!(cause:, actor: Current.user, notify: true)
+    return false if new_record? || destroyed?
+
+    # Concurrent webhooks (or a webhook racing a guardian's commit hook) can
+    # both get here. Deriving under a row lock means only one of them makes
+    # the change and sends the email.
+    previous = nil
+    # Derived once, under the lock, and reused for everything this sync
+    # goes on to ask: where the status lands, what it is stuck on, and
+    # whether submitting is all that's left.
+    requirements = nil
+    changed = with_lock do
+      reset_document_memoisation!
+      requirements = Registration::Requirements.new(self)
+      target = requirements.stage
+
+      moved = target != status
+      if moved
+        previous = status
+        self.onboarding_completed_at ||= Time.current if target == "complete"
+        transition_to!(target, cause: cause, actor: actor, requirements: requirements)
+      end
+      note_signature_outstanding(requirements) unless complete?
+      moved
+    end
+
+    if notify
+      if changed && complete?
+        ParticipantMailer.registration_confirmed(participant_event: self).deliver_later unless reopened_for_data_only?
+      elsif !complete?
+        # Sent here rather than by ReopenParticipantsForCustomDocumentsJob:
+        # whichever sync gets to a registration first is the one that reopens
+        # it, and the job would find it already reopened and tell nobody.
+        if changed && previous == "complete"
+          ParticipantMailer.new_document_ready(participant_event: self).deliver_later if new_document_to_sign?
+          # The event switched something on, or moved its dates, and they
+          # now owe an answer they were never asked for.
+          if cause.to_s == "settings_changed"
+            ParticipantMailer.information_needed(participant_event: self).deliver_later
+          end
+        end
+        remind_to_submit_if_only_step_left(requirements)
+      end
+    end
+
+    changed
+  end
+
+  # A document that applies to them and was never issued to them: one the
+  # event added after they finished. A document they opted into, or whose
+  # signature staff discarded, has a consent on file and they already know
+  # about it. Nobody can sign while guardian invites are locked, so there is
+  # nothing to tell them until those unlock.
+  def new_document_to_sign?
+    return false if event.guardian_invites_locked?
+
+    pending_custom_documents.any? { |document| custom_document_consent(document).nil? }
   end
 
   # SQL mirror of !onboarding_complete? so list filters don't have to load
@@ -205,12 +315,8 @@ class ParticipantEvent < ApplicationRecord
   # Resending the onboarding invitation only helps while the participant still
   # owes us their own information. Once they've submitted, what's outstanding
   # is the guardian's part, chased by resending the guardian invite instead.
-  #
-  # Deliberately keyed off display_status rather than the status column: the
-  # column lags behind reality, and the menu item has to agree with the badge
-  # staff are looking at on the same page.
   def invitation_resendable?
-    display_status == "Awaiting Participant"
+    invited? || in_progress?
   end
 
   # Removing someone from an event has to take their invitation with it. An
@@ -305,7 +411,12 @@ class ParticipantEvent < ApplicationRecord
   # document reopens a completed participant, so in_progress on its own
   # doesn't mean this.
   def in_onboarding?
-    invited? || (in_progress? && onboarding_completed_at.nil?)
+    return true if invited?
+    return false if complete? || inactive? || onboarding_completed_at.present?
+
+    # A minor who has submitted is waiting on their guardian's side, or on
+    # their own countersignature, not on the wizard.
+    !(code_of_conduct_accepted_at.present? && requires_guardian?)
   end
 
   def assigned_to_room?
@@ -344,6 +455,16 @@ class ParticipantEvent < ApplicationRecord
 
   def freedom_waiver_signed?
     signed_consent_of_type?("freedom_waiver")
+  end
+
+  # Uses the already-loaded consents when eager-loaded, like the predicates
+  # above.
+  def consent_of_type(type)
+    if consents.loaded?
+      consents.find { |c| c.consent_type == type }
+    else
+      consents.find_by(consent_type: type)
+    end
   end
 
   def applicable_custom_documents
@@ -395,7 +516,7 @@ class ParticipantEvent < ApplicationRecord
   # derived from the consent set, none of which #reload touches.
   def reset_document_memoisation!
     @applicable_custom_documents = nil
-    @onboarding_progress = nil
+    @registration_requirements = nil
     self
   end
 
@@ -422,44 +543,33 @@ class ParticipantEvent < ApplicationRecord
   # ignoring_submission: answers "would this complete if the participant hit
   # submit?", which #remind_to_submit_if_only_step_left uses.
   def eligible_for_completion?(ignoring_submission: false)
-    # A withdrawn or rejected registration is closed: a still-open DocuSeal
-    # link finishing later must not flip it back to complete.
-    return false if withdrawn? || rejected?
-    # Signing can now happen before the participant submits their registration
-    # (documents step) — never complete someone who hasn't hit submit yet.
-    return false unless ignoring_submission || code_of_conduct_accepted_at.present?
-    return false unless waiver_signed?
-    return false unless custom_documents_signed?
-
-    if requires_guardian?
-      return false unless guardian_participant_events.any? && guardian_participant_events.all?(&:completed?)
-      return false if event.freedom_waivers_enabled? && !freedom_waiver_signed?
-    end
-
-    true
+    # Built fresh rather than read from #registration_requirements: this is
+    # asked right after signatures and guardian rows change, and must not
+    # answer from a list memoised earlier in the request.
+    Registration::Requirements.new(self).completable?(ignoring_submission: ignoring_submission)
   end
 
-  def mark_complete_if_eligible!
-    return false if complete?
+  # Whether they hold a ticket: complete by what the registration needs
+  # right now, not by the stored status. The two agree whenever every sync
+  # has run. This is for the rows where one hasn't: statuses stored before
+  # they were derived (until `rake registration:sync` has run), and any path
+  # that misses its sync. A stale "complete" must not get a scannable QR
+  # from the ticket API, and someone who has everything shouldn't be sent
+  # back to onboarding by it. Answers changing once the event has started
+  # still don't take a ticket away, and ended events stay as stored
+  # (Requirements#stage).
+  #
+  # Derived fresh for the same reason as #eligible_for_completion?.
+  def confirmed?
+    Registration::Requirements.new(self).stage == "complete"
+  end
 
-    unless eligible_for_completion?
-      remind_to_submit_if_only_step_left
-      return false
-    end
-
-    # Concurrent webhooks (or a webhook racing a guardian's commit hook) can
-    # both get this far. Re-check under a row lock so only one of them
-    # completes the registration and sends the confirmation email.
-    completed_now = with_lock do
-      reset_document_memoisation!
-      next false if complete? || !eligible_for_completion?
-
-      update!(status: :complete, onboarding_completed_at: onboarding_completed_at || Time.current)
-      true
-    end
-
-    ParticipantMailer.registration_confirmed(participant_event: self).deliver_later if completed_now
-    completed_now
+  # Syncs, and says whether that completed the registration just now.
+  #
+  # cause: what just happened that might have been the last piece, for the
+  # transition record.
+  def mark_complete_if_eligible!(cause: :requirements_met)
+    sync_status!(cause: cause) && complete?
   end
 
   SUBMISSION_REMINDER_DELAY = 15.minutes
@@ -469,12 +579,16 @@ class ParticipantEvent < ApplicationRecord
   # resend, the portal center) and do their whole part. Submitting, the review
   # step where they agree to the code of conduct, is then the only thing left,
   # and nothing else would ever prompt them, so the registration sat
-  # in_progress with every signature in. Every completion hook comes through
-  # #mark_complete_if_eligible!, so this is where we notice and email them,
-  # once.
-  def remind_to_submit_if_only_step_left
+  # in_progress with every signature in. Every change comes through
+  # #sync_status!, so that is where we notice and email them, once.
+  #
+  # requirements: the ones #sync_status! just derived. Anything else asks
+  # afresh.
+  def remind_to_submit_if_only_step_left(requirements = nil)
     return false if code_of_conduct_accepted_at.present?
-    return false unless eligible_for_completion?(ignoring_submission: true)
+
+    requirements ||= Registration::Requirements.new(self)
+    return false unless requirements.completable?(ignoring_submission: true)
 
     claimed = self.class.where(id: id, submission_reminder_sent_at: nil)
       .update_all(submission_reminder_sent_at: Time.current, updated_at: Time.current)
@@ -486,65 +600,52 @@ class ParticipantEvent < ApplicationRecord
     true
   end
 
-  # Computed display status for the UI. Maps the DB status + actual progress
-  # into one of 3 user-facing labels (plus withdrawn/rejected for admin states).
+  # The status in the words staff and participants see. The status column
+  # already follows what the registration needs (#sync_status!), so this is
+  # only a label for it, and lists, filters and counts can all work from the
+  # column.
   #
-  # - "Awaiting Participant" — participant has steps to complete (includes invited)
-  # - "Awaiting Parent"      — participant done, blocked on guardian/waiver
+  # - "Awaiting Participant" — the next step is the participant's (includes invited)
+  # - "Awaiting Parent"      — the next step is their guardian's
   # - "Complete"             — everything done
-  DISPLAY_STATUSES = [ "Awaiting Participant", "Awaiting Parent", "Complete", "Withdrawn", "Rejected" ].freeze
+  DISPLAY_STATUS = {
+    "invited" => "Awaiting Participant",
+    "in_progress" => "Awaiting Participant",
+    "awaiting_guardian" => "Awaiting Parent",
+    "complete" => "Complete",
+    "withdrawn" => "Withdrawn",
+    "rejected" => "Rejected"
+  }.freeze
+  DISPLAY_STATUSES = DISPLAY_STATUS.values.uniq.freeze
 
   def display_status
-    return "Withdrawn" if withdrawn?
-    return "Rejected" if rejected?
+    DISPLAY_STATUS.fetch(status)
+  end
 
-    progress = onboarding_progress
-    all_done = progress[:blocking_step].nil?
+  # { "Complete" => 12, "Awaiting Parent" => 3, ... } for a scope, in one query.
+  def self.display_status_counts(scope = all)
+    display_counts_from(scope.group(:status).count)
+  end
 
-    return "Complete" if all_done
-    return "Awaiting Parent" if blocked_on_parent?(progress)
-
-    "Awaiting Participant"
+  # The same, from status counts the caller already has.
+  def self.display_counts_from(status_counts)
+    status_counts.each_with_object(Hash.new(0)) do |(status, count), counts|
+      counts[DISPLAY_STATUS.fetch(status)] += count
+    end
   end
 
   # Returns a hash describing exactly where this participant is in the onboarding process.
   # { steps: [{ name:, done: }], blocking_step: "waiver" | nil }
-  # Memoized: list views compute this several times per row. Reload the record
-  # if consents/travel/etc change mid-request and a fresh answer is needed.
   def onboarding_progress
-    @onboarding_progress ||= compute_onboarding_progress
+    registration_requirements.progress
   end
 
-  def compute_onboarding_progress
-    steps = []
-
-    steps << { name: "profile", done: participant.legal_first_name.present? && participant.legal_last_name.present? && participant.date_of_birth.present? }
-    steps << { name: "travel", done: travel_inbound.present? && travel_outbound.present? } if event.travel_enabled?
-    steps << { name: "accommodation", done: accommodation.present? } if event.accommodation_enabled?
-    steps << { name: "health", done: medical.present? && dietary.present? && accessibility.present? }
-    # Accepting the code of conduct is what "submitted" means — it gates
-    # `eligible_for_completion?`, so leaving it out of the progress list let
-    # display_status report Complete for registrations the DB could never
-    # complete (imported participants whose guardian did everything while they
-    # never signed in). It sits before the guardian steps because the guardian
-    # isn't even invited until the participant has submitted.
-    steps << { name: "code_of_conduct", done: code_of_conduct_accepted_at.present? }
-
-    if requires_guardian?
-      steps << { name: "guardian_details", done: guardian_participant_events.any? }
-      steps << { name: "guardian_portal", done: guardian_participant_events.any? && guardian_participant_events.all?(&:completed?) }
-      steps << { name: "waiver", done: waiver_signed? }
-      steps << { name: "freedom_waiver", done: freedom_waiver_signed? } if event.freedom_waivers_enabled?
-    else
-      steps << { name: "emergency_contacts", done: emergency_contacts.any? || guardian_participant_events.flat_map(&:emergency_contacts).any? }
-      steps << { name: "waiver", done: waiver_signed? }
-    end
-
-    steps << { name: "custom_documents", done: custom_documents_signed? } if applicable_custom_documents.any?
-
-    blocking = steps.find { |s| !s[:done] }
-
-    { steps: steps, blocking_step: blocking&.dig(:name) }
+  # What this registration still needs and who it's waiting on. Memoized: list
+  # views ask several times per row. #reload doesn't clear it, so call
+  # #reset_document_memoisation! if consents/travel/etc change mid-request and
+  # a fresh answer is needed.
+  def registration_requirements
+    @registration_requirements ||= Registration::Requirements.new(self)
   end
 
   def food_safety_summary
@@ -655,39 +756,6 @@ class ParticipantEvent < ApplicationRecord
     end
   end
 
-  def consent_of_type(type)
-    if consents.loaded?
-      consents.find { |c| c.consent_type == type }
-    else
-      consents.find_by(consent_type: type)
-    end
-  end
-
-  # True when the blocking step is something only a guardian/parent can resolve
-  def blocked_on_parent?(progress)
-    return false unless requires_guardian?
-
-    blocking = progress[:blocking_step]
-    return false if blocking.blank?
-
-    case blocking
-    when "guardian_portal"
-      true
-    when "waiver", "freedom_waiver"
-      # Dual-sign: guardian signs first, then participant countersigns.
-      # Once the guardian has signed, we're waiting on the participant.
-      consent = consent_of_type(blocking)
-      !consent&.guardian_signed?
-    when "custom_documents"
-      # Only "Awaiting Parent" when nothing is left for the participant to do.
-      pending_custom_documents.none? do |doc|
-        doc.participant_signs? && !consents.find { |c| c.custom_document_id == doc.id }&.participant_signed?
-      end
-    else
-      false
-    end
-  end
-
   def participant_events_to_update
     [ self ]
   end
@@ -706,6 +774,81 @@ class ParticipantEvent < ApplicationRecord
     return unless too_old_for_event?
 
     errors.add(:base, "You will be 19 or older during this event. Please contact event staff for assistance.")
+  end
+
+  # Whether an answer going missing is all that has kept this registration
+  # out of complete since it was last there. Filling it back in isn't news:
+  # they were confirmed before, so they don't get the confirmation email a
+  # second time. Anything signed in the meantime is (see
+  # #note_signature_outstanding).
+  def reopened_for_data_only?
+    reopening = last_transition_out_of_complete
+    return false unless reopening&.caused_by_data_changed?
+
+    !reopening.metadata[SIGNATURE_OUTSTANDING]
+  end
+
+  SIGNATURE_OUTSTANDING = "signature_outstanding".freeze
+
+  def last_transition_out_of_complete
+    registration_transitions.where(from_status: "complete").order(created_at: :desc).first
+  end
+
+  # The cause of a reopening only says what happened first. A waiver reset
+  # or reissued while an answer is missing moves no status, so it leaves no
+  # transition, and a date of birth change that brings in a guardian's whole
+  # part is recorded as an answer changing. Every such change does come
+  # through #sync_status!, so that is where it's noticed: once a signature
+  # or the guardian's portal has been outstanding, the reopening is marked,
+  # and completing again is confirmed by email.
+  def note_signature_outstanding(requirements)
+    return if onboarding_completed_at.blank?
+    return unless requirements.unmet.any? { |requirement| requirement.kind == :document }
+
+    reopening = last_transition_out_of_complete
+    return if reopening.nil? || reopening.metadata[SIGNATURE_OUTSTANDING]
+
+    reopening.update_columns(metadata: reopening.metadata.merge(SIGNATURE_OUTSTANDING => true))
+  end
+
+  def record_initial_transition
+    pending = @pending_transition || {}
+    registration_transitions.create!(
+      to_status: status,
+      cause: pending[:cause] || :created,
+      actor: pending.key?(:actor) ? pending[:actor] : Current.user,
+      metadata: pending[:metadata] || {}
+    )
+  end
+
+  def record_status_transition
+    pending = @pending_transition || {}
+    from, to = saved_change_to_status
+    cause = pending[:cause] || :untracked
+
+    registration_transitions.create!(
+      from_status: from,
+      to_status: to,
+      cause: cause,
+      actor: pending.key?(:actor) ? pending[:actor] : Current.user,
+      blocking_requirement: blocking_requirement_for_transition(pending[:requirements]),
+      metadata: pending[:metadata] || {}
+    )
+
+    if cause.to_s == "untracked"
+      Rails.logger.warn("[Registration] #{id} went #{from} -> #{to} outside #transition_to!")
+    end
+  end
+
+  # What the registration is stuck on as it lands in its new status. A sync
+  # hands over the requirements it derived. Anything else reads a fresh
+  # copy: asking this one would load and cache associations the caller may
+  # be about to change.
+  def blocking_requirement_for_transition(requirements = nil)
+    return if complete? || inactive?
+
+    requirements ||= Registration::Requirements.new(self.class.find(id))
+    requirements.blocking&.key
   end
 
   def rejection_change_must_be_authorized

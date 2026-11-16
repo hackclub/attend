@@ -21,7 +21,7 @@ class DashboardController < ApplicationController
   after_action :discard_rejected_public_profile_photo, only: :update_public_profile
 
   def index
-    # display_status per row walks travel/health/guardian/consent/custom-doc
+    # onboarding progress per row walks travel/health/guardian/consent/custom-doc
     # associations, and the event avatars read logo attachments
     @participant_events = @participant.participant_events.includes(
       :consents, :travel_inbound, :travel_outbound, :accommodation,

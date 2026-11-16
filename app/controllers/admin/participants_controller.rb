@@ -517,7 +517,7 @@ module Admin
       # A signature just vanished, so the participant isn't done any more and a
       # guardian who had finished needs their portal back to sign again.
       reopen_guardian_portal_access
-      @participant_event.update!(status: :in_progress) if @participant_event.complete?
+      @participant_event.sync_status!(cause: :document_reset)
 
       redirect_to consents_admin_event_participant_path(current_event, @participant_event),
         notice: "The previous signature has been discarded. #{custom_document_resend_notice(custom_document)}"
@@ -617,7 +617,7 @@ module Admin
         return redirect_to admin_event_participant_path(current_event, @participant_event),
           alert: "#{@participant_event.participant.display_name} is already #{@participant_event.status}, so there's nothing to withdraw."
       end
-      @participant_event.withdrawn!
+      @participant_event.transition_to!(:withdrawn, cause: :withdrawn)
       redirect_to admin_event_participant_path(current_event, @participant_event),
         notice: "#{@participant_event.participant.display_name} has been marked as withdrawn."
     rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
@@ -634,11 +634,10 @@ module Admin
         return redirect_to admin_event_participant_path(current_event, @participant_event),
           alert: "#{@participant_event.participant.display_name} isn't withdrawn or rejected, so there's nothing to reinstate."
       end
-      # Reset to a non-terminal status; #display_status recomputes the real state
-      # (Awaiting Participant / Awaiting Parent / Complete) from onboarding progress.
-      # unreject? was checked above for a rejected registration.
-      @participant_event.rejection_change_authorized = true
-      @participant_event.in_progress!
+      # Lands wherever their requirements put them (awaiting participant,
+      # awaiting parent or complete). unreject? was checked above for a
+      # rejected registration.
+      @participant_event.reinstate!
       redirect_to admin_event_participant_path(current_event, @participant_event),
         notice: "#{@participant_event.participant.display_name} has been reinstated."
     rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved => e
@@ -1185,8 +1184,8 @@ module Admin
       end
     end
 
-    # What grouping reads: display_status walks most of onboarding, and the
-    # other group keys read a single association each.
+    # What grouping reads: the blocking-step and onboarding groups walk most
+    # of onboarding, and the other group keys read a single association each.
     TABLE_GROUPING_INCLUDES = [
       :participant, :travel_inbound, :travel_outbound, :accommodation, :medical,
       :dietary, :accessibility, :safeguarding_info, :consents, :emergency_contacts,
@@ -1200,7 +1199,7 @@ module Admin
       { room_assignments: { room: [ :rooming_context, { participant_events: :participant } ] } }
     ].freeze
 
-    # Groups are Ruby (display_status and friends aren't SQL), so a grouped
+    # Groups are Ruby (most group keys aren't SQL), so a grouped
     # table still loads every matching row to bucket it — but only the page it
     # renders gets the cell-only preloads. A participant in several groups
     # (group_by "group") is a row in each, so pages count rows, not people.
@@ -1769,7 +1768,7 @@ module Admin
     # Why there's nothing to invite them to, in the words of the status badge
     # the admin is looking at.
     def nothing_to_invite_error(participant)
-      if @participant_event.display_status == "Awaiting Parent"
+      if @participant_event.awaiting_guardian?
         "#{participant.display_name} has submitted their information — what's outstanding is their guardian's. Resend the guardian invite instead."
       else
         "#{participant.display_name} has already finished onboarding."

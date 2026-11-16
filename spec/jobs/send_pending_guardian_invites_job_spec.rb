@@ -7,8 +7,10 @@ RSpec.describe SendPendingGuardianInvitesJob do
 
   def submitted_minor_pe
     participant = create(:participant, date_of_birth: 16.years.ago)
-    create(:participant_event, event: event, participant: participant,
-      status: :awaiting_guardian, code_of_conduct_accepted_at: 1.day.ago)
+    fill_in_registration_answers(
+      create(:participant_event, event: event, participant: participant,
+        status: :awaiting_guardian, code_of_conduct_accepted_at: 1.day.ago)
+    )
   end
 
   def submitted_adult_pe

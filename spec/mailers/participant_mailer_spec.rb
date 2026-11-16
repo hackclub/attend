@@ -70,6 +70,35 @@ RSpec.describe ParticipantMailer, type: :mailer do
     end
   end
 
+  describe "#information_needed" do
+    let(:event) { create(:event, name: "Trailblazer", travel_enabled: true) }
+    let(:participant_event) do
+      create(:participant_event, event: event, status: :in_progress, code_of_conduct_accepted_at: 1.day.ago,
+        participant: create(:participant, date_of_birth: 18.years.ago - 1.month))
+    end
+
+    it "lists what is missing and links to the first step that collects it" do
+      meet_registration_requirements(participant_event, except: "travel")
+
+      mail = described_class.information_needed(participant_event: participant_event)
+
+      expect(mail.subject).to eq("We need a little more information for Trailblazer")
+      [ mail.html_part.body.decoded, mail.text_part.body.decoded ].each do |body|
+        expect(body).to include("your travel plans")
+        expect(body).not_to include("emergency contact")
+        expect(body).to include("/onboarding/travel")
+      end
+    end
+
+    it "sends nothing once it has been filled in" do
+      complete_registration(participant_event)
+
+      mail = described_class.information_needed(participant_event: participant_event)
+
+      expect(mail.message).to be_a(ActionMailer::Base::NullMail)
+    end
+  end
+
   describe "#submission_needed" do
     let(:event) { create(:event, name: "Trailblazer") }
     let(:participant_event) do

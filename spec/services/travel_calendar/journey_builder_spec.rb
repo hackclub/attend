@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe TravelCalendar::JourneyBuilder do
+RSpec.describe TravelCalendar::JourneyBuilder, fiat_registrations: true do
   subject(:entries) { described_class.new(event: event).call }
 
   let(:event) { create(:event, timezone: "Europe/London", groups_enabled: true) }

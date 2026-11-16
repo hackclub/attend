@@ -10,8 +10,10 @@ RSpec.describe "Registration completion states", type: :request do
       date_of_birth: 15.years.ago)
   end
   let(:participant_event) do
-    create(:participant_event, participant: participant, event: event,
-      status: :awaiting_guardian, code_of_conduct_accepted_at: Time.current)
+    fill_in_registration_answers(
+      create(:participant_event, participant: participant, event: event,
+        status: :awaiting_guardian, code_of_conduct_accepted_at: Time.current)
+    )
   end
   let!(:guardian_participant_event) do
     create(:guardian_participant_event, participant_event: participant_event,
@@ -171,7 +173,8 @@ RSpec.describe "Registration completion states", type: :request do
 
   it "uses the same confirmed predicate for the summary and entry pass" do
     sign_in user
-    create(:consent, :signed, participant_event: participant_event)
+    meet_registration_requirements(participant_event, except: "waiver")
+    waiver = create(:consent, participant_event: participant_event, status: :sent, guardian_signed_at: Time.current)
 
     get dashboard_path
     expect(response.body).not_to include("Registration confirmed")
@@ -179,7 +182,8 @@ RSpec.describe "Registration completion states", type: :request do
     get dashboard_event_path(participant_event)
     expect(response.body).not_to include("ENTRY TICKET")
 
-    participant_event.update!(status: :complete)
+    waiver.update!(status: :signed, signed_at: Time.current)
+    expect(participant_event.reload).to be_complete
 
     get dashboard_path
     expect(response.body).to include("Registration confirmed")

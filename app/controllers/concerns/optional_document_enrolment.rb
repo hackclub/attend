@@ -31,9 +31,7 @@ module OptionalDocumentEnrolment
     # status honest with the live one, for the same reason
     # ReopenParticipantsForCustomDocumentsJob exists — message audiences,
     # Airtable sync, and raw-status filters all read the column.
-    if participant_event.complete? && !consent.signed?
-      participant_event.update!(status: :in_progress)
-    end
+    participant_event.sync_status!(cause: :document_added)
 
     notify_guardian_of_optional_document(participant_event, custom_document, consent)
     consent
@@ -70,7 +68,7 @@ module OptionalDocumentEnrolment
 
     participant_event.consents.reload
     participant_event.reset_document_memoisation!
-    participant_event.mark_complete_if_eligible!
+    participant_event.mark_complete_if_eligible!(cause: :document_withdrawn)
 
     consent
   end

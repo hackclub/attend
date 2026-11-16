@@ -105,6 +105,10 @@ class Participant < ApplicationRecord
   before_validation :normalize_public_profile_slug
   before_validation :generate_public_profile_slug, if: -> { public_profile_enabled? && public_profile_slug.blank? }
   after_update_commit :touch_participant_events
+  # The profile requirement reads the legal name and date of birth, and the
+  # date of birth decides whether a guardian is needed at all.
+  after_update_commit :sync_registration_statuses,
+    if: -> { saved_change_to_legal_first_name? || saved_change_to_legal_last_name? || saved_change_to_date_of_birth? }
   # Runs on the HCA sign-in sync too: that saves with validate: false, which
   # still fires commit callbacks. See Invitation.follow_email_change!.
   after_update_commit :move_invitations_to_new_email, if: :saved_change_to_email?
@@ -315,6 +319,12 @@ class Participant < ApplicationRecord
 
   def touch_participant_events
     participant_events.touch_all
+  end
+
+  def sync_registration_statuses
+    return if SyncsRegistration.suspended?
+
+    participant_events.find_each { |participant_event| participant_event.sync_status!(cause: :data_changed) }
   end
 
   # Most- to least-committed registration.

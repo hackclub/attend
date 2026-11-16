@@ -98,6 +98,7 @@ RSpec.describe "Onboarding documents step", type: :request do
   describe "submitting as a minor" do
     it "enqueues the guardian invitation at submit" do
       participant.update!(date_of_birth: 16.years.ago)
+      fill_in_registration_answers(participant_event)
       # Onboarding is what triggers the first invite, so this guardian has not
       # been sent one yet.
       gpe = create(:guardian_participant_event, :never_sent, participant_event: participant_event)

@@ -1,11 +1,10 @@
 require "rails_helper"
 
 # A guardian can finish their whole side — waiver plus portal — before the
-# participant gets round to hitting submit. Every `mark_complete_if_eligible!`
-# hook fires on the guardian's actions and bails on the not-yet-accepted code
-# of conduct, so submitting has to be the thing that re-checks. When it didn't,
-# these rows sat at `awaiting_guardian` forever and the dashboard hid their
-# boarding pass (it gates the QR on the raw `complete?` enum, not display_status).
+# participant gets round to hitting submit. Nothing completes a registration
+# without the code of conduct, so submitting has to re-derive the status.
+# When it didn't, these rows sat at `awaiting_guardian` forever and the
+# dashboard hid their boarding pass (it gates the QR on `complete?`).
 RSpec.describe "Onboarding completion for minors", type: :request do
   include Devise::Test::IntegrationHelpers
 
@@ -15,8 +14,10 @@ RSpec.describe "Onboarding completion for minors", type: :request do
     create(:participant, user: user, email: user.email, date_of_birth: 15.years.ago.to_date)
   end
   let(:participant_event) do
-    create(:participant_event, participant: participant, event: event,
-      status: :in_progress, onboarding_step: 99)
+    # Everything the wizard collects is in; what's left is the submit.
+    fill_in_registration_answers(
+      create(:participant_event, participant: participant, event: event, status: :in_progress, onboarding_step: 99)
+    )
   end
 
   before { sign_in user }
@@ -83,48 +84,100 @@ RSpec.describe "Onboarding completion for minors", type: :request do
     end
   end
 
-  # Staff sometimes move a registration on by hand before the participant has
-  # submitted. The onboarding lock used to treat that as "already submitted"
-  # and bounce them to the dashboard, so they could never reach the code of
-  # conduct and the registration could never complete.
-  context "when staff set the status before the participant submitted" do
+  # Staff corrected the date of birth to an adult's after a guardian was
+  # linked. An adult's registration counts a guardian's emergency contacts,
+  # but submitting removes the guardian, so it can't complete on them.
+  context "when a participant who turned out to be an adult still has a guardian on file" do
+    before do
+      link = create(:guardian_participant_event, participant_event: participant_event, status: :completed)
+      link.emergency_contacts.create!(name: "Ada Example", phone: "+14155550123")
+      create(:consent, :signed, participant_event: participant_event)
+      SyncsRegistration.suspended { participant.update!(date_of_birth: (18.years.ago - 1.month).to_date) }
+    end
+
+    it "asks for a contact of their own instead of confirming and then reopening them" do
+      expect { submit }.not_to have_enqueued_mail(ParticipantMailer, :registration_confirmed)
+
+      expect(response).to redirect_to(onboarding_step_path(step: "emergency", event_id: event.id))
+      expect(participant_event.reload).to be_in_progress
+      expect(participant_event.guardian_participant_events).to be_empty
+      expect(participant_event.registration_transitions.pluck(:to_status)).not_to include("complete")
+    end
+  end
+
+  # Submitting is what locks the wizard, not the status. A registration left
+  # at awaiting_guardian without one (staff used to be able to set that by
+  # hand) was bounced to the dashboard, so it could never reach the code of
+  # conduct and could never complete.
+  context "when the status says awaiting guardian but the participant never submitted" do
     before do
       create(:guardian_participant_event, participant_event: participant_event, status: :completed)
       create(:consent, :signed, participant_event: participant_event)
       create(:consent, :freedom_waiver, :signed, participant_event: participant_event)
+      participant_event.update_columns(status: "awaiting_guardian")
     end
 
-    it "lets an awaiting_guardian participant back in to submit, then completes them" do
-      participant_event.update!(status: :awaiting_guardian)
-
+    it "lets them in to submit, then completes them" do
       get onboarding_step_path(step: "review", event_id: event.id)
       expect(response).to have_http_status(:ok)
 
       expect { submit }.to change { participant_event.reload.status }.to("complete")
       expect(participant_event.code_of_conduct_accepted_at).to be_present
     end
+  end
 
-    it "lets a hand-completed participant sign without undoing the completion" do
-      participant_event.update!(status: :complete)
-
-      get onboarding_step_path(step: "review", event_id: event.id)
-      expect(response).to have_http_status(:ok)
-
-      submit
-      expect(participant_event.reload).to be_complete
-      expect(participant_event.code_of_conduct_accepted_at).to be_present
+  # Submitting records the code of conduct before it finds there's no
+  # guardian, and sends them to the guardian step. Saving that step is then
+  # the end of the submission: nothing else would prepare the waiver or
+  # invite the guardian, and the wizard is locked from there on.
+  context "when the participant submitted without a guardian on file" do
+    let(:guardian_params) do
+      {
+        guardian_first_name: "Jo", guardian_last_name: "Example", guardian_email: "jo.guardian@example.com",
+        guardian_phone: "+14155550199", guardian_relationship: "Parent"
+      }
     end
 
-    it "keeps a hand-completed participant out of the other steps" do
-      participant_event.update!(status: :complete)
+    before do
+      participant_event
+      submit
+    end
 
-      get onboarding_step_path(step: "profile", event_id: event.id)
-      expect(response).to redirect_to(onboarding_step_path(step: "review", event_id: event.id))
+    it "sends them to the guardian step" do
+      expect(response).to redirect_to(onboarding_step_path(step: "guardian", event_id: event.id))
+      expect(participant_event.reload).to be_in_progress
+    end
 
-      patch onboarding_step_path(step: "profile", event_id: event.id),
-        params: { participant: { date_of_birth: 30.years.ago.to_date } }
-      expect(response).to redirect_to(onboarding_step_path(step: "review", event_id: event.id))
-      expect(participant.reload.date_of_birth).to eq(15.years.ago.to_date)
+    it "finishes the submission once the guardian is saved" do
+      expect {
+        patch onboarding_step_path(step: "guardian", event_id: event.id), params: guardian_params
+      }.to have_enqueued_job(DocusealJobs::CreateMinorWaiverJob)
+        .and have_enqueued_mail(GuardianMailer, :invitation)
+
+      expect(response).to redirect_to(onboarding_waiver_path(event_id: event.id))
+      expect(participant_event.reload).to be_awaiting_guardian
+    end
+
+    # Autosave creates the guardian while the form is still being typed, so
+    # by the time they press continue the requirement is already met.
+    it "still finishes it when autosave got to the guardian first" do
+      patch onboarding_step_path(step: "guardian", event_id: event.id), params: guardian_params.merge(autosave: "true")
+      expect(participant_event.guardian_participant_events.reload).to be_present
+
+      get onboarding_step_path(step: "review", event_id: event.id)
+      expect(response).to redirect_to(onboarding_step_path(step: "guardian", event_id: event.id))
+
+      expect {
+        patch onboarding_step_path(step: "guardian", event_id: event.id), params: guardian_params
+      }.to have_enqueued_job(DocusealJobs::CreateMinorWaiverJob)
+        .and have_enqueued_mail(GuardianMailer, :invitation)
+      expect(response).to redirect_to(onboarding_waiver_path(event_id: event.id))
+    end
+
+    it "keeps them on the guardian step while it's still empty" do
+      patch onboarding_step_path(step: "guardian", event_id: event.id), params: { guardian_first_name: "" }
+
+      expect(response).to redirect_to(onboarding_step_path(step: "guardian", event_id: event.id))
     end
   end
 
@@ -140,6 +193,60 @@ RSpec.describe "Onboarding completion for minors", type: :request do
 
       expect(response).to redirect_to(dashboard_path)
       expect(flash[:alert]).to include("cannot be edited")
+    end
+
+    context "and one of their answers has gone missing" do
+      before do
+        participant_event.travel_inbound.destroy!
+        expect(participant_event.reload).to be_in_progress
+      end
+
+      it "lets them back in to that step" do
+        get onboarding_step_path(step: "travel", event_id: event.id)
+
+        expect(response).to have_http_status(:ok)
+      end
+
+      # Everything else is still what they submitted, and what their guardian
+      # is signing for. A date of birth edit here could drop the guardian
+      # requirement altogether.
+      it "keeps every other step shut, pointing them at the one that's missing" do
+        get onboarding_step_path(step: "profile", event_id: event.id)
+        expect(response).to redirect_to(onboarding_step_path(step: "travel", event_id: event.id))
+
+        patch onboarding_step_path(step: "profile", event_id: event.id),
+          params: { participant: { date_of_birth: 30.years.ago.to_date } }
+        expect(response).to redirect_to(onboarding_step_path(step: "travel", event_id: event.id))
+        expect(participant.reload.date_of_birth).to eq(15.years.ago.to_date)
+
+        post complete_onboarding_path(event_id: event.id),
+          params: { code_of_conduct_accepted: "1", code_of_conduct_signature: "Test Minor" }
+        expect(response).to redirect_to(onboarding_step_path(step: "travel", event_id: event.id))
+      end
+    end
+
+    # The profile step can come back for a missing name. The birthday on a
+    # submitted registration decides whether a guardian is needed, so it
+    # doesn't come back with it.
+    it "keeps the date of birth fixed when the profile step is what reopens" do
+      participant.update_columns(legal_first_name: "")
+
+      patch onboarding_step_path(step: "profile", event_id: event.id),
+        params: { participant: { legal_first_name: "Robin", date_of_birth: 30.years.ago.to_date } }
+
+      expect(participant.reload.date_of_birth).to eq(15.years.ago.to_date)
+      expect(participant_event.reload.requires_guardian?).to be(true)
+    end
+
+    it "stays shut for a complete registration, whatever has gone missing since the event began" do
+      complete_registration(participant_event)
+      event.update_columns(starts_at: 1.hour.ago, ends_at: 2.days.from_now)
+      participant_event.travel_inbound.destroy!
+      expect(participant_event.reload).to be_complete
+
+      get onboarding_step_path(step: "travel", event_id: event.id)
+
+      expect(response).to redirect_to(dashboard_path)
     end
   end
 end

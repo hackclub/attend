@@ -13,6 +13,15 @@ class EmergencyContact < ApplicationRecord
   belongs_to :guardian_participant_event, optional: true
   belongs_to :participant_event, optional: true
 
+  include SyncsRegistration
+  syncs_registration cause: :data_changed
+
+  # A contact given by a guardian counts towards their participant's
+  # registration too. Looked up by id: the guardian link may be gone with it.
+  def registration_ids_to_sync
+    [ participant_event_id, GuardianParticipantEvent.where(id: guardian_participant_event_id).pick(:participant_event_id) ]
+  end
+
   has_one :guardian, through: :guardian_participant_event
 
   validates :name, presence: true

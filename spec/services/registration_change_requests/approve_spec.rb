@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe RegistrationChangeRequests::Approve do
   let(:event) { create(:event) }
   let(:participant) { create(:participant, legal_first_name: "Old", legal_last_name: "Name") }
-  let(:participant_event) { create(:participant_event, event: event, participant: participant) }
+  let(:participant_event) { fill_in_registration_answers(create(:participant_event, event: event, participant: participant)) }
   let(:owner) { create(:user) }
   let(:reviewer) { create(:user) }
 
@@ -220,11 +220,11 @@ RSpec.describe RegistrationChangeRequests::Approve do
     end
 
     it "fixes a signed guardian's details in place and keeps their signed waiver" do
-      participant_event.update!(status: :complete)
       link = create(:guardian_participant_event, participant_event: participant_event, guardian: old_guardian,
         status: :completed, is_primary_guardian: true)
       consent = Consent.create!(participant_event: participant_event, guardian_participant_event: link,
         consent_type: :waiver, status: :signed, guardian_signed_at: 1.day.ago, signed_at: 1.day.ago)
+      complete_registration(participant_event)
       request = create_request(kind: :guardian, requested_changes: {
         "legal_first_name" => "Robin", "legal_last_name" => "Testparent",
         "email" => "robin.testparent@example.com", "phone" => "0412 345 678", "relationship" => "Parent"

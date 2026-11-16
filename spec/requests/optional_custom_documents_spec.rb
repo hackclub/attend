@@ -201,7 +201,8 @@ RSpec.describe "Optional custom documents", type: :request do
       doc = create(:custom_document, :optional, event: event)
       consent = create(:consent, participant_event: participant_event, consent_type: :custom_document,
         custom_document: doc, opted_in_at: Time.current)
-      participant_event.update!(status: :in_progress, code_of_conduct_accepted_at: Time.current)
+      participant_event.update_columns(status: "in_progress", code_of_conduct_accepted_at: Time.current)
+      fill_in_registration_answers(participant_event)
       create(:consent, :signed, participant_event: participant_event)
       gpe.update!(status: :completed, completed_at: Time.current)
 
@@ -576,7 +577,7 @@ RSpec.describe "Optional custom documents", type: :request do
 
   describe "completion" do
     let(:participant_event) do
-      create(:participant_event, event: event, code_of_conduct_accepted_at: Time.current)
+      fill_in_registration_answers(create(:participant_event, event: event, code_of_conduct_accepted_at: Time.current))
     end
     let!(:gpe) do
       create(:guardian_participant_event, participant_event: participant_event,

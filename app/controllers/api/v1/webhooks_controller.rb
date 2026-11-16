@@ -278,13 +278,10 @@ module Api
         # Completion can be unblocked by the main waiver, freedom waiver, or a custom document
         return unless consent.signed? && (consent.waiver? || consent.freedom_waiver? || consent.custom_document?)
 
-        # complete_ready_guardians may already have completed the participant
-        # through the guardian's commit hook; reload so this copy sees it and
-        # doesn't send the confirmation email a second time.
-        participant_event.reload
-
-        if participant_event.mark_complete_if_eligible!
-          Rails.logger.info("[Docuseal] Participant #{participant_event.id} marked complete after #{consent.consent_type} signed")
+        # Saving the consent, and any guardian complete_ready_guardians just
+        # finished, already re-synced the registration; this only reports it.
+        if participant_event.reload.complete?
+          Rails.logger.info("[Docuseal] Participant #{participant_event.id} complete after #{consent.consent_type} signed")
         end
       end
 

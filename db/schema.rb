@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_15_230000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -1095,6 +1095,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_15_230000) do
     t.index ["status", "created_at"], name: "index_registration_change_requests_on_status_and_created_at"
   end
 
+  create_table "registration_transitions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "participant_event_id", null: false
+    t.uuid "actor_id"
+    t.string "from_status"
+    t.string "to_status", null: false
+    t.string "cause", null: false
+    t.string "blocking_requirement"
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.index ["actor_id"], name: "index_registration_transitions_on_actor_id"
+    t.index ["participant_event_id", "created_at"], name: "index_registration_transitions_on_registration_and_time"
+  end
+
   create_table "room_assignments", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.jsonb "flags", default: {}, null: false
@@ -1926,6 +1939,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_15_230000) do
   add_foreign_key "registration_change_requests", "participant_events"
   add_foreign_key "registration_change_requests", "users", column: "requested_by_id"
   add_foreign_key "registration_change_requests", "users", column: "resolved_by_id"
+  add_foreign_key "registration_transitions", "participant_events", on_delete: :cascade
+  add_foreign_key "registration_transitions", "users", column: "actor_id", on_delete: :nullify
   add_foreign_key "room_assignments", "participant_events"
   add_foreign_key "room_assignments", "rooming_contexts"
   add_foreign_key "room_assignments", "rooms"

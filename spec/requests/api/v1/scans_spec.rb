@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Api::V1::Scans", type: :request do
+RSpec.describe "Api::V1::Scans", type: :request, fiat_registrations: true do
   include ActiveSupport::Testing::TimeHelpers
 
   let(:event) { create(:event, slug: "api-scans-#{SecureRandom.hex(8)}") }

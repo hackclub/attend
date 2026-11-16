@@ -7,10 +7,7 @@ RSpec.describe "Dashboard wallet passes", type: :request do
   let(:participant) { create(:participant, user: user, date_of_birth: 18.years.ago - 1.day) }
   let(:participant_event) do
     participant.update!(date_of_birth: 18.years.ago - 1.day)
-    create(:participant_event, participant: participant, status: :complete,
-      code_of_conduct_accepted_at: Time.current).tap do |registration|
-      create(:consent, :signed, participant_event: registration)
-    end
+    complete_registration(create(:participant_event, participant: participant))
   end
 
   before { sign_in user }

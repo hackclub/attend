@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe TravelCalendar::JourneyCache do
+RSpec.describe TravelCalendar::JourneyCache, fiat_registrations: true do
   let(:memory_store) { ActiveSupport::Cache::MemoryStore.new }
   let(:event) { create(:event, timezone: "UTC", groups_enabled: true) }
   let(:participant) { create(:participant, legal_first_name: "Alex", legal_last_name: "Original") }

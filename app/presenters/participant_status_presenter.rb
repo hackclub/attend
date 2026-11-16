@@ -1,7 +1,7 @@
 # The one status staff see for a registration. Before any scan places them,
 # it's their registration status; after one, it's where their latest placing
 # scan puts them; once the event has ended, whether they attended. Computed
-# from scans and display_status, never stored.
+# from scans and the registration's status, never stored.
 #
 # Tones: :done (green), :wait (amber), :live (blue, with staff right now),
 # :idle (grey, nothing to act on).

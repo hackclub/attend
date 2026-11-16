@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "Api::V1::TravelCalendar", type: :request do
+RSpec.describe "Api::V1::TravelCalendar", type: :request, fiat_registrations: true do
   let(:event) { create(:event, timezone: "America/Los_Angeles") }
 
   before do
