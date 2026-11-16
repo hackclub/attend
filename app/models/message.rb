@@ -901,6 +901,8 @@ class Message < ApplicationRecord
   # The children who put this guardian in the audience, as "Alex and Sam".
   # Falls back to all their children at the event, since a message viewed or
   # re-sent later may no longer match how the audience looked at send time.
+  # Uses legal first names, never preferred ones, like every other surface
+  # parents see.
   def participant_first_names_for(recipient)
     # A participant reading a message meant for guardians is still addressed
     # as themselves, never as "your child".
@@ -910,7 +912,8 @@ class Message < ApplicationRecord
       .where(guardian: recipient, participant_events: { event_id: event_id })
     [ guardian_links.where(guardian: recipient), all_links ].each do |links|
       names = links.includes(participant_event: :participant).order("participant_events.created_at")
-        .filter_map { |link| link.participant_event.participant.greeting_name }.uniq
+        .map { |link| link.participant_event.participant.legal_first_name }
+        .reject { |name| Participant.name_placeholder?(name) }.uniq
       return names.to_sentence if names.any?
     end
     nil
