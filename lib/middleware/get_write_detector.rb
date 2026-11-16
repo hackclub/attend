@@ -97,13 +97,28 @@ module GetWriteDetector
   # ActiveSupport::Notifications subscriber. Jobs run inline by a test's
   # perform_enqueued_jobs are not the request's own writes: in production they
   # run on a worker, which is the whole point of moving a write into one.
+  #
+  # Only those are let off. perform_now, and perform_later on the inline
+  # adapter, run the job inside the request in production too, so what they
+  # write is the request's own.
   class JobSubscriber
-    def start(_name, _id, _payload)
+    def start(_name, _id, payload)
+      return unless JobSubscriber.run_by_test_queue?(payload)
+
       GetWriteDetector.current&.then { |tracking| tracking.jobs_running += 1 }
     end
 
-    def finish(_name, _id, _payload)
+    def finish(_name, _id, payload)
+      return unless JobSubscriber.run_by_test_queue?(payload)
+
       GetWriteDetector.current&.then { |tracking| tracking.jobs_running -= 1 }
+    end
+
+    # A job the test adapter is performing after it was queued: it carries
+    # the time it was enqueued, which a job handed straight to perform_now
+    # never does.
+    def self.run_by_test_queue?(payload)
+      payload[:adapter].is_a?(ActiveJob::QueueAdapters::TestAdapter) && payload[:job]&.enqueued_at.present?
     end
   end
 

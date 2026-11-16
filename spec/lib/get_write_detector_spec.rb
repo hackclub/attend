@@ -45,19 +45,39 @@ RSpec.describe GetWriteDetector do
       expect(rack_request("POST") { user.update!(name: "Example Name") }).to be_empty
     end
 
-    it "doesn't count what a job run inline wrote: in production that is a worker's write" do
-      job = Class.new(ApplicationJob) do
-        def self.name = "DetectorExampleJob"
+    describe "jobs" do
+      include ActiveJob::TestHelper
 
-        def perform(user)
-          user.update!(name: "Written By A Job")
-        end
+      before do
+        stub_const("DetectorExampleJob", Class.new(ApplicationJob) do
+          def perform(user)
+            user.update!(name: "Written By A Job")
+          end
+        end)
       end
 
-      writes = rack_request("GET") { job.perform_now(user) }
+      it "doesn't count what a queued job wrote when a test runs it inline: in production that is a worker's write" do
+        writes = rack_request("GET") { perform_enqueued_jobs { DetectorExampleJob.perform_later(user) } }
 
-      expect(user.reload.name).to eq("Written By A Job")
-      expect(writes).to be_empty
+        expect(user.reload.name).to eq("Written By A Job")
+        expect(writes).to be_empty
+      end
+
+      it "counts what perform_now wrote: that runs inside the request in production too" do
+        writes = rack_request("GET") { DetectorExampleJob.perform_now(user) }
+
+        expect(user.reload.name).to eq("Written By A Job")
+        expect(writes.map(&:table)).to include("users")
+      end
+
+      it "counts what a job wrote on the inline adapter, which also runs it inside the request" do
+        DetectorExampleJob.queue_adapter = :inline
+
+        writes = rack_request("GET") { DetectorExampleJob.perform_later(user) }
+
+        expect(user.reload.name).to eq("Written By A Job")
+        expect(writes.map(&:table)).to include("users")
+      end
     end
 
     it "records nothing outside a request" do
