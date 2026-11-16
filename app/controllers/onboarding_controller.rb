@@ -1223,12 +1223,16 @@ class OnboardingController < ApplicationController
 
   # A birthday that ages the participant out is locked: changing it to one
   # that doesn't would let anyone past the age limit by retyping a year, so
-  # it goes through staff as a change request instead. The lock is applied
-  # to the attribute rather than the param keys, because Rails also accepts
-  # a date as date_of_birth(1i), (2i) and (3i).
+  # it goes through staff as a change request instead. So is the birthday on
+  # a registration that has been submitted: the profile step can come back
+  # for a missing name, and a new birthday there could make a minor an adult
+  # and drop the guardian their registration was submitted with. The lock is
+  # applied to the attribute rather than the param keys, because Rails also
+  # accepts a date as date_of_birth(1i), (2i) and (3i).
   def assign_profile_attributes(attributes)
     participant = @participant_event.participant
-    locked = @participant_event.too_old_for_event?
+    locked = @participant_event.too_old_for_event? ||
+      (@participant_event.code_of_conduct_accepted_at.present? && participant.date_of_birth.present?)
     participant.assign_attributes(attributes)
     participant.restore_attributes([ :date_of_birth ]) if locked
     participant

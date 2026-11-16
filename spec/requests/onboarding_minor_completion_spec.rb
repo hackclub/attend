@@ -225,6 +225,19 @@ RSpec.describe "Onboarding completion for minors", type: :request do
       end
     end
 
+    # The profile step can come back for a missing name. The birthday on a
+    # submitted registration decides whether a guardian is needed, so it
+    # doesn't come back with it.
+    it "keeps the date of birth fixed when the profile step is what reopens" do
+      participant.update_columns(legal_first_name: "")
+
+      patch onboarding_step_path(step: "profile", event_id: event.id),
+        params: { participant: { legal_first_name: "Robin", date_of_birth: 30.years.ago.to_date } }
+
+      expect(participant.reload.date_of_birth).to eq(15.years.ago.to_date)
+      expect(participant_event.reload.requires_guardian?).to be(true)
+    end
+
     it "stays shut for a complete registration, whatever has gone missing since the event began" do
       complete_registration(participant_event)
       event.update_columns(starts_at: 1.hour.ago, ends_at: 2.days.from_now)
