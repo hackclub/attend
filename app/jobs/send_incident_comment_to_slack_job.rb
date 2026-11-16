@@ -10,6 +10,7 @@ class SendIncidentCommentToSlackJob < ApplicationJob
     return unless incident.slack_message_ts.present?
 
     text = build_comment_text(comment)
+    text += "\n\n<#{IncidentLinks.incident_url(incident)}|View on Attend>"
 
     SlackService.new.send_to_channel(
       channel_id: CONDUCT_CHANNEL_ID,

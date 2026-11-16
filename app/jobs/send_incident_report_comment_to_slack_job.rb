@@ -9,7 +9,7 @@ class SendIncidentReportCommentToSlackJob < ApplicationJob
 
     SlackService.new.send_to_channel(
       channel_id: report.slack_channel_id,
-      text: build_comment_text(comment),
+      text: "#{build_comment_text(comment)}\n\n<#{IncidentLinks.report_url(report)}|View on Attend>",
       thread_ts: report.slack_message_ts
     )
   end

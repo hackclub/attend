@@ -6,6 +6,7 @@ class IncidentReportMailer < ApplicationMailer
   def new_report(incident_report)
     @incident_report = incident_report
     @event_name = incident_report.event_name
+    @incident_url = IncidentLinks.report_url(incident_report)
     @skipped_attachments = []
 
     budget = EMAIL_ATTACHMENT_BUDGET

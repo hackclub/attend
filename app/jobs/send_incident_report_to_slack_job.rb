@@ -84,7 +84,7 @@ class SendIncidentReportToSlackJob < ApplicationJob
           {
             type: "button",
             text: { type: "plain_text", text: "View on Attend", emoji: true },
-            url: incident_url(report),
+            url: IncidentLinks.report_url(report),
             style: "primary"
           }
         ]
@@ -96,11 +96,5 @@ class SendIncidentReportToSlackJob < ApplicationJob
         ]
       }
     ]
-  end
-
-  def incident_url(report)
-    opts = Rails.application.config.action_mailer.default_url_options.presence ||
-      { host: "attend.hackclub.com", protocol: "https" }
-    Rails.application.routes.url_helpers.admin_incident_report_url(report, **opts)
   end
 end

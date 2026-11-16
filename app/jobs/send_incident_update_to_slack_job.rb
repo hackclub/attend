@@ -17,6 +17,8 @@ class SendIncidentUpdateToSlackJob < ApplicationJob
     # Only fields the thread describes get a post; Slack rejects an empty one.
     return if text.nil?
 
+    text += "\n\n<#{IncidentLinks.incident_url(incident)}|View on Attend>"
+
     SlackService.new.send_to_channel(
       channel_id: CONDUCT_CHANNEL_ID,
       text: text,

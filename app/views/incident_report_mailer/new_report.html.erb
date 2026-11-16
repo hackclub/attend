@@ -2,6 +2,10 @@
   <h2 style="margin: 0 0 4px;">New Incident Report</h2>
   <p style="margin: 0 0 16px; color: #666;">Filed <%= @incident_report.created_at.strftime("%B %-d, %Y at %H:%M %Z") %></p>
 
+  <p style="margin: 0 0 20px;">
+    <a href="<%= @incident_url %>" style="display: inline-block; background: #ec3750; color: #ffffff; text-decoration: none; font-weight: 600; padding: 10px 18px; border-radius: 6px;">View incident on Attend</a>
+  </p>
+
   <table style="width: 100%; border-collapse: collapse;">
     <tbody>
       <% rows = [
@@ -51,5 +55,6 @@
 
   <p style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e5e5; font-size: 13px; color: #666;">
     This report is confidential. Reply directly to this email to reach the reporter.
+    View, comment on, or update it at <a href="<%= @incident_url %>" style="color: #666;"><%= @incident_url %></a>.
   </p>
 </div>
