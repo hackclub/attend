@@ -105,6 +105,24 @@ RSpec.describe "Admin participant page is read-only", type: :request do
           expect(gpe.reload.invite_token).to eq(token)
         end
 
+        # The page stops offering the link once the guardian is done. Posting
+        # for it anyway must not bring a lapsed link back to life.
+        it "isn't offered or revived once the guardian has completed the portal" do
+          token = gpe.generate_invite_token!
+          gpe.update!(status: :completed, invite_token_sent_at: 30.days.ago, invite_last_used_at: nil)
+
+          get show_path
+          expect(copy_button).to be_nil
+          expect(portal_link_form).to be_nil
+
+          post guardian_portal_link_admin_event_participant_path(event, participant_event, guardian_participant_event_id: gpe.id)
+
+          expect(response).to redirect_to(show_path)
+          expect(flash[:alert]).to include("already completed")
+          expect(gpe.reload.invite_expired?).to be(true)
+          expect { GuardianParticipantEvent.find_by_invite_token!(token) }.to raise_error(ActiveRecord::RecordNotFound)
+        end
+
         it "isn't offered, or refreshed, while the event has guardian invites locked" do
           gpe.generate_invite_token!
           gpe.update!(invite_token_sent_at: 30.days.ago)

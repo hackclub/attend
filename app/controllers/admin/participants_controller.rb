@@ -730,10 +730,10 @@ module Admin
     # "Copy Portal Link" for a guardian who has no working link: none minted
     # yet, or one whose window has lapsed. The page used to mint or restamp it
     # while rendering; now that takes this POST, and the page comes back with
-    # a live link in the button. Open to anyone who can see the page, as the
-    # link itself always was.
+    # a live link in the button. Same guards as the button: staff of this
+    # event, invites not locked, and a guardian who still has a portal to do.
     def guardian_portal_link
-      authorize @participant_event, :show?
+      authorize @participant_event, :guardian_portal_link?
 
       if current_event.guardian_invites_locked?
         redirect_to admin_event_participant_path(current_event, @participant_event), alert: "Guardian invites are currently locked for this event."
@@ -741,6 +741,13 @@ module Admin
       end
 
       gpe = @participant_event.guardian_participant_events.find(params[:guardian_participant_event_id])
+
+      if gpe.completed?
+        redirect_to admin_event_participant_path(current_event, @participant_event),
+          alert: "#{gpe.guardian.full_name} has already completed the guardian portal, so there is no link to copy."
+        return
+      end
+
       gpe.invite_url
       @record = gpe
 
