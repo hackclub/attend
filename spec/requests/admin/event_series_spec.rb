@@ -25,12 +25,43 @@ RSpec.describe "Admin::EventSeries", type: :request do
   end
 
   describe "the series dashboard" do
+    # The page answers before tallying anything; the dashboard below the
+    # header loads into it from its own request.
+    it "renders the header straight away and loads the dashboard into it" do
+      create(:participant_event, event: sub_event)
+      sign_in owner
+
+      get admin_series_path(series, events_page: 2, events_search: "x", other: "y")
+
+      expect(response).to have_http_status(:ok)
+      frame = Nokogiri::HTML(response.body).at_css("turbo-frame#series_dashboard")
+      expect(frame["src"]).to eq(dashboard_admin_series_path(series, events_page: 2, events_search: "x"))
+      expect(frame["target"]).to eq("_top")
+      expect(frame.at_css(".skeleton")).to be_present
+      expect(response.body).not_to include("Participant funnel")
+
+      get dashboard_admin_series_path(series), headers: { "Turbo-Frame" => "series_dashboard" }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("<html")
+      expect(Nokogiri::HTML(response.body).at_css("turbo-frame#series_dashboard")).to be_present
+      expect(response.body).to include("Participant funnel")
+    end
+
+    it "keeps the dashboard to people who can see the series" do
+      sign_in unrelated_event_admin
+
+      get dashboard_admin_series_path(series)
+
+      expect(response).to redirect_to(root_path)
+    end
+
     it "renders the funnel, chase list, and map for a series with participants" do
       3.times { create(:participant_event, event: sub_event) }
       create(:participant_event, event: sub_event, status: :withdrawn)
       sign_in owner
 
-      get admin_series_path(series)
+      get dashboard_admin_series_path(series)
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Participant funnel")
@@ -57,8 +88,14 @@ RSpec.describe "Admin::EventSeries", type: :request do
 
       get admin_series_path(series)
 
-      # Header line: how big, what's running, who has dropped out.
+      # Header line: how big, what's running, who has dropped out. The
+      # withdrawn count needs the tallies, so the dashboard fills it in.
       expect(response.body).to include("1 event")
+      expect(response.body).to include('id="series-withdrawn"')
+
+      get dashboard_admin_series_path(series)
+
+      expect(response.body).to include('<turbo-stream action="update" target="series-withdrawn">')
       expect(response.body).to include("1 withdrawn")
       # Funnel: the two endpoints, and nothing restating them above.
       # The left-hand total counts every active registration, not only those
@@ -77,7 +114,7 @@ RSpec.describe "Admin::EventSeries", type: :request do
       2.times { create(:participant_event, event: sub_event, status: :invited) }
       sign_in owner
 
-      get admin_series_path(series)
+      get dashboard_admin_series_path(series)
 
       expect(response.body).to include("participants haven&#39;t signed in to start onboarding yet")
       expect(response.body).to include("stuck on sign in")
@@ -89,7 +126,7 @@ RSpec.describe "Admin::EventSeries", type: :request do
       create(:event, event_series: series, name: "Sunbeam Oslo", location_city: "Oslo")
       sign_in owner
 
-      get admin_series_path(series, events_search: "oslo")
+      get dashboard_admin_series_path(series, events_search: "oslo")
 
       expect(response.body).to include("Sunbeam Oslo")
       expect(response.body).not_to include("series-event-#{sub_event.id}")
@@ -99,10 +136,10 @@ RSpec.describe "Admin::EventSeries", type: :request do
       create_list(:event, 21, event_series: series)
       sign_in owner
 
-      get admin_series_path(series)
+      get dashboard_admin_series_path(series)
       expect(response.body).to include("Showing 1 to 20 of 22 events")
 
-      get admin_series_path(series, events_page: 2)
+      get dashboard_admin_series_path(series, events_page: 2)
       expect(response.body).to include("Showing 21 to 22 of 22 events")
       expect(response.body.scan(/id="series-event-/).length).to eq(2)
     end
@@ -110,7 +147,7 @@ RSpec.describe "Admin::EventSeries", type: :request do
     it "says so plainly when nothing needs chasing" do
       sign_in owner
 
-      get admin_series_path(series)
+      get dashboard_admin_series_path(series)
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Nothing needs chasing")
@@ -122,7 +159,7 @@ RSpec.describe "Admin::EventSeries", type: :request do
       # a zero.
       sign_in organizer
 
-      get admin_series_path(series)
+      get dashboard_admin_series_path(series)
 
       expect(response.body).to include("aren't visible to you")
     end
@@ -130,7 +167,7 @@ RSpec.describe "Admin::EventSeries", type: :request do
     it "stays quiet about incident visibility when nothing is hidden" do
       sign_in global_admin
 
-      get admin_series_path(series)
+      get dashboard_admin_series_path(series)
 
       expect(response.body).not_to include("aren't visible to you")
     end
@@ -140,7 +177,7 @@ RSpec.describe "Admin::EventSeries", type: :request do
                               location_latitude: nil, location_longitude: nil)
       sign_in owner
 
-      get admin_series_path(series)
+      get dashboard_admin_series_path(series)
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("nothing to plot")
@@ -156,6 +193,9 @@ RSpec.describe "Admin::EventSeries", type: :request do
       expect(response).to have_http_status(:ok)
 
       get admin_series_path(series)
+      expect(response).to have_http_status(:ok)
+
+      get dashboard_admin_series_path(series)
       expect(response).to have_http_status(:ok)
       expect(response.body).to include(sub_event.name)
     end

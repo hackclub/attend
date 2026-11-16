@@ -168,7 +168,8 @@
         <% end %>
 
         <!-- Main content -->
-        <main class="flex-1 px-4 sm:px-6 lg:px-8 py-8">
+        <main class="flex-1 px-4 sm:px-6 lg:px-8 py-8" data-page-content>
+          <%= render "shared/page_loading" %>
           <%= yield %>
         </main>
       </div>

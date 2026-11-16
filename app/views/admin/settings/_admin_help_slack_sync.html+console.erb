@@ -1,0 +1,24 @@
+<% row_divider = "border-t border-(--cs-border-divider-secondary) mt-4 pt-4" %>
+<div class="<%= row_divider %> flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+  <div>
+    <h3 class="cs-setting-title">Sync global and active event admins</h3>
+    <p class="cs-setting-description">
+      <%= pluralize(@admin_help_member_count, "eligible person", plural: "eligible people") %>,
+      <%= @admin_help_members_without_slack %> without a Slack account linked through Hack Club Auth (they can't be invited).
+    </p>
+    <% if @admin_help_last_sync["at"].present? %>
+      <p class="cs-field-description mt-1">
+        Last synced <%= cs_relative_time(Time.zone.parse(@admin_help_last_sync["at"])) %>:
+        <%= @admin_help_last_sync["added"] %> added,
+        <%= @admin_help_last_sync["already_member"] %> already in the channel,
+        <%= @admin_help_last_sync["failed"] %> failed,
+        <%= @admin_help_last_sync["no_slack"] %> without Slack.
+      </p>
+    <% end %>
+  </div>
+  <%= button_to "Sync to channel", sync_admin_help_slack_channel_admin_settings_path,
+        method: :post,
+        disabled: @admin_help_slack_channel_id.blank?,
+        class: "cs-btn shrink-0",
+        data: { turbo_confirm: "Invite #{pluralize(@admin_help_member_count - @admin_help_members_without_slack, "person", plural: "people")} with Slack accounts to the channel?" } %>
+</div>

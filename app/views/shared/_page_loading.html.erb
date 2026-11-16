@@ -1,0 +1,14 @@
+<%# Shown in place of the page's own content while a Turbo visit to the next
+    page is in flight (CSS: html[aria-busy] in tailwind/application.css), so a
+    slow page answers a click straight away with the layout kept and a
+    skeleton where the content will go. Hidden the rest of the time. %>
+<div class="page-loading" aria-hidden="true" hidden>
+  <div class="space-y-5 max-w-6xl">
+    <div class="space-y-2.5">
+      <span class="skeleton skeleton-title" style="width: 18rem; max-width: 70%"></span>
+      <span class="skeleton skeleton-line" style="width: 26rem; max-width: 85%"></span>
+    </div>
+    <%= render "shared/skeleton", shape: :panel, lines: 3 %>
+    <%= render "shared/skeleton", shape: :table, lines: 6 %>
+  </div>
+</div>

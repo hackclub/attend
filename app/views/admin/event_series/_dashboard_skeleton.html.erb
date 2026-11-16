@@ -1,0 +1,16 @@
+<%# Stands in for dashboard.html(+console).erb while it tallies: the chase
+    list, the funnel, then the events table beside the map. %>
+<div class="space-y-5">
+  <%= render "shared/skeleton", shape: :panel, lines: 4, label: "Loading who needs chasing" %>
+  <%= render "shared/skeleton", shape: :stats, lines: 4, label: "Loading the participant funnel" %>
+  <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
+    <div class="lg:col-span-3 min-w-0">
+      <%= render "shared/skeleton", shape: :table, lines: 6, label: "Loading events" %>
+    </div>
+    <div class="lg:col-span-2 min-w-0" aria-hidden="true">
+      <div class="<%= console_ui? ? "cs-container" : "bg-(--bg-elev) border border-(--border-card) rounded-lg" %> p-5 h-full min-h-64 flex">
+        <span class="skeleton skeleton-block flex-1"></span>
+      </div>
+    </div>
+  </div>
+</div>

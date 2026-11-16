@@ -100,4 +100,11 @@ Rails.application.configure do
   # Envoy's old host, for /verify and its redirects (see VisaLetter and the
   # visas block in config/routes.rb).
   config.hosts << ENV.fetch("VISAS_HOST", "visas.hackclub.com")
+
+  # SIMULATE_LATENCY=1 bin/dev: a slow network and a loaded server, for
+  # judging loading states locally. See lib/middleware/simulated_latency.rb.
+  if ENV["SIMULATE_LATENCY"].present?
+    require Rails.root.join("lib/middleware/simulated_latency")
+    config.middleware.insert_before 0, SimulatedLatency
+  end
 end

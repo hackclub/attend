@@ -275,6 +275,8 @@ Rails.application.routes.draw do
     root "dashboard#index"
 
     get "search", to: "search#index"
+    # The event switcher's list, loaded when its menu first opens.
+    get "event_switcher", to: "event_switcher#show", as: :event_switcher
 
     # Opt-in switch between the original admin and the console redesign.
     patch "console_beta", to: "console_beta#update", as: :console_beta
@@ -444,6 +446,7 @@ Rails.application.routes.draw do
         resource :rooming_wizard, only: [ :show ], controller: "rooming_wizard", path: "(/stays/:stay_id)/rooming_wizard" do
           get :setup
           post :setup, action: :create_setup
+          get :suggested_siblings
           get :preferences
           post :link_preference
           delete :unlink_preference
@@ -481,6 +484,8 @@ Rails.application.routes.draw do
     resources :series, controller: "event_series", param: :slug, except: [ :destroy ] do
       member do
         post :send_held_invitations
+        # The slow half of the series page, loaded into it after the header.
+        get :dashboard
       end
       resource :integrations, only: [ :show ], controller: "series_integrations" do
         # Vote events are per event, so this one names which of the series'
@@ -519,6 +524,7 @@ Rails.application.routes.draw do
     scope "training", as: "training" do
       resources :courses, controller: "training_courses", param: :slug, except: :index do
         patch :move, on: :member
+        get :people, on: :member
         resources :invitations, controller: "training_course_invitations", only: [ :create, :destroy ]
         resources :lessons, controller: "training_lessons", except: [ :index, :show ] do
           patch :move, on: :member
@@ -576,6 +582,8 @@ Rails.application.routes.draw do
       # General (show) holds the app-wide switches; this tab holds Twilio,
       # WhatsApp and the Slack channels.
       get :integrations
+      # The slow member counts for one Slack channel, loaded into the page.
+      get :slack_channel_sync
       post :toggle_maintenance
       post :toggle_twilio
       post :update_twilio_from_number

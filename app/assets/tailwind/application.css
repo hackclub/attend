@@ -1279,3 +1279,146 @@
   }
   .message-body pre code { padding: 0; background: none; }
 }
+
+/* ====================================================================
+ * Loading states
+ *
+ * Slow sections render after the page shell: a <turbo-frame> with a src
+ * (see LazyFrameHelper#lazy_frame) holds a skeleton until its own request
+ * answers. Everything here reads currentColor, so one rule works on every
+ * theme and in both admin UIs without per-theme tokens.
+ *
+ * - .skeleton / .skeleton-* — placeholder shapes. A shimmer when motion is
+ *   allowed, a still tint otherwise.
+ * - The skeleton fades in after a short delay, so a section that answers in
+ *   ~200ms swaps straight in instead of flashing grey.
+ * - turbo-frame[aria-busy] — Turbo sets aria-busy while a frame that already
+ *   has content reloads (a filter, a page link); the old content dims under a
+ *   spinner rather than blanking.
+ * - .loading-spinner — the inline spinner, for buttons and frames alike.
+ * ==================================================================== */
+@layer components {
+  .skeleton-group {
+    animation: skeleton-appear 0s 180ms both;
+  }
+
+  .skeleton {
+    display: block;
+    border-radius: 4px;
+    background-color: color-mix(in srgb, currentColor 9%, transparent);
+  }
+
+  .skeleton-line { height: 0.75rem; }
+  .skeleton-title { height: 1.125rem; width: 40%; }
+  .skeleton-figure { height: 2rem; width: 4.5rem; }
+  .skeleton-block { height: 100%; min-height: 8rem; }
+  .skeleton-circle { border-radius: 9999px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .skeleton {
+      background-image: linear-gradient(
+        90deg,
+        transparent 0%,
+        color-mix(in srgb, currentColor 7%, transparent) 50%,
+        transparent 100%
+      );
+      background-size: 200% 100%;
+      background-repeat: no-repeat;
+      animation: skeleton-shimmer 1.4s ease-in-out infinite;
+    }
+  }
+
+  @keyframes skeleton-shimmer {
+    from { background-position: 150% 0; }
+    to { background-position: -50% 0; }
+  }
+
+  @keyframes skeleton-appear {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* A frame reloading over content it already shows. */
+  turbo-frame.lazy-frame { display: block; position: relative; }
+  turbo-frame.lazy-frame[aria-busy="true"][complete] > * {
+    opacity: 0.55;
+    transition: opacity 120ms 150ms;
+    pointer-events: none;
+  }
+
+  .loading-spinner {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    flex: none;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 9999px;
+    animation: loading-spin 0.7s linear infinite;
+    vertical-align: -0.15em;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .loading-spinner { animation-duration: 2.4s; }
+  }
+
+  @keyframes loading-spin { to { transform: rotate(360deg); } }
+
+  /* A form waiting on its submission: the button that sent it shows a
+   * spinner, and nothing in the form can be sent twice. See utils/loading.js. */
+  form[aria-busy="true"] [data-loading-submitter] {
+    position: relative;
+    color: transparent !important;
+  }
+  form[aria-busy="true"] [data-loading-submitter]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 1em;
+    height: 1em;
+    border: 2px solid var(--loading-spinner-color, currentColor);
+    border-right-color: transparent;
+    border-radius: 9999px;
+    animation: loading-spin 0.7s linear infinite;
+  }
+
+  /* Shown in place of a section whose request failed. */
+  .lazy-frame-error {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    padding: 1rem 1.25rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* Page visits: while Turbo fetches the next page (it sets aria-busy on <html>
+ * for the whole visit), the layout stays and the main area shows a skeleton
+ * (shared/_page_loading) instead of the page being left. Both wait 150ms, so
+ * a quick visit swaps straight to the new page. A back/forward preview
+ * ([data-turbo-preview]) already shows the cached page, so it's left alone. */
+@layer components {
+  [data-page-content] { position: relative; }
+  .page-loading { display: none; }
+
+  html[aria-busy="true"]:not([data-turbo-preview]) [data-page-content] > .page-loading {
+    display: block;
+    position: absolute;
+    inset: 0;
+    padding: inherit;
+    z-index: 1;
+    animation: skeleton-appear 0s 150ms both;
+  }
+
+  html[aria-busy="true"]:not([data-turbo-preview]) [data-page-content] > :not(.page-loading) {
+    animation: page-content-leave 0s 150ms forwards;
+  }
+
+  @keyframes page-content-leave { to { visibility: hidden; } }
+}
+
+/* A lazy section that turned out to have nothing to show (no suggestions)
+ * takes no room, not even a stack gap. */
+turbo-frame.lazy-frame[complete]:not(:has(*)) { display: none; }

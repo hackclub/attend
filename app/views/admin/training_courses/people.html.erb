@@ -1,0 +1,19 @@
+<%= lazy_frame_response "course_people", class: "space-y-6" do %>
+  <%= render "admin/training_courses/invitations", course: @course, invitations: @invitations %>
+
+  <div class="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+    <div class="px-6 py-4 border-b border-gray-100"><h2 class="text-lg font-medium text-gray-900">Learners (<%= @enrollments.size %>)</h2></div>
+    <table class="min-w-full divide-y divide-gray-100">
+      <tbody class="divide-y divide-gray-100 text-sm">
+        <% if @enrollments.empty? %><tr><td class="px-6 py-8 text-center text-gray-500">Nobody has started this course yet.</td></tr><% end %>
+        <% @enrollments.each do |enrollment| %>
+          <tr>
+            <td class="px-6 py-4"><%= link_to enrollment.user.display_name_or_fallback, admin_user_path(enrollment.user), class: "font-medium text-gray-900 hover:text-[#ec3750]" %><div class="text-gray-500"><%= enrollment.user.email %></div></td>
+            <td class="px-6 py-4 text-gray-600"><%= @completed_counts.fetch(enrollment.id, 0) %> of <%= pluralize(@lessons.size, "lesson") %></td>
+            <td class="px-6 py-4 text-gray-600"><%= enrollment.completed_at ? "Completed #{l(enrollment.completed_at.to_date, format: :long)}" : "In progress" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

@@ -202,7 +202,7 @@ RSpec.describe "Onboarding invitations held", type: :request do
       create(:invitation, event: other_event, sent_at: nil)
       sign_in owner
 
-      get admin_series_path(series)
+      get dashboard_admin_series_path(series)
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("series-held-invitations")
@@ -215,7 +215,7 @@ RSpec.describe "Onboarding invitations held", type: :request do
       create(:invitation, event: open_event, sent_at: 2.days.ago)
       sign_in owner
 
-      get admin_series_path(series)
+      get dashboard_admin_series_path(series)
 
       expect(response.body).to include("invitation hasn't been accepted yet")
       expect(response.body).not_to include("2 invitations haven't been accepted yet")
@@ -226,7 +226,7 @@ RSpec.describe "Onboarding invitations held", type: :request do
       create(:invitation, event: other_event, sent_at: nil)
       sign_in owner
 
-      get admin_series_path(series)
+      get dashboard_admin_series_path(series)
 
       expect(response.body).to include("invitations haven't been sent yet")
       expect(response.body).to match(/<details[^>]*data-testid="series-held-invitations-list"/)

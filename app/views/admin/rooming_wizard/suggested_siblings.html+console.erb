@@ -1,0 +1,35 @@
+<%= lazy_frame_response "suggested_siblings" do %>
+  <% if @suggested_siblings.any? %>
+    <div class="cs-alert">
+      <%= cs_status_icon(:info) %>
+      <div class="min-w-0 flex-1">
+        <p class="cs-alert-title">Suggested sibling groups (by surname)</p>
+        <ul class="mt-2">
+          <% @suggested_siblings.each do |suggestion| %>
+            <li class="flex flex-wrap items-center justify-between gap-3 py-2 border-t border-(--cs-border-divider-secondary) first:border-t-0">
+              <div class="min-w-0">
+                <span class="font-bold <%= 'cs-muted' if suggestion[:already_grouped] %>"><%= suggestion[:surname] %></span>
+                <span class="cs-secondary ml-2">
+                  <%= suggestion[:participants].map(&:full_name).join(", ") %>
+                </span>
+              </div>
+              <% if suggestion[:already_grouped] %>
+                <%= cs_status(:success, "Created") %>
+              <% else %>
+                <%= form_with url: admin_event_sibling_groups_path(@event.slug), method: :post, class: "inline", data: { turbo: true } do %>
+                  <% suggestion[:participants].each do |p| %>
+                    <input type="hidden" name="participant_ids[]" value="<%= p.id %>">
+                  <% end %>
+                  <input type="hidden" name="label" value="<%= suggestion[:surname] %> siblings">
+                  <button type="submit" class="cs-btn">
+                    Create group
+                  </button>
+                <% end %>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    </div>
+  <% end %>
+<% end %>

@@ -15,11 +15,19 @@ module Admin
 
     def show
       @lessons = @course.lessons.includes(questions: :options)
+      @has_enrollments = @course.enrollments.exists?
+      @funnel = TrainingFunnel.new(@course, @lessons.to_a) if @has_enrollments && @lessons.any?
+    end
+
+    # The invitations and learners tables, loaded into the course page after
+    # it renders: a course every volunteer takes has thousands of each.
+    def people
+      @lessons = @course.lessons.to_a
       @enrollments = @course.enrollments.includes(:user).order(started_at: :desc)
       @invitations = @course.invitations.includes(:user, :invited_by).order("users.email")
       @completed_counts = TrainingLessonCompletion.where(training_enrollment_id: @enrollments.map(&:id))
         .group(:training_enrollment_id).count
-      @funnel = TrainingFunnel.new(@course, @lessons.to_a) if @enrollments.any? && @lessons.any?
+      render layout: false
     end
 
     def new
