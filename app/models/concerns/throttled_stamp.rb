@@ -14,6 +14,8 @@ module ThrottledStamp
     stamped_at = self[column]
     return if stamped_at.present? && stamped_at > interval.ago
 
-    update_column(column, Time.current)
+    # Explicitly on the primary: a request serving reads from the replica
+    # (ReplicaReads) may still reach this.
+    ReplicaReads.on_primary { update_column(column, Time.current) }
   end
 end

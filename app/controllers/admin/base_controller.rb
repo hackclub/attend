@@ -1,6 +1,9 @@
 module Admin
   class BaseController < ApplicationController
     before_action :authenticate_user!
+    # After authentication, so the signed-in user always comes from the
+    # primary. A no-op unless replica reads are switched on (ReplicaReads).
+    route_reads_to_replica
     before_action :set_admin_ui_variant
     before_action :authorize_admin_access
     before_action :set_current_event_from_session
