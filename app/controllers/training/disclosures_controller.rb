@@ -46,8 +46,7 @@ module Training
     # the form (and its "my answer is true" tick) for this attempt.
     def record_yes
       session.delete(PENDING_YES_KEY)
-      disclosure = record!("yes")
-      TrainingMailer.disclosure_review_needed(disclosure: disclosure).deliver_later if disclosure
+      record!("yes")
       # The training home shows the neutral "thanks for telling us" page to
       # anyone waiting on a review, and a refresh there re-sends nothing.
       redirect_to training_path

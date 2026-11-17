@@ -1,5 +1,7 @@
 require "rails_helper"
 
+RSpec::Matchers.define_negated_matcher :not_have_enqueued_mail, :have_enqueued_mail
+
 RSpec.describe "Training declarations", type: :request do
   include Devise::Test::IntegrationHelpers
 
@@ -35,14 +37,17 @@ RSpec.describe "Training declarations", type: :request do
     expect(response).to have_http_status(:unprocessable_entity)
   end
 
-  it "stops all training after a yes, tells the Safety Team, and stays neutral" do
+  it "stops all training after a yes, emails nobody, and stays neutral" do
     other = create(:training_course, :published, access: "open")
     post enroll_training_course_path(course)
     post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1" }
 
+    # Nobody is emailed: the declaration waits in the admin review queue, and
+    # the page asks the person to get in touch themselves.
     expect {
       post confirm_training_course_disclosure_path(course)
-    }.to have_enqueued_mail(TrainingMailer, :disclosure_review_needed)
+    }.to change { learner.training_disclosures.where(review_status: "pending").count }.by(1)
+      .and not_have_enqueued_mail
     expect(response).to redirect_to(training_path)
     follow_redirect!
     expect(response.body).to include("Thanks for telling us", TrainingDisclosure::SAFETY_TEAM_EMAIL)
@@ -137,10 +142,8 @@ RSpec.describe "Training declarations", type: :request do
     end
 
     expect {
-      expect {
-        post confirm_training_course_disclosure_path(course)
-      }.to change(TrainingDisclosure, :count).by(1)
-    }.not_to have_enqueued_mail(TrainingMailer, :disclosure_review_needed)
+      post confirm_training_course_disclosure_path(course)
+    }.to change(TrainingDisclosure, :count).by(1)
     expect(response).to redirect_to(training_path)
   end
 
