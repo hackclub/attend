@@ -156,8 +156,17 @@ RSpec.describe "Training declarations", type: :request do
   end
 
   it "uses the course's own wording, and keeps a copy of what was asked" do
-    course.update!(disclosure_question: "Example custom declaration wording?")
     post enroll_training_course_path(course)
+    get new_training_course_disclosure_path(course)
+    expect(response.body).to include("this applies to me", "none of this applies to me")
+
+    # The longer labels are written for the standard question; a course's own
+    # wording could make them read backwards, so it gets bare Yes and No.
+    course.update!(disclosure_question: "Example custom declaration wording?")
+    get new_training_course_disclosure_path(course)
+    expect(response.body).to include("Example custom declaration wording?", "<strong>Yes</strong></span>", "<strong>No</strong></span>")
+    expect(response.body).not_to include("applies to me")
+
     post training_course_disclosure_path(course), params: { answer: "no", confirm: "1" }
     expect(learner.training_disclosures.last.question).to eq("Example custom declaration wording?")
   end

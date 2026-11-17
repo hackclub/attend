@@ -42,6 +42,13 @@ class TrainingCourse < ApplicationRecord
     disclosure_question.presence || TrainingDisclosure::DEFAULT_QUESTION
   end
 
+  # The longer answer labels on the declaration form ("Yes, this applies to
+  # me") are written for the standard wording; a course's own question can
+  # be phrased so they read backwards, and gets bare Yes and No instead.
+  def standard_disclosure_question?
+    disclosure_question.blank?
+  end
+
   def question_count
     lessons.sum { |lesson| lesson.questions.size }
   end
