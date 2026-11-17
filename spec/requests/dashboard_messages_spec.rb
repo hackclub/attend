@@ -31,6 +31,30 @@ RSpec.describe "Dashboard messages", type: :request do
     expect([ email, push ].map { |delivery| delivery.reload.read? }).to all(be(true))
   end
 
+  it "lists each channel the message came through once, in order" do
+    push = deliver("push")
+    deliver("email")
+    deliver("email")
+
+    get dashboard_message_path(push)
+
+    expect(controller.instance_variable_get(:@channels)).to eq(%w[email push])
+  end
+
+  it "asks about the message's deliveries once per open, not once per question" do
+    delivery = deliver("email")
+    get dashboard_message_path(delivery)
+
+    queries = []
+    counter = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+      queries << payload[:sql] if payload[:sql].include?('FROM "message_deliveries"') && payload[:sql].include?('"message_id" =')
+    end
+    get dashboard_message_path(delivery)
+    ActiveSupport::Notifications.unsubscribe(counter)
+
+    expect(queries.size).to eq(1), queries.join("\n")
+  end
+
   it "doesn't write when the message is opened again" do
     delivery = deliver("email")
     get dashboard_message_path(delivery)
