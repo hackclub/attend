@@ -120,6 +120,34 @@ RSpec.describe GuardianParticipantEvent do
     end
   end
 
+  describe "#portal_url" do
+    it "is nil until a link is minted, and never mints one itself" do
+      gpe = create(:guardian_participant_event, :never_sent)
+
+      expect { expect(gpe.portal_url).to be_nil }.not_to change { gpe.reload.attributes }
+    end
+
+    it "is the link while its window is open, without stamping anything" do
+      gpe = create(:guardian_participant_event, invite_token_sent_at: 1.day.ago)
+      token = gpe.generate_invite_token!
+
+      expect { expect(gpe.portal_url).to end_with("/guardian/portal/#{token}") }
+        .not_to change { gpe.reload.attributes }
+    end
+
+    # A lapsed link 404s on arrival, so it is never handed out as it stands;
+    # #invite_url (a POST) is what revives it.
+    it "is nil once the window has lapsed, and #invite_url brings the same link back" do
+      gpe = create(:guardian_participant_event, invite_token_sent_at: 30.days.ago)
+      token = gpe.generate_invite_token!
+
+      expect(gpe.portal_url).to be_nil
+      expect(gpe.invite_url).to end_with("/guardian/portal/#{token}")
+      expect(gpe.portal_url).to end_with("/guardian/portal/#{token}")
+      expect(described_class.find_by_invite_token!(token)).to eq(gpe)
+    end
+  end
+
   describe "guardian email vs participant email" do
     it "refuses to link a guardian who shares the participant's email" do
       participant_event = create(:participant_event)

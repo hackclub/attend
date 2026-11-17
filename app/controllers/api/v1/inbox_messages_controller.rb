@@ -62,7 +62,11 @@ module Api
         return render json: { error: "Not found" }, status: :not_found if deliveries.empty?
 
         message = deliveries.first.message
-        current_deliveries.where(message: message).unread.update_all(read_at: Time.current)
+        # Only the first open has anything to mark; opening it again is a
+        # plain read.
+        if deliveries.any? { |delivery| !delivery.read? }
+          current_deliveries.where(message: message).unread.update_all(read_at: Time.current)
+        end
 
         render json: {
           message: {

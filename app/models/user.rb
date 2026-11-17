@@ -312,17 +312,30 @@ class User < ApplicationRecord
     end
   end
 
-  def sync_slack_id_to_participant
+  # The Slack id from the last sign-in, when the linked participant doesn't
+  # carry it yet. nil when there's nothing to sync.
+  #
+  # `target` is which of this account's participant rows is being asked
+  # about. One account can end up linked to more than one row (duplicates
+  # from a corrected import), and #participant only ever names one of them,
+  # so a caller working on a particular row passes it.
+  def pending_participant_slack_id(target = participant)
     slack_id = oidc_claims&.dig("slack_id")
     return if slack_id.blank?
-    return unless participant.present?
+    return unless target.present? && target.user_id == id
+    return if target.slack_user_id == slack_id
 
-    return if participant.slack_user_id == slack_id
+    slack_id
+  end
+
+  def sync_slack_id_to_participant(target = participant)
+    slack_id = pending_participant_slack_id(target)
+    return if slack_id.blank?
 
     # Skip validations: this is a system sync, and pre-existing invalid data on
     # the participant (e.g. a legacy phone number) must not block sign-in.
-    participant.slack_user_id = slack_id
-    participant.save!(validate: false)
+    target.slack_user_id = slack_id
+    target.save!(validate: false)
   end
 
   # A Hack Club Auth email change lands on the User row at sign-in; the linked

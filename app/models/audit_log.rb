@@ -20,6 +20,7 @@ class AuditLog < ApplicationRecord
     update_travel: "update_travel",
     resend_invitation: "resend_invitation",
     resend_guardian_invite: "resend_guardian_invite",
+    guardian_portal_link: "guardian_portal_link",
     clear_email_bounce: "clear_email_bounce",
     clear_guardian_email_bounce: "clear_guardian_email_bounce",
     event_select: "select",
@@ -152,6 +153,21 @@ class AuditLog < ApplicationRecord
       event: event,
       changed_fields: changed_fields,
       metadata: metadata
+    )
+  end
+
+  # A "view" entry for a GET, written by a job so the request doesn't write.
+  # The enqueue is still part of the request: if it fails, so does the page,
+  # and the entry carries the time of the view, not of the job. The job
+  # retries until the entry is written (see AuditViewJob).
+  def self.log_view_later(record:, actor:, event: nil, metadata: {})
+    AuditViewJob.perform_later(
+      record_type: record.class.polymorphic_name,
+      record_id: record.id,
+      actor_user_id: actor&.id,
+      event_id: event&.id,
+      metadata: metadata.deep_stringify_keys,
+      viewed_at: Time.current
     )
   end
 

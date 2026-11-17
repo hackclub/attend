@@ -1,6 +1,8 @@
 class EventApiToken < ApplicationRecord
   self.implicit_order_column = "created_at"
 
+  include LastUsedTracking
+
   belongs_to :event
   # The user who created the token. Nullable so a token outlives its creator's
   # account, but retained for the "leo@..." display name and audit context.
@@ -57,10 +59,6 @@ class EventApiToken < ApplicationRecord
 
   def revoke!
     update!(revoked_at: Time.current)
-  end
-
-  def touch_last_used!
-    update_column(:last_used_at, Time.current)
   end
 
   def revoked?

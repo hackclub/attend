@@ -150,7 +150,7 @@ module Admin
     def show
       authorize @participant_event
       @participant = @participant_event.participant
-      @participant.user&.sync_slack_id_to_participant
+      show_pending_slack_id
       @travel_inbound = @participant_event.travel_inbound&.tap { |t| t.travel_legs.load }
       @travel_outbound = @participant_event.travel_outbound&.tap { |t| t.travel_legs.load }
       @accommodation = @participant_event.accommodation
@@ -727,6 +727,34 @@ module Admin
       redirect_to admin_event_participant_path(current_event, @participant_event), notice: "Guardian invite resent to #{gpe.guardian.email}."
     end
 
+    # "Copy Portal Link" for a guardian who has no working link: none minted
+    # yet, or one whose window has lapsed. The page used to mint or restamp it
+    # while rendering; now that takes this POST, and the page comes back with
+    # a live link in the button. Same guards as the button: staff of this
+    # event, invites not locked, and a guardian who still has a portal to do.
+    def guardian_portal_link
+      authorize @participant_event, :guardian_portal_link?
+
+      if current_event.guardian_invites_locked?
+        redirect_to admin_event_participant_path(current_event, @participant_event), alert: "Guardian invites are currently locked for this event."
+        return
+      end
+
+      gpe = @participant_event.guardian_participant_events.find(params[:guardian_participant_event_id])
+
+      if gpe.completed?
+        redirect_to admin_event_participant_path(current_event, @participant_event),
+          alert: "#{gpe.guardian.full_name} has already completed the guardian portal, so there is no link to copy."
+        return
+      end
+
+      gpe.invite_url
+      @record = gpe
+
+      redirect_to admin_event_participant_path(current_event, @participant_event),
+        notice: "Portal link for #{gpe.guardian.full_name} is ready to copy."
+    end
+
     # Re-send the participant's onboarding invitation. The mailer reuses the
     # pending Invitation when there is one, so the link they were already sent
     # keeps working; an expired one is replaced with a fresh token.
@@ -980,6 +1008,22 @@ module Admin
     end
 
     private
+
+    # The participant's Slack id can trail their account's (they signed in
+    # before the two were linked). Viewing the page used to save it; now the
+    # page shows the id it is about to have and a job does the saving. Both
+    # are about this participant row, whichever row the account's own
+    # association happens to name.
+    def show_pending_slack_id
+      slack_id = @participant.user&.pending_participant_slack_id(@participant)
+      return if slack_id.blank?
+
+      # Shown, not changed: nothing later in the request should find the
+      # record dirty and save it on the page view's behalf.
+      @participant.slack_user_id = slack_id
+      @participant.clear_attribute_changes([ :slack_user_id ])
+      SyncParticipantSlackIdJob.perform_later_once(@participant)
+    end
 
     # `blocked_on=<stage key>` — the series dashboard's chase links. A stage's
     # count is "whose *first* uncleared onboarding step maps to this stage", so

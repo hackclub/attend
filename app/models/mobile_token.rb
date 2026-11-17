@@ -1,6 +1,8 @@
 class MobileToken < ApplicationRecord
   self.implicit_order_column = "created_at"
 
+  include LastUsedTracking
+
   # Shorter expiry for apps handling minor PII data
   DEFAULT_EXPIRY = 14.days
   REFRESH_THRESHOLD = 3.days
@@ -35,10 +37,6 @@ class MobileToken < ApplicationRecord
 
   def revoke!
     update!(revoked_at: Time.current)
-  end
-
-  def touch_last_used!
-    update_column(:last_used_at, Time.current)
   end
 
   def expired?

@@ -50,6 +50,19 @@ RSpec.describe "Api::V1::InboxMessages", type: :request do
     expect(delivery.reload).to be_read
   end
 
+  it "only writes the first time a message is opened" do
+    delivery = deliver(message, "email")
+    get api_v1_message_path(message), headers: headers
+    read_at = delivery.reload.read_at
+    GetWriteDetector.drain
+
+    get api_v1_message_path(message), headers: headers
+
+    expect(response).to have_http_status(:ok)
+    expect(GetWriteDetector.drain).to be_empty
+    expect(delivery.reload.read_at).to eq(read_at)
+  end
+
   it "fills in placeholders for the signed-in participant" do
     participant.update!(preferred_name: "Alex")
     message.update!(subject: "{{first_name}}, bus times", body: "<p>Hi {{first_name}}</p>")

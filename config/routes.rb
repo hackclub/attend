@@ -335,6 +335,7 @@ Rails.application.routes.draw do
           post :resync_airtable
           post :resend_invitation
           post :resend_guardian_invite
+          post :guardian_portal_link
           post :clear_email_bounce
           post :clear_guardian_email_bounce
           get :slack_invite_link
