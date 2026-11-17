@@ -132,5 +132,20 @@ RSpec.describe ApplicationOperation do
       expect(context.audited?(note)).to be(true)
       expect(context.audited?(participant_event.participant)).to be(false)
     end
+
+    # In production a failed audit write is reported, not raised. The context
+    # must not claim the row exists, or the surface's catch-all hook stands
+    # down and the write ends up with no row at all.
+    it "leaves the context unaudited when the row can't be written" do
+      allow(Rails.env).to receive(:local?).and_return(false)
+      allow(AuditLog).to receive(:log!).and_raise(ActiveRecord::StatementInvalid, "audit_logs is unavailable")
+
+      result = Notes::Create.call(context, participant_event: participant_event,
+        attributes: { body: "Arriving late.", note_type: "ops" })
+
+      expect(result).to be_success
+      expect(context.audited?).to be(false)
+      expect(context.audited?(result.value)).to be(false)
+    end
   end
 end

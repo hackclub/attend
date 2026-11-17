@@ -110,10 +110,11 @@ class ApplicationOperation
   # audit_write!) doesn't write a second one.
   #
   # Like those hooks, a failure to audit is reported rather than allowed to
-  # undo the write, and raises in development and test.
+  # undo the write, and raises in development and test. The context is only
+  # told once the row exists: if writing it failed, the catch-all hook still
+  # gets its turn, so the write is not left with no row at all.
   def audit!(action, record, changed_fields: nil, metadata: {})
-    @audited = true
-    context.audited!(record)
+    @audit_attempted = true
 
     unless self.class.declared_audit_actions.include?(action.to_sym)
       raise UndeclaredAuditAction, "#{self.class.name} audits #{action.inspect} without declaring it in audit_actions"
@@ -129,6 +130,7 @@ class ApplicationOperation
       changed_fields: AuditLog.redact_sensitive_fields(record, changes),
       metadata: audit_metadata.merge(metadata).compact
     )
+    context.audited!(record)
   rescue StandardError => e
     report_audit_failure(e)
   end
@@ -144,8 +146,9 @@ class ApplicationOperation
     base.merge(operation: self.class.name, surface: context.surface.to_s)
   end
 
+  # A run that tried to audit and failed has already been reported by audit!.
   def ensure_audited!
-    return if @audited
+    return if @audit_attempted
 
     report_audit_failure(UnauditedWrite.new("#{self.class.name} succeeded without writing an audit row"))
   end

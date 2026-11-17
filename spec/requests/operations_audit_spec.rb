@@ -47,6 +47,28 @@ RSpec.describe "Operation audit rows", type: :request do
       expect(log.to_json).not_to include("corrected@example.com", "Shelbyville")
     end
 
+    it "falls back to the catch-all row when the operation's own audit write fails" do
+      allow(Rails.env).to receive(:local?).and_return(false)
+      attempts = 0
+      allow(AuditLog).to receive(:log!).and_wrap_original do |original, **arguments|
+        attempts += 1
+        raise ActiveRecord::StatementInvalid, "audit_logs is unavailable" if attempts == 1
+
+        original.call(**arguments)
+      end
+
+      patch admin_event_participant_guardian_path(event, participant_event, link),
+        params: { guardian: { legal_first_name: "Janet", city: "Shelbyville" } }
+
+      expect(guardian.reload).to have_attributes(legal_first_name: "Janet", city: "Shelbyville")
+      log = AuditLog.sole
+      expect(log.record).to eq(guardian)
+      expect(log.metadata).to include("controller" => "guardians")
+      expect(log.metadata).not_to have_key("operation")
+      expect(log.changed_fields).to include("city" => "[REDACTED]")
+      expect(log.to_json).not_to include("Shelbyville")
+    end
+
     it "re-renders the form when the guardian's phone is the participant's" do
       participant.update!(phone: "+12025550123")
 
