@@ -75,6 +75,9 @@ module SensitiveFields
 
   BY_MODEL = COLUMNS.group_by(&:model).transform_values { |fields| fields.index_by(&:name).freeze }.freeze
 
+  # Each model's PII column names, for redacting request params.
+  PII_NAMES = BY_MODEL.transform_values { |fields| fields.values.select(&:pii?).map(&:name).freeze }.freeze
+
   # How an anonymized MCP connection treats a response key: person names
   # become initials, everything else here is replaced outright.
   RESPONSE_KEYS = {
@@ -156,9 +159,15 @@ module SensitiveFields
     # Request params stored in audit metadata. Rails' filter_parameters has
     # already run; this covers the registry's PII columns it doesn't name
     # (city, state, postal_code, country).
-    def redact_params(params)
-      @pii_param_names ||= names(sensitivity: :pii).to_set
-      deep_redact(params, @pii_param_names)
+    #
+    # A key is only redacted where it means that column, because `state` and
+    # `country` are also a status filter and an event's country. Which model a
+    # hash describes comes from the key it sits under, the way Rails nests
+    # params (`guardian`, `emergency_contacts_attributes`); any other key
+    # inherits from its parent, and the top level belongs to `model`, the
+    # record being audited. A hash under no registered model is left alone.
+    def redact_params(params, model: nil)
+      deep_redact(params, model && PII_NAMES[model_name_for(model)])
     end
 
     private
@@ -172,12 +181,34 @@ module SensitiveFields
     def deep_redact(value, hidden)
       case value
       when Hash
-        value.to_h { |key, inner| [ key, hidden.include?(key.to_s) && !inner.nil? ? REDACTED : deep_redact(inner, hidden) ] }
+        value.to_h do |key, inner|
+          if hidden&.include?(key.to_s)
+            [ key, redact_leaves(inner) ]
+          else
+            [ key, deep_redact(inner, PII_NAMES[param_model_name(key)] || hidden) ]
+          end
+        end
       when Array
         value.map { |inner| deep_redact(inner, hidden) }
       else
         value
       end
+    end
+
+    # Everything under a PII key goes, but its shape stays, so the row still
+    # says which keys were sent.
+    def redact_leaves(value)
+      case value
+      when Hash then value.transform_values { |inner| redact_leaves(inner) }
+      when Array then value.map { |inner| redact_leaves(inner) }
+      when nil then nil
+      else REDACTED
+      end
+    end
+
+    # "guardian", "guardians" and "guardians_attributes" all describe a Guardian.
+    def param_model_name(key)
+      key.to_s.delete_suffix("_attributes").singularize.camelize
     end
 
     def model_name_for(model)

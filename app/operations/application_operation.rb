@@ -136,7 +136,7 @@ class ApplicationOperation
         actor: context.actor,
         event: audit_event,
         changed_fields: AuditLog.redact_sensitive_fields(record, changes),
-        metadata: audit_metadata.merge(metadata).compact
+        metadata: audit_metadata(record).merge(metadata).compact
       )
     end
     context.audited!(record)
@@ -149,9 +149,9 @@ class ApplicationOperation
     event unless event.nil? || event.destroyed?
   end
 
-  def audit_metadata
+  def audit_metadata(record)
     base = context.metadata.deep_dup
-    base[:params] = SensitiveFields.redact_params(base[:params]) if base[:params]
+    base[:params] = SensitiveFields.redact_params(base[:params], model: record.class) if base[:params]
     base.merge(operation: self.class.name, surface: context.surface.to_s)
   end
 

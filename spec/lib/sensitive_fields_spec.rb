@@ -102,12 +102,44 @@ RSpec.describe SensitiveFields do
   end
 
   describe ".redact_params" do
-    it "redacts PII column names at any depth" do
+    it "redacts a model's PII columns under that model's key" do
       params = { "guardian" => { "city" => "Springfield", "postal_code" => "05001", "legal_first_name" => "[FILTERED]" }, "id" => "abc" }
 
       expect(described_class.redact_params(params)).to eq(
         "guardian" => { "city" => "[REDACTED]", "postal_code" => "[REDACTED]", "legal_first_name" => "[FILTERED]" },
         "id" => "abc"
+      )
+    end
+
+    it "follows Rails' nested-attributes keys, through the index hashes" do
+      params = { "participant" => { "tshirt_size" => "L",
+                                    "guardians_attributes" => { "0" => { "country" => "US", "id" => "abc" } } } }
+
+      expect(described_class.redact_params(params)).to eq(
+        "participant" => { "tshirt_size" => "L",
+                           "guardians_attributes" => { "0" => { "country" => "[REDACTED]", "id" => "abc" } } }
+      )
+    end
+
+    # `state` and `country` are PII on a person and plain data elsewhere.
+    it "leaves the same key names alone where they aren't that model's column" do
+      params = { "state" => "pending", "event" => { "country" => "US", "city" => "Burlington" },
+                 "filters" => { "state" => "draft" } }
+
+      expect(described_class.redact_params(params)).to eq(params)
+      expect(described_class.redact_params(params, model: Event)).to eq(params)
+    end
+
+    it "reads top-level keys as the audited record's columns" do
+      expect(described_class.redact_params({ "city" => "Springfield", "page" => "2" }, model: Guardian))
+        .to eq("city" => "[REDACTED]", "page" => "2")
+    end
+
+    it "keeps the shape of a nested value under a PII key, without its contents" do
+      params = { "guardian" => { "city" => { "name" => "Springfield", "codes" => %w[05001 05002], "none" => nil } } }
+
+      expect(described_class.redact_params(params)).to eq(
+        "guardian" => { "city" => { "name" => "[REDACTED]", "codes" => %w[[REDACTED] [REDACTED]], "none" => nil } }
       )
     end
   end

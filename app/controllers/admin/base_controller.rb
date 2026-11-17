@@ -218,7 +218,7 @@ module Admin
           # (city, state, postal_code, country), and the request's params are
           # stored whether or not the action permitted them.
           params: SensitiveFields.redact_params(
-            request.filtered_parameters.except("controller", "action", "authenticity_token")
+            request.filtered_parameters.except("controller", "action", "authenticity_token"), model: record.class
           )
         }
       )
