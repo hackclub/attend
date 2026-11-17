@@ -65,6 +65,8 @@ RSpec.describe "Training declarations", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Check your answer", "No, change my answer")
     expect(response.body).not_to include("Thanks for telling us")
+    # The way out is the first, prominent button; confirming is the quiet one.
+    expect(response.body).to match(/portal-btn-primary[^>]*>No, change my answer.*portal-btn-secondary[^>]*>\s*Yes, that/m)
 
     get new_training_course_disclosure_path(course)
     expect(response).to have_http_status(:ok)
