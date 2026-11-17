@@ -17,16 +17,16 @@
     </p>
   </div>
 
-  <section class="portal-card p-5 sm:p-6 mb-6">
+  <%= portal_card tag: :section, class: "p-5 sm:p-6 mb-6" do %>
     <h2 class="portal-heading text-base mb-1">Get back in now</h2>
     <p class="portal-hint text-sm mb-4">
       Verify your email address or phone number and we'll reopen this portal straight away — no need to
       wait for another email.
     </p>
-    <%= link_to "Find my portals", guardian_portal_center_path, class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
-  </section>
+    <%= portal_button "Find my portals", variant: :primary, href: guardian_portal_center_path, class: "w-full sm:w-auto" %>
+  <% end %>
 
-  <section class="portal-card p-5 sm:p-6 mb-6">
+  <%= portal_card tag: :section, class: "p-5 sm:p-6 mb-6" do %>
     <h2 class="portal-heading text-base mb-3">Or, if you'd rather wait</h2>
     <ul class="space-y-4">
       <li>
@@ -38,7 +38,7 @@
         <p class="portal-hint text-sm mt-0.5">The participant or the event organizers can resend it to you.</p>
       </li>
     </ul>
-  </section>
+  <% end %>
 
   <p class="portal-hint text-sm">
     Links expire so that a forwarded email can't give a stranger access to a participant's medical and

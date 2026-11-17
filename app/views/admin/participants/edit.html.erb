@@ -20,7 +20,7 @@
       <% end %>
 
       <div class="space-y-6">
-        <div class="border-2 border-dashed border-orange-400 rounded px-4 py-4">
+        <%= admin_tool_marker "rounded px-4 py-4" do %>
           <label class="block text-sm font-medium text-gray-700 mb-2">Profile Photo</label>
           <div class="flex items-center gap-4">
             <% if @participant.headshot.attached? && @participant.headshot.blob.persisted? %>
@@ -35,7 +35,7 @@
               <p class="mt-1 text-sm text-gray-500">JPEG, PNG, or WebP. Max 10MB.</p>
             </div>
           </div>
-        </div>
+        <% end %>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>

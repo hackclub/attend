@@ -11,17 +11,15 @@
     </p>
   </div>
 
-  <div class="portal-card p-5 sm:p-6 mb-6">
+  <%= portal_card class: "p-5 sm:p-6 mb-6" do %>
     <%= form_with url: guardian_portal_center_request_code_path, method: :post do |f| %>
-      <%= label_tag :contact, "Email address or phone number", class: "portal-label" %>
-      <p class="portal-hint text-sm mb-3">
-        Use whichever one the event organizers have on file for you. For a phone number, include the
-        country code — for example +1 555 555 5555.
-      </p>
-      <%= f.text_field :contact, id: "contact", required: true, autofocus: true,
-            autocomplete: "email",
-            placeholder: "you@example.com",
-            class: "portal-input" %>
+      <%= portal_field "Email address or phone number", for: "contact", wrapper: false,
+            hint: "Use whichever one the event organizers have on file for you. For a phone number, include the country code — for example +1 555 555 5555." do %>
+        <%= f.text_field :contact, id: "contact", required: true, autofocus: true,
+              autocomplete: "email",
+              placeholder: "you@example.com",
+              class: "portal-input" %>
+      <% end %>
 
       <% if TurnstileVerifier.site_key.present? && !user_signed_in? %>
         <div class="cf-turnstile mt-4"
@@ -29,19 +27,17 @@
              data-action="<%= GuardianPortalCenterController::TURNSTILE_ACTION %>"></div>
       <% end %>
 
-      <button type="submit" class="portal-btn portal-btn-primary w-full sm:w-auto mt-4">
-        Send me a verification code
-      </button>
+      <%= portal_button "Send me a verification code", variant: :primary, class: "w-full sm:w-auto mt-4" %>
     <% end %>
-  </div>
+  <% end %>
 
-  <div class="portal-panel p-5">
+  <%= portal_panel class: "p-5" do %>
     <h2 class="portal-heading text-sm mb-1">How this works</h2>
     <p class="portal-hint text-sm">
       We send a 6-digit code to check it's really you. Once you enter it, you'll see every pending and
       completed portal for that email or phone number — no invite link needed.
     </p>
-  </div>
+  <% end %>
 </div>
 
 <% if TurnstileVerifier.site_key.present? && !user_signed_in? %>

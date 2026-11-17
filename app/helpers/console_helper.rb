@@ -1,5 +1,10 @@
 # Helpers for the admin console, the Cloudscape-based /admin shell. Styles
 # live in app/assets/stylesheets/console.css.
+#
+# The kit's primitives (button, badge, status indicator, container, alert,
+# empty state, form field) are components under app/components/console. The
+# cs_* helpers for them here are thin delegates, so the markup is written down
+# once and every existing call site keeps working.
 module ConsoleHelper
   # The console has Cloudscape's two modes rather than the nine app themes.
   # Light-ground themes land on light, everything else on dark.
@@ -7,15 +12,7 @@ module ConsoleHelper
 
   CONSOLE_THEME_COLOR = "#0f141a".freeze
 
-  STATUS_ICONS = {
-    success: '<circle cx="8" cy="8" r="7"/><path d="M4.5 8.2l2.3 2.3 4.7-4.9"/>',
-    error: '<circle cx="8" cy="8" r="7"/><path d="M5.5 5.5l5 5m0-5l-5 5"/>',
-    warning: '<path d="M8 1.5l7 12.5H1z"/><path d="M8 6v4m0 1.8v.2"/>',
-    info: '<circle cx="8" cy="8" r="7"/><path d="M8 7v4.5m0-6.8v.3"/>',
-    pending: '<circle cx="8" cy="8" r="7"/><path d="M8 4.5V8l2.5 1.8"/>',
-    in_progress: '<circle cx="8" cy="8" r="7" stroke-dasharray="3 2.5"/><circle cx="8" cy="8" r="1.4" fill="currentColor" stroke="none"/>',
-    stopped: '<circle cx="8" cy="8" r="7"/><path d="M5 8h6"/>'
-  }.freeze
+  STATUS_ICONS = Console::StatusIconComponent::ICONS
 
   # True when this request renders the +console template variant. Helpers
   # shared by both admin UIs branch on it, so the original templates keep
@@ -89,24 +86,54 @@ module ConsoleHelper
   end
 
   def cs_status(type, label)
-    type = type.to_s.to_sym
-    type = :info unless STATUS_ICONS.key?(type)
-    content_tag(:span, class: "cs-status cs-status-#{type.to_s.dasherize}") do
-      cs_status_icon(type) + content_tag(:span, label)
-    end
+    render Console::StatusComponent.new(type, label)
   end
 
   def cs_status_icon(type)
-    content_tag(:svg, STATUS_ICONS.fetch(type.to_sym).html_safe,
-      viewBox: "0 0 16 16", fill: "none", stroke: "currentColor",
-      "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round",
-      "aria-hidden": "true")
+    render Console::StatusIconComponent.new(type)
   end
 
   def cs_badge(label, color = nil)
-    classes = [ "cs-badge" ]
-    classes << "cs-badge-#{color}" if color
-    content_tag(:span, label, class: classes.join(" "))
+    render Console::BadgeComponent.new(label, color)
+  end
+
+  # Cloudscape's button. `variant` is nil (normal), :primary, :link or :icon;
+  # `href:` makes it a link that looks like a button. Pass a block for
+  # content that isn't a plain label.
+  #   <%= cs_button "Create room", variant: :primary, type: "submit" %>
+  #   <%= cs_button "Clear filters", href: admin_bans_path %>
+  def cs_button(label = nil, **options, &block)
+    component = Console::ButtonComponent.new(label, **options)
+    component.with_content(capture(&block)) if block
+    render component
+  end
+
+  # The class string for builders that emit their own element:
+  #   <%= f.button "Save", class: cs_button_classes(:primary) %>
+  def cs_button_classes(variant = nil, extra = nil, full: false)
+    Console::ButtonComponent.classes(variant: variant, full: full, extra: extra)
+  end
+
+  # Cloudscape's container. The block is the body and receives the component,
+  # for its `with_actions` and `with_footer` slots. `flush: true` drops the
+  # body padding (tables, filter bars, empty states).
+  #   <%= cs_container "Ban details", description: "Who this applies to." do %>…<% end %>
+  def cs_container(title = nil, **options, &block)
+    render Console::ContainerComponent.new(title, **options), &block
+  end
+
+  # Cloudscape's alert. `type` is :info, :warning, :error or :success; the
+  # block is the body.
+  #   <%= cs_alert :warning, title: "Invitations are held" do %><p>…</p><% end %>
+  def cs_alert(type = :info, **options, &block)
+    render Console::AlertComponent.new(type, **options), &block
+  end
+
+  # Cloudscape's empty state. The block is optional extra content and
+  # receives the component, for its `with_actions` slot.
+  #   <%= cs_empty "No participants yet", "The funnel fills in as people are invited." %>
+  def cs_empty(title, description = nil, **options, &block)
+    render Console::EmptyStateComponent.new(title, description, **options), &block
   end
 
   # Cloudscape's breadcrumb group. Pass [label, path] pairs; the last one is
@@ -143,11 +170,10 @@ module ConsoleHelper
   end
 
   # Cloudscape severity badge for incidents and other graded things.
-  SEVERITY_BADGES = %w[critical high medium low neutral].freeze
+  SEVERITY_BADGES = Console::BadgeComponent::SEVERITIES
 
   def cs_severity_badge(severity, label = nil)
-    level = SEVERITY_BADGES.include?(severity.to_s) ? severity.to_s : "neutral"
-    content_tag(:span, label || severity.to_s.humanize, class: "cs-badge cs-badge-severity-#{level}")
+    render Console::BadgeComponent.severity(severity, label)
   end
 
   # aria-current for side navigation links, so the active state is exposed
@@ -182,7 +208,7 @@ module ConsoleHelper
           end
         end)
       end
-      list + link_to("Clear filters", clear_href, class: "cs-btn cs-btn-link cs-filter-clear")
+      list + cs_button("Clear filters", variant: :link, href: clear_href, class: "cs-filter-clear")
     end
   end
 
@@ -193,16 +219,9 @@ module ConsoleHelper
 
   # Cloudscape's no-match empty state, shown when filters leave nothing.
   def cs_no_match(clear_href: nil, **options)
-    content_tag(:div, class: "cs-empty", **options) do
-      button = if clear_href
-        link_to("Clear filters", clear_href, class: "cs-btn")
-      end
-      safe_join([
-        content_tag(:p, "No matches", class: "cs-empty-title"),
-        content_tag(:p, "We can't find a match."),
-        (content_tag(:div, button, class: "cs-actions") if button)
-      ].compact)
-    end
+    component = Console::EmptyStateComponent.new("No matches", "We can't find a match.", **options)
+    component.with_actions_content(cs_button("Clear filters", href: clear_href)) if clear_href
+    render component
   end
 
   # Cloudscape timestamps (cloudscape.design/patterns/general/timestamps).
@@ -423,41 +442,17 @@ module ConsoleHelper
   # own (cs-option); `group: true` renders a fieldset with a legend.
   def cs_field(id:, label:, optional: false, description: nil, constraint: nil, errors: [], warning: nil,
     group: false, label_class: nil, hide_label: false, bare: false, **wrapper_options, &block)
-    errors = Array(errors).compact_blank
-    error_id = "#{id}-error"
-    warning_id = "#{id}-warning"
-    description_id = "#{id}-description"
-    constraint_id = "#{id}-constraint"
-    describedby = [
-      (error_id if errors.any?),
-      (warning_id if warning.present? && errors.empty?),
-      (description_id if description.present?),
-      (constraint_id if constraint.present?)
-    ].compact
-    aria = { aria: { invalid: (true if errors.any?), describedby: describedby.join(" ").presence }.compact }
-
-    data = { cs_field: true, cs_label: label, cs_error_id: error_id }.merge(wrapper_options.delete(:data) || {})
-    classes = [ "cs-field", wrapper_options.delete(:class) ].compact.join(" ")
-
-    content_tag(group ? :fieldset : :div, class: classes, data: data, **wrapper_options) do
-      label_classes = [ "cs-field-label", label_class, ("sr-only" if hide_label) ].compact.join(" ")
-      label_markup = safe_join([ label, (content_tag(:span, " - optional", class: "cs-field-optional") if optional) ].compact)
-      safe_join([
-        (group ? content_tag(:legend, label_markup, class: label_classes) : content_tag(:label, label_markup, for: id, class: label_classes) unless bare),
-        (content_tag(:p, description, class: "cs-field-description", id: description_id) if description.present?),
-        capture(aria, &block),
-        (cs_field_message(:error, errors.first, id: error_id, data: { cs_server_error: true }) if errors.any?),
-        (cs_field_message(:warning, warning, id: warning_id, data: { cs_server_warning: true }) if warning.present? && errors.empty?),
-        (content_tag(:p, constraint, class: "cs-field-hint", id: constraint_id) if constraint.present?)
-      ].compact)
-    end
+    component = Console::FieldComponent.new(id: id, label: label, optional: optional, description: description,
+      constraint: constraint, errors: errors, warning: warning, group: group, label_class: label_class,
+      hide_label: hide_label, bare: bare, **wrapper_options)
+    # The control needs the field's aria attributes, so capture it here, in
+    # the caller's view, and hand the result to the component as its content.
+    render component.with_content(capture(component.control_attributes, &block))
   end
 
   # Inline error or warning text under a control.
   def cs_field_message(type, message, id:, **options)
-    content_tag(:p, class: "cs-field-#{type}", id: id, **options) do
-      cs_status_icon(type) + content_tag(:span, message)
-    end
+    render Console::FieldMessageComponent.new(type, message, id: id, **options)
   end
 
   # Marks attributes as shown inline, for errors rendered by hand (nested
@@ -494,7 +489,7 @@ module ConsoleHelper
 
   # The footer holding a settings box's own Save button.
   def cs_settings_save(form, label = "Save")
-    content_tag(:div, form.button(label, class: "cs-btn cs-btn-primary"), class: "cs-container-footer flex justify-end")
+    content_tag(:div, form.button(label, class: cs_button_classes(:primary)), class: "cs-container-footer flex justify-end")
   end
 
   # Errors that no cs_form_field on this form claimed (and anything on
@@ -520,17 +515,12 @@ module ConsoleHelper
     messages = Array(messages).compact_blank
     return "".html_safe if messages.empty?
 
-    content_tag(:div, class: "cs-alert cs-alert-error cs-form-error", role: "alert", tabindex: "-1") do
-      body = if messages.one? && title.nil?
-        content_tag(:p, messages.first)
-      else
-        safe_join([
-          (content_tag(:p, title, class: "cs-alert-title") if title),
-          (messages.one? ? content_tag(:p, messages.first) : content_tag(:ul, safe_join(messages.map { |m| content_tag(:li, m) }), class: "cs-form-error-list"))
-        ].compact)
-      end
-      cs_status_icon(:error) + content_tag(:div, body)
+    body = if messages.one?
+      content_tag(:p, messages.first)
+    else
+      content_tag(:ul, safe_join(messages.map { |m| content_tag(:li, m) }), class: "cs-form-error-list")
     end
+    render Console::AlertComponent.new(:error, title: title, class: "cs-form-error", role: "alert", tabindex: "-1").with_content(body)
   end
 
   # One ActiveModel::Error as a Cloudscape sentence. Precedence: the
