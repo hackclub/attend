@@ -15,7 +15,7 @@
     <%# The way out comes first and is the prominent button, on every screen
         size: a reflex tap on this page should undo a stray yes, not confirm it. %>
     <div class="flex flex-col sm:flex-row sm:justify-end gap-3">
-      <%= link_to "No, change my answer", new_training_course_disclosure_path(@course), class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+      <%= link_to "No, change my answer", new_training_course_disclosure_path(@course, answer: "no", changing: 1), class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
       <%= form_with url: confirm_training_course_disclosure_path(@course), method: :post, data: { turbo: false } do %>
         <%= button_tag "Yes, that's right", type: "submit", class: "portal-btn portal-btn-secondary w-full sm:w-auto" %>
       <% end %>

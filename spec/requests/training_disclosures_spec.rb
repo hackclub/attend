@@ -68,8 +68,17 @@ RSpec.describe "Training declarations", type: :request do
     # The way out is the first, prominent button; confirming is the quiet one.
     expect(response.body).to match(/portal-btn-primary[^>]*>No, change my answer.*portal-btn-secondary[^>]*>\s*Yes, that/m)
 
-    get new_training_course_disclosure_path(course)
+    # Changing the answer lands on the form with No picked, saying the yes
+    # wasn't saved; they still have to confirm it themselves.
+    change_link = new_training_course_disclosure_path(course, answer: "no", changing: 1)
+    expect(response.body).to include(ERB::Util.html_escape(change_link))
+    get change_link
     expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Your earlier answer wasn't saved")
+    expect(response.body).to match(/<input[^>]*value="no"[^>]*checked/)
+    expect(response.body).not_to match(/<input[^>]*value="yes"[^>]*checked/)
+    expect(response.body).not_to match(/<input[^>]*name="confirm"[^>]*checked/)
+
     post training_course_disclosure_path(course), params: { answer: "no", confirm: "1" }
     expect(response).to redirect_to(training_course_lesson_path(course, first_lesson))
     expect(learner.training_disclosures.last).to be_review_not_required
