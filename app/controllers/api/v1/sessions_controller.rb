@@ -106,7 +106,9 @@ module Api
 
         # Find or create user
         user = User.find_by(hack_club_account_id: identity["id"])
-        user ||= User.find_by(email: identity["primary_email"])
+        # users.email is stored downcased; the identity's address may not be.
+        primary_email = identity["primary_email"].to_s.strip.downcase
+        user ||= User.find_by(email: primary_email) if primary_email.present?
 
         if user
           user.update(hack_club_account_id: identity["id"]) unless user.hack_club_account_id

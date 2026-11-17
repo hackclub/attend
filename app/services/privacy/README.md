@@ -147,6 +147,10 @@ All in one transaction, with PaperTrail switched off:
 - guardians matched directly, and guardians whose only links were to the
   registrations being erased; a guardian with another child still on file keeps
   their row and loses only the erased links
+- the person record above those rows (`people`), with its copies of their
+  email addresses and phone numbers, once no account, participant or guardian
+  still points at it; a person a kept row still points at stays, and loses
+  only the subject's own addresses. Identity reviews naming an erased row go too
 - support tickets with their messages and notes, invitations, email logs and
   automated SMS logs
 - visa letter applications with their letter PDF, and visa letter invitations

@@ -101,7 +101,7 @@ module Api
           return render json: { success: false, error: "This email is banned from events" }, status: :unprocessable_entity
         end
 
-        existing_invitation = @event.invitations.find_by(email: email)
+        existing_invitation = @event.invitations.for_email(email).first
         if existing_invitation
           error = existing_invitation.held? ? "This email has already been added; its invitation is held" : "An invitation has already been sent to this email"
           return render json: { success: false, error: error }, status: :conflict
@@ -178,7 +178,9 @@ module Api
         end
 
         participant_event = if email.present?
-          participant = @event.participants.find_by(email: email)
+          # LOWER(): rows written before emails were normalised on save can
+          # still be mixed-case.
+          participant = @event.participants.where("LOWER(participants.email) = ?", email).order(:created_at).first
           participant && @event.participant_events.find_by(participant_id: participant.id)
         else
           matches = participant_events_for_slack_id(slack_id).limit(2).to_a

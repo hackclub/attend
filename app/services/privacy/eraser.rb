@@ -413,6 +413,11 @@ module Privacy
       MessageDelivery.where(id: people.message_deliveries).destroy_all
       AutomatedSmsLog.where(id: people.sms_logs).delete_all
 
+      # read before the rows go: the person above them holds copies of their
+      # addresses and phone numbers (see Person)
+      person_ids = [ User.where(id: users), Participant.where(id: people.participants), Guardian.where(id: people.guardians) ]
+        .flat_map { |scope| scope.where.not(person_id: nil).pluck(:person_id) }.uniq
+
       Participant.where(id: people.participants).destroy_all
       Guardian.where(id: people.guardians).destroy_all
 
@@ -425,6 +430,12 @@ module Privacy
       end
       McpConnectionSetting.where(resource_owner_id: owners).destroy_all
       User.where(id: users).destroy_all
+
+      # a person a row we kept still points at stays, minus the subject's
+      # own addresses
+      Person.unattached.where(id: person_ids).destroy_all
+      EmailAddress.where(person_id: person_ids, address: people.emails).delete_all if people.emails.any?
+      IdentityReview.naming(ids).delete_all if ids.any?
 
       PaperTrail::Version.where(item_id: ids).delete_all
       AuditLog.where(record_id: ids).delete_all
