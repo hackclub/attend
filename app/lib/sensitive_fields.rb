@@ -75,6 +75,13 @@ module SensitiveFields
 
   BY_MODEL = COLUMNS.group_by(&:model).transform_values { |fields| fields.index_by(&:name).freeze }.freeze
 
+  # Each model's columns a PII-restricted role may not see. Worked out once:
+  # the serializer gates ask several times per record on the API and MCP.
+  RESTRICTED_NAMES = BY_MODEL.transform_values { |fields|
+    fields.values.select { |field| field.pii? && field.restricted }.map(&:name).freeze
+  }.freeze
+  NO_NAMES = [].freeze
+
   # Each model's PII column names, for redacting request params.
   PII_NAMES = BY_MODEL.transform_values { |fields| fields.values.select(&:pii?).map(&:name).freeze }.freeze
 
@@ -124,9 +131,9 @@ module SensitiveFields
       }.map(&:name).uniq
     end
 
-    # The columns of `model` a PII-restricted role may not see.
+    # The columns of `model` a PII-restricted role may not see. Frozen.
     def restricted_names(model)
-      BY_MODEL.fetch(model_name_for(model), {}).values.select { |field| field.pii? && field.restricted }.map(&:name)
+      RESTRICTED_NAMES.fetch(model_name_for(model), NO_NAMES)
     end
 
     # Serializer gate: drops the keys of `attributes` that are restricted PII

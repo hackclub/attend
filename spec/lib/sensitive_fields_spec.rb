@@ -56,6 +56,8 @@ RSpec.describe SensitiveFields do
       expect(described_class.restricted_names(Guardian)).to include("email", "phone")
       expect(described_class.restricted_names(GuardianParticipantEvent)).to match_array(%w[phone_override invited_via_email])
       expect(described_class.restricted_names(Travel)).to eq(%w[origin_address])
+      expect(described_class.restricted_names(Event)).to eq([])
+      expect(described_class.restricted_names(Participant)).to be_frozen.and be(described_class.restricted_names(Participant))
       # A restricted role keeps an emergency contact's number and loses the rest.
       expect(described_class.restricted_names(EmergencyContact)).to match_array(%w[name email relationship])
     end
