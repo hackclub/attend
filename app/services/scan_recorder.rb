@@ -13,13 +13,14 @@ class ScanRecorder
     new(**attributes).call
   end
 
-  def initialize(participant_event:, user:, scan_context:, scanned_at:, client_scan_id:, source:)
+  def initialize(participant_event:, user:, scan_context:, scanned_at:, client_scan_id:, source:, client_scanned_at: nil)
     @participant_event = participant_event
     @user = user
     @scan_context = scan_context
     @scanned_at = scanned_at
     @client_scan_id = client_scan_id.presence
     @source = source
+    @client_scanned_at = client_scanned_at
   end
 
   def call
@@ -33,6 +34,7 @@ class ScanRecorder
         scan_context: scan_context,
         scanned_at: scanned_at,
         client_scan_id: client_scan_id,
+        client_scanned_at: client_scanned_at,
         source: source
       )
 
@@ -52,7 +54,7 @@ class ScanRecorder
 
   private
 
-  attr_reader :participant_event, :user, :scan_context, :scanned_at, :client_scan_id, :source
+  attr_reader :participant_event, :user, :scan_context, :scanned_at, :client_scan_id, :source, :client_scanned_at
 
   def context_scans
     participant_event.scans.where(scan_context: scan_context)

@@ -1250,6 +1250,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
 
   create_table "scans", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "client_scan_id"
+    t.datetime "client_scanned_at"
     t.datetime "created_at", null: false
     t.uuid "participant_event_id", null: false
     t.uuid "scan_context_id"
