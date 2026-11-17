@@ -144,11 +144,6 @@ class AuditLog < ApplicationRecord
     SensitiveFields.redact_changes(record, changed_fields)
   end
 
-  # The name from when only encrypted attributes were redacted.
-  def self.redact_encrypted_fields(record, changed_fields)
-    redact_sensitive_fields(record, changed_fields)
-  end
-
   def self.log!(action:, record:, actor: nil, event: nil, changed_fields: {}, metadata: {})
     create!(
       action: action,

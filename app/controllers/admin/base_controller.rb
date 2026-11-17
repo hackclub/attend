@@ -208,7 +208,7 @@ module Admin
       else
         {}
       end
-      changed_fields = redact_encrypted_audit_fields(record, changed_fields)
+      changed_fields = AuditLog.redact_sensitive_fields(record, changed_fields)
 
       event_for_log = current_event if event_page? && !current_event.destroyed?
 
@@ -262,10 +262,6 @@ module Admin
       return explicit[1] if explicit
 
       candidates.max_by { |_, _, change_count, _| change_count }[1]
-    end
-
-    def redact_encrypted_audit_fields(record, changed_fields)
-      AuditLog.redact_encrypted_fields(record, changed_fields)
     end
   end
 end

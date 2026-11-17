@@ -260,7 +260,7 @@ class ApplicationToolbox < Toolchest::Toolbox
     return if record.nil?
 
     changed = record.respond_to?(:previous_changes) ? record.previous_changes.except("updated_at", "created_at") : {}
-    changed = redact_encrypted_audit_fields(record, changed)
+    changed = AuditLog.redact_sensitive_fields(record, changed)
 
     AuditLog.log!(
       action: audit_action_for(record),
@@ -304,9 +304,5 @@ class ApplicationToolbox < Toolchest::Toolbox
     return explicit[1] if explicit
 
     candidates.max_by { |_, _, size| size }[1]
-  end
-
-  def redact_encrypted_audit_fields(record, changed_fields)
-    AuditLog.redact_encrypted_fields(record, changed_fields)
   end
 end
