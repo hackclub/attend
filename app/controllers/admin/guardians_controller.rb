@@ -24,6 +24,11 @@ module Admin
           notice: "Guardian information updated successfully."
       elsif result.code == :pii_restricted
         require_contact_details_access
+      elsif result.code == :nothing_to_update
+        # A submission with none of the form's fields. Not an error to fix, so
+        # back to the participant rather than a form with nothing wrong on it.
+        redirect_to admin_event_participant_path(current_event, @participant_event),
+          notice: "No changes were made to the guardian."
       else
         # @guardian carries the errors: a failed validation, or a phone number
         # that is also the participant's. A failure somewhere else (the invite

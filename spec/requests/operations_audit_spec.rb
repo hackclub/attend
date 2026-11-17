@@ -82,6 +82,14 @@ RSpec.describe "Operation audit rows", type: :request do
       expect(guardian.reload.email).not_to eq("corrected@example.com")
     end
 
+    it "goes back to the participant when the form carried nothing to change" do
+      patch admin_event_participant_guardian_path(event, participant_event, link),
+        params: { guardian: { not_a_field: "x" } }
+
+      expect(response).to redirect_to(admin_event_participant_path(event, participant_event))
+      expect(flash[:notice]).to eq("No changes were made to the guardian.")
+    end
+
     it "re-renders the form when the guardian's phone is the participant's" do
       participant.update!(phone: "+12025550123")
 
