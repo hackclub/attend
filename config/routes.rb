@@ -197,7 +197,10 @@ Rails.application.routes.draw do
         post :enroll
         post :restart
       end
-      resource :disclosure, only: [ :new, :create ]
+      resource :disclosure, only: [ :new, :create ] do
+        get :confirm, action: :confirm_yes
+        post :confirm, action: :record_yes
+      end
       resources :lessons, only: :show do
         member do
           post :complete
