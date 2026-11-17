@@ -160,8 +160,28 @@ module Admin
       Sentry.capture_exception(e) if defined?(Sentry)
     end
 
+    # Who is acting, for app/operations. One per request: it remembers what
+    # operations audited, and log_admin_action stands down when they have.
+    def operation_context
+      @operation_context ||= Operation::Context.new(
+        surface: :html,
+        user: current_user,
+        event: (current_event if event_page?),
+        metadata: {
+          ip: request.remote_ip,
+          user_agent: request.user_agent,
+          controller: controller_name,
+          params: request.filtered_parameters.except("controller", "action", "authenticity_token")
+        }
+      )
+    end
+
+    # The catch-all: audits whatever record the action left changed, under the
+    # action's own name. Actions that run an operation are audited by it, by
+    # name, and are skipped here so there is one row, not two.
     def log_admin_action
       return unless current_user
+      return if @operation_context&.audited?
 
       changed_record = find_changed_record
       record = changed_record || @record || @event || @participant_event

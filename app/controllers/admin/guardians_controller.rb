@@ -14,28 +14,19 @@ module Admin
     def update
       @guardian = @guardian_participant_event.guardian
 
-      old_email = @guardian.email
+      result = Guardians::Update.call(operation_context,
+        participant_event: @participant_event,
+        guardian_participant_event: @guardian_participant_event,
+        attributes: guardian_params)
 
-      participant = @participant_event.participant
-      if guardian_params[:phone].present? && participant.phone.present?
-        guardian_phone_e164 = PhoneNormalizer.normalize(guardian_params[:phone])
-        if guardian_phone_e164 && guardian_phone_e164 == participant.phone
-          @guardian.errors.add(:phone, "cannot be the same as the participant's phone number")
-          render :edit, status: :unprocessable_entity
-          return
-        end
-      end
-
-      if @guardian.update(guardian_params)
-        # The old portal link went to the old address: kill it, so the next
-        # invite carries a fresh token (see GuardianParticipantEvent#revoke_invite_token!).
-        if @guardian.email != old_email && !@guardian_participant_event.completed?
-          @guardian_participant_event.revoke_invite_token!
-        end
-
+      if result.success?
         redirect_to admin_event_participant_path(current_event, @participant_event),
           notice: "Guardian information updated successfully."
+      elsif result.code == :pii_restricted
+        require_contact_details_access
       else
+        # @guardian carries the errors: a failed validation, or a phone number
+        # that is also the participant's.
         render :edit, status: :unprocessable_entity
       end
     end

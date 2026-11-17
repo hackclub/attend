@@ -17,24 +17,11 @@ module Mcp
   module ResponseFilter
     REDACTED = "[redacted]".freeze
 
-    NAME_KEYS = %w[
-      legal_name full_name preferred_name display_name participant_name
-      guardian_name author sent_by reported_by last_updated_by assigned_to
-      closed_by created_by from staff_names roommate_name occupant_name
-      emergency_contact_name next_of_kin
-    ].to_set.freeze
+    # Both lists live in the SensitiveFields registry, next to the columns
+    # they are the payload names for.
+    NAME_KEYS = SensitiveFields.response_keys(:initials).to_set.freeze
 
-    REDACTED_KEYS = %w[
-      email emails email_address personal_email work_email guardian_email
-      phone phone_number phone_numbers mobile mobile_number home_phone
-      twilio_to_number from_number to_number guardian_phone
-      emergency_contact_phone emergency_contact emergency_contacts
-      slack_user_id slack_id discord_id
-      date_of_birth dob
-      address street_address address_line1 address_line2 mailing_address
-      postal_code postcode zip zipcode city state
-      passport_number national_id ip_address
-    ].to_set.freeze
+    REDACTED_KEYS = SensitiveFields.response_keys(:redact).to_set.freeze
 
     EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i
     # Seven or more digits with optional separators, not glued to a word (so

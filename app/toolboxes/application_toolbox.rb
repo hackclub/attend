@@ -212,11 +212,43 @@ class ApplicationToolbox < Toolchest::Toolbox
     names.presence || [ "no events" ]
   end
 
-  # Log mutating tool calls so MCP activity lands in the same audit trail as the
-  # admin UI. Read tools declare `access: :read` and are skipped.
+  # Who is acting, for app/operations. One per tool call: it remembers what
+  # operations audited, and audit_write! stands down when they have.
+  #
+  # Authorization goes back through #authorize! so the connection's event
+  # allowlist is checked alongside Pundit, and PII access is judged the way
+  # #view_pii? judges it (a role on any event), not per event.
+  def operation_context
+    @operation_context ||= Operation::Context.new(
+      surface: :mcp,
+      user: current_user,
+      event: Current.event,
+      anonymized: anonymized?,
+      pii_scope: :any,
+      authorizer: ->(record, query) { authorize!(record, query) },
+      metadata: { source: "mcp", toolbox: controller_name, tool: action_name, scopes: auth&.scopes }
+    )
+  end
+
+  # Unwraps an operation's Result the way tools report problems: a failed
+  # validation raises (rescue_from renders the record's errors), anything else
+  # halts with the operation's message, or this tool's own wording for that
+  # failure code when it has one.
+  def operation_value!(result, messages = {})
+    return result.value if result.success?
+    raise ActiveRecord::RecordInvalid, result.record if result.code == :invalid && result.record
+
+    halt error: messages.fetch(result.code, result.message)
+  end
+
+  # The catch-all: logs mutating tool calls so MCP activity lands in the same
+  # audit trail as the admin UI, as a coarse create/update/destroy. Read tools
+  # declare `access: :read` and are skipped, and so are calls an operation has
+  # already audited by name.
   def audit_write!
     return if @_tool_definition&.access_level == :read
     return if current_user.nil?
+    return if @operation_context&.audited?
 
     record = find_changed_record
     return if record.nil?
