@@ -167,13 +167,21 @@ module Admin
         surface: :html,
         user: current_user,
         event: (current_event if event_page?),
-        metadata: {
-          ip: request.remote_ip,
-          user_agent: request.user_agent,
-          controller: controller_name,
-          params: request.filtered_parameters.except("controller", "action", "authenticity_token")
-        }
+        metadata: admin_audit_metadata
       )
+    end
+
+    # What every audit row from the admin UI says about the request, whether
+    # an operation writes the row or the catch-all hook does. The params are
+    # as Rails filtered them; whoever writes the row redacts the registry's
+    # PII from them for the record it is about (SensitiveFields.redact_params).
+    def admin_audit_metadata
+      {
+        ip: request.remote_ip,
+        user_agent: request.user_agent,
+        controller: controller_name,
+        params: request.filtered_parameters.except("controller", "action", "authenticity_token")
+      }
     end
 
     # The catch-all: audits whatever record the action left changed, under the
@@ -210,16 +218,11 @@ module Admin
         actor: current_user,
         event: event_for_log,
         changed_fields: changed_fields,
-        metadata: {
-          ip: request.remote_ip,
-          user_agent: request.user_agent,
-          controller: controller_name,
-          # filter_parameters doesn't name every PII column in the registry
-          # (city, state, postal_code, country), and the request's params are
-          # stored whether or not the action permitted them.
-          params: SensitiveFields.redact_params(
-            request.filtered_parameters.except("controller", "action", "authenticity_token"), model: record.class
-          )
+        # filter_parameters doesn't name every PII column in the registry
+        # (city, state, postal_code, country), and the request's params are
+        # stored whether or not the action permitted them.
+        metadata: admin_audit_metadata.tap { |metadata|
+          metadata[:params] = SensitiveFields.redact_params(metadata[:params], model: record.class)
         }
       )
     rescue => e

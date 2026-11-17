@@ -226,8 +226,14 @@ class ApplicationToolbox < Toolchest::Toolbox
       anonymized: anonymized?,
       pii_scope: :any,
       authorizer: ->(record, query) { authorize!(record, query) },
-      metadata: { source: "mcp", toolbox: controller_name, tool: action_name, scopes: auth&.scopes }
+      metadata: mcp_audit_metadata
     )
+  end
+
+  # What every audit row from a tool call says about it, whether an operation
+  # writes the row or audit_write! does.
+  def mcp_audit_metadata
+    { source: "mcp", toolbox: controller_name, tool: action_name, scopes: auth&.scopes }
   end
 
   # Unwraps an operation's Result the way tools report problems: a failed
@@ -262,7 +268,7 @@ class ApplicationToolbox < Toolchest::Toolbox
       actor: current_user,
       event: (Current.event unless Current.event&.destroyed?),
       changed_fields: changed,
-      metadata: { source: "mcp", toolbox: controller_name, tool: action_name, scopes: auth&.scopes }
+      metadata: mcp_audit_metadata
     )
   rescue => e
     Rails.logger.error("[mcp] audit log failed: #{e.class} - #{e.message}")
