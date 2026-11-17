@@ -11,6 +11,8 @@ module Operation
   #   api_key     the request authenticated with an event or series API key.
   #   pii_scope   how the surface decides "may this user see PII": against this
   #               event (:event), or against any event they hold a role on (:any).
+  #               :event with no event fails closed for everyone but a global
+  #               admin; a surface that means "any event" has to say :any.
   #   metadata    surface details stored on the audit row (ip, tool name...).
   #   authorizer  optional callable(record, query) replacing the plain Pundit
   #               check, for a surface that layers its own rule on top (MCP's
@@ -63,8 +65,12 @@ module Operation
 
     def can_view_pii?
       return false unless user
+      return user.can_view_participant_pii? || false if pii_scope == :any
+      # No event to judge against. User#can_view_participant_pii?(nil) would
+      # answer for any event, which is the wider :any question, not this one.
+      return user.global_admin? || false if event.nil?
 
-      user.can_view_participant_pii?(pii_scope == :event ? event : nil) || false
+      user.can_view_participant_pii?(event) || false
     end
 
     def audited!(record)
