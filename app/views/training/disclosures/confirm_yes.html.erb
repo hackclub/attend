@@ -6,7 +6,7 @@
     <p class="portal-body mb-4">You answered <strong>Yes</strong> to:</p>
     <blockquote class="portal-inset rounded-lg p-3 mb-4 text-sm"><%= @course.disclosure_question_text %></blockquote>
     <p class="portal-hint text-sm mb-6">
-      If that's right, the <%= TrainingDisclosure::SAFETY_TEAM_NAME %> will be in touch before you can carry on with training or work at an event.
+      If that's right, you'll need to reach out to the <%= TrainingDisclosure::SAFETY_TEAM_NAME %> at <%= mail_to TrainingDisclosure::SAFETY_TEAM_EMAIL, class: "portal-link" %> before you can carry on with training or work at an event.
       If you picked Yes by mistake, go back and change it.
     </p>
 

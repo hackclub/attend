@@ -50,7 +50,8 @@ RSpec.describe "Training declarations", type: :request do
       .and not_have_enqueued_mail
     expect(response).to redirect_to(training_path)
     follow_redirect!
-    expect(response.body).to include("Thanks for telling us", TrainingDisclosure::SAFETY_TEAM_EMAIL)
+    expect(response.body).to include("Thanks for telling us", "reach out to the #{TrainingDisclosure::SAFETY_TEAM_NAME}", "mailto:#{TrainingDisclosure::SAFETY_TEAM_EMAIL}")
+    expect(response.body).not_to include("will be in touch")
     expect(response.body).not_to match(/ineligible/i)
 
     get training_course_path(other)
@@ -68,7 +69,8 @@ RSpec.describe "Training declarations", type: :request do
     expect(response).to redirect_to(confirm_training_course_disclosure_path(course))
     follow_redirect!
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("Check your answer", "No, change my answer")
+    expect(response.body).to include("Check your answer", "No, change my answer", "mailto:#{TrainingDisclosure::SAFETY_TEAM_EMAIL}")
+    expect(response.body).not_to include("will be in touch")
     expect(response.body).not_to include("Thanks for telling us")
     # The way out is the first, prominent button; confirming is the quiet one.
     expect(response.body).to match(/portal-btn-primary[^>]*>No, change my answer.*portal-btn-secondary[^>]*>\s*Yes, that/m)
