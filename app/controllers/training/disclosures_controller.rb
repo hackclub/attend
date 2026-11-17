@@ -6,8 +6,15 @@ module Training
     before_action :set_course
     before_action :require_enrollment
     before_action :require_disclosure_needed
+    before_action :require_pending_yes, only: %i[confirm_yes record_yes]
+
+    # Set when the form is submitted with a yes, so the "check your answer"
+    # step is held here rather than in fields the page sends back.
+    PENDING_YES_KEY = :training_disclosure_pending_yes
 
     def new
+      # Back on the form, a yes that was waiting to be checked is dropped.
+      session.delete(PENDING_YES_KEY)
     end
 
     def create
@@ -19,26 +26,30 @@ module Training
       end
 
       # A yes locks the person out of all training until the Safety Team
-      # reviews it, so a stray tap mustn't be enough: ask them to check it
-      # before anything is recorded.
-      if answer == "yes" && params[:yes_confirmed] != "1"
-        render :confirm_yes
+      # reviews it, so a stray tap mustn't be enough: nothing is recorded
+      # until they've checked it on the next page.
+      if answer == "yes"
+        session[PENDING_YES_KEY] = pending_yes_token
+        redirect_to confirm_training_course_disclosure_path(@course)
         return
       end
 
-      disclosure = current_user.training_disclosures.create!(
-        course: @course,
-        enrollment: @enrollment,
-        question: @course.disclosure_question_text,
-        answer: answer
-      )
+      session.delete(PENDING_YES_KEY)
+      record!("no")
+      redirect_to training_course_lesson_path(@course, @enrollment.next_lesson || @course.lessons.first)
+    end
 
-      if disclosure.answered_yes?
-        TrainingMailer.disclosure_review_needed(disclosure: disclosure).deliver_later
-        render "training/disclosures/under_review"
-      else
-        redirect_to training_course_lesson_path(@course, @enrollment.next_lesson || @course.lessons.first)
-      end
+    def confirm_yes
+    end
+
+    # The only place a yes is recorded, and only for someone who came through
+    # the form (and its "my answer is true" tick) for this attempt.
+    def record_yes
+      session.delete(PENDING_YES_KEY)
+      TrainingMailer.disclosure_review_needed(disclosure: record!("yes")).deliver_later
+      # The training home shows the neutral "thanks for telling us" page to
+      # anyone waiting on a review, and a refresh there re-sends nothing.
+      redirect_to training_path
     end
 
     private
@@ -56,6 +67,26 @@ module Training
       return if @enrollment.disclosure_needed?
 
       redirect_to training_course_path(@course)
+    end
+
+    def require_pending_yes
+      return if session[PENDING_YES_KEY] == pending_yes_token
+
+      redirect_to new_training_course_disclosure_path(@course)
+    end
+
+    # Names this attempt at the course: a restart asks the question afresh.
+    def pending_yes_token
+      "#{@enrollment.id}:#{@enrollment.started_at.to_i}"
+    end
+
+    def record!(answer)
+      current_user.training_disclosures.create!(
+        course: @course,
+        enrollment: @enrollment,
+        question: @course.disclosure_question_text,
+        answer: answer
+      )
     end
   end
 end

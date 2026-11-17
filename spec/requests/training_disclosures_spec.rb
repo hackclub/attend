@@ -38,15 +38,16 @@ RSpec.describe "Training declarations", type: :request do
   it "stops all training after a yes, tells the Safety Team, and stays neutral" do
     other = create(:training_course, :published, access: "open")
     post enroll_training_course_path(course)
+    post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1" }
 
     expect {
-      post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1", yes_confirmed: "1" }
+      post confirm_training_course_disclosure_path(course)
     }.to have_enqueued_mail(TrainingMailer, :disclosure_review_needed)
+    expect(response).to redirect_to(training_path)
+    follow_redirect!
     expect(response.body).to include("Thanks for telling us", TrainingDisclosure::SAFETY_TEAM_EMAIL)
     expect(response.body).not_to match(/ineligible/i)
 
-    get training_path
-    expect(response.body).to include("Thanks for telling us")
     get training_course_path(other)
     expect(response).to have_http_status(:forbidden)
     get training_course_lesson_path(course, first_lesson)
@@ -59,6 +60,8 @@ RSpec.describe "Training declarations", type: :request do
     expect {
       post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1" }
     }.not_to change(TrainingDisclosure, :count)
+    expect(response).to redirect_to(confirm_training_course_disclosure_path(course))
+    follow_redirect!
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Check your answer", "No, change my answer")
     expect(response.body).not_to include("Thanks for telling us")
@@ -70,13 +73,39 @@ RSpec.describe "Training declarations", type: :request do
     expect(learner.training_disclosures.last).to be_review_not_required
   end
 
+  it "only records a yes that came through the form and its confirmation" do
+    post enroll_training_course_path(course)
+
+    # Straight to the second step, or with the old hidden-field flag.
+    expect {
+      post confirm_training_course_disclosure_path(course)
+      post training_course_disclosure_path(course), params: { answer: "yes", yes_confirmed: "1" }
+    }.not_to change(TrainingDisclosure, :count)
+
+    get confirm_training_course_disclosure_path(course)
+    expect(response).to redirect_to(new_training_course_disclosure_path(course))
+  end
+
+  it "drops a yes that was waiting to be checked once they go back to the form" do
+    post enroll_training_course_path(course)
+    post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1" }
+    get new_training_course_disclosure_path(course)
+
+    expect {
+      post confirm_training_course_disclosure_path(course)
+    }.not_to change(TrainingDisclosure, :count)
+    expect(response).to redirect_to(new_training_course_disclosure_path(course))
+  end
+
   it "won't record a second answer once the declaration is made" do
     post enroll_training_course_path(course)
+    # A yes left on the "check your answer" page in one tab...
+    post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1" }
+    # ...while a form already open in another tab answers no.
     post training_course_disclosure_path(course), params: { answer: "no", confirm: "1" }
 
-    # A "check your answer" page left open in another tab.
     expect {
-      post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1", yes_confirmed: "1" }
+      post confirm_training_course_disclosure_path(course)
     }.not_to change(TrainingDisclosure, :count)
     expect(response).to redirect_to(training_course_path(course))
     expect(learner.reload).to be_eligible_to_work_events
@@ -90,7 +119,8 @@ RSpec.describe "Training declarations", type: :request do
     post enroll_training_course_path(course)
 
     expect {
-      post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1", yes_confirmed: "1" }
+      post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1" }
+      post confirm_training_course_disclosure_path(course)
     }.not_to change(TrainingDisclosure, :count)
     expect(response).to redirect_to(training_course_path(course))
   end

@@ -14,10 +14,7 @@
 
     <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
       <%= link_to "No, change my answer", new_training_course_disclosure_path(@course), class: "portal-btn portal-btn-secondary w-full sm:w-auto" %>
-      <%= form_with url: training_course_disclosure_path(@course), method: :post, data: { turbo: false } do %>
-        <%= hidden_field_tag :answer, "yes" %>
-        <%= hidden_field_tag :confirm, "1" %>
-        <%= hidden_field_tag :yes_confirmed, "1" %>
+      <%= form_with url: confirm_training_course_disclosure_path(@course), method: :post, data: { turbo: false } do %>
         <%= button_tag "Yes, that's right", type: "submit", class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
       <% end %>
     </div>
