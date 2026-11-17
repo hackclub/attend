@@ -48,7 +48,11 @@ module Guardians
       sent_at_was = link.invite_token_sent_at
       rotate_token? ? link.revoke_invite_token! : link.update!(invite_token_sent_at: nil)
 
-      GuardianMailer.invitation(guardian_participant_event: link).deliver_later
+      # Once the link's new state is committed: the job reads it, and a run
+      # that rolls back must not email anyone.
+      ActiveRecord.after_all_transactions_commit do
+        GuardianMailer.invitation(guardian_participant_event: link).deliver_later
+      end
 
       # Named fields only: the changeset also holds the token's digest, which
       # has no business in an audit row.

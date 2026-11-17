@@ -69,6 +69,19 @@ RSpec.describe "Operation audit rows", type: :request do
       expect(log.to_json).not_to include("Shelbyville")
     end
 
+    it "says why when the correction fails somewhere other than the guardian's own fields" do
+      allow_any_instance_of(GuardianParticipantEvent).to receive(:revoke_invite_token!) do |failing_link|
+        raise ActiveRecord::RecordInvalid.new(failing_link)
+      end
+
+      patch admin_event_participant_guardian_path(event, participant_event, link),
+        params: { guardian: { email: "corrected@example.com" } }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(flash[:alert]).to be_present
+      expect(guardian.reload.email).not_to eq("corrected@example.com")
+    end
+
     it "re-renders the form when the guardian's phone is the participant's" do
       participant.update!(phone: "+12025550123")
 

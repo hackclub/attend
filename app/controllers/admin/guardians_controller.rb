@@ -26,7 +26,9 @@ module Admin
         require_contact_details_access
       else
         # @guardian carries the errors: a failed validation, or a phone number
-        # that is also the participant's.
+        # that is also the participant's. A failure somewhere else (the invite
+        # link) left nothing on it, so say what the operation said.
+        flash.now[:alert] = result.message if @guardian.errors.empty?
         render :edit, status: :unprocessable_entity
       end
     end

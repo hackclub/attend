@@ -63,6 +63,14 @@ RSpec.describe Guardians::ResendInvite do
     end
   end
 
+  it "sends nothing when the run is rolled back" do
+    allow(AuditLog).to receive(:log!).and_raise(ActiveRecord::StatementInvalid, "audit_logs is unavailable")
+
+    expect {
+      expect { resend(context_for(global_admin, surface: :html)) }.to raise_error(ActiveRecord::StatementInvalid)
+    }.not_to have_enqueued_mail(GuardianMailer, :invitation)
+  end
+
   it "is held to event admins" do
     ops = create(:user).tap { |user| EventRoleAssignment.create!(user: user, event: event, role: "ops") }
 

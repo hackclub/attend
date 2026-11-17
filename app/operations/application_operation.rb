@@ -17,6 +17,10 @@
 #     already turns into its own "not allowed" response
 #   * an API key is refused unless the operation opts in per check
 #   * an anonymized connection is refused outright
+#   * #perform runs in one transaction with its audit row: a step that fails
+#     part-way undoes the steps before it, so a failed Result never describes a
+#     half-applied change. Anything that must not happen for a rolled-back run
+#     (mail, jobs) goes in ActiveRecord.after_all_transactions_commit
 #   * a successful run that wrote no audit row is a bug: it raises in
 #     development and test, and is reported in production
 #   * audit! only accepts an action the class declared, and
@@ -67,8 +71,9 @@ class ApplicationOperation
     refusal = refuse_anonymized || precheck
     raise Operation::Failure, refusal if refusal
 
-    result = perform
-    raise Operation::Failure, result if result.failure?
+    result = ActiveRecord::Base.transaction do
+      perform.tap { |outcome| raise Operation::Failure, outcome if outcome.failure? }
+    end
 
     ensure_audited!
     result
@@ -122,14 +127,18 @@ class ApplicationOperation
 
     changes = changed_fields || record.previous_changes.except("created_at", "updated_at")
 
-    AuditLog.log!(
-      action: action,
-      record: record,
-      actor: context.actor,
-      event: audit_event,
-      changed_fields: AuditLog.redact_sensitive_fields(record, changes),
-      metadata: audit_metadata.merge(metadata).compact
-    )
+    # In a savepoint, so a database error here is undone on its own instead
+    # of poisoning the operation's transaction and taking the write with it.
+    AuditLog.transaction(requires_new: true) do
+      AuditLog.log!(
+        action: action,
+        record: record,
+        actor: context.actor,
+        event: audit_event,
+        changed_fields: AuditLog.redact_sensitive_fields(record, changes),
+        metadata: audit_metadata.merge(metadata).compact
+      )
+    end
     context.audited!(record)
   rescue StandardError => e
     report_audit_failure(e)

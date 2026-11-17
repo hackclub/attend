@@ -78,6 +78,18 @@ RSpec.describe Guardians::Update do
     expect(AuditLog.count).to eq(0)
   end
 
+  it "undoes the correction when the old link can't be revoked, rather than half-applying it" do
+    token = link.generate_invite_token!
+    allow(link).to receive(:revoke_invite_token!).and_raise(ActiveRecord::RecordInvalid.new(link))
+
+    result = update(context_for(global_admin, surface: :html), { email: "parent@example.com" })
+
+    expect(result.code).to eq(:invalid)
+    expect(guardian.reload.email).to eq("parent@example.con")
+    expect(GuardianParticipantEvent.find_by_invite_token!(token)).to eq(link)
+    expect(AuditLog.count).to eq(0)
+  end
+
   # The two surfaces hold this to different bars today. Pinned as found, so a
   # change to either is a decision rather than an accident.
   describe "who may, by surface" do
