@@ -46,7 +46,8 @@ module Training
     # the form (and its "my answer is true" tick) for this attempt.
     def record_yes
       session.delete(PENDING_YES_KEY)
-      TrainingMailer.disclosure_review_needed(disclosure: record!("yes")).deliver_later
+      disclosure = record!("yes")
+      TrainingMailer.disclosure_review_needed(disclosure: disclosure).deliver_later if disclosure
       # The training home shows the neutral "thanks for telling us" page to
       # anyone waiting on a review, and a refresh there re-sends nothing.
       redirect_to training_path
@@ -80,13 +81,21 @@ module Training
       "#{@enrollment.id}:#{@enrollment.started_at.to_i}"
     end
 
+    # Records the answer once per attempt. Two taps on a slow connection both
+    # get past require_disclosure_needed before either saves, so the check is
+    # made again under a lock on the enrollment; the loser records nothing
+    # and returns nil.
     def record!(answer)
-      current_user.training_disclosures.create!(
-        course: @course,
-        enrollment: @enrollment,
-        question: @course.disclosure_question_text,
-        answer: answer
-      )
+      @enrollment.with_lock do
+        next unless @enrollment.disclosure_needed?
+
+        current_user.training_disclosures.create!(
+          course: @course,
+          enrollment: @enrollment,
+          question: @course.disclosure_question_text,
+          answer: answer
+        )
+      end
     end
   end
 end

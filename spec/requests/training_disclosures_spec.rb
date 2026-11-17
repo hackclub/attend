@@ -114,6 +114,25 @@ RSpec.describe "Training declarations", type: :request do
     expect(response).to redirect_to(training_course_path(course))
   end
 
+  it "records one declaration when the confirm button is tapped twice" do
+    post enroll_training_course_path(course)
+    post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1" }
+
+    # The other tap saves after this request's checks but before its lock.
+    allow_any_instance_of(TrainingEnrollment).to receive(:with_lock).and_wrap_original do |original, *args, &block|
+      enrollment = original.receiver
+      enrollment.user.training_disclosures.create!(course: course, enrollment: enrollment, question: "Example declaration?", answer: "yes")
+      original.call(*args, &block)
+    end
+
+    expect {
+      expect {
+        post confirm_training_course_disclosure_path(course)
+      }.to change(TrainingDisclosure, :count).by(1)
+    }.not_to have_enqueued_mail(TrainingMailer, :disclosure_review_needed)
+    expect(response).to redirect_to(training_path)
+  end
+
   it "doesn't take a declaration for a course that doesn't ask for one" do
     course.update!(disclosure_required: false)
     post enroll_training_course_path(course)
