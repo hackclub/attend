@@ -214,7 +214,12 @@ module Admin
           ip: request.remote_ip,
           user_agent: request.user_agent,
           controller: controller_name,
-          params: request.filtered_parameters.except("controller", "action", "authenticity_token")
+          # filter_parameters doesn't name every PII column in the registry
+          # (city, state, postal_code, country), and the request's params are
+          # stored whether or not the action permitted them.
+          params: SensitiveFields.redact_params(
+            request.filtered_parameters.except("controller", "action", "authenticity_token")
+          )
         }
       )
     rescue => e

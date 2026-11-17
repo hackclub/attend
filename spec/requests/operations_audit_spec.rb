@@ -77,6 +77,19 @@ RSpec.describe "Operation audit rows", type: :request do
       expect(log.changed_fields["tshirt_size"]).to be_an(Array)
       expect(log.to_json).not_to include("2010-02-03")
     end
+
+    it "redacts the address fields Rails' parameter filter doesn't name from the catch-all row's params" do
+      patch admin_event_participant_path(event, participant_event),
+        params: { participant: { tshirt_size: "L", city: "Shelbyville", state: "VT", postal_code: "05001",
+                                 country_of_residence: "US" } }
+
+      log = AuditLog.where(record: participant).sole
+      expect(log.metadata.dig("params", "participant")).to include(
+        "tshirt_size" => "L", "city" => "[REDACTED]", "state" => "[REDACTED]",
+        "postal_code" => "[REDACTED]", "country_of_residence" => "[REDACTED]"
+      )
+      expect(log.to_json).not_to include("Shelbyville", "05001")
+    end
   end
 
   describe "the API" do
