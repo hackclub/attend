@@ -82,6 +82,20 @@ RSpec.describe "Operation audit rows", type: :request do
       expect(guardian.reload.email).not_to eq("corrected@example.com")
     end
 
+    # The guardian form is gated on PII access, not on manage_guardians?.
+    # Pinned as found.
+    it "lets ops correct a guardian, which MCP holds to event admins" do
+      ops = create(:user).tap { |user| EventRoleAssignment.create!(user: user, event: event, role: "ops") }
+      sign_in ops
+      get admin_event_participant_path(event, participant_event)
+
+      patch admin_event_participant_guardian_path(event, participant_event, link),
+        params: { guardian: { legal_first_name: "Janet" } }
+
+      expect(response).to redirect_to(admin_event_participant_path(event, participant_event))
+      expect(guardian.reload.legal_first_name).to eq("Janet")
+    end
+
     it "goes back to the participant when the form carried nothing to change" do
       patch admin_event_participant_guardian_path(event, participant_event, link),
         params: { guardian: { not_a_field: "x" } }

@@ -17,7 +17,10 @@ module Admin
       result = Guardians::Update.call(operation_context,
         participant_event: @participant_event,
         guardian_participant_event: @guardian_participant_event,
-        attributes: guardian_params)
+        attributes: guardian_params,
+        # This form is gated on PII access (require_contact_details_access),
+        # not on manage_guardians?, so ops can correct a guardian here.
+        require_policy: false)
 
       if result.success?
         redirect_to admin_event_participant_path(current_event, @participant_event),

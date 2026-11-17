@@ -12,8 +12,8 @@ RSpec.describe Guardians::ResendInvite do
     Operation::Context.new(surface: surface, user: user, event: event)
   end
 
-  def resend(context, reference: link)
-    described_class.call(context, participant_event: participant_event, guardian_participant_event: reference)
+  def resend(context, reference: link, **options)
+    described_class.call(context, participant_event: participant_event, guardian_participant_event: reference, **options)
   end
 
   around { |example| Current.set(event: event) { example.run } }
@@ -32,32 +32,34 @@ RSpec.describe Guardians::ResendInvite do
     expect(log.to_json).not_to include(token)
   end
 
-  # The surfaces treat the link already out there differently today. Pinned as
-  # found, so a change to either is a decision rather than an accident.
-  describe "what happens to the old link, by surface" do
-    it "dies on a resend from the admin UI" do
-      token = link.generate_invite_token!
+  # The caller chooses, whatever surface it is: the admin UI rotates and MCP
+  # keeps (pinned for each in the request and toolbox specs).
+  describe "what happens to the old link" do
+    it "dies by default, on every surface" do
+      %i[html api mcp].each do |surface|
+        token = link.generate_invite_token!
 
-      resend(context_for(global_admin, surface: :html))
+        resend(context_for(global_admin, surface: surface))
 
-      expect { GuardianParticipantEvent.find_by_invite_token!(token) }.to raise_error(ActiveRecord::RecordNotFound)
+        expect { GuardianParticipantEvent.find_by_invite_token!(token) }.to raise_error(ActiveRecord::RecordNotFound)
+      end
     end
 
-    it "keeps working on a resend from MCP, which only clears the sent-at stamp" do
+    it "keeps working when the caller asks not to rotate, which only clears the sent-at stamp" do
       token = link.generate_invite_token!
       link.update!(invite_token_sent_at: 1.day.ago)
 
-      resend(context_for(global_admin, surface: :mcp))
+      resend(context_for(global_admin, surface: :html), rotate_token: false)
 
       expect(link.reload.invite_token_sent_at).to be_nil
       expect(link.invite_token).to eq(token)
       expect(AuditLog.sole.metadata).to include("token_rotated" => false)
     end
 
-    it "audits an MCP resend even when there was no sent-at stamp to clear" do
+    it "audits a non-rotating resend even when there was no sent-at stamp to clear" do
       link.update!(invite_token_sent_at: nil)
 
-      resend(context_for(global_admin, surface: :mcp))
+      resend(context_for(global_admin, surface: :mcp), rotate_token: false)
 
       expect(AuditLog.sole.action).to eq("resend_guardian_invite")
     end

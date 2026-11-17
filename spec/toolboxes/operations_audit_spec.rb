@@ -63,6 +63,33 @@ RSpec.describe "MCP tools that run operations", type: :toolbox do
     expect(AuditLog.sole.action).to eq("resend_guardian_invite")
   end
 
+  # MCP's resend emails the link already out there again; the admin UI's
+  # rotates it. Pinned as found.
+  it "keeps the guardian's existing link working on a resend" do
+    old_token = link.generate_invite_token!
+
+    call_tool("participant_events_resend_guardian_invite",
+      params: { "participant_event_id" => participant_event.id, "guardian_participant_event_id" => link.id }, as: auth)
+
+    expect(link.reload.invite_token).to eq(old_token)
+    expect(AuditLog.sole.metadata).to include("token_rotated" => false)
+  end
+
+  it "holds a guardian correction to event admins" do
+    ops = create(:user).tap { |staff| EventRoleAssignment.create!(user: staff, event: event, role: "ops") }
+    ops_token = Toolchest::OauthAccessToken.create_for(
+      application: application, resource_owner_id: ops.id, scopes: "participants:read participants:write"
+    )
+    ops_auth = Toolchest::AuthContext.new(resource_owner: ops, scopes: ops_token.scopes_array, token: ops_token)
+
+    call_tool("participant_events_update_guardian",
+      params: { "participant_event_id" => participant_event.id, "guardian_participant_event_id" => link.id,
+                "legal_first_name" => "Janet" }, as: ops_auth)
+
+    expect(tool_response).to be_error
+    expect(guardian.reload.legal_first_name).not_to eq("Janet")
+  end
+
   it "keeps the catch-all hook for tools that don't run an operation" do
     call_tool("participant_events_check_in", params: { "participant_event_id" => participant_event.id }, as: auth)
 

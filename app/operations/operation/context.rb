@@ -4,7 +4,9 @@ module Operation
   #   user        the person Pundit authorizes. nil for an API key.
   #   actor       who the audit row is attributed to. The user, or for an API
   #               key the person who issued it.
-  #   surface     :html, :api or :mcp.
+  #   surface     :html, :api or :mcp. Recorded on the audit row; operations
+  #               don't branch on it. Where front ends differ, the caller
+  #               passes the decision in as an argument.
   #   event       the event the surface is working in, if any. Audit rows are
   #               filed under it.
   #   anonymized  an anonymized MCP connection. Operations refuse to run.
@@ -46,12 +48,6 @@ module Operation
     def anonymized? = @anonymized ? true : false
 
     def api_key? = @api_key ? true : false
-
-    def html? = surface == :html
-
-    def api? = surface == :api
-
-    def mcp? = surface == :mcp
 
     def authorize!(record, query)
       return @authorizer.call(record, query) if @authorizer

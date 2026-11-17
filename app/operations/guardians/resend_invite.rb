@@ -4,25 +4,24 @@ module Guardians
   # ParticipantEventPolicy#manage_guardians? on every surface. Refused while
   # the event has guardian invites locked, and for an address that is bouncing.
   #
-  # What happens to the link already out there differs by surface today, and
-  # is preserved as found rather than unified:
+  # What happens to the link already out there is the caller's choice:
   #
-  #   html  rotates: the old link dies now and the email carries a new one
-  #         (a staff resend is usually because the old link went astray).
-  #   mcp   keeps: only the sent-at stamp is cleared, so the same link is
-  #         emailed again and the old one keeps working.
+  #   rotate_token: true   the old link dies now and the email carries a new
+  #                        one. The default, and the more cautious of the two.
+  #   rotate_token: false  only the sent-at stamp is cleared, so the same link
+  #                        is emailed again and the old one keeps working.
   #
-  # The API has no resend today; it would rotate, the more cautious of the two.
+  # The admin UI rotates (a staff resend is usually because the old link went
+  # astray) and MCP keeps, both preserved as found rather than unified.
   class ResendInvite < ApplicationOperation
     include LinkLookup
 
     audit_actions :resend_guardian_invite
 
-    ROTATES_TOKEN = { html: true, api: true, mcp: false }.freeze
-
     # `guardian_participant_event` is the link or its id.
-    def initialize(context, participant_event:, guardian_participant_event:)
+    def initialize(context, participant_event:, guardian_participant_event:, rotate_token: true)
       super(context)
+      @rotate_token = rotate_token
       @participant_event = participant_event
       @link_reference = guardian_participant_event
     end
@@ -42,11 +41,9 @@ module Guardians
 
     private
 
-    def rotate_token? = ROTATES_TOKEN.fetch(context.surface)
-
     def perform
       sent_at_was = link.invite_token_sent_at
-      rotate_token? ? link.revoke_invite_token! : link.update!(invite_token_sent_at: nil)
+      @rotate_token ? link.revoke_invite_token! : link.update!(invite_token_sent_at: nil)
 
       # Once the link's new state is committed: the job reads it, and a run
       # that rolls back must not email anyone.
@@ -58,7 +55,7 @@ module Guardians
       # has no business in an audit row.
       audit!(:resend_guardian_invite, link,
         changed_fields: { "invite_token_sent_at" => [ sent_at_was, nil ] },
-        metadata: { participant_event_id: @participant_event.id, token_rotated: rotate_token? })
+        metadata: { participant_event_id: @participant_event.id, token_rotated: @rotate_token })
       success(link)
     end
   end

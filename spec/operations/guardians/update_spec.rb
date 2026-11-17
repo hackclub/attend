@@ -16,9 +16,9 @@ RSpec.describe Guardians::Update do
     Operation::Context.new(surface: surface, user: user, event: event, pii_scope: surface == :mcp ? :any : :event)
   end
 
-  def update(context, attributes, reference: link)
+  def update(context, attributes, reference: link, **options)
     described_class.call(context, participant_event: participant_event, guardian_participant_event: reference,
-      attributes: attributes)
+      attributes: attributes, **options)
   end
 
   around { |example| Current.set(event: event) { example.run } }
@@ -90,27 +90,30 @@ RSpec.describe Guardians::Update do
     expect(AuditLog.count).to eq(0)
   end
 
-  # The two surfaces hold this to different bars today. Pinned as found, so a
-  # change to either is a decision rather than an accident.
-  describe "who may, by surface" do
-    it "lets ops through the admin UI, which has no policy check, but not through MCP" do
+  # The admin UI's guardian form skips the policy check and MCP doesn't.
+  # Pinned as found, so a change to either is a decision rather than an
+  # accident; which bar applies is the caller's argument, not the surface.
+  describe "who may" do
+    it "holds ops to manage_guardians? unless the caller waives the policy check" do
       ops = staff("ops")
 
-      expect(update(context_for(ops, surface: :html), { legal_first_name: "Janet" })).to be_success
-      expect { update(context_for(ops, surface: :mcp), { legal_first_name: "Janice" }) }
-        .to raise_error(Pundit::NotAuthorizedError)
+      expect(update(context_for(ops, surface: :html), { legal_first_name: "Janet" }, require_policy: false)).to be_success
+      %i[html api mcp].each do |surface|
+        expect { update(context_for(ops, surface: surface), { legal_first_name: "Janice" }) }
+          .to raise_error(Pundit::NotAuthorizedError)
+      end
       expect(guardian.reload.legal_first_name).to eq("Janet")
     end
 
-    it "lets an event admin through both" do
+    it "lets an event admin through either way" do
       admin = staff("event_admin")
 
-      expect(update(context_for(admin, surface: :html), { legal_first_name: "Janet" })).to be_success
+      expect(update(context_for(admin, surface: :html), { legal_first_name: "Janet" }, require_policy: false)).to be_success
       expect(update(context_for(admin, surface: :mcp), { legal_first_name: "Janice" })).to be_success
     end
 
-    it "refuses a role that can't see PII on this event through the admin UI" do
-      result = update(context_for(staff("limited"), surface: :html), { legal_first_name: "Janet" })
+    it "refuses a role that can't see PII on this event even with the policy check waived" do
+      result = update(context_for(staff("limited"), surface: :html), { legal_first_name: "Janet" }, require_policy: false)
 
       expect(result.code).to eq(:pii_restricted)
       expect(guardian.reload.legal_first_name).to eq("Jane")

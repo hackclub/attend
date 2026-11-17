@@ -708,7 +708,8 @@ module Admin
     def resend_guardian_invite
       result = Guardians::ResendInvite.call(operation_context,
         participant_event: @participant_event,
-        guardian_participant_event: params[:guardian_participant_event_id])
+        guardian_participant_event: params[:guardian_participant_event_id],
+        rotate_token: true)
       participant_path = admin_event_participant_path(current_event, @participant_event)
 
       if result.success?

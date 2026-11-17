@@ -223,7 +223,8 @@ class ParticipantEventsToolbox < ApplicationToolbox
     gpe = operation_value!(
       Guardians::ResendInvite.call(operation_context,
         participant_event: @participant_event,
-        guardian_participant_event: params[:guardian_participant_event_id]),
+        guardian_participant_event: params[:guardian_participant_event_id],
+        rotate_token: false),
       email_undeliverable: "The guardian's email is bouncing — correct it with participant_events_update_guardian first."
     )
 

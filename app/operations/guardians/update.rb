@@ -6,29 +6,28 @@ module Guardians
   # A Guardian row is shared by every registration it is linked to, so the
   # change reaches siblings too.
   #
-  # The surfaces hold this to different bars today, preserved as found:
-  #
-  #   html  no policy check: anyone in the admin area for this event whose role
-  #         there can see PII (Admin::GuardiansController#require_contact_details_access).
-  #   mcp   ParticipantEventPolicy#manage_guardians? (event admins), plus a role
-  #         on any event that can see PII.
-  #
-  # Anything that isn't the admin UI gets the stricter bar.
+  # Held to ParticipantEventPolicy#manage_guardians? (event admins) and to PII
+  # access as the context judges it. The admin UI's guardian form has never had
+  # the policy check: anyone in the admin area for the event whose role there
+  # can see PII may submit it. That is preserved as found, but as that caller's
+  # decision (`require_policy: false`) rather than something the operation
+  # works out from which front end it is running under.
   class Update < ApplicationOperation
     include LinkLookup
 
     audit_actions :record_update
 
     # `guardian_participant_event` is the link or its id.
-    def initialize(context, participant_event:, guardian_participant_event:, attributes:)
+    def initialize(context, participant_event:, guardian_participant_event:, attributes:, require_policy: true)
       super(context)
+      @require_policy = require_policy
       @participant_event = participant_event
       @link_reference = guardian_participant_event
       @attributes = attributes.to_h.stringify_keys
     end
 
     def precheck
-      authorize!(@participant_event, :manage_guardians?) unless context.html?
+      authorize!(@participant_event, :manage_guardians?) if @require_policy
 
       unless context.can_view_pii?
         return failure(:pii_restricted, "Your role can't edit guardian contact details.")
