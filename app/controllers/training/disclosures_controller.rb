@@ -5,9 +5,9 @@ module Training
   class DisclosuresController < BaseController
     before_action :set_course
     before_action :require_enrollment
+    before_action :require_disclosure_needed
 
     def new
-      redirect_to training_course_path(@course) unless @enrollment.disclosure_needed?
     end
 
     def create
@@ -45,6 +45,15 @@ module Training
 
     def require_enrollment
       return if @enrollment
+
+      redirect_to training_course_path(@course)
+    end
+
+    # Once this attempt at the course has its answer (or the course doesn't
+    # ask), nothing here may record another: a "check your answer" page left
+    # open in another tab would otherwise still lock the person out.
+    def require_disclosure_needed
+      return if @enrollment.disclosure_needed?
 
       redirect_to training_course_path(@course)
     end

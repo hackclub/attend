@@ -70,6 +70,31 @@ RSpec.describe "Training declarations", type: :request do
     expect(learner.training_disclosures.last).to be_review_not_required
   end
 
+  it "won't record a second answer once the declaration is made" do
+    post enroll_training_course_path(course)
+    post training_course_disclosure_path(course), params: { answer: "no", confirm: "1" }
+
+    # A "check your answer" page left open in another tab.
+    expect {
+      post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1", yes_confirmed: "1" }
+    }.not_to change(TrainingDisclosure, :count)
+    expect(response).to redirect_to(training_course_path(course))
+    expect(learner.reload).to be_eligible_to_work_events
+
+    get new_training_course_disclosure_path(course)
+    expect(response).to redirect_to(training_course_path(course))
+  end
+
+  it "doesn't take a declaration for a course that doesn't ask for one" do
+    course.update!(disclosure_required: false)
+    post enroll_training_course_path(course)
+
+    expect {
+      post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1", yes_confirmed: "1" }
+    }.not_to change(TrainingDisclosure, :count)
+    expect(response).to redirect_to(training_course_path(course))
+  end
+
   it "uses the course's own wording, and keeps a copy of what was asked" do
     course.update!(disclosure_question: "Example custom declaration wording?")
     post enroll_training_course_path(course)
