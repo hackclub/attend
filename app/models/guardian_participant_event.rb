@@ -7,6 +7,7 @@ class GuardianParticipantEvent < ApplicationRecord
   belongs_to :participant_event
 
   include SyncsRegistration
+  include ThrottledStamp
   syncs_registration cause: :guardian_changed
 
   # A guardian finishing the portal can be the last thing a registration was
@@ -121,9 +122,7 @@ class GuardianParticipantEvent < ApplicationRecord
   # find_by_invite_token! has already rejected expired tokens, so this extends a
   # live window and can never resurrect a dead one.
   def touch_invite_use!
-    return if invite_last_used_at.present? && invite_last_used_at > INVITE_USE_TOUCH_INTERVAL.ago
-
-    update_column(:invite_last_used_at, Time.current)
+    stamp_at_most_every(INVITE_USE_TOUCH_INTERVAL, :invite_last_used_at)
   end
 
   def mark_accepted!

@@ -6,12 +6,11 @@
 # update per call for a polling client).
 module LastUsedTracking
   extend ActiveSupport::Concern
+  include ThrottledStamp
 
   LAST_USED_TOUCH_INTERVAL = 15.minutes
 
   def touch_last_used!
-    return if last_used_at.present? && last_used_at > LAST_USED_TOUCH_INTERVAL.ago
-
-    update_column(:last_used_at, Time.current)
+    stamp_at_most_every(LAST_USED_TOUCH_INTERVAL, :last_used_at)
   end
 end

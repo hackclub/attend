@@ -30,6 +30,12 @@ RSpec.describe LastUsedTracking do
     end
   end
 
+  # One implementation of "stamp at most every so often" (ThrottledStamp),
+  # so a fix to it reaches the credentials and the guardian portal alike.
+  it "shares its throttle with the guardian invite's last-used stamp" do
+    expect([ MobileToken, GuardianParticipantEvent ]).to all(include(ThrottledStamp))
+  end
+
   it "is how every API credential is stamped" do
     expect([ MobileToken, GlobalApiToken, EventApiToken, SeriesApiToken ]).to all(include(described_class))
   end
