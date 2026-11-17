@@ -76,11 +76,13 @@ RSpec.describe Privacy::Eraser do
     expect(PhoneNumber.count).to eq(0)
   end
 
-  it "keeps a person a surviving row still points at, minus the erased address" do
+  it "keeps a person a surviving row still points at, minus the erased address and number" do
     Identity::Backfill.new(apply: true).call
     person = participant.reload.person
-    kept = create(:guardian, email: "someone.else@example.com", person: person)
+    expect(person.phone_numbers).to be_present
+    kept = create(:guardian, email: "someone.else@example.com", phone: "+12025550188", person: person)
     create(:email_address, person: person, address: "someone.else@example.com")
+    PhoneNumber.create!(person: person, number: "+12025550188", source: "guardian")
     create(:guardian_participant_event, guardian: kept,
       participant_event: create(:participant_event, event: create(:event, starts_at: 2.weeks.from_now, ends_at: 3.weeks.from_now)))
 
@@ -88,6 +90,7 @@ RSpec.describe Privacy::Eraser do
 
     expect(kept.reload.person).to eq(person)
     expect(person.email_addresses.pluck(:address)).to eq([ "someone.else@example.com" ])
+    expect(PhoneNumber.where(person: person).map(&:number)).to eq([ "+12025550188" ])
   end
 
   it "keeps a guardian who still has another child registered" do
