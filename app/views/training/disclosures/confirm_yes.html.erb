@@ -1,8 +1,6 @@
 <% content_for :title, "Check your answer – #{@course.title} – Attend" %>
 
-<div class="w-full max-w-2xl mx-auto">
-  <%= link_to "← #{@course.title}", training_course_path(@course), class: "portal-link text-sm inline-block mb-6" %>
-
+<%= render layout: "training/disclosures/shell", locals: { course: @course } do %>
   <div class="portal-card p-6 sm:p-8">
     <h1 class="portal-title text-2xl mb-2">Check your answer</h1>
     <p class="portal-body mb-4">You answered <strong>Yes</strong> to:</p>
@@ -21,4 +19,4 @@
       <% end %>
     </div>
   </div>
-</div>
+<% end %>

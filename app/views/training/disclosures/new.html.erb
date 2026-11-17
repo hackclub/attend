@@ -1,8 +1,6 @@
 <% content_for :title, "Declaration – #{@course.title} – Attend" %>
 
-<div class="w-full max-w-2xl mx-auto">
-  <%= link_to "← #{@course.title}", training_course_path(@course), class: "portal-link text-sm inline-block mb-6" %>
-
+<%= render layout: "training/disclosures/shell", locals: { course: @course } do %>
   <%= form_with url: training_course_disclosure_path(@course), method: :post, class: "portal-card p-6 sm:p-8", data: { turbo: false } do %>
     <h1 class="portal-title text-2xl mb-2">Before you start</h1>
     <p class="portal-hint text-sm mb-6">
@@ -36,4 +34,4 @@
       <%= button_tag "Continue", type: "submit", class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
     </div>
   <% end %>
-</div>
+<% end %>
