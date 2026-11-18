@@ -191,6 +191,7 @@ def admin_tool(class_name = "", element = "div", **options, &block)
     "Guyana",
     "Haiti",
     "Honduras",
+    "Hong Kong",
     "Hungary",
     "Iceland",
     "India",
