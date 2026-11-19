@@ -585,7 +585,10 @@ module ConsoleHelper
   private
 
   def cs_error_values(object, error, label)
-    value = object.respond_to?(:read_attribute_for_validation) && error.attribute != :base ? object.read_attribute_for_validation(error.attribute) : nil
+    # Nested autosave errors come keyed as "travel_legs.departure_time_zone",
+    # which isn't a method on the parent, so only read real attributes.
+    readable = error.attribute != :base && object.respond_to?(:read_attribute_for_validation) && object.respond_to?(error.attribute)
+    value = readable ? object.read_attribute_for_validation(error.attribute) : nil
     {
       label: label,
       thing: cs_label_in_sentence(label),

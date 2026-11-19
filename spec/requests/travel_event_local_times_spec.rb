@@ -88,6 +88,24 @@ RSpec.describe "Travel times on the event's clock", type: :request do
       expect(description.text).to include(hint)
     end
 
+    it "asks for a time zone in the console when the airport's is unknown, instead of erroring" do
+      admin.update!(admin_console_beta: true)
+      patch travel_admin_event_participant_path(event, participant_event), params: {
+        travel_inbound: {
+          arrangement_status: "confirmed", mode: "plane",
+          travel_legs_attributes: { "0" => {
+            position: 0, flight_code: "ZZ1", departure_airport: "ZZZ", arrival_airport: "JFK",
+            departure_time: "2026-07-12T06:00", arrival_time: "2026-07-12T09:30"
+          } }
+        },
+        travel_outbound: { arrangement_status: "provisional", mode: "bus", departure_time: "2026-07-14T17:00" }
+      }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include("time zone for that airport, so pick one")
+      expect(participant_event.reload.travel_inbound).to be_nil
+    end
+
     it "prefills a legacy row as it was typed and reads a re-save on the event's clock" do
       travel = legacy_inbound_train(arrival_time: Time.utc(2026, 7, 12, 9, 30))
 
