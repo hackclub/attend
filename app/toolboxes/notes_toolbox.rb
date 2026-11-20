@@ -24,14 +24,13 @@ class NotesToolbox < ApplicationToolbox
   def create
     @participant_event = ParticipantEvent.find(params[:participant_event_id])
     Current.event = @participant_event.event
-    @note = @participant_event.notes.build(
-      params.permit(:body, :note_type, :sensitivity, visible_to_roles: []).to_h
+    note = operation_value!(
+      Notes::Create.call(operation_context,
+        participant_event: @participant_event,
+        attributes: params.permit(:body, :note_type, :sensitivity, visible_to_roles: []).to_h),
+      restricted_not_allowed: "You are not authorized to do that."
     )
-    @note.event = @participant_event.event
-    @note.author = current_user
-    authorize! @note, :create?
-    @note.save!
-    render json: serialize_note(@note)
+    render json: serialize_note(note)
   end
 
   private

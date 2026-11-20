@@ -160,8 +160,36 @@ module Admin
       Sentry.capture_exception(e) if defined?(Sentry)
     end
 
+    # Who is acting, for app/operations. One per request: it remembers what
+    # operations audited, and log_admin_action stands down when they have.
+    def operation_context
+      @operation_context ||= Operation::Context.new(
+        surface: :html,
+        user: current_user,
+        event: (current_event if event_page?),
+        metadata: admin_audit_metadata
+      )
+    end
+
+    # What every audit row from the admin UI says about the request, whether
+    # an operation writes the row or the catch-all hook does. The params are
+    # as Rails filtered them; whoever writes the row redacts the registry's
+    # PII from them for the record it is about (SensitiveFields.redact_params).
+    def admin_audit_metadata
+      {
+        ip: request.remote_ip,
+        user_agent: request.user_agent,
+        controller: controller_name,
+        params: request.filtered_parameters.except("controller", "action", "authenticity_token")
+      }
+    end
+
+    # The catch-all: audits whatever record the action left changed, under the
+    # action's own name. Actions that run an operation are audited by it, by
+    # name, and are skipped here so there is one row, not two.
     def log_admin_action
       return unless current_user
+      return if @operation_context&.audited?
 
       changed_record = find_changed_record
       record = changed_record || @record || @event || @participant_event
@@ -180,7 +208,7 @@ module Admin
       else
         {}
       end
-      changed_fields = redact_encrypted_audit_fields(record, changed_fields)
+      changed_fields = AuditLog.redact_sensitive_fields(record, changed_fields)
 
       event_for_log = current_event if event_page? && !current_event.destroyed?
 
@@ -190,11 +218,11 @@ module Admin
         actor: current_user,
         event: event_for_log,
         changed_fields: changed_fields,
-        metadata: {
-          ip: request.remote_ip,
-          user_agent: request.user_agent,
-          controller: controller_name,
-          params: request.filtered_parameters.except("controller", "action", "authenticity_token")
+        # filter_parameters doesn't name every PII column in the registry
+        # (city, state, postal_code, country), and the request's params are
+        # stored whether or not the action permitted them.
+        metadata: admin_audit_metadata.tap { |metadata|
+          metadata[:params] = SensitiveFields.redact_params(metadata[:params], model: record.class)
         }
       )
     rescue => e
@@ -234,10 +262,6 @@ module Admin
       return explicit[1] if explicit
 
       candidates.max_by { |_, _, change_count, _| change_count }[1]
-    end
-
-    def redact_encrypted_audit_fields(record, changed_fields)
-      AuditLog.redact_encrypted_fields(record, changed_fields)
     end
   end
 end

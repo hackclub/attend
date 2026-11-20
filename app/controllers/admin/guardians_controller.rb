@@ -14,28 +14,29 @@ module Admin
     def update
       @guardian = @guardian_participant_event.guardian
 
-      old_email = @guardian.email
+      result = Guardians::Update.call(operation_context,
+        participant_event: @participant_event,
+        guardian_participant_event: @guardian_participant_event,
+        attributes: guardian_params,
+        # This form is gated on PII access (require_contact_details_access),
+        # not on manage_guardians?, so ops can correct a guardian here.
+        require_policy: false)
 
-      participant = @participant_event.participant
-      if guardian_params[:phone].present? && participant.phone.present?
-        guardian_phone_e164 = PhoneNormalizer.normalize(guardian_params[:phone])
-        if guardian_phone_e164 && guardian_phone_e164 == participant.phone
-          @guardian.errors.add(:phone, "cannot be the same as the participant's phone number")
-          render :edit, status: :unprocessable_entity
-          return
-        end
-      end
-
-      if @guardian.update(guardian_params)
-        # The old portal link went to the old address: kill it, so the next
-        # invite carries a fresh token (see GuardianParticipantEvent#revoke_invite_token!).
-        if @guardian.email != old_email && !@guardian_participant_event.completed?
-          @guardian_participant_event.revoke_invite_token!
-        end
-
+      if result.success?
         redirect_to admin_event_participant_path(current_event, @participant_event),
           notice: "Guardian information updated successfully."
+      elsif result.code == :pii_restricted
+        require_contact_details_access
+      elsif result.code == :nothing_to_update
+        # A submission with none of the form's fields. Not an error to fix, so
+        # back to the participant rather than a form with nothing wrong on it.
+        redirect_to admin_event_participant_path(current_event, @participant_event),
+          notice: "No changes were made to the guardian."
       else
+        # @guardian carries the errors: a failed validation, or a phone number
+        # that is also the participant's. A failure somewhere else (the invite
+        # link) left nothing on it, so say what the operation said.
+        flash.now[:alert] = result.message if @guardian.errors.empty?
         render :edit, status: :unprocessable_entity
       end
     end
