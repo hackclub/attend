@@ -98,7 +98,15 @@ module ApplicationHelper
 def admin_tool(class_name = "", element = "div", **options, &block)
     return unless current_user&.admin?
 
-    concat content_tag(element, class: "border-2 border-dashed border-orange-400 bg-yellow-100 rounded-lg p-2 #{class_name}", **options, &block)
+    concat render(AdminToolComponent.new(class_name, element, **options).with_content(capture(&block)))
+  end
+
+  # The bare dashed-orange marker around an admin-only control, with no wash
+  # or padding of its own and no role check: use it inside the policy check
+  # the control already sits in. Returns the markup, so call it with <%= %>.
+  #   <%= admin_tool_marker "rounded px-4 py-4" do %>…<% end %>
+  def admin_tool_marker(class_name = "", element = "div", **options, &block)
+    render AdminToolComponent.new(class_name, element, panel: false, **options).with_content(capture(&block))
   end
 
   def required_indicator

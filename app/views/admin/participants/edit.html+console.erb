@@ -14,7 +14,7 @@
         <h2 class="cs-h2">Participant details</h2>
       </div>
       <div class="cs-container-body">
-        <div class="border-2 border-dashed border-orange-400 rounded px-4 py-4 mb-5">
+        <%= admin_tool_marker "rounded px-4 py-4 mb-5" do %>
           <%= cs_form_field f, :headshot, label: "Profile photo", optional: true, constraint: "JPEG, PNG, or WebP. Max 10MB." do |aria| %>
             <div class="flex items-center gap-4">
               <% if @participant.headshot.attached? && @participant.headshot.blob.persisted? %>
@@ -29,7 +29,7 @@
               </div>
             </div>
           <% end %>
-        </div>
+        <% end %>
 
         <div class="cs-field-grid">
           <%= cs_form_field f, :legal_first_name, label: "Legal first name", input: { required: true, autocomplete: "off" } %>

@@ -23,12 +23,12 @@
               class: "px-3 py-2 text-sm font-medium rounded-md bg-amber-600 text-white hover:bg-amber-700" %>
       <% end %>
       <% if policy(event).clear_waiver_dates_warning? %>
-        <div class="border-2 border-dashed border-orange-400 rounded-md p-1">
+        <%= admin_tool_marker "rounded-md p-1" do %>
           <%= button_to "Dismiss", clear_waiver_dates_warning_admin_event_path(event),
                 method: :patch,
                 form: { data: { turbo_confirm: "Dismiss without regenerating? Only do this if the waivers were already fixed by hand." } },
                 class: "px-3 py-2 text-sm font-medium rounded-md bg-white text-amber-900 border border-amber-300 hover:bg-amber-100 cursor-pointer" %>
-        </div>
+        <% end %>
       <% end %>
     </div>
   </div>
