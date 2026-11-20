@@ -1,5 +1,6 @@
 class ApplicationController < ActionController::Base
   include Pundit::Authorization
+  include ReplicaReadRouting
 
   IMPERSONATION_TIMEOUT = 1.hour
 
