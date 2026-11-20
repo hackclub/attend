@@ -126,4 +126,19 @@ RSpec.describe ScanRecorder do
       expect(@concurrent_participant_event.scans.where(scan_context: @concurrent_context).count).to eq(2)
     end
   end
+
+  it "keeps the device's own time for the scan beside the recorded one" do
+    claimed = scanned_at - 3.minutes
+    result = described_class.call(
+      participant_event: participant_event,
+      user: user,
+      scan_context: scan_context,
+      scanned_at: scanned_at,
+      client_scanned_at: claimed,
+      client_scan_id: client_scan_id,
+      source: "qr"
+    )
+
+    expect(result.scan.reload).to have_attributes(scanned_at: scanned_at, client_scanned_at: claimed)
+  end
 end

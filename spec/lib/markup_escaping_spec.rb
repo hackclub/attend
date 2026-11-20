@@ -199,8 +199,7 @@ RSpec.describe "markup built in JavaScript" do
 
       expect(offenders).to be_empty, <<~MESSAGE
         Markup built from interpolated values must use the `html` tag from
-        app/javascript/utils/html.js (or the matching inline helper in
-        app/views/admin/scans/scanner.html.erb), which escapes each `${...}`:
+        app/javascript/utils/html.js, which escapes each `${...}`:
 
         #{offenders.join("\n")}
 

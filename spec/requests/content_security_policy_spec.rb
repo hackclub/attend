@@ -151,7 +151,9 @@ RSpec.describe "Content Security Policy", type: :request do
       it "the QR scanner is clean" do
         ScanContext.create!(event: event, name: "Main Door", checks_in: true, is_travel_pickup: false)
 
-        expect_csp_clean(scanner_admin_event_scans_path(event), inline_scripts: admin_layout_inline_scripts + 1)
+        # The scanner itself is modules (app/javascript/scanner), so the
+        # page adds no inline script of its own.
+        expect_csp_clean(scanner_admin_event_scans_path(event), inline_scripts: admin_layout_inline_scripts)
       end
 
       it "the scan history is clean" do
