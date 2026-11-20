@@ -256,6 +256,16 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(body["participant_id"]).to eq(participant.id)
     end
 
+    it "finds a participant whose stored email predates normalisation" do
+      participant = store_legacy_email(create(:participant), "Legacy.Voter@Example.com")
+      create(:participant_event, participant: participant, event: event)
+
+      get "/api/v1/events/#{event.id}/participants/lookup",
+        params: { email: "legacy.voter@example.com" }, headers: api_key_headers
+
+      expect(JSON.parse(response.body)).to include("registered" => true, "participant_id" => participant.id)
+    end
+
     it "reports a non-participant as not registered" do
       get "/api/v1/events/#{event.id}/participants/lookup",
         params: { email: "stranger@example.com" }, headers: api_key_headers

@@ -22,7 +22,8 @@ module Api
 
         Rails.logger.info("[HelpScout Webhook] convo.created from #{customer_email} (customer #{customer_id})")
 
-        user = User.find_by(email: customer_email)
+        # users.email is stored downcased; Help Scout sends what the customer typed.
+        user = User.find_by(email: customer_email.to_s.strip.downcase)
         unless user
           Rails.logger.info("[HelpScout Webhook] No Attend user found for #{customer_email}")
           head :ok

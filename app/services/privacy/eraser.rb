@@ -282,6 +282,27 @@ module Privacy
 
     # an empty list matches nothing. Matching on "" instead would sweep up
     # every row whose email is blank
+    # The addresses and numbers a set of user, participant and guardian rows
+    # carry, as the person above them would have copied them.
+    def person_contacts(scopes)
+      rows = scopes.flat_map(&:to_a)
+      {
+        emails: rows.filter_map { |row| EmailAddress.normalize(row.email).presence },
+        phones: rows.filter_map { |row| PhoneNormalizer.normalize(row.try(:phone) || row.try(:phone_number)) }
+      }
+    end
+
+    # Removes the erased rows' addresses and numbers from a person that
+    # outlives them, except any a row still on that person holds too.
+    def forget_erased_contacts(person, erased, subject_emails)
+      kept = person_contacts([ person.users, person.participants, person.guardians ])
+      emails = (erased[:emails] + subject_emails.map { |email| EmailAddress.normalize(email) }).uniq - kept[:emails]
+      phones = erased[:phones].uniq - kept[:phones]
+
+      person.email_addresses.where(address: emails).delete_all if emails.any?
+      person.phone_numbers.where(number: phones).delete_all if phones.any?
+    end
+
     def email_in(model, column, emails)
       emails = emails.compact_blank
       return model.where("1=0") if emails.empty?
@@ -413,6 +434,12 @@ module Privacy
       MessageDelivery.where(id: people.message_deliveries).destroy_all
       AutomatedSmsLog.where(id: people.sms_logs).delete_all
 
+      # read before the rows go: the person above them holds copies of their
+      # addresses and phone numbers (see Person)
+      erased_rows = [ User.where(id: users), Participant.where(id: people.participants), Guardian.where(id: people.guardians) ]
+      person_ids = erased_rows.flat_map { |scope| scope.where.not(person_id: nil).pluck(:person_id) }.uniq
+      erased_contacts = person_contacts(erased_rows) if person_ids.any?
+
       Participant.where(id: people.participants).destroy_all
       Guardian.where(id: people.guardians).destroy_all
 
@@ -425,6 +452,14 @@ module Privacy
       end
       McpConnectionSetting.where(resource_owner_id: owners).destroy_all
       User.where(id: users).destroy_all
+
+      # a person a row we kept still points at stays, minus the subject's
+      # own addresses and numbers
+      Person.unattached.where(id: person_ids).destroy_all
+      Person.where(id: person_ids).find_each do |person|
+        forget_erased_contacts(person, erased_contacts, people.emails)
+      end
+      IdentityReview.naming(ids).delete_all if ids.any?
 
       PaperTrail::Version.where(item_id: ids).delete_all
       AuditLog.where(record_id: ids).delete_all

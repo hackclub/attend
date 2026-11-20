@@ -62,6 +62,37 @@ RSpec.describe Privacy::Eraser do
     expect(ActiveStorage::Attachment.where(record_id: participant.id)).not_to exist
   end
 
+  it "erases the person above their rows, with its copies of their address and phone" do
+    Identity::Backfill.new(apply: true).call
+    person = participant.reload.person
+    guardian_person = guardian.reload.person
+    expect(person.email_addresses.pluck(:address)).to eq([ "attendee@example.com" ])
+    expect(person.phone_numbers).to be_present
+
+    described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false)
+
+    expect(Person.where(id: [ person.id, guardian_person.id ])).to be_empty
+    expect(EmailAddress.count).to eq(0)
+    expect(PhoneNumber.count).to eq(0)
+  end
+
+  it "keeps a person a surviving row still points at, minus the erased address and number" do
+    Identity::Backfill.new(apply: true).call
+    person = participant.reload.person
+    expect(person.phone_numbers).to be_present
+    kept = create(:guardian, email: "someone.else@example.com", phone: "+12025550188", person: person)
+    create(:email_address, person: person, address: "someone.else@example.com")
+    PhoneNumber.create!(person: person, number: "+12025550188", source: "guardian")
+    create(:guardian_participant_event, guardian: kept,
+      participant_event: create(:participant_event, event: create(:event, starts_at: 2.weeks.from_now, ends_at: 3.weeks.from_now)))
+
+    described_class.new(subject_for(emails: [ "attendee@example.com" ])).call(dry_run: false)
+
+    expect(kept.reload.person).to eq(person)
+    expect(person.email_addresses.pluck(:address)).to eq([ "someone.else@example.com" ])
+    expect(PhoneNumber.where(person: person).map(&:number)).to eq([ "+12025550188" ])
+  end
+
   it "keeps a guardian who still has another child registered" do
     sibling = create(:participant_event, event: past_event)
     create(:guardian_participant_event, guardian:, participant_event: sibling)

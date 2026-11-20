@@ -69,6 +69,7 @@ class User < ApplicationRecord
   has_many :event_series, through: :series_role_assignments
   has_one :participant
   has_one :guardian
+  belongs_to :person, optional: true
   has_many :reported_incidents, class_name: "Incident", foreign_key: "reported_by_user_id"
   has_many :authored_notes, class_name: "Note", foreign_key: "author_user_id"
   has_many :mobile_tokens, dependent: :destroy
