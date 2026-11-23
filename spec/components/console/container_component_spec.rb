@@ -33,6 +33,19 @@ RSpec.describe Console::ContainerComponent, type: :component do
     )
   end
 
+  it "keeps actions given without a title, in a header of their own" do
+    render_inline(described_class.new) do |box|
+      box.with_actions { '<a class="cs-btn" href="/new">New</a>'.html_safe }
+      "Body"
+    end
+
+    expect(rendered_content).to eq(
+      '<section class="cs-container"><div class="cs-container-header">' \
+      '<div class="cs-actions"><a class="cs-btn" href="/new">New</a></div></div>' \
+      '<div class="cs-container-body">Body</div></section>'
+    )
+  end
+
   it "renders a footer, body classes, and no header without a title" do
     render_inline(described_class.new(body_class: "cs-stack", footer_class: "flex justify-end", tag: :div, id: "box")) do |box|
       box.with_footer { "Save" }

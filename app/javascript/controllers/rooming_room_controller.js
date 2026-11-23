@@ -9,7 +9,7 @@ import { Controller } from "@hotwired/stimulus"
 // the interaction and asks for the change with an event; the page's
 // rooming-assignments controller (or, for adding staff, the staff modal)
 // makes the request:
-//   rooming-room:rename        { roomId, name }
+//   rooming-room:rename        { roomId, name, revert }
 //   rooming-room:delete        { roomId, card }
 //   rooming-room:remove-staff  { roomId, staffName }
 //   rooming-room:acknowledge   { assignmentId }
@@ -47,7 +47,10 @@ export default class extends Controller {
     const name = this.nameInputTarget.value
     if (name === this.nameInputTarget.defaultValue) return
 
-    this.dispatch("rename", { detail: { roomId: this.roomId, name } })
+    // A refused rename puts the saved name back in the field, so the next
+    // edit doesn't start from the rejected one.
+    const revert = () => { this.nameInputTarget.value = this.nameInputTarget.defaultValue }
+    this.dispatch("rename", { detail: { roomId: this.roomId, name, revert } })
   }
 
   delete() {

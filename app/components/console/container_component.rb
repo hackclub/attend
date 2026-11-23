@@ -45,11 +45,12 @@ module Console
 
     private
 
+    # Actions with no title still get a header to sit in.
     def header
-      return if @title.nil?
+      return if @title.nil? && !actions?
 
       content_tag(:div, class: class_list("cs-container-header", ("cs-container-header-divided" if @divided))) do
-        safe_join([ heading_block, (content_tag(:div, actions, class: "cs-actions") if actions?) ].compact)
+        safe_join([ (heading_block unless @title.nil?), (content_tag(:div, actions, class: "cs-actions") if actions?) ].compact)
       end
     end
 

@@ -62,6 +62,10 @@ export default class extends Controller {
   // --- drag and drop -------------------------------------------------------
 
   dragStart(event) {
+    // dragend never reaches this element when the dragged node was replaced
+    // mid-drag (a turbo stream re-rendering the rooms), so a room drag can be
+    // left behind; every new drag starts clean.
+    this.draggedRoomId = null
     const source = elementOf(event.target)
 
     // A participant sits inside a room card, so check for it first: dragging
@@ -110,6 +114,7 @@ export default class extends Controller {
   drop(event) {
     if (this.draggedRoomId) {
       this.dropRoom(event)
+      this.draggedRoomId = null
       return
     }
 
@@ -168,20 +173,27 @@ export default class extends Controller {
     await roomingRequest(this.reorderUrlValue, { body })
   }
 
-  async renameRoom({ detail: { roomId, name } }) {
+  async renameRoom({ detail: { roomId, name, revert } }) {
     const response = await roomingRequest(this.updateRoomUrlValue, {
       method: "PATCH", body: { room_id: roomId, name }, stream: true
     })
     if (response.ok) {
       await renderStream(response)
     } else {
-      alert("Failed to rename room")
+      revert?.()
+      alert(await errorMessage(response, "Failed to rename room"))
     }
   }
 
+  // The card only goes once the server has deleted the room: a refused
+  // delete (a locked plan, say) leaves it, and the next reorder, alone.
   async deleteRoom({ detail: { roomId, card } }) {
-    await roomingRequest(this.destroyRoomUrlValue, { method: "DELETE", body: { room_id: roomId } })
-    card.remove()
+    const response = await roomingRequest(this.destroyRoomUrlValue, { method: "DELETE", body: { room_id: roomId } })
+    if (response.ok) {
+      card.remove()
+    } else {
+      alert(await errorMessage(response, "Failed to delete room"))
+    }
   }
 
   async removeStaff({ detail: { roomId, staffName } }) {
@@ -194,8 +206,12 @@ export default class extends Controller {
   // Acknowledging changes flags on the card and the counts in the summary
   // bar, and the action answers with no body, so reload for the fresh page.
   async acknowledge({ detail: { assignmentId } }) {
-    await roomingRequest(this.acknowledgeUrlValue, { body: { assignment_id: assignmentId } })
-    location.reload()
+    const response = await roomingRequest(this.acknowledgeUrlValue, { body: { assignment_id: assignmentId } })
+    if (response.ok) {
+      location.reload()
+    } else {
+      alert(await errorMessage(response, "Failed to acknowledge"))
+    }
   }
 }
 

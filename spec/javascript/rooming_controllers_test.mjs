@@ -346,9 +346,57 @@ test("a rename is sent as a turbo-stream PATCH, and a failure says so", async (t
   assert.equal(globalThis.renderedStreams.length, 1)
   assert.deepEqual(state.alerts, [])
 
-  page.fire("rooming-room:rename", a.card, { detail: { roomId: "a", name: "Again" } })
+  let reverted = false
+  page.fire("rooming-room:rename", a.card, { detail: { roomId: "a", name: "Again", revert: () => { reverted = true } } })
   await flush()
   assert.deepEqual(state.alerts, [ "Failed to rename room" ])
+  assert.ok(reverted, "the field gets the saved name back")
+})
+
+test("a refused rename shows the server's reason", async (t) => {
+  const { page, a, state } = board(t, { responses: [ { ok: false, json: async () => ({ error: "Name has already been taken" }) } ] })
+
+  page.fire("rooming-room:rename", a.card, { detail: { roomId: "a", name: "Taken" } })
+  await flush()
+
+  assert.deepEqual(state.alerts, [ "Name has already been taken" ])
+})
+
+test("a refused delete keeps the card and says why", async (t) => {
+  const { page, list, b, state } = board(t, { responses: [ { ok: false, json: async () => ({ error: "The plan is locked" }) } ] })
+
+  page.fire("rooming-room:delete", b.card, { detail: { roomId: "b", card: b.card } })
+  await flush()
+
+  assert.deepEqual(list.children.map((card) => card.dataset.roomId), [ "a", "b", "c" ])
+  assert.deepEqual(state.alerts, [ "The plan is locked" ])
+})
+
+test("a failed acknowledge says so instead of reloading", async (t) => {
+  const { page, a, state } = board(t, { responses: [ { ok: false } ] })
+
+  page.fire("rooming-room:acknowledge", a.card, { detail: { assignmentId: "ra-9" } })
+  await flush()
+
+  assert.equal(state.reloads, 0)
+  assert.deepEqual(state.alerts, [ "Failed to acknowledge" ])
+})
+
+test("a room drag whose dragend never arrived doesn't swallow the next participant drag", async (t) => {
+  const { page, a, b, loose, state } = board(t)
+
+  // The dragged card was replaced mid-drag, so no dragend.
+  page.fire("dragstart", a.card, { dataTransfer: dataTransfer() })
+
+  const transfer = dataTransfer()
+  page.fire("dragstart", loose, { dataTransfer: transfer })
+  page.fire("dragover", b.zone, { dataTransfer: transfer })
+  assert.ok(b.zone.classList.contains("bg-blue-50"), "the zone lights up for the participant")
+  page.fire("drop", b.zone, { dataTransfer: transfer })
+  await flush()
+
+  assert.equal(state.requests.length, 1)
+  assert.equal(state.requests[0].url, "/rooming/move_assignment")
 })
 
 test("deleting a room removes its card once the request is back", async (t) => {
@@ -419,7 +467,15 @@ test("leaving the field with a new name asks for the rename; an unchanged name d
   controller.editName()
   input.value = "Room 102"
   controller.saveName()
-  assert.deepEqual(card.dispatched, [ { type: "rooming-room:rename", detail: { roomId: "a", name: "Room 102" } } ])
+  assert.equal(card.dispatched.length, 1)
+  const [ { type, detail } ] = card.dispatched
+  assert.equal(type, "rooming-room:rename")
+  assert.equal(detail.roomId, "a")
+  assert.equal(detail.name, "Room 102")
+
+  // A refused rename puts the saved name back in the field.
+  detail.revert()
+  assert.equal(input.value, "Room 101")
 })
 
 test("Enter leaves the field; Escape puts the saved name back without renaming", (t) => {

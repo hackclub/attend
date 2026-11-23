@@ -11,13 +11,13 @@
             <%= room.display_name %>
           </h3>
         <% else %>
-          <h3 class="font-medium text-gray-900 truncate hover:bg-white hover:px-1 hover:rounded cursor-text room-name-display"
+          <h3 class="font-medium text-gray-900 truncate hover:bg-white hover:px-1 hover:rounded cursor-text"
               title="Click to rename"
               data-rooming-room-target="nameDisplay" data-action="click->rooming-room#editName">
             <%= room.display_name %>
           </h3>
           <input type="text"
-                 class="hidden border border-gray-300 rounded px-2 py-0.5 text-sm font-medium room-name-input"
+                 class="hidden border border-gray-300 rounded px-2 py-0.5 text-sm font-medium"
                  value="<%= room.name %>"
                  placeholder="Room name"
                  data-rooming-room-target="nameInput" data-action="blur->rooming-room#saveName keydown->rooming-room#nameKey"
@@ -49,7 +49,7 @@
           <% end %>
         <% end %>
         <% unless @rooming_plan.locked? %>
-          <button type="button" data-delete-room="<%= room.id %>" data-action="rooming-room#delete" class="text-red-500 hover:text-red-700 text-sm">
+          <button type="button" data-action="rooming-room#delete" class="text-red-500 hover:text-red-700 text-sm">
             &times;
           </button>
         <% end %>
@@ -72,7 +72,7 @@
           </div>
           <% unless @rooming_plan.locked? %>
             <button type="button" 
-                    data-remove-staff="<%= room.id %>" data-staff-name="<%= staff_name %>" data-action="rooming-room#removeStaff"
+                    data-staff-name="<%= staff_name %>" data-action="rooming-room#removeStaff"
                     class="text-orange-500 hover:text-orange-700 text-sm">
               &times;
             </button>
@@ -136,7 +136,7 @@
         <% unless @rooming_plan.locked? %>
           <p class="text-xs text-gray-400">or</p>
           <button type="button" 
-                  data-add-staff-room="<%= room.id %>" data-action="rooming-room#addStaff"
+                  data-action="rooming-room#addStaff"
                   class="inline-flex items-center px-3 py-1.5 border border-orange-300 text-sm font-medium rounded-md text-orange-700 bg-orange-50 hover:bg-orange-100">
             + Add Staff
           </button>
@@ -144,7 +144,7 @@
       </div>
     <% elsif room.has_staff? && room.remaining_capacity > 0 && !@rooming_plan.locked? %>
       <button type="button" 
-              data-add-staff-room="<%= room.id %>" data-action="rooming-room#addStaff"
+              data-action="rooming-room#addStaff"
               class="w-full inline-flex items-center justify-center px-3 py-1.5 border border-dashed border-orange-300 text-sm font-medium rounded-md text-orange-600 hover:bg-orange-50">
         + Add Another Staff (<%= room.remaining_capacity %> spots left)
       </button>
