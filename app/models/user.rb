@@ -129,6 +129,14 @@ class User < ApplicationRecord
     global_admin? || event_role_assignments.exists?(event: event) || series_member_for_event?(event)
   end
 
+  # can_access_event? minus the read-only role: whether this person may change
+  # anything on the event at all. Read-only staff can look, and that's it.
+  def can_change_event?(event)
+    global_admin? ||
+      event_role_assignments.where(event: event).where.not(role: :read_only).exists? ||
+      series_member_for_event?(event)
+  end
+
   # Series members act as event admins on every event in their series.
   def series_member_for_event?(event)
     event.event_series_id.present? &&

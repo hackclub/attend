@@ -194,12 +194,12 @@ module Api
         PaperTrail.request.whodunnit = current_user&.id
       end
 
-      # The web composer is behind EventPolicy#update?: anyone with access to
-      # the event.
+      # The web composer is behind EventPolicy#update?: any role on the event
+      # but read_only, which can read what was sent and nothing more.
       def set_event
         @event = Event.find_by(id: params[:event_id]) || Event.find_by!(slug: params[:event_id])
         Current.event = @event
-        authorize @event, :update?
+        authorize @event, request.get? || request.head? ? :show? : :update?
       end
 
       def set_message

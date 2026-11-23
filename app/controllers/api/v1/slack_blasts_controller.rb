@@ -2,7 +2,8 @@ module Api
   module V1
     class SlackBlastsController < BaseController
       before_action :set_event
-      before_action :require_event_access
+      before_action :require_event_access, only: [ :index, :show ]
+      before_action :require_event_write_access, only: [ :create ]
 
       def index
         slack_blasts = @event.slack_blasts
@@ -71,6 +72,10 @@ module Api
 
       def require_event_access
         require_event_access!(@event)
+      end
+
+      def require_event_write_access
+        require_event_write_access!(@event)
       end
 
       def slack_blast_json(blast)
