@@ -30,13 +30,29 @@ function assetPaths() {
   return [...paths]
 }
 
-export function keepAvailableOffline() {
+// What the kept copy depends on: the assets (they change with each deploy)
+// and the page's config (who is scanning, the skin, the scan points). The
+// worker only renders the page again when this changes, or when its copy is
+// getting old, rather than on every visit.
+export function keptCopyKey(assets, config) {
+  const text = JSON.stringify([ [ ...assets ].sort(), config ])
+  // FNV-1a: a short fingerprint, not a secret.
+  let hash = 0x811c9dc5
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  return `${text.length.toString(36)}-${hash.toString(36)}`
+}
+
+export function keepAvailableOffline(config) {
   if (!("serviceWorker" in navigator)) return
 
   navigator.serviceWorker.ready.then((registration) => {
     // After the page has settled, so late-loading assets are listed too.
     setTimeout(() => {
-      registration.active?.postMessage({ type: "scanner:keep", assets: assetPaths() })
+      const assets = assetPaths()
+      registration.active?.postMessage({ type: "scanner:keep", assets, key: keptCopyKey(assets, config) })
     }, 3000)
   }).catch((error) => console.warn("Scanner can't be kept for offline use:", error))
 }

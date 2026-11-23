@@ -4,7 +4,7 @@ import test from "node:test"
 globalThis.window = { addEventListener() {} }
 globalThis.document = { addEventListener() {}, visibilityState: "visible" }
 
-const { createScanQueue, retryDelay } =
+const { createScanQueue, retryDelay, MAX_SERVER_ERRORS } =
   await import(new URL("../../app/javascript/scanner/sync.js", import.meta.url))
 
 const SCOPE = { eventId: "event-1", userId: "user-1" }
@@ -100,6 +100,54 @@ test("retries after a server error too", async () => {
   stop()
 
   assert.equal(store.rows.get("a").status, "queued")
+})
+
+test("doesn't let one scan the server fails on hold up the ones behind it", async () => {
+  const { store, posted, synced, queue, stop } = build([
+    queued("a", "2026-08-24T09:41:00.000Z"),
+    queued("b", "2026-08-24T09:42:00.000Z")
+  ], { a: { outcome: "server", status: 500 } })
+
+  await queue.load()
+  await queue.sync()
+  stop()
+
+  assert.deepEqual(posted.map((body) => body.client_scan_id), [ "a", "b" ])
+  assert.deepEqual(synced.map(([ id ]) => id), [ "b" ])
+  assert.equal(store.rows.get("a").status, "queued")
+  assert.equal(store.rows.get("a").serverErrors, 1)
+  assert.deepEqual(queue.snapshot().queued.map((record) => record.clientScanId), [ "a" ])
+})
+
+test("sets a scan aside for the operator once the server has failed on it too often", async () => {
+  const { store, queue, stop } = build([
+    queued("a", "2026-08-24T09:41:00.000Z", { serverErrors: MAX_SERVER_ERRORS - 1 }),
+    queued("b", "2026-08-24T09:42:00.000Z")
+  ], { a: { outcome: "server", status: 500 } })
+
+  await queue.load()
+  await queue.sync()
+  stop()
+
+  assert.equal(store.rows.get("a").status, "rejected")
+  assert.match(store.rows.get("a").error, /kept failing/)
+  assert.deepEqual(queue.snapshot().queued, [])
+})
+
+test("never sets scans aside while the server is failing on all of them", async () => {
+  const records = [ "a", "b", "c", "d" ].map((id, i) =>
+    queued(id, `2026-08-24T09:4${i}:00.000Z`, { serverErrors: MAX_SERVER_ERRORS - 1 }))
+  const down = { outcome: "server", status: 503 }
+  const { store, posted, queue, stop } = build(records, { a: down, b: down, c: down, d: down })
+
+  await queue.load()
+  await queue.sync()
+  stop()
+
+  // Three in a row and it stops asking, as it would for no connection.
+  assert.deepEqual(posted.map((body) => body.client_scan_id), [ "a", "b", "c" ])
+  assert.deepEqual([ ...store.rows.values() ].map((row) => row.status), [ "queued", "queued", "queued", "queued" ])
+  assert.equal(queue.snapshot().queued.length, 4)
 })
 
 test("keeps a scan the server turned down where the operator can see it, and carries on", async () => {

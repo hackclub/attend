@@ -8,6 +8,14 @@ const RETRY_MAX_MS = 60000
 // While signed out there is nothing to gain from hammering the server.
 const SESSION_RETRY_MS = 60000
 const LOCK_NAME = "attend-scanner-sync"
+// A scan the server keeps failing on while it records others is set aside
+// where the operator can see it after this many tries, rather than retried
+// for ever. Errors while nothing gets through (a deploy, a database restart)
+// don't count, so an outage never turns queued scans away.
+export const MAX_SERVER_ERRORS = 5
+// This many server errors in a row with nothing recorded between them looks
+// like the server being down, not a problem with these scans.
+const SERVER_DOWN_AFTER = 3
 
 export function retryDelay(failures) {
   const delay = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** Math.max(0, failures - 1))
@@ -77,6 +85,9 @@ export function createScanQueue({ store, api, scope, signal, onChange, onSynced 
   async function sendAll() {
     // Re-read first: another tab may have sent or added scans since.
     records = await store.all()
+    const serverFailed = []
+    let serverAnswered = false
+    let serverErrorsInARow = 0
 
     for (const record of snapshot().queued) {
       if (signal.aborted) return
@@ -92,6 +103,8 @@ export function createScanQueue({ store, api, scope, signal, onChange, onSynced 
         records = records.filter((other) => other.clientScanId !== record.clientScanId)
         failures = 0
         sessionExpired = false
+        serverAnswered = true
+        serverErrorsInARow = 0
         if (!signal.aborted) onSynced(record, result.data)
       } else if (result.outcome === "refused") {
         // The server understood and said no. Retrying can't change that, so
@@ -100,12 +113,23 @@ export function createScanQueue({ store, api, scope, signal, onChange, onSynced 
         await store.put(record)
         failures = 0
         sessionExpired = false
+        serverAnswered = true
+        serverErrorsInARow = 0
       } else if (result.outcome === "session") {
         // Not a verdict on the scan: it stays queued until someone signs in.
         sessionExpired = true
         schedule(SESSION_RETRY_MS)
         return
+      } else if (result.outcome === "server") {
+        // A server error may be about this scan alone, so it must not hold
+        // up the ones behind it: skip it for now and come back after a wait.
+        record.attempts = (record.attempts || 0) + 1
+        await store.put(record)
+        sessionExpired = false
+        serverFailed.push(record)
+        if (++serverErrorsInARow >= SERVER_DOWN_AFTER) break
       } else {
+        // Unreachable: everything behind it would be too, so stop here.
         record.attempts = (record.attempts || 0) + 1
         await store.put(record)
         sessionExpired = false
@@ -114,6 +138,25 @@ export function createScanQueue({ store, api, scope, signal, onChange, onSynced 
       }
       changed()
     }
+
+    if (!serverFailed.length) return
+    if (serverAnswered) {
+      // The server recorded other scans, so these failures are about the
+      // scans themselves.
+      for (const record of serverFailed) {
+        record.serverErrors = (record.serverErrors || 0) + 1
+        if (record.serverErrors >= MAX_SERVER_ERRORS) {
+          Object.assign(record, {
+            status: "rejected",
+            error: "The server kept failing on this scan. Check Recent Scans, and scan again if it is not listed.",
+            rejectedAt: new Date().toISOString()
+          })
+        }
+        await store.put(record)
+      }
+      changed()
+    }
+    schedule(retryDelay(++failures))
   }
 
   async function sync() {

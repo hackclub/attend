@@ -146,19 +146,25 @@ module Api
           return render json: { error: "Participant not found for this event" }, status: :not_found
         end
 
+        # `scanned_at` is the client's claim for when the scan happened; the
+        # recorder bounds it as it does the admin scanner's.
         result = ScanRecorder.call(
           participant_event: participant_event,
           user: current_user,
           scan_context: scan_context,
-          scanned_at: params[:scanned_at].presence || Time.current,
+          client_scanned_at: params[:scanned_at],
+          client_sent_at: params[:client_sent_at],
           client_scan_id: params[:client_scan_id],
           source: scan_source
         )
 
-        first_attempt_in_context = result.first_scan_in_context? && !result.deduplicated?
+        # These also run on a retry of the first scan, in case the first
+        # attempt saved the scan and then failed before finishing them. Both
+        # are idempotent.
+        first_in_context = result.first_scan_in_context?
 
         # Mark travel pickup for travel or check-in contexts on first scan in that context
-        if (scan_context.is_travel_pickup? || scan_context.checks_in?) && first_attempt_in_context
+        if (scan_context.is_travel_pickup? || scan_context.checks_in?) && first_in_context
           mark_travel_pickup(participant_event, current_user)
         end
 
@@ -167,7 +173,7 @@ module Api
         end
 
         # Auto-generate NFC badge token on first check-in if NFC is enabled
-        if @event.nfc_badges_enabled? && scan_context.checks_in? && first_attempt_in_context
+        if @event.nfc_badges_enabled? && scan_context.checks_in? && first_in_context
           participant_event.ensure_nfc_badge_token!
         end
 
@@ -181,7 +187,7 @@ module Api
           scan_context: scan_context_json(result.scan.scan_context),
           participant: participant_detail_json(participant_event.reload)
         }
-      rescue ActiveRecord::RecordInvalid => e
+      rescue ScanRecorder::ClientScanIdConflict, ActiveRecord::RecordInvalid => e
         render json: { error: e.message }, status: :unprocessable_entity
       end
 

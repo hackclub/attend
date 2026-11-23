@@ -213,15 +213,33 @@ RSpec.describe "Admin::Scans", type: :request do
       expect { scan!(client_scan_id: client_scan_id) }.not_to change(AuditLog, :count)
     end
 
-    it "doesn't repeat the first scan's side effects on a retry" do
+    # The scan is saved before the side effects run, so a failure in them
+    # comes back as a server error that the device retries with the same id.
+    it "finishes the first scan's side effects and audit entry on a retry after they failed" do
       event.update!(nfc_badges_enabled: true)
-      scan!(client_scan_id: client_scan_id)
-      token = participant_event.reload.nfc_badge_token
+      get scanner_admin_event_scans_path(event)
+      allow_any_instance_of(ParticipantEvent).to receive(:ensure_nfc_badge_token!).and_raise(ActiveRecord::Deadlocked)
+
+      expect { scan!(client_scan_id: client_scan_id) }.to raise_error(ActiveRecord::Deadlocked)
+      expect(participant_event.scans.count).to eq(1)
+      expect(AuditLog.where(record_type: "Scan")).to be_empty
+
+      allow_any_instance_of(ParticipantEvent).to receive(:ensure_nfc_badge_token!).and_call_original
+      expect { scan!(client_scan_id: client_scan_id) }.to change { AuditLog.where(record_type: "Scan").count }.by(1)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["deduplicated"]).to be(true)
+      expect(participant_event.reload.nfc_badge_token).to be_present
+    end
+
+    it "doesn't run the side effects for a retry of a later scan" do
+      event.update!(nfc_badges_enabled: true)
+      scan!
       participant_event.update_columns(nfc_badge_token: nil)
 
       scan!(client_scan_id: client_scan_id)
+      scan!(client_scan_id: client_scan_id)
 
-      expect(token).to be_present
       expect(participant_event.reload.nfc_badge_token).to be_nil
     end
   end

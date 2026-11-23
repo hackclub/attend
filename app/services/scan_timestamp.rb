@@ -34,7 +34,9 @@ class ScanTimestamp
     if age > MAX_AGE || age < -MAX_FUTURE_SKEW
       Result.new(scanned_at: now, client_scanned_at: claimed, adjusted: true)
     else
-      Result.new(scanned_at: now - [ age, 0 ].max, client_scanned_at: claimed, adjusted: false)
+      # Rounded to what the database keeps, so the scan compares the same
+      # before and after it is saved.
+      Result.new(scanned_at: (now - [ age, 0 ].max).round(6), client_scanned_at: claimed, adjusted: false)
     end
   end
 

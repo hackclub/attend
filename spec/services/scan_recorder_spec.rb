@@ -1,12 +1,14 @@
 require "rails_helper"
 
 RSpec.describe ScanRecorder do
+  include ActiveSupport::Testing::TimeHelpers
+
   subject(:record_scan) do
     described_class.call(
       participant_event: participant_event,
       user: user,
       scan_context: scan_context,
-      scanned_at: scanned_at,
+      client_scanned_at: scanned_at,
       client_scan_id: client_scan_id,
       source: "qr"
     )
@@ -15,7 +17,7 @@ RSpec.describe ScanRecorder do
   let(:participant_event) { create(:participant_event) }
   let(:scan_context) { participant_event.event.scan_contexts.find_by!(checks_in: true) }
   let(:user) { create(:user) }
-  let(:scanned_at) { Time.zone.parse("2026-08-24 09:41:00") }
+  let(:scanned_at) { 10.minutes.ago.change(usec: 0) }
   let(:client_scan_id) { SecureRandom.uuid }
 
   it "classifies the first context attempt as scanned" do
@@ -33,7 +35,7 @@ RSpec.describe ScanRecorder do
       participant_event: participant_event,
       user: user,
       scan_context: scan_context,
-      scanned_at: scanned_at + 1.minute,
+      client_scanned_at: scanned_at + 1.minute,
       client_scan_id: SecureRandom.uuid,
       source: "qr"
     )
@@ -50,7 +52,7 @@ RSpec.describe ScanRecorder do
       participant_event: participant_event,
       user: user,
       scan_context: scan_context,
-      scanned_at: scanned_at + 2.minutes,
+      client_scanned_at: scanned_at + 2.minutes,
       client_scan_id: client_scan_id,
       source: "qr"
     )
@@ -69,7 +71,7 @@ RSpec.describe ScanRecorder do
       participant_event: participant_event,
       user: user,
       scan_context: exit_context,
-      scanned_at: scanned_at + 1.minute,
+      client_scanned_at: scanned_at + 1.minute,
       client_scan_id: SecureRandom.uuid,
       source: "qr"
     )
@@ -110,7 +112,6 @@ RSpec.describe ScanRecorder do
               participant_event: @concurrent_participant_event,
               user: @concurrent_user,
               scan_context: @concurrent_context,
-              scanned_at: Time.current,
               client_scan_id: SecureRandom.uuid,
               source: "qr"
             )
@@ -128,17 +129,91 @@ RSpec.describe ScanRecorder do
   end
 
   it "keeps the device's own time for the scan beside the recorded one" do
-    claimed = scanned_at - 3.minutes
-    result = described_class.call(
+    freeze_time do
+      claimed = 3.days.from_now
+      result = described_class.call(
+        participant_event: participant_event,
+        user: user,
+        scan_context: scan_context,
+        client_scanned_at: claimed - 3.minutes,
+        client_sent_at: claimed,
+        client_scan_id: client_scan_id,
+        source: "qr"
+      )
+
+      expect(result.scan.reload.scanned_at).to be_within(1.second).of(3.minutes.ago)
+      expect(result.scan.client_scanned_at).to be_within(1.second).of(claimed - 3.minutes)
+      expect(result.time_adjusted?).to be(false)
+    end
+  end
+
+  it "records the server's time for a device time out of bounds" do
+    freeze_time do
+      result = described_class.call(
+        participant_event: participant_event,
+        user: user,
+        scan_context: scan_context,
+        client_scanned_at: 1.year.ago,
+        client_scan_id: client_scan_id,
+        source: "qr"
+      )
+
+      expect(result.scan.scanned_at).to be_within(1.second).of(Time.current)
+      expect(result.time_adjusted?).to be(true)
+    end
+  end
+
+  # A scan held on a device while offline reaches the server after a later
+  # scan of the same person from another device. It is still the first, as it
+  # is for the participant's check-in time.
+  it "decides the first scan by when it happened, not when it arrived" do
+    later = record_scan
+    earlier = described_class.call(
       participant_event: participant_event,
       user: user,
       scan_context: scan_context,
-      scanned_at: scanned_at,
-      client_scanned_at: claimed,
-      client_scan_id: client_scan_id,
+      client_scanned_at: scanned_at - 5.minutes,
+      client_scan_id: SecureRandom.uuid,
       source: "qr"
     )
 
-    expect(result.scan.reload).to have_attributes(scanned_at: scanned_at, client_scanned_at: claimed)
+    expect(later.first_scan_in_context?).to be(true)
+    expect(earlier.first_scan_in_context?).to be(true)
+    expect(earlier.first_scanned_at).to eq(earlier.scan.scanned_at)
+    expect(participant_event.reload.check_in_time).to eq(earlier.scan.reload.scanned_at)
+
+    retry_of_later = described_class.call(
+      participant_event: participant_event,
+      user: user,
+      scan_context: scan_context,
+      client_scanned_at: scanned_at,
+      client_scan_id: client_scan_id,
+      source: "qr"
+    )
+    expect(retry_of_later).to have_attributes(outcome: "already_scanned", first_scanned_at: earlier.scan.scanned_at)
+  end
+
+  it "refuses an id already used for another person or scan point" do
+    record_scan
+    other = create(:participant_event, event: participant_event.event)
+
+    expect {
+      described_class.call(
+        participant_event: other,
+        user: user,
+        scan_context: scan_context,
+        client_scan_id: client_scan_id,
+        source: "qr"
+      )
+    }.to raise_error(ScanRecorder::ClientScanIdConflict)
+    expect(other.scans).to be_empty
+  end
+
+  it "only treats a clash on the scan id as a retry" do
+    invalid = Scan.new.tap { |scan| scan.errors.add(:scanned_at, :blank) }
+    allow(participant_event.scans).to receive(:create!).and_raise(ActiveRecord::RecordInvalid.new(invalid))
+    allow(participant_event).to receive(:scans).and_return(participant_event.scans)
+
+    expect { record_scan }.to raise_error(ActiveRecord::RecordInvalid)
   end
 end

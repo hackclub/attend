@@ -395,7 +395,7 @@ export function mountScanner(element, config) {
     renderSyncState()
   })
 
-  keepAvailableOffline()
+  keepAvailableOffline(config)
 
   // Hand the camera back as soon as we navigate away, otherwise iOS keeps the
   // capture (and its indicator) alive behind the next page.

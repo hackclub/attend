@@ -165,42 +165,32 @@ module Admin
         return
       end
 
-      if client_scan_id && client_scan_id_taken_elsewhere?(client_scan_id, participant_event, scan_context)
-        render_client_scan_id_conflict
-        return
-      end
-
-      timestamp = ScanTimestamp.resolve(
-        client_scanned_at: params[:client_scanned_at],
-        client_sent_at: params[:client_sent_at]
-      )
-
       begin
         result = ScanRecorder.call(
           participant_event: participant_event,
           user: current_user,
           scan_context: scan_context,
-          scanned_at: timestamp.scanned_at,
-          client_scanned_at: timestamp.client_scanned_at,
+          client_scanned_at: params[:client_scanned_at],
+          client_sent_at: params[:client_sent_at],
           client_scan_id: client_scan_id,
           source: scan_source
         )
-      rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
-        raise unless client_scan_id
-
-        # Lost a race for the id to a scan of someone else.
-        render_client_scan_id_conflict
+      rescue ScanRecorder::ClientScanIdConflict => error
+        render json: { error: error.message }, status: :conflict
         return
       end
 
       scan = result.scan
       first_scan_in_context = result.first_scan_in_context?
-      # A retry of a scan we already hold changes nothing, so it must not
-      # repeat the first scan's side effects or its audit entry.
-      new_scan = !result.deduplicated?
-      @record = scan if new_scan
+      # A retry of a scan we already hold adds no audit entry of its own,
+      # unless the first attempt failed after the scan was saved and so never
+      # wrote one.
+      @record = scan if !result.deduplicated? || !AuditLog.exists?(record_type: "Scan", record_id: scan.id)
 
-      if scan_context.is_travel_pickup? && first_scan_in_context && new_scan
+      # These run again on a retry of the first scan. Both are idempotent, and
+      # the first attempt may have saved the scan and then failed before or
+      # during them, which the device sees as a server error and retries.
+      if scan_context.is_travel_pickup? && first_scan_in_context
         mark_travel_pickup(participant_event, current_user)
       end
 
@@ -209,7 +199,7 @@ module Admin
       end
 
       # Auto-generate NFC badge token on first check-in if NFC is enabled
-      if current_event.nfc_badges_enabled? && scan_context.checks_in? && first_scan_in_context && new_scan
+      if current_event.nfc_badges_enabled? && scan_context.checks_in? && first_scan_in_context
         participant_event.ensure_nfc_badge_token!
       end
 
@@ -231,7 +221,7 @@ module Admin
         scanned_at: scan.scanned_at.iso8601,
         # True when the device's time for the scan was out of bounds and the
         # server's was recorded instead.
-        time_adjusted: new_scan && timestamp.adjusted?,
+        time_adjusted: result.time_adjusted?,
         scan_context: {
           id: scan_context.id,
           name: scan_context.name,
@@ -343,18 +333,6 @@ module Admin
     # than the UTC one, which ends in the afternoon or evening at a US event.
     def event_today
       Time.current.in_time_zone(current_event.event_time_zone).all_day
-    end
-
-    # An id is only ever a retry of the same person at the same scan point.
-    # Seen again for anything else, it is a client bug or a forged request.
-    def client_scan_id_taken_elsewhere?(client_scan_id, participant_event, scan_context)
-      existing = Scan.find_by(client_scan_id: client_scan_id)
-      existing.present? &&
-        (existing.participant_event_id != participant_event.id || existing.scan_context_id != scan_context.id)
-    end
-
-    def render_client_scan_id_conflict
-      render json: { error: "This scan id was already used for a different scan" }, status: :conflict
     end
 
     def set_scan
