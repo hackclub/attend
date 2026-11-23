@@ -114,6 +114,33 @@ RSpec.describe "Event creation invite flow", type: :request do
       expect(response).to redirect_to(admin_new_event_path(invite: invite.id))
     end
 
+    it "can't be kept by naming a different invite on the create" do
+      post admin_accept_event_creation_invite_path(token)
+
+      post admin_events_path, params: { invite: SecureRandom.uuid, event: event_params }
+      post admin_events_path, params: { invite: "", event: event_params.merge(slug: "second-con") }
+
+      # The first is refused outright; the second falls back to the invite and
+      # spends it.
+      expect(Event.where(slug: "invited-con")).to be_empty
+      expect(Event.where(slug: "second-con")).to exist
+      expect(invite.reload).to be_completed
+
+      post admin_events_path, params: { event: event_params.merge(slug: "third-con") }
+      expect(Event.where(slug: "third-con")).to be_empty
+    end
+
+    it "is spent even when the person is also a member of some series" do
+      create(:series_role_assignment, user: invitee)
+      post admin_accept_event_creation_invite_path(token)
+
+      post admin_events_path, params: { event: event_params }
+      expect(invite.reload).to be_completed
+
+      post admin_events_path, params: { event: event_params.merge(slug: "second-con") }
+      expect(Event.where(slug: "second-con")).to be_empty
+    end
+
     it "stops working once revoked" do
       post admin_accept_event_creation_invite_path(token)
       invite.revoke!

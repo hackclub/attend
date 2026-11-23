@@ -5,13 +5,10 @@ module Admin
 
     def new
       @event = Event.new
+      @event.event_series = EventSeries.find_by(slug: params[:series]) if params[:series].present?
       @creation_invite = creation_invite
-      if @creation_invite
-        @event.event_series = @creation_invite.event_series
-      elsif params[:series].present?
-        @event.event_series = EventSeries.find_by(slug: params[:series])
-      end
-      authorize @event
+      @event.event_series = @creation_invite.event_series if @creation_invite
+      authorize_new_event
     end
 
     def create
@@ -19,7 +16,7 @@ module Admin
       @creation_invite = creation_invite
       # The invite decides which series, if any, the event belongs to.
       @event.event_series_id = @creation_invite.event_series_id if @creation_invite
-      authorize @event
+      authorize_new_event
 
       if save_new_event
         ensure_creator_has_admin_role
@@ -157,19 +154,27 @@ module Admin
       super
     end
 
-    # The invite this event is being created under, if any. Global admins
-    # never need one. Anyone else names theirs (the form carries it), and
-    # someone with no other way to create an event falls back to the invite
-    # they've accepted.
+    # The invite this event is being created under, if any: the one the form
+    # names, or, for someone with no right of their own to create @event, the
+    # one they've accepted. Global admins never need one.
     def creation_invite
       return nil if current_user.global_admin?
 
       invites = EventCreationInvite.usable_by(current_user)
-      if params[:invite].present?
-        invites.find_by(id: params[:invite])
-      elsif !current_user.series_role_assignments.exists?
-        invites.order(:accepted_at).first
-      end
+      return invites.find_by(id: params[:invite]) if params[:invite].present?
+      return nil if policy(@event).create?
+
+      invites.order(:accepted_at).first
+    end
+
+    # Either the person may create @event in their own right, or the create
+    # is tied to a usable invite of theirs, which #save_new_event then uses
+    # up. There is no third way: an invite never authorizes a create that
+    # doesn't consume it.
+    def authorize_new_event
+      return authorize(@event, :create?) unless @creation_invite
+
+      skip_authorization
     end
 
     # One invite makes one event: the invite is locked while the event saves
