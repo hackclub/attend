@@ -6,6 +6,7 @@ module Admin
     before_action :set_current_event_from_session
     before_action :switch_event_if_needed
     before_action :ensure_can_access_current_event, if: -> { current_event.present? }
+    before_action :ensure_can_change_current_event, if: :event_write_request?
     after_action :log_admin_action, unless: -> { request.get? }
 
     layout "admin"
@@ -135,6 +136,18 @@ module Admin
       return false unless current_event
 
       current_user.can_access_event?(current_event)
+    end
+
+    # A write to an event-scoped route. Getting into /admin only takes an
+    # admin role on some event, so someone who is ops on one event and
+    # read_only on another reaches both; this is what keeps the read_only one
+    # read-only, whatever the individual controller checks.
+    def event_write_request?
+      current_event.present? && params[:event_slug].present? && !request.get? && !request.head?
+    end
+
+    def ensure_can_change_current_event
+      raise Pundit::NotAuthorizedError unless current_user.can_change_event?(current_event)
     end
 
     def ensure_can_access_current_event

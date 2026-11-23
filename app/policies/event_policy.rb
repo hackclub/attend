@@ -15,8 +15,11 @@ class EventPolicy < ApplicationPolicy
     record.is_a?(Event) && record.event_series_id.present? && user.series_member_for_event?(record)
   end
 
+  # Any role on the event except read_only, which can look (show?) but not
+  # change anything. This is the bar for the event's settings, broadcasts and
+  # every other write that has no narrower policy of its own.
   def update?
-    user.global_admin? || user.can_access_event?(record)
+    user.global_admin? || user.can_change_event?(record)
   end
 
   def select?
