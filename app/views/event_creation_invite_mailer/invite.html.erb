@@ -1,0 +1,37 @@
+<p>Hi,</p>
+
+<p>
+  <% if @invited_by %>
+    <strong><%= @invited_by.name.presence || @invited_by.email %></strong> invited you to
+  <% else %>
+    You've been invited to
+  <% end %>
+  set up an event on Attend<% if @series %> in the <strong><%= @series.name %></strong> series<% end %>.
+  Attend is where Hack Club events handle registration, waivers, travel and check-in.
+</p>
+
+<% if @invite.note.present? %>
+  <p style="margin-bottom: 4px;"><strong>A note from <%= @invited_by&.name.presence || "them" %>:</strong></p>
+  <blockquote style="margin: 0 0 16px; padding-left: 12px; border-left: 3px solid #d0d0d0;"><%= simple_format(@invite.note, {}, wrapper_tag: "span") %></blockquote>
+<% end %>
+
+<p>
+  You'll name the event, set its dates and venue, choose what it needs (travel,
+  accommodation, visa letters) and add your team. It takes about ten minutes,
+  and you can stop and come back.
+</p>
+
+<p><%= mail_button "Set up your event", @url %></p>
+
+<p>
+  Sign in with the Hack Club account that uses this email address (<%= @invite.email %>).
+  The link works until <%= @invite.expires_at.strftime("%-d %B %Y") %>.
+</p>
+
+<p>
+  <% if @invited_by %>
+    Questions? Just reply to this email and it'll go to <%= @invited_by.email %>.
+  <% else %>
+    Questions? Just reply to this email.
+  <% end %>
+</p>

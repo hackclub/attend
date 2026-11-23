@@ -6,6 +6,8 @@
       description: "You can change any of this later."
     } do %>
   <%= form_with model: [ :admin, @event ], class: "cs-stack", multipart: true, html: { novalidate: true }, data: { controller: "cs-form-validation" } do |f| %>
+    <%# Created under an event creation invite: carried so the create uses the same one. %>
+    <%= hidden_field_tag :invite, @creation_invite.id if @creation_invite %>
     <% if @event.event_series %>
       <%= f.hidden_field :event_series_id %>
       <div class="cs-alert">
@@ -41,7 +43,7 @@
     <%= cs_form_errors f %>
 
     <div class="cs-wizard-actions">
-      <%= link_to "Cancel", admin_root_path, class: "cs-btn cs-btn-link" %>
+      <%= link_to "Cancel", admin_root_path, class: "cs-btn cs-btn-link" unless @creation_invite && !current_user.admin? %>
       <%= f.button "Create event and continue", class: "cs-btn cs-btn-primary" %>
     </div>
   <% end %>

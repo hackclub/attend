@@ -5,20 +5,31 @@ module Admin
 
     def new
       @event = Event.new
-      @event.event_series = EventSeries.find_by(slug: params[:series]) if params[:series].present?
+      @creation_invite = creation_invite
+      if @creation_invite
+        @event.event_series = @creation_invite.event_series
+      elsif params[:series].present?
+        @event.event_series = EventSeries.find_by(slug: params[:series])
+      end
       authorize @event
     end
 
     def create
       @event = Event.new(event_params)
+      @creation_invite = creation_invite
+      # The invite decides which series, if any, the event belongs to.
+      @event.event_series_id = @creation_invite.event_series_id if @creation_invite
       authorize @event
 
-      if @event.save
+      if save_new_event
         ensure_creator_has_admin_role
         # As the setup wizard it lands on does, so the audit row is the new
         # event's rather than whichever one was picked.
         set_current_event(@event)
         redirect_to admin_event_setup_schedule_path(@event), notice: "#{@event.name} created! Let's finish setting it up."
+      elsif @creation_invite&.completed?
+        # A second submit of the same form: the first one made the event.
+        redirect_to admin_event_setup_path(@creation_invite.event)
       else
         render :new, status: :unprocessable_entity
       end
@@ -136,6 +147,44 @@ module Admin
     end
 
     private
+
+    # Someone invited to create an event (EventCreationInvite) isn't an admin
+    # of anything until it exists, so these two actions let them in on the
+    # invite alone. EventPolicy#create? still decides.
+    def authorize_admin_access
+      return if action_name.in?(%w[new create]) && EventCreationInvite.usable_by(current_user).exists?
+
+      super
+    end
+
+    # The invite this event is being created under, if any. Global admins
+    # never need one. Anyone else names theirs (the form carries it), and
+    # someone with no other way to create an event falls back to the invite
+    # they've accepted.
+    def creation_invite
+      return nil if current_user.global_admin?
+
+      invites = EventCreationInvite.usable_by(current_user)
+      if params[:invite].present?
+        invites.find_by(id: params[:invite])
+      elsif !current_user.series_role_assignments.exists?
+        invites.order(:accepted_at).first
+      end
+    end
+
+    # One invite makes one event: the invite is locked while the event saves
+    # and marked used in the same transaction, so a double submit can't
+    # create two.
+    def save_new_event
+      return @event.save unless @creation_invite
+
+      @creation_invite.with_lock do
+        next false unless @creation_invite.usable? && @event.save
+
+        @creation_invite.complete!(@event)
+        true
+      end
+    end
 
     # A create that failed re-renders the new event form, which isn't about
     # the picked event any more than #new is.

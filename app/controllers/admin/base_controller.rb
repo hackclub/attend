@@ -85,7 +85,13 @@ module Admin
     end
 
     def authorize_admin_access
-      unless current_user&.admin?
+      return if current_user&.admin?
+
+      # Someone partway through an event creation invite has one admin page
+      # open to them, the new event form; send them back to it.
+      if (invite = EventCreationInvite.usable_by(current_user).first)
+        redirect_to admin_new_event_path(invite: invite.id)
+      else
         redirect_to root_path, alert: "You are not authorized to access this area."
       end
     end

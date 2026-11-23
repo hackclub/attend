@@ -20,6 +20,8 @@
       </div>
     <% end %>
 
+    <%# Created under an event creation invite: carried so the create uses the same one. %>
+    <%= hidden_field_tag :invite, @creation_invite.id if @creation_invite %>
     <% if @event.event_series %>
       <%= f.hidden_field :event_series_id %>
       <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">

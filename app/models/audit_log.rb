@@ -105,6 +105,8 @@ class AuditLog < ApplicationRecord
     connect_airtable: "connect_airtable",
     disconnect_airtable: "disconnect_airtable",
     revoke_invite: "revoke_invite",
+    resend_event_creation_invite: "resend",
+    accept_event_creation_invite: "accept",
     send_held_invitations: "send_held_invitations",
     destroy_avatar: "destroy_avatar",
     toggle_maintenance: "toggle_maintenance",

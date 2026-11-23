@@ -8,11 +8,15 @@ class EventPolicy < ApplicationPolicy
   end
 
   # Series members can create events inside their own series; the record must
-  # carry the target event_series_id so membership can be checked here.
+  # carry the target event_series_id so membership can be checked here. Anyone
+  # else needs an event creation invite they've accepted, which names the
+  # series (or none) the event has to be in.
   def create?
     return true if user.global_admin?
+    return false unless record.is_a?(Event)
 
-    record.is_a?(Event) && record.event_series_id.present? && user.series_member_for_event?(record)
+    (record.event_series_id.present? && user.series_member_for_event?(record)) ||
+      EventCreationInvite.usable_by(user).exists?(event_series_id: record.event_series_id)
   end
 
   def update?
