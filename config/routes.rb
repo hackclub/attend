@@ -53,6 +53,10 @@ Rails.application.routes.draw do
 
   root "home#index"
 
+  # The link in an event creation invite. Signed out it offers sign-in; signed
+  # in it hands over to the welcome step in the admin (see the admin routes).
+  get "event-invites/:token", to: "event_creation_invites#show", as: :event_creation_invite
+
   # Admin-only API reference. /docs is reverse-proxied onto the Mintlify-hosted
   # docs (see Mintlify::Proxy), so the whole prefix belongs to the proxy —
   # `format: false` keeps Rails from splitting /docs/_next/chunk.js into a path
@@ -555,6 +559,16 @@ Rails.application.routes.draw do
       get :preview, on: :member
     end
 
+    # Inviting someone to create an event themselves (EventCreationInvite).
+    # The invited person's side: the welcome step ahead of the setup wizard.
+    get "event_invites/:token/welcome", to: "event_creation_invite_onboarding#show", as: :event_creation_invite_welcome
+    post "event_invites/:token/accept", to: "event_creation_invite_onboarding#accept", as: :accept_event_creation_invite
+    resources :event_creation_invites, path: "event_invites", only: [ :index, :new, :create ] do
+      member do
+        post :resend
+        patch :revoke
+      end
+    end
     resources :bans do
       member do
         patch :revoke

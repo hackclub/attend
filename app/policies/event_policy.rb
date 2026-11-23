@@ -9,6 +9,10 @@ class EventPolicy < ApplicationPolicy
 
   # Series members can create events inside their own series; the record must
   # carry the target event_series_id so membership can be checked here.
+  #
+  # An event creation invite is deliberately not a way in here: it is good for
+  # one event, so it only counts where the create also uses it up
+  # (Admin::EventsController#authorize_new_event).
   def create?
     return true if user.global_admin?
 
