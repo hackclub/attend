@@ -231,6 +231,38 @@ class ParticipantEventsToolbox < ApplicationToolbox
     render json: { sent: true, to: gpe.guardian.email, guardian: serialize_guardian_link(gpe) }
   end
 
+  tool "Replace a guardian with a DIFFERENT person (global admins only). Removes the old guardian from the " \
+       "registration, resets every guardian-signed waiver and document for the new guardian to sign, moves " \
+       "emergency contacts across, and emails the new guardian their portal invite once the registration is " \
+       "waiting on them. Can't be undone. To fix a typo in the same person's details, use " \
+       "participant_events_update_guardian instead, which keeps their signatures.",
+    access: :write, scope: "participants:write" do
+    param :participant_event_id, :string, "ParticipantEvent ID"
+    param :guardian_participant_event_id, :string, "Guardian link ID being replaced, from participant_events_guardians"
+    param :legal_first_name, :string, "New guardian's legal first name"
+    param :legal_last_name, :string, "New guardian's legal last name"
+    param :email, :string, "New guardian's email"
+    param :phone, :string, "New guardian's phone number (E.164)", optional: true
+    param :relationship, :string, "Relationship to the participant, e.g. Parent", optional: true
+  end
+  def replace_guardian
+    load_participant_event!
+
+    outcome = operation_value!(
+      Guardians::Replace.call(operation_context,
+        participant_event: @participant_event,
+        guardian_participant_event: params[:guardian_participant_event_id],
+        attributes: params.permit(:legal_first_name, :legal_last_name, :email, :phone, :relationship).to_h)
+    )
+
+    render json: {
+      guardian: serialize_guardian_link(outcome.link.reload),
+      invited: outcome.invited?,
+      reset_consents: outcome.reset_consents.map { |consent| serialize_consent(consent.reload) },
+      note: replacement_invite_note(outcome)
+    }
+  end
+
   # --- Consents / waivers ----------------------------------------------------
 
   tool "List a registration's consents and waivers with their signing state (who it's pending on, " \
@@ -280,6 +312,16 @@ class ParticipantEventsToolbox < ApplicationToolbox
   end
 
   private
+
+  def replacement_invite_note(outcome)
+    if outcome.invited?
+      "Portal invite emailed to the new guardian."
+    elsif @participant_event.event.guardian_invites_locked?
+      "Guardian invites are locked for this event; the new guardian is invited when they open."
+    else
+      "The new guardian is invited once the participant submits their registration."
+    end
+  end
 
   def load_participant_event!
     @participant_event = ParticipantEvent.includes(:event, :participant).find(params[:participant_event_id])

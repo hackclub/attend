@@ -41,7 +41,52 @@ module Admin
       end
     end
 
+    # Replace this guardian with a different person: global admins only
+    # (Guardians::Replace). Editing above is for fixing the same person's
+    # details; this is for "the wrong parent did the portal".
+    def new_replacement
+      authorize @participant_event, :replace_guardian?
+      @replacement = Guardian.new
+    end
+
+    def replace_guardian
+      result = Guardians::Replace.call(operation_context,
+        participant_event: @participant_event,
+        guardian_participant_event: @guardian_participant_event,
+        attributes: replacement_params.to_h)
+
+      if result.success?
+        outcome = result.value
+        redirect_to admin_event_participant_path(current_event, @participant_event),
+          notice: replacement_notice(outcome)
+      else
+        @replacement = result.record.is_a?(Guardian) ? result.record : Guardian.new(replacement_params.except(:relationship))
+        @relationship = replacement_params[:relationship]
+        flash.now[:alert] = result.message if @replacement.errors.empty?
+        render :new_replacement, status: :unprocessable_content
+      end
+    end
+
     private
+
+    def replacement_notice(outcome)
+      guardian = outcome.link.guardian
+      reset = outcome.reset_consents.size
+      parts = [ "#{guardian.full_name} is now the guardian." ]
+      parts << "#{reset} signed #{"document".pluralize(reset)} reset for them to sign again." if reset.positive?
+      parts << if outcome.invited?
+        "Portal invite sent to #{guardian.email}."
+      elsif current_event.guardian_invites_locked?
+        "Guardian invites are locked, so they'll be invited when invites open."
+      else
+        "They'll be invited once the participant submits their registration."
+      end
+      parts.join(" ")
+    end
+
+    def replacement_params
+      params.require(:guardian).permit(:legal_first_name, :legal_last_name, :email, :phone, :relationship)
+    end
 
     def require_contact_details_access
       return if can_view_participant_pii?

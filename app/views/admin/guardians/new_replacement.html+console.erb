@@ -1,0 +1,71 @@
+<% content_for :breadcrumbs, cs_event_breadcrumbs([ "Participants", admin_event_participants_path(current_event) ], [ participant_name(@participant_event.participant), admin_event_participant_path(current_event, @participant_event) ], [ "Replace guardian", nil ]) %>
+<% current = @guardian_participant_event.guardian %>
+<% signed = Guardians::Replacement.dependent_consents(@participant_event).select { |consent| consent.signed? || consent.guardian_signed_at.present? } %>
+
+<div class="max-w-3xl">
+  <div class="cs-header">
+    <div class="cs-header-text">
+      <h1 class="cs-h1">Replace guardian</h1>
+      <p class="cs-description">Swap <%= current.full_name %> for a different person on <%= @participant_event.participant.display_name %>'s registration.</p>
+    </div>
+  </div>
+
+  <div class="cs-stack border-2 border-dashed border-orange-400 rounded p-4">
+    <div class="cs-alert cs-alert-warning">
+      <%= cs_status_icon(:warning) %>
+      <div>
+        <p class="cs-alert-title">This can't be undone</p>
+        <ul class="list-disc pl-5 mt-1 space-y-1">
+          <li><%= current.full_name %> (<%= current.email %>) is removed from this registration and loses access to its portal.</li>
+          <% if signed.any? %>
+            <li>Discards what they signed: <%= signed.map(&:display_name).to_sentence %>. The new guardian signs again.</li>
+          <% else %>
+            <li>Every guardian-signed waiver and document goes back to pending for the new guardian.</li>
+          <% end %>
+          <li>Emergency contacts move across to the new guardian.</li>
+          <li>A submitted registration goes back to waiting on the guardian, and the new guardian is emailed their portal invite.</li>
+        </ul>
+        <p class="mt-2">Fixing a typo in the same person's details? Use <%= link_to "Edit guardian", edit_admin_event_participant_guardian_path(current_event, @participant_event, @guardian_participant_event), class: "cs-link" %> instead, which keeps their signatures.</p>
+      </div>
+    </div>
+
+    <%= form_with model: @replacement, scope: :guardian, url: replace_admin_event_participant_guardian_path(current_event, @participant_event, @guardian_participant_event), method: :post, local: true, class: "cs-stack", html: { novalidate: true }, data: { controller: "phone-input cs-form-validation", turbo_confirm: "Replace #{current.full_name}? What they signed on this registration will be discarded." } do |f| %>
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <div>
+            <h2 class="cs-h2">New guardian</h2>
+          </div>
+        </div>
+        <div class="cs-container-body">
+          <div class="cs-field-grid">
+            <%= cs_form_field f, :legal_first_name, label: "First name", input: { required: true } %>
+            <%= cs_form_field f, :legal_last_name, label: "Last name", input: { required: true } %>
+            <%= cs_form_field f, :email, label: "Email", messages: { invalid: "Enter a valid email address." } do |aria| %>
+              <%= f.email_field :email, class: "cs-input", required: true, **aria %>
+            <% end %>
+            <%
+              phone_errors = @replacement.errors.where(:phone).map do |error|
+                error.type == E164PhoneValidator::MESSAGE ? "Enter a valid phone number, including the country code." : cs_sentence("Phone number #{error.message}")
+              end
+            %>
+            <%= cs_field id: f.field_id(:phone), label: "Phone number", optional: true, errors: phone_errors,
+                  constraint: "Include the country code. For example: +1 415 555 0132" do |aria| %>
+              <%= f.telephone_field :phone, class: "cs-input", **aria %>
+            <% end %>
+            <%= cs_field id: "guardian_relationship", label: "Relationship", optional: true,
+                  constraint: "For example: Parent, Grandparent, Legal guardian" do |aria| %>
+              <%= text_field_tag "guardian[relationship]", @relationship || @guardian_participant_event.relationship, id: "guardian_relationship", class: "cs-input", **aria %>
+            <% end %>
+          </div>
+        </div>
+      </section>
+
+      <%= cs_form_errors f, except: [ :phone ] %>
+
+      <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <%= link_to "Cancel", admin_event_participant_path(current_event, @participant_event), class: "cs-btn cs-btn-link cs-btn-full" %>
+        <%= f.button "Replace guardian", class: "cs-btn cs-btn-primary cs-btn-full" %>
+      </div>
+    <% end %>
+  </div>
+</div>

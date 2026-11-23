@@ -352,6 +352,13 @@
                         edit_admin_event_participant_guardian_path(current_event, @participant_event, gpe),
                         class: "text-xs text-[#ec3750] hover:text-blue-800 font-medium" %>
                   <% end %>
+                  <% if policy(@participant_event).replace_guardian? && @participant_event.requires_guardian? %>
+                    <span class="ml-1 border-2 border-dashed border-orange-400 rounded px-1">
+                      <%= link_to "Replace",
+                          replace_admin_event_participant_guardian_path(current_event, @participant_event, gpe),
+                          class: "text-xs text-[#ec3750] hover:text-blue-800 font-medium" %>
+                    </span>
+                  <% end %>
                   </div>
                 </div>
                 <div class=" rounded px-2 py-1 mt-2 flex items-center gap-3">
