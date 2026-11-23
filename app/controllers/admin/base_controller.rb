@@ -8,8 +8,10 @@ module Admin
     before_action :ensure_can_access_current_event, if: -> { current_event.present? }
     # After authentication and the access checks above, so the signed-in user
     # and the roles that let them into the admin and into this event are read
-    # from the primary: a role removed a moment ago can't linger on a lagging
-    # replica. A no-op unless replica reads are switched on (ReplicaReads).
+    # from the primary. Checks made after this point (a subclass's
+    # before_actions, Pundit `authorize` in an action) read from the replica,
+    # so within its lag a role removed a moment ago can still pass them.
+    # A no-op unless replica reads are switched on (ReplicaReads).
     route_reads_to_replica
     after_action :log_admin_action, unless: -> { request.get? }
 

@@ -112,6 +112,25 @@ RSpec.describe ReplicaReads do
     end
   end
 
+  describe ".replica_unavailable_error?" do
+    it "recognises a connection that couldn't be made or was lost, also when wrapped" do
+      wrapped = begin
+        begin
+          raise PG::ConnectionBad, "could not connect to server"
+        rescue PG::ConnectionBad
+          raise ActiveRecord::ConnectionNotEstablished, "could not connect to server"
+        end
+      rescue ActiveRecord::ConnectionNotEstablished => error
+        error
+      end
+
+      expect(described_class.replica_unavailable_error?(wrapped)).to be(true)
+      expect(described_class.replica_unavailable_error?(ActiveRecord::ConnectionFailed.new("gone"))).to be(true)
+      expect(described_class.replica_unavailable_error?(ActiveRecord::ReadOnlyError.new)).to be(false)
+      expect(described_class.replica_unavailable_error?(ActiveRecord::RecordNotFound.new)).to be(false)
+    end
+  end
+
   describe "switching roles" do
     include_context "with a reading role"
 

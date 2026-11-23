@@ -29,14 +29,23 @@ module ReplicaReadRouting
 
   # A GET that turns out to write (or take a row lock) while on the reading
   # role is run again on the primary instead of failing, and reported so the
-  # action can be fixed or added to config/get_write_allowlist.yml. Only when
-  # nothing has been rendered yet: after that there is no clean second go.
+  # action can be fixed or added to config/get_write_allowlist.yml. So is one
+  # that couldn't reach the replica at all (a restart, a failover, a rollout):
+  # the primary is still there to answer it. Only when nothing has been
+  # rendered yet: after that there is no clean second go.
+  #
+  # Anything the first pass memoized (records, Pundit's policy cache) came off
+  # the replica, so it is dropped before the second pass. What the first pass
+  # did outside ApplicationRecord (a job it enqueued, a cache write) is not
+  # undone and happens again; the report is there so those GETs get fixed.
   def process_action(*)
+    ivars_before = instance_variables
     super
   rescue StandardError => error
     raise unless replica_reads_retry?(error)
 
     replica_reads_report_fallback(error)
+    (instance_variables - ivars_before).each { |ivar| remove_instance_variable(ivar) }
     @_replica_reads_fell_back = true
     super
   ensure
@@ -70,10 +79,20 @@ module ReplicaReadRouting
   end
 
   def replica_reads_retry?(error)
-    @_replica_reads_reading && !@_replica_reads_fell_back && !performed? && ReplicaReads.read_only_error?(error)
+    @_replica_reads_reading && !@_replica_reads_fell_back && !performed? &&
+      (ReplicaReads.read_only_error?(error) || ReplicaReads.replica_unavailable_error?(error))
   end
 
   def replica_reads_report_fallback(error)
+    if ReplicaReads.replica_unavailable_error?(error)
+      # Not the action's fault, so no error report per request while the
+      # replica is down.
+      Rails.logger.warn(
+        "[ReplicaReads] replica unavailable for #{replica_reads_endpoint} (#{error.class}); re-running on the primary."
+      )
+      return
+    end
+
     Rails.logger.warn(
       "[ReplicaReads] #{replica_reads_endpoint} needed the primary (#{error.class}: #{error.message.truncate(200)}); " \
       "re-running there. Fix the write or add the action to config/get_write_allowlist.yml."

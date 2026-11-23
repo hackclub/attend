@@ -175,6 +175,38 @@ RSpec.describe "Replica read routing", type: :request do
         expect(response.body).to include("viewed-example@example.com")
         expect(role).to eq("writing")
       end
+
+      it "re-runs a GET on the primary when the replica can't be reached, without an error report" do
+        allow_any_instance_of(Admin::BansController).to receive(:index).and_wrap_original do |original, *args|
+          raise ActiveRecord::ConnectionNotEstablished, "replica is restarting" if ReplicaReads.reading?
+
+          original.call(*args)
+        end
+        expect(Sentry).not_to receive(:capture_exception)
+
+        get admin_bans_path
+
+        expect(response).to have_http_status(:ok)
+        expect(role).to eq("writing")
+      end
+
+      it "drops what the replica pass memoized before re-running on the primary", :allow_get_writes do
+        allow(ReplicaReads).to receive(:writes_on_get?).and_return(false)
+        allow(Sentry).to receive(:capture_exception)
+        seen_on_entry = []
+        allow_any_instance_of(Admin::BansController).to receive(:index).and_wrap_original do |original, *args|
+          controller = original.receiver
+          seen_on_entry << controller.instance_variable_defined?(:@memoized_on_replica)
+          controller.instance_variable_set(:@memoized_on_replica, true)
+          FactoryBot.create(:ban, reason: "Written on a GET")
+          original.call(*args)
+        end
+
+        get admin_bans_path
+
+        expect(response).to have_http_status(:ok)
+        expect(seen_on_entry).to eq([ false, false ])
+      end
     end
 
     describe "the API" do
@@ -235,6 +267,15 @@ RSpec.describe "Replica read routing", type: :request do
 
         expect(keys).not_to be_empty
         expect(keys.join).not_to include(raw_token)
+      end
+
+      it "writes nothing to the cache for a token that doesn't authenticate" do
+        expect(cache).not_to receive(:write)
+
+        post api_v1_push_tokens_path, params: { token: "example-device-token", platform: "ios" },
+          headers: { "Authorization" => "Bearer not-a-real-token" }
+
+        expect(response).to have_http_status(:unauthorized)
       end
     end
 

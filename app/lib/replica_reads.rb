@@ -26,6 +26,9 @@ module ReplicaReads
   # What a hot standby says to a row lock or a write Rails didn't catch first.
   READ_ONLY_PG_ERRORS = %w[PG::ReadOnlySqlTransaction].freeze
 
+  # The replica being down or going away mid-request (a restart, a failover).
+  UNAVAILABLE_PG_ERRORS = %w[PG::ConnectionBad PG::UnableToSend].freeze
+
   Decision = Struct.new(:role, :reason) do
     def reading?
       role == :reading
@@ -93,6 +96,19 @@ module ReplicaReads
       5.times do
         return false if error.nil?
         return true if error.is_a?(ActiveRecord::ReadOnlyError) || READ_ONLY_PG_ERRORS.include?(error.class.name)
+
+        error = error.cause
+      end
+
+      false
+    end
+
+    # True when the replica couldn't be reached or dropped the connection.
+    def replica_unavailable_error?(error)
+      5.times do
+        return false if error.nil?
+        return true if error.is_a?(ActiveRecord::ConnectionNotEstablished) || error.is_a?(ActiveRecord::ConnectionFailed)
+        return true if UNAVAILABLE_PG_ERRORS.include?(error.class.name)
 
         error = error.cause
       end
