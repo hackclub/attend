@@ -280,16 +280,21 @@ module Privacy
       raise ManualReviewRequired, "identity_conflict"
     end
 
-    # an empty list matches nothing. Matching on "" instead would sweep up
-    # every row whose email is blank
     # The addresses and numbers a set of user, participant and guardian rows
-    # carry, as the person above them would have copied them.
+    # carry, from every source Identity::Backfill copies them from: an
+    # account's training details included.
     def person_contacts(scopes)
       rows = scopes.flat_map(&:to_a)
       {
         emails: rows.filter_map { |row| EmailAddress.normalize(row.email).presence },
-        phones: rows.filter_map { |row| PhoneNormalizer.normalize(row.try(:phone) || row.try(:phone_number)) }
+        phones: rows.flat_map { |row| row_phones(row) }.filter_map { |phone| PhoneNormalizer.normalize(phone) }
       }
+    end
+
+    def row_phones(row)
+      return [ row.phone ] unless row.is_a?(User)
+
+      [ row.phone_number, row.training_profile&.phone_number ]
     end
 
     # Removes the erased rows' addresses and numbers from a person that
@@ -303,6 +308,21 @@ module Privacy
       person.phone_numbers.where(number: phones).delete_all if phones.any?
     end
 
+    # A review names rows by id. The erased ones come out of it; one left
+    # naming fewer than two rows no longer asks anything, so it goes.
+    def forget_erased_reviews(ids)
+      IdentityReview.naming(ids).find_each do |review|
+        remaining = %i[user_ids participant_ids guardian_ids].index_with { |column| review.public_send(column) - ids }
+        if remaining.values.sum(&:size) < 2
+          review.delete
+        else
+          review.update_columns(remaining)
+        end
+      end
+    end
+
+    # an empty list matches nothing. Matching on "" instead would sweep up
+    # every row whose email is blank
     def email_in(model, column, emails)
       emails = emails.compact_blank
       return model.where("1=0") if emails.empty?
@@ -459,7 +479,7 @@ module Privacy
       Person.where(id: person_ids).find_each do |person|
         forget_erased_contacts(person, erased_contacts, people.emails)
       end
-      IdentityReview.naming(ids).delete_all if ids.any?
+      forget_erased_reviews(ids) if ids.any?
 
       PaperTrail::Version.where(item_id: ids).delete_all
       AuditLog.where(record_id: ids).delete_all

@@ -32,6 +32,13 @@ class EmailAddress < ApplicationRecord
     NORMALIZER.call(value)
   end
 
+  # NORMALIZER in SQL, for comparing and rewriting stored columns. BTRIM's set
+  # is what Ruby's #strip removes (space, \t \n \v \f \r) less NUL, which a
+  # Postgres text value cannot hold. NormalizeStoredEmails keeps a literal copy.
+  def self.normalized_sql(column = "email")
+    "LOWER(BTRIM(#{column}, E' \\t\\n\\x0B\\f\\r'))"
+  end
+
   def verified?
     verified_at.present?
   end

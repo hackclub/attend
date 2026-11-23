@@ -89,6 +89,19 @@ RSpec.describe Identity::Backfill do
       expect(review.participant_ids).to match_array([ first.id, second.id ])
       expect(review.reasons).to include("name mismatch")
     end
+
+    it "holds a participant found at the account's address while the account's own participants are held" do
+      create(:participant, user:, email: "robin.old@example.com", legal_first_name: "Robin", legal_last_name: "Vale")
+      create(:participant, user:, email: "alder.vale@example.com", legal_first_name: "Alder", legal_last_name: "Vale")
+      unlinked = create(:participant, email: "robin.vale@example.com", legal_first_name: "Robin", legal_last_name: "Vale")
+
+      report = run
+
+      expect(unlinked.reload.person_id).to be_nil
+      expect(user.reload.person.participants).to be_empty
+      expect(report[:participants][:needs_review][:email_matches_account_flagged]).to eq(1)
+      expect(IdentityReview.find_by!(category: "participant_account_email").reasons).to include("a linked row is awaiting review")
+    end
   end
 
   describe "participants found by address" do
@@ -191,6 +204,17 @@ RSpec.describe Identity::Backfill do
       expect(report[:participants][:needs_review][:same_email_flagged]).to eq(1)
     end
 
+    it "flags a group from the rows it loaded, without reading registrations" do
+      create(:participant, email: "family@example.com", legal_first_name: "Robin", legal_last_name: "Vale")
+      create(:participant, email: "family@example.com", legal_first_name: "Alder", legal_last_name: "Vale")
+      queries = []
+      callback = ->(*, payload) { queries << payload[:sql] }
+
+      ActiveSupport::Notifications.subscribed(callback, "sql.active_record") { run(apply: false) }
+
+      expect(queries.grep(/participant_events/)).to be_empty
+    end
+
     it "never uses a shared phone number to join people" do
       first = create(:participant, email: "one@example.com", phone: "+12025550143")
       second = create(:participant, email: "two@example.com", phone: "+12025550143")
@@ -253,6 +277,32 @@ RSpec.describe Identity::Backfill do
       expect(report[:guardians][:needs_review][:possible_same_person_kept_separate]).to eq(1)
       review = IdentityReview.find_by!(category: "guardian_overlap")
       expect(review).to have_attributes(guardian_ids: [ guardian.id ], user_ids: [ user.id ], participant_ids: [ attendee.id ])
+    end
+
+    it "joins a guardian linked to an account to that account's person, under any address" do
+      user = create(:user, email: "morgan.vale@example.com", hack_club_account_id: "ident!morgan")
+      at_home = create(:guardian, user:, email: "morgan.home@example.com", legal_first_name: "Morgan", legal_last_name: "Vale")
+      at_account = create(:guardian, user:, email: "morgan.vale@example.com", legal_first_name: "Morgan", legal_last_name: "Vale")
+
+      report = run
+
+      expect([ at_home, at_account ].map { |row| row.reload.person }).to all(eq(user.reload.person))
+      expect(addresses_of(user.person)).to contain_exactly("morgan.vale@example.com", "morgan.home@example.com")
+      expect(report[:guardians][:mechanical]).to eq(linked_account: 2)
+      expect(IdentityReview.count).to eq(0)
+    end
+
+    it "holds a linked guardian whose name disagrees with the account's participant" do
+      user = create(:user, email: "family@example.com", hack_club_account_id: "ident!family")
+      create(:participant, user:, email: "family@example.com", legal_first_name: "Robin", legal_last_name: "Vale")
+      guardian = create(:guardian, user:, email: "morgan.vale@example.com", legal_first_name: "Morgan", legal_last_name: "Vale")
+
+      report = run
+
+      expect(guardian.reload.person_id).to be_nil
+      expect(report[:guardians][:needs_review][:linked_account_rows_disagree]).to eq(1)
+      expect(IdentityReview.find_by!(category: "linked_guardians"))
+        .to have_attributes(user_ids: [ user.id ], guardian_ids: [ guardian.id ], reasons: [ "name mismatch" ])
     end
 
     it "does not file an overlap for a child using their parent's inbox" do
@@ -324,6 +374,23 @@ RSpec.describe Identity::Backfill do
       expect { run }.not_to change(Person, :count)
 
       expect(later.reload.person).to eq(person)
+    end
+
+    it "writes no addresses for, and keeps no person made for, a row attached elsewhere mid-run" do
+      participant = Participant.find_by!(email: "solo.attendee@example.com")
+      elsewhere = create(:person)
+      backfill = described_class.new(apply: true, batch_size: 2)
+      allow(backfill).to receive(:attach).and_wrap_original do |original, record, person_id|
+        record.class.where(id: record.id).update_all(person_id: elsewhere.id) if record == participant
+        original.call(record, person_id)
+      end
+
+      backfill.call
+
+      expect(participant.reload.person).to eq(elsewhere)
+      expect(elsewhere.email_addresses).to be_empty
+      expect(EmailAddress.where(address: "solo.attendee@example.com")).to be_empty
+      expect(Person.unattached).to be_empty
     end
 
     it "does not touch updated_at or write versions on the rows it attaches" do

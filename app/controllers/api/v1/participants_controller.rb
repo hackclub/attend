@@ -178,9 +178,7 @@ module Api
         end
 
         participant_event = if email.present?
-          # LOWER(): rows written before emails were normalised on save can
-          # still be mixed-case.
-          participant = @event.participants.where("LOWER(participants.email) = ?", email).order(:created_at).first
+          participant = @event.participants.where(email: email).order(:created_at).first
           participant && @event.participant_events.find_by(participant_id: participant.id)
         else
           matches = participant_events_for_slack_id(slack_id).limit(2).to_a

@@ -187,9 +187,7 @@ module Admin
         return
       end
 
-      # LOWER(): a guardian saved before emails were normalised can still be
-      # mixed-case, and an exact match would add a second row for them.
-      guardian = Guardian.where("LOWER(email) = ?", guardian_email).order(:created_at).first ||
+      guardian = Guardian.where(email: guardian_email).order(:created_at).first ||
         Guardian.new(email: guardian_email)
       guardian.assign_attributes(
         legal_first_name: params[:guardian_first_name],

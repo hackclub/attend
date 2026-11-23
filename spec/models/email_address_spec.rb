@@ -4,6 +4,15 @@ RSpec.describe EmailAddress do
   let(:person) { create(:person) }
   let(:other_person) { create(:person) }
 
+  it "normalises in SQL exactly as it does in Ruby, as the migration does" do
+    require Rails.root.join("db/migrate/20261116213100_normalize_stored_emails")
+    raw = " \t\n\v\f\r Robin.Vale@Example.COM \v\f\r\n\t "
+    in_sql = ->(sql) { ActiveRecord::Base.connection.select_value(ActiveRecord::Base.sanitize_sql([ "SELECT #{sql}", raw ])) }
+
+    expect(in_sql.call(described_class.normalized_sql("?"))).to eq(described_class.normalize(raw))
+    expect(NormalizeStoredEmails::NORMALISED).to eq(described_class.normalized_sql)
+  end
+
   it "stores the address stripped and downcased" do
     address = create(:email_address, person:, address: "  Robin.Vale@Example.COM ")
 

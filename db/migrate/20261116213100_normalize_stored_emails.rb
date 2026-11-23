@@ -11,7 +11,9 @@
 # Safe to run again, and `identity:normalize_emails` does the same on demand.
 class NormalizeStoredEmails < ActiveRecord::Migration[8.1]
   TABLES = %w[participants guardians emergency_contacts].freeze
-  NORMALISED = "LOWER(BTRIM(email, E' \\t\\r\\n'))".freeze
+  # A copy of EmailAddress.normalized_sql (migrations don't load app code):
+  # the characters Ruby's #strip removes, less NUL.
+  NORMALISED = "LOWER(BTRIM(email, E' \\t\\n\\x0B\\f\\r'))".freeze
 
   def up
     TABLES.each do |table|

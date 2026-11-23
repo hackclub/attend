@@ -102,9 +102,9 @@ class Participant < ApplicationRecord
     value.presence
   }
 
-  # Stored stripped and downcased. Rows written before this may still be
-  # mixed-case until `identity:normalize_emails` has run, so lookups keep
-  # comparing on LOWER(email).
+  # Stored stripped and downcased, and `normalizes` rewrites query values the
+  # same way, so `where(email:)` matches whatever case was typed.
+  # NormalizeStoredEmails brought rows written before this in line.
   normalizes :email, with: EmailAddress::NORMALIZER
 
   normalizes_phone_number :phone

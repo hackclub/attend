@@ -13,12 +13,16 @@ module Identity
   #
   # 1. One person per user.
   # 2. Participants linked to an account (user_id) join that account's person.
-  # 3. Remaining participants are grouped by normalised email: onto the person
+  # 3. Guardians linked to an account (user_id) do the same, when their names
+  #    agree with the account's other rows.
+  # 4. Remaining participants are grouped by normalised email: onto the person
   #    of the account holding that address, or one person per address, using
   #    DuplicateParticipantScan's clean / needs-review split for the group.
-  # 4. Guardians get one person per normalised email when their names agree.
-  #    They are never joined to an account's or participant's person by address
-  #    alone; an overlap that looks like the same human is filed for review.
+  #    An account whose linked rows were held back in 2 or 3 holds these too.
+  # 5. Remaining guardians get one person per normalised email when their names
+  #    agree. They are never joined to an account's or participant's person by
+  #    address alone; an overlap that looks like the same human is filed for
+  #    review.
   #
   # Everything is planned in memory from light rows first, so a dry run issues
   # no writes at all and reports the same numbers an apply would. Rows that
@@ -28,11 +32,12 @@ module Identity
   # ids, since the output ends up in terminals and deploy logs.
   class Backfill
     UserRow = Struct.new(:id, :person_id, :email, :verified)
-    ParticipantRow = Struct.new(:id, :person_id, :user_id, :email, :first_name, :last_name)
-    GuardianRow = Struct.new(:id, :person_id, :email, :first_name, :last_name)
+    # Field names match Participant's, so DuplicateParticipantScan can read them.
+    ParticipantRow = Struct.new(:id, :person_id, :user_id, :email, :legal_first_name, :legal_last_name, :date_of_birth)
+    GuardianRow = Struct.new(:id, :person_id, :user_id, :email, :first_name, :last_name)
     Attachment = Struct.new(:id, :person_id, :verified)
 
-    NORMALISED_EMAIL = Arel.sql("LOWER(BTRIM(email, E' \\t\\r\\n'))")
+    NORMALISED_EMAIL = Arel.sql(EmailAddress.normalized_sql)
 
     attr_reader :report
 
@@ -45,6 +50,10 @@ module Identity
       @inserted_people = Set.new
       @attachments = { user: [], participant: [], guardian: [] }
       @reviews = {}
+      # Accounts whose linked rows were held for review. Nothing else joins
+      # their person by address until a human has looked.
+      @held_accounts = Set.new
+      @pending_emails = []
     end
 
     def call
@@ -53,6 +62,7 @@ module Identity
 
       plan_users
       plan_linked_participants
+      plan_linked_guardians
       plan_participants_by_email
       plan_guardians
 
@@ -61,7 +71,7 @@ module Identity
       attach_guardians
       record_reviews
 
-      count(:people, :mechanical, :created, @new_people.size)
+      count(:people, :mechanical, :created, @inserted_people.size)
       count(:reviews, :needs_review, :groups_recorded, @reviews.size)
       report
     end
@@ -86,14 +96,14 @@ module Identity
 
       @participants = []
       Participant.in_batches(of: batch_size) do |batch|
-        batch.pluck(:id, :person_id, :user_id, NORMALISED_EMAIL, :legal_first_name, :legal_last_name).each do |values|
+        batch.pluck(:id, :person_id, :user_id, NORMALISED_EMAIL, :legal_first_name, :legal_last_name, :date_of_birth).each do |values|
           @participants << ParticipantRow.new(*values)
         end
       end
 
       @guardians = []
       Guardian.in_batches(of: batch_size) do |batch|
-        batch.pluck(:id, :person_id, NORMALISED_EMAIL, :legal_first_name, :legal_last_name).each do |values|
+        batch.pluck(:id, :person_id, :user_id, NORMALISED_EMAIL, :legal_first_name, :legal_last_name).each do |values|
           @guardians << GuardianRow.new(*values)
         end
       end
@@ -165,12 +175,42 @@ module Identity
         reasons << "rows already belong to different people" if group.filter_map(&:person_id).any? { |id| id != person_id }
 
         if reasons.any?
+          @held_accounts << user_id
           plan_review("linked_participants", key: user_id, reasons: reasons,
             user_ids: [ user_id ], participant_ids: group.map(&:id))
           count(:participants, :needs_review, :linked_account_rows_disagree, candidates.size)
         else
           candidates.each { |participant| plan_attach(:participant, participant, person_id) }
           count(:participants, :mechanical, :linked_account, candidates.size)
+        end
+      end
+    end
+
+    # Guardians linked to an account (user_id) are that account's holder, as
+    # linked participants are, so they join its person on the same terms: the
+    # names on every row joining or already on that person have to agree.
+    def plan_linked_guardians
+      @guardians.select(&:user_id).group_by(&:user_id).each do |user_id, group|
+        candidates = group.reject(&:person_id)
+        next count(:guardians, :skipped, :already_attached, group.size) if candidates.empty?
+
+        count(:guardians, :skipped, :already_attached, group.size - candidates.size)
+        person_id = @users.fetch(user_id).person_id
+        names = group.map { |guardian| [ guardian.first_name, guardian.last_name ] } +
+          @participants_by_person.fetch(person_id, []).map { |participant| [ participant.legal_first_name, participant.legal_last_name ] }
+        reasons = []
+        reasons << "name mismatch" unless NameMatch.agree?(names)
+        reasons << "rows already belong to different people" if group.filter_map(&:person_id).any? { |id| id != person_id }
+        reasons << "a linked row is awaiting review" if @held_accounts.include?(user_id)
+
+        if reasons.any?
+          @held_accounts << user_id
+          plan_review("linked_guardians", key: user_id, reasons: reasons,
+            user_ids: [ user_id ], guardian_ids: group.map(&:id))
+          count(:guardians, :needs_review, :linked_account_rows_disagree, candidates.size)
+        else
+          candidates.each { |guardian| plan_attach(:guardian, guardian, person_id) }
+          count(:guardians, :mechanical, :linked_account, candidates.size)
         end
       end
     end
@@ -202,8 +242,12 @@ module Identity
       reasons = participant_flags((group + people.flat_map { |id| @participants_by_person.fetch(id, []) }).uniq)
       reasons << "more than one account at this address" if accounts.size > 1
       reasons << "rows already belong to different people" if people.size > 1
-      # A linked row with no person was itself held back in step 2.
-      reasons << "a linked row is awaiting review" if group.any? { |participant| participant.user_id && participant.person_id.nil? }
+      # A linked row with no person was itself held back in step 2, as was
+      # every linked row of an account in @held_accounts, under any address.
+      if group.any? { |participant| participant.user_id && participant.person_id.nil? } ||
+          accounts.any? { |account| @held_accounts.include?(account.id) }
+        reasons << "a linked row is awaiting review"
+      end
 
       if reasons.any?
         category = accounts.any? ? "participant_account_email" : "participant_duplicates"
@@ -222,26 +266,27 @@ module Identity
       count(:participants, :mechanical, bucket, candidates.size)
     end
 
-    # DuplicateParticipantScan's flags for rows sharing an address or an
-    # account. The public-profile flag is dropped: it protects a merge from
-    # deleting a profile, and nothing is merged or deleted here.
+    # DuplicateParticipantScan's identity flags for rows sharing an address or
+    # an account, read off the rows already loaded. Its public-profile flag is
+    # left out: it protects a merge from deleting a profile, and nothing is
+    # merged or deleted here.
     def participant_flags(group)
       return [] if group.size < 2
 
-      rows = Participant.where(id: group.map(&:id)).order(:created_at).to_a
-      DuplicateParticipantScan.new.group_for(nil, rows).flags - [ DuplicateParticipantScan::PUBLIC_PROFILE_FLAG ]
+      DuplicateParticipantScan.new.identity_flags(group)
     end
 
     def plan_guardians
-      count(:guardians, :skipped, :already_attached, @guardians.count(&:person_id))
+      unlinked = @guardians.reject(&:user_id)
+      count(:guardians, :skipped, :already_attached, unlinked.count(&:person_id))
 
-      @guardians.select { |guardian| guardian.email.blank? && guardian.person_id.nil? }.each do |guardian|
+      unlinked.select { |guardian| guardian.email.blank? && guardian.person_id.nil? }.each do |guardian|
         plan_attach(:guardian, guardian, new_person)
         count(:guardians, :mechanical, :single)
       end
 
       @guardians.reject { |guardian| guardian.email.blank? }.group_by(&:email).each do |email, group|
-        candidates = group.reject(&:person_id)
+        candidates = group.select { |guardian| guardian.user_id.nil? && guardian.person_id.nil? }
         next if candidates.empty?
 
         plan_guardian_group(email, group, candidates)
@@ -253,6 +298,7 @@ module Identity
       reasons = []
       reasons << "name mismatch" unless NameMatch.agree?(group.map { |guardian| [ guardian.first_name, guardian.last_name ] })
       reasons << "rows already belong to different people" if people.size > 1
+      reasons << "a linked row is awaiting review" if group.any? { |guardian| guardian.user_id && guardian.person_id.nil? }
 
       if reasons.any?
         plan_review("guardian_duplicates", key: email, reasons: reasons, guardian_ids: group.map(&:id))
@@ -263,17 +309,20 @@ module Identity
       candidates.each { |guardian| plan_attach(:guardian, guardian, person_id) }
       count(:guardians, :mechanical, group.size > 1 ? :same_email_names_agree : :single, candidates.size)
 
-      plan_guardian_overlap(email, group, candidates)
+      plan_guardian_overlap(email, group, candidates, person_id)
     end
 
     # The guardian keeps a person of their own either way. Sharing an address
     # with an account, or with a participant of the same name, may mean the
     # same human (a parent who also attends or staffs) or may not (a child
     # using a parent's inbox): that call is a person's to make.
-    def plan_guardian_overlap(email, group, candidates)
-      accounts = @users_by_email.fetch(email, [])
+    # Rows already on the guardian's own person (through an account link) are
+    # not an overlap.
+    def plan_guardian_overlap(email, group, candidates, person_id)
+      accounts = @users_by_email.fetch(email, []).reject { |user| user.person_id == person_id }
       namesakes = @participants_by_email.fetch(email, []).select do |participant|
-        NameMatch.agree?([ [ group.first.first_name, group.first.last_name ], [ participant.first_name, participant.last_name ] ])
+        participant.person_id != person_id &&
+          NameMatch.agree?([ [ group.first.first_name, group.first.last_name ], [ participant.legal_first_name, participant.legal_last_name ] ])
       end
       return if accounts.empty? && namesakes.empty?
 
@@ -316,31 +365,52 @@ module Identity
       @attachments[kind].each_slice(batch_size) do |slice|
         records = scope.where(id: slice.map(&:id)).index_by(&:id)
         in_transaction do
-          insert_people(slice.map(&:person_id))
+          fresh = insert_people(slice.map(&:person_id))
+          attached = Set.new
           slice.each do |attachment|
             record = records[attachment.id]
             # Deleted, or attached by someone else, since the plan was made.
             next if record.nil? || record.person_id.present?
+            next unless attach(record, attachment.person_id)
 
-            # update_all: no validations, callbacks, versions or updated_at.
-            # Legacy rows fail today's validations, and a participant's
-            # callbacks would fan out wallet pass updates.
-            record.class.where(id: record.id, person_id: nil).update_all(person_id: attachment.person_id) if apply
+            attached << attachment.person_id
             yield record, attachment
           end
+          drop_people(fresh.reject { |id| attached.include?(id) })
+          flush_emails
         end
       end
+    end
+
+    # update_all: no validations, callbacks, versions or updated_at. Legacy
+    # rows fail today's validations, and a participant's callbacks would fan
+    # out wallet pass updates. Guarded on person_id IS NULL, so a row someone
+    # else attached after it was read is left alone, contacts and all.
+    def attach(record, person_id)
+      return true unless apply
+
+      record.class.where(id: record.id, person_id: nil).update_all(person_id: person_id) == 1
     end
 
     def in_transaction(&block)
       apply ? ActiveRecord::Base.transaction(&block) : yield
     end
 
+    # Returns the ids it inserted.
     def insert_people(person_ids)
       fresh = person_ids.uniq.select { |id| @new_people.include?(id) && @inserted_people.add?(id) }
-      return if fresh.empty? || !apply
+      Person.insert_all(fresh.map { |id| { id: id, created_at: now, updated_at: now } }) if fresh.any? && apply
+      fresh
+    end
 
-      Person.insert_all(fresh.map { |id| { id: id, created_at: now, updated_at: now } })
+    # People inserted for a batch whose rows were all skipped. Nothing points
+    # at them, so they go; a later batch planning the same person inserts it
+    # again.
+    def drop_people(person_ids)
+      return if person_ids.empty?
+
+      @inserted_people.subtract(person_ids)
+      Person.where(id: person_ids).delete_all if apply
     end
 
     def add_email(person_id, raw, source:, verified: false, user_id: nil)
@@ -363,8 +433,20 @@ module Identity
       count(:email_addresses, :mechanical, verified ? :verified : :unverified)
       return unless apply
 
-      EmailAddress.create!(person_id: person_id, address: address, source: source,
-        verified_at: (now if verified), primary: primary)
+      @pending_emails << { person_id: person_id, address: address, source: source,
+        verified_at: (now if verified), primary: primary }
+    end
+
+    # One insert per batch instead of EmailAddress.create! per address, whose
+    # validations cost three SELECTs each. Everything they check is decided
+    # above from what load_existing_contact_rows read (one address per person,
+    # one verified owner, one primary), and the unique indexes behind each of
+    # those make insert_all! raise rather than write a second one.
+    def flush_emails
+      return if @pending_emails.empty?
+
+      EmailAddress.insert_all!(@pending_emails)
+      @pending_emails = []
     end
 
     # Takes a block so a value that will not decrypt costs us that one number,

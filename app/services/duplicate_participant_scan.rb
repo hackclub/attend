@@ -50,10 +50,15 @@ class DuplicateParticipantScan
     emails - duplicate_emails
   end
 
-  # The Group for rows the caller has already gathered under one address.
-  def group_for(email, rows)
-    primary = pick_primary(rows)
-    Group.new(email: email, rows: rows, primary: primary, flags: flags_for(rows, primary))
+  # The signals that rows sharing an address may not be one human. Reads only
+  # legal_first_name, legal_last_name, date_of_birth and user_id, so it works
+  # on light rows too (Identity::Backfill passes structs, not records).
+  def identity_flags(rows)
+    flags = []
+    flags << "name mismatch" unless names_agree?(rows)
+    flags << "date of birth mismatch" if rows.filter_map(&:date_of_birth).uniq.size > 1
+    flags << "linked to different accounts" if rows.filter_map(&:user_id).uniq.size > 1
+    flags
   end
 
   private
@@ -61,7 +66,9 @@ class DuplicateParticipantScan
   attr_reader :emails
 
   def build_group(email)
-    group_for(email, Participant.where("LOWER(email) = ?", email).order(:created_at).to_a)
+    rows = Participant.where("LOWER(email) = ?", email).order(:created_at).to_a
+    primary = pick_primary(rows)
+    Group.new(email: email, rows: rows, primary: primary, flags: flags_for(rows, primary))
   end
 
   # Keep the row the sign-in account already points at — that is the one the
@@ -75,10 +82,7 @@ class DuplicateParticipantScan
   end
 
   def flags_for(rows, primary)
-    flags = []
-    flags << "name mismatch" unless names_agree?(rows)
-    flags << "date of birth mismatch" if rows.filter_map(&:date_of_birth).uniq.size > 1
-    flags << "linked to different accounts" if rows.filter_map(&:user_id).uniq.size > 1
+    flags = identity_flags(rows)
 
     # ParticipantMergeService doesn't carry public-profile fields across, so
     # merging away the row that owns an enabled profile would silently delete

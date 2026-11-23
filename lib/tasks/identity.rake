@@ -5,7 +5,7 @@ namespace :identity do
     puts apply ? "MODE: APPLY" : "MODE: dry run (re-run with APPLY=1 to write)"
 
     # Counts only, here and below: this output lands in terminals and logs.
-    normalised = "LOWER(BTRIM(email, E' \\t\\r\\n'))"
+    normalised = EmailAddress.normalized_sql
     [ Participant, Guardian, EmergencyContact ].each do |model|
       table = model.table_name
       stale = model.where("email IS NOT NULL AND email <> #{normalised}")
@@ -18,7 +18,7 @@ namespace :identity do
       sharing = stale.where(<<~SQL.squish).count
         EXISTS (SELECT 1 FROM #{table} other
                 WHERE other.id <> #{table}.id
-                  AND LOWER(BTRIM(other.email, E' \\t\\r\\n')) = LOWER(BTRIM(#{table}.email, E' \\t\\r\\n')))
+                  AND #{EmailAddress.normalized_sql('other.email')} = #{EmailAddress.normalized_sql("#{table}.email")})
       SQL
 
       written = 0
@@ -39,7 +39,7 @@ namespace :identity do
     # one address, but only when the email changes. Report what already sits
     # in the data so it isn't a surprise later; this task does not touch it.
     collisions = GuardianParticipantEvent.joins(:guardian, participant_event: :participant)
-      .where("LOWER(BTRIM(guardians.email, E' \\t\\r\\n')) = LOWER(BTRIM(participants.email, E' \\t\\r\\n'))")
+      .where("#{EmailAddress.normalized_sql('guardians.email')} = #{EmailAddress.normalized_sql('participants.email')}")
       .distinct.count(:guardian_id)
     puts "\nguardians sharing an address with their own participant (not changed): #{collisions}"
   end

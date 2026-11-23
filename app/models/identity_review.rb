@@ -10,6 +10,7 @@ class IdentityReview < ApplicationRecord
 
   CATEGORIES = %w[
     linked_participants
+    linked_guardians
     participant_account_email
     participant_duplicates
     guardian_duplicates
