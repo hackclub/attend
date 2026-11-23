@@ -351,7 +351,12 @@ Rails.application.routes.draw do
           patch :groups, action: :update_groups
         end
         resources :notes, only: [ :create, :destroy ], controller: "participant_notes"
-        resources :guardians, only: [ :edit, :update ]
+        resources :guardians, only: [ :edit, :update ] do
+          member do
+            get :replace, action: :new_replacement
+            post :replace, action: :replace_guardian
+          end
+        end
         resources :emergency_contacts, only: [ :new, :create, :edit, :update, :destroy ]
       end
       resources :incidents do

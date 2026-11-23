@@ -91,6 +91,47 @@ RSpec.describe "registration support MCP tools" do
     end
   end
 
+  describe "ParticipantEventsToolbox#replace_guardian" do
+    let(:new_guardian) do
+      { legal_first_name: "Robin", legal_last_name: "Rightparent", email: "robin@example.com", phone: "+12025550188" }
+    end
+
+    it "swaps the guardian for a different person and invites them" do
+      fill_in_registration_answers(participant_event)
+      participant_event.update!(status: :complete, code_of_conduct_accepted_at: 1.day.ago)
+      guardian_link.update!(status: :completed)
+      waiver = Consent.create!(participant_event: participant_event, guardian_participant_event: guardian_link,
+        consent_type: :waiver, status: :signed, signed_at: 1.day.ago)
+
+      json = nil
+      expect {
+        json, = run_tool(ParticipantEventsToolbox, :replace_guardian,
+          participant_event_id: participant_event.id, guardian_participant_event_id: guardian_link.id, **new_guardian)
+      }.to have_enqueued_mail(GuardianMailer, :invitation)
+
+      expect(json[:guardian]).to include(name: "Robin Rightparent", email: "robin@example.com", status: "pending")
+      expect(json[:invited]).to be(true)
+      expect(json[:reset_consents].map { |consent| consent[:consent_id] }).to eq([ waiver.id ])
+      expect(GuardianParticipantEvent.exists?(guardian_link.id)).to be(false)
+      expect(AuditLog.where(action: "replace_guardian").sole.metadata).to include("surface" => "mcp")
+    end
+
+    # run_tool stubs authorize!, so this one runs the real policy.
+    it "is refused for an event admin" do
+      event_admin = create(:user)
+      EventRoleAssignment.create!(user: event_admin, event: event, role: "event_admin")
+      toolbox = ParticipantEventsToolbox.new(params: { participant_event_id: participant_event.id,
+        guardian_participant_event_id: guardian_link.id, **new_guardian }.stringify_keys)
+      allow(toolbox).to receive(:current_user).and_return(event_admin)
+      allow(toolbox).to receive(:render)
+
+      Current.set(event: event) do
+        expect { catch(:halt) { toolbox.replace_guardian } }.to raise_error(Pundit::NotAuthorizedError)
+      end
+      expect(GuardianParticipantEvent.exists?(guardian_link.id)).to be(true)
+    end
+  end
+
   describe "ParticipantEventsToolbox#resend_guardian_invite" do
     it "emails the guardian their invite" do
       expect {

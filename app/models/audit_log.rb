@@ -20,6 +20,7 @@ class AuditLog < ApplicationRecord
     update_travel: "update_travel",
     resend_invitation: "resend_invitation",
     resend_guardian_invite: "resend_guardian_invite",
+    replace_guardian: "replace_guardian",
     guardian_portal_link: "guardian_portal_link",
     clear_email_bounce: "clear_email_bounce",
     clear_guardian_email_bounce: "clear_guardian_email_bounce",
