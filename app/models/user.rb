@@ -460,7 +460,7 @@ class User < ApplicationRecord
   # The claim name the attend-self-serve-events entitlement is exposed to
   # Attend's app under in the HCA directory. Holders may create standalone
   # events and use the admin before they staff anything.
-  SELF_SERVE_EVENTS_GROUP = "self-serve-events".freeze
+  SELF_SERVE_EVENTS_GROUP = "attend-self-serve-events".freeze
 
   # HCA directory entitlements this person held at their last sign-in, as the
   # claim names they're exposed to Attend under. Read from the `groups` claim
