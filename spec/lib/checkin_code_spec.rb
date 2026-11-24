@@ -125,6 +125,8 @@ RSpec.describe CheckinCode do
     it "is the code on the Apple and Google wallet passes" do
       expect(Passkit::EventTicket.new(participant_event).barcodes.first[:message]).to eq(code)
 
+      # Building the object only needs an issuer id; CI has no wallet credentials.
+      allow(GoogleWallet).to receive(:configuration).and_return(instance_double(GoogleWallet::Configuration, issuer_id: "1234567890"))
       google = GoogleWallet::EventTicket.new(participant_event).send(:ticket_object)
       expect(google.options.dig(:barcode, :value)).to eq(code)
     end
