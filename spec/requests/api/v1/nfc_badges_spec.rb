@@ -57,4 +57,18 @@ RSpec.describe "Api::V1::NfcBadges", type: :request do
     expect(participation).not_to be_nfc_badge_assigned
     expect(JSON.parse(response.body).fetch("badge_token")).to eq(participation.nfc_badge_token)
   end
+
+  it "refuses every badge action from read-only staff" do
+    viewer = create(:user)
+    create(:event_role_assignment, user: viewer, event: event, role: "read_only")
+    viewer_headers = { "Authorization" => "Bearer #{MobileToken.generate_for(viewer).token}" }
+    participation.update_columns(nfc_badge_token: nil)
+
+    %w[ensure confirm reset].each do |action|
+      post endpoint(action), headers: viewer_headers
+
+      expect(response).to have_http_status(:forbidden)
+    end
+    expect(participation.reload.nfc_badge_token).to be_nil
+  end
 end

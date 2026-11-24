@@ -1,0 +1,20 @@
+<% content_for :title, "Set up your event – Attend" %>
+
+<div class="w-full max-w-lg mx-auto">
+  <div class="mb-8">
+    <h1 class="portal-title text-2xl mb-3">This invite is for a different account</h1>
+    <p class="portal-body text-lg">
+      It was sent to <strong><%= @invite.email %></strong>, and you're signed in as <strong><%= current_user.email %></strong>.
+    </p>
+  </div>
+
+  <div class="portal-card p-5 sm:p-6 mb-6">
+    <p class="portal-body mb-4">
+      Sign out, then open the link again and sign in with the Hack Club account for <%= @invite.email %>.
+      <% if @invite.invited_by %>
+        If that's not an address you sign in with, ask <%= @invite.invited_by.name.presence || @invite.invited_by.email %> to send the invite to the one you use.
+      <% end %>
+    </p>
+    <%= button_to "Sign out", destroy_user_session_path, method: :delete, data: { turbo: false }, class: "portal-btn portal-btn-secondary w-full sm:w-auto" %>
+  </div>
+</div>

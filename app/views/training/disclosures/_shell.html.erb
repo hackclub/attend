@@ -1,0 +1,6 @@
+<%# The page frame the declaration steps share: the column and the way back to the course. %>
+<div class="w-full max-w-2xl mx-auto">
+  <%= link_to "← #{course.title}", training_course_path(course), class: "portal-link text-sm inline-block mb-6" %>
+
+  <%= yield %>
+</div>

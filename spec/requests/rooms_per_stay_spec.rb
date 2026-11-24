@@ -58,10 +58,8 @@ RSpec.describe "Rooms per stay", type: :request do
       sign_in admin
     end
 
-    { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+    { "with the admin console beta" => true }.each do |ui, console|
       context ui do
-        before { admin.update!(admin_console_beta: console) }
-
         it "shows each room on the participant table" do
           get table_admin_event_participants_path(event)
 

@@ -44,10 +44,9 @@ RSpec.describe "Admin series broadcasts", type: :request do
       body: "<p>Hi {{first_name}}</p>", audience: "attendees_incomplete", event_scope: "upcoming", channels: [ "email" ], **attrs)
   end
 
-  [ true, false ].each do |console|
+  [ true ].each do |console|
     context "with the #{console ? 'console' : 'original'} admin" do
       before do
-        owner.update!(admin_console_beta: console)
         sign_in owner
       end
 
@@ -184,7 +183,7 @@ RSpec.describe "Admin series broadcasts", type: :request do
   describe "a held series broadcast in the review queue" do
     let(:admin) { create(:user, email: "starling-admin@example.com", global_role: "global_admin") }
 
-    [ true, false ].each do |console|
+    [ true ].each do |console|
       it "shows and approves it (console: #{console})" do
         allow(BroadcastScreener).to receive(:call).and_return(
           BroadcastScreener::Result.new(flagged: true, categories: [ "spam" ], reason: "Odd link.", flagged_by: "heuristics")
@@ -192,7 +191,6 @@ RSpec.describe "Admin series broadcasts", type: :request do
         broadcast = create_broadcast
         broadcast.send!(sender: owner)
         review = broadcast.pending_broadcast_review
-        admin.update!(admin_console_beta: console)
         sign_in admin
 
         get admin_broadcast_reviews_path

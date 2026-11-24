@@ -6,19 +6,27 @@ module Admin
     def new
       @event = Event.new
       @event.event_series = EventSeries.find_by(slug: params[:series]) if params[:series].present?
-      authorize @event
+      @creation_invite = creation_invite
+      @event.event_series = @creation_invite.event_series if @creation_invite
+      authorize_new_event
     end
 
     def create
       @event = Event.new(event_params)
-      authorize @event
+      @creation_invite = creation_invite
+      # The invite decides which series, if any, the event belongs to.
+      @event.event_series_id = @creation_invite.event_series_id if @creation_invite
+      authorize_new_event
 
-      if @event.save
+      if save_new_event
         ensure_creator_has_admin_role
         # As the setup wizard it lands on does, so the audit row is the new
         # event's rather than whichever one was picked.
         set_current_event(@event)
         redirect_to admin_event_setup_schedule_path(@event), notice: "#{@event.name} created! Let's finish setting it up."
+      elsif @creation_invite&.completed?
+        # A second submit of the same form: the first one made the event.
+        redirect_to admin_event_setup_path(@creation_invite.event)
       else
         render :new, status: :unprocessable_entity
       end
@@ -33,17 +41,11 @@ module Admin
       set_current_event(@event) unless current_event&.id == @event.id
     end
 
-    # The Features settings tab. The original admin has no tabs: its edit
-    # form still carries every one of these fields.
+    # The Features settings tab.
     def features
       @event = Event.find_by!(slug: params[:slug])
       authorize @event, :update?
       set_current_event(@event) unless current_event&.id == @event.id
-
-      unless helpers.console_ui?
-        flash.keep
-        redirect_to edit_admin_event_path(@event)
-      end
     end
 
     # Where a save from the setup wizard's Basics step goes back to. It rides
@@ -137,6 +139,52 @@ module Admin
 
     private
 
+    # Someone invited to create an event (EventCreationInvite) isn't an admin
+    # of anything until it exists, so these two actions let them in on the
+    # invite alone. EventPolicy#create? still decides.
+    def authorize_admin_access
+      return if action_name.in?(%w[new create]) && EventCreationInvite.usable_by(current_user).exists?
+
+      super
+    end
+
+    # The invite this event is being created under, if any: the one the form
+    # names, or, for someone with no right of their own to create @event, the
+    # one they've accepted. Global admins never need one.
+    def creation_invite
+      return nil if current_user.global_admin?
+
+      invites = EventCreationInvite.usable_by(current_user)
+      return invites.find_by(id: params[:invite]) if params[:invite].present?
+      return nil if policy(@event).create?
+
+      invites.order(:accepted_at).first
+    end
+
+    # Either the person may create @event in their own right, or the create
+    # is tied to a usable invite of theirs, which #save_new_event then uses
+    # up. There is no third way: an invite never authorizes a create that
+    # doesn't consume it.
+    def authorize_new_event
+      return authorize(@event, :create?) unless @creation_invite
+
+      skip_authorization
+    end
+
+    # One invite makes one event: the invite is locked while the event saves
+    # and marked used in the same transaction, so a double submit can't
+    # create two.
+    def save_new_event
+      return @event.save unless @creation_invite
+
+      @creation_invite.with_lock do
+        next false unless @creation_invite.usable? && @event.save
+
+        @creation_invite.complete!(@event)
+        true
+      end
+    end
+
     # A create that failed re-renders the new event form, which isn't about
     # the picked event any more than #new is.
     def event_page?
@@ -151,7 +199,6 @@ module Admin
         case params[:tab]
         when "features" then features_admin_event_path(@event)
         when "general" then edit_admin_event_path(@event)
-        # The original admin's single form sends no tab and goes back to the overview.
         else admin_event_dashboard_path(@event)
         end
       end

@@ -107,19 +107,21 @@ RSpec.describe "Admin::Scans", type: :request do
       )
     end
 
-    it "leaves health-form allergies out for roles that can't see the medical summary" do
+    it "refuses a scan from someone who is read-only on this event" do
       # Read-only here, but staff elsewhere, so the admin area is open to them.
       read_only = create(:event_role_assignment, event: event, role: "read_only").user
       create(:event_role_assignment, user: read_only, event: create(:event), role: "ops")
       participant_event.create_medical!(allergies: "Penicillin")
       sign_in read_only
 
-      post admin_event_scans_path(event), params: {
-        participant_id: participant_event.id, scan_context_id: scan_context.id
-      }, as: :json
+      expect {
+        post admin_event_scans_path(event), params: {
+          participant_id: participant_event.id, scan_context_id: scan_context.id
+        }, as: :json
+      }.not_to change(Scan, :count)
 
-      expect(response).to have_http_status(:ok)
-      expect(response.parsed_body["participant"]).not_to have_key("has_allergies")
+      expect(response).not_to have_http_status(:ok)
+      expect(response.body).not_to include("has_allergies")
     end
   end
 
@@ -347,36 +349,30 @@ RSpec.describe "Admin::Scans", type: :request do
   end
 
   it "uses the only scan context without asking in the old admin" do
-    admin.update!(admin_console_beta: false)
-
     get scanner_admin_event_scans_path(event)
 
     expect(response.body).to include(%(<input type="hidden" id="scan-context" value="#{scan_context.id}"))
   end
 
-  # Both admins share one scanner (app/javascript/scanner); each view is
-  # markup, the elements the scanner paints into, and the mount point.
-  { "the console" => [ true, "console" ], "the old admin" => [ false, "classic" ] }.each do |ui, (console, skin)|
-    it "mounts the shared scanner with no inline script in #{ui}" do
-      admin.update!(admin_console_beta: console)
+  # The scanner is app/javascript/scanner; the view is markup, the elements
+  # the scanner paints into, and the mount point.
+  it "mounts the shared scanner with no inline script" do
+    get scanner_admin_event_scans_path(event)
 
-      get scanner_admin_event_scans_path(event)
-
-      page = Nokogiri::HTML(response.body)
-      mount = page.at_css('[data-controller="scanner"]')
-      config = JSON.parse(mount["data-scanner-config-value"])
-      expect(config).to include(
-        "skin" => skin,
-        "eventId" => event.id,
-        "userId" => admin.id,
-        "scanUrl" => admin_event_scans_path(event),
-        "searchUrl" => search_admin_event_scans_path(event),
-        "contexts" => { scan_context.id => scan_context.name }
-      )
-      expect(page.css("#scan-result, #scan-queue-note, #scan-sync, #participant-modal").size).to eq(4)
-      expect(mount.css("template[data-scanner-icon]").size).to eq(console ? 4 : 0)
-      expect(response.body).not_to include("function submitScan", "pendingScans")
-    end
+    page = Nokogiri::HTML(response.body)
+    mount = page.at_css('[data-controller="scanner"]')
+    config = JSON.parse(mount["data-scanner-config-value"])
+    expect(config).to include(
+      "skin" => "console",
+      "eventId" => event.id,
+      "userId" => admin.id,
+      "scanUrl" => admin_event_scans_path(event),
+      "searchUrl" => search_admin_event_scans_path(event),
+      "contexts" => { scan_context.id => scan_context.name }
+    )
+    expect(page.css("#scan-result, #scan-queue-note, #scan-sync, #participant-modal").size).to eq(4)
+    expect(mount.css("template[data-scanner-icon]").size).to eq(4)
+    expect(response.body).not_to include("function submitScan", "pendingScans")
   end
 
   describe "signed check-in codes" do
@@ -466,9 +462,7 @@ RSpec.describe "Admin::Scans", type: :request do
       morning = scan_at(Time.utc(2030, 7, 12, 16, 0))       # July 12, 09:00
       late_evening = scan_at(Time.utc(2030, 7, 13, 5, 0))   # July 12, 22:00
 
-      [ true, false ].each do |console|
-        admin.update!(admin_console_beta: console)
-
+      [ true ].each do |console|
         get history_admin_event_scans_path(event, date: "2030-07-12")
 
         expect(response.body).to include("scan-row-#{morning.id}", "scan-row-#{late_evening.id}")

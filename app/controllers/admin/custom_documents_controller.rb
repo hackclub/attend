@@ -54,8 +54,7 @@ module Admin
         redirect_to admin_event_documents_path(@event),
                     notice: "\"#{@custom_document.name}\" updated.#{" Sync its fields again to reconfigure pre-fill." if template_id_changed && @custom_document.electronic?}"
       else
-        # The console shows these errors under their fields instead.
-        flash.now[:alert] = "Couldn't update document: #{@custom_document.errors.full_messages.to_sentence}" unless request.variant.include?(:console)
+        # The form shows these errors under their fields.
         render :edit, status: :unprocessable_entity
       end
     rescue ArgumentError => e

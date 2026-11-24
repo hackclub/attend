@@ -26,7 +26,6 @@ RSpec.describe "Admin waiver dates banner", type: :request do
     end
 
     it "uses the console's alert styling inside the content column in the admin console" do
-      organizer.update!(admin_console_beta: true)
       sign_in organizer
       get admin_event_dashboard_path(event)
 

@@ -8,7 +8,7 @@ RSpec.describe "Admin CSV import", type: :request do
 
   let(:event) { create(:event) }
 
-  before { sign_in User.create!(email: "ga-imports@example.com", name: "Global Admin", global_role: "global_admin", admin_console_beta: false) }
+  before { sign_in User.create!(email: "ga-imports@example.com", name: "Global Admin", global_role: "global_admin") }
 
   def upload(content)
     post admin_event_imports_path(event.slug), params: {
@@ -68,10 +68,11 @@ RSpec.describe "Admin CSV import", type: :request do
 
   it "explains a file it can't read instead of failing" do
     upload("Email,First Name\n\"broken@example.com,Pat\n")
-    expect(flash[:alert]).to start_with("This file isn't a valid CSV")
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(CGI.unescapeHTML(response.body)).to include("This file isn't a valid CSV")
 
     upload("Email,First Name\nx@example.com,\x81\x8D\n".b)
-    expect(flash[:alert]).to include("CSV UTF-8")
+    expect(CGI.unescapeHTML(response.body)).to include("CSV UTF-8")
   end
 
   it "previews the rows the job would reject, with the reason" do

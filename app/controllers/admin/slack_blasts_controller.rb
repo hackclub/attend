@@ -35,15 +35,10 @@ module Admin
       message = params[:message]&.strip
 
       if message.blank?
-        # The console shows the error under the field; the original UI keeps
-        # its redirect and flash.
-        if request.variant.include?(:console)
-          @message_errors = [ "Message is required." ]
-          new
-          render :new, status: :unprocessable_entity
-        else
-          redirect_to new_admin_event_slack_blast_path(current_event), alert: "Message cannot be blank."
-        end
+        # The form shows the error under the field.
+        @message_errors = [ "Message is required." ]
+        new
+        render :new, status: :unprocessable_entity
         return
       end
 

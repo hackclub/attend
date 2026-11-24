@@ -1,0 +1,36 @@
+<% content_for :title, "Invite unavailable – Attend" %>
+
+<div class="w-full max-w-lg mx-auto">
+  <%= render "shared/portal_masthead" unless user_signed_in? %>
+
+  <div class="mb-8">
+    <% if @invite&.expired? %>
+      <h1 class="portal-title text-2xl mb-3">This invite has expired</h1>
+      <p class="portal-body text-lg">
+        Invites work for <%= EventCreationInvite::LINK_VALIDITY.inspect %>.
+        <% if @invite.invited_by %>
+          Ask <%= @invite.invited_by.name.presence || @invite.invited_by.email %> to send it again.
+        <% else %>
+          Ask whoever invited you to send it again.
+        <% end %>
+      </p>
+    <% elsif @invite&.revoked? %>
+      <h1 class="portal-title text-2xl mb-3">This invite was withdrawn</h1>
+      <p class="portal-body text-lg">
+        <% if @invite.invited_by %>
+          Get in touch with <%= @invite.invited_by.name.presence || @invite.invited_by.email %> if you were expecting to set up an event.
+        <% else %>
+          Get in touch with whoever invited you if you were expecting to set up an event.
+        <% end %>
+      </p>
+    <% elsif @invite&.completed? %>
+      <h1 class="portal-title text-2xl mb-3">This invite has been used</h1>
+      <p class="portal-body text-lg">The event it created has since been deleted. Ask for a new invite to create another.</p>
+    <% else %>
+      <h1 class="portal-title text-2xl mb-3">This link doesn't work any more</h1>
+      <p class="portal-body text-lg">
+        If you were sent a newer invite email, use the link in that one. Otherwise ask whoever invited you to send it again.
+      </p>
+    <% end %>
+  </div>
+</div>

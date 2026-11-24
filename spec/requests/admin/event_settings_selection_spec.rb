@@ -9,9 +9,8 @@ RSpec.describe "Opening an event's settings", type: :request do
 
   before { sign_in admin }
 
-  { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+  { "with the admin console beta" => true }.each do |ui, console|
     it "selects that event in the sidebar #{ui}" do
-      admin.update!(admin_console_beta: console)
       get admin_event_dashboard_path(selected.slug)
 
       get edit_admin_event_path(opened)

@@ -106,10 +106,8 @@ RSpec.describe "Stay check-in points", type: :request do
       expect(stay.arrived_count).to eq(1)
     end
 
-    { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+    { "with the admin console beta" => true }.each do |ui, console|
       it "shows them on the check-ins page #{ui}" do
-        admin.update!(admin_console_beta: console)
-
         get admin_event_scans_path(event)
 
         text = Nokogiri::HTML5(response.body).text.squish
@@ -117,8 +115,6 @@ RSpec.describe "Stay check-in points", type: :request do
       end
 
       it "shows them on the accommodation page #{ui}" do
-        admin.update!(admin_console_beta: console)
-
         get admin_event_rooming_stays_path(event.slug)
 
         expect(Nokogiri::HTML5(response.body).text.squish).to include("1 of 2 at Night before arrivals")

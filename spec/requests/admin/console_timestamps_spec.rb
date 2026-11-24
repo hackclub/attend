@@ -18,7 +18,7 @@ RSpec.describe "Admin console timestamps", type: :request do
 
   let(:admin) do
     User.create!(email: "time-admin@example.com", name: "Robin Placeholder",
-      global_role: "global_admin", admin_console_beta: true)
+      global_role: "global_admin")
   end
   let(:event) { create(:event, name: "Timestamp Test Jam", starts_at: 3.days.from_now, ends_at: 5.days.from_now) }
   let(:participant) { create(:participant, legal_first_name: "Fictional", legal_last_name: "Attendee") }

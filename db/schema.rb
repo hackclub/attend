@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_23_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -464,6 +464,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
     t.index ["event_id"], name: "index_event_api_tokens_on_event_id"
     t.index ["token_digest"], name: "index_event_api_tokens_on_token_digest", unique: true
     t.index ["user_id"], name: "index_event_api_tokens_on_user_id"
+  end
+
+  create_table "event_creation_invites", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "accepted_at"
+    t.uuid "accepted_by_id"
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.string "email", null: false
+    t.uuid "event_id"
+    t.uuid "event_series_id"
+    t.datetime "expires_at", null: false
+    t.uuid "invited_by_id"
+    t.datetime "last_sent_at"
+    t.text "note"
+    t.datetime "revoked_at"
+    t.string "token_digest"
+    t.datetime "updated_at", null: false
+    t.index ["accepted_by_id"], name: "index_event_creation_invites_on_accepted_by_id"
+    t.index ["email"], name: "index_event_creation_invites_on_email"
+    t.index ["event_id"], name: "index_event_creation_invites_on_event_id"
+    t.index ["event_series_id"], name: "index_event_creation_invites_on_event_series_id"
+    t.index ["invited_by_id"], name: "index_event_creation_invites_on_invited_by_id"
+    t.index ["token_digest"], name: "index_event_creation_invites_on_token_digest", unique: true
   end
 
   create_table "event_role_assignments", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1878,6 +1901,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
   add_foreign_key "emergency_contacts", "participant_events"
   add_foreign_key "event_api_tokens", "events"
   add_foreign_key "event_api_tokens", "users", on_delete: :nullify
+  add_foreign_key "event_creation_invites", "event_series", on_delete: :cascade
+  add_foreign_key "event_creation_invites", "events", on_delete: :nullify
+  add_foreign_key "event_creation_invites", "users", column: "accepted_by_id", on_delete: :nullify
+  add_foreign_key "event_creation_invites", "users", column: "invited_by_id", on_delete: :nullify
   add_foreign_key "event_role_assignments", "events"
   add_foreign_key "event_role_assignments", "users"
   add_foreign_key "event_volunteers", "events", on_delete: :cascade

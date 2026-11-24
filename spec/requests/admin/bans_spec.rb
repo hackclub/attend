@@ -4,7 +4,7 @@ RSpec.describe "Admin::Bans", type: :request do
   include Devise::Test::IntegrationHelpers
 
   let(:console) { true }
-  let(:global_admin) { User.create!(email: "ga-bans@example.com", name: "Global Admin", global_role: "global_admin", admin_console_beta: console) }
+  let(:global_admin) { User.create!(email: "ga-bans@example.com", name: "Global Admin", global_role: "global_admin") }
 
   before { sign_in global_admin }
 
@@ -99,9 +99,8 @@ RSpec.describe "Admin::Bans", type: :request do
   end
 
   describe "GET show" do
-    [ true, false ].each do |console_variant|
+    [ true ].each do |console_variant|
       it "links a UCAT ban to its Airtable cases (console=#{console_variant})" do
-        global_admin.update!(admin_console_beta: console_variant)
         ban = create(:ban, email: "ucat@example.com", source: :ucat, external_key: "ucat@example.com",
           ucat_cases: [ { "id" => "C1", "record_id" => "recC1000000000000" }, { "id" => "C2", "record_id" => nil } ])
 
@@ -113,7 +112,6 @@ RSpec.describe "Admin::Bans", type: :request do
       end
 
       it "links each existing enrollment to its registration (console=#{console_variant})" do
-        global_admin.update!(admin_console_beta: console_variant)
         event = create(:event, name: "Fictional Hackathon")
         participant = create(:participant, email: "banned-enrollee@example.com")
         registration = create(:participant_event, participant: participant, event: event)
@@ -130,7 +128,7 @@ RSpec.describe "Admin::Bans", type: :request do
   # Bans are global, not tied to an event, so the expiry is typed and shown
   # in UTC (the app's zone), as a 24-hour time.
   describe "the expiry field" do
-    [ true, false ].each do |console_variant|
+    [ true ].each do |console_variant|
       context "console=#{console_variant}" do
         let(:console) { console_variant }
 

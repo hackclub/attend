@@ -157,6 +157,20 @@ module Api
         end
       end
 
+      # require_event_access! for actions that change something. Any event
+      # role passes the read gate, including read_only, so every write behind
+      # it needs this one instead.
+      def require_event_write_access!(event)
+        if current_user.nil?
+          render json: { error: "API key is not authorized for this action" }, status: :forbidden
+          return
+        end
+
+        unless current_user.can_change_event?(event)
+          render json: { error: "Forbidden" }, status: :forbidden
+        end
+      end
+
       # For before_action, where a render halts the chain:
       #   before_action -> { require_global_admin!("Only global admins can ...") }
       # API keys have no user, so they're refused here too.

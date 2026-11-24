@@ -9,10 +9,8 @@ RSpec.describe "Scan point kinds in the admin", type: :request do
 
   before { sign_in admin }
 
-  [ true, false ].each do |console|
+  [ true ].each do |console|
     context(console ? "in the console beta" : "in the original admin") do
-      before { admin.update!(admin_console_beta: console) }
-
       it "saves a kind and a usage note, and writes the old flags to match" do
         get new_admin_event_scan_context_path(event)
         expect(response.body).to include("What a scan here means", "When to use this")
