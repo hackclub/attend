@@ -125,6 +125,200 @@ RSpec.describe "Admin::Scans", type: :request do
     end
   end
 
+  # The scanner sends an id of its own with each scan and repeats it when it
+  # retries after losing the connection.
+  describe "retried scans" do
+    let(:client_scan_id) { SecureRandom.uuid }
+
+    def scan!(**params)
+      post admin_event_scans_path(event), params: {
+        participant_id: participant_event.id, scan_context_id: scan_context.id, **params
+      }, as: :json
+    end
+
+    it "answers a retry with the scan already recorded" do
+      scan!(client_scan_id: client_scan_id)
+      first = response.parsed_body
+
+      expect { scan!(client_scan_id: client_scan_id) }.not_to change(Scan, :count)
+
+      expect(response).to have_http_status(:ok)
+      expect(first).to include("deduplicated" => false, "first_scan_in_context" => true, "client_scan_id" => client_scan_id)
+      expect(response.parsed_body).to include(
+        "scan_id" => first["scan_id"],
+        "scanned_at" => first["scanned_at"],
+        "deduplicated" => true,
+        "first_scan_in_context" => true
+      )
+    end
+
+    it "keeps the first scanner's name on a retry sent by someone else" do
+      scan!(client_scan_id: client_scan_id)
+      other_admin = create(:user, global_role: "global_admin")
+      sign_in other_admin
+
+      scan!(client_scan_id: client_scan_id)
+
+      expect(response.parsed_body["scanned_by"]).to eq(admin.display_name_or_fallback)
+    end
+
+    it "still records every scan sent without an id, or with ids of their own" do
+      expect {
+        scan!
+        scan!
+        scan!(client_scan_id: SecureRandom.uuid)
+        scan!(client_scan_id: SecureRandom.uuid)
+      }.to change { participant_event.scans.count }.by(4)
+
+      expect(response.parsed_body).to include("deduplicated" => false, "first_scan_in_context" => false)
+    end
+
+    it "refuses an id already used for a different person" do
+      other = create(:participant_event, event: event)
+      scan!(client_scan_id: client_scan_id)
+
+      expect {
+        scan!(client_scan_id: client_scan_id, participant_id: other.id)
+      }.not_to change(Scan, :count)
+
+      expect(response).to have_http_status(:conflict)
+      expect(response.parsed_body).not_to have_key("participant")
+    end
+
+    it "refuses an id already used at a different scan point" do
+      elsewhere = event.scan_contexts.create!(name: "Side door", starts_at: 1.hour.ago, ends_at: 1.hour.from_now, position: 9)
+      scan!(client_scan_id: client_scan_id)
+
+      expect {
+        scan!(client_scan_id: client_scan_id, scan_context_id: elsewhere.id)
+      }.not_to change(Scan, :count)
+
+      expect(response).to have_http_status(:conflict)
+    end
+
+    it "rejects an id that isn't shaped like one" do
+      expect { scan!(client_scan_id: "x" * 200) }.not_to change(Scan, :count)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it "audits the scan once, not each retry" do
+      # The first POST after sign-in audits the user Devise just tracked.
+      get scanner_admin_event_scans_path(event)
+
+      expect { scan!(client_scan_id: client_scan_id) }.to change { AuditLog.where(record_type: "Scan").count }.by(1)
+
+      log = AuditLog.where(record_type: "Scan").order(:created_at).last
+      expect(log).to have_attributes(action: "record_create", actor: admin, event: event, record_id: response.parsed_body["scan_id"])
+      expect(log.changed_fields).to include("client_scan_id", "scanned_at", "participant_event_id")
+
+      expect { scan!(client_scan_id: client_scan_id) }.not_to change(AuditLog, :count)
+    end
+
+    # The scan is saved before the side effects run, so a failure in them
+    # comes back as a server error that the device retries with the same id.
+    it "finishes the first scan's side effects and audit entry on a retry after they failed" do
+      event.update!(nfc_badges_enabled: true)
+      get scanner_admin_event_scans_path(event)
+      allow_any_instance_of(ParticipantEvent).to receive(:ensure_nfc_badge_token!).and_raise(ActiveRecord::Deadlocked)
+
+      expect { scan!(client_scan_id: client_scan_id) }.to raise_error(ActiveRecord::Deadlocked)
+      expect(participant_event.scans.count).to eq(1)
+      expect(AuditLog.where(record_type: "Scan")).to be_empty
+
+      allow_any_instance_of(ParticipantEvent).to receive(:ensure_nfc_badge_token!).and_call_original
+      expect { scan!(client_scan_id: client_scan_id) }.to change { AuditLog.where(record_type: "Scan").count }.by(1)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["deduplicated"]).to be(true)
+      expect(participant_event.reload.nfc_badge_token).to be_present
+    end
+
+    it "doesn't run the side effects for a retry of a later scan" do
+      event.update!(nfc_badges_enabled: true)
+      scan!
+      participant_event.update_columns(nfc_badge_token: nil)
+
+      scan!(client_scan_id: client_scan_id)
+      scan!(client_scan_id: client_scan_id)
+
+      expect(participant_event.reload.nfc_badge_token).to be_nil
+    end
+  end
+
+  # A scan held on a device is sent late, so the device says when it scanned
+  # and when it sent; see ScanTimestamp for how far that is believed.
+  describe "device scan times" do
+    def scan!(**params)
+      post admin_event_scans_path(event), params: {
+        participant_id: participant_event.id, scan_context_id: scan_context.id, **params
+      }, as: :json
+    end
+
+    it "backdates a scan by how long the device held it, and keeps the device's own time" do
+      freeze_time do
+        scan!(client_scanned_at: 10.minutes.ago.iso8601(3), client_sent_at: Time.current.iso8601(3))
+
+        scan = participant_event.scans.last
+        expect(scan.scanned_at).to be_within(1.second).of(10.minutes.ago)
+        expect(scan.client_scanned_at).to be_within(1.second).of(10.minutes.ago)
+        expect(scan.created_at).to be_within(1.second).of(Time.current)
+        expect(response.parsed_body).to include("scanned_at" => 10.minutes.ago.iso8601, "time_adjusted" => false)
+      end
+    end
+
+    it "is not thrown by a device whose clock is wrong" do
+      freeze_time do
+        device_now = 3.days.from_now
+        scan!(client_scanned_at: (device_now - 10.minutes).iso8601(3), client_sent_at: device_now.iso8601(3))
+
+        scan = participant_event.scans.last
+        expect(scan.scanned_at).to be_within(1.second).of(10.minutes.ago)
+        expect(scan.client_scanned_at).to be_within(1.second).of(device_now - 10.minutes)
+      end
+    end
+
+    it "records the server's time when the device held the scan too long" do
+      freeze_time do
+        claimed = Time.current - ScanTimestamp::MAX_AGE - 1.minute
+        scan!(client_scanned_at: claimed.iso8601(3), client_sent_at: Time.current.iso8601(3))
+
+        scan = participant_event.scans.last
+        expect(scan.scanned_at).to be_within(1.second).of(Time.current)
+        expect(scan.client_scanned_at).to be_within(1.second).of(claimed)
+        expect(response.parsed_body["time_adjusted"]).to be(true)
+      end
+    end
+
+    it "records the server's time for a scan dated after it was sent" do
+      freeze_time do
+        scan!(client_scanned_at: 1.hour.from_now.iso8601(3), client_sent_at: Time.current.iso8601(3))
+
+        expect(participant_event.scans.last.scanned_at).to be_within(1.second).of(Time.current)
+        expect(response.parsed_body["time_adjusted"]).to be(true)
+      end
+    end
+
+    it "never records a scan in the future" do
+      freeze_time do
+        scan!(client_scanned_at: 1.minute.from_now.iso8601(3))
+
+        expect(participant_event.scans.last.scanned_at).to be_within(1.second).of(Time.current)
+      end
+    end
+
+    it "falls back to the server's time for a time it can't read" do
+      freeze_time do
+        scan!(client_scanned_at: "yesterday-ish")
+
+        scan = participant_event.scans.last
+        expect(response).to have_http_status(:ok)
+        expect(scan.scanned_at).to be_within(1.second).of(Time.current)
+        expect(scan.client_scanned_at).to be_nil
+      end
+    end
+  end
+
   it "shows NFC reading but hides writing when issuance is disabled" do
     get scanner_admin_event_scans_path(event)
 
@@ -160,15 +354,41 @@ RSpec.describe "Admin::Scans", type: :request do
     expect(response.body).to include(%(<input type="hidden" id="scan-context" value="#{scan_context.id}"))
   end
 
-  # Both admins carry their own copy of the scanner script, so pin each one
-  # to the persistent banner and the queue for scans arriving mid-scan.
-  { "the console" => true }.each do |ui, console|
-    it "keeps scan results up and queues scans made mid-scan in #{ui}" do
-      get scanner_admin_event_scans_path(event)
+  # The scanner is app/javascript/scanner; the view is markup, the elements
+  # the scanner paints into, and the mount point.
+  it "mounts the shared scanner with no inline script" do
+    get scanner_admin_event_scans_path(event)
 
-      expect(response.body).to include('id="scan-queue-note"', "pendingScans.push", "data-scan-result-dismiss", "function submitScan")
-      expect(response.body).not_to include("resultHideTimeout")
-    end
+    page = Nokogiri::HTML(response.body)
+    mount = page.at_css('[data-controller="scanner"]')
+    config = JSON.parse(mount["data-scanner-config-value"])
+    expect(config).to include(
+      "skin" => "console",
+      "eventId" => event.id,
+      "userId" => admin.id,
+      "scanUrl" => admin_event_scans_path(event),
+      "searchUrl" => search_admin_event_scans_path(event),
+      "contexts" => { scan_context.id => scan_context.name }
+    )
+    expect(page.css("#scan-result, #scan-queue-note, #scan-sync, #participant-modal").size).to eq(4)
+    expect(mount.css("template[data-scanner-icon]").size).to eq(4)
+    expect(response.body).not_to include("function submitScan", "pendingScans")
+  end
+
+  # The service worker keeps this copy on the device for reloading offline,
+  # so it must not carry anyone's name.
+  it "renders the offline shell without the day's scans" do
+    participant_event.scans.create!(scan_context: scan_context, user: admin, scanned_at: Time.current)
+
+    get scanner_admin_event_scans_path(event)
+    expect(response.body).to include(participant_event.participant.display_name)
+
+    get scanner_admin_event_scans_path(event, shell: 1)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).not_to include(participant_event.participant.display_name)
+    expect(response.body).to include("Scans from today are not shown without a connection.", 'data-controller="scanner"')
+    expect(response.body).not_to include('id="scan-count"')
   end
 
   # Scan times are instants; "today" and the history's date filter are days
@@ -215,6 +435,7 @@ RSpec.describe "Admin::Scans", type: :request do
 
     get scanner_admin_event_scans_path(event)
 
-    expect(response.body).to include("const nfcWriteOnCheckin = false;")
+    mount = Nokogiri::HTML(response.body).at_css('[data-controller="scanner"]')
+    expect(JSON.parse(mount["data-scanner-config-value"])).to include("nfcWriteOnCheckin" => false)
   end
 end

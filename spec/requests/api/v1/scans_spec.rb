@@ -136,7 +136,7 @@ RSpec.describe "Api::V1::Scans", type: :request, fiat_registrations: true do
     let(:participant_event) { create(:participant_event, event: event) }
     let(:scan_context) { event.scan_contexts.find_by!(checks_in: true) }
     let(:client_scan_id) { SecureRandom.uuid }
-    let(:scanned_at) { Time.zone.parse("2026-08-24 09:41:00") }
+    let(:scanned_at) { 10.minutes.ago.change(usec: 0) }
 
     def create_scan(participant_event:, scan_context:, client_scan_id:, scanned_at:)
       post "/api/v1/events/#{event.id}/scans",
@@ -236,6 +236,41 @@ RSpec.describe "Api::V1::Scans", type: :request, fiat_registrations: true do
       expect(json.dig("scan", "id")).to eq(original_scan_id)
       expect(json.dig("scan_context", "id")).to eq(scan_context.id)
       expect(participant_event.scans.count).to eq(1)
+    end
+
+    it "records the server's time for a scan time outside the bounds the admin scanner has" do
+      freeze_time do
+        create_scan(
+          participant_event: participant_event,
+          scan_context: scan_context,
+          client_scan_id: client_scan_id,
+          scanned_at: 3.days.ago
+        )
+
+        expect(response).to have_http_status(:ok)
+        expect(participant_event.scans.sole).to have_attributes(scanned_at: Time.current)
+        expect(participant_event.scans.sole.client_scanned_at).to be_within(1.second).of(3.days.ago)
+      end
+    end
+
+    it "refuses an id already used for someone else at the same event" do
+      create_scan(
+        participant_event: participant_event,
+        scan_context: scan_context,
+        client_scan_id: client_scan_id,
+        scanned_at: scanned_at
+      )
+      other = create(:participant_event, event: event)
+
+      create_scan(
+        participant_event: other,
+        scan_context: scan_context,
+        client_scan_id: client_scan_id,
+        scanned_at: scanned_at
+      )
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(other.scans).to be_empty
     end
 
     it "does not expose another event when a client id collides" do
