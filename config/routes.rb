@@ -53,6 +53,10 @@ Rails.application.routes.draw do
 
   root "home#index"
 
+  # The link in an event creation invite. Signed out it offers sign-in; signed
+  # in it hands over to the welcome step in the admin (see the admin routes).
+  get "event-invites/:token", to: "event_creation_invites#show", as: :event_creation_invite
+
   # Admin-only API reference. /docs is reverse-proxied onto the Mintlify-hosted
   # docs (see Mintlify::Proxy), so the whole prefix belongs to the proxy —
   # `format: false` keeps Rails from splitting /docs/_next/chunk.js into a path
@@ -197,7 +201,10 @@ Rails.application.routes.draw do
         post :enroll
         post :restart
       end
-      resource :disclosure, only: [ :new, :create ]
+      resource :disclosure, only: [ :new, :create ] do
+        get :confirm, action: :confirm_yes
+        post :confirm, action: :record_yes
+      end
       resources :lessons, only: :show do
         member do
           post :complete
@@ -278,9 +285,6 @@ Rails.application.routes.draw do
     # The event switcher's list, loaded when its menu first opens.
     get "event_switcher", to: "event_switcher#show", as: :event_switcher
 
-    # Opt-in switch between the original admin and the console redesign.
-    patch "console_beta", to: "console_beta#update", as: :console_beta
-
     # The staff profile form now lives on the participant-facing settings page.
     get "profile/edit", to: redirect("/dashboard/profile#staff-settings")
 
@@ -348,7 +352,12 @@ Rails.application.routes.draw do
           patch :groups, action: :update_groups
         end
         resources :notes, only: [ :create, :destroy ], controller: "participant_notes"
-        resources :guardians, only: [ :edit, :update ]
+        resources :guardians, only: [ :edit, :update ] do
+          member do
+            get :replace, action: :new_replacement
+            post :replace, action: :replace_guardian
+          end
+        end
         resources :emergency_contacts, only: [ :new, :create, :edit, :update, :destroy ]
       end
       resources :incidents do
@@ -547,6 +556,16 @@ Rails.application.routes.draw do
       get :preview, on: :member
     end
 
+    # Inviting someone to create an event themselves (EventCreationInvite).
+    # The invited person's side: the welcome step ahead of the setup wizard.
+    get "event_invites/:token/welcome", to: "event_creation_invite_onboarding#show", as: :event_creation_invite_welcome
+    post "event_invites/:token/accept", to: "event_creation_invite_onboarding#accept", as: :accept_event_creation_invite
+    resources :event_creation_invites, path: "event_invites", only: [ :index, :new, :create ] do
+      member do
+        post :resend
+        patch :revoke
+      end
+    end
     resources :bans do
       member do
         patch :revoke
@@ -678,6 +697,10 @@ Rails.application.routes.draw do
           post :docuseal
         end
       end
+
+      # Hack Club Auth's session revoker: someone lost a directory entitlement.
+      # Under /webhooks for its rack-attack throttle.
+      post "webhooks/hack_club_auth", to: "hack_club_auth_revocations#create"
 
       post "postmark_webhooks", to: "postmark_webhooks#create"
       post "helpscout_webhooks", to: "helpscout_webhooks#create"

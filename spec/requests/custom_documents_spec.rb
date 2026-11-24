@@ -7,14 +7,14 @@ RSpec.describe "Custom documents", type: :request do
   let(:event) { create(:event) }
 
   describe "admin management" do
-    let(:admin) { User.create!(email: "admin-docs@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
+    let(:admin) { User.create!(email: "admin-docs@example.com", name: "Admin", global_role: "global_admin") }
 
     before { sign_in admin }
 
-    it "lists custom documents on the integrations page" do
+    it "lists custom documents on the documents tab" do
       create(:custom_document, event: event, name: "Hotel Waiver")
 
-      get admin_event_integrations_path(event)
+      get admin_event_documents_path(event)
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Hotel Waiver")
@@ -33,10 +33,10 @@ RSpec.describe "Custom documents", type: :request do
       expect(response).to redirect_to(admin_event_documents_path(event))
     end
 
-    it "links to the edit page from the integrations list" do
+    it "links to the edit page from the documents list" do
       doc = create(:custom_document, event: event, name: "Hotel Waiver")
 
-      get admin_event_integrations_path(event)
+      get admin_event_documents_path(event)
 
       expect(response.body).to include(admin_event_custom_document_edit_path(event, doc))
     end
@@ -48,7 +48,7 @@ RSpec.describe "Custom documents", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Edit Hotel Waiver")
-      expect(response.body).to include("Who signs?")
+      expect(response.body).to include("Who signs")
     end
 
     it "updates the name, description and signer type when nobody has signed" do
@@ -147,18 +147,7 @@ RSpec.describe "Custom documents", type: :request do
       expect(used.reload).to be_archived
     end
 
-    it "renders the mappings page for a custom document via its mapping key" do
-      doc = create(:custom_document, event: event, name: "Hotel Waiver")
-
-      get admin_event_docuseal_template_mappings_path(event, doc.mapping_key)
-
-      expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Hotel Waiver Field Mappings")
-    end
-
     context "with the admin console beta" do
-      before { admin.update!(admin_console_beta: true) }
-
       it "renders the sentence-case mappings heading via its mapping key" do
         doc = create(:custom_document, event: event, name: "Hotel Waiver")
 
@@ -206,10 +195,8 @@ RSpec.describe "Custom documents", type: :request do
         })
       end
 
-      [ false, true ].each do |console|
+      [ true ].each do |console|
         it "shows each row its own mapping#{" in the admin console" if console}" do
-          admin.update!(admin_console_beta: console)
-
           get admin_event_docuseal_template_mappings_path(event, doc.mapping_key)
 
           expect(response).to have_http_status(:ok)
@@ -251,10 +238,8 @@ RSpec.describe "Custom documents", type: :request do
         })
       end
 
-      [ false, true ].each do |console|
+      [ true ].each do |console|
         it "shows a role picker for each signer#{" in the admin console" if console}" do
-          admin.update!(admin_console_beta: console)
-
           get admin_event_docuseal_template_mappings_path(event, doc.mapping_key)
 
           expect(response).to have_http_status(:ok)

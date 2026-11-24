@@ -38,8 +38,7 @@ class Admin::DashboardController < Admin::BaseController
     load_event_details
   end
 
-  # The Integrations settings tab. In the original admin this page still holds
-  # every integration, documents and API access included.
+  # The Integrations settings tab.
   def integrations
     @event = Event.find_by!(slug: params[:slug])
     authorize @event, :manage_integrations?
@@ -56,7 +55,6 @@ class Admin::DashboardController < Admin::BaseController
     authorize @event, :manage_integrations?
 
     set_current_event(@event)
-    redirect_to_classic_integrations unless helpers.console_ui?
   end
 
   # The API access settings tab: named tokens and the legacy key.
@@ -65,8 +63,6 @@ class Admin::DashboardController < Admin::BaseController
     authorize @event, :manage_integrations?
 
     set_current_event(@event)
-    return redirect_to_classic_integrations unless helpers.console_ui?
-
     load_event_api_tokens
   end
 
@@ -150,14 +146,6 @@ class Admin::DashboardController < Admin::BaseController
 
   def settings_tab_path
     documents_tab? ? admin_event_documents_path(@event) : admin_event_integrations_path(@event)
-  end
-
-  # The original admin has no settings tabs: its integrations page still holds
-  # documents and API access. The flash is kept so a one-time token or key
-  # shown after a redirect here isn't lost on the way.
-  def redirect_to_classic_integrations
-    flash.keep
-    redirect_to admin_event_integrations_path(@event)
   end
 
   # Revoking is permanent (rotate/destroy only find active tokens), so revoked

@@ -199,12 +199,9 @@ RSpec.describe "Admin::Incidents", type: :request do
     end
 
     {
-      "the original UI" => { console: false, show: "July 12, 2026 at 21:30", index: "Jul 12, 2026 21:30" },
       "the console" => { console: true, show: "July 12, 2026, 21:30 (UTC-4:00)", index: "July 12, 2026, 21:30 (UTC-4:00)" }
     }.each do |ui, expected|
       context "in #{ui}" do
-        before { event_admin.update!(admin_console_beta: expected[:console]) }
-
         it "prefills and labels the field on the event's clock, in 24-hour time" do
           incident = log_incident("2026-07-12T21:30")
 

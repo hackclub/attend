@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Admin::EventSetup", type: :request do
   include Devise::Test::IntegrationHelpers
 
-  let(:admin) { User.create!(email: "admin-setup@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
+  let(:admin) { User.create!(email: "admin-setup@example.com", name: "Admin", global_role: "global_admin") }
   let(:event) { create(:event, :draft) }
 
   before { sign_in admin }
@@ -77,16 +77,7 @@ RSpec.describe "Admin::EventSetup", type: :request do
   end
 
   describe "step pages" do
-    it "renders the progress bar on step 1 without links" do
-      get admin_new_event_path
-
-      expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Setup progress")
-    end
-
     context "with the admin console beta" do
-      before { admin.update!(admin_console_beta: true) }
-
       it "renders the setup steps on step 1" do
         get admin_new_event_path
 

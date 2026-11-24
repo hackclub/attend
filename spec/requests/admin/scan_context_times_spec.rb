@@ -19,10 +19,8 @@ RSpec.describe "Scan context times in the admin", type: :request do
     page.text.squish
   end
 
-  [ true, false ].each do |console|
+  [ true ].each do |console|
     context(console ? "in the console beta" : "in the original admin") do
-      before { admin.update!(admin_console_beta: console) }
-
       it "reads typed times on the event's clock" do
         post admin_event_scan_contexts_path(event), params: {
           scan_context: { name: "Dinner", kind: "tracking_only", starts_at: "2030-07-12T18:00", ends_at: "2030-07-12T20:30" }

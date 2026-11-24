@@ -123,10 +123,9 @@ RSpec.describe "Training details", type: :request do
       create(:training_profile, user: volunteer, connection_detail: "Parent of Example Kid")
     end
 
-    [ true, false ].each do |console|
+    [ true ].each do |console|
       it "shows event admins how each person is connected and their phone (#{console ? "console" : "original"})" do
         admin = create(:event_role_assignment, event: event, role: "event_admin").user
-        admin.update!(admin_console_beta: console)
         sign_in admin
         get select_admin_event_path(slug: event.slug)
 
@@ -136,7 +135,6 @@ RSpec.describe "Training details", type: :request do
 
       it "keeps phone numbers from staff who don't manage staff (#{console ? "console" : "original"})" do
         staff = create(:event_role_assignment, event: event, role: "ops").user
-        staff.update!(admin_console_beta: console)
         sign_in staff
         get select_admin_event_path(slug: event.slug)
 
@@ -147,9 +145,9 @@ RSpec.describe "Training details", type: :request do
     end
   end
 
-  [ true, false ].each do |console|
+  [ true ].each do |console|
     it "shows global admins everything on the user page (#{console ? "console" : "original"})" do
-      admin = create(:user, global_role: "global_admin", admin_console_beta: console)
+      admin = create(:user, global_role: "global_admin")
       profile = create(:training_profile)
       sign_in admin
 

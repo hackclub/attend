@@ -17,10 +17,8 @@ RSpec.describe "My training link in the admin side nav", type: :request do
     Nokogiri::HTML(response.body).css("a[href='#{training_path}']").select { |link| link.text.include?("My training") }
   end
 
-  { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+  { "with the admin console beta" => true }.each do |ui, console|
     context ui do
-      before { staff.update!(admin_console_beta: console) }
-
       it "links to the person's training once a course is published" do
         create(:training_course, :published)
         get admin_root_path

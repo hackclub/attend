@@ -3,7 +3,10 @@ module Api
     class ScansController < BaseController
       include TravelPickupMarkable
       before_action :set_event
-      before_action :require_event_access
+      before_action :require_event_access, only: [ :index ]
+      # Scanning checks people in and undoing a scan checks them back out, so
+      # read-only staff can list scans but not make or remove them.
+      before_action :require_event_write_access, only: [ :create, :destroy ]
 
       # Cap for `since` incremental syncs — a stale client cursor must not be
       # able to load the event's entire scan history in one request.
@@ -201,6 +204,10 @@ module Api
         require_event_access!(@event)
       end
 
+      def require_event_write_access
+        require_event_write_access!(@event)
+      end
+
       def scan_json(scan)
         {
           id: scan.id,
@@ -240,7 +247,9 @@ module Api
           full_name: participant.full_name,
           email: participant.email,
           slack_user_id: participant.slack_user_id,
-          phone: participant.phone,
+          # Omitted, not nulled, for PII-restricted roles — the same contract
+          # as Api::V1::ParticipantsController#participant_json.
+          **(current_user.can_view_participant_pii?(@event) ? { phone: participant.phone } : {}),
           pronouns: participant.pronouns,
           headshot_url: headshot_url_for(participant),
           tshirt_size: participant.tshirt_size,
@@ -248,17 +257,14 @@ module Api
           checked_in_at: pe.check_in_time&.iso8601,
           updated_at: pe.updated_at.iso8601,
 
+          # The flags go to everyone who can scan, as they do on the web
+          # scanner. The free text behind them follows the caller's role.
           has_anaphylaxis_risk: medical&.has_anaphylaxis_risk || false,
           requires_refrigeration: medical&.requires_refrigeration || false,
-          allergies: medical&.allergies,
-          medical_conditions: medical&.medical_conditions,
-          medications: medical&.medications,
-
-          diet_type: dietary&.diet_type,
-          life_threatening_allergies: dietary&.life_threatening_allergies,
           cross_contamination_risk: dietary&.cross_contamination_risk || false,
+          **medical_detail_json(pe, medical, dietary),
 
-          freedom_waiver_granted: safeguarding&.freedom_waiver_granted || false,
+          **(safeguarding_detail_visible?(pe) ? { freedom_waiver_granted: safeguarding&.freedom_waiver_granted || false } : {}),
           high_support_flag: safeguarding&.high_support_flag || false,
           can_leave_unaccompanied: safeguarding&.can_leave_unaccompanied || false,
 
@@ -270,6 +276,45 @@ module Api
           groups: pe.event.groups_enabled? ? pe.groups.ordered.map { |g| { id: g.id, name: g.name, color: g.normalized_color } } : [],
           scans_by_context: scans_by_context_json(pe)
         }
+      end
+
+      # Keys the caller's role doesn't cover are left out rather than sent as
+      # null, so the app can tell "not permitted" from "nothing on file".
+      # Full medical detail (MedicalPolicy#show_full_details?) adds conditions
+      # and medications; the limited view (#show_limited?, ops) stops at
+      # allergies and dietary needs.
+      def medical_detail_json(pe, medical, dietary)
+        level = medical_detail_level(pe)
+        return {} unless level
+
+        detail = {
+          allergies: medical&.allergies,
+          diet_type: dietary&.diet_type,
+          life_threatening_allergies: dietary&.life_threatening_allergies
+        }
+        return detail unless level == :full
+
+        detail.merge(
+          medical_conditions: medical&.medical_conditions,
+          medications: medical&.medications
+        )
+      end
+
+      def medical_detail_level(pe)
+        # Series members act as event admins on every event in their series,
+        # but hold no event role for the policy to find.
+        return :full if current_user.series_member_for_event?(@event)
+
+        policy = MedicalPolicy.new(current_user, Medical.new(participant_event_id: pe.id))
+        if policy.show_full_details?
+          :full
+        elsif policy.show_limited?
+          :limited
+        end
+      end
+
+      def safeguarding_detail_visible?(pe)
+        SafeguardingInfoPolicy.new(current_user, SafeguardingInfo.new(participant_event_id: pe.id)).show_full_details?
       end
 
       def scans_by_context_json(participant_event)

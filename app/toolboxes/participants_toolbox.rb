@@ -52,7 +52,7 @@ class ParticipantsToolbox < ApplicationToolbox
     # roles that can't read it can't write it either.
     permitted = %i[preferred_name legal_first_name legal_last_name date_of_birth email phone pronouns tshirt_size
       city state country_of_residence]
-    permitted -= %i[date_of_birth phone city state country_of_residence] unless view_pii?
+    permitted -= SensitiveFields.restricted_names(Participant).map(&:to_sym) unless view_pii?
     @participant.update!(params.permit(*permitted).to_h)
     render json: serialize_participant(@participant, full: true)
   end
@@ -90,11 +90,11 @@ class ParticipantsToolbox < ApplicationToolbox
     return base unless full
 
     base.merge(
-      **(view_pii? ? { phone: p.phone } : {}),
+      **SensitiveFields.visible(Participant, { phone: p.phone }, pii: view_pii?),
       slack_user_id: p.slack_user_id,
       tshirt_size: p.tshirt_size,
-      **(view_pii? ? { date_of_birth: p.date_of_birth, city: p.city, state: p.state,
-                       country_of_residence: p.country_of_residence } : {}),
+      **SensitiveFields.visible(Participant, { date_of_birth: p.date_of_birth, city: p.city, state: p.state,
+                                               country_of_residence: p.country_of_residence }, pii: view_pii?),
       registrations: p.participant_events
         .where(current_user.global_admin? && permitted_event_ids.nil? ? {} : { event_id: accessible_events.select(:id) })
         .includes(:event).map { |pe|

@@ -21,13 +21,13 @@ RSpec.describe "Participant notes visibility", type: :request do
   end
 
   def sign_in_with_role(role, console: false)
-    user = User.create!(email: "#{role}-notes-spec@example.com", name: role.titleize, admin_console_beta: console)
+    user = User.create!(email: "#{role}-notes-spec@example.com", name: role.titleize)
     EventRoleAssignment.create!(user: user, event: event, role: role)
     sign_in user
     user
   end
 
-  [ false, true ].each do |console|
+  [ true ].each do |console|
     context(console ? "in the console UI" : "in the original UI") do
       it "hides notes outside a limited user's scope on the record and notes tab" do
         sign_in_with_role("limited", console: console)
@@ -117,7 +117,7 @@ RSpec.describe "Participant notes visibility", type: :request do
         note_type: "ops", sensitivity: "restricted", visible_to_roles: %w[ops], body: "Restricted note body")
     end
 
-    [ false, true ].each do |console|
+    [ true ].each do |console|
       context(console ? "in the console UI" : "in the original UI") do
         it "hides restricted notes and the sensitivity picker from ops" do
           sign_in_with_role("ops", console: console)

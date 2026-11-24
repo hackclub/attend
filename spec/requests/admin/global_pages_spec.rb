@@ -19,10 +19,8 @@ RSpec.describe "Admin pages that aren't about an event", type: :request do
     Nokogiri::HTML(response.body).css("details").select { |group| group.at_css("summary").text.include?("Picked Hacks") }
   end
 
-  { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+  { "with the admin console beta" => true }.each do |ui, console|
     context ui do
-      before { admin.update!(admin_console_beta: console) }
-
       it "folds the picked event's links away in the side nav" do
         get admin_visa_letter_templates_path
 

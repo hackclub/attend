@@ -428,4 +428,122 @@ RSpec.describe "Api::V1::Scans", type: :request, fiat_registrations: true do
       expect(TravelCalendar::JourneyCache.fetch(event).sole).to include(id: travel.id, pickup_state: :awaiting_pickup)
     end
   end
+
+  describe "role gating" do
+    let(:participant_event) { create(:participant_event, event: event) }
+    let(:scan_context) { event.scan_contexts.find_by!(checks_in: true) }
+
+    before do
+      participant_event.participant.update!(phone: "+12025550143")
+      Medical.create!(
+        participant_event: participant_event,
+        allergies: "Peanuts",
+        medical_conditions: "Asthma",
+        medications: "Inhaler",
+        has_anaphylaxis_risk: true
+      )
+      Dietary.create!(participant_event: participant_event, diet_type: "vegetarian", life_threatening_allergies: "Peanuts")
+      SafeguardingInfo.create!(participant_event: participant_event, freedom_waiver_granted: true, high_support_flag: true)
+    end
+
+    def scan_as(user)
+      token = MobileToken.generate_for(user)
+      post "/api/v1/events/#{event.id}/scans",
+        params: { participant_id: participant_event.id, scan_context_id: scan_context.id },
+        headers: { "Authorization" => "Bearer #{token.token}" },
+        as: :json
+      response.parsed_body["participant"]
+    end
+
+    def staff_with(role)
+      create(:user).tap { |user| create(:event_role_assignment, user: user, event: event, role: role) }
+    end
+
+    it "gives a global admin everything" do
+      participant = scan_as(admin)
+
+      expect(participant).to include(
+        "phone" => "+12025550143",
+        "allergies" => "Peanuts",
+        "medical_conditions" => "Asthma",
+        "medications" => "Inhaler",
+        "diet_type" => "vegetarian",
+        "freedom_waiver_granted" => true
+      )
+    end
+
+    it "keeps the phone number from limited staff, who still get full medical detail" do
+      participant = scan_as(staff_with("limited"))
+
+      expect(response).to have_http_status(:ok)
+      expect(participant).not_to have_key("phone")
+      expect(participant).not_to have_key("freedom_waiver_granted")
+      expect(participant).to include(
+        "allergies" => "Peanuts",
+        "medical_conditions" => "Asthma",
+        "medications" => "Inhaler"
+      )
+    end
+
+    it "stops ops at allergies and dietary needs" do
+      participant = scan_as(staff_with("ops"))
+
+      expect(response).to have_http_status(:ok)
+      expect(participant).to include(
+        "phone" => "+12025550143",
+        "allergies" => "Peanuts",
+        "diet_type" => "vegetarian",
+        "life_threatening_allergies" => "Peanuts",
+        "has_anaphylaxis_risk" => true,
+        "high_support_flag" => true
+      )
+      expect(participant.keys).not_to include("medical_conditions", "medications", "freedom_waiver_granted")
+    end
+
+    it "gives event admins full medical detail but not the safeguarding detail" do
+      participant = scan_as(staff_with("event_admin"))
+
+      expect(participant).to include("phone" => "+12025550143", "medical_conditions" => "Asthma", "medications" => "Inhaler")
+      expect(participant).not_to have_key("freedom_waiver_granted")
+    end
+
+    it "gives safeguarding leads the safeguarding detail" do
+      participant = scan_as(staff_with("safeguarding_lead"))
+
+      expect(participant).to include("medical_conditions" => "Asthma", "freedom_waiver_granted" => true)
+    end
+
+    it "treats a series member as an event admin" do
+      series = create(:event_series)
+      event.update!(event_series: series)
+      member = create(:user)
+      SeriesRoleAssignment.create!(user: member, event_series: series, role: SeriesRoleAssignment.roles.keys.first)
+
+      participant = scan_as(member)
+
+      expect(response).to have_http_status(:ok)
+      expect(participant).to include("phone" => "+12025550143", "medical_conditions" => "Asthma")
+    end
+
+    it "refuses a scan from read-only staff" do
+      expect { scan_as(staff_with("read_only")) }.not_to change(Scan, :count)
+
+      expect(response).to have_http_status(:forbidden)
+      expect(response.parsed_body).not_to have_key("participant")
+    end
+
+    it "refuses an undo from read-only staff but still lets them list scans" do
+      participant_event.scans.create!(scan_context: scan_context, user: admin, scanned_at: Time.current)
+      token = MobileToken.generate_for(staff_with("read_only"))
+      headers = { "Authorization" => "Bearer #{token.token}" }
+
+      expect {
+        delete "/api/v1/events/#{event.id}/scans/#{participant_event.id}", headers: headers
+      }.not_to change(Scan, :count)
+      expect(response).to have_http_status(:forbidden)
+
+      get "/api/v1/events/#{event.id}/scans", headers: headers
+      expect(response).to have_http_status(:ok)
+    end
+  end
 end

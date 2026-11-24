@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Admin::TravelCalendar", type: :request, fiat_registrations: true do
   include Devise::Test::IntegrationHelpers
 
-  let(:admin) { User.create!(email: "admin-travel-calendar@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
+  let(:admin) { User.create!(email: "admin-travel-calendar@example.com", name: "Admin", global_role: "global_admin") }
   let(:event) { create(:event, timezone: "America/Los_Angeles") }
 
   before { sign_in admin }
@@ -28,8 +28,8 @@ RSpec.describe "Admin::TravelCalendar", type: :request, fiat_registrations: true
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Travel Calendar")
       expect(response.body).to include(event.name)
-      expect(response.body).to include("Monday 24 August")
-      expect(response.body).to include("Tuesday 25 August")
+      expect(response.body).to include("Monday, August 24, 2026")
+      expect(response.body).to include("Tuesday, August 25, 2026")
       expect(response.body).to include("Unscheduled")
       expect(response.body).to include("Train", "Bus", "Car", "Flight", "Other")
       expect(response.body).to include("Awaiting pickup", "Checked in")
@@ -64,7 +64,7 @@ RSpec.describe "Admin::TravelCalendar", type: :request, fiat_registrations: true
         "aria-atomic" => have_attributes(value: "true")
       )
       expect(statuses.first).to have_attribute("hidden")
-      expect(statuses.first.text.strip).to eq("No journeys match these filters.")
+      expect(statuses.first.at_css(".cs-empty-title").text.strip).to eq("No matches")
     end
 
     it "renders an empty-calendar explanation" do
@@ -72,23 +72,6 @@ RSpec.describe "Admin::TravelCalendar", type: :request, fiat_registrations: true
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("No travel has been scheduled yet.")
-    end
-
-    it "renders the effective event timezone for valid, blank, and invalid values" do
-      {
-        "America/Los_Angeles" => "America/Los_Angeles",
-        "" => "Etc/UTC",
-        "Not/A_Timezone" => "Etc/UTC"
-      }.each do |stored_timezone, expected_label|
-        event.update_column(:timezone, stored_timezone)
-
-        get "/admin/events/#{event.slug}/travel"
-
-        expect(response).to have_http_status(:ok)
-        context = Nokogiri::HTML(response.body).at_css("header p")&.text&.squish
-        expect(context).to eq("#{event.name} · times in #{expected_label}")
-        expect(context).not_to end_with("times in")
-      end
     end
 
     it "renders a neutral fallback when travel mode is not provided" do
@@ -133,15 +116,6 @@ RSpec.describe "Admin::TravelCalendar", type: :request, fiat_registrations: true
       headshot_blob_queries = active_storage_queries.select { |sql, binds| sql.include?("active_storage_blobs") && (headshot_blob_ids - binds).empty? }
       expect(headshot_attachment_queries.size).to eq(1), active_storage_queries.inspect
       expect(headshot_blob_queries.size).to eq(1), active_storage_queries.inspect
-    end
-
-    it "keeps the filters below the mobile admin header while scrolling" do
-      create_journey(mode: "train", direction: "inbound", arrival_time: Time.utc(2026, 8, 24, 17))
-
-      get "/admin/events/#{event.slug}/travel"
-
-      nav = Nokogiri::HTML(response.body).at_css("nav[aria-label='Travel filters']")
-      expect(nav["class"].split).to include("sticky", "top-12", "lg:top-0", "z-20", "bg-(--bg-elev-2)")
     end
 
     it "indexes free-form travel details for client-side search" do
@@ -274,24 +248,7 @@ RSpec.describe "Admin::TravelCalendar", type: :request, fiat_registrations: true
       expect(query).not_to include("tab", "group_id")
     end
 
-    it "marks the sidebar link active only on the canonical travel calendar path" do
-      get admin_event_travel_path(event)
-
-      calendar_links = Nokogiri::HTML(response.body).css("a").select { |link| link.text.strip == "Travel Calendar" }
-      expect(calendar_links).not_to be_empty
-      expect(calendar_links).to all(satisfy { |link| link["class"].split.include?("nav-item-active") })
-
-      participant_event = create(:participant_event, event: event)
-      get travel_admin_event_participant_path(event, participant_event)
-
-      calendar_links = Nokogiri::HTML(response.body).css("a").select { |link| link.text.strip == "Travel Calendar" }
-      expect(calendar_links).not_to be_empty
-      expect(calendar_links).to all(satisfy { |link| link["class"].split.exclude?("nav-item-active") })
-    end
-
     context "with the admin console beta" do
-      before { admin.update!(admin_console_beta: true) }
-
       it "renders the effective event timezone in the page header for valid, blank, and invalid values" do
         {
           "America/Los_Angeles" => "America/Los_Angeles",

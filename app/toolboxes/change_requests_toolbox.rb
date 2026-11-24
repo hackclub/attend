@@ -142,6 +142,6 @@ class ChangeRequestsToolbox < ApplicationToolbox
   def redact_requested_changes(changes)
     return changes if view_pii?
 
-    (changes || {}).except("phone", "date_of_birth")
+    (changes || {}).except(*SensitiveFields.names(models: [ Participant, Guardian ], kinds: %i[phone birth_date]))
   end
 end

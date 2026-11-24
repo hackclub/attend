@@ -9,7 +9,7 @@ RSpec.describe "Admin console participant filters", type: :request, fiat_registr
 
   let(:event) { create(:event, accommodation_enabled: false) }
   let(:admin) do
-    User.create!(email: "console-filters@example.com", name: "Console Filters", global_role: "global_admin", admin_console_beta: true)
+    User.create!(email: "console-filters@example.com", name: "Console Filters", global_role: "global_admin")
   end
 
   let!(:ada) do
@@ -250,21 +250,6 @@ RSpec.describe "Admin console participant filters", type: :request, fiat_registr
       expect(empty["data-travel-calendar-filter-target"]).to eq("empty")
       expect(empty.at_css(".cs-empty-title").text).to eq("No matches")
       expect(empty.at_css("button[data-action='cs-property-filter#clear']").text).to eq("Clear filters")
-    end
-  end
-
-  describe "the original admin" do
-    before { admin.update!(admin_console_beta: false) }
-
-    it "still renders its own filter bar without console tokens" do
-      get admin_event_participants_path(event), params: { status: "complete" }
-
-      expect(document.at_css("[data-controller~='cs-property-filter']")).to be_nil
-      expect(document.at_css("[data-testid='participant-filter-tokens']")).to be_nil
-      expect(document.at_css("select[name='status']")).to be_present
-      expect(document.at_css("input[name='search']")).to be_present
-      expect(response.body).to include("Ada")
-      expect(response.body).not_to include("Bram")
     end
   end
 end

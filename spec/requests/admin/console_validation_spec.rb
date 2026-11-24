@@ -10,7 +10,7 @@ RSpec.describe "Admin console form validation", type: :request do
 
   let(:admin) do
     User.create!(email: "validation-admin@example.com", name: "Robin Placeholder",
-      global_role: "global_admin", admin_console_beta: true)
+      global_role: "global_admin")
   end
   let(:event) { create(:event, name: "Validation Test Jam", groups_enabled: true) }
 
@@ -223,20 +223,6 @@ RSpec.describe "Admin console form validation", type: :request do
       post admin_users_path, params: { user: { email: "existing-user@example.com", global_role: "no_role" } }
 
       expect(inline_error("user_email")).to eq("This email address already belongs to a user.")
-    end
-  end
-
-  describe "original UI" do
-    before { admin.update!(admin_console_beta: false) }
-
-    it "keeps its own error summary" do
-      post admin_event_scan_contexts_path(event), params: { scan_context: { name: "" } }
-
-      expect(response).to have_http_status(:unprocessable_entity)
-      expect(response.body).to include("prohibited this context from being saved")
-      expect(response.body).to include("Name can&#39;t be blank")
-      expect(response.body).not_to include("cs-field-error")
-      expect(response.body).not_to include("cs-form-validation")
     end
   end
 end

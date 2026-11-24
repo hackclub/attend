@@ -6,17 +6,16 @@ module Admin
     # on participants, guardians, and emergency contacts alike. PII-restricted
     # roles (see EventRoleAssignment::PII_RESTRICTED_ROLES) can reach a
     # participant's change history, and a changeset is just as revealing as the
-    # field itself.
-    PII_FIELDS = %w[
-      date_of_birth address_line_1 address_line_2 city state postal_code
-      country country_of_residence
-      phone phone_number phone_override
-    ].freeze
+    # field itself. Read from the SensitiveFields registry, by name across the
+    # models whose versions the history page shows.
+    HISTORY_MODELS = %w[Participant Guardian GuardianParticipantEvent EmergencyContact User].freeze
+
+    PII_FIELDS = SensitiveFields.names(models: HISTORY_MODELS, kinds: %i[birth_date address phone]).freeze
 
     # The history page mixes in Guardian and EmergencyContact versions. A
     # participant's own email address is visible to PII-restricted roles; the
     # people around them still aren't.
-    EMAIL_FIELDS = %w[email invited_via_email].freeze
+    EMAIL_FIELDS = SensitiveFields.names(models: HISTORY_MODELS, kinds: :email).freeze
 
     def audit_field_label(field)
       field.to_s.humanize

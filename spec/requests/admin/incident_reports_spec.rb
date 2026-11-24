@@ -67,8 +67,6 @@ RSpec.describe "Admin::IncidentReports (HQ inbox)", type: :request do
   end
 
   context "with the admin console beta" do
-    before { global_admin.update!(admin_console_beta: true) }
-
     it "renders the same inbox" do
       sign_in global_admin
       get admin_incident_reports_path

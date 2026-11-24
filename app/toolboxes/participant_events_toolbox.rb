@@ -186,32 +186,22 @@ class ParticipantEventsToolbox < ApplicationToolbox
   end
   def update_guardian
     load_participant_event!
-    authorize! @participant_event, :manage_guardians?
-    require_pii_access!("edit guardian contact details")
-
-    gpe = @participant_event.guardian_participant_events.find(params[:guardian_participant_event_id])
-    @guardian = gpe.guardian
     attributes = params.permit(:email, :legal_first_name, :legal_last_name, :phone).to_h.compact_blank
-    halt error: "Pass at least one of email, legal_first_name, legal_last_name, phone." if attributes.empty?
 
-    # Mirrors Admin::GuardiansController#update: a guardian can't share the
-    # participant's phone (the email check lives on the model).
-    participant_phone = @participant_event.participant.phone
-    if attributes["phone"].present? && participant_phone.present? &&
-        PhoneNormalizer.normalize(attributes["phone"]) == participant_phone
-      halt error: "Guardian phone cannot be the same as the participant's phone number."
-    end
+    # Guardians::Update holds this to manage_guardians? and PII access, refuses
+    # a phone that is also the participant's (the email check lives on the
+    # model), and revokes the invite link when the email changes.
+    gpe = operation_value!(
+      Guardians::Update.call(operation_context,
+        participant_event: @participant_event,
+        guardian_participant_event: params[:guardian_participant_event_id],
+        attributes: attributes),
+      nothing_to_update: "Pass at least one of email, legal_first_name, legal_last_name, phone."
+    )
 
     # A guardian row is shared by every registration it's linked to (siblings),
     # so say so rather than silently changing their details too.
-    other_registrations = @guardian.guardian_participant_events.where.not(id: gpe.id).count
-
-    old_email = @guardian.email
-    @guardian.update!(attributes)
-    # Revoke rather than just unstamp: the old link went to the wrong address,
-    # and clearing invite_token_sent_at alone leaves its token live (for a week
-    # after any use) and makes the next invite resend the same URL.
-    gpe.revoke_invite_token! if @guardian.email != old_email && !gpe.completed?
+    other_registrations = gpe.guardian.guardian_participant_events.where.not(id: gpe.id).count
 
     render json: {
       guardian: serialize_guardian_link(gpe.reload),
@@ -227,22 +217,50 @@ class ParticipantEventsToolbox < ApplicationToolbox
   end
   def resend_guardian_invite
     load_participant_event!
-    authorize! @participant_event, :manage_guardians?
 
-    if @participant_event.event.guardian_invites_locked?
-      halt error: "Guardian invites are currently locked for #{@participant_event.event.name}."
-    end
+    # On this surface the link already sent keeps working and is emailed
+    # again; the admin UI's resend rotates it (see Guardians::ResendInvite).
+    gpe = operation_value!(
+      Guardians::ResendInvite.call(operation_context,
+        participant_event: @participant_event,
+        guardian_participant_event: params[:guardian_participant_event_id],
+        rotate_token: false),
+      email_undeliverable: "The guardian's email is bouncing — correct it with participant_events_update_guardian first."
+    )
 
-    @guardian_participant_event = @participant_event.guardian_participant_events.find(params[:guardian_participant_event_id])
-    guardian = @guardian_participant_event.guardian
-    if guardian.email_undeliverable?
-      halt error: "The guardian's email is bouncing — correct it with participant_events_update_guardian first."
-    end
+    render json: { sent: true, to: gpe.guardian.email, guardian: serialize_guardian_link(gpe) }
+  end
 
-    @guardian_participant_event.update!(invite_token_sent_at: nil)
-    GuardianMailer.invitation(guardian_participant_event: @guardian_participant_event).deliver_later
+  tool "Replace a guardian with a DIFFERENT person (global admins only). Removes the old guardian from the " \
+       "registration, resets every guardian-signed waiver and document for the new guardian to sign, moves " \
+       "emergency contacts across, and emails the new guardian their portal invite once the registration is " \
+       "waiting on them. Can't be undone. To fix a typo in the same person's details, use " \
+       "participant_events_update_guardian instead, which keeps their signatures.",
+    access: :write, scope: "participants:write" do
+    param :participant_event_id, :string, "ParticipantEvent ID"
+    param :guardian_participant_event_id, :string, "Guardian link ID being replaced, from participant_events_guardians"
+    param :legal_first_name, :string, "New guardian's legal first name"
+    param :legal_last_name, :string, "New guardian's legal last name"
+    param :email, :string, "New guardian's email"
+    param :phone, :string, "New guardian's phone number (E.164)", optional: true
+    param :relationship, :string, "Relationship to the participant, e.g. Parent", optional: true
+  end
+  def replace_guardian
+    load_participant_event!
 
-    render json: { sent: true, to: guardian.email, guardian: serialize_guardian_link(@guardian_participant_event) }
+    outcome = operation_value!(
+      Guardians::Replace.call(operation_context,
+        participant_event: @participant_event,
+        guardian_participant_event: params[:guardian_participant_event_id],
+        attributes: params.permit(:legal_first_name, :legal_last_name, :email, :phone, :relationship).to_h)
+    )
+
+    render json: {
+      guardian: serialize_guardian_link(outcome.link.reload),
+      invited: outcome.invited?,
+      reset_consents: outcome.reset_consents.map { |consent| serialize_consent(consent.reload) },
+      note: replacement_invite_note(outcome)
+    }
   end
 
   # --- Consents / waivers ----------------------------------------------------
@@ -295,6 +313,16 @@ class ParticipantEventsToolbox < ApplicationToolbox
 
   private
 
+  def replacement_invite_note(outcome)
+    if outcome.invited?
+      "Portal invite emailed to the new guardian."
+    elsif @participant_event.event.guardian_invites_locked?
+      "Guardian invites are locked for this event; the new guardian is invited when they open."
+    else
+      "The new guardian is invited once the participant submits their registration."
+    end
+  end
+
   def load_participant_event!
     @participant_event = ParticipantEvent.includes(:event, :participant).find(params[:participant_event_id])
     # Several ParticipantEventPolicy checks compare against Current.event, the
@@ -312,7 +340,7 @@ class ParticipantEventsToolbox < ApplicationToolbox
       guardian_participant_event_id: gpe.id,
       name: person_name(g&.full_name),
       email: g&.email,
-      phone: (g&.phone if view_pii?),
+      phone: SensitiveFields.visible(Guardian, { phone: g&.phone }, pii: view_pii?)[:phone],
       relationship: gpe.relationship,
       primary: gpe.is_primary_guardian,
       status: gpe.status,
