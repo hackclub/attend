@@ -86,7 +86,7 @@ module Admin
     end
 
     def authorize_admin_access
-      return if current_user&.admin_console_access?
+      return if current_user&.admin?
 
       # Someone partway through an event creation invite has one admin page
       # open to them, the new event form; send them back to it.

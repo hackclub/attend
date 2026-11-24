@@ -23,7 +23,7 @@ RSpec.describe "Hack Club Auth session revoker", type: :request do
     user.reload
     expect(user.oidc_claims).to eq("slack_id" => "U0EXAMPLE1")
     expect(user).not_to be_self_serve_event_creator
-    expect(user).not_to be_admin_console_access
+    expect(user).not_to be_admin
   end
 
   it "answers 2xx for an address nobody here has, so HCA doesn't keep retrying" do

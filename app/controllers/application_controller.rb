@@ -63,7 +63,7 @@ class ApplicationController < ActionController::Base
   # volunteers) or who've been invited to a course. nil means the home page.
   # Shared by the home page and the sign-in callback so they can't disagree.
   def landing_path_for(user)
-    if user.admin_console_access? && (user.participant.blank? || user.admin_for_current_events?)
+    if user.admin? && (user.participant.blank? || user.admin_for_current_events?)
       admin_root_path
     elsif user.participant.present?
       dashboard_path

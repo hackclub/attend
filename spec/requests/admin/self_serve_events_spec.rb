@@ -55,18 +55,6 @@ RSpec.describe "Self-serve event creation", type: :request do
     expect(response.body).not_to include("someone-elses-con")
   end
 
-  it "doesn't let the entitlement get a banned person past their ban" do
-    create(:ban, email: creator.email)
-
-    expect(creator).not_to be_self_serve_event_creator
-
-    get admin_root_path
-    expect(response).to redirect_to(root_path)
-
-    post admin_events_path, params: { event: event_params }
-    expect(Event.find_by(slug: "self-serve-con")).to be_nil
-  end
-
   it "turns away someone whose groups don't include the entitlement" do
     creator.update!(oidc_claims: { "groups" => [ "some-other-entitlement" ] })
 

@@ -459,7 +459,9 @@ class User < ApplicationRecord
 
   # The claim name the attend-self-serve-events entitlement is exposed to
   # Attend's app under in the HCA directory. Holders may create standalone
-  # events and use the admin before they staff anything.
+  # events and use the admin before they staff anything. It's an HQ staff
+  # entitlement, so holders count as #admin? in full: ban and maintenance
+  # exemptions and MCP included (with no events, MCP just has nothing to show).
   SELF_SERVE_EVENTS_GROUP = "attend-self-serve-events".freeze
 
   # HCA directory entitlements this person held at their last sign-in, as the
@@ -470,20 +472,8 @@ class User < ApplicationRecord
     Array((oidc_claims || {})["groups"])
   end
 
-  # The entitlement reaches far more people than hand-assigned staff, and the
-  # admin doesn't run the participant side's ban check (RestrictsBannedUsers),
-  # so a ban turns it off here.
   def self_serve_event_creator?
-    hca_groups.include?(SELF_SERVE_EVENTS_GROUP) && !Ban.user_banned?(self)
-  end
-
-  # Who gets into the admin at all: staff (#admin?), plus self-serve event
-  # creators who don't staff anything yet. Deliberately not folded into
-  # #admin?, which also exempts people from bans and maintenance mode and
-  # opens MCP: those stay with real staff roles. Once a creator has made an
-  # event, its event_admin role makes them #admin? like anyone else.
-  def admin_console_access?
-    admin? || self_serve_event_creator?
+    hca_groups.include?(SELF_SERVE_EVENTS_GROUP)
   end
 
   # Identity-verified through Hack Club Auth (same signal the admin UI shows).
@@ -493,6 +483,7 @@ class User < ApplicationRecord
 
   def admin?
     global_admin? ||
+      self_serve_event_creator? ||
       event_role_assignments.exists?(role: ADMIN_EVENT_ROLES) ||
       series_role_assignments.exists?
   end
