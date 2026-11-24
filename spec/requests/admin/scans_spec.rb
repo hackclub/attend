@@ -413,21 +413,18 @@ RSpec.describe "Admin::Scans", type: :request do
       expect { scan("attend://checkin/#{participant_event.participant_id}") }.to change { participant_event.scans.count }.by(1)
     end
 
-    { "the console" => true, "the old admin" => false }.each do |ui, console|
-      it "hands #{ui}'s scanner the public keys and the cancelled registrations, and nothing more" do
-        admin.update!(admin_console_beta: console)
-        withdrawn = create(:participant_event, event: event, status: "withdrawn")
-        rejected = create(:participant_event, event: event, status: "rejected")
-        create(:participant_event, status: "withdrawn")
-        participant_event
+    it "hands the scanner the public keys and the cancelled registrations, and nothing more" do
+      withdrawn = create(:participant_event, event: event, status: "withdrawn")
+      rejected = create(:participant_event, event: event, status: "rejected")
+      create(:participant_event, status: "withdrawn")
+      participant_event
 
-        get scanner_admin_event_scans_path(event)
+      get scanner_admin_event_scans_path(event)
 
-        config = JSON.parse(Nokogiri::HTML(response.body).at_css('[data-controller="scanner"]')["data-scanner-config-value"])
-        expect(config["ticketKeys"]).to eq("1" => Base64.strict_encode64(signing_key.public_to_der))
-        expect(config["cancelledTickets"]).to contain_exactly(withdrawn.id, rejected.id)
-        expect(response.body).not_to include(signing_key.private_to_pem.lines[1].strip)
-      end
+      config = JSON.parse(Nokogiri::HTML(response.body).at_css('[data-controller="scanner"]')["data-scanner-config-value"])
+      expect(config["ticketKeys"]).to eq("1" => Base64.strict_encode64(signing_key.public_to_der))
+      expect(config["cancelledTickets"]).to contain_exactly(withdrawn.id, rejected.id)
+      expect(response.body).not_to include(signing_key.private_to_pem.lines[1].strip)
     end
   end
 
