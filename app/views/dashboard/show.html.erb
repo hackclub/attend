@@ -353,7 +353,7 @@
     </div>
 
     <% if @participant_event.travel_outstanding? %>
-      <div class="rounded-2xl border border-amber-300 bg-amber-50 p-4 mb-4 text-amber-950">
+      <div class="rounded-2xl border border-amber-300 bg-amber-50 p-4 mb-4 text-amber-900">
         <p class="font-semibold">Your travel plans still need an update</p>
         <ul class="mt-2 text-sm space-y-1">
           <% [ [@participant_event.travel_inbound, "Arrival"], [@participant_event.travel_outbound, "Departure"] ].each do |travel, label| %>
