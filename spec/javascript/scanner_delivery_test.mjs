@@ -104,6 +104,17 @@ test("doesn't save a code that isn't shaped like a participant's", async () => {
   assert.deepEqual(saved, [])
 })
 
+// app.js has already checked its signature by the time it gets here.
+test("saves a signed ticket for later", async () => {
+  const { deliver, saved } = build({ outcome: "unreachable" })
+  const ticket = { participant_id: "T.AED2VKVKVK53WTGMRXO653XO53XO5Z3XVB66Q34V", scan_context_id: "context-1" }
+
+  const result = await deliver(ticket, { label: "Ticket AAAAAAAA" })
+
+  assert.equal(result.status, "queued")
+  assert.deepEqual(saved.map((record) => record.body), [ ticket ])
+})
+
 test("says the scan was not recorded where scans can't be saved", async () => {
   const offline = await build({ outcome: "unreachable" }, { queue: false }).deliver(SCAN, { label: "ID" })
   assert.equal(offline.status, "failed")

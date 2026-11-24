@@ -3,6 +3,8 @@
 import { newClientScanId } from "scanner/api"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// A signed ticket (scanner/ticket.js), already checked by the time it gets here.
+const SIGNED_TICKET = /^T\.[A-Z2-7]+$/
 
 // `queue()` returns the saved-scans queue (sync.js), or null where scans
 // can't be saved on this device. `deliver` resolves to one of:
@@ -37,9 +39,10 @@ export function createDelivery({ api, queue, contexts }) {
       : { status: "failed", message: "Couldn't reach the server — check your connection and scan again.", detail: "The scan was not recorded." }
     if (!queue()) return unsaved
 
-    // Offline there is no way to tell a participant's code from any other QR
-    // code by looking it up, so only save what at least has the right shape.
-    if (!body.badge_token && !UUID.test(String(body.participant_id || "").trim())) {
+    // Offline an unsigned code can't be looked up, so only save what at least
+    // has the right shape. A signed one has been checked on the device.
+    const code = String(body.participant_id || "").trim()
+    if (!body.badge_token && !UUID.test(code) && !SIGNED_TICKET.test(code)) {
       return { status: "failed", message: "Couldn't reach the server, and this doesn't look like an Attend code.", detail: "The scan was not recorded." }
     }
 

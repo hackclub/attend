@@ -208,7 +208,7 @@ module Passkit
         {
           messageEncoding: "iso-8859-1",
           format: "PKBarcodeFormatQR",
-          message: "attend://checkin/#{participant.id}",
+          message: CheckinCode.for(participant_event),
           altText: participant.id.split("-").first.upcase
         }
       ]

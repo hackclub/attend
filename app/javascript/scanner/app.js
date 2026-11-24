@@ -8,6 +8,7 @@
 //   queue_store.js  scans that couldn't be sent, kept in IndexedDB
 //   sync.js         sending those once the connection is back
 //   nfc.js          the NFC bridge
+//   ticket.js       reading a QR code, and checking a signed one on the device
 //   ui.js, skins.js what it all looks like
 //   offline.js      asks the service worker to keep this page loadable
 import { createApi } from "scanner/api"
@@ -18,15 +19,8 @@ import { keepAvailableOffline } from "scanner/offline"
 import { openQueueStore } from "scanner/queue_store"
 import { createSkin } from "scanner/skins"
 import { createScanQueue } from "scanner/sync"
+import { INVALID_TICKET, createTicketVerifier, parseCheckinCode } from "scanner/ticket"
 import { createUi } from "scanner/ui"
-
-function parseQrCode(scannedValue) {
-  const deepLinkMatch = scannedValue.match(/^attend:\/\/checkin\/(.+)$/)
-  if (deepLinkMatch) {
-    return deepLinkMatch[1]
-  }
-  return scannedValue
-}
 
 function readIcons(element) {
   const icons = {}
@@ -109,11 +103,25 @@ export function mountScanner(element, config) {
   }
 
   const deliver = createDelivery({ api, queue: () => queue, contexts: config.contexts })
+  const verifyTicket = createTicketVerifier({ keys: config.ticketKeys, eventId: config.eventId, cancelled: config.cancelledTickets })
 
-  function showQueued(outcome, label) {
-    ui.showResult("Saved on this device, not sent yet", "warning", {
-      detail: `${label} · ${outcome.reason === "server" ? "The server had a problem." : "Couldn't reach the server."} It will be sent automatically; who it was shows up once it has.`
-    })
+  // `check` is what the device could tell about the code on its own (see
+  // ticket.js). Online the server's answer is what counts; offline this is
+  // all the operator has to go on.
+  function showQueued(outcome, label, check = { verdict: "unverified" }) {
+    const why = outcome.reason === "server" ? "The server had a problem." : "Couldn't reach the server."
+    const later = "It will be sent automatically; who it was shows up once it has."
+    if (check.verdict === "valid") {
+      ui.showResult("Valid ticket · saved on this device", "success", { detail: `${label} · ${why} ${later}` })
+    } else if (check.verdict === "cancelled") {
+      ui.showResult("This registration was withdrawn or rejected", "error", {
+        detail: `${label} · The ticket is genuine but no longer counts. Check with the event team before letting them in. The scan was saved and will be sent later.`
+      })
+    } else {
+      ui.showResult("Saved on this device, but this code couldn't be checked", "warning", {
+        detail: `${label} · ${why} Older tickets and typed IDs can only be checked online, so check their ticket another way. ${later}`
+      })
+    }
   }
 
   // The one gate for every camera, search and manual scan. Returns whether
@@ -131,7 +139,6 @@ export function mountScanner(element, config) {
     }
     if (!manual && scannedValue === lastScannedCode) return false
 
-    const participantId = parseQrCode(scannedValue)
     const scanContextId = requireContextId()
     if (!scanContextId) {
       // Report a code held up to the camera once rather than every frame, but
@@ -145,15 +152,27 @@ export function mountScanner(element, config) {
 
     scanCooldown = true
     lastScannedCode = scannedValue
-    sendScan(participantId, scanContextId)
+    sendScan(scannedValue, scanContextId)
     return true
   }
 
-  async function sendScan(participantId, scanContextId) {
+  async function sendScan(scannedValue, scanContextId) {
     updateStatus("Processing...", "scanning")
 
     try {
-      const label = `ID ${String(participantId).trim().slice(0, 8).toUpperCase()}`
+      const code = parseCheckinCode(scannedValue)
+      // A code that fails its signature is turned away here, online or not:
+      // the server would refuse it too.
+      const check = await verifyTicket(code)
+      if (check.verdict === "invalid") {
+        ui.showResult("Not a valid ticket", "error", { detail: `${INVALID_TICKET[check.reason]} The scan was not recorded.` })
+        return finishScan()
+      }
+
+      const participantId = code.kind === "plain" ? code.id : code.token
+      const label = code.kind === "signed"
+        ? `Ticket ${code.participantEventId.slice(0, 8).toUpperCase()}`
+        : `ID ${String(participantId).trim().slice(0, 8).toUpperCase()}`
       const outcome = await deliver({ participant_id: participantId, scan_context_id: scanContextId }, { label })
 
       if (outcome.status === "recorded") {
@@ -182,7 +201,7 @@ export function mountScanner(element, config) {
           }
         }
       } else if (outcome.status === "queued") {
-        showQueued(outcome, label)
+        showQueued(outcome, label, check)
       } else {
         ui.showResult(outcome.message, "error", { detail: outcome.detail, reload: outcome.reload })
       }
@@ -192,6 +211,11 @@ export function mountScanner(element, config) {
       ui.showResult("Something went wrong showing this scan.", "error", { detail: "Check Recent Scans to see whether it was recorded." })
     }
 
+    finishScan()
+  }
+
+  // The cooldown after every scan, recorded or not, before the next one.
+  function finishScan() {
     setTimeout(() => {
       if (signal.aborted) return
       scanCooldown = false

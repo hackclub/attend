@@ -144,11 +144,16 @@ module Admin
 
       # Fall back to participant identifier lookup (QR code flow)
       if participant_event.nil? && params[:participant_id].present?
-        participant_event = ScanParticipantResolver.call(
-          event: current_event,
-          identifier: params[:participant_id],
-          includes: [ :participant, :medical, :dietary ]
-        )
+        begin
+          participant_event = ScanParticipantResolver.call(
+            event: current_event,
+            identifier: params[:participant_id],
+            includes: [ :participant, :medical, :dietary ]
+          )
+        rescue CheckinCode::Invalid => error
+          render json: { error: error.message }, status: :unprocessable_entity
+          return
+        end
       end
 
       unless participant_event

@@ -14,7 +14,12 @@ module Admin
         nfcEnsureUrl: "/api/v1/events/#{current_event.id}/participant_events/:id/nfc_badge/ensure",
         nfcConfirmUrl: "/admin/events/#{current_event.slug}/participant_events/:id/confirm_nfc_badge",
         nfcWriteOnCheckin: !!(current_event.nfc_badges_enabled? && current_event.nfc_badge_write_on_checkin_enabled?),
-        contexts: @scan_contexts.to_h { |context| [ context.id, context.name ] }
+        contexts: @scan_contexts.to_h { |context| [ context.id, context.name ] },
+        # For checking signed QR codes on the device (see CheckinCode and
+        # scanner/ticket.js): the public keys, and the registrations whose
+        # tickets no longer count. Ids only; no names reach the device.
+        ticketKeys: CheckinCode.public_keys,
+        cancelledTickets: current_event.participant_events.where(status: %w[withdrawn rejected]).pluck(:id)
       }
 
       tag.div(hidden: true, data: { controller: "scanner", scanner_config_value: config.to_json }) do

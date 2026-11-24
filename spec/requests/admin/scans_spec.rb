@@ -375,6 +375,59 @@ RSpec.describe "Admin::Scans", type: :request do
     expect(response.body).not_to include("function submitScan", "pendingScans")
   end
 
+  describe "signed check-in codes" do
+    let(:signing_key) { CheckinCode.generate_key }
+
+    before { CheckinCode.keyring = { 1 => signing_key } }
+    after { CheckinCode.reset_keyring! }
+
+    def scan(code)
+      post admin_event_scans_path(event), params: { participant_id: code, scan_context_id: scan_context.id }, as: :json
+    end
+
+    it "records a scan of a signed ticket, with or without the deep link prefix" do
+      code = CheckinCode.for(participant_event)
+
+      expect { scan(code) }.to change { participant_event.scans.count }.by(1)
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body.dig("participant", "participant_event_id")).to eq(participant_event.id)
+
+      expect { scan(CheckinCode.strip_prefix(code)) }.to change { participant_event.scans.count }.by(1)
+      expect(response).to have_http_status(:ok)
+    end
+
+    it "refuses a forged or foreign ticket without recording anything" do
+      CheckinCode.keyring = { 1 => CheckinCode.generate_key }
+      forged = CheckinCode.for(participant_event)
+      CheckinCode.keyring = { 1 => signing_key }
+      other_event = CheckinCode.for(create(:participant_event))
+
+      [ forged, other_event ].each do |code|
+        expect { scan(code) }.not_to change(Scan, :count)
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body["error"]).to eq("This is not a valid ticket for this event")
+      end
+    end
+
+    it "still accepts an unsigned code issued before signing" do
+      expect { scan("attend://checkin/#{participant_event.participant_id}") }.to change { participant_event.scans.count }.by(1)
+    end
+
+    it "hands the scanner the public keys and the cancelled registrations, and nothing more" do
+      withdrawn = create(:participant_event, event: event, status: "withdrawn")
+      rejected = create(:participant_event, event: event, status: "rejected")
+      create(:participant_event, status: "withdrawn")
+      participant_event
+
+      get scanner_admin_event_scans_path(event)
+
+      config = JSON.parse(Nokogiri::HTML(response.body).at_css('[data-controller="scanner"]')["data-scanner-config-value"])
+      expect(config["ticketKeys"]).to eq("1" => Base64.strict_encode64(signing_key.public_to_der))
+      expect(config["cancelledTickets"]).to contain_exactly(withdrawn.id, rejected.id)
+      expect(response.body).not_to include(signing_key.private_to_pem.lines[1].strip)
+    end
+  end
+
   # The service worker keeps this copy on the device for reloading offline,
   # so it must not carry anyone's name.
   it "renders the offline shell without the day's scans" do
