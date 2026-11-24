@@ -15,17 +15,22 @@
     <% stays = Rooming::ParticipantStays.for(@participant_event) %>
     <% if show_privacy_note || rooming_status || stays.any? %>
       <div class="portal-note portal-note-info mt-4">
-        <% if show_privacy_note %>
-          <p class="portal-body text-sm"><strong class="portal-heading">Who sees this?</strong> Rooming details are used by the event team to plan assignments and are visible to staff managing accommodation. Other attendees cannot see them. Your selections are recorded as requests, not confirmed placements.</p>
-          <p class="portal-body text-sm mt-2">If a rooming concern is sensitive, <%= link_to "send a private request to event staff", edit_dashboard_event_correction_path(@participant_event, section: :support), class: "portal-link" %>. You can choose event administrators, operations, or safeguarding staff for that request.</p>
-        <% end %>
-        <% if rooming_status %>
-          <p class="portal-body text-sm <%= "mt-2" if show_privacy_note %>"><%= rooming_status %></p>
-        <% end %>
-        <% if stays.any? %>
-          <p class="portal-body text-sm <%= "mt-2" if show_privacy_note || rooming_status %>"><strong class="portal-heading">Where you're staying</strong></p>
-          <%= render "dashboard/stays", stays: stays, item_class: "portal-body text-sm" %>
-        <% end %>
+        <svg class="portal-note-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.852l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/>
+        </svg>
+        <div class="min-w-0 flex-1">
+          <% if show_privacy_note %>
+            <p class="portal-body text-sm"><strong class="portal-heading">Who sees this?</strong> Rooming details are used by the event team to plan assignments and are visible to staff managing accommodation. Other attendees cannot see them. Your selections are recorded as requests, not confirmed placements.</p>
+            <p class="portal-body text-sm mt-2">If a rooming concern is sensitive, <%= link_to "send a private request to event staff", edit_dashboard_event_correction_path(@participant_event, section: :support), class: "portal-link" %>. You can choose event administrators, operations, or safeguarding staff for that request.</p>
+          <% end %>
+          <% if rooming_status %>
+            <p class="portal-body text-sm <%= "mt-2" if show_privacy_note %>"><%= rooming_status %></p>
+          <% end %>
+          <% if stays.any? %>
+            <p class="portal-body text-sm <%= "mt-2" if show_privacy_note || rooming_status %>"><strong class="portal-heading">Where you're staying</strong></p>
+            <%= render "dashboard/stays", stays: stays, item_class: "portal-body text-sm" %>
+          <% end %>
+        </div>
       </div>
     <% end %>
   </header>
