@@ -1,10 +1,11 @@
 namespace :checkin_codes do
   # Prints a new Ed25519 private key for signing check-in QR codes. Add it to
-  # credentials under ticket_signing.keys with the next free id (1-255):
+  # credentials under ticket_signing.keys with the next free id (1-255),
+  # quoted: Rails refuses to boot on a bare numeric key in credentials.
   #
   #   ticket_signing:
   #     keys:
-  #       1: |
+  #       "1": |
   #         -----BEGIN PRIVATE KEY-----
   #         ...
   #
