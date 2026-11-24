@@ -701,6 +701,10 @@ Rails.application.routes.draw do
         end
       end
 
+      # Hack Club Auth's session revoker: someone lost a directory entitlement.
+      # Under /webhooks for its rack-attack throttle.
+      post "webhooks/hack_club_auth", to: "hack_club_auth_revocations#create"
+
       post "postmark_webhooks", to: "postmark_webhooks#create"
       post "helpscout_webhooks", to: "helpscout_webhooks#create"
       post "slack/events", to: "slack_events#create"

@@ -1,6 +1,7 @@
 class EventPolicy < ApplicationPolicy
   def index?
-    user.global_admin? || user.event_role_assignments.exists? || user.series_role_assignments.exists?
+    user.global_admin? || user.self_serve_event_creator? ||
+      user.event_role_assignments.exists? || user.series_role_assignments.exists?
   end
 
   def show?
@@ -9,6 +10,9 @@ class EventPolicy < ApplicationPolicy
 
   # Series members can create events inside their own series; the record must
   # carry the target event_series_id so membership can be checked here.
+  # Holders of the self-serve events entitlement (User#self_serve_event_creator?)
+  # can create standalone events; putting one in a series still takes
+  # membership of it.
   #
   # An event creation invite is deliberately not a way in here: it is good for
   # one event, so it only counts where the create also uses it up
@@ -16,7 +20,10 @@ class EventPolicy < ApplicationPolicy
   def create?
     return true if user.global_admin?
 
-    record.is_a?(Event) && record.event_series_id.present? && user.series_member_for_event?(record)
+    in_series = record.is_a?(Event) && record.event_series_id.present?
+    return user.series_member_for_event?(record) if in_series
+
+    user.self_serve_event_creator?
   end
 
   # Any role on the event except read_only, which can look (show?) but not
