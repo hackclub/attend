@@ -4,9 +4,9 @@ RSpec.describe "Admin::EventCreationInvites", type: :request do
   include Devise::Test::IntegrationHelpers
   include ActiveJob::TestHelper
 
-  [ true, false ].each do |console|
+  [ true ].each do |console|
     context "with the #{console ? 'console' : 'original'} admin" do
-      let(:global_admin) { User.create!(email: "ga-invites@example.com", name: "Global Admin", global_role: "global_admin", admin_console_beta: console) }
+      let(:global_admin) { User.create!(email: "ga-invites@example.com", name: "Global Admin", global_role: "global_admin") }
 
       before { sign_in global_admin }
 

@@ -15,12 +15,6 @@ module Admin
 
     private
 
-    # This page only exists in the console UI, whichever admin the person
-    # would otherwise get.
-    def set_admin_ui_variant
-      request.variant = :console
-    end
-
     # The public link explains anything that isn't a usable invite of theirs.
     def authorize_admin_access
       @invite = EventCreationInvite.find_by_token(params[:token])

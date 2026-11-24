@@ -28,11 +28,11 @@ RSpec.describe "Admin branding and account linking settings", type: :request do
     }
   end
 
-  { "classic admin" => false, "admin console" => true }.each do |label, console|
+  { "admin console" => true }.each do |label, console|
     context "in the #{label}" do
       let(:admin) do
         User.create!(email: "branding-#{console}@example.com", name: "Robin Placeholder",
-          global_role: "global_admin", admin_console_beta: console)
+          global_role: "global_admin")
       end
 
       before { sign_in admin }

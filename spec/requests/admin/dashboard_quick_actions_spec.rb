@@ -14,7 +14,7 @@ RSpec.describe "Admin dashboard quick actions", type: :request do
   end
 
   context "with the admin console beta" do
-    let(:admin) { create(:user, global_role: "global_admin", admin_console_beta: true) }
+    let(:admin) { create(:user, global_role: "global_admin") }
 
     it "lists every event surface as a tinted tile" do
       visit_dashboard(admin)
@@ -46,7 +46,7 @@ RSpec.describe "Admin dashboard quick actions", type: :request do
     end
 
     it "keeps the audit log tile from staff who can't open audit logs" do
-      ops = create(:user, admin_console_beta: true)
+      ops = create(:user)
       create(:event_role_assignment, user: ops, event: event, role: :ops)
       visit_dashboard(ops)
 
@@ -54,12 +54,5 @@ RSpec.describe "Admin dashboard quick actions", type: :request do
       expect(quick_actions).to include(admin_event_scans_path(event))
       expect(quick_actions).not_to include(admin_audit_logs_path(event_id: event.id))
     end
-  end
-
-  it "leaves the original dashboard untouched" do
-    visit_dashboard(create(:user, global_role: "global_admin", admin_console_beta: false))
-
-    expect(response.body).not_to include('data-testid="quick-actions"')
-    expect(response.body).to include("Quick Actions")
   end
 end

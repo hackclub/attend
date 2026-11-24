@@ -92,10 +92,10 @@ RSpec.describe "Admin::Participants withdraw authorization", type: :request do
     let(:reinstate_path) { unwithdraw_admin_event_participant_path(event.slug, participant_event) }
     let(:withdraw_path) { withdraw_admin_event_participant_path(event.slug, participant_event) }
 
-    [ true, false ].each do |console|
+    [ true ].each do |console|
       context "in the #{console ? 'console' : 'classic'} admin UI" do
         it "offers event admins Reinstate and no Withdraw" do
-          sign_in_with_role("event_admin").update!(admin_console_beta: console)
+          sign_in_with_role("event_admin")
 
           get admin_event_participant_path(event.slug, participant_event)
 
@@ -106,7 +106,7 @@ RSpec.describe "Admin::Participants withdraw authorization", type: :request do
         end
 
         it "offers ops neither button" do
-          sign_in_with_role("ops").update!(admin_console_beta: console)
+          sign_in_with_role("ops")
 
           get admin_event_participant_path(event.slug, participant_event)
 

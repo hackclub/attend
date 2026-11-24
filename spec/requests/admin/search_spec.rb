@@ -14,7 +14,7 @@ RSpec.describe "Admin search", type: :request do
   # Event staff search through a join onto participant_events, which has its
   # own slack_user_id column, so an unqualified column name was ambiguous.
   it "finds a participant by Slack ID for event staff, whose search joins registrations" do
-    user = User.create!(email: "search-staff@example.com", name: "Staff", admin_console_beta: false)
+    user = User.create!(email: "search-staff@example.com", name: "Staff")
     EventRoleAssignment.create!(user: user, event: event, role: "ops")
     sign_in user
 
@@ -26,7 +26,7 @@ RSpec.describe "Admin search", type: :request do
 
   describe "accents" do
     let(:admin) do
-      User.create!(email: "search-accents@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false)
+      User.create!(email: "search-accents@example.com", name: "Admin", global_role: "global_admin")
     end
 
     def results_for(query, key)
@@ -72,7 +72,7 @@ RSpec.describe "Admin search", type: :request do
     let(:other_event) { create(:event) }
 
     def sign_in_with_role(role)
-      user = User.create!(email: "search-#{role}@example.com", name: "Staff", admin_console_beta: false)
+      user = User.create!(email: "search-#{role}@example.com", name: "Staff")
       EventRoleAssignment.create!(user: user, event: event, role: role)
       sign_in user
       user
@@ -121,7 +121,7 @@ RSpec.describe "Admin search", type: :request do
     it "lets global admins search across every event" do
       other_pe = create(:participant_event, event: other_event)
       create(:guardian_participant_event, guardian: guardian, participant_event: other_pe)
-      sign_in User.create!(email: "search-global@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false)
+      sign_in User.create!(email: "search-global@example.com", name: "Admin", global_role: "global_admin")
 
       expect(guardians_for("difference.engine").size).to eq(2)
     end

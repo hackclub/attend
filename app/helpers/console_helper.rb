@@ -43,9 +43,8 @@ module ConsoleHelper
     mode == SYSTEM_THEME ? "light" : mode
   end
 
-  # Both admin layouts link across to /dashboard for staff who are also
-  # registered for an upcoming event. Memoized because the original admin
-  # renders its sidebar footer twice (drawer and desktop).
+  # The admin layout links across to /dashboard for staff who are also
+  # registered for an upcoming event. Memoized per request.
   def show_participant_dashboard_link?
     return @show_participant_dashboard_link if defined?(@show_participant_dashboard_link)
 

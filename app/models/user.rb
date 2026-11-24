@@ -1,4 +1,9 @@
 class User < ApplicationRecord
+  # The old admin UI toggle, retired with that UI. Ignored until the column
+  # is dropped in a follow-up, so pods on the previous release keep working
+  # during the rollout.
+  self.ignored_columns += [ "admin_console_beta" ]
+
   include NormalizesPhoneNumbers
   include DecodableImageAttachment
 

@@ -12,9 +12,8 @@ RSpec.describe "Event staff training flags", type: :request do
     get select_admin_event_path(slug: event.slug)
   end
 
-  [ true, false ].each do |console|
+  [ true ].each do |console|
     it "flags who has and hasn't trained (#{console ? "console" : "original"})" do
-      admin.update!(admin_console_beta: console)
       trained = create(:event_role_assignment, event: event, role: "ops").user
       create(:training_badge_award, user: trained, badge: badge)
       create(:event_role_assignment, event: event, role: "ops")
@@ -82,10 +81,8 @@ RSpec.describe "Event staff training flags", type: :request do
       get select_admin_event_path(slug: event.slug)
     end
 
-    [ true, false ].each do |console|
+    [ true ].each do |console|
       it "shows the roster and the volunteer form, without staff controls (#{console ? "console" : "original"})" do
-        staff.update!(admin_console_beta: console)
-
         get admin_event_staff_index_path(event_slug: event.slug)
 
         expect(response).to have_http_status(:ok)

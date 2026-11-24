@@ -32,14 +32,13 @@ RSpec.describe "Admin guardian replacement", type: :request do
                   phone: "+12025550188", relationship: "Parent" } }
   end
 
-  [ false, true ].each do |console|
+  [ true ].each do |console|
     context(console ? "in the console UI" : "in the original admin UI") do
       def participant_page = admin_event_participant_path(event, participant_event)
       def replace_path = replace_admin_event_participant_guardian_path(event, participant_event, old_link)
 
       context "as a global admin" do
         before do
-          global_admin.update!(admin_console_beta: console)
           sign_in global_admin
         end
 
@@ -88,7 +87,6 @@ RSpec.describe "Admin guardian replacement", type: :request do
 
       context "as an event admin" do
         before do
-          event_admin.update!(admin_console_beta: console)
           sign_in event_admin
         end
 

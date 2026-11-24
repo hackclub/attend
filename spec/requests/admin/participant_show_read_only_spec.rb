@@ -28,10 +28,9 @@ RSpec.describe "Admin participant page is read-only", type: :request do
     page.at_css("form[action*='guardian_portal_link']")
   end
 
-  { "the console" => true, "the original admin" => false }.each do |ui, console|
+  { "the console" => true }.each do |ui, console|
     context "in #{ui}" do
       before do
-        admin.update!(admin_console_beta: console)
         sign_in admin
         get admin_bans_path # Devise stamps the sign-in on the session's first request
         GetWriteDetector.drain

@@ -11,10 +11,9 @@ RSpec.describe "Self-serve event creation", type: :request do
       oidc_claims: { "groups" => [ User::SELF_SERVE_EVENTS_GROUP ] })
   end
 
-  [ false, true ].each do |console|
+  [ true ].each do |console|
     context "with the admin console #{console ? 'on' : 'off'}" do
       before do
-        creator.update!(admin_console_beta: console)
         sign_in creator
       end
 

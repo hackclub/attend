@@ -11,9 +11,8 @@ RSpec.describe "Admin safety reviews", type: :request do
 
   before { sign_in admin }
 
-  [ true, false ].each do |console|
+  [ true ].each do |console|
     it "lists and shows declarations, logging each view (#{console ? "console" : "original"})" do
-      admin.update!(admin_console_beta: console)
       get admin_training_disclosures_path
       expect(response.body).to include("declared-example@example.com")
 

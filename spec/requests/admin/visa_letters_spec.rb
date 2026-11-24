@@ -5,7 +5,7 @@ RSpec.describe "Admin visa letters", type: :request do
   include ActiveJob::TestHelper
 
   let(:event) { create(:event, name: "Fictional Hackathon", visa_letters: "open", visa_letter_rejection_reasons: [ "The name doesn't match your passport." ]) }
-  let(:admin) { create(:user, email: "visa-admin@example.com", admin_console_beta: false).tap { |user| create(:event_role_assignment, user: user, event: event, role: "event_admin") } }
+  let(:admin) { create(:user, email: "visa-admin@example.com").tap { |user| create(:event_role_assignment, user: user, event: event, role: "event_admin") } }
   let(:application) { create(:visa_letter_application, event: event, full_name: "Ada Example") }
 
   before do
@@ -13,10 +13,8 @@ RSpec.describe "Admin visa letters", type: :request do
     sign_in admin
   end
 
-  { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+  { "with the admin console beta" => true }.each do |ui, console|
     context ui do
-      before { admin.update!(admin_console_beta: console) }
-
       it "lists applications awaiting review, and finds one by reference number" do
         application
         letter_sent = create(:visa_letter_application, event: event, full_name: "Grace Sample", status: :letter_sent)

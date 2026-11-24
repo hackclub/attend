@@ -41,17 +41,11 @@ module Admin
       set_current_event(@event) unless current_event&.id == @event.id
     end
 
-    # The Features settings tab. The original admin has no tabs: its edit
-    # form still carries every one of these fields.
+    # The Features settings tab.
     def features
       @event = Event.find_by!(slug: params[:slug])
       authorize @event, :update?
       set_current_event(@event) unless current_event&.id == @event.id
-
-      unless helpers.console_ui?
-        flash.keep
-        redirect_to edit_admin_event_path(@event)
-      end
     end
 
     # Where a save from the setup wizard's Basics step goes back to. It rides
@@ -205,7 +199,6 @@ module Admin
         case params[:tab]
         when "features" then features_admin_event_path(@event)
         when "general" then edit_admin_event_path(@event)
-        # The original admin's single form sends no tab and goes back to the overview.
         else admin_event_dashboard_path(@event)
         end
       end
