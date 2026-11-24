@@ -7,7 +7,7 @@
 //
 //   version (1) | key id (1) | participant_event id (16) | signature (64)
 //
-// with an ECDSA P-256 / SHA-256 signature over
+// with an Ed25519 signature over
 //
 //   version (1) | key id (1) | event id (16) | participant_event id (16)
 //
@@ -80,7 +80,9 @@ export function parseCheckinCode(text) {
 //
 // An unsigned code is "unverified": it can only be looked up online. So is a
 // signed one whose key this page wasn't given, which happens when the key
-// changed after the page was saved; the server still checks it.
+// changed after the page was saved, and any signed one on a browser without
+// Ed25519 in WebCrypto (Chrome before 137, Safari before 17); the server
+// still checks those.
 export function createTicketVerifier({ keys = {}, eventId, cancelled = [], subtle = globalThis.crypto?.subtle } = {}) {
   const imported = new Map()
   const cancelledIds = new Set(cancelled.map((id) => String(id).toLowerCase()))
@@ -88,7 +90,7 @@ export function createTicketVerifier({ keys = {}, eventId, cancelled = [], subtl
 
   function importKey(keyId) {
     if (!imported.has(keyId)) {
-      imported.set(keyId, subtle.importKey("spki", fromBase64(keys[keyId]), { name: "ECDSA", namedCurve: "P-256" }, false, [ "verify" ]))
+      imported.set(keyId, subtle.importKey("spki", fromBase64(keys[keyId]), { name: "Ed25519" }, false, [ "verify" ]))
     }
     return imported.get(keyId)
   }
@@ -105,7 +107,7 @@ export function createTicketVerifier({ keys = {}, eventId, cancelled = [], subtl
 
     let genuine = false
     try {
-      genuine = await subtle.verify({ name: "ECDSA", hash: "SHA-256" }, await importKey(ticket.keyId), ticket.signature, message)
+      genuine = await subtle.verify({ name: "Ed25519" }, await importKey(ticket.keyId), ticket.signature, message)
     } catch (error) {
       console.warn("Couldn't check this ticket's signature:", error)
       return { verdict: "unverified" }

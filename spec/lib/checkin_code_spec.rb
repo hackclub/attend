@@ -109,7 +109,8 @@ RSpec.describe CheckinCode do
       der = Base64.strict_decode64(described_class.public_keys.fetch(1))
       public_key = OpenSSL::PKey.read(der)
 
-      expect(public_key.private?).to be(false)
+      expect(public_key.oid).to eq("ED25519")
+      expect(described_class.private_key?(public_key)).to be(false)
       expect(public_key.public_to_der).to eq(key.public_to_der)
     end
   end
@@ -136,13 +137,15 @@ RSpec.describe CheckinCode do
   end
 
   describe ".load_keyring" do
-    it "reads keys from credentials and rejects anything that isn't a P-256 private key" do
-      pem = key.to_pem
+    it "reads keys from credentials and rejects anything that isn't an Ed25519 private key" do
+      pem = key.private_to_pem
       allow(Rails.application.credentials).to receive(:dig).with(:ticket_signing, :keys).and_return({ "3": pem })
       expect(described_class.load_keyring.keys).to eq([ 3 ])
 
-      allow(Rails.application.credentials).to receive(:dig).with(:ticket_signing, :keys).and_return({ "1": OpenSSL::PKey::RSA.generate(2048).to_pem })
-      expect { described_class.load_keyring }.to raise_error(ArgumentError, /P-256/)
+      [ OpenSSL::PKey::RSA.generate(2048).to_pem, OpenSSL::PKey::EC.generate("prime256v1").to_pem ].each do |other|
+        allow(Rails.application.credentials).to receive(:dig).with(:ticket_signing, :keys).and_return({ "1": other })
+        expect { described_class.load_keyring }.to raise_error(ArgumentError, /Ed25519/)
+      end
 
       allow(Rails.application.credentials).to receive(:dig).with(:ticket_signing, :keys).and_return({ "1": key.public_to_pem })
       expect { described_class.load_keyring }.to raise_error(ArgumentError, /private/)

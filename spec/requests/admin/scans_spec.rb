@@ -430,7 +430,7 @@ RSpec.describe "Admin::Scans", type: :request do
         config = JSON.parse(Nokogiri::HTML(response.body).at_css('[data-controller="scanner"]')["data-scanner-config-value"])
         expect(config["ticketKeys"]).to eq("1" => Base64.strict_encode64(signing_key.public_to_der))
         expect(config["cancelledTickets"]).to contain_exactly(withdrawn.id, rejected.id)
-        expect(response.body).not_to include(signing_key.to_pem.lines[1].strip)
+        expect(response.body).not_to include(signing_key.private_to_pem.lines[1].strip)
       end
     end
   end

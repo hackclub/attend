@@ -7,11 +7,15 @@ require "openssl"
 #
 #   version (1) | key id (1) | participant_event id (16) | signature (64)
 #
-# The signature is ECDSA P-256 over SHA-256 of
+# The signature is Ed25519 over
 #
 #   version (1) | key id (1) | event id (16) | participant_event id (16)
 #
-# as raw r || s (the form WebCrypto verifies). The event id is signed but not
+# Ed25519 signatures are deterministic, so a registration always gets the
+# same code: a wallet pass is only pushed when its contents change, and a
+# fresh signature on every render would make every pass look changed.
+# (ECDSA can only do that on OpenSSL 3.2+, which CI and possibly production
+# don't have.) The event id is signed but not
 # written into the code: the scanner knows which event it is at and checks
 # against that, so a ticket for one event fails at another's door, and the
 # code is 16 bytes shorter. Uppercase base32 keeps the QR in alphanumeric
@@ -23,7 +27,8 @@ require "openssl"
 # with no connection.
 #
 # Signing is off until keys are configured, under credentials
-# `ticket_signing.keys` (key id => PEM private key; the highest id signs).
+# `ticket_signing.keys` (key id => PEM Ed25519 private key; the highest id
+# signs).
 # Until then, and for anything issued before, the code is the old unsigned
 # `attend://checkin/<participant id>`, which the scanner still accepts but
 # can only vouch for online.
@@ -34,8 +39,7 @@ module CheckinCode
   VERSION = 1
   CODE_BYTES = 18
   SIGNATURE_BYTES = 64
-  CURVE = "prime256v1".freeze
-  DETERMINISTIC = { "nonce-type" => "1" }.freeze
+  ALGORITHM = "ED25519".freeze
   BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".freeze
 
   class Invalid < StandardError
@@ -61,7 +65,7 @@ module CheckinCode
   def sign(event_id:, participant_event_id:)
     key_id = keyring.keys.max
     code = [ VERSION, key_id ].pack("CC") + uuid_bytes(participant_event_id)
-    signature = raw_signature(keyring.fetch(key_id), signed_message(code, event_id))
+    signature = keyring.fetch(key_id).sign(nil, signed_message(code, event_id))
     "#{SIGNED_MARKER}#{base32_encode(code + signature)}"
   end
 
@@ -119,14 +123,21 @@ module CheckinCode
       raise ArgumentError, "ticket_signing key ids must be 1-255" unless id.between?(1, 255)
 
       key = OpenSSL::PKey.read(pem.to_s)
-      raise ArgumentError, "ticket_signing key #{id} is not a P-256 private key" unless key.is_a?(OpenSSL::PKey::EC) && key.group.curve_name == CURVE && key.private?
+      raise ArgumentError, "ticket_signing key #{id} is not an Ed25519 private key" unless key.oid == ALGORITHM && private_key?(key)
 
       ring[id] = key
     end
   end
 
   def generate_key
-    OpenSSL::PKey::EC.generate(CURVE)
+    OpenSSL::PKey.generate_key(ALGORITHM)
+  end
+
+  def private_key?(key)
+    key.private_to_der
+    true
+  rescue OpenSSL::PKey::PKeyError
+    false
   end
 
   # version | key id, then the event, then the registration.
@@ -134,24 +145,8 @@ module CheckinCode
     code.byteslice(0, 2) + uuid_bytes(event_id) + code.byteslice(2, 16)
   end
 
-  # Deterministic (RFC 6979), so one registration always gets the same code:
-  # a wallet pass is only pushed when its contents change, and a fresh random
-  # signature on every render would make every pass look changed. OpenSSL
-  # before 3.2 can't do that; there the signature is random but just as valid.
-  def raw_signature(key, message)
-    der = begin
-      key.sign("SHA256", message, DETERMINISTIC)
-    rescue OpenSSL::PKey::PKeyError
-      key.sign("SHA256", message)
-    end
-    OpenSSL::ASN1.decode(der).value.map { |part| part.value.to_s(2).rjust(32, "\0") }.join
-  end
-
   def valid_signature?(key, message, signature)
-    r = OpenSSL::BN.new(signature.byteslice(0, 32), 2)
-    s = OpenSSL::BN.new(signature.byteslice(32, 32), 2)
-    der = OpenSSL::ASN1::Sequence.new([ OpenSSL::ASN1::Integer.new(r), OpenSSL::ASN1::Integer.new(s) ]).to_der
-    key.verify("SHA256", der, message)
+    key.verify(nil, signature, message)
   rescue OpenSSL::PKey::PKeyError
     false
   end
