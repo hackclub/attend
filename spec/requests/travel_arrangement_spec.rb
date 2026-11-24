@@ -81,6 +81,16 @@ RSpec.describe "Travel arrangement state", type: :request do
     expect(participant_event.travel_outbound).to be_confirmed
   end
 
+  it "reads every airport code in the time zone table as a string" do
+    OagFlightService::AirportTimezones.reset!
+    data = OagFlightService::AirportTimezones.data
+
+    expect(data.keys).to all(be_a(String).and(match(/\A[A-Z0-9]{3,4}\z/)))
+    # Bare YAML keys like OFF/YES parse as booleans.
+    expect(FlightTrackingService.airport_timezone("OFF")).to eq("America/Chicago")
+    expect(FlightTrackingService.airport_timezone("YES")).to eq("Asia/Tehran")
+  end
+
   it "preserves confirmed details while a direction is marked not arranged" do
     inbound = participant_event.travels.create!(direction: :inbound, arrangement_status: :confirmed,
       mode: :other, other_details: "Private coach")

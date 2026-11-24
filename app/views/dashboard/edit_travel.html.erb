@@ -10,7 +10,9 @@
 
   <% travel_problems = [ [ @travel_inbound, "Arrival" ], [ @travel_outbound, "Departure" ] ].flat_map do |travel, label|
        own = travel.errors.reject { |error| error.attribute.to_s.include?(".") }.map { |error| "#{label}: #{error.full_message}" }
-       legs = travel.travel_legs.reject(&:marked_for_destruction?).each_with_index.flat_map do |leg, index|
+       # Number legs off the same collection the form renders below, so
+       # "leg 2" is the second card on screen.
+       legs = travel.travel_legs.each_with_index.flat_map do |leg, index|
          leg.errors.full_messages.map { |message| "#{label}, leg #{index + 1}: #{message}" }
        end
        own + legs
