@@ -21,7 +21,6 @@ RSpec.describe "Event creation invite flow", type: :request do
     end
 
     it "walks the invited account through what setup covers, in the admin console" do
-      invitee.update!(admin_console_beta: false)
       sign_in invitee
 
       get event_creation_invite_path(token)

@@ -4,28 +4,15 @@ RSpec.describe "Admin::Settings", type: :request do
   include Devise::Test::IntegrationHelpers
 
   let(:event) { create(:event) }
-  let(:global_admin) { User.create!(email: "ga-settings@example.com", name: "Global Admin", global_role: "global_admin", admin_console_beta: false) }
+  let(:global_admin) { User.create!(email: "ga-settings@example.com", name: "Global Admin", global_role: "global_admin") }
   let(:event_admin) do
-    User.create!(email: "ea-settings@example.com", name: "Event Admin", admin_console_beta: false).tap do |user|
+    User.create!(email: "ea-settings@example.com", name: "Event Admin").tap do |user|
       EventRoleAssignment.create!(user: user, event: event, role: "event_admin")
     end
   end
 
   describe "support SMS notification settings" do
-    it "renders the settings page with the notification card" do
-      Setting.support_sms_notification_numbers = [ "+14155551234" ]
-      sign_in global_admin
-
-      get admin_settings_path
-
-      expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Support Inbox Notifications")
-      expect(response.body).to include("+14155551234")
-    end
-
     context "with the admin console beta" do
-      before { global_admin.update!(admin_console_beta: true) }
-
       it "renders the sentence-case notification card" do
         Setting.support_sms_notification_numbers = [ "+14155551234" ]
         sign_in global_admin
@@ -86,9 +73,8 @@ RSpec.describe "Admin::Settings", type: :request do
   end
 
   describe "support email notification settings" do
-    [ false, true ].each do |console|
+    [ true ].each do |console|
       it "renders the saved addresses #{console ? "in the console" : "in the classic UI"}" do
-        global_admin.update!(admin_console_beta: console)
         Setting.support_email_notification_addresses = [ "inbox-watcher@example.com" ]
         sign_in global_admin
 
@@ -101,7 +87,6 @@ RSpec.describe "Admin::Settings", type: :request do
       end
 
       it "saves a list of addresses #{console ? "in the console" : "in the classic UI"}" do
-        global_admin.update!(admin_console_beta: console)
         sign_in global_admin
 
         post update_support_email_addresses_admin_settings_path,
@@ -149,9 +134,8 @@ RSpec.describe "Admin::Settings", type: :request do
   describe "Twilio Verify settings" do
     let(:service_sid) { "VA#{"0" * 32}" }
 
-    [ false, true ].each do |console|
+    [ true ].each do |console|
       it "renders the Verify fields #{console ? "in the console" : "in the classic UI"}" do
-        global_admin.update!(admin_console_beta: console)
         Setting.twilio_verify_service_sid = service_sid
         sign_in global_admin
 
@@ -204,9 +188,8 @@ RSpec.describe "Admin::Settings", type: :request do
   end
 
   describe "WhatsApp switch" do
-    [ false, true ].each do |console|
+    [ true ].each do |console|
       it "shows the switch #{console ? "in the console" : "in the classic UI"}" do
-        global_admin.update!(admin_console_beta: console)
         sign_in global_admin
 
         get(console ? integrations_admin_settings_path : admin_settings_path)
@@ -242,9 +225,9 @@ RSpec.describe "Admin::Settings", type: :request do
       event_admin
       sign_in global_admin
 
-      get admin_settings_path
+      get integrations_admin_settings_path
 
-      expect(response.body).to include("Admin Help Slack Channel")
+      expect(response.body).to include("Admin help Slack channel")
       expect(response.body).to include("CHELP")
       # Counting is slow, so the count loads into the page separately.
       expect(response.body).to include(slack_channel_sync_admin_settings_path(channel: "admin_help"))
@@ -273,8 +256,6 @@ RSpec.describe "Admin::Settings", type: :request do
     end
 
     context "with the admin console beta" do
-      before { global_admin.update!(admin_console_beta: true) }
-
       it "shows the sentence-case channel card and how many people would be synced" do
         Setting.admin_help_slack_channel_id = "CHELP"
         event_admin
@@ -331,9 +312,9 @@ RSpec.describe "Admin::Settings", type: :request do
       event_admin
       sign_in global_admin
 
-      get admin_settings_path
+      get integrations_admin_settings_path
 
-      expect(response.body).to include("Org Support Slack Channel")
+      expect(response.body).to include("Org support Slack channel")
       expect(response.body).to include("CORG")
     end
 
@@ -348,8 +329,6 @@ RSpec.describe "Admin::Settings", type: :request do
     end
 
     context "with the admin console beta" do
-      before { global_admin.update!(admin_console_beta: true) }
-
       it "shows the sentence-case channel card" do
         Setting.org_support_slack_channel_id = "CORG"
         sign_in global_admin
@@ -393,8 +372,6 @@ RSpec.describe "Admin::Settings", type: :request do
   end
 
   describe "settings tabs in the console" do
-    before { global_admin.update!(admin_console_beta: true) }
-
     it "keeps the app-wide switches on General and the connections on Integrations" do
       sign_in global_admin
 
@@ -420,17 +397,6 @@ RSpec.describe "Admin::Settings", type: :request do
     ensure
       Setting.maintenance_mode = false
     end
-  end
-
-  it "sends the original admin's Integrations tab back to its single settings page, flash and all" do
-    sign_in global_admin
-
-    post update_admin_help_slack_channel_admin_settings_path, params: { admin_help_slack_channel_id: "C0123ABCD" }
-    follow_redirect!
-
-    expect(response).to redirect_to(admin_settings_path)
-    follow_redirect!
-    expect(response.body).to include("Admin help channel updated.")
   end
 
   it "keeps the Integrations tab to global admins" do

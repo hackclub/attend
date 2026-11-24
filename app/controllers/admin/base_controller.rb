@@ -77,12 +77,17 @@ module Admin
 
     private
 
-    # Staff get the console redesign unless they've switched back to the
-    # original admin (Admin::ConsoleBetaController): every *.html+console.erb template, layout included,
-    # wins over its *.html.erb original. Set before any action runs so
-    # renders, Turbo Stream responses and render_to_string all see it.
+    # Every admin page renders the console (Cloudscape) UI. The +console
+    # variant marks templates and partials as admin renders: shared partials
+    # that also appear outside /admin keep a plain *.html.erb for those pages,
+    # and helpers branch on ConsoleHelper#console_ui?. Set before any action
+    # runs so renders, Turbo Stream responses and render_to_string all see it.
+    # The lookup context is set too: turbo_stream.replace(partial: ...) renders
+    # its partial when the stream is built, before `render` would copy the
+    # request variant across, so it would otherwise miss the +console partials.
     def set_admin_ui_variant
-      request.variant = :console if current_user&.admin_console_beta?
+      request.variant = :console
+      lookup_context.variants = [ :console ]
     end
 
     def authorize_admin_access

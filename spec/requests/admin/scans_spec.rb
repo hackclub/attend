@@ -155,8 +155,6 @@ RSpec.describe "Admin::Scans", type: :request do
   end
 
   it "uses the only scan context without asking in the old admin" do
-    admin.update!(admin_console_beta: false)
-
     get scanner_admin_event_scans_path(event)
 
     expect(response.body).to include(%(<input type="hidden" id="scan-context" value="#{scan_context.id}"))
@@ -164,10 +162,8 @@ RSpec.describe "Admin::Scans", type: :request do
 
   # Both admins carry their own copy of the scanner script, so pin each one
   # to the persistent banner and the queue for scans arriving mid-scan.
-  { "the console" => true, "the old admin" => false }.each do |ui, console|
+  { "the console" => true }.each do |ui, console|
     it "keeps scan results up and queues scans made mid-scan in #{ui}" do
-      admin.update!(admin_console_beta: console)
-
       get scanner_admin_event_scans_path(event)
 
       expect(response.body).to include('id="scan-queue-note"', "pendingScans.push", "data-scan-result-dismiss", "function submitScan")
@@ -190,9 +186,7 @@ RSpec.describe "Admin::Scans", type: :request do
       morning = scan_at(Time.utc(2030, 7, 12, 16, 0))       # July 12, 09:00
       late_evening = scan_at(Time.utc(2030, 7, 13, 5, 0))   # July 12, 22:00
 
-      [ true, false ].each do |console|
-        admin.update!(admin_console_beta: console)
-
+      [ true ].each do |console|
         get history_admin_event_scans_path(event, date: "2030-07-12")
 
         expect(response.body).to include("scan-row-#{morning.id}", "scan-row-#{late_evening.id}")

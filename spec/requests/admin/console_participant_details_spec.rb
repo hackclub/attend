@@ -54,7 +54,7 @@ RSpec.describe "Admin console participant details page", type: :request do
   describe "as a global admin" do
     let(:admin) do
       User.create!(email: "details-admin@example.com", name: "Robin Placeholder",
-        global_role: "global_admin", admin_console_beta: true)
+        global_role: "global_admin")
     end
 
     before { sign_in admin }
@@ -100,8 +100,7 @@ RSpec.describe "Admin console participant details page", type: :request do
 
   describe "as a limited-role user" do
     let(:limited_user) do
-      User.create!(email: "details-limited@example.com", name: "Limited Placeholder",
-        admin_console_beta: true)
+      User.create!(email: "details-limited@example.com", name: "Limited Placeholder")
     end
 
     before do

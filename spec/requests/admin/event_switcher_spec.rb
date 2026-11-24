@@ -11,41 +11,9 @@ RSpec.describe "Admin event switcher", type: :request do
 
   before { sign_in admin }
 
-  context "in the original admin" do
-    before { admin.update!(admin_console_beta: false) }
-
-    def switcher_lists
-      Nokogiri::HTML(response.body).css(".sidebar-dropdown .max-h-72")
-    end
-
-    it "lists running and upcoming events in both menus, and leaves finished ones out" do
-      get admin_series_index_path
-
-      lists = switcher_lists
-      expect(lists.size).to eq(2)
-      lists.each do |list|
-        expect(list.text).to include("Upcoming Hacks")
-        expect(list.text).not_to include("Bygone Hacks")
-      end
-    end
-
-    it "still shows the current event when it has finished" do
-      get select_admin_event_path(slug: long_past.slug)
-      get admin_series_index_path
-
-      lists = switcher_lists
-      expect(lists.size).to eq(2)
-      lists.each do |list|
-        expect(list.at_css(".sidebar-dropdown-item-active").text).to include("Bygone Hacks")
-      end
-    end
-  end
-
   # The console's menus load their list the first time they open, from
   # admin_event_switcher_path, instead of rendering it into every page.
   context "with the admin console beta" do
-    before { admin.update!(admin_console_beta: true) }
-
     def switcher_list(frame_id)
       get admin_event_switcher_path, headers: { "Turbo-Frame" => frame_id }
       expect(response).to have_http_status(:ok)

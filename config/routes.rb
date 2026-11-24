@@ -285,9 +285,6 @@ Rails.application.routes.draw do
     # The event switcher's list, loaded when its menu first opens.
     get "event_switcher", to: "event_switcher#show", as: :event_switcher
 
-    # Opt-in switch between the original admin and the console redesign.
-    patch "console_beta", to: "console_beta#update", as: :console_beta
-
     # The staff profile form now lives on the participant-facing settings page.
     get "profile/edit", to: redirect("/dashboard/profile#staff-settings")
 

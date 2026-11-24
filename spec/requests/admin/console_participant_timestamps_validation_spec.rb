@@ -24,7 +24,7 @@ RSpec.describe "Admin console participant timestamps and validation", type: :req
   let!(:participant_event) { create(:participant_event, :checked_in, event: event, participant: participant, status: :complete) }
   let(:admin) do
     User.create!(email: "timestamps-admin@example.com", name: "Robin Placeholder",
-      global_role: "global_admin", admin_console_beta: true)
+      global_role: "global_admin")
   end
 
   before do

@@ -8,7 +8,7 @@ RSpec.describe "Admin console theme", type: :request do
 
   let(:user) do
     User.create!(email: "console-theme-spec@example.com", name: "Theme Tester",
-      global_role: "global_admin", admin_console_beta: true)
+      global_role: "global_admin")
   end
 
   def html_attrs
@@ -57,13 +57,5 @@ RSpec.describe "Admin console theme", type: :request do
   it "still rejects unknown themes" do
     post update_theme_path, params: { theme: "neon" }, as: :json
     expect(user.reload.theme).to eq("light")
-  end
-
-  it "shows a saved system theme as light outside the console" do
-    user.update!(theme: "system", admin_console_beta: false)
-    get admin_root_path
-
-    expect(html_attrs["class"].to_s).not_to include("cs-console")
-    expect(html_attrs["data-theme"]).to eq("light")
   end
 end
