@@ -15,11 +15,14 @@ module Api
       before_action :authenticate!
 
       def create
+        # No address, or nobody here under it, is nothing to revoke; answering
+        # 2xx keeps HCA from retrying it for hours.
         email = params[:email].to_s.strip.downcase
-        return head(:bad_request) if email.blank?
+        if email.blank?
+          Rails.logger.warn("[HCA revoker] request with no email; nothing to revoke")
+          return head(:no_content)
+        end
 
-        # Nobody here under that address is nothing to revoke; answering 2xx
-        # keeps HCA from retrying it for hours.
         user = User.find_by(email: email)
         if user && user.hca_groups.any?
           user.with_lock { user.update!(oidc_claims: user.oidc_claims.except("groups")) }

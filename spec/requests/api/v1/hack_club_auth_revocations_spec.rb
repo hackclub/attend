@@ -32,6 +32,16 @@ RSpec.describe "Hack Club Auth session revoker", type: :request do
     expect(response).to have_http_status(:no_content)
   end
 
+  it "answers 2xx to a request with no email, changing nothing" do
+    post path, params: { email: "  " }.to_json, headers: headers
+    expect(response).to have_http_status(:no_content)
+
+    post path, params: {}.to_json, headers: headers
+    expect(response).to have_http_status(:no_content)
+
+    expect(user.reload).to be_self_serve_event_creator
+  end
+
   it "refuses a wrong or missing secret" do
     post path, params: { email: user.email }.to_json, headers: headers.merge("Authorization" => "Bearer wrong")
     expect(response).to have_http_status(:unauthorized)
