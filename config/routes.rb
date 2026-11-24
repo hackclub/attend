@@ -782,6 +782,9 @@ Rails.application.routes.draw do
         end
         resources :scan_contexts, only: [ :index ]
         resources :scans, only: [ :index, :create, :destroy ]
+        # Public keys and cancelled registrations, for checking signed
+        # check-in codes on a device (see CheckinCode).
+        resource :checkin_codes, only: [ :show ]
         # Stays (during, before, after the event) and their rosters. A shop that
         # sells a pre/post-event night adds buyers to the roster here.
         resources :stays, only: [ :index ], controller: "rooming_stays" do

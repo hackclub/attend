@@ -19,7 +19,7 @@ module Admin
         # scanner/ticket.js): the public keys, and the registrations whose
         # tickets no longer count. Ids only; no names reach the device.
         ticketKeys: CheckinCode.public_keys,
-        cancelledTickets: current_event.participant_events.where(status: %w[withdrawn rejected]).pluck(:id)
+        cancelledTickets: CheckinCode.cancelled_registration_ids(current_event)
       }
 
       tag.div(hidden: true, data: { controller: "scanner", scanner_config_value: config.to_json }) do
