@@ -180,7 +180,7 @@ RSpec.describe "Registration completion states", type: :request do
     expect(response.body).not_to include("Registration confirmed")
 
     get dashboard_event_path(participant_event)
-    expect(response.body).not_to include("ENTRY TICKET")
+    expect(response.body).not_to include(%(id="entry-ticket-heading"))
 
     waiver.update!(status: :signed, signed_at: Time.current)
     expect(participant_event.reload).to be_complete
