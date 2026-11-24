@@ -76,7 +76,7 @@ RSpec.describe "Api::V1::Scans", type: :request, fiat_registrations: true do
       def scan(code)
         post "/api/v1/events/#{event.id}/scans",
           params: { participant_id: code, scan_context_id: scan_context.id },
-          headers: auth_headers,
+          headers: auth_headers.merge("X-Attend-Scanner" => "2"),
           as: :json
       end
 
@@ -94,6 +94,45 @@ RSpec.describe "Api::V1::Scans", type: :request, fiat_registrations: true do
         expect(response).to have_http_status(:unprocessable_entity)
         expect(response.parsed_body["error"]).to eq("This is not a valid ticket for this event")
       end
+
+      # An app that can't read signed codes would call them unrecognised and
+      # never send them, so it is told to update instead.
+      it "turns away a mobile app too old to read signed codes, and lets an updated one through" do
+        params = { participant_id: participant_event.id, scan_context_id: scan_context.id }
+
+        [ nil, "1" ].each do |version|
+          headers = auth_headers.merge(version ? { "X-Attend-Scanner" => version } : {})
+          expect {
+            post "/api/v1/events/#{event.id}/scans", params: params, headers: headers, as: :json
+          }.not_to change(Scan, :count)
+          expect(response).to have_http_status(:upgrade_required)
+          expect(response.parsed_body).to include("update_required" => true, "error" => a_string_starting_with("Update the Attend app"))
+        end
+
+        expect {
+          post "/api/v1/events/#{event.id}/scans", params: params, headers: auth_headers.merge("X-Attend-Scanner" => "2"), as: :json
+        }.to change { participant_event.scans.count }.by(1)
+      end
+
+      it "leaves other API clients alone" do
+        api_key = GlobalApiToken.generate_for(admin, name: "door script")
+
+        expect {
+          post "/api/v1/events/#{event.id}/scans",
+            params: { participant_id: participant_event.id, scan_context_id: scan_context.id },
+            headers: { "Authorization" => "Bearer #{api_key.token}" },
+            as: :json
+        }.to change { participant_event.scans.count }.by(1)
+      end
+    end
+
+    it "doesn't ask the app to update while tickets aren't signed" do
+      expect {
+        post "/api/v1/events/#{event.id}/scans",
+          params: { participant_id: participant_event.id, scan_context_id: scan_context.id },
+          headers: auth_headers,
+          as: :json
+      }.to change { participant_event.scans.count }.by(1)
     end
   end
 

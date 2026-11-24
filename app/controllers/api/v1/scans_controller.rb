@@ -102,7 +102,21 @@ module Api
         }
       end
 
+      # The mobile app sends X-Attend-Scanner with the version of its scanner.
+      # Before version 2 it can't read a signed check-in code (CheckinCode):
+      # it calls one an unrecognised QR code and never sends it here, so once
+      # tickets are signed it would fail at the door without anyone being told
+      # why. Those installs are refused every scan instead, with a message the
+      # app shows as is, until they update. API keys and other clients send
+      # whatever ids they like and are left alone.
+      SIGNED_CODE_SCANNER_VERSION = 2
+      UPDATE_REQUIRED_MESSAGE = "Update the Attend app to keep scanning. This version can't read the new tickets.".freeze
+
       def create
+        if mobile_scanner_too_old?
+          return render json: { error: UPDATE_REQUIRED_MESSAGE, update_required: true }, status: :upgrade_required
+        end
+
         scan_contexts = @event.scan_contexts.to_a
 
         if scan_contexts.empty?
@@ -192,6 +206,12 @@ module Api
       end
 
       private
+
+      def mobile_scanner_too_old?
+        CheckinCode.signing_enabled? &&
+          @current_token.is_a?(MobileToken) &&
+          request.headers["X-Attend-Scanner"].to_i < SIGNED_CODE_SCANNER_VERSION
+      end
 
       def set_event
         @event = Event.find(params[:event_id])
