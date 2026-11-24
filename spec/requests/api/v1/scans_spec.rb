@@ -66,6 +66,35 @@ RSpec.describe "Api::V1::Scans", type: :request, fiat_registrations: true do
       expect(response).to have_http_status(:not_found)
       expect(other_participation.scans).to be_empty
     end
+
+    context "with signed check-in codes" do
+      let(:signing_key) { CheckinCode.generate_key }
+
+      before { CheckinCode.keyring = { 1 => signing_key } }
+      after { CheckinCode.reset_keyring! }
+
+      def scan(code)
+        post "/api/v1/events/#{event.id}/scans",
+          params: { participant_id: code, scan_context_id: scan_context.id },
+          headers: auth_headers,
+          as: :json
+      end
+
+      it "records a signed ticket" do
+        expect { scan(CheckinCode.for(participant_event)) }.to change { participant_event.scans.count }.by(1)
+        expect(response).to have_http_status(:ok)
+      end
+
+      it "refuses a forged one" do
+        CheckinCode.keyring = { 1 => CheckinCode.generate_key }
+        forged = CheckinCode.for(participant_event)
+        CheckinCode.keyring = { 1 => signing_key }
+
+        expect { scan(forged) }.not_to change(Scan, :count)
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body["error"]).to eq("This is not a valid ticket for this event")
+      end
+    end
   end
 
   describe "GET /api/v1/events/:event_id/scans with since" do

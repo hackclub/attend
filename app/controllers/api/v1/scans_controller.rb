@@ -187,7 +187,7 @@ module Api
           scan_context: scan_context_json(result.scan.scan_context),
           participant: participant_detail_json(participant_event.reload)
         }
-      rescue ScanRecorder::ClientScanIdConflict, ActiveRecord::RecordInvalid => e
+      rescue ScanRecorder::ClientScanIdConflict, ActiveRecord::RecordInvalid, CheckinCode::Invalid => e
         render json: { error: e.message }, status: :unprocessable_entity
       end
 

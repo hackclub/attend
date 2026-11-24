@@ -31,7 +31,7 @@
       <%# literal white, not bg-white — themes.css remaps --color-white to the theme
 surface, which would put black QR modules on a dark tile %>
       <div class="shrink-0 bg-[#ffffff] p-2 rounded-lg border border-(--border-card)">
-        <%= qr_code_svg(attend_deep_link(participant_event.participant_id), size: 100) %>
+        <%= qr_code_svg(CheckinCode.for(participant_event), size: 132, level: :m) %>
       </div>
     </div>
 
