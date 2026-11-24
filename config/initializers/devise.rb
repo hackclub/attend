@@ -286,7 +286,9 @@ Devise.setup do |config|
       # `birthdate` the date of birth, both read from /oauth/userinfo. HCA
       # refuses a sign-in that asks for a scope the app isn't allowed, so
       # check Attend's app in HCA has a scope before adding it here or below.
-      scope: "openid profile email slack_id phone birthdate verification_status",
+      # `groups` is the HCA directory entitlements wired up to Attend's app,
+      # by the claim name each was exposed under (see User#hca_groups).
+      scope: "openid profile email slack_id phone birthdate verification_status groups",
       # The visa letter pages' sign-in and refresh buttons send
       # `extra_scopes=visa_letter`: `address` gets every mailing address on
       # the account and `legal_name` the legal names, for the letter. Nobody

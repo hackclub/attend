@@ -13,7 +13,7 @@ RSpec.describe "Refreshing the visa letter form from Hack Club Auth", type: :req
       oidc_claims: { "legal_first_name" => "Ada", "legal_last_name" => "Example", "birthdate" => "2008-04-01" })
   end
   let(:new_address) { { "id" => "addr!new", "line_1" => "4 Fictional Way", "city" => "Sample Town", "country" => "GB", "primary" => true } }
-  let(:usual_scope) { "openid profile email slack_id phone birthdate verification_status" }
+  let(:usual_scope) { "openid profile email slack_id phone birthdate verification_status groups" }
   let(:signed_in) { "Successfully authenticated from Hack Club Auth account." }
 
   def press_refresh(return_to = form_path)
