@@ -238,14 +238,16 @@ RSpec.describe User, type: :model do
       user = User.from_omniauth(auth_hash("identity" => identity, "groups" => [ User::SELF_SERVE_EVENTS_GROUP ]))
       expect(user.hca_groups).to eq([ User::SELF_SERVE_EVENTS_GROUP ])
       expect(user).to be_self_serve_event_creator
-      expect(user).to be_admin
+      expect(user).to be_admin_console_access
+      # Not staff: no ban, maintenance or MCP exemptions.
+      expect(user).not_to be_admin
 
       user = User.from_omniauth(auth_hash("identity" => identity, "groups" => []))
       expect(user).not_to be_self_serve_event_creator
 
       user = User.from_omniauth(auth_hash("identity" => identity))
       expect(user.hca_groups).to eq([])
-      expect(user).not_to be_admin
+      expect(user).not_to be_admin_console_access
     end
 
     it "uses the OIDC name claims rather than the email local part" do
