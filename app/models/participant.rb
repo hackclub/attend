@@ -17,6 +17,7 @@ class Participant < ApplicationRecord
   encrypts :phone, deterministic: true
 
   belongs_to :user, optional: true
+  belongs_to :person, optional: true
   has_many :participant_events, dependent: :destroy
   has_many :events, through: :participant_events
   has_many :guardian_participant_events, through: :participant_events
@@ -100,6 +101,11 @@ class Participant < ApplicationRecord
     value = "https://#{value}" if value.present? && !value.match?(/\A[a-z][a-z0-9+.-]*:/i)
     value.presence
   }
+
+  # Stored stripped and downcased, and `normalizes` rewrites query values the
+  # same way, so `where(email:)` matches whatever case was typed.
+  # NormalizeStoredEmails brought rows written before this in line.
+  normalizes :email, with: EmailAddress::NORMALIZER
 
   normalizes_phone_number :phone
   before_validation :normalize_public_profile_slug
