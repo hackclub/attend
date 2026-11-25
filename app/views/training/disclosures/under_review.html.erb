@@ -8,11 +8,8 @@
       </svg>
     </span>
     <h1 class="portal-title text-2xl mb-2">Thanks for telling us</h1>
-    <p class="portal-body mb-4 mx-auto max-w-prose">
-      The <%= TrainingDisclosure::SAFETY_TEAM_NAME %> will be in touch before you can work at an event.
-    </p>
-    <p class="portal-hint text-sm mb-6">
-      If you have questions in the meantime, email <%= mail_to TrainingDisclosure::SAFETY_TEAM_EMAIL, class: "portal-link" %>.
+    <p class="portal-body mb-6 mx-auto max-w-prose">
+      Before you can carry on with training or work at an event, reach out to the <%= TrainingDisclosure::SAFETY_TEAM_NAME %> at <%= mail_to TrainingDisclosure::SAFETY_TEAM_EMAIL, class: "portal-link" %>.
     </p>
     <%= link_to "Back to training", training_path, class: "portal-btn portal-btn-secondary w-full sm:w-auto" %>
   </div>

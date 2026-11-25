@@ -3,14 +3,12 @@ require "rails_helper"
 RSpec.describe "Admin visa letter templates", type: :request do
   include Devise::Test::IntegrationHelpers
 
-  let(:admin) { create(:user, email: "templates-admin@example.com", global_role: "global_admin", admin_console_beta: false) }
+  let(:admin) { create(:user, email: "templates-admin@example.com", global_role: "global_admin") }
 
   before { sign_in admin }
 
-  { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+  { "with the admin console beta" => true }.each do |ui, console|
     context ui do
-      before { admin.update!(admin_console_beta: console) }
-
       it "warns when there's no default, and starts a new template from Envoy's wording" do
         get admin_visa_letter_templates_path
         expect(response.body).to include("no active default template")

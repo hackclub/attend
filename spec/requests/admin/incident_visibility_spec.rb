@@ -9,7 +9,7 @@ RSpec.describe "Admin::Incidents visibility", type: :request do
   let(:event) { create(:event) }
 
   def staff(role, email: "#{role}-incidents-spec@example.com", console: false)
-    User.create!(email: email, name: role.titleize, admin_console_beta: console).tap do |user|
+    User.create!(email: email, name: role.titleize).tap do |user|
       EventRoleAssignment.create!(user: user, event: event, role: role)
     end
   end
@@ -111,7 +111,7 @@ RSpec.describe "Admin::Incidents visibility", type: :request do
 
     # Option 2 from the PR discussion: a receipt, not the case file. The
     # follow-up is written by the people handling it, in both UIs.
-    [ false, true ].each do |console|
+    [ true ].each do |console|
       context(console ? "in the console" : "in the original admin") do
         before do
           incident.update!(actions_taken: "Spoke to the organiser")
@@ -122,7 +122,6 @@ RSpec.describe "Admin::Incidents visibility", type: :request do
         end
 
         it "shows the reporter what they filed without the casework" do
-          reporter.update!(admin_console_beta: console)
           sign_in reporter
 
           get admin_event_incident_path(event, incident)
@@ -190,7 +189,7 @@ RSpec.describe "Admin::Incidents visibility", type: :request do
         participant_event: participant_event)
     end
 
-    [ false, true ].each do |console|
+    [ true ].each do |console|
       context(console ? "in the console" : "in the original admin") do
         it "leaves out incidents the viewer can't see" do
           sign_in staff("event_admin", console: console)
@@ -265,7 +264,6 @@ RSpec.describe "Admin::Incidents visibility", type: :request do
           end
 
           it "shows staff it's shared with every row" do
-            handler.update!(admin_console_beta: console)
             sign_in handler
 
             get admin_event_dashboard_path(event)

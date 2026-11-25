@@ -20,6 +20,8 @@ class AuditLog < ApplicationRecord
     update_travel: "update_travel",
     resend_invitation: "resend_invitation",
     resend_guardian_invite: "resend_guardian_invite",
+    replace_guardian: "replace_guardian",
+    guardian_portal_link: "guardian_portal_link",
     clear_email_bounce: "clear_email_bounce",
     clear_guardian_email_bounce: "clear_guardian_email_bounce",
     event_select: "select",
@@ -104,6 +106,8 @@ class AuditLog < ApplicationRecord
     connect_airtable: "connect_airtable",
     disconnect_airtable: "disconnect_airtable",
     revoke_invite: "revoke_invite",
+    resend_event_creation_invite: "resend",
+    accept_event_creation_invite: "accept",
     send_held_invitations: "send_held_invitations",
     destroy_avatar: "destroy_avatar",
     toggle_maintenance: "toggle_maintenance",
@@ -133,15 +137,15 @@ class AuditLog < ApplicationRecord
   scope :by_actor, ->(user) { where(actor_user_id: user.id) }
   scope :recent, -> { order(created_at: :desc).limit(100) }
 
-  # Values of `encrypts`-declared attributes are plaintext in previous_changes;
-  # keep them out of the audit_logs jsonb so encrypted-at-rest content never
-  # lands there readable. Every audit writer (admin, MCP, API) goes through this.
-  def self.redact_encrypted_fields(record, changed_fields)
-    encrypted = record.class.try(:encrypted_attributes)
-    return changed_fields if encrypted.blank? || changed_fields.blank?
-
-    names = encrypted.map(&:to_s)
-    changed_fields.to_h { |field, change| [ field, names.include?(field.to_s) ? "[REDACTED]" : change ] }
+  # What may not sit readable in audit_logs.changed_fields: the values of
+  # `encrypts`-declared attributes (plaintext in previous_changes, encrypted
+  # at rest everywhere else) and the PII columns in the SensitiveFields
+  # registry (dates of birth, addresses, phone numbers, email addresses). The
+  # field name is kept, so a row still says what changed. Every audit writer
+  # (admin, MCP, API, operations) goes through this. Rows written before the
+  # registry existed are left as they were.
+  def self.redact_sensitive_fields(record, changed_fields)
+    SensitiveFields.redact_changes(record, changed_fields)
   end
 
   def self.log!(action:, record:, actor: nil, event: nil, changed_fields: {}, metadata: {})
@@ -152,6 +156,21 @@ class AuditLog < ApplicationRecord
       event: event,
       changed_fields: changed_fields,
       metadata: metadata
+    )
+  end
+
+  # A "view" entry for a GET, written by a job so the request doesn't write.
+  # The enqueue is still part of the request: if it fails, so does the page,
+  # and the entry carries the time of the view, not of the job. The job
+  # retries until the entry is written (see AuditViewJob).
+  def self.log_view_later(record:, actor:, event: nil, metadata: {})
+    AuditViewJob.perform_later(
+      record_type: record.class.polymorphic_name,
+      record_id: record.id,
+      actor_user_id: actor&.id,
+      event_id: event&.id,
+      metadata: metadata.deep_stringify_keys,
+      viewed_at: Time.current
     )
   end
 

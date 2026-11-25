@@ -7,10 +7,8 @@ RSpec.describe "Admin training", type: :request do
 
   before { sign_in admin }
 
-  [ true, false ].each do |console|
+  [ true ].each do |console|
     context(console ? "in the admin console" : "in the original admin") do
-      before { admin.update!(admin_console_beta: console) }
-
       it "renders every authoring page" do
         course = create(:training_course, :with_lessons)
         lesson = course.lessons.second

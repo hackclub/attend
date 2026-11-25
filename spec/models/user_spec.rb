@@ -111,6 +111,25 @@ RSpec.describe User, type: :model do
       user.sync_slack_id_to_participant
       expect(participant.reload.slack_user_id).to be_nil
     end
+
+    it "syncs the row it is given when the account is linked to more than one" do
+      duplicate = create(:participant)
+      duplicate.update_columns(user_id: user.id)
+
+      expect(user.pending_participant_slack_id(duplicate)).to eq("U123ABC")
+      user.sync_slack_id_to_participant(duplicate)
+
+      expect(duplicate.reload.slack_user_id).to eq("U123ABC")
+    end
+
+    it "leaves a participant that belongs to someone else alone" do
+      stranger = create(:participant, user: create(:user))
+
+      expect(user.pending_participant_slack_id(stranger)).to be_nil
+      user.sync_slack_id_to_participant(stranger)
+
+      expect(stranger.reload.slack_user_id).to be_nil
+    end
   end
 
   describe "#verified_slack_id" do
@@ -215,6 +234,20 @@ RSpec.describe User, type: :model do
       }
     end
 
+    it "keeps the directory groups from userinfo, and drops them once they're gone" do
+      user = User.from_omniauth(auth_hash("identity" => identity, "groups" => [ User::SELF_SERVE_EVENTS_GROUP ]))
+      expect(user.hca_groups).to eq([ User::SELF_SERVE_EVENTS_GROUP ])
+      expect(user).to be_self_serve_event_creator
+      expect(user).to be_admin
+
+      user = User.from_omniauth(auth_hash("identity" => identity, "groups" => []))
+      expect(user).not_to be_self_serve_event_creator
+
+      user = User.from_omniauth(auth_hash("identity" => identity))
+      expect(user.hca_groups).to eq([])
+      expect(user).not_to be_admin
+    end
+
     it "uses the OIDC name claims rather than the email local part" do
       user = User.from_omniauth(auth_hash(
         "identity" => identity,
@@ -255,7 +288,7 @@ RSpec.describe User, type: :model do
     end
 
     describe "addresses and legal names, which only the visa letter pages ask for" do
-      let(:usual_scope) { "openid profile email slack_id phone birthdate verification_status" }
+      let(:usual_scope) { "openid profile email slack_id phone birthdate verification_status groups" }
       let(:visa_scope) { "#{usual_scope} address legal_name" }
       let(:home) { { "id" => "addr!home", "line_1" => "2 Sample Road", "city" => "Example City", "country" => "GB", "primary" => true } }
       let(:visa_identity) { identity.merge("legal_first_name" => "Ada", "legal_last_name" => "Example", "addresses" => [ home ]) }

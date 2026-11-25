@@ -12,6 +12,8 @@
 class SeriesApiToken < ApplicationRecord
   self.implicit_order_column = "created_at"
 
+  include LastUsedTracking
+
   belongs_to :event_series
   belongs_to :user, optional: true
 
@@ -69,10 +71,6 @@ class SeriesApiToken < ApplicationRecord
 
   def revoke!
     update!(revoked_at: Time.current)
-  end
-
-  def touch_last_used!
-    update_column(:last_used_at, Time.current)
   end
 
   def revoked?

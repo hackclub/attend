@@ -68,8 +68,8 @@ module Admin
       authorize @series
 
       if @series.update(series_params)
-        # Each box on the settings tab saves on its own, so those saves stay
-        # on the tab; the original admin's single form goes back to the series.
+        # Each box on the General tab saves on its own, so those saves stay
+        # on the tab; anything else goes back to the series.
         redirect_to (params[:tab] == "general" ? edit_admin_series_path(@series) : admin_series_path(@series)), notice: "Series updated."
       else
         render :edit, status: :unprocessable_entity

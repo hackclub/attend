@@ -74,14 +74,9 @@ module Admin
       user = User.find_by(email: params[:email].to_s.strip.downcase)
 
       unless user
-        # The console shows the problem under the email field; the original
-        # UI keeps its flash.
-        if console_team_form?
-          @email_error = params[:email].blank? ? "User email is required." : "No Attend account uses this email address. Ask them to sign in to Attend first, then add them."
-          return render_team_with_errors(@event.event_role_assignments.build(role: params.dig(:event_role_assignment, :role)))
-        end
-        redirect_to admin_event_setup_team_path(@event), alert: "User not found with that email. They need to sign in to Attend first."
-        return
+        # The form shows the problem under the email field.
+        @email_error = params[:email].blank? ? "User email is required." : "No Attend account uses this email address. Ask them to sign in to Attend first, then add them."
+        return render_team_with_errors(@event.event_role_assignments.build(role: params.dig(:event_role_assignment, :role)))
       end
 
       @event_role_assignment = @event.event_role_assignments.build(
@@ -92,10 +87,8 @@ module Admin
       if @event_role_assignment.save
         notify_new_staff_member(@event_role_assignment)
         redirect_to admin_event_setup_team_path(@event), notice: "#{user.email} added as #{@event_role_assignment.role.humanize.downcase}."
-      elsif console_team_form?
-        render_team_with_errors(@event_role_assignment)
       else
-        redirect_to admin_event_setup_team_path(@event), alert: @event_role_assignment.errors.full_messages.to_sentence
+        render_team_with_errors(@event_role_assignment)
       end
     end
 
@@ -128,10 +121,6 @@ module Admin
     end
 
     private
-
-    def console_team_form?
-      Array(request.variant).include?(:console)
-    end
 
     # Re-renders the team step with the failed assignment's errors inline.
     def render_team_with_errors(assignment)
@@ -180,8 +169,7 @@ module Admin
     end
 
     def after_waivers_path
-      # "integrations" is what the old all-in-one page sent; the Waivers &
-      # documents tab sends it too (the original admin still lands there).
+      # The Waivers & documents tab sends return_to=integrations.
       if params[:return_to] == "integrations" || @event.setup_complete?
         admin_event_documents_path(@event)
       else

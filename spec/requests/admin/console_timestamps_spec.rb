@@ -6,13 +6,19 @@ require "rails_helper"
 # abbreviated months anywhere.
 RSpec.describe "Admin console timestamps", type: :request do
   include Devise::Test::IntegrationHelpers
+  include ActiveSupport::Testing::TimeHelpers
+
+  # The scanner lists today's scans, and these examples make theirs "10
+  # minutes ago". Run just after midnight, that scan was yesterday and the
+  # page had no timestamp to check. Midday keeps everything on one day.
+  around { |example| travel_to(Time.current.noon) { example.run } }
 
   ABBREVIATED_MONTH = /\b(Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\b(?!\w)/
   ABSOLUTE = /\A[A-Z][a-z]+ \d{1,2}, \d{4}(, \d{2}:\d{2} \(UTC[+-]\d{1,2}:\d{2}\))?\z/
 
   let(:admin) do
     User.create!(email: "time-admin@example.com", name: "Robin Placeholder",
-      global_role: "global_admin", admin_console_beta: true)
+      global_role: "global_admin")
   end
   let(:event) { create(:event, name: "Timestamp Test Jam", starts_at: 3.days.from_now, ends_at: 5.days.from_now) }
   let(:participant) { create(:participant, legal_first_name: "Fictional", legal_last_name: "Attendee") }

@@ -149,6 +149,23 @@ class ParticipantEventPolicy < ApplicationPolicy
     has_role?("event_admin")
   end
 
+  # Swapping a guardian for a different person (Guardians::Replace). It throws
+  # away everything the old guardian signed, so it is held to global admins,
+  # tighter than manage_guardians?.
+  def replace_guardian?
+    user.global_admin? || false
+  end
+
+  # Minting or reviving a guardian's portal link ("Copy Portal Link"). Every
+  # staff role that sees the admin participant page has always been handed
+  # the link there, so this is theirs too. It is narrower than show?, which
+  # also lets participants and guardians see their own record.
+  def guardian_portal_link?
+    return true if user.global_admin?
+    return false unless record.event == Current.event
+    has_role?("event_admin", "ops", "limited", "safeguarding_lead")
+  end
+
   class Scope < ApplicationPolicy::Scope
     def resolve
       return scope.none unless user

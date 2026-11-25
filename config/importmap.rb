@@ -10,4 +10,6 @@ pin_all_from "app/javascript/controllers", under: "controllers"
 pin_all_from "app/javascript/channels", under: "channels"
 pin_all_from "app/javascript/vendor", under: "vendor"
 pin_all_from "app/javascript/utils", under: "utils"
+# The check-in scanner, imported on demand by scanner_controller.js.
+pin_all_from "app/javascript/scanner", under: "scanner", preload: false
 pin "@rails/activestorage", to: "activestorage.esm.js"

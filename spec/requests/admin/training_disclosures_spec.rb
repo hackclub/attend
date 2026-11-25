@@ -2,6 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Admin safety reviews", type: :request do
   include Devise::Test::IntegrationHelpers
+  include ActiveJob::TestHelper
 
   let(:admin) { create(:user, global_role: "global_admin") }
   let(:person) { create(:user, email: "declared-example@example.com") }
@@ -10,15 +11,17 @@ RSpec.describe "Admin safety reviews", type: :request do
 
   before { sign_in admin }
 
-  [ true, false ].each do |console|
+  [ true ].each do |console|
     it "lists and shows declarations, logging each view (#{console ? "console" : "original"})" do
-      admin.update!(admin_console_beta: console)
       get admin_training_disclosures_path
       expect(response.body).to include("declared-example@example.com")
 
+      # The entry is written by a job, so the page view itself is a read.
       expect {
         get admin_training_disclosure_path(disclosure)
-      }.to change { AuditLog.where(record: disclosure, action: "view").count }.by(1)
+      }.to have_enqueued_job(AuditViewJob).and(not_change(AuditLog, :count))
+      expect { perform_enqueued_jobs(only: AuditViewJob) }
+        .to change { AuditLog.where(record: disclosure, action: "view", actor: admin).count }.by(1)
       expect(response.body).to include("Example declaration?")
     end
   end

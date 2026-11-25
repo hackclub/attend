@@ -31,10 +31,8 @@ RSpec.describe "Admin series change requests", type: :request do
   let!(:approved_request) { change_request(event: second_event, note: "Already sorted out", status: :approved) }
   let!(:outside_request) { change_request(event: outside_event, note: "Not part of this series") }
 
-  [ true, false ].each do |console|
+  [ true ].each do |console|
     context "with the #{console ? 'console' : 'original'} admin" do
-      before { owner.update!(admin_console_beta: console) }
-
       it "lists pending requests from every event in the series, linking to each event's review page" do
         sign_in owner
 

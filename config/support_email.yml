@@ -1,0 +1,11 @@
+# Domains an event's support email may use (Event#support_email). It is the
+# from and reply-to address on every participant and guardian email, so each
+# domain here must be one we can send from and receive replies at.
+#
+# SUPPORT_EMAIL_DOMAINS (comma-separated) replaces the list for a deployment
+# without a code change.
+shared:
+  domains:
+    - hackclub.com
+    - events.hackclub.com
+    - haven.hackclub.com

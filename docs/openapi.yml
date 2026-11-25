@@ -3955,7 +3955,12 @@ components:
 
     ScanParticipant:
       type: object
-      description: Compact participant summary returned when recording a scan.
+      description: |
+        Compact participant summary returned when recording a scan. Fields the
+        caller's event role doesn't cover are omitted rather than sent as null:
+        `phone` for PII-restricted roles; `medical_conditions` and `medications`
+        for roles without full medical access; `freedom_waiver_granted` for
+        everyone but safeguarding leads and global admins.
       properties:
         participant_id: { type: integer }
         participant_event_id: { type: integer }

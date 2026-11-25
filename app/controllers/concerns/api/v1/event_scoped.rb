@@ -40,9 +40,14 @@ module Api
       end
 
       # Overridden per controller. `update?` is the same question the web asks
-      # before letting someone edit an event at all.
+      # before letting someone edit an event at all; reading only takes access
+      # to the event, so read_only staff can look without being able to change.
       def authorize_event_access!
-        authorize @event, :update?
+        authorize @event, read_request? ? :show? : :update?
+      end
+
+      def read_request?
+        request.get? || request.head?
       end
     end
   end

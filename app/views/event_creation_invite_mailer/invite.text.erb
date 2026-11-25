@@ -1,0 +1,27 @@
+Hi,
+
+<% if @invited_by %>
+<%= @invited_by.name.presence || @invited_by.email %> invited you to set up an event on Attend<% if @series %> in the <%= @series.name %> series<% end %>.
+<% else %>
+You've been invited to set up an event on Attend<% if @series %> in the <%= @series.name %> series<% end %>.
+<% end %>
+Attend is where Hack Club events handle registration, waivers, travel and check-in.
+<% if @invite.note.present? %>
+
+A note from <%= @invited_by&.name.presence || "them" %>:
+
+<%= @invite.note %>
+<% end %>
+
+You'll name the event, set its dates and venue, choose what it needs (travel, accommodation, visa letters) and add your team. It takes about ten minutes, and you can stop and come back.
+
+Set up your event:
+<%= @url %>
+
+Sign in with the Hack Club account that uses this email address (<%= @invite.email %>). The link works until <%= @invite.expires_at.strftime("%-d %B %Y") %>.
+
+<% if @invited_by %>
+Questions? Just reply to this email and it'll go to <%= @invited_by.email %>.
+<% else %>
+Questions? Just reply to this email.
+<% end %>

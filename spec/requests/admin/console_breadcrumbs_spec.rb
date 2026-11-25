@@ -8,7 +8,7 @@ RSpec.describe "Admin console breadcrumbs", type: :request do
 
   let(:admin) do
     User.create!(email: "crumb-admin@example.com", name: "Robin Placeholder",
-      global_role: "global_admin", admin_console_beta: true)
+      global_role: "global_admin")
   end
   let(:event) do
     create(:event, name: "Breadcrumb Test Jam", travel_enabled: true,
@@ -118,7 +118,7 @@ RSpec.describe "Admin console breadcrumbs", type: :request do
 
   describe "as an ops staff member" do
     let(:ops) do
-      User.create!(email: "crumb-ops@example.com", name: "Alex Example", admin_console_beta: true).tap do |user|
+      User.create!(email: "crumb-ops@example.com", name: "Alex Example").tap do |user|
         EventRoleAssignment.create!(user: user, event: event, role: "ops")
       end
     end
@@ -159,7 +159,7 @@ RSpec.describe "Admin console breadcrumbs", type: :request do
   describe "as an event admin of a different event" do
     let(:other_event) { create(:event, name: "Unrelated Jam") }
     let(:outsider) do
-      User.create!(email: "crumb-outsider@example.com", name: "Jo Fiction", admin_console_beta: true).tap do |user|
+      User.create!(email: "crumb-outsider@example.com", name: "Jo Fiction").tap do |user|
         EventRoleAssignment.create!(user: user, event: other_event, role: "event_admin")
       end
     end

@@ -58,10 +58,6 @@ module Api
 
       private
 
-      def authorize_event_access!
-        authorize @event, :update?
-      end
-
       def configure_default_waivers
         results = { "waiver" => Docuseal::DefaultTemplateSetup.new(@event).call("waiver") }
         if @event.freedom_waivers_enabled?

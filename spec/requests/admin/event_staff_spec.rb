@@ -189,7 +189,6 @@ RSpec.describe "Admin::EventStaff", type: :request do
   describe "GET index with the admin console beta" do
     let(:staff_user) { create(:user) }
 
-    before { admin.update!(admin_console_beta: true) }
 
     it "renders an inline-editable role cell" do
       assignment = create(:event_role_assignment, event: event, user: staff_user, role: "ops")

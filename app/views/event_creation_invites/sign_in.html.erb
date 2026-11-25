@@ -1,0 +1,33 @@
+<% content_for :title, "Set up your event – Attend" %>
+
+<div class="w-full max-w-lg mx-auto">
+  <%= render "shared/portal_masthead" %>
+
+  <div class="mb-8">
+    <h1 class="portal-title text-2xl mb-3">Set up your event</h1>
+    <p class="portal-body text-lg">
+      <% if @invite.invited_by %>
+        <strong><%= @invite.invited_by.name.presence || @invite.invited_by.email %></strong> invited you to create an event on Attend<% if @invite.event_series %> in the <strong><%= @invite.event_series.name %></strong> series<% end %>.
+      <% else %>
+        You've been invited to create an event on Attend<% if @invite.event_series %> in the <strong><%= @invite.event_series.name %></strong> series<% end %>.
+      <% end %>
+    </p>
+  </div>
+
+  <div class="portal-card p-5 sm:p-6 mb-6">
+    <h2 class="portal-heading text-base mb-1">Sign in to start</h2>
+    <p class="portal-hint text-sm mb-4">
+      Use the Hack Club account for <strong><%= @invite.email %></strong>, the address this invite was sent to.
+    </p>
+    <%= button_to user_hack_club_omniauth_authorize_path,
+          method: :post,
+          data: { turbo: false },
+          class: "portal-btn portal-btn-primary w-full sm:w-auto" do %>
+      Continue with Hack Club
+    <% end %>
+  </div>
+
+  <p class="portal-meta text-sm">
+    Attend is where Hack Club events handle registration, waivers, travel and check-in.
+  </p>
+</div>

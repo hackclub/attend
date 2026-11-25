@@ -125,9 +125,7 @@ RSpec.describe "Admin::Exports", type: :request, fiat_registrations: true do
       it "shows the time field as 24-hour, in the event's time zone" do
         template = create(:export_template, event: event, created_by: admin, columns: [ "participant.email" ], filters: [ time_filter ])
 
-        [ true, false ].each do |console|
-          admin.update!(admin_console_beta: console)
-
+        [ true ].each do |console|
           get admin_event_exports_path(event_slug: event.slug, template_id: template.id)
 
           input = Nokogiri::HTML5(response.body).at_css('input[name="filters[0][value]"]')

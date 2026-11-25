@@ -376,6 +376,13 @@
                             class: "cs-link" %>
                       </div>
                     <% end %>
+                    <% if policy(@participant_event).replace_guardian? && @participant_event.requires_guardian? %>
+                      <div class="mt-1 inline-block border-2 border-dashed border-orange-400 rounded px-1">
+                        <%= link_to "Replace",
+                            replace_admin_event_participant_guardian_path(current_event, @participant_event, gpe),
+                            class: "cs-link" %>
+                      </div>
+                    <% end %>
                     </div>
                   </div>
                   <div class="mt-2 flex flex-wrap items-center gap-1 -ml-3">
@@ -384,13 +391,21 @@
                           resend_guardian_invite_admin_event_participant_path(current_event, @participant_event, guardian_participant_event_id: gpe.id),
                           method: :post,
                           class: "cs-btn cs-btn-link" %>
-                      <button type="button"
-                              data-controller="clipboard"
-                              data-clipboard-content-value="<%= gpe.invite_url %>"
-                              data-action="click->clipboard#copy"
-                              class="cs-btn cs-btn-link">
-                        Copy portal link
-                      </button>
+                      <% if (portal_url = gpe.portal_url) %>
+                        <button type="button"
+                                data-controller="clipboard"
+                                data-clipboard-content-value="<%= portal_url %>"
+                                data-action="click->clipboard#copy"
+                                class="cs-btn cs-btn-link">
+                          Copy portal link
+                        </button>
+                      <% else %>
+                        <%# No working link (none minted, or its window lapsed): a page view must not write, so the click makes or revives one. %>
+                        <%= button_to "Copy portal link",
+                            guardian_portal_link_admin_event_participant_path(current_event, @participant_event, guardian_participant_event_id: gpe.id),
+                            method: :post,
+                            class: "cs-btn cs-btn-link" %>
+                      <% end %>
                     <% end %>
                   </div>
                 </li>

@@ -1,4 +1,9 @@
 class User < ApplicationRecord
+  # The old admin UI toggle, retired with that UI. Ignored until the column
+  # is dropped in a follow-up, so pods on the previous release keep working
+  # during the rollout.
+  self.ignored_columns += [ "admin_console_beta" ]
+
   include NormalizesPhoneNumbers
   include DecodableImageAttachment
 
@@ -128,6 +133,14 @@ class User < ApplicationRecord
 
   def can_access_event?(event)
     global_admin? || event_role_assignments.exists?(event: event) || series_member_for_event?(event)
+  end
+
+  # can_access_event? minus the read-only role: whether this person may change
+  # anything on the event at all. Read-only staff can look, and that's it.
+  def can_change_event?(event)
+    global_admin? ||
+      event_role_assignments.where(event: event).where.not(role: :read_only).exists? ||
+      series_member_for_event?(event)
   end
 
   # Series members act as event admins on every event in their series.
@@ -313,17 +326,30 @@ class User < ApplicationRecord
     end
   end
 
-  def sync_slack_id_to_participant
+  # The Slack id from the last sign-in, when the linked participant doesn't
+  # carry it yet. nil when there's nothing to sync.
+  #
+  # `target` is which of this account's participant rows is being asked
+  # about. One account can end up linked to more than one row (duplicates
+  # from a corrected import), and #participant only ever names one of them,
+  # so a caller working on a particular row passes it.
+  def pending_participant_slack_id(target = participant)
     slack_id = oidc_claims&.dig("slack_id")
     return if slack_id.blank?
-    return unless participant.present?
+    return unless target.present? && target.user_id == id
+    return if target.slack_user_id == slack_id
 
-    return if participant.slack_user_id == slack_id
+    slack_id
+  end
+
+  def sync_slack_id_to_participant(target = participant)
+    slack_id = pending_participant_slack_id(target)
+    return if slack_id.blank?
 
     # Skip validations: this is a system sync, and pre-existing invalid data on
     # the participant (e.g. a legacy phone number) must not block sign-in.
-    participant.slack_user_id = slack_id
-    participant.save!(validate: false)
+    target.slack_user_id = slack_id
+    target.save!(validate: false)
   end
 
   # A Hack Club Auth email change lands on the User row at sign-in; the linked
@@ -393,7 +419,8 @@ class User < ApplicationRecord
           oidc_addresses(raw["address"]),
         slack_id: identity["slack_id"],
         verification_status: identity["verification_status"],
-        ysws_eligible: identity["ysws_eligible"]
+        ysws_eligible: identity["ysws_eligible"],
+        groups: raw["groups"]
       }.compact
     else
       # OIDC format
@@ -407,7 +434,8 @@ class User < ApplicationRecord
         addresses: oidc_addresses(raw["address"]),
         slack_id: raw["slack_id"],
         verification_status: raw["verification_status"],
-        ysws_eligible: raw["ysws_eligible"]
+        ysws_eligible: raw["ysws_eligible"],
+        groups: raw["groups"]
       }.compact
     end
   end
@@ -435,6 +463,25 @@ class User < ApplicationRecord
     primary + others
   end
 
+  # The claim name the attend-self-serve-events entitlement is exposed to
+  # Attend's app under in the HCA directory. Holders may create standalone
+  # events and use the admin before they staff anything. It's an HQ staff
+  # entitlement, so holders count as #admin? in full: ban and maintenance
+  # exemptions and MCP included (with no events, MCP just has nothing to show).
+  SELF_SERVE_EVENTS_GROUP = "attend-self-serve-events".freeze
+
+  # HCA directory entitlements this person held at their last sign-in, as the
+  # claim names they're exposed to Attend under. Read from the `groups` claim
+  # Hack Club Auth sends with the `groups` scope; only entitlements wired to
+  # Attend's app appear, and losing one takes effect at the next sign-in.
+  def hca_groups
+    Array((oidc_claims || {})["groups"])
+  end
+
+  def self_serve_event_creator?
+    hca_groups.include?(SELF_SERVE_EVENTS_GROUP)
+  end
+
   # Identity-verified through Hack Club Auth (same signal the admin UI shows).
   def hca_verified?
     oidc_claims["verification_status"] == "verified"
@@ -442,6 +489,7 @@ class User < ApplicationRecord
 
   def admin?
     global_admin? ||
+      self_serve_event_creator? ||
       event_role_assignments.exists?(role: ADMIN_EVENT_ROLES) ||
       series_role_assignments.exists?
   end

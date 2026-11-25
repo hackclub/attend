@@ -26,7 +26,7 @@ module Admin
     end
 
     def show
-      AuditLog.log!(action: :view, record: @application, actor: current_user, event: @event,
+      AuditLog.log_view_later(record: @application, actor: current_user, event: @event,
         metadata: { what: "visa_letter_application" })
     end
 

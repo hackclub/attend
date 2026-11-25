@@ -45,10 +45,8 @@ RSpec.describe "Admin event schedule fields", type: :request do
     end
   end
 
-  [ false, true ].each do |console|
+  [ true ].each do |console|
     context(console ? "with the admin console beta" : "in the original admin") do
-      before { admin.update!(admin_console_beta: console) }
-
       it "prefills the event form on the event's clock in 24-hour fields" do
         get edit_admin_event_path(event)
 

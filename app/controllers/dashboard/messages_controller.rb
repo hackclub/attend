@@ -44,11 +44,15 @@ class Dashboard::MessagesController < ApplicationController
     @message = @delivery.message
     @event = @message.event
 
-    # Get all channels this message was delivered through
-    @channels = current_deliveries.where(message: @message).pluck(:channel).uniq.sort
+    # One query answers both questions: which channels this message was
+    # delivered through, and whether any delivery is still unread.
+    deliveries = current_deliveries.where(message: @message)
+    channels_and_read_at = deliveries.pluck(:channel, :read_at)
+    @channels = channels_and_read_at.map(&:first).uniq.sort
 
-    # Mark all deliveries for this message as read
-    current_deliveries.where(message: @message).unread.update_all(read_at: Time.current)
+    # Mark all deliveries for this message as read. Only the first open has
+    # anything to mark; opening it again is a plain read.
+    deliveries.unread.update_all(read_at: Time.current) if channels_and_read_at.any? { |_, read_at| read_at.nil? }
   end
 
   private

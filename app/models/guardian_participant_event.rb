@@ -7,6 +7,7 @@ class GuardianParticipantEvent < ApplicationRecord
   belongs_to :participant_event
 
   include SyncsRegistration
+  include ThrottledStamp
   syncs_registration cause: :guardian_changed
 
   # A guardian finishing the portal can be the last thing a registration was
@@ -72,20 +73,30 @@ class GuardianParticipantEvent < ApplicationRecord
   end
 
   # Handing this link to someone counts as sending it: an unstamped invite is
-  # treated as dead by #invite_expired?, so admins copying a link out of the
+  # treated as dead by #invite_expired?, so an admin copying a link out of the
   # participant page would otherwise paste a URL that 404s on arrival. Only
-  # stamp a link that is actually dead -- this renders inside the admin
-  # participant page, and refreshing a live invite on every page load would
-  # write (and record a PaperTrail version) for every guardian shown.
+  # stamp a link that is actually dead: refreshing a live invite every time
+  # would write (and record a PaperTrail version) for nothing.
+  #
+  # This mints and stamps, so it is for POSTs and jobs. Pages render
+  # #portal_url, which never writes, and send staff here (through
+  # Admin::ParticipantsController#guardian_portal_link) when it has nothing
+  # live to show.
   def invite_url
-    host = ENV.fetch("APP_HOST") { Rails.application.config.action_mailer.default_url_options[:host] || "localhost:3000" }
     token = generate_invite_token!
     update!(invite_token_sent_at: Time.current) if invite_expired?
 
-    Rails.application.routes.url_helpers.guardian_portal_url(
-      token: token,
-      host: host
-    )
+    portal_url_for(token)
+  end
+
+  # The portal link, when there is one that works right now. nil when no token
+  # has been minted yet or its window has lapsed: a link that would 404 on
+  # arrival is never handed out. Read-only, so safe to call from a view.
+  def portal_url
+    return if invite_expired?
+
+    token = invite_token
+    portal_url_for(token) if token.present?
   end
 
   INVITE_VALIDITY = 7.days
@@ -111,9 +122,7 @@ class GuardianParticipantEvent < ApplicationRecord
   # find_by_invite_token! has already rejected expired tokens, so this extends a
   # live window and can never resurrect a dead one.
   def touch_invite_use!
-    return if invite_last_used_at.present? && invite_last_used_at > INVITE_USE_TOUCH_INTERVAL.ago
-
-    update_column(:invite_last_used_at, Time.current)
+    stamp_at_most_every(INVITE_USE_TOUCH_INTERVAL, :invite_last_used_at)
   end
 
   def mark_accepted!
@@ -137,6 +146,12 @@ class GuardianParticipantEvent < ApplicationRecord
   end
 
   private
+
+  def portal_url_for(token)
+    host = ENV.fetch("APP_HOST") { Rails.application.config.action_mailer.default_url_options[:host] || "localhost:3000" }
+
+    Rails.application.routes.url_helpers.guardian_portal_url(token: token, host: host)
+  end
 
   def guardian_email_differs_from_participant
     guardian_email = guardian&.email.to_s.strip.downcase

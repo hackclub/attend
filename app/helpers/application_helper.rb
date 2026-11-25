@@ -191,6 +191,7 @@ def admin_tool(class_name = "", element = "div", **options, &block)
     "Guyana",
     "Haiti",
     "Honduras",
+    "Hong Kong",
     "Hungary",
     "Iceland",
     "India",
@@ -361,12 +362,11 @@ def admin_tool(class_name = "", element = "div", **options, &block)
     leg.public_send(:"local_#{endpoint}_time")&.strftime("%Y-%m-%dT%H:%M")
   end
 
-  def attend_deep_link(participant_id)
-    "attend://checkin/#{participant_id}"
-  end
-
-  def qr_code_svg(data, size: 200)
-    qr = ::RQRCode::QRCode.new(data)
+  # `level` is the error correction: rqrcode defaults to the highest, H. A
+  # signed check-in code is long enough that M keeps it noticeably less
+  # dense, which matters more on a small screen than surviving damage does.
+  def qr_code_svg(data, size: 200, level: :h)
+    qr = ::RQRCode::QRCode.new(data, level: level)
     qr.as_svg(
       color: "000",
       fill: "fff",
