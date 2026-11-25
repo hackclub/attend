@@ -1,8 +1,13 @@
 module Api
   module V1
     class BaseController < ActionController::API
+      include ReplicaReadRouting
+
       before_action :authenticate_token!
       before_action :authorize_token_scope!
+      # After authentication, so tokens are always looked up on the primary.
+      # A no-op unless replica reads are switched on (ReplicaReads).
+      route_reads_to_replica
 
       attr_reader :current_user, :current_token, :current_event_from_api_key,
                   :current_series_from_api_key, :current_series_api_token,
@@ -114,6 +119,17 @@ module Api
         return nil unless header&.start_with?("Bearer ")
 
         header.split(" ").last
+      end
+
+      # Read-your-own-writes is per credential here: there's no session. Keyed
+      # on the credential authenticate_token! resolved, so a caller sending
+      # tokens that don't authenticate never gets a cache entry.
+      def replica_reads_principal
+        credential = @current_token || @current_event_api_token || @current_series_api_token
+        return "#{credential.class.name}:#{credential.id}" if credential
+        return "event_api_key:#{@current_event_from_api_key.id}" if @current_event_from_api_key
+
+        nil
       end
 
       # True when the caller authenticated with an API key rather than a
