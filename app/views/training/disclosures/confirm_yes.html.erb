@@ -1,0 +1,22 @@
+<% content_for :title, "Check your answer – #{@course.title} – Attend" %>
+
+<%= render layout: "training/disclosures/shell", locals: { course: @course } do %>
+  <div class="portal-card p-6 sm:p-8">
+    <h1 class="portal-title text-2xl mb-2">Check your answer</h1>
+    <p class="portal-body mb-4">You answered <strong>Yes</strong> to:</p>
+    <blockquote class="portal-inset rounded-lg p-3 mb-4 text-sm"><%= @course.disclosure_question_text %></blockquote>
+    <p class="portal-hint text-sm mb-6">
+      If that's right, you'll need to reach out to the <%= TrainingDisclosure::SAFETY_TEAM_NAME %> at <%= mail_to TrainingDisclosure::SAFETY_TEAM_EMAIL, class: "portal-link" %> before you can carry on with training or work at an event.
+      If you picked Yes by mistake, go back and change it.
+    </p>
+
+    <%# The way out comes first and is the prominent button, on every screen
+        size: a reflex tap on this page should undo a stray yes, not confirm it. %>
+    <div class="flex flex-col sm:flex-row sm:justify-end gap-3">
+      <%= link_to "No, change my answer", new_training_course_disclosure_path(@course, answer: "no", changing: 1), class: "portal-btn portal-btn-primary w-full sm:w-auto" %>
+      <%= form_with url: confirm_training_course_disclosure_path(@course), method: :post, data: { turbo: false } do %>
+        <%= button_tag "Yes, that's right", type: "submit", class: "portal-btn portal-btn-secondary w-full sm:w-auto" %>
+      <% end %>
+    </div>
+  </div>
+<% end %>

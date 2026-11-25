@@ -25,8 +25,7 @@ RSpec.describe "Admin::Dashboard#show headcount", type: :request do
   end
 
   def each_admin_ui
-    [ false, true ].each do |console|
-      admin.update!(admin_console_beta: console)
+    [ true ].each do |console|
       sign_in admin
       get admin_event_dashboard_path(event.slug)
       expect(response).to have_http_status(:ok)

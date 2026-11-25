@@ -4,7 +4,7 @@ RSpec.describe "Admin::Messages", type: :request do
   include Devise::Test::IntegrationHelpers
   include ActiveSupport::Testing::TimeHelpers
 
-  let(:admin) { User.create!(email: "admin-test@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
+  let(:admin) { User.create!(email: "admin-test@example.com", name: "Admin", global_role: "global_admin") }
   let(:event) { create(:event) }
 
   before { sign_in admin }
@@ -17,10 +17,8 @@ RSpec.describe "Admin::Messages", type: :request do
         params: { message: { subject: "Hi", body: body, audience: "all_guardians", channels: [ "email" ] } }
     end
 
-    [ false, true ].each do |console|
+    [ true ].each do |console|
       it "refuses the draft and says why (console: #{console})" do
-        admin.update!(admin_console_beta: console)
-
         expect { create_message(%(<p>Open <a href="#{portal_link}">your portal</a></p>)) }.not_to change(Message, :count)
         expect(response).to have_http_status(:unprocessable_entity)
         expect(response.body).to include("guardian portal link")
@@ -40,18 +38,7 @@ RSpec.describe "Admin::Messages", type: :request do
   end
 
   describe "GET new" do
-    it "renders the compose form without creating a draft" do
-      expect {
-        get new_admin_event_message_path(event_slug: event.slug)
-      }.not_to change(Message, :count)
-
-      expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Compose Message")
-    end
-
     context "with the admin console beta" do
-      before { admin.update!(admin_console_beta: true) }
-
       it "renders the sentence-case compose form without creating a draft" do
         expect {
           get new_admin_event_message_path(event_slug: event.slug)
@@ -77,8 +64,6 @@ RSpec.describe "Admin::Messages", type: :request do
 
   describe "GET index" do
     context "with the admin console beta" do
-      before { admin.update!(admin_console_beta: true) }
-
       it "shows each message's body as text, with placeholders left as written" do
         event.messages.create!(audience: "confirmed_attendees", channels: [ "email" ], subject: "Test",
           body: "<p>{{first_name}} &amp; friends</p>", sent_by_user: admin, status: :draft)
@@ -186,7 +171,7 @@ RSpec.describe "Admin::Messages", type: :request do
       latecomer = create(:participant_event, event: event, status: :complete)
 
       get admin_event_message_path(event_slug: event.slug, id: message)
-      expect(response.body).to include("Send to 1 New Recipient")
+      expect(response.body).to include("Send to 1 new recipient")
 
       expect {
         post send_to_new_recipients_admin_event_message_path(event_slug: event.slug, id: message)
@@ -202,7 +187,6 @@ RSpec.describe "Admin::Messages", type: :request do
     end
 
     it "offers the button and marks late deliveries in the admin console beta" do
-      admin.update!(admin_console_beta: true)
       create(:participant_event, event: event, status: :complete)
       send_and_complete(message)
       travel 2.minutes
@@ -229,7 +213,7 @@ RSpec.describe "Admin::Messages", type: :request do
 
       message.update!(status: :completed)
       get admin_event_message_path(event_slug: event.slug, id: message)
-      expect(response.body).to include("Send to 1 New Recipient")
+      expect(response.body).to include("Send to 1 new recipient")
     end
 
     it "offers the button on a failed message" do
@@ -240,7 +224,7 @@ RSpec.describe "Admin::Messages", type: :request do
       create(:participant_event, event: event, status: :complete)
 
       get admin_event_message_path(event_slug: event.slug, id: message)
-      expect(response.body).to include("Send to 1 New Recipient")
+      expect(response.body).to include("Send to 1 new recipient")
     end
 
     it "tells staff when no one new matches" do
@@ -355,8 +339,6 @@ RSpec.describe "Admin::Messages", type: :request do
     end
 
     context "with the admin console beta" do
-      before { admin.update!(admin_console_beta: true) }
-
       it "asks before sending a draft" do
         get admin_event_message_path(event_slug: event.slug, id: message)
 
@@ -376,10 +358,8 @@ RSpec.describe "Admin::Messages", type: :request do
       Nokogiri::HTML(response.body).text.squish
     end
 
-    [ false, true ].each do |console|
+    [ true ].each do |console|
       context(console ? "with the admin console beta" : "in the original admin") do
-        before { admin.update!(admin_console_beta: console) }
-
         it "reads the send time in the event's time zone and shows it back that way" do
           travel_to Time.utc(2030, 1, 1, 12, 0) do
             post admin_event_messages_path(event_slug: event.slug), params: params
@@ -427,9 +407,8 @@ RSpec.describe "Admin::Messages", type: :request do
       count
     end
 
-    [ false, true ].each do |console|
+    [ true ].each do |console|
       it "loads recipients in bulk rather than one per delivery (console: #{console})" do
-        admin.update!(admin_console_beta: console)
         2.times { deliver_to_new_participant }
         queries_for_show # warm-up
         baseline = queries_for_show

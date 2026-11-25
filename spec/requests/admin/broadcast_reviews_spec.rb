@@ -5,8 +5,8 @@ RSpec.describe "Admin::BroadcastReviews", type: :request do
   include ActiveJob::TestHelper
 
   let(:event) { create(:event) }
-  let(:admin) { User.create!(email: "reviewer@example.com", name: "Reviewer", global_role: "global_admin", admin_console_beta: false) }
-  let(:organizer) { User.create!(email: "organizer@example.com", name: "Organizer", admin_console_beta: false) }
+  let(:admin) { User.create!(email: "reviewer@example.com", name: "Reviewer", global_role: "global_admin") }
+  let(:organizer) { User.create!(email: "organizer@example.com", name: "Organizer") }
   let(:flagged) do
     BroadcastScreener::Result.new(flagged: true, categories: [ "marketing" ], reason: "Advertises a sponsor's sale.", flagged_by: "model")
   end
@@ -20,11 +20,9 @@ RSpec.describe "Admin::BroadcastReviews", type: :request do
     allow(BroadcastScreener).to receive(:call).and_return(flagged)
   end
 
-  [ false, true ].each do |console|
+  [ true ].each do |console|
     context(console ? "in the console" : "in the classic admin") do
       before do
-        admin.update!(admin_console_beta: console)
-        organizer.update!(admin_console_beta: console)
       end
 
       it "holds an organizer's Send now and tells them why" do
@@ -119,7 +117,7 @@ RSpec.describe "Admin::BroadcastReviews", type: :request do
 
   context "when the event is in a series" do
     let(:series) { create(:event_series) }
-    let(:owner) { User.create!(email: "series-owner@example.com", name: "Series Owner", admin_console_beta: false) }
+    let(:owner) { User.create!(email: "series-owner@example.com", name: "Series Owner") }
     let(:other_event) { create(:event) }
 
     before do
@@ -127,10 +125,8 @@ RSpec.describe "Admin::BroadcastReviews", type: :request do
       create(:series_role_assignment, :owner, event_series: series, user: owner)
     end
 
-    [ false, true ].each do |console|
+    [ true ].each do |console|
       context(console ? "in the console" : "in the classic admin") do
-        before { owner.update!(admin_console_beta: console) }
-
         it "lets a series owner see and approve held messages for their series only" do
           message.send!(sender: organizer)
           review = message.pending_broadcast_review

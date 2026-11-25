@@ -6,6 +6,7 @@ module Admin
     before_action :set_current_event_from_session
     before_action :switch_event_if_needed
     before_action :ensure_can_access_current_event, if: -> { current_event.present? }
+    before_action :ensure_can_change_current_event, if: :event_write_request?
     # After authentication and the access checks above, so the signed-in user
     # and the roles that let them into the admin and into this event are read
     # from the primary. Checks made after this point (a subclass's
@@ -83,16 +84,27 @@ module Admin
 
     private
 
-    # Staff get the console redesign unless they've switched back to the
-    # original admin (Admin::ConsoleBetaController): every *.html+console.erb template, layout included,
-    # wins over its *.html.erb original. Set before any action runs so
-    # renders, Turbo Stream responses and render_to_string all see it.
+    # Every admin page renders the console (Cloudscape) UI. The +console
+    # variant marks templates and partials as admin renders: shared partials
+    # that also appear outside /admin keep a plain *.html.erb for those pages,
+    # and helpers branch on ConsoleHelper#console_ui?. Set before any action
+    # runs so renders, Turbo Stream responses and render_to_string all see it.
+    # The lookup context is set too: turbo_stream.replace(partial: ...) renders
+    # its partial when the stream is built, before `render` would copy the
+    # request variant across, so it would otherwise miss the +console partials.
     def set_admin_ui_variant
-      request.variant = :console if current_user&.admin_console_beta?
+      request.variant = :console
+      lookup_context.variants = [ :console ]
     end
 
     def authorize_admin_access
-      unless current_user&.admin?
+      return if current_user&.admin?
+
+      # Someone partway through an event creation invite has one admin page
+      # open to them, the new event form; send them back to it.
+      if (invite = EventCreationInvite.usable_by(current_user).first)
+        redirect_to admin_new_event_path(invite: invite.id)
+      else
         redirect_to root_path, alert: "You are not authorized to access this area."
       end
     end
@@ -144,6 +156,18 @@ module Admin
       current_user.can_access_event?(current_event)
     end
 
+    # A write to an event-scoped route. Getting into /admin only takes an
+    # admin role on some event, so someone who is ops on one event and
+    # read_only on another reaches both; this is what keeps the read_only one
+    # read-only, whatever the individual controller checks.
+    def event_write_request?
+      current_event.present? && params[:event_slug].present? && !request.get? && !request.head?
+    end
+
+    def ensure_can_change_current_event
+      raise Pundit::NotAuthorizedError unless current_user.can_change_event?(current_event)
+    end
+
     def ensure_can_access_current_event
       return if can_access_current_event?
 
@@ -167,8 +191,36 @@ module Admin
       Sentry.capture_exception(e) if defined?(Sentry)
     end
 
+    # Who is acting, for app/operations. One per request: it remembers what
+    # operations audited, and log_admin_action stands down when they have.
+    def operation_context
+      @operation_context ||= Operation::Context.new(
+        surface: :html,
+        user: current_user,
+        event: (current_event if event_page?),
+        metadata: admin_audit_metadata
+      )
+    end
+
+    # What every audit row from the admin UI says about the request, whether
+    # an operation writes the row or the catch-all hook does. The params are
+    # as Rails filtered them; whoever writes the row redacts the registry's
+    # PII from them for the record it is about (SensitiveFields.redact_params).
+    def admin_audit_metadata
+      {
+        ip: request.remote_ip,
+        user_agent: request.user_agent,
+        controller: controller_name,
+        params: request.filtered_parameters.except("controller", "action", "authenticity_token")
+      }
+    end
+
+    # The catch-all: audits whatever record the action left changed, under the
+    # action's own name. Actions that run an operation are audited by it, by
+    # name, and are skipped here so there is one row, not two.
     def log_admin_action
       return unless current_user
+      return if @operation_context&.audited?
 
       changed_record = find_changed_record
       record = changed_record || @record || @event || @participant_event
@@ -187,7 +239,7 @@ module Admin
       else
         {}
       end
-      changed_fields = redact_encrypted_audit_fields(record, changed_fields)
+      changed_fields = AuditLog.redact_sensitive_fields(record, changed_fields)
 
       event_for_log = current_event if event_page? && !current_event.destroyed?
 
@@ -197,11 +249,11 @@ module Admin
         actor: current_user,
         event: event_for_log,
         changed_fields: changed_fields,
-        metadata: {
-          ip: request.remote_ip,
-          user_agent: request.user_agent,
-          controller: controller_name,
-          params: request.filtered_parameters.except("controller", "action", "authenticity_token")
+        # filter_parameters doesn't name every PII column in the registry
+        # (city, state, postal_code, country), and the request's params are
+        # stored whether or not the action permitted them.
+        metadata: admin_audit_metadata.tap { |metadata|
+          metadata[:params] = SensitiveFields.redact_params(metadata[:params], model: record.class)
         }
       )
     rescue => e
@@ -241,10 +293,6 @@ module Admin
       return explicit[1] if explicit
 
       candidates.max_by { |_, _, change_count, _| change_count }[1]
-    end
-
-    def redact_encrypted_audit_fields(record, changed_fields)
-      AuditLog.redact_encrypted_fields(record, changed_fields)
     end
   end
 end

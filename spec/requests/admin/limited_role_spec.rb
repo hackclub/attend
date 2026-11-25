@@ -22,7 +22,7 @@ RSpec.describe "Limited event role", type: :request do
   let!(:participant_event) { create(:participant_event, event: event, participant: participant) }
 
   def sign_in_with_role(role, email: "#{role}-limited-spec@example.com")
-    user = User.create!(email: email, name: role.titleize, admin_console_beta: false)
+    user = User.create!(email: email, name: role.titleize)
     EventRoleAssignment.create!(user: user, event: event, role: role)
     sign_in user
     user
@@ -35,8 +35,8 @@ RSpec.describe "Limited event role", type: :request do
       get admin_event_participant_path(event.slug, participant_event)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Age at Event")
-      expect(response.body).not_to include("Date of Birth", "March 14, 2009")
+      expect(response.body).to include("Age at event")
+      expect(response.body).not_to include("Date of birth", "March 14, 2009")
       expect(response.body).not_to include("12 Langley Road", "23666")
     end
 
@@ -64,7 +64,7 @@ RSpec.describe "Limited event role", type: :request do
 
       get admin_event_participant_path(event.slug, participant_event)
 
-      expect(response.body).to include("Date of Birth", "March 14, 2009")
+      expect(response.body).to include("Date of birth", "March 14, 2009")
       expect(response.body).to include("12 Langley Road", "23666")
     end
   end
@@ -428,7 +428,7 @@ RSpec.describe "Limited event role", type: :request do
 
       get admin_event_participant_path(event.slug, participant_event)
 
-      expect(response.body).to include("Emergency Contacts", "Mary", "+15005550002")
+      expect(response.body).to include("Emergency contacts", "Mary", "+15005550002")
       expect(response.body).not_to include("Mary Jackson", "mary@example.com")
     end
 
@@ -437,7 +437,7 @@ RSpec.describe "Limited event role", type: :request do
 
       get admin_event_participant_path(event.slug, participant_event)
 
-      expect(response.body).not_to include("Emergency Contacts", "+15005550002")
+      expect(response.body).not_to include("Emergency contacts", "+15005550002")
     end
   end
 
@@ -590,7 +590,7 @@ RSpec.describe "Limited event role", type: :request do
       get admin_event_integrations_path(event.slug)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Configure external services and API access")
+      expect(response.body).to include("Connect this event to Slack, Airtable")
     end
 
     it "refuses to save integration settings" do
@@ -688,14 +688,17 @@ RSpec.describe "Limited event role", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).not_to include(admin_event_integrations_path(event.slug))
-      expect(response.body).not_to include("Integrations &amp; API")
       expect(response.body).to include('<meta name="can-manage-integrations" content="false">')
+
+      get edit_admin_event_path(event)
+
+      expect(response.body).not_to include(admin_event_integrations_path(event.slug))
     end
 
     it "shows the way in to ops" do
       sign_in_with_role("ops", email: "ops-integrations-spec@example.com")
 
-      get admin_event_dashboard_path(event)
+      get edit_admin_event_path(event)
 
       expect(response.body).to include(admin_event_integrations_path(event.slug))
       expect(response.body).to include('<meta name="can-manage-integrations" content="true">')

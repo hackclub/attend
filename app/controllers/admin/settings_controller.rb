@@ -7,8 +7,7 @@ module Admin
     TWILIO_VERIFY_SERVICE_SID = /\AVA[0-9a-f]{32}\z/
     SLACK_SYNC_CHANNELS = { "admin_help" => "admin_help", "org_support" => "org_support" }.freeze
 
-    # The General tab: the app-wide switches. The original admin keeps
-    # everything on this one page.
+    # The General tab: the app-wide switches.
     def show
       load_settings
     end
@@ -16,11 +15,6 @@ module Admin
     # Twilio, WhatsApp and the Slack channels, split off from General so a
     # credential isn't one click away from maintenance mode.
     def integrations
-      unless helpers.console_ui?
-        flash.keep
-        return redirect_to admin_settings_path
-      end
-
       load_settings
     end
 

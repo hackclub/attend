@@ -4,7 +4,7 @@ RSpec.describe "Admin::Participants", type: :request do
   include Devise::Test::IntegrationHelpers
 
   let(:event) { create(:event, accommodation_enabled: false) }
-  let(:global_admin) { User.create!(email: "ga-participants@example.com", name: "Global Admin", global_role: "global_admin", admin_console_beta: false) }
+  let(:global_admin) { User.create!(email: "ga-participants@example.com", name: "Global Admin", global_role: "global_admin") }
 
   def complete_onboarding!(pe)
     pe.travels.create!(direction: "inbound", mode: "car")
@@ -45,28 +45,6 @@ RSpec.describe "Admin::Participants", type: :request do
 
   describe "GET index filter form" do
     before { sign_in global_admin }
-
-    it "auto-submits and keeps active filters, including the chase filter" do
-      event.update!(groups_enabled: true, slack_channel_id: "C123")
-      create(:group, event: event)
-      create(:custom_document, :optional, event: event)
-
-      get admin_event_participants_path(event.slug), params: { search: "ada", status: "", blocked_on: "travel" }
-
-      page = Nokogiri::HTML(response.body)
-      form = page.at_css("#participant-filters")
-      expect(form["data-action"]).to include("change->auto-submit#debouncedSubmit")
-      expect(form.css("select").size).to eq(5)
-      expect(form.at_css("input[name='blocked_on']")["value"]).to eq("travel")
-      expect(page.at_css("a[title='Table view']")["href"]).to eq(table_admin_event_participants_path(event.slug, search: "ada", blocked_on: "travel"))
-
-      chip = form.at_css("[data-blocked-on-filter]")
-      expect(chip.text).to include("haven't given us both travel legs")
-      expect(chip.at_css("a[aria-label='Remove this filter']")["href"]).to eq(admin_event_participants_path(event.slug, search: "ada"))
-
-      expect(page.at_css("#slack-sync-progress-#{event.id}")).to be_present
-      expect(page.at_css("#sync-slack-modal-#{event.id}")).to be_present
-    end
   end
 
   describe "participants over the age limit" do
@@ -80,8 +58,7 @@ RSpec.describe "Admin::Participants", type: :request do
     end
 
     it "lists only them under flag=over_age_limit, in both admin UIs" do
-      [ false, true ].each do |console|
-        global_admin.update!(admin_console_beta: console)
+      [ true ].each do |console|
         sign_in global_admin
 
         get admin_event_participants_path(event.slug), params: { flag: "over_age_limit" }
@@ -93,8 +70,7 @@ RSpec.describe "Admin::Participants", type: :request do
     end
 
     it "warns on their participant page, in both admin UIs" do
-      [ false, true ].each do |console|
-        global_admin.update!(admin_console_beta: console)
+      [ true ].each do |console|
         sign_in global_admin
 
         get admin_event_participant_path(event.slug, aged_out)
@@ -177,8 +153,6 @@ RSpec.describe "Admin::Participants", type: :request do
     include_examples "Slack ID copy controls"
 
     context "with the admin console beta" do
-      before { global_admin.update!(admin_console_beta: true) }
-
       include_examples "Slack ID copy controls"
     end
   end
@@ -241,7 +215,7 @@ RSpec.describe "Admin::Participants", type: :request do
 
       get_consents
 
-      expect(response.body).to include("Additional Documents")
+      expect(response.body).to include("Additional documents")
       expect(response.body).to include("Entry Authorization")
       expect(response.body).to include("Awaiting participant upload")
     end
@@ -256,7 +230,7 @@ RSpec.describe "Admin::Participants", type: :request do
       get_consents
 
       expect(response.body).to include("Awaiting guardian confirmation")
-      expect(response.body).to include("View Upload")
+      expect(response.body).to include("View upload")
     end
 
     it "shows an untouched DocuSeal document as not started" do
@@ -480,7 +454,7 @@ RSpec.describe "Admin::Participants", type: :request do
     let(:guardian) { create(:guardian, email: "flagged-guardian@example.com", email_undeliverable_at: 1.day.ago) }
     let(:gpe) { create(:guardian_participant_event, participant_event: participant_event, guardian: guardian) }
     let(:event_admin) do
-      User.create!(email: "ea-bounce@example.com", name: "Event Admin", admin_console_beta: false).tap do |user|
+      User.create!(email: "ea-bounce@example.com", name: "Event Admin").tap do |user|
         EventRoleAssignment.create!(user: user, event: event, role: "event_admin")
       end
     end
@@ -521,9 +495,8 @@ RSpec.describe "Admin::Participants", type: :request do
         expect(participant.reload.email_undeliverable_at).to be_present
       end
 
-      [ false, true ].each do |console|
+      [ true ].each do |console|
         it "offers the clear buttons on the participant page#{' in the console' if console}" do
-          global_admin.update!(admin_console_beta: console)
           gpe
 
           get admin_event_participant_path(event, participant_event)
@@ -550,9 +523,8 @@ RSpec.describe "Admin::Participants", type: :request do
         expect(guardian.reload.email_undeliverable_at).to be_present
       end
 
-      [ false, true ].each do |console|
+      [ true ].each do |console|
         it "doesn't show the clear buttons#{' in the console' if console}" do
-          event_admin.update!(admin_console_beta: console)
           gpe
 
           get admin_event_participant_path(event, participant_event)
@@ -607,8 +579,7 @@ RSpec.describe "Admin::Participants", type: :request do
       participant_event.create_medical!(allergies: "Penicillin", has_anaphylaxis_risk: true, requires_refrigeration: true)
       participant_event.create_dietary!(life_threatening_allergies: "Peanuts", cross_contamination_risk: true)
 
-      [ false, true ].each do |console|
-        global_admin.update!(admin_console_beta: console)
+      [ true ].each do |console|
         sign_in global_admin
 
         get admin_event_participant_path(event, participant_event)
@@ -623,8 +594,7 @@ RSpec.describe "Admin::Participants", type: :request do
       participant_event.create_medical!(allergies: "None")
       participant_event.create_dietary!(life_threatening_allergies: "None")
 
-      [ false, true ].each do |console|
-        global_admin.update!(admin_console_beta: console)
+      [ true ].each do |console|
         sign_in global_admin
 
         get admin_event_participant_path(event, participant_event)
@@ -638,8 +608,7 @@ RSpec.describe "Admin::Participants", type: :request do
       create(:participant_event, event: event).create_dietary!(life_threatening_allergies: "None")
       create(:participant_event, event: event)
 
-      [ false, true ].each do |console|
-        global_admin.update!(admin_console_beta: console)
+      [ true ].each do |console|
         sign_in global_admin
 
         get table_admin_event_participants_path(event)

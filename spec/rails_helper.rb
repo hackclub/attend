@@ -65,6 +65,11 @@ RSpec.configure do |config|
   # To enable this behaviour uncomment the line below.
   # config.infer_spec_type_from_file_location!
 
+  # A checkout with the master key would otherwise sign every check-in code
+  # with the production key, and CI (which has no key) wouldn't. Specs that
+  # sign set their own keyring.
+  config.before { CheckinCode.keyring = {} }
+
   # Filter lines from Rails gems in backtraces.
   config.filter_rails_from_backtrace!
   # arbitrary gems may also be filtered via:

@@ -38,9 +38,8 @@ RSpec.describe "Admin waiver regeneration", type: :request do
       expect(response.body).to include("Only unsigned waivers (1 participant)")
     end
 
-    [ false, true ].each do |console|
+    [ true ].each do |console|
       it "doesn't show the stale-dates banner on the page it links to (console: #{console})" do
-        organizer.update!(admin_console_beta: console)
         sign_in organizer
         get new_admin_event_waiver_regeneration_path(event)
 
@@ -50,7 +49,6 @@ RSpec.describe "Admin waiver regeneration", type: :request do
     end
 
     it "renders in the admin console too" do
-      organizer.update!(admin_console_beta: true)
       sign_in organizer
       get new_admin_event_waiver_regeneration_path(event)
 
@@ -73,7 +71,6 @@ RSpec.describe "Admin waiver regeneration", type: :request do
       get new_admin_event_waiver_regeneration_path(event)
       expect(response.body).to include("DocuSeal didn&#39;t respond").or include("DocuSeal didn't respond")
 
-      organizer.update!(admin_console_beta: true)
       get new_admin_event_waiver_regeneration_path(event)
       expect(response.body).to include("cs-alert-error")
     end

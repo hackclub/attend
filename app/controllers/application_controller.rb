@@ -70,6 +70,9 @@ class ApplicationController < ActionController::Base
       dashboard_path
     elsif user.event_role_assignments.exists? || user.event_volunteers.exists? || user.training_course_invitations.exists?
       training_path
+    elsif (invite = EventCreationInvite.usable_by(user).first)
+      # Accepted an invite to create an event and hasn't yet: back to the form.
+      admin_new_event_path(invite: invite.id)
     end
   end
 

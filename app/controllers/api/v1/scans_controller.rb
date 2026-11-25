@@ -3,7 +3,10 @@ module Api
     class ScansController < BaseController
       include TravelPickupMarkable
       before_action :set_event
-      before_action :require_event_access
+      before_action :require_event_access, only: [ :index ]
+      # Scanning checks people in and undoing a scan checks them back out, so
+      # read-only staff can list scans but not make or remove them.
+      before_action :require_event_write_access, only: [ :create, :destroy ]
 
       # Cap for `since` incremental syncs — a stale client cursor must not be
       # able to load the event's entire scan history in one request.
@@ -102,7 +105,21 @@ module Api
         }
       end
 
+      # The mobile app sends X-Attend-Scanner with the version of its scanner.
+      # Before version 2 it can't read a signed check-in code (CheckinCode):
+      # it calls one an unrecognised QR code and never sends it here, so once
+      # tickets are signed it would fail at the door without anyone being told
+      # why. Those installs are refused every scan instead, with a message the
+      # app shows as is, until they update. API keys and other clients send
+      # whatever ids they like and are left alone.
+      SIGNED_CODE_SCANNER_VERSION = 2
+      UPDATE_REQUIRED_MESSAGE = "Update the Attend app to keep scanning. This version can't read the new tickets.".freeze
+
       def create
+        if mobile_scanner_too_old?
+          return render json: { error: UPDATE_REQUIRED_MESSAGE, update_required: true }, status: :upgrade_required
+        end
+
         scan_contexts = @event.scan_contexts.to_a
 
         if scan_contexts.empty?
@@ -146,19 +163,25 @@ module Api
           return render json: { error: "Participant not found for this event" }, status: :not_found
         end
 
+        # `scanned_at` is the client's claim for when the scan happened; the
+        # recorder bounds it as it does the admin scanner's.
         result = ScanRecorder.call(
           participant_event: participant_event,
           user: current_user,
           scan_context: scan_context,
-          scanned_at: params[:scanned_at].presence || Time.current,
+          client_scanned_at: params[:scanned_at],
+          client_sent_at: params[:client_sent_at],
           client_scan_id: params[:client_scan_id],
           source: scan_source
         )
 
-        first_attempt_in_context = result.first_scan_in_context? && !result.deduplicated?
+        # These also run on a retry of the first scan, in case the first
+        # attempt saved the scan and then failed before finishing them. Both
+        # are idempotent.
+        first_in_context = result.first_scan_in_context?
 
         # Mark travel pickup for travel or check-in contexts on first scan in that context
-        if (scan_context.is_travel_pickup? || scan_context.checks_in?) && first_attempt_in_context
+        if (scan_context.is_travel_pickup? || scan_context.checks_in?) && first_in_context
           mark_travel_pickup(participant_event, current_user)
         end
 
@@ -167,7 +190,7 @@ module Api
         end
 
         # Auto-generate NFC badge token on first check-in if NFC is enabled
-        if @event.nfc_badges_enabled? && scan_context.checks_in? && first_attempt_in_context
+        if @event.nfc_badges_enabled? && scan_context.checks_in? && first_in_context
           participant_event.ensure_nfc_badge_token!
         end
 
@@ -181,11 +204,17 @@ module Api
           scan_context: scan_context_json(result.scan.scan_context),
           participant: participant_detail_json(participant_event.reload)
         }
-      rescue ActiveRecord::RecordInvalid => e
+      rescue ScanRecorder::ClientScanIdConflict, ActiveRecord::RecordInvalid, CheckinCode::Invalid => e
         render json: { error: e.message }, status: :unprocessable_entity
       end
 
       private
+
+      def mobile_scanner_too_old?
+        CheckinCode.signing_enabled? &&
+          @current_token.is_a?(MobileToken) &&
+          request.headers["X-Attend-Scanner"].to_i < SIGNED_CODE_SCANNER_VERSION
+      end
 
       def set_event
         @event = Event.find(params[:event_id])
@@ -193,6 +222,10 @@ module Api
 
       def require_event_access
         require_event_access!(@event)
+      end
+
+      def require_event_write_access
+        require_event_write_access!(@event)
       end
 
       def scan_json(scan)
@@ -234,7 +267,9 @@ module Api
           full_name: participant.full_name,
           email: participant.email,
           slack_user_id: participant.slack_user_id,
-          phone: participant.phone,
+          # Omitted, not nulled, for PII-restricted roles — the same contract
+          # as Api::V1::ParticipantsController#participant_json.
+          **(current_user.can_view_participant_pii?(@event) ? { phone: participant.phone } : {}),
           pronouns: participant.pronouns,
           headshot_url: headshot_url_for(participant),
           tshirt_size: participant.tshirt_size,
@@ -242,17 +277,14 @@ module Api
           checked_in_at: pe.check_in_time&.iso8601,
           updated_at: pe.updated_at.iso8601,
 
+          # The flags go to everyone who can scan, as they do on the web
+          # scanner. The free text behind them follows the caller's role.
           has_anaphylaxis_risk: medical&.has_anaphylaxis_risk || false,
           requires_refrigeration: medical&.requires_refrigeration || false,
-          allergies: medical&.allergies,
-          medical_conditions: medical&.medical_conditions,
-          medications: medical&.medications,
-
-          diet_type: dietary&.diet_type,
-          life_threatening_allergies: dietary&.life_threatening_allergies,
           cross_contamination_risk: dietary&.cross_contamination_risk || false,
+          **medical_detail_json(pe, medical, dietary),
 
-          freedom_waiver_granted: safeguarding&.freedom_waiver_granted || false,
+          **(safeguarding_detail_visible?(pe) ? { freedom_waiver_granted: safeguarding&.freedom_waiver_granted || false } : {}),
           high_support_flag: safeguarding&.high_support_flag || false,
           can_leave_unaccompanied: safeguarding&.can_leave_unaccompanied || false,
 
@@ -264,6 +296,45 @@ module Api
           groups: pe.event.groups_enabled? ? pe.groups.ordered.map { |g| { id: g.id, name: g.name, color: g.normalized_color } } : [],
           scans_by_context: scans_by_context_json(pe)
         }
+      end
+
+      # Keys the caller's role doesn't cover are left out rather than sent as
+      # null, so the app can tell "not permitted" from "nothing on file".
+      # Full medical detail (MedicalPolicy#show_full_details?) adds conditions
+      # and medications; the limited view (#show_limited?, ops) stops at
+      # allergies and dietary needs.
+      def medical_detail_json(pe, medical, dietary)
+        level = medical_detail_level(pe)
+        return {} unless level
+
+        detail = {
+          allergies: medical&.allergies,
+          diet_type: dietary&.diet_type,
+          life_threatening_allergies: dietary&.life_threatening_allergies
+        }
+        return detail unless level == :full
+
+        detail.merge(
+          medical_conditions: medical&.medical_conditions,
+          medications: medical&.medications
+        )
+      end
+
+      def medical_detail_level(pe)
+        # Series members act as event admins on every event in their series,
+        # but hold no event role for the policy to find.
+        return :full if current_user.series_member_for_event?(@event)
+
+        policy = MedicalPolicy.new(current_user, Medical.new(participant_event_id: pe.id))
+        if policy.show_full_details?
+          :full
+        elsif policy.show_limited?
+          :limited
+        end
+      end
+
+      def safeguarding_detail_visible?(pe)
+        SafeguardingInfoPolicy.new(current_user, SafeguardingInfo.new(participant_event_id: pe.id)).show_full_details?
       end
 
       def scans_by_context_json(participant_event)

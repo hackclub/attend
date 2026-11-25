@@ -4,14 +4,12 @@ RSpec.describe "Admin visa letter invitations", type: :request do
   include Devise::Test::IntegrationHelpers
 
   let(:event) { create(:event, visa_letters: "invite_only") }
-  let(:admin) { create(:user, admin_console_beta: false).tap { |user| create(:event_role_assignment, user: user, event: event, role: "event_admin") } }
+  let(:admin) { create(:user).tap { |user| create(:event_role_assignment, user: user, event: event, role: "event_admin") } }
 
   before { sign_in admin }
 
-  { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+  { "with the admin console beta" => true }.each do |ui, console|
     context ui do
-      before { admin.update!(admin_console_beta: console) }
-
       it "invites people, skipping addresses it can't use" do
         create(:ban, email: "banned-invitee@example.com")
 

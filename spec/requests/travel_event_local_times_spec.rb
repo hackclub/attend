@@ -38,7 +38,7 @@ RSpec.describe "Travel times on the event's clock", type: :request do
   describe "admin travel page" do
     let(:admin) do
       User.create!(email: "travel-times-admin@example.com", name: "Travel Admin",
-        global_role: "global_admin", admin_console_beta: false)
+        global_role: "global_admin")
     end
 
     before { sign_in admin }
@@ -65,19 +65,7 @@ RSpec.describe "Travel times on the event's clock", type: :request do
       expect(participant_event.travel_outbound.departure_time).to eq(Time.utc(2026, 7, 14, 21, 0))
     end
 
-    it "prefills the event-local time in a 24-hour input with the zone hint" do
-      save_travel
-      get travel_admin_event_participant_path(event, participant_event)
-
-      input = page.at('input[name="travel_inbound[arrival_time]"]')
-      expect(input["value"]).to eq("2026-07-12T09:30")
-      expect(input["lang"]).to eq("en-GB")
-      expect(page.at('input[name="travel_outbound[departure_time]"]')["value"]).to eq("2026-07-14T17:00")
-      expect(response.body).to include(hint)
-    end
-
     it "does the same in the console" do
-      admin.update!(admin_console_beta: true)
       save_travel
       get travel_admin_event_participant_path(event, participant_event)
 
@@ -86,6 +74,23 @@ RSpec.describe "Travel times on the event's clock", type: :request do
       expect(input["lang"]).to eq("en-GB")
       description = page.at("##{input["aria-describedby"].split.find { |id| id.end_with?("-description") }}")
       expect(description.text).to include(hint)
+    end
+
+    it "asks for a time zone in the console when the airport's is unknown, instead of erroring" do
+      patch travel_admin_event_participant_path(event, participant_event), params: {
+        travel_inbound: {
+          arrangement_status: "confirmed", mode: "plane",
+          travel_legs_attributes: { "0" => {
+            position: 0, flight_code: "ZZ1", departure_airport: "ZZZ", arrival_airport: "JFK",
+            departure_time: "2026-07-12T06:00", arrival_time: "2026-07-12T09:30"
+          } }
+        },
+        travel_outbound: { arrangement_status: "provisional", mode: "bus", departure_time: "2026-07-14T17:00" }
+      }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include("time zone for that airport, so pick one")
+      expect(participant_event.reload.travel_inbound).to be_nil
     end
 
     it "prefills a legacy row as it was typed and reads a re-save on the event's clock" do
@@ -98,9 +103,8 @@ RSpec.describe "Travel times on the event's clock", type: :request do
       expect(travel.reload).to have_attributes(arrival_time: Time.utc(2026, 7, 12, 13, 30), times_in_event_zone: true)
     end
 
-    [ false, true ].each do |console|
+    [ true ].each do |console|
       it "renders flight leg times in 24-hour inputs#{" in the console" if console}" do
-        admin.update!(admin_console_beta: console)
         jfk_leg(participant_event.travels.create!(direction: "inbound", mode: "plane"))
 
         get travel_admin_event_participant_path(event, participant_event)
@@ -115,18 +119,7 @@ RSpec.describe "Travel times on the event's clock", type: :request do
     end
 
     describe "participant page" do
-      it "shows times on the event's clock, and a legacy row on UTC" do
-        participant_event.travels.create!(direction: "outbound", mode: "bus", departure_time: "2026-07-14T17:00")
-        legacy_inbound_train(arrival_time: Time.utc(2026, 7, 12, 9, 30))
-
-        get admin_event_participant_path(event, participant_event)
-
-        expect(response.body).to include("Jul 14, 2026 17:00 EDT")
-        expect(response.body).to include("Jul 12, 2026 09:30 UTC")
-      end
-
       it "shows times on the event's clock in the console" do
-        admin.update!(admin_console_beta: true)
         participant_event.travels.create!(direction: "outbound", mode: "bus", departure_time: "2026-07-14T17:00")
         legacy_inbound_train(arrival_time: Time.utc(2026, 7, 12, 9, 30))
 

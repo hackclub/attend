@@ -27,7 +27,8 @@ class HomeController < ApplicationController
 
     if user
       sign_in(user)
-      redirect_to root_path, notice: "Signed in as #{user.email}"
+      # As the real sign-in does, back to wherever asked for it.
+      redirect_to stored_location_for(:user) || root_path, notice: "Signed in as #{user.email}"
     else
       redirect_to root_path, alert: "User not found: #{email}. Check the box to create a new user."
     end

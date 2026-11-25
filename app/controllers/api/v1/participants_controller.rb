@@ -514,7 +514,7 @@ module Api
           email: participant.email,
           # The phone is omitted, not nulled, for PII-restricted roles — same
           # contract as date_of_birth and address in #personal_json.
-          **(include_pii? ? { phone: participant.phone } : {}),
+          **pii_gated(Participant, phone: participant.phone),
           slack_user_id: participant.slack_user_id,
           pronouns: participant.pronouns,
           headshot_url: headshot_url_for(participant),
@@ -607,17 +607,24 @@ module Api
           engagement_preference: participant.engagement_preference,
           engagement_notes: participant.engagement_notes
         }
-        return base unless include_pii?
+        address = pii_gated(Participant,
+          address_line_1: participant.address_line_1,
+          address_line_2: participant.address_line_2,
+          city: participant.city,
+          state: participant.state,
+          postal_code: participant.postal_code,
+          country_of_residence: participant.country_of_residence)
+        return base if address.empty?
 
         base.merge(
-          date_of_birth: participant.date_of_birth&.iso8601,
+          **pii_gated(Participant, date_of_birth: participant.date_of_birth&.iso8601),
           address: {
-            line_1: participant.address_line_1,
-            line_2: participant.address_line_2,
-            city: participant.city,
-            state: participant.state,
-            postal_code: participant.postal_code,
-            country: participant.country_of_residence
+            line_1: address[:address_line_1],
+            line_2: address[:address_line_2],
+            city: address[:city],
+            state: address[:state],
+            postal_code: address[:postal_code],
+            country: address[:country_of_residence]
           }.compact_blank
         )
       end
@@ -725,13 +732,13 @@ module Api
           id: gpe.id,
           guardian_id: g&.id,
           name: g&.full_name,
-          **(include_pii? ? { email: g&.email, phone: gpe.phone_override.presence || g&.phone } : {}),
+          **pii_gated(Guardian, email: g&.email, phone: gpe.phone_override.presence || g&.phone),
           relationship: gpe.relationship,
           is_primary: gpe.is_primary_guardian,
           status: gpe.status,
           accepted_at: gpe.accepted_at&.iso8601,
           completed_at: gpe.completed_at&.iso8601,
-          **(include_pii? ? { invited_via_email: gpe.invited_via_email } : {}),
+          **pii_gated(GuardianParticipantEvent, invited_via_email: gpe.invited_via_email),
           invite_token_sent_at: gpe.invite_token_sent_at&.iso8601,
           media_permission: gpe.media_permission,
           photo_permission: gpe.photo_permission,
@@ -746,14 +753,13 @@ module Api
       # role keeps — you can't run an incident without being able to call
       # someone — but they get the first name only, and no email address.
       def emergency_contact_json(ec)
-        return { id: ec.id, name: ec.first_name, phone: ec.phone, priority: ec.priority } unless include_pii?
+        full = pii_gated(EmergencyContact, name: ec.name, email: ec.email, relationship: ec.relationship)
 
         {
           id: ec.id,
-          name: ec.name,
+          name: full.fetch(:name) { ec.first_name },
           phone: ec.phone,
-          email: ec.email,
-          relationship: ec.relationship,
+          **full.slice(:email, :relationship),
           priority: ec.priority
         }
       end
@@ -801,7 +807,7 @@ module Api
           expected_arrival_time: travel.expected_arrival_time&.iso8601,
           bus_departure_location: travel.bus_departure_location,
           bus_arrival_location: travel.bus_arrival_location,
-          **(include_pii? ? { origin_address: travel.origin_address } : {}),
+          **pii_gated(Travel, origin_address: travel.origin_address),
           other_details: travel.other_details,
           notes: travel.notes,
           pickup_dismissed_at: travel.pickup_dismissed_at&.iso8601,
@@ -843,6 +849,15 @@ module Api
           end
       end
 
+      # The fields of `model` in `attributes` that this caller may see: all of
+      # them, or for a PII-restricted role and for API keys, only those the
+      # SensitiveFields registry doesn't mark as restricted PII. Hidden fields
+      # are left out rather than nulled, so a client can tell "not permitted"
+      # from "not on file".
+      def pii_gated(model, **attributes)
+        SensitiveFields.visible(model, attributes, pii: include_pii?)
+      end
+
       # Memoized per request: participant_json calls this once per participant,
       # and safeguarding_lead_for? is an EXISTS query. `defined?` guard because
       # the memoized value is usually false.
@@ -860,12 +875,12 @@ module Api
       def emergency_contacts_json(pe)
         pe.guardian_participant_events.flat_map do |gpe|
           gpe.emergency_contacts.sort_by { |ec| ec.priority || Float::INFINITY }.map do |ec|
-            next { name: ec.first_name, phone: ec.phone, priority: ec.priority } unless include_pii?
+            full = pii_gated(EmergencyContact, name: ec.name, relationship: ec.relationship)
 
             {
-              name: ec.name,
+              name: full.fetch(:name) { ec.first_name },
               phone: ec.phone,
-              relationship: ec.relationship,
+              **full.slice(:relationship),
               priority: ec.priority
             }
           end
