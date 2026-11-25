@@ -299,7 +299,7 @@ GEM
       net-smtp
     marcel (1.2.1)
     matrix (0.4.3)
-    mcp (1.4.0)
+    mcp (1.11.0)
       json_schemer (>= 2.4)
     mini_magick (5.4.0)
       logger
@@ -673,7 +673,7 @@ GEM
       prism (>= 1.6.0)
       rbs (>= 4.0.0)
       tsort
-    regexp_parser (2.13.1)
+    regexp_parser (2.13.4)
     reline (0.7.0)
       io-console (~> 0.5)
     request_store (1.7.0)
@@ -870,7 +870,7 @@ DEPENDENCIES
   jb
   kramdown
   letter_opener_web
-  mcp (~> 1.4.0)
+  mcp (~> 1.11.0)
   mini_magick
   mission_control-jobs
   omniauth
