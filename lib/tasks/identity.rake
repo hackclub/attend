@@ -50,8 +50,19 @@ namespace :identity do
     batch_size = ENV.fetch("BATCH_SIZE", 500).to_i
     puts apply ? "MODE: APPLY" : "MODE: dry run (re-run with APPLY=1 to write)"
 
-    report = Identity::Backfill.new(apply: apply, batch_size: batch_size).call
+    print_identity_report(Identity::Backfill.new(apply: apply, batch_size: batch_size).call, apply: apply)
+  end
 
+  desc "Give every unlinked row still held for review a person of its own, and close the open reviews (merges nobody; dry run unless APPLY=1)"
+  task resolve_reviews: :environment do
+    apply = ENV["APPLY"] == "1"
+    batch_size = ENV.fetch("BATCH_SIZE", 500).to_i
+    puts apply ? "MODE: APPLY" : "MODE: dry run (re-run with APPLY=1 to write)"
+
+    print_identity_report(Identity::Backfill.new(apply: apply, batch_size: batch_size, separate_held: true).call, apply: apply)
+  end
+
+  def print_identity_report(report, apply:)
     verb = apply ? "" : "would be "
     headings = { mechanical: "#{verb}joined or created mechanically", needs_review: "left for review", skipped: "skipped" }
     report.each do |section, kinds|

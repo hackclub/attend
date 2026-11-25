@@ -317,6 +317,107 @@ RSpec.describe Identity::Backfill do
     end
   end
 
+  describe "keeping what is held separate" do
+    def separate(apply: true)
+      described_class.new(apply:, batch_size: 2, separate_held: true).call
+    end
+
+    it "gives held rows a person each, closes their reviews, and merges nobody" do
+      older = create(:participant, email: "family@example.com", legal_first_name: "Robin", legal_last_name: "Vale")
+      younger = create(:participant, email: "family@example.com", legal_first_name: "Alder", legal_last_name: "Vale")
+      first = create(:guardian, email: "shared@example.com", legal_first_name: "Morgan", legal_last_name: "Vale")
+      second = create(:guardian, email: "shared@example.com", legal_first_name: "Ash", legal_last_name: "Vale")
+
+      report = separate
+
+      people = [ older, younger, first, second ].map { |row| row.reload.person_id }
+      expect(people).to all(be_present)
+      expect(people.uniq.size).to eq(4)
+      expect(report[:participants][:mechanical][:own_person_while_held]).to eq(2)
+      expect(report[:guardians][:mechanical][:own_person_while_held]).to eq(2)
+      expect(IdentityReview.open).to be_empty
+      expect(IdentityReview.count).to eq(2)
+      expect(report[:reviews][:mechanical][:closed_kept_separate]).to eq(2)
+    end
+
+    it "closes an overlap review, whose guardian already had a person of their own" do
+      user = create(:user, email: "morgan.vale@example.com", hack_club_account_id: "ident!morgan")
+      create(:participant, user:, email: "morgan.vale@example.com", legal_first_name: "Morgan", legal_last_name: "Vale")
+      guardian = create(:guardian, email: "morgan.vale@example.com", legal_first_name: "Morgan", legal_last_name: "Vale")
+      run
+      guardian_person = guardian.reload.person_id
+      expect(IdentityReview.open.where(category: "guardian_overlap").count).to eq(1)
+
+      report = separate
+
+      expect(IdentityReview.open).to be_empty
+      expect(guardian.reload.person_id).to eq(guardian_person)
+      expect(report[:people][:mechanical][:created]).to be_nil.or eq(0)
+    end
+
+    it "writes the held rows' addresses to their own person" do
+      older = create(:participant, email: "family@example.com", legal_first_name: "Robin", legal_last_name: "Vale")
+      younger = create(:participant, email: "family@example.com", legal_first_name: "Alder", legal_last_name: "Vale")
+
+      separate
+
+      expect(older.reload.person.email_addresses.pluck(:address)).to eq([ "family@example.com" ])
+      expect(younger.reload.person.email_addresses.pluck(:address)).to eq([ "family@example.com" ])
+      expect(older.person.email_addresses.sole).not_to be_verified
+    end
+
+    it "leaves a row linked to an account, and its review, held" do
+      user = create(:user, email: "robin.vale@example.com", hack_club_account_id: "ident!robin")
+      create(:participant, user:, email: "robin.vale@example.com", legal_first_name: "Robin", legal_last_name: "Vale")
+      create(:participant, user:, email: "other@example.com", legal_first_name: "Alder", legal_last_name: "Vale")
+
+      report = separate
+
+      expect(Participant.where(user:).pluck(:person_id)).to all(be_nil)
+      expect(IdentityReview.open.pluck(:category)).to eq([ "linked_participants" ])
+      expect(report[:reviews][:needs_review][:left_open]).to eq(1)
+    end
+
+    it "does not close a review about an address verified for two accounts" do
+      create(:user, email: "robin.vale@example.com", hack_club_account_id: "ident!one", created_at: 2.days.ago)
+      store_legacy_email(create(:user, hack_club_account_id: "ident!two"), "Robin.Vale@example.com")
+      run
+
+      separate
+
+      expect(IdentityReview.open.pluck(:category)).to eq([ "verified_email_conflict" ])
+    end
+
+    it "reports the same counts on a dry run as an apply, and writes nothing" do
+      create(:participant, email: "family@example.com", legal_first_name: "Robin", legal_last_name: "Vale")
+      create(:participant, email: "family@example.com", legal_first_name: "Alder", legal_last_name: "Vale")
+
+      dry = nil
+      expect { dry = separate(apply: false) }.to not_change(Person, :count).and not_change(IdentityReview, :count)
+
+      expect(dry).to eq(separate(apply: true))
+    end
+
+    it "changes nothing when run again" do
+      create(:participant, email: "family@example.com", legal_first_name: "Robin", legal_last_name: "Vale")
+      create(:participant, email: "family@example.com", legal_first_name: "Alder", legal_last_name: "Vale")
+      separate
+
+      expect { separate }.to not_change(Person, :count).and not_change(EmailAddress, :count)
+        .and not_change { IdentityReview.open.count }
+    end
+
+    it "reports counts and nothing else" do
+      create(:participant, email: "family@example.com", legal_first_name: "Robin", legal_last_name: "Vale")
+      create(:participant, email: "family@example.com", legal_first_name: "Alder", legal_last_name: "Vale")
+
+      report = separate(apply: false)
+
+      expect(report.values.flat_map(&:values).flat_map(&:values)).to all(be_an(Integer))
+      expect(report.to_s).not_to match(/@|example|Vale|[0-9a-f]{8}-[0-9a-f]{4}/)
+    end
+  end
+
   describe "running it" do
     before do
       user = create(:user, email: "robin.vale@example.com", hack_club_account_id: "ident!robin", phone_number: "+12025550111")

@@ -102,4 +102,31 @@ RSpec.describe "identity rake tasks" do
       expect(output).not_to match(PERSONAL)
     end
   end
+
+  describe "identity:resolve_reviews" do
+    before do
+      create(:participant, email: "family@example.com", legal_first_name: "Robin", legal_last_name: "Vale")
+      create(:participant, email: "family@example.com", legal_first_name: "Alder", legal_last_name: "Vale")
+      run("identity:backfill", apply: true)
+    end
+
+    it "prints counts and writes nothing on a dry run" do
+      output = nil
+      expect { output = run("identity:resolve_reviews", apply: false) }
+        .to not_change(Person, :count).and not_change { IdentityReview.open.count }
+
+      expect(output).to include("MODE: dry run")
+      expect(output).to include("closed kept separate: 1")
+      expect(output).to include("Dry run: nothing was written.")
+      expect(output).not_to match(PERSONAL)
+    end
+
+    it "gives the held rows a person each and closes the review with APPLY=1" do
+      output = nil
+      expect { output = run("identity:resolve_reviews", apply: true) }.to change(Person, :count).by(2)
+
+      expect(output).to include("Open identity reviews on file: 0")
+      expect(output).not_to match(PERSONAL)
+    end
+  end
 end
