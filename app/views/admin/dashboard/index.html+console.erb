@@ -23,6 +23,11 @@
               <span class="cs-menu-item-label">New series</span>
             <% end %>
           <% end %>
+          <% if current_user.global_admin? %>
+            <%= link_to new_admin_event_creation_invite_path, class: "cs-menu-item" do %>
+              <span class="cs-menu-item-label">New invite</span>
+            <% end %>
+          <% end %>
         </div>
       </div>
     </div>

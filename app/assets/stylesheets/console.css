@@ -2558,57 +2558,6 @@
 }
 
 @layer components {
-  /* The new-admin notice, with its switch-back link, under the top nav
-   * (layouts/admin.html+console.erb). Cloudscape's info treatment, one quiet line that wraps on phones. Its
-   * gutters match .cs-breadcrumbs and .cs-main so the text lines up with the
-   * page below it. */
-  .cs-beta-bar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 16px;
-    padding: 11px 16px;
-    background-color: var(--cs-info-bg);
-    border-bottom: 1px solid var(--cs-border-divider-secondary);
-    color: var(--cs-text-body);
-    font-size: 14px;
-    line-height: 20px;
-
-    p { margin: 0; min-width: 0; }
-    form { display: inline-flex; }
-  }
-
-  .cs-beta-bar-actions {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 16px;
-  }
-
-  @media (min-width: 640px) {
-    .cs-beta-bar { padding-left: 24px; padding-right: 24px; }
-  }
-
-  @media (min-width: 1024px) {
-    .cs-beta-bar { padding-left: 40px; padding-right: 40px; }
-  }
-
-  .cs-beta-bar-link {
-    padding: 0;
-    background: none;
-    border: 0;
-    color: var(--cs-info);
-    font: inherit;
-    font-weight: 700;
-    text-decoration: none;
-    cursor: pointer;
-
-    &:hover { text-decoration: underline; text-underline-offset: 2px; }
-    &:focus-visible { outline: 2px solid var(--cs-info); outline-offset: 2px; border-radius: 2px; }
-  }
-}
-
-@layer components {
   /* Cloudscape filter patterns: property filter (participants list, travel
    * calendar) and the text filter's count + no-match feedback (table view).
    * Tokens sit under the input, joined by the fixed operation, with

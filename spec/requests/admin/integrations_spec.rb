@@ -63,10 +63,8 @@ RSpec.describe "Admin::Integrations", type: :request do
     end
 
     # The token list exists in both admin UIs, so pin it in each.
-    { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+    { "with the admin console beta" => true }.each do |ui, console|
       context ui do
-        before { admin.update!(admin_console_beta: console) }
-
         # Browsers drop a <form> nested inside another, so a button_to inside
         # the settings form silently submits the settings form instead.
         it "gives Sync Now its own form rather than nesting it in the settings form" do

@@ -20,10 +20,9 @@ RSpec.describe "Admin link to the participant dashboard", type: :request do
     create(:participant_event, participant: participant, event: event, status: status)
   end
 
-  [ true, false ].each do |console|
+  [ true ].each do |console|
     context "in the #{console ? "console" : "original admin"}" do
       before do
-        staff.update!(admin_console_beta: console)
         sign_in staff
       end
 

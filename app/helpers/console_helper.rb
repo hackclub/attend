@@ -40,9 +40,8 @@ module ConsoleHelper
     mode == SYSTEM_THEME ? "light" : mode
   end
 
-  # Both admin layouts link across to /dashboard for staff who are also
-  # registered for an upcoming event. Memoized because the original admin
-  # renders its sidebar footer twice (drawer and desktop).
+  # The admin layout links across to /dashboard for staff who are also
+  # registered for an upcoming event. Memoized per request.
   def show_participant_dashboard_link?
     return @show_participant_dashboard_link if defined?(@show_participant_dashboard_link)
 
@@ -575,7 +574,10 @@ module ConsoleHelper
   private
 
   def cs_error_values(object, error, label)
-    value = object.respond_to?(:read_attribute_for_validation) && error.attribute != :base ? object.read_attribute_for_validation(error.attribute) : nil
+    # Nested autosave errors come keyed as "travel_legs.departure_time_zone",
+    # which isn't a method on the parent, so only read real attributes.
+    readable = error.attribute != :base && object.respond_to?(:read_attribute_for_validation) && object.respond_to?(error.attribute)
+    value = readable ? object.read_attribute_for_validation(error.attribute) : nil
     {
       label: label,
       thing: cs_label_in_sentence(label),

@@ -76,9 +76,9 @@ RSpec.describe "Admin registration change requests", type: :request do
     expect(request_record.reload).to be_follow_up_needed
   end
 
-  [ false, true ].each do |console|
+  [ true ].each do |console|
     context "dismissing #{console ? 'in the admin console' : 'in the original admin'}" do
-      let(:ops) { create(:user, admin_console_beta: console) }
+      let(:ops) { create(:user) }
 
       before do
         create(:event_role_assignment, event: event, user: ops, role: :ops)

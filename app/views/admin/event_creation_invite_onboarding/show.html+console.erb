@@ -1,0 +1,110 @@
+<% content_for :title, "Set up your event – Attend" %>
+<% content_for :breadcrumbs, cs_breadcrumbs([ "Events", nil ], [ "New event", nil ]) %>
+<%# The setup wizard's own frame (admin/event_setup/_wizard), one step early:
+    its steps are listed but none is open until the event exists. %>
+<% steps = [
+     [ "Basics", "The event's name, its web address, and the email participants reply to." ],
+     [ "Schedule & location", "Dates, venue, and when registration opens and closes." ],
+     [ "Modules", "Turn on what the event needs: travel, accommodation, visa letters, groups." ],
+     [ "Accommodation", "The nights people stay, if you turned accommodation on." ],
+     [ "Waivers", "The forms participants and their guardians sign." ],
+     [ "Team", "Add the people running the event with you." ],
+     [ "Review and finish", "Check it over. Nothing goes to participants until you invite them." ]
+   ]
+   inviter = @invite.invited_by %>
+
+<div class="cs-wizard">
+  <nav class="cs-wizard-nav" aria-label="Event setup steps">
+    <ol>
+      <li class="cs-wizard-nav-step cs-wizard-nav-step-current">
+        <span class="cs-wizard-nav-number">Before you start</span>
+        <span class="cs-wizard-nav-label" aria-current="step">Welcome</span>
+      </li>
+      <% steps.each_with_index do |(label, _), index| %>
+        <li class="cs-wizard-nav-step cs-wizard-nav-step-disabled">
+          <span class="cs-wizard-nav-number">Step <%= index + 1 %></span>
+          <span class="cs-wizard-nav-label" aria-disabled="true"><%= label %></span>
+        </li>
+      <% end %>
+    </ol>
+  </nav>
+
+  <div class="cs-wizard-main">
+    <div class="cs-header">
+      <div class="cs-header-text">
+        <h1 class="cs-h1">Set up your event</h1>
+        <p class="cs-description">
+          <% if inviter %>
+            <%= inviter.name.presence || inviter.email %> invited you to create an event on Attend<% if @invite.event_series %> in the <%= @invite.event_series.name %> series<% end %>.
+          <% else %>
+            You've been invited to create an event on Attend<% if @invite.event_series %> in the <%= @invite.event_series.name %> series<% end %>.
+          <% end %>
+        </p>
+      </div>
+    </div>
+
+    <div class="cs-stack">
+      <% if @invite.note.present? %>
+        <div class="cs-alert">
+          <%= cs_status_icon(:info) %>
+          <div>
+            <p class="cs-alert-title">Note from <%= inviter&.name.presence || "whoever invited you" %></p>
+            <%= simple_format(@invite.note, {}, wrapper_tag: "p") %>
+          </div>
+        </div>
+      <% end %>
+
+      <section class="cs-container">
+        <div class="cs-container-header cs-container-header-divided">
+          <div>
+            <h2 class="cs-h2">What setup covers</h2>
+            <p class="cs-description">About ten minutes. Each step saves on its own, so you can stop and come back, and change any of it later.</p>
+          </div>
+        </div>
+        <div class="cs-table-wrap">
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th scope="col">Step</th>
+                <th scope="col">What you'll do</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% steps.each_with_index do |(label, detail), index| %>
+                <tr>
+                  <td class="whitespace-nowrap"><%= index + 1 %>. <%= label %></td>
+                  <td><%= detail %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="cs-container">
+        <div class="cs-container-header">
+          <h2 class="cs-h2">Have to hand</h2>
+        </div>
+        <div class="cs-container-body">
+          <ul class="list-disc pl-5 space-y-1">
+            <li>The event's name and dates.</li>
+            <li>A support email address ending in <%= Event::SUPPORT_EMAIL_DOMAINS_SENTENCE %>. Every email to participants and guardians comes from it.</li>
+            <li>The venue's address, if you know it yet.</li>
+          </ul>
+        </div>
+      </section>
+
+      <p class="cs-small cs-muted">
+        You'll be the event admin: you can see participants' medical, travel and safeguarding details, and everything you do is audit-logged.
+      </p>
+
+      <div class="cs-wizard-actions">
+        <% if @invite.started? %>
+          <%= link_to "Continue", admin_new_event_path(invite: @invite.id), class: "cs-btn cs-btn-primary" %>
+        <% else %>
+          <%= button_to "Get started", admin_accept_event_creation_invite_path(params[:token]), method: :post, class: "cs-btn cs-btn-primary" %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

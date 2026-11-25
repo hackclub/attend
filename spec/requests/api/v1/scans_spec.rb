@@ -66,6 +66,74 @@ RSpec.describe "Api::V1::Scans", type: :request, fiat_registrations: true do
       expect(response).to have_http_status(:not_found)
       expect(other_participation.scans).to be_empty
     end
+
+    context "with signed check-in codes" do
+      let(:signing_key) { CheckinCode.generate_key }
+
+      before { CheckinCode.keyring = { 1 => signing_key } }
+      after { CheckinCode.reset_keyring! }
+
+      def scan(code)
+        post "/api/v1/events/#{event.id}/scans",
+          params: { participant_id: code, scan_context_id: scan_context.id },
+          headers: auth_headers.merge("X-Attend-Scanner" => "2"),
+          as: :json
+      end
+
+      it "records a signed ticket" do
+        expect { scan(CheckinCode.for(participant_event)) }.to change { participant_event.scans.count }.by(1)
+        expect(response).to have_http_status(:ok)
+      end
+
+      it "refuses a forged one" do
+        CheckinCode.keyring = { 1 => CheckinCode.generate_key }
+        forged = CheckinCode.for(participant_event)
+        CheckinCode.keyring = { 1 => signing_key }
+
+        expect { scan(forged) }.not_to change(Scan, :count)
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body["error"]).to eq("This is not a valid ticket for this event")
+      end
+
+      # An app that can't read signed codes would call them unrecognised and
+      # never send them, so it is told to update instead.
+      it "turns away a mobile app too old to read signed codes, and lets an updated one through" do
+        params = { participant_id: participant_event.id, scan_context_id: scan_context.id }
+
+        [ nil, "1" ].each do |version|
+          headers = auth_headers.merge(version ? { "X-Attend-Scanner" => version } : {})
+          expect {
+            post "/api/v1/events/#{event.id}/scans", params: params, headers: headers, as: :json
+          }.not_to change(Scan, :count)
+          expect(response).to have_http_status(:upgrade_required)
+          expect(response.parsed_body).to include("update_required" => true, "error" => a_string_starting_with("Update the Attend app"))
+        end
+
+        expect {
+          post "/api/v1/events/#{event.id}/scans", params: params, headers: auth_headers.merge("X-Attend-Scanner" => "2"), as: :json
+        }.to change { participant_event.scans.count }.by(1)
+      end
+
+      it "leaves other API clients alone" do
+        api_key = GlobalApiToken.generate_for(admin, name: "door script")
+
+        expect {
+          post "/api/v1/events/#{event.id}/scans",
+            params: { participant_id: participant_event.id, scan_context_id: scan_context.id },
+            headers: { "Authorization" => "Bearer #{api_key.token}" },
+            as: :json
+        }.to change { participant_event.scans.count }.by(1)
+      end
+    end
+
+    it "doesn't ask the app to update while tickets aren't signed" do
+      expect {
+        post "/api/v1/events/#{event.id}/scans",
+          params: { participant_id: participant_event.id, scan_context_id: scan_context.id },
+          headers: auth_headers,
+          as: :json
+      }.to change { participant_event.scans.count }.by(1)
+    end
   end
 
   describe "GET /api/v1/events/:event_id/scans with since" do
@@ -136,7 +204,7 @@ RSpec.describe "Api::V1::Scans", type: :request, fiat_registrations: true do
     let(:participant_event) { create(:participant_event, event: event) }
     let(:scan_context) { event.scan_contexts.find_by!(checks_in: true) }
     let(:client_scan_id) { SecureRandom.uuid }
-    let(:scanned_at) { Time.zone.parse("2026-08-24 09:41:00") }
+    let(:scanned_at) { 10.minutes.ago.change(usec: 0) }
 
     def create_scan(participant_event:, scan_context:, client_scan_id:, scanned_at:)
       post "/api/v1/events/#{event.id}/scans",
@@ -236,6 +304,41 @@ RSpec.describe "Api::V1::Scans", type: :request, fiat_registrations: true do
       expect(json.dig("scan", "id")).to eq(original_scan_id)
       expect(json.dig("scan_context", "id")).to eq(scan_context.id)
       expect(participant_event.scans.count).to eq(1)
+    end
+
+    it "records the server's time for a scan time outside the bounds the admin scanner has" do
+      freeze_time do
+        create_scan(
+          participant_event: participant_event,
+          scan_context: scan_context,
+          client_scan_id: client_scan_id,
+          scanned_at: 3.days.ago
+        )
+
+        expect(response).to have_http_status(:ok)
+        expect(participant_event.scans.sole).to have_attributes(scanned_at: Time.current)
+        expect(participant_event.scans.sole.client_scanned_at).to be_within(1.second).of(3.days.ago)
+      end
+    end
+
+    it "refuses an id already used for someone else at the same event" do
+      create_scan(
+        participant_event: participant_event,
+        scan_context: scan_context,
+        client_scan_id: client_scan_id,
+        scanned_at: scanned_at
+      )
+      other = create(:participant_event, event: event)
+
+      create_scan(
+        participant_event: other,
+        scan_context: scan_context,
+        client_scan_id: client_scan_id,
+        scanned_at: scanned_at
+      )
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(other.scans).to be_empty
     end
 
     it "does not expose another event when a client id collides" do
@@ -391,6 +494,124 @@ RSpec.describe "Api::V1::Scans", type: :request, fiat_registrations: true do
       expect(response).to have_http_status(:ok)
       expect(JSON.parse(response.body)).to include("deleted_scans" => 1)
       expect(TravelCalendar::JourneyCache.fetch(event).sole).to include(id: travel.id, pickup_state: :awaiting_pickup)
+    end
+  end
+
+  describe "role gating" do
+    let(:participant_event) { create(:participant_event, event: event) }
+    let(:scan_context) { event.scan_contexts.find_by!(checks_in: true) }
+
+    before do
+      participant_event.participant.update!(phone: "+12025550143")
+      Medical.create!(
+        participant_event: participant_event,
+        allergies: "Peanuts",
+        medical_conditions: "Asthma",
+        medications: "Inhaler",
+        has_anaphylaxis_risk: true
+      )
+      Dietary.create!(participant_event: participant_event, diet_type: "vegetarian", life_threatening_allergies: "Peanuts")
+      SafeguardingInfo.create!(participant_event: participant_event, freedom_waiver_granted: true, high_support_flag: true)
+    end
+
+    def scan_as(user)
+      token = MobileToken.generate_for(user)
+      post "/api/v1/events/#{event.id}/scans",
+        params: { participant_id: participant_event.id, scan_context_id: scan_context.id },
+        headers: { "Authorization" => "Bearer #{token.token}" },
+        as: :json
+      response.parsed_body["participant"]
+    end
+
+    def staff_with(role)
+      create(:user).tap { |user| create(:event_role_assignment, user: user, event: event, role: role) }
+    end
+
+    it "gives a global admin everything" do
+      participant = scan_as(admin)
+
+      expect(participant).to include(
+        "phone" => "+12025550143",
+        "allergies" => "Peanuts",
+        "medical_conditions" => "Asthma",
+        "medications" => "Inhaler",
+        "diet_type" => "vegetarian",
+        "freedom_waiver_granted" => true
+      )
+    end
+
+    it "keeps the phone number from limited staff, who still get full medical detail" do
+      participant = scan_as(staff_with("limited"))
+
+      expect(response).to have_http_status(:ok)
+      expect(participant).not_to have_key("phone")
+      expect(participant).not_to have_key("freedom_waiver_granted")
+      expect(participant).to include(
+        "allergies" => "Peanuts",
+        "medical_conditions" => "Asthma",
+        "medications" => "Inhaler"
+      )
+    end
+
+    it "stops ops at allergies and dietary needs" do
+      participant = scan_as(staff_with("ops"))
+
+      expect(response).to have_http_status(:ok)
+      expect(participant).to include(
+        "phone" => "+12025550143",
+        "allergies" => "Peanuts",
+        "diet_type" => "vegetarian",
+        "life_threatening_allergies" => "Peanuts",
+        "has_anaphylaxis_risk" => true,
+        "high_support_flag" => true
+      )
+      expect(participant.keys).not_to include("medical_conditions", "medications", "freedom_waiver_granted")
+    end
+
+    it "gives event admins full medical detail but not the safeguarding detail" do
+      participant = scan_as(staff_with("event_admin"))
+
+      expect(participant).to include("phone" => "+12025550143", "medical_conditions" => "Asthma", "medications" => "Inhaler")
+      expect(participant).not_to have_key("freedom_waiver_granted")
+    end
+
+    it "gives safeguarding leads the safeguarding detail" do
+      participant = scan_as(staff_with("safeguarding_lead"))
+
+      expect(participant).to include("medical_conditions" => "Asthma", "freedom_waiver_granted" => true)
+    end
+
+    it "treats a series member as an event admin" do
+      series = create(:event_series)
+      event.update!(event_series: series)
+      member = create(:user)
+      SeriesRoleAssignment.create!(user: member, event_series: series, role: SeriesRoleAssignment.roles.keys.first)
+
+      participant = scan_as(member)
+
+      expect(response).to have_http_status(:ok)
+      expect(participant).to include("phone" => "+12025550143", "medical_conditions" => "Asthma")
+    end
+
+    it "refuses a scan from read-only staff" do
+      expect { scan_as(staff_with("read_only")) }.not_to change(Scan, :count)
+
+      expect(response).to have_http_status(:forbidden)
+      expect(response.parsed_body).not_to have_key("participant")
+    end
+
+    it "refuses an undo from read-only staff but still lets them list scans" do
+      participant_event.scans.create!(scan_context: scan_context, user: admin, scanned_at: Time.current)
+      token = MobileToken.generate_for(staff_with("read_only"))
+      headers = { "Authorization" => "Bearer #{token.token}" }
+
+      expect {
+        delete "/api/v1/events/#{event.id}/scans/#{participant_event.id}", headers: headers
+      }.not_to change(Scan, :count)
+      expect(response).to have_http_status(:forbidden)
+
+      get "/api/v1/events/#{event.id}/scans", headers: headers
+      expect(response).to have_http_status(:ok)
     end
   end
 end

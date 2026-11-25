@@ -20,12 +20,7 @@ module Admin
     end
 
     def create
-      unless params[:csv_file].present?
-        return render_console_file_error("Participants CSV is required.") if request.variant.include?(:console)
-
-        redirect_to new_admin_event_import_path(current_event), alert: "Please select a CSV file to import."
-        return
-      end
+      return reject_csv_file("Participants CSV is required.") unless params[:csv_file].present?
 
       csv_content = params[:csv_file].read
       # A held event never emails on import, whatever the box says: the
@@ -40,12 +35,7 @@ module Admin
         return reject_csv_file("This file couldn't be read. Save it from your spreadsheet as \"CSV UTF-8\" and upload it again.")
       end
 
-      if rows.empty?
-        return render_console_file_error("The file has no rows to import. Check it against the template.") if request.variant.include?(:console)
-
-        redirect_to new_admin_event_import_path(current_event), alert: "No valid rows found in CSV."
-        return
-      end
+      return reject_csv_file("The file has no rows to import. Check it against the template.") if rows.empty?
 
       @import_batch = ImportBatch.create!(
         event: current_event,
@@ -139,17 +129,11 @@ module Admin
 
     private
 
-    # The console shows upload problems under the file field rather than as
-    # a flash on a fresh form; the original UI keeps its redirects.
-    def render_console_file_error(message)
+    # Upload problems show under the file field rather than as a flash on a
+    # fresh form.
+    def reject_csv_file(message)
       @csv_file_errors = [ message ]
       render :new, status: :unprocessable_entity
-    end
-
-    def reject_csv_file(message)
-      return render_console_file_error(message) if request.variant.include?(:console)
-
-      redirect_to new_admin_event_import_path(current_event), alert: message
     end
 
     # Importing a CSV invites everyone in it, so it takes the same permission as

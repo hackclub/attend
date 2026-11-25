@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Admin::RoomingWizard", type: :request do
   include Devise::Test::IntegrationHelpers
 
-  let(:admin) { User.create!(email: "admin-rooming@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
+  let(:admin) { User.create!(email: "admin-rooming@example.com", name: "Admin", global_role: "global_admin") }
   let(:event) { create(:event) }
   let!(:rooming_plan) do
     event.main_rooming_context.create_rooming_plan!(event: event, created_by_user: admin, room_capacity: 2, status: :draft)
@@ -12,17 +12,7 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
   before { sign_in admin }
 
   describe "GET preferences" do
-    it "offers manual assignment without auto-assigning" do
-      get preferences_admin_event_rooming_wizard_path(event.slug)
-
-      expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Assign Manually")
-      expect(response.body).to include(manual_assign_admin_event_rooming_wizard_path(event.slug))
-    end
-
     context "with the admin console beta" do
-      before { admin.update!(admin_console_beta: true) }
-
       it "offers sentence-case manual assignment without auto-assigning" do
         get preferences_admin_event_rooming_wizard_path(event.slug)
 
@@ -89,10 +79,8 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
 
     # The original and console assignments boards both wrap the room list in
     # #rooms_container > #rooms_list, so the streams must hold for either UI.
-    { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+    { "with the admin console beta" => true }.each do |ui, console|
       context ui do
-        before { admin.update!(admin_console_beta: console) }
-
         it "keeps #rooms_container after a participant is moved into a room" do
           post move_assignment_admin_event_rooming_wizard_path(event.slug),
             params: { participant_event_id: participant_event.id, room_id: room.id },
@@ -144,10 +132,8 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
   end
 
   describe "POST link_preference" do
-    { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+    { "with the admin console beta" => true }.each do |ui, console|
       context ui do
-        before { admin.update!(admin_console_beta: console) }
-
         it "updates the preference links wrapper instead of replacing it" do
           participant_event = create(:participant_event, event: event).tap(&:create_accommodation!)
           target = create(:participant_event, event: event).tap(&:create_accommodation!)
@@ -186,10 +172,8 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
       expect(participant_event.room_assignments.find_by(rooming_context: post_event).room).to eq(post_room)
     end
 
-    { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+    { "with the admin console beta" => true }.each do |ui, console|
       it "keeps the wizard's own links inside the stay #{ui}" do
-        admin.update!(admin_console_beta: console)
-
         get assignments_admin_event_rooming_wizard_path(event.slug, stay_id: post_event.id)
 
         expect(response).to have_http_status(:ok)
@@ -241,8 +225,12 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
     let(:stay) { event.main_rooming_context }
     let(:room) { stay.rooms.create!(capacity: 3) }
 
-    def tokens
-      Nokogiri::HTML(response.body).css("span.rounded-full").to_h { |token| [ token.text[/\A\s*(\S+)/, 1], token[:class] ] }
+    # Each roomed person is a token; someone who has arrived gets a success
+    # status inside theirs.
+    def arrived?(first_name)
+      token = Nokogiri::HTML(response.body).css("span.cs-token").find { |t| t.text.strip.start_with?(first_name) }
+      raise KeyError, first_name unless token
+      token.at_css(".cs-status-success").present?
     end
 
     def roomed(first_name)
@@ -261,8 +249,8 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
       get finalize_admin_event_rooming_wizard_path(event.slug)
 
       expect(response).to have_http_status(:ok)
-      expect(tokens.fetch("Arrived")).to include("bg-green-100")
-      expect(tokens.fetch("Elsewhere")).not_to include("bg-green-100")
+      expect(arrived?("Arrived")).to be(true)
+      expect(arrived?("Elsewhere")).to be(false)
     end
 
     it "falls back to any Lodging point for a stay without its own" do
@@ -277,8 +265,8 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
       get finalize_admin_event_rooming_wizard_path(event.slug)
 
       expect(response).to have_http_status(:ok)
-      expect(tokens.fetch("Arrived")).to include("bg-green-100")
-      expect(tokens.fetch("Lunching")).not_to include("bg-green-100")
+      expect(arrived?("Arrived")).to be(true)
+      expect(arrived?("Lunching")).to be(false)
     end
   end
 end

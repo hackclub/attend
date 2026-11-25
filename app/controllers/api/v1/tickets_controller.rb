@@ -82,7 +82,7 @@ module Api
           checked_in: participant_event.checked_in?,
           attendee_name: participant.display_name,
           # QR payload the scanner reads (same value the website encodes).
-          qr_payload: "attend://checkin/#{participant.id}",
+          qr_payload: CheckinCode.for(participant_event),
           short_code: participant.id.split("-").first.upcase,
           apple_wallet_url: apple_wallet_url(participant_event),
           onboarding_url: onboarding_url_for(event),

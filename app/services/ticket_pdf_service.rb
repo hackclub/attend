@@ -110,7 +110,7 @@ class TicketPdfService
       pdf.stroke_color BORDER_COLOR
       pdf.fill_and_stroke_rounded_rectangle [ qr_x, content_top ], qr_box, qr_box, 6
 
-      qr_code = RQRCode::QRCode.new(attend_deep_link(@participant.id))
+      qr_code = RQRCode::QRCode.new(CheckinCode.for(@participant_event), level: :m)
       qr_png = qr_code.as_png(size: 200, border_modules: 0)
       qr_image = StringIO.new(qr_png.to_s)
       pdf.image qr_image, at: [ qr_x + 5, content_top - 5 ], width: qr_box - 10
@@ -220,9 +220,5 @@ class TicketPdfService
     else
       @event.local_starts_at.strftime("%B %d, %Y")
     end
-  end
-
-  def attend_deep_link(participant_id)
-    "attend://checkin/#{participant_id}"
   end
 end

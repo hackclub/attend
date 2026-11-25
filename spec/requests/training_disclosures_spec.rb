@@ -1,5 +1,7 @@
 require "rails_helper"
 
+RSpec::Matchers.define_negated_matcher :not_have_enqueued_mail, :have_enqueued_mail
+
 RSpec.describe "Training declarations", type: :request do
   include Devise::Test::IntegrationHelpers
 
@@ -35,27 +37,141 @@ RSpec.describe "Training declarations", type: :request do
     expect(response).to have_http_status(:unprocessable_entity)
   end
 
-  it "stops all training after a yes, tells the Safety Team, and stays neutral" do
+  it "stops all training after a yes, emails nobody, and stays neutral" do
     other = create(:training_course, :published, access: "open")
     post enroll_training_course_path(course)
+    post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1" }
 
+    # Nobody is emailed: the declaration waits in the admin review queue, and
+    # the page asks the person to get in touch themselves.
     expect {
-      post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1" }
-    }.to have_enqueued_mail(TrainingMailer, :disclosure_review_needed)
-    expect(response.body).to include("Thanks for telling us", TrainingDisclosure::SAFETY_TEAM_EMAIL)
+      post confirm_training_course_disclosure_path(course)
+    }.to change { learner.training_disclosures.where(review_status: "pending").count }.by(1)
+      .and not_have_enqueued_mail
+    expect(response).to redirect_to(training_path)
+    follow_redirect!
+    expect(response.body).to include("Thanks for telling us", "reach out to the #{TrainingDisclosure::SAFETY_TEAM_NAME}", "mailto:#{TrainingDisclosure::SAFETY_TEAM_EMAIL}")
+    expect(response.body).not_to include("will be in touch")
     expect(response.body).not_to match(/ineligible/i)
 
-    get training_path
-    expect(response.body).to include("Thanks for telling us")
     get training_course_path(other)
     expect(response).to have_http_status(:forbidden)
     get training_course_lesson_path(course, first_lesson)
     expect(response).to have_http_status(:forbidden)
   end
 
-  it "uses the course's own wording, and keeps a copy of what was asked" do
-    course.update!(disclosure_question: "Example custom declaration wording?")
+  it "checks a yes before recording it, so a stray tap can be undone" do
     post enroll_training_course_path(course)
+
+    expect {
+      post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1" }
+    }.not_to change(TrainingDisclosure, :count)
+    expect(response).to redirect_to(confirm_training_course_disclosure_path(course))
+    follow_redirect!
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Check your answer", "No, change my answer", "mailto:#{TrainingDisclosure::SAFETY_TEAM_EMAIL}")
+    expect(response.body).not_to include("will be in touch")
+    expect(response.body).not_to include("Thanks for telling us")
+    # The way out is the first, prominent button; confirming is the quiet one.
+    expect(response.body).to match(/portal-btn-primary[^>]*>No, change my answer.*portal-btn-secondary[^>]*>\s*Yes, that/m)
+
+    # Changing the answer lands on the form with No picked, saying the yes
+    # wasn't saved; they still have to confirm it themselves.
+    change_link = new_training_course_disclosure_path(course, answer: "no", changing: 1)
+    expect(response.body).to include(ERB::Util.html_escape(change_link))
+    get change_link
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Your earlier answer wasn't saved")
+    expect(response.body).to match(/<input[^>]*value="no"[^>]*checked/)
+    expect(response.body).not_to match(/<input[^>]*value="yes"[^>]*checked/)
+    expect(response.body).not_to match(/<input[^>]*name="confirm"[^>]*checked/)
+
+    post training_course_disclosure_path(course), params: { answer: "no", confirm: "1" }
+    expect(response).to redirect_to(training_course_lesson_path(course, first_lesson))
+    expect(learner.training_disclosures.last).to be_review_not_required
+  end
+
+  it "only records a yes that came through the form and its confirmation" do
+    post enroll_training_course_path(course)
+
+    # Straight to the second step, or with the old hidden-field flag.
+    expect {
+      post confirm_training_course_disclosure_path(course)
+      post training_course_disclosure_path(course), params: { answer: "yes", yes_confirmed: "1" }
+    }.not_to change(TrainingDisclosure, :count)
+
+    get confirm_training_course_disclosure_path(course)
+    expect(response).to redirect_to(new_training_course_disclosure_path(course))
+  end
+
+  it "drops a yes that was waiting to be checked once they go back to the form" do
+    post enroll_training_course_path(course)
+    post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1" }
+    get new_training_course_disclosure_path(course)
+
+    expect {
+      post confirm_training_course_disclosure_path(course)
+    }.not_to change(TrainingDisclosure, :count)
+    expect(response).to redirect_to(new_training_course_disclosure_path(course))
+  end
+
+  it "won't record a second answer once the declaration is made" do
+    post enroll_training_course_path(course)
+    # A yes left on the "check your answer" page in one tab...
+    post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1" }
+    # ...while a form already open in another tab answers no.
+    post training_course_disclosure_path(course), params: { answer: "no", confirm: "1" }
+
+    expect {
+      post confirm_training_course_disclosure_path(course)
+    }.not_to change(TrainingDisclosure, :count)
+    expect(response).to redirect_to(training_course_path(course))
+    expect(learner.reload).to be_eligible_to_work_events
+
+    get new_training_course_disclosure_path(course)
+    expect(response).to redirect_to(training_course_path(course))
+  end
+
+  it "records one declaration when the confirm button is tapped twice" do
+    post enroll_training_course_path(course)
+    post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1" }
+
+    # The other tap saves after this request's checks but before its lock.
+    allow_any_instance_of(TrainingEnrollment).to receive(:with_lock).and_wrap_original do |original, *args, &block|
+      enrollment = original.receiver
+      enrollment.user.training_disclosures.create!(course: course, enrollment: enrollment, question: "Example declaration?", answer: "yes")
+      original.call(*args, &block)
+    end
+
+    expect {
+      post confirm_training_course_disclosure_path(course)
+    }.to change(TrainingDisclosure, :count).by(1)
+    expect(response).to redirect_to(training_path)
+  end
+
+  it "doesn't take a declaration for a course that doesn't ask for one" do
+    course.update!(disclosure_required: false)
+    post enroll_training_course_path(course)
+
+    expect {
+      post training_course_disclosure_path(course), params: { answer: "yes", confirm: "1" }
+      post confirm_training_course_disclosure_path(course)
+    }.not_to change(TrainingDisclosure, :count)
+    expect(response).to redirect_to(training_course_path(course))
+  end
+
+  it "uses the course's own wording, and keeps a copy of what was asked" do
+    post enroll_training_course_path(course)
+    get new_training_course_disclosure_path(course)
+    expect(response.body).to include("this applies to me", "none of this applies to me")
+
+    # The longer labels are written for the standard question; a course's own
+    # wording could make them read backwards, so it gets bare Yes and No.
+    course.update!(disclosure_question: "Example custom declaration wording?")
+    get new_training_course_disclosure_path(course)
+    expect(response.body).to include("Example custom declaration wording?", "<strong>Yes</strong></span>", "<strong>No</strong></span>")
+    expect(response.body).not_to include("applies to me")
+
     post training_course_disclosure_path(course), params: { answer: "no", confirm: "1" }
     expect(learner.training_disclosures.last.question).to eq("Example custom declaration wording?")
   end

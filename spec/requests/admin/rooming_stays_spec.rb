@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Admin rooming stays and rosters", type: :request do
   include Devise::Test::IntegrationHelpers
 
-  let(:admin) { User.create!(email: "admin-stays@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
+  let(:admin) { User.create!(email: "admin-stays@example.com", name: "Admin", global_role: "global_admin") }
   let(:event) { create(:event, accommodation_enabled: true) }
 
   before { sign_in admin }
@@ -13,10 +13,8 @@ RSpec.describe "Admin rooming stays and rosters", type: :request do
     create(:participant_event, event: event, participant: participant, status: :complete).tap(&:create_accommodation!)
   end
 
-  { "in the original admin" => false, "with the admin console beta" => true }.each do |ui, console|
+  { "with the admin console beta" => true }.each do |ui, console|
     context ui do
-      before { admin.update!(admin_console_beta: console) }
-
       it "lists every stay, the one during the event included" do
         event.main_rooming_context
         event.rooming_contexts.create!(name: "Night after", kind: :post_event)

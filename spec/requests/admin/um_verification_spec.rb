@@ -4,7 +4,7 @@ RSpec.describe "Admin UM verification", type: :request do
   include Devise::Test::IntegrationHelpers
 
   let(:event) { create(:event) }
-  let(:admin) { User.create!(email: "ga-um@example.com", name: "Global Admin", global_role: "global_admin", admin_console_beta: false) }
+  let(:admin) { User.create!(email: "ga-um@example.com", name: "Global Admin", global_role: "global_admin") }
   let(:participant_event) { create(:participant_event, event: event, um_status: :pending) }
 
   before do
@@ -33,7 +33,7 @@ RSpec.describe "Admin UM verification", type: :request do
   it "shows the verification panel on the travel page" do
     get travel_admin_event_participant_path(event.slug, participant_event)
 
-    expect(response.body).to include("Unaccompanied Minor Verification")
+    expect(response.body).to include("Unaccompanied minor verification")
     expect(response.body).to include("Pending review")
   end
 

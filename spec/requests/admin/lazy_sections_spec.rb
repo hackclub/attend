@@ -14,10 +14,8 @@ RSpec.describe "Lazy-loaded admin sections", type: :request do
     Nokogiri::HTML(response.body).at_css("turbo-frame##{id}")
   end
 
-  [ false, true ].each do |console|
+  [ true ].each do |console|
     context(console ? "with the admin console beta" : "in the original admin") do
-      before { admin.update!(admin_console_beta: console) }
-
       describe "a training course's invitations and learners" do
         let(:course) { create(:training_course, :with_lessons) }
         let(:learner) { create(:user, name: "Ada Fictional") }
