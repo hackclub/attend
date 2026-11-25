@@ -24,6 +24,13 @@ module Identity
   #    address alone; an overlap that looks like the same human is filed for
   #    review.
   #
+  # With `separate_held: true` (`identity:resolve_reviews`) nothing is left
+  # waiting on a person: every unlinked row held back above gets a person of its
+  # own, and every open review whose rows all have one is closed. That is the
+  # same outcome the overlap review already describes (kept separate), and it
+  # never merges anyone. Rows linked to an account stay held, and so do their
+  # reviews.
+  #
   # Everything is planned in memory from light rows first, so a dry run issues
   # no writes at all and reports the same numbers an apply would. Rows that
   # already have a person are skipped, which is what makes a re-run safe.
@@ -41,8 +48,13 @@ module Identity
 
     attr_reader :report
 
-    def initialize(apply: false, batch_size: 500, now: Time.current)
+    # Merging is a person's call, and verified_email_conflict reviews are about
+    # an account, not about rows without a person, so neither is closed here.
+    RESOLVABLE_CATEGORIES = (IdentityReview::CATEGORIES - %w[verified_email_conflict]).freeze
+
+    def initialize(apply: false, batch_size: 500, now: Time.current, separate_held: false)
       @apply = apply
+      @separate_held = separate_held
       @batch_size = batch_size
       @now = now
       @report = Hash.new { |sections, section| sections[section] = Hash.new { |kinds, kind| kinds[kind] = Hash.new(0) } }
@@ -70,6 +82,7 @@ module Identity
       attach_participants
       attach_guardians
       record_reviews
+      resolve_reviews
 
       count(:people, :mechanical, :created, @inserted_people.size)
       count(:reviews, :needs_review, :groups_recorded, @reviews.size)
@@ -108,6 +121,8 @@ module Identity
         end
       end
 
+      @participants_by_id = @participants.index_by(&:id)
+      @guardians_by_id = @guardians.index_by(&:id)
       @users_by_email = @users.values.reject { |user| user.email.blank? }.group_by(&:email)
       @participants_by_email = @participants.reject { |participant| participant.email.blank? }.group_by(&:email)
       @participants_by_person = @participants.select(&:person_id).group_by(&:person_id)
@@ -147,6 +162,21 @@ module Identity
         category: category, reasons: reasons.uniq.sort,
         user_ids: user_ids.uniq.sort, participant_ids: participant_ids.uniq.sort, guardian_ids: guardian_ids.uniq.sort
       }
+      separate_held_rows(participant_ids, guardian_ids) if @separate_held
+    end
+
+    # An unlinked row that is held gets a person of its own and nobody else's.
+    # A row with an account link is that account's holder and is not ours to
+    # split off.
+    def separate_held_rows(participant_ids, guardian_ids)
+      { participants: [ participant_ids, @participants_by_id ], guardians: [ guardian_ids, @guardians_by_id ] }.each do |section, (ids, rows)|
+        ids.uniq.filter_map { |id| rows[id] }.each do |row|
+          next if row.person_id || row.user_id
+
+          plan_attach(section.to_s.singularize.to_sym, row, new_person)
+          count(section, :mechanical, :own_person_while_held)
+        end
+      end
     end
 
     def plan_users
@@ -480,6 +510,39 @@ module Identity
           end
         end
       end
+    end
+
+    # Closes every open review whose rows all have a person by now (the
+    # overlap reviews, which never lacked one, and the ones just separated).
+    # Reviews are kept, only marked resolved. Planned and stored reviews are
+    # both considered so a dry run reports what an apply then does.
+    def resolve_reviews
+      return unless @separate_held
+
+      candidates = {}
+      IdentityReview.open.where(category: RESOLVABLE_CATEGORIES).find_each(batch_size: batch_size) do |review|
+        candidates[review.fingerprint] = [ review.participant_ids, review.guardian_ids ]
+      end
+      @reviews.each do |fingerprint, attributes|
+        candidates[fingerprint] = attributes.values_at(:participant_ids, :guardian_ids) if RESOLVABLE_CATEGORIES.include?(attributes[:category])
+      end
+
+      resolvable = candidates.select do |_fingerprint, (participant_ids, guardian_ids)|
+        every_row_has_a_person?(participant_ids, @participants_by_id) && every_row_has_a_person?(guardian_ids, @guardians_by_id)
+      end.keys
+
+      count(:reviews, :mechanical, :closed_kept_separate, resolvable.size)
+      count(:reviews, :needs_review, :left_open, candidates.size - resolvable.size)
+      return unless apply
+
+      resolvable.each_slice(batch_size) do |slice|
+        IdentityReview.open.where(fingerprint: slice).update_all(resolved_at: now, updated_at: now)
+      end
+    end
+
+    # A row that no longer exists has nothing to wait for.
+    def every_row_has_a_person?(ids, rows)
+      ids.all? { |id| rows[id].nil? || rows[id].person_id.present? }
     end
   end
 end
