@@ -34,6 +34,9 @@ gem "omniauth-rails_csrf_protection"
 # Authorization
 gem "pundit"
 
+# Component layer for the cs-* and portal-* kits (app/components)
+gem "view_component"
+
 # MCP server — Rails-native (toolboxes are controllers, tools are actions)
 gem "toolchest", "~> 0.3.7"
 # mcp 0.23.0 is the first release with fixes for the five 2026 transport

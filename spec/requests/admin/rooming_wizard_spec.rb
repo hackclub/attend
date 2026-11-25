@@ -67,8 +67,7 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
       streams.each do |stream|
         next unless stream["action"] == "replace"
 
-        # The room card partial ships a trailing <script>, so ignore those.
-        roots = stream.at_css("template").children.select(&:element?).reject { |el| el.name == "script" }
+        roots = stream.at_css("template").children.select(&:element?)
         expect(roots.map { |el| el["id"] }).to eq([ stream["target"] ]),
           "replace of ##{stream["target"]} would drop the target id"
       end
@@ -179,7 +178,14 @@ RSpec.describe "Admin::RoomingWizard", type: :request do
 
         expect(response).to have_http_status(:ok)
         expect(response.body).to include(move_assignment_admin_event_rooming_wizard_path(event.slug, stay_id: post_event.id))
-        expect(response.body).not_to include(%("#{move_assignment_admin_event_rooming_wizard_path(event.slug)}"))
+        # Spelled out: after the request above, the path helper recalls
+        # stay_id and would hand back the stay's own URL.
+        expect(response.body).not_to include(%("/admin/events/#{event.slug}/rooming_wizard/move_assignment"))
+
+        urls = Nokogiri::HTML5(response.body).at_css("[data-controller~='rooming-assignments']")
+          .attribute_nodes.select { |a| a.name.end_with?("-url-value") }.map(&:value)
+        expect(urls.size).to eq(6)
+        expect(urls).to all(start_with("/admin/events/#{event.slug}/stays/#{post_event.id}/rooming_wizard/"))
       end
     end
 

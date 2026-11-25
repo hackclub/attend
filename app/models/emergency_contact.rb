@@ -28,6 +28,8 @@ class EmergencyContact < ApplicationRecord
   validates :phone, presence: true, e164_phone: true
   validate :linked_to_guardian_or_participant
 
+  normalizes :email, with: EmailAddress::NORMALIZER
+
   normalizes_phone_number :phone
 
   scope :by_priority, -> { order(priority: :asc) }

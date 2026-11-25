@@ -17,28 +17,29 @@
     </p>
   </div>
 
-  <div class="portal-card p-5 sm:p-6 mb-6">
+  <%= portal_card class: "p-5 sm:p-6 mb-6" do %>
     <%= form_with url: guardian_portal_center_verify_path, method: :post do |f| %>
-      <%= label_tag :code, "Verification code", class: "portal-label" %>
-      <%= f.text_field :code, id: "code", required: true, autofocus: true,
-            inputmode: "numeric", autocomplete: "one-time-code", maxlength: 6, pattern: "\\d{6}",
-            placeholder: "000000",
-            class: "portal-input text-center text-2xl font-mono tracking-[0.4em] pl-[0.4em]" %>
+      <%= portal_field "Verification code", for: "code", wrapper: false do %>
+        <%= f.text_field :code, id: "code", required: true, autofocus: true,
+              inputmode: "numeric", autocomplete: "one-time-code", maxlength: 6, pattern: "\\d{6}",
+              placeholder: "000000",
+              class: "portal-input text-center text-2xl font-mono tracking-[0.4em] pl-[0.4em]" %>
+      <% end %>
 
-      <button type="submit" class="portal-btn portal-btn-primary w-full sm:w-auto mt-4">Verify</button>
+      <%= portal_button "Verify", variant: :primary, class: "w-full sm:w-auto mt-4" %>
     <% end %>
-  </div>
+  <% end %>
 
   <div class="flex flex-col items-center gap-1">
     <%= form_with url: guardian_portal_center_request_code_path, method: :post do |f| %>
       <%= f.hidden_field :contact, value: @pending&.dig("contact_value") %>
-      <button type="submit" class="portal-btn portal-btn-quiet">Send a new code</button>
+      <%= portal_button "Send a new code", variant: :quiet %>
     <% end %>
     <% if on_whatsapp %>
       <%= form_with url: guardian_portal_center_request_code_path, method: :post do |f| %>
         <%= f.hidden_field :contact, value: @pending&.dig("contact_value") %>
         <%= f.hidden_field :channel, value: "sms" %>
-        <button type="submit" class="portal-btn portal-btn-quiet">Not on WhatsApp? Text me the code instead</button>
+        <%= portal_button "Not on WhatsApp? Text me the code instead", variant: :quiet %>
       <% end %>
     <% end %>
     <%= link_to "Use a different email or phone number", guardian_portal_center_path, class: "portal-hint text-sm underline underline-offset-2" %>

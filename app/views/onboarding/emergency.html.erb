@@ -10,7 +10,7 @@
   <%= form_with url: onboarding_step_path(step: @step, event_id: current_event.id), method: :patch, local: true, data: { turbo: false, controller: "phone-input autosave", autosave_notify_only_value: "true", action: "input->autosave#input change->autosave#change" } do |f| %>
     <%= render "autosave_status" %>
     <div class="space-y-6">
-      <section class="portal-card p-5 sm:p-6">
+      <%= portal_card tag: :section, class: "p-5 sm:p-6" do %>
         <h2 class="portal-heading text-base mb-4">Primary Emergency Contact</h2>
 
         <% primary_contact = @emergency_contacts.find { |c| c.priority == 1 } || @participant_event.emergency_contacts.build(priority: 1) %>
@@ -20,31 +20,27 @@
             <%= ec.hidden_field :id if primary_contact.persisted? %>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <%= ec.label :name, label_text("Full Name", required: true), class: "portal-label" %>
+              <%= portal_field "Full Name", for: ec.field_id(:name), required: true do %>
                 <%= ec.text_field :name, class: "portal-input", required: true %>
-              </div>
+              <% end %>
 
-              <div>
-                <%= ec.label :relationship, label_text("Relationship", required: true), class: "portal-label" %>
+              <%= portal_field "Relationship", for: ec.field_id(:relationship), required: true do %>
                 <%= ec.select :relationship, [["Select relationship", ""], "Parent", "Spouse/Partner", "Sibling", "Friend", "Colleague", "Other"], {}, class: "portal-select", required: true %>
-              </div>
+              <% end %>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <%= ec.label :phone, label_text("Phone Number", required: true), class: "portal-label" %>
+              <%= portal_field "Phone Number", for: ec.field_id(:phone), required: true do %>
                 <%= ec.telephone_field :phone, class: "portal-input", required: true %>
-              </div>
+              <% end %>
 
-              <div>
-                <%= ec.label :email, "Email", class: "portal-label" %>
+              <%= portal_field "Email", for: ec.field_id(:email) do %>
                 <%= ec.email_field :email, class: "portal-input" %>
-              </div>
+              <% end %>
             </div>
           <% end %>
         </div>
-      </section>
+      <% end %>
 
       <%# TODO: Additional Emergency Contacts section removed until nested-form controller is implemented %>
 

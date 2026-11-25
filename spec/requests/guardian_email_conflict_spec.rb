@@ -159,6 +159,22 @@ RSpec.describe "Guardian and participant email collisions", type: :request do
         .to eq("Guardian email cannot be the same as the participant's email address.")
     end
 
+    it "reuses a guardian typed in another case instead of adding a second row" do
+      existing = create(:guardian, email: "casey.parent@example.com")
+
+      expect {
+        post link_guardian_admin_event_participant_path(event.slug, participant_event),
+          params: {
+            guardian_email: "Casey.Parent@Example.com",
+            guardian_first_name: "Alex",
+            guardian_last_name: "Guardian",
+            guardian_relationship: "Parent"
+          }
+      }.to not_change(Guardian, :count).and change(GuardianParticipantEvent, :count).by(1)
+
+      expect(participant_event.guardians).to contain_exactly(existing)
+    end
+
     it "rejects it on the guardian edit form too" do
       gpe = create(:guardian_participant_event, participant_event: participant_event)
 

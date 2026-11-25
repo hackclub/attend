@@ -192,10 +192,12 @@ RSpec.describe "Content Security Policy", type: :request do
     end
   end
 
-  # The rooming wizard carried most of the inline handlers, and its partials
-  # (_room_card, _preference_links) render one script block per room and per
-  # participant, so the counts here also pin that the delegated listeners
-  # aren't being installed once per copy.
+  # The rooming wizard carried most of the inline handlers. _preference_links
+  # still renders one script block per participant, so its count also pins
+  # that the delegated listeners aren't being installed once per copy. The
+  # assignments step has none of its own: its drag and drop and room cards
+  # are Stimulus controllers (rooming-assignments, rooming-room,
+  # rooming-staff-modal).
   describe "the rooming wizard" do
     # The wizard needs a stay to room; one during the event is the usual.
     let(:event) { create(:event).tap(&:main_rooming_context) }
@@ -221,14 +223,16 @@ RSpec.describe "Content Security Policy", type: :request do
       )
     end
 
-    it "the assignments step is clean, with one script per room partial" do
+    it "the assignments step is clean, with no inline script of its own" do
       RoomingPlan.create!(rooming_context: event.main_rooming_context)
       2.times { |i| Room.create!(rooming_context: event.main_rooming_context, name: "Room #{i}", capacity: 2) }
 
-      expect_csp_clean(
-        assignments_admin_event_rooming_wizard_path(event.slug),
-        inline_scripts: admin_layout_inline_scripts + 1 + 2
-      )
+      expect_csp_clean(assignments_admin_event_rooming_wizard_path(event.slug), inline_scripts: admin_layout_inline_scripts)
+
+      page = Nokogiri::HTML5(response.body)
+      expect(page.css("[data-controller~='rooming-assignments']").size).to eq(1)
+      expect(page.css(".room-card[data-controller~='rooming-room']").size).to eq(2)
+      expect(page.css("#add-staff-modal[data-controller~='rooming-staff-modal']").size).to eq(1)
     end
 
     it "the finalize step is clean" do
