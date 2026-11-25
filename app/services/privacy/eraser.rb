@@ -280,6 +280,47 @@ module Privacy
       raise ManualReviewRequired, "identity_conflict"
     end
 
+    # The addresses and numbers a set of user, participant and guardian rows
+    # carry, from every source Identity::Backfill copies them from: an
+    # account's training details included.
+    def person_contacts(scopes)
+      rows = scopes.flat_map(&:to_a)
+      {
+        emails: rows.filter_map { |row| EmailAddress.normalize(row.email).presence },
+        phones: rows.flat_map { |row| row_phones(row) }.filter_map { |phone| PhoneNormalizer.normalize(phone) }
+      }
+    end
+
+    def row_phones(row)
+      return [ row.phone ] unless row.is_a?(User)
+
+      [ row.phone_number, row.training_profile&.phone_number ]
+    end
+
+    # Removes the erased rows' addresses and numbers from a person that
+    # outlives them, except any a row still on that person holds too.
+    def forget_erased_contacts(person, erased, subject_emails)
+      kept = person_contacts([ person.users, person.participants, person.guardians ])
+      emails = (erased[:emails] + subject_emails.map { |email| EmailAddress.normalize(email) }).uniq - kept[:emails]
+      phones = erased[:phones].uniq - kept[:phones]
+
+      person.email_addresses.where(address: emails).delete_all if emails.any?
+      person.phone_numbers.where(number: phones).delete_all if phones.any?
+    end
+
+    # A review names rows by id. The erased ones come out of it; one left
+    # naming fewer than two rows no longer asks anything, so it goes.
+    def forget_erased_reviews(ids)
+      IdentityReview.naming(ids).find_each do |review|
+        remaining = %i[user_ids participant_ids guardian_ids].index_with { |column| review.public_send(column) - ids }
+        if remaining.values.sum(&:size) < 2
+          review.delete
+        else
+          review.update_columns(remaining)
+        end
+      end
+    end
+
     # an empty list matches nothing. Matching on "" instead would sweep up
     # every row whose email is blank
     def email_in(model, column, emails)
@@ -413,6 +454,12 @@ module Privacy
       MessageDelivery.where(id: people.message_deliveries).destroy_all
       AutomatedSmsLog.where(id: people.sms_logs).delete_all
 
+      # read before the rows go: the person above them holds copies of their
+      # addresses and phone numbers (see Person)
+      erased_rows = [ User.where(id: users), Participant.where(id: people.participants), Guardian.where(id: people.guardians) ]
+      person_ids = erased_rows.flat_map { |scope| scope.where.not(person_id: nil).pluck(:person_id) }.uniq
+      erased_contacts = person_contacts(erased_rows) if person_ids.any?
+
       Participant.where(id: people.participants).destroy_all
       Guardian.where(id: people.guardians).destroy_all
 
@@ -425,6 +472,14 @@ module Privacy
       end
       McpConnectionSetting.where(resource_owner_id: owners).destroy_all
       User.where(id: users).destroy_all
+
+      # a person a row we kept still points at stays, minus the subject's
+      # own addresses and numbers
+      Person.unattached.where(id: person_ids).destroy_all
+      Person.where(id: person_ids).find_each do |person|
+        forget_erased_contacts(person, erased_contacts, people.emails)
+      end
+      forget_erased_reviews(ids) if ids.any?
 
       PaperTrail::Version.where(item_id: ids).delete_all
       AuditLog.where(record_id: ids).delete_all
