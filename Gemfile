@@ -38,7 +38,7 @@ gem "pundit"
 gem "view_component"
 
 # MCP server — Rails-native (toolboxes are controllers, tools are actions)
-gem "toolchest", "~> 0.3.7"
+gem "toolchest", "~> 0.4.0"
 # mcp 0.23.0 is the first release with fixes for the five 2026 transport
 # advisories (unbounded request body, SSE session poisoning, DNS rebinding,
 # unbounded stdio line buffer, unbounded session retention). toolchest 0.3.x
