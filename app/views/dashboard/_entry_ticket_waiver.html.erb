@@ -1,0 +1,14 @@
+<%# Freedom waiver state for the volunteer at the door.
+    locals: participant_event:, labelled: (true when a "Freedom waiver" label sits above it) %>
+<% labelled = local_assigns[:labelled] %>
+<% if participant_event.safeguarding_info&.freedom_waiver_granted? %>
+  <span class="ticket-badge ticket-badge-yes">
+    <svg class="size-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+    <%= labelled ? "Granted" : "Freedom waiver" %>
+  </span>
+<% else %>
+  <span class="ticket-badge ticket-badge-no">
+    <svg class="size-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    <%= labelled ? "Not granted" : "No freedom waiver" %>
+  </span>
+<% end %>

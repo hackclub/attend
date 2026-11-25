@@ -148,7 +148,7 @@ RSpec.describe "Onboarding welcome and done screens", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("You're all set!")
-      expect(response.body).to include("ENTRY TICKET")
+      expect(response.body).to include(%(id="entry-ticket-heading"))
       expect(response.body).to include("Bring a laptop!")
     end
 
@@ -165,7 +165,7 @@ RSpec.describe "Onboarding welcome and done screens", type: :request do
       completion = RegistrationCompletionPresenter.new(participant_event.reload, viewer: :participant)
       expect(completion).not_to be_confirmed
       expect(response.body).to include(completion.headline)
-      expect(response.body).not_to include("ENTRY TICKET")
+      expect(response.body).not_to include(%(id="entry-ticket-heading"))
     end
   end
 end

@@ -1422,3 +1422,204 @@
 /* A lazy section that turned out to have nothing to show (no suggestions)
  * takes no room, not even a stack gap. */
 turbo-frame.lazy-frame[complete]:not(:has(*)) { display: none; }
+
+/* ====================================================================
+ * Entry ticket (dashboard/_entry_ticket). A two-part ticket: the main
+ * part and a stub, joined by a perforation with a notch bitten out of
+ * each edge. The notches are cut with a mask so whatever is behind the
+ * ticket (paper, or a branded page's glow) shows through; a browser
+ * without mask support gets a plain rectangle, which still reads fine.
+ * `.ticket-split` turns the join vertical from `sm` up.
+ * ==================================================================== */
+@layer components {
+  .ticket {
+    --notch: 10px;
+    --notch-in: calc(var(--notch) + 0.5px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ticket-part {
+    min-width: 0;
+    background-color: var(--bg-elev);
+    border: 1px solid var(--border-card);
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+  }
+
+  .ticket-main {
+    border-bottom-width: 0;
+    border-radius: 0.5rem 0.5rem 0 0;
+    overflow: hidden;
+    -webkit-mask-image:
+      radial-gradient(circle at 0 100%, transparent var(--notch), #000 var(--notch-in)),
+      radial-gradient(circle at 100% 100%, transparent var(--notch), #000 var(--notch-in));
+    mask-image:
+      radial-gradient(circle at 0 100%, transparent var(--notch), #000 var(--notch-in)),
+      radial-gradient(circle at 100% 100%, transparent var(--notch), #000 var(--notch-in));
+    -webkit-mask-size: 51% 100%;
+    mask-size: 51% 100%;
+    -webkit-mask-position: left, right;
+    mask-position: left, right;
+  }
+
+  .ticket-stub {
+    border-top-width: 0;
+    border-radius: 0 0 0.5rem 0.5rem;
+    -webkit-mask-image:
+      radial-gradient(circle at 0 0, transparent var(--notch), #000 var(--notch-in)),
+      radial-gradient(circle at 100% 0, transparent var(--notch), #000 var(--notch-in));
+    mask-image:
+      radial-gradient(circle at 0 0, transparent var(--notch), #000 var(--notch-in)),
+      radial-gradient(circle at 100% 0, transparent var(--notch), #000 var(--notch-in));
+    -webkit-mask-size: 51% 100%;
+    mask-size: 51% 100%;
+    -webkit-mask-position: left, right;
+    mask-position: left, right;
+  }
+
+  /* The perforation: a dashed rule between the notches, plus the hairline
+   * around each notch (the mask cut the parts' own border away there). */
+  .ticket-perf {
+    position: relative;
+    height: 1px;
+    margin: 0 var(--notch);
+    background-image: linear-gradient(to right, var(--border-strong) 55%, var(--bg-elev) 0);
+    background-size: 9px 1px;
+    background-color: var(--bg-elev);
+  }
+
+  .ticket-perf::before,
+  .ticket-perf::after {
+    content: "";
+    position: absolute;
+    top: calc(0.5px - var(--notch));
+    width: calc(var(--notch) * 2);
+    height: calc(var(--notch) * 2);
+    border: 1px solid var(--border-card);
+    border-radius: 9999px;
+  }
+
+  .ticket-perf::before {
+    left: calc(var(--notch) * -2);
+    clip-path: inset(0 0 0 50%);
+  }
+
+  .ticket-perf::after {
+    right: calc(var(--notch) * -2);
+    clip-path: inset(0 50% 0 0);
+  }
+
+  @media (min-width: 40rem) {
+    .ticket-split {
+      flex-direction: row;
+    }
+
+    .ticket-split .ticket-main {
+      flex: 1 1 auto;
+      border-bottom-width: 1px;
+      border-right-width: 0;
+      border-radius: 0.5rem 0 0 0.5rem;
+      -webkit-mask-image:
+        radial-gradient(circle at 100% 0, transparent var(--notch), #000 var(--notch-in)),
+        radial-gradient(circle at 100% 100%, transparent var(--notch), #000 var(--notch-in));
+      mask-image:
+        radial-gradient(circle at 100% 0, transparent var(--notch), #000 var(--notch-in)),
+        radial-gradient(circle at 100% 100%, transparent var(--notch), #000 var(--notch-in));
+      -webkit-mask-size: 100% 51%;
+      mask-size: 100% 51%;
+      -webkit-mask-position: top, bottom;
+      mask-position: top, bottom;
+    }
+
+    .ticket-split .ticket-stub {
+      flex: 0 0 auto;
+      border-top-width: 1px;
+      border-left-width: 0;
+      border-radius: 0 0.5rem 0.5rem 0;
+      -webkit-mask-image:
+        radial-gradient(circle at 0 0, transparent var(--notch), #000 var(--notch-in)),
+        radial-gradient(circle at 0 100%, transparent var(--notch), #000 var(--notch-in));
+      mask-image:
+        radial-gradient(circle at 0 0, transparent var(--notch), #000 var(--notch-in)),
+        radial-gradient(circle at 0 100%, transparent var(--notch), #000 var(--notch-in));
+      -webkit-mask-size: 100% 51%;
+      mask-size: 100% 51%;
+      -webkit-mask-position: top, bottom;
+      mask-position: top, bottom;
+    }
+
+    .ticket-split .ticket-perf {
+      width: 1px;
+      height: auto;
+      margin: var(--notch) 0;
+      background-image: linear-gradient(to bottom, var(--border-strong) 55%, var(--bg-elev) 0);
+      background-size: 1px 9px;
+    }
+
+    .ticket-split .ticket-perf::before,
+    .ticket-split .ticket-perf::after {
+      left: calc(0.5px - var(--notch));
+      right: auto;
+    }
+
+    .ticket-split .ticket-perf::before {
+      top: calc(var(--notch) * -2);
+      clip-path: inset(50% 0 0 0);
+    }
+
+    .ticket-split .ticket-perf::after {
+      top: auto;
+      bottom: calc(var(--notch) * -2);
+      clip-path: inset(0 0 50% 0);
+    }
+  }
+
+  /* The Hack Club red edge along the top of the ticket. Branded series
+   * recolour it (brand.css, .entry-ticket-header). */
+  .ticket-edge {
+    height: 3px;
+    background-color: var(--accent);
+  }
+
+  /* The QR always sits on literal white: themes.css remaps --color-white
+   * to the theme surface, which would put black modules on a dark tile. */
+  .ticket-qr {
+    background-color: #ffffff;
+    border-radius: 0.375rem;
+  }
+
+  .ticket-qr svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  /* Freedom waiver state, for the volunteer at the door. Tint + word. */
+  .ticket-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.125rem 0.625rem 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+  }
+
+  .ticket-badge-yes {
+    background-color: color-mix(in oklab, var(--success) 18%, var(--bg-elev));
+    color: color-mix(in oklab, var(--success) 30%, var(--text-strong));
+  }
+
+  .ticket-badge-no {
+    background-color: color-mix(in oklab, var(--danger) 14%, var(--bg-elev));
+    color: color-mix(in oklab, var(--danger) 35%, var(--text-strong));
+  }
+
+  .ticket-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-soft);
+  }
+}
