@@ -22,7 +22,9 @@ class DuplicateParticipantScan
     end
   end
 
-  PLACEHOLDER = Participant::NAME_PLACEHOLDER
+  # Only matters to a merge, which would delete the row that owns the profile.
+  # It says nothing about whether the rows are one person.
+  PUBLIC_PROFILE_FLAG = "duplicate owns the public profile".freeze
 
   def initialize(emails: nil)
     @emails = emails&.map { |email| email.to_s.downcase.strip }&.reject(&:empty?)
@@ -48,6 +50,17 @@ class DuplicateParticipantScan
     emails - duplicate_emails
   end
 
+  # The signals that rows sharing an address may not be one human. Reads only
+  # legal_first_name, legal_last_name, date_of_birth and user_id, so it works
+  # on light rows too (Identity::Backfill passes structs, not records).
+  def identity_flags(rows)
+    flags = []
+    flags << "name mismatch" unless names_agree?(rows)
+    flags << "date of birth mismatch" if rows.filter_map(&:date_of_birth).uniq.size > 1
+    flags << "linked to different accounts" if rows.filter_map(&:user_id).uniq.size > 1
+    flags
+  end
+
   private
 
   attr_reader :emails
@@ -69,34 +82,19 @@ class DuplicateParticipantScan
   end
 
   def flags_for(rows, primary)
-    flags = []
-    flags << "name mismatch" unless names_agree?(rows)
-    flags << "date of birth mismatch" if rows.filter_map(&:date_of_birth).uniq.size > 1
-    flags << "linked to different accounts" if rows.filter_map(&:user_id).uniq.size > 1
+    flags = identity_flags(rows)
 
     # ParticipantMergeService doesn't carry public-profile fields across, so
     # merging away the row that owns an enabled profile would silently delete
     # someone's /p/ page and free up their slug.
     if (rows - [ primary ]).any?(&:public_profile_enabled?) && !primary.public_profile_enabled?
-      flags << "duplicate owns the public profile"
+      flags << PUBLIC_PROFILE_FLAG
     end
 
     flags
   end
 
-  # Legal names are entered by hand on both sides — imports, OIDC claims and
-  # admins all disagree about spacing, case and which name is the "first" one.
-  # Agreement on the normalised full name, or on the first name alone, is enough
-  # to call it one person; anything else gets flagged for review.
   def names_agree?(rows)
-    full = rows.map { |row| normalise([ row.legal_first_name, row.legal_last_name ].join(" ")) }
-    return true if full.uniq.size == 1
-
-    firsts = rows.map { |row| normalise(row.legal_first_name) }.reject { |name| name.empty? || name == normalise(PLACEHOLDER) }
-    firsts.any? && firsts.uniq.size == 1
-  end
-
-  def normalise(value)
-    value.to_s.downcase.gsub(/[^a-z0-9]/, " ").squish
+    Identity::NameMatch.agree?(rows.map { |row| [ row.legal_first_name, row.legal_last_name ] })
   end
 end

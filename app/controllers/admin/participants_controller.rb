@@ -187,7 +187,8 @@ module Admin
         return
       end
 
-      guardian = Guardian.find_or_initialize_by(email: guardian_email)
+      guardian = Guardian.where(email: guardian_email).order(:created_at).first ||
+        Guardian.new(email: guardian_email)
       guardian.assign_attributes(
         legal_first_name: params[:guardian_first_name],
         legal_last_name: params[:guardian_last_name],

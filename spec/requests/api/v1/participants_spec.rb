@@ -256,6 +256,16 @@ RSpec.describe "Api::V1::Participants", type: :request do
       expect(body["participant_id"]).to eq(participant.id)
     end
 
+    it "finds a participant whatever case the email is sent in" do
+      participant = create(:participant, email: "casey.voter@example.com")
+      create(:participant_event, participant: participant, event: event)
+
+      get "/api/v1/events/#{event.id}/participants/lookup",
+        params: { email: " Casey.Voter@Example.com" }, headers: api_key_headers
+
+      expect(JSON.parse(response.body)).to include("registered" => true, "participant_id" => participant.id)
+    end
+
     it "reports a non-participant as not registered" do
       get "/api/v1/events/#{event.id}/participants/lookup",
         params: { email: "stranger@example.com" }, headers: api_key_headers
