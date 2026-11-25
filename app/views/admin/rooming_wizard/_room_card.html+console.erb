@@ -1,5 +1,5 @@
 <% close_icon = capture do %><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8m0-8l-8 8"/></svg><% end %>
-<div id="room_<%= room.id %>" class="cs-card room-card" data-room-id="<%= room.id %>" draggable="<%= !@rooming_plan.locked? %>">
+<div id="room_<%= room.id %>" class="cs-card room-card" data-room-id="<%= room.id %>" draggable="<%= !@rooming_plan.locked? %>" data-controller="rooming-room">
   <!-- Room Header -->
   <div class="pb-3 border-b border-(--cs-border-divider-secondary) <%= 'cursor-move' unless @rooming_plan.locked? %>">
     <div class="flex items-start justify-between gap-2">
@@ -12,14 +12,16 @@
             <%= room.display_name %>
           </h3>
         <% else %>
-          <h3 class="cs-card-title truncate rounded hover:bg-(--cs-bg-hover) hover:px-1 cursor-text room-name-display"
-              title="Click to rename">
+          <h3 class="cs-card-title truncate rounded hover:bg-(--cs-bg-hover) hover:px-1 cursor-text"
+              title="Click to rename"
+              data-rooming-room-target="nameDisplay" data-action="click->rooming-room#editName">
             <%= room.display_name %>
           </h3>
           <input type="text"
-                 class="hidden min-w-0 rounded-(--cs-radius-item) border border-(--cs-border-input) bg-(--cs-bg-input) px-2 py-0.5 text-sm font-bold room-name-input"
+                 class="hidden min-w-0 rounded-(--cs-radius-item) border border-(--cs-border-input) bg-(--cs-bg-input) px-2 py-0.5 text-sm font-bold"
                  value="<%= room.name %>"
                  placeholder="Room name"
+                 data-rooming-room-target="nameInput" data-action="blur->rooming-room#saveName keydown->rooming-room#nameKey"
                  aria-label="Room name"
                  >
         <% end %>
@@ -28,7 +30,7 @@
         </span>
       </div>
       <% unless @rooming_plan.locked? %>
-        <button type="button" data-delete-room="<%= room.id %>" class="cs-btn-inline-icon" aria-label="Delete room">
+        <button type="button" data-action="rooming-room#delete" class="cs-btn-inline-icon" aria-label="Delete room">
           <%= close_icon %>
         </button>
       <% end %>
@@ -68,7 +70,7 @@
           </div>
           <% unless @rooming_plan.locked? %>
             <button type="button"
-                    data-remove-staff="<%= room.id %>" data-staff-name="<%= staff_name %>"
+                    data-staff-name="<%= staff_name %>" data-action="rooming-room#removeStaff"
                     class="cs-btn-inline-icon" aria-label="Remove <%= staff_name %>">
               <%= close_icon %>
             </button>
@@ -119,7 +121,7 @@
             <%= cs_status_icon(:warning) %>
             <div class="cs-small">
               <p>Trans/NB pairing requires acknowledgment</p>
-              <button type="button" data-acknowledge-trans-nb="<%= assignment.id %>" class="cs-link cs-link-strong cursor-pointer">
+              <button type="button" data-acknowledge-trans-nb="<%= assignment.id %>" data-action="rooming-room#acknowledge" class="cs-link cs-link-strong cursor-pointer">
                 Mark as acknowledged
               </button>
             </div>
@@ -136,7 +138,7 @@
           <p>or</p>
           <div class="cs-actions">
             <button type="button"
-                    data-add-staff-room="<%= room.id %>"
+                    data-action="rooming-room#addStaff"
                     class="cs-btn">
               Add staff
             </button>
@@ -145,156 +147,10 @@
       </div>
     <% elsif room.has_staff? && room.remaining_capacity > 0 && !@rooming_plan.locked? %>
       <button type="button"
-              data-add-staff-room="<%= room.id %>"
+              data-action="rooming-room#addStaff"
               class="cs-btn w-full">
         Add another staff (<%= room.remaining_capacity %> spots left)
       </button>
     <% end %>
   </div>
 </div>
-
-<script nonce="<%= content_security_policy_nonce %>">
-async function deleteRoom(roomId) {
-  await fetch('<%= destroy_room_admin_event_rooming_wizard_path(@event.slug) %>', {
-    method: 'DELETE',
-    headers: {
-      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: 'room_id=' + roomId
-  });
-  document.getElementById('room_' + roomId)?.remove();
-}
-
-async function removeStaff(roomId, staffName) {
-  if (!confirm('Remove ' + staffName + ' from this room?')) return;
-  
-  const response = await fetch('<%= remove_staff_admin_event_rooming_wizard_path(@event.slug) %>', {
-    method: 'DELETE',
-    headers: {
-      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
-      'Accept': 'text/vnd.turbo-stream.html',
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: 'room_id=' + roomId + '&staff_name=' + encodeURIComponent(staffName)
-  });
-  
-  if (response.ok) {
-    const html = await response.text();
-    Turbo.renderStreamMessage(html);
-  }
-}
-
-function showAddStaffModal(roomId) {
-  document.getElementById('add-staff-room-id').value = roomId;
-  document.getElementById('add-staff-name').value = '';
-  document.getElementById('add-staff-modal').classList.remove('hidden');
-  document.getElementById('add-staff-name').focus();
-}
-
-function startEditRoomName(event, roomId) {
-  event.stopPropagation();
-  const card = document.getElementById('room_' + roomId);
-  if (!card) return;
-  const display = card.querySelector('.room-name-display');
-  const input = card.querySelector('.room-name-input');
-  if (!display || !input) return;
-  display.classList.add('hidden');
-  input.classList.remove('hidden');
-  input.focus();
-  input.select();
-}
-
-function handleRoomNameKey(event, roomId) {
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    event.target.blur();
-  } else if (event.key === 'Escape') {
-    event.preventDefault();
-    const card = document.getElementById('room_' + roomId);
-    const display = card.querySelector('.room-name-display');
-    const input = card.querySelector('.room-name-input');
-    input.value = input.defaultValue;
-    input.classList.add('hidden');
-    display.classList.remove('hidden');
-  }
-}
-
-async function saveRoomName(roomId, name) {
-  const card = document.getElementById('room_' + roomId);
-  const display = card.querySelector('.room-name-display');
-  const input = card.querySelector('.room-name-input');
-  input.classList.add('hidden');
-  display.classList.remove('hidden');
-
-  if (input.defaultValue === name) return;
-
-  const response = await fetch('<%= update_room_admin_event_rooming_wizard_path(@event.slug) %>', {
-    method: 'PATCH',
-    headers: {
-      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
-      'Accept': 'text/vnd.turbo-stream.html',
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: 'room_id=' + roomId + '&name=' + encodeURIComponent(name)
-  });
-
-  if (response.ok) {
-    const html = await response.text();
-    Turbo.renderStreamMessage(html);
-    if (typeof initDragAndDrop === 'function') setTimeout(initDragAndDrop, 100);
-    if (typeof initRoomReorder === 'function') setTimeout(initRoomReorder, 100);
-  } else {
-    alert('Failed to rename room');
-  }
-}
-
-// This partial renders once per room, so the script block repeats. Delegate
-// from document and install only once, which also survives the Turbo Stream
-// re-renders above replacing the cards.
-if (!window.roomCardHandlersInstalled) {
-  window.roomCardHandlersInstalled = true;
-
-  const roomIdOf = (el) => el.closest('[data-room-id]')?.dataset.roomId;
-
-  document.addEventListener('click', (event) => {
-    const deleteButton = event.target.closest('[data-delete-room]');
-    if (deleteButton) {
-      if (confirm('Delete this room?')) deleteRoom(deleteButton.dataset.deleteRoom);
-      return;
-    }
-
-    const removeStaffButton = event.target.closest('[data-remove-staff]');
-    if (removeStaffButton) {
-      removeStaff(removeStaffButton.dataset.removeStaff, removeStaffButton.dataset.staffName);
-      return;
-    }
-
-    const acknowledgeButton = event.target.closest('[data-acknowledge-trans-nb]');
-    if (acknowledgeButton) {
-      acknowledgeTransNb(acknowledgeButton.dataset.acknowledgeTransNb);
-      return;
-    }
-
-    const addStaffButton = event.target.closest('[data-add-staff-room]');
-    if (addStaffButton) {
-      showAddStaffModal(addStaffButton.dataset.addStaffRoom);
-      return;
-    }
-
-    const nameDisplay = event.target.closest('.room-name-display');
-    if (nameDisplay) startEditRoomName(event, roomIdOf(nameDisplay));
-  });
-
-  // focusout rather than blur: blur doesn't bubble, so it never reaches document.
-  document.addEventListener('focusout', (event) => {
-    const input = event.target.closest('.room-name-input');
-    if (input) saveRoomName(roomIdOf(input), input.value);
-  });
-
-  document.addEventListener('keydown', (event) => {
-    const input = event.target.closest('.room-name-input');
-    if (input) handleRoomNameKey(event, roomIdOf(input));
-  });
-}
-</script>

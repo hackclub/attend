@@ -2,21 +2,6 @@ module RegistrationChangeRequests
   class Approve
     IDENTITY_FIELDS = %w[legal_first_name legal_last_name date_of_birth].freeze
     GUARDIAN_FIELDS = %w[legal_first_name legal_last_name email phone relationship].freeze
-    RESET_FIELDS = {
-      status: :pending,
-      docuseal_envelope_id: nil,
-      docuseal_participant_slug: nil,
-      docuseal_guardian_slug: nil,
-      docuseal_template_id: nil,
-      participant_signed_at: nil,
-      guardian_signed_at: nil,
-      signed_at: nil,
-      document_url: nil,
-      documents: [],
-      failure_reason: nil,
-      pending_on: nil,
-      sent_at: nil
-    }.freeze
     # Set automatically, so it is written for staff. Participants see a
     # generic "staff will be in touch" message instead (see #mark_follow_up).
     SHARED_IDENTITY_FOLLOW_UP = "This identity is shared across events with signed registrations. " \
@@ -107,32 +92,12 @@ module RegistrationChangeRequests
       end
 
       attributes = details.normalized_changes
-      relationship = attributes.delete("relationship")
-      guardian = Guardian.new(attributes)
-      validate_guardian_separation!(guardian, participant_event.participant)
-      guardian.save!
-
-      new_link = participant_event.guardian_participant_events.create!(
-        guardian: guardian,
-        relationship: relationship,
-        is_primary_guardian: old_link&.is_primary_guardian? || participant_event.guardian_participant_events.none?,
-        status: :pending,
-        invite_token_sent_at: nil,
-        invite_last_used_at: nil
-      )
-
-      guardian_dependent_consents.each do |consent|
-        consent.update!(RESET_FIELDS.merge(guardian_participant_event: new_link))
-      end
-      old_link.emergency_contacts.find_each do |emergency_contact|
-        emergency_contact.update!(guardian_participant_event: new_link)
-      end
-      participant_event.safeguarding_info&.update!(freedom_waiver_granted: false)
-      old_link&.destroy!
-      # A submitted registration goes back to waiting on the new guardian;
-      # one the participant hasn't submitted yet is still theirs to finish,
-      # and the new guardian is invited when they do.
-      participant_event.sync_status!(cause: :guardian_replaced)
+      Guardians::Replacement.new(
+        participant_event: participant_event,
+        old_link: old_link,
+        attributes: attributes.except("relationship"),
+        relationship: attributes["relationship"]
+      ).call
       mark_approved
     end
 
@@ -162,31 +127,15 @@ module RegistrationChangeRequests
     end
 
     def validate_guardian_separation!(guardian, participant)
-      participant_email = participant.email.to_s.strip.downcase
-      guardian_email = guardian.email.to_s.strip.downcase
-      if guardian_email.present? && guardian_email == participant_email
-        guardian.errors.add(:email, "cannot be the same as the participant's email address")
-      end
-
-      participant_phone = PhoneNormalizer.normalize(participant.phone)
-      guardian_phone = PhoneNormalizer.normalize(guardian.phone)
-      if guardian_phone.present? && guardian_phone == participant_phone
-        guardian.errors.add(:phone, "cannot be the same as the participant's phone number")
-      end
-
-      raise ActiveRecord::RecordInvalid, guardian if guardian.errors.any?
+      Guardians::Replacement.validate_separation!(guardian, participant)
     end
 
     def guardian_dependent_consents
-      request.participant_event.consents.includes(:custom_document).select do |consent|
-        consent.waiver? || consent.freedom_waiver? || consent.custom_document&.guardian_signs?
-      end
+      Guardians::Replacement.dependent_consents(request.participant_event)
     end
 
     def guardian_change_needs_manual_follow_up?
-      guardian_dependent_consents.any? do |consent|
-        consent.custom_document&.physical? && consent.physical_uploads.attached?
-      end
+      Guardians::Replacement.needs_manual_follow_up?(request.participant_event)
     end
 
     def mark_approved
@@ -216,11 +165,7 @@ module RegistrationChangeRequests
       end
 
       SendPendingGuardianInvitesJob.perform_later(request.participant_event.event_id)
-      guardian_dependent_consents.each do |consent|
-        next unless consent.custom_document&.electronic?
-
-        DocusealJobs::CreateCustomDocumentJob.perform_later(consent.id)
-      end
+      Guardians::Replacement.enqueue_custom_documents(request.participant_event)
     end
   end
 end

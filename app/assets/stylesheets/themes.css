@@ -533,6 +533,7 @@
   --color-amber-700: #fcd34d;
   --color-amber-800: #fde68a;
   --color-amber-900: #fef3c7;
+  --color-amber-950: #fffbeb;
 
   --color-yellow-50:  color-mix(in oklab, #eab308 14%, var(--bg-elev));
   --color-yellow-100: color-mix(in oklab, #eab308 22%, var(--bg-elev));

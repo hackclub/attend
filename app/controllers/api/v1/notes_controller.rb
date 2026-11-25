@@ -2,6 +2,7 @@ module Api
   module V1
     class NotesController < BaseController
       include Pundit::Authorization
+      include Api::V1::ApiAuditing
 
       before_action :reject_api_key_auth
       before_action :set_event
@@ -18,20 +19,20 @@ module Api
       end
 
       def create
-        note = @participant_event.notes.build(
+        result = Notes::Create.call(operation_context, participant_event: @participant_event, attributes: {
           body: params[:content],
-          event: @event,
-          author: current_user,
           note_type: params[:note_type] || "ops",
           sensitivity: params[:sensitivity] || "normal"
-        )
+        })
 
-        if note.restricted? && !Note.restricted_visible_to?(current_user, @event)
+        if result.success?
+          render json: { note: note_json(result.value) }, status: :created
+        elsif result.code == :restricted_not_allowed
           render json: { error: "Only event admins and safeguarding leads can add restricted notes" }, status: :forbidden
-        elsif note.save
-          render json: { note: note_json(note) }, status: :created
+        elsif result.code == :invalid
+          render json: { error: result.record.errors.full_messages.join(", ") }, status: :unprocessable_entity
         else
-          render json: { error: note.errors.full_messages.join(", ") }, status: :unprocessable_entity
+          render json: { error: result.message }, status: :unprocessable_entity
         end
       end
 

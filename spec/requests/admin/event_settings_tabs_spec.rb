@@ -7,10 +7,10 @@ RSpec.describe "Admin event settings tabs", type: :request do
   include Devise::Test::IntegrationHelpers
 
   let(:event) { create(:event) }
-  let(:admin) { User.create!(email: "settings-tabs-admin@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: true) }
+  let(:admin) { User.create!(email: "settings-tabs-admin@example.com", name: "Admin", global_role: "global_admin") }
 
   def staff_with(role, console: true)
-    User.create!(email: "settings-tabs-#{role}@example.com", name: role.titleize, admin_console_beta: console).tap do |user|
+    User.create!(email: "settings-tabs-#{role}@example.com", name: role.titleize).tap do |user|
       EventRoleAssignment.create!(user: user, event: event, role: role)
     end
   end
@@ -147,45 +147,10 @@ RSpec.describe "Admin event settings tabs", type: :request do
     end
   end
 
-  describe "in the original admin" do
-    before do
-      admin.update!(admin_console_beta: false)
-      sign_in admin
-    end
-
-    it "sends the console-only tabs to the page that still holds their settings" do
-      get features_admin_event_path(event)
-      expect(response).to redirect_to(edit_admin_event_path(event))
-
-      get admin_event_documents_path(event)
-      expect(response).to redirect_to(admin_event_integrations_path(event))
-
-      get admin_event_api_access_path(event)
-      expect(response).to redirect_to(admin_event_integrations_path(event))
-    end
-
-    it "keeps a one-time token visible through the extra redirect" do
-      post admin_event_api_tokens_path(event.slug), params: { name: "fictional-widget-sync" }
-      expect(response).to redirect_to(admin_event_api_access_path(event))
-
-      follow_redirect!
-      expect(response).to redirect_to(admin_event_integrations_path(event))
-
-      follow_redirect!
-      expect(response.body).to include("Copy this token now")
-    end
-
-    it "still goes back to the overview after saving its single form" do
-      patch admin_event_path(event), params: { event: { venue_name: "Fictional Hall" } }
-
-      expect(response).to redirect_to(admin_event_dashboard_path(event))
-    end
-  end
-
   describe "series settings" do
     let(:series) { create(:event_series, name: "Fictional Series", slug: "fictional-settings-series") }
     let(:owner) do
-      User.create!(email: "settings-tabs-owner@example.com", name: "Owner", admin_console_beta: true).tap do |user|
+      User.create!(email: "settings-tabs-owner@example.com", name: "Owner").tap do |user|
         SeriesRoleAssignment.create!(user: user, event_series: series, role: "owner")
       end
     end

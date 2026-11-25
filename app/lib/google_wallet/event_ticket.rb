@@ -51,7 +51,7 @@ module GoogleWallet
         options: {
           barcode: {
             type: "QR_CODE",
-            value: "attend://checkin/#{participant.id}",
+            value: CheckinCode.for(participant_event),
             alternateText: participant.id.split("-").first.upcase
           }
         }

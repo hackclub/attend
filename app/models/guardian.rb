@@ -10,6 +10,7 @@ class Guardian < ApplicationRecord
   encrypts :address_line_1, :address_line_2, :city, :state, :postal_code, :country
 
   belongs_to :user, optional: true
+  belongs_to :person, optional: true
   has_many :guardian_participant_events, dependent: :destroy
   has_many :participant_events, through: :guardian_participant_events
   has_many :participants, through: :participant_events, source: :participant
@@ -23,6 +24,9 @@ class Guardian < ApplicationRecord
   # own consent by reading their "guardian's" mail. Only checked when the email
   # actually changes, so pre-existing rows can still be edited otherwise.
   validate :email_differs_from_participants, if: :will_save_change_to_email?
+
+  # Stored stripped and downcased; see the note on Participant.
+  normalizes :email, with: EmailAddress::NORMALIZER
 
   normalizes_phone_number :phone
 

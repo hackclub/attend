@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Admin::Dashboard#index", type: :request do
   include Devise::Test::IntegrationHelpers
 
-  let(:global_admin) { User.create!(email: "ga-events@example.com", name: "Global Admin", global_role: "global_admin", admin_console_beta: false) }
+  let(:global_admin) { User.create!(email: "ga-events@example.com", name: "Global Admin", global_role: "global_admin") }
 
   before { sign_in global_admin }
 
@@ -57,19 +57,7 @@ RSpec.describe "Admin::Dashboard#index", type: :request do
     let!(:first_event) { create(:event, name: "Series Stop One", slug: "series-stop-one", event_series: series, starts_at: 1.week.from_now, ends_at: 1.week.from_now + 2.days) }
     let!(:second_event) { create(:event, name: "Series Stop Two", slug: "series-stop-two", event_series: series, starts_at: 2.weeks.from_now, ends_at: 2.weeks.from_now + 2.days) }
 
-    it "renders the series as a collapsed group holding both events" do
-      get admin_root_path
-
-      group = Nokogiri::HTML(response.body).at_css("details.group\\/series")
-      expect(group).to be_present
-      expect(group.key?("open")).to be(false)
-      expect(group.at_css("summary").text).to include("Example Series")
-      expect(group.css("a").map { |link| link["href"] }).to include("/admin/series-stop-one", "/admin/series-stop-two")
-    end
-
     context "with the admin console beta" do
-      before { global_admin.update!(admin_console_beta: true) }
-
       it "renders the series as a collapsed row group with a toggle" do
         get admin_root_path
 
@@ -87,16 +75,7 @@ RSpec.describe "Admin::Dashboard#index", type: :request do
   describe "when every visible event has finished" do
     let!(:finished) { create(:event, slug: "finished", starts_at: 1.month.ago, ends_at: 3.weeks.ago) }
 
-    it "explains the gap instead of rendering a bare heading" do
-      get admin_root_path
-
-      expect(response.body).to include("Nothing running right now")
-      expect(response.body).to include('<details class="mt-6 group/completed" open>')
-    end
-
     context "with the admin console beta" do
-      before { global_admin.update!(admin_console_beta: true) }
-
       it "explains the gap and opens the completed section" do
         get admin_root_path
 

@@ -11,10 +11,8 @@ RSpec.describe "Missing arrival window banner", type: :request do
     get select_admin_event_path(slug: event.slug)
   end
 
-  [ true, false ].each do |console|
+  [ true ].each do |console|
     it "shows on every page of an event with no arrival window (#{console ? "console" : "original"})" do
-      admin.update!(admin_console_beta: console)
-
       get admin_event_dashboard_path(event.slug)
       expect(response.body).to include('data-testid="arrival-window-banner"')
       expect(response.body).to include(edit_admin_event_path(event, anchor: "arrival-window"))
@@ -24,10 +22,8 @@ RSpec.describe "Missing arrival window banner", type: :request do
     end
   end
 
-  [ true, false ].each do |console|
+  [ true ].each do |console|
     it "stays off pages that aren't about any one event (#{console ? "console" : "original"})" do
-      admin.update!(admin_console_beta: console)
-
       [ admin_root_path, admin_new_event_path, admin_users_path, admin_visa_letter_templates_path, admin_audit_logs_path ].each do |path|
         get path
         expect(response).to have_http_status(:ok)

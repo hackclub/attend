@@ -2,7 +2,8 @@ module Api
   module V1
     class NfcBadgesController < BaseController
       before_action :set_event
-      before_action :require_event_access
+      # Every action here mints, assigns, or resets a badge token.
+      before_action :require_event_write_access
       before_action :set_participant_event
 
       def ensure
@@ -86,8 +87,8 @@ module Api
         @event = Event.find(params[:event_id])
       end
 
-      def require_event_access
-        require_event_access!(@event)
+      def require_event_write_access
+        require_event_write_access!(@event)
       end
 
       def set_participant_event

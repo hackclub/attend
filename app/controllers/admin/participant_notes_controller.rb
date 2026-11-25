@@ -5,20 +5,16 @@ module Admin
     before_action :set_note, only: [ :destroy ]
 
     def create
-      @note = @participant_event.notes.build(note_params)
-      @note.event = current_event
-      @note.author = current_user
+      result = Notes::Create.call(operation_context, participant_event: @participant_event, attributes: note_params)
+      @note = result.value || result.record
+      participant_path = admin_event_participant_path(current_event, @participant_event)
 
-      if @note.restricted? && !Note.restricted_visible_to?(current_user, current_event)
-        redirect_to admin_event_participant_path(current_event, @participant_event),
-          alert: "Only event admins and safeguarding leads can add restricted notes."
-        return
-      end
-
-      if @note.save
-        redirect_to admin_event_participant_path(current_event, @participant_event), notice: "Note added successfully."
+      if result.success?
+        redirect_to participant_path, notice: "Note added successfully."
+      elsif result.code == :invalid
+        redirect_to participant_path, alert: "Failed to add note: #{@note.errors.full_messages.join(', ')}"
       else
-        redirect_to admin_event_participant_path(current_event, @participant_event), alert: "Failed to add note: #{@note.errors.full_messages.join(', ')}"
+        redirect_to participant_path, alert: result.message
       end
     end
 

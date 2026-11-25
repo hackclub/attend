@@ -1,8 +1,13 @@
 module Api
   module V1
     class BaseController < ActionController::API
+      include ReplicaReadRouting
+
       before_action :authenticate_token!
       before_action :authorize_token_scope!
+      # After authentication, so tokens are always looked up on the primary.
+      # A no-op unless replica reads are switched on (ReplicaReads).
+      route_reads_to_replica
 
       attr_reader :current_user, :current_token, :current_event_from_api_key,
                   :current_series_from_api_key, :current_series_api_token,
@@ -116,6 +121,17 @@ module Api
         header.split(" ").last
       end
 
+      # Read-your-own-writes is per credential here: there's no session. Keyed
+      # on the credential authenticate_token! resolved, so a caller sending
+      # tokens that don't authenticate never gets a cache entry.
+      def replica_reads_principal
+        credential = @current_token || @current_event_api_token || @current_series_api_token
+        return "#{credential.class.name}:#{credential.id}" if credential
+        return "event_api_key:#{@current_event_from_api_key.id}" if @current_event_from_api_key
+
+        nil
+      end
+
       # True when the caller authenticated with an API key rather than a
       # person. There is no current_user on these requests, so endpoints that
       # need one have to keep them out explicitly.
@@ -153,6 +169,20 @@ module Api
         end
 
         unless current_user.can_access_event?(event)
+          render json: { error: "Forbidden" }, status: :forbidden
+        end
+      end
+
+      # require_event_access! for actions that change something. Any event
+      # role passes the read gate, including read_only, so every write behind
+      # it needs this one instead.
+      def require_event_write_access!(event)
+        if current_user.nil?
+          render json: { error: "API key is not authorized for this action" }, status: :forbidden
+          return
+        end
+
+        unless current_user.can_change_event?(event)
           render json: { error: "Forbidden" }, status: :forbidden
         end
       end

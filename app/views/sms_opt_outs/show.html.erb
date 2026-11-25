@@ -5,21 +5,21 @@
 
   <h1 class="portal-title text-2xl mb-3">Text messages</h1>
 
-  <div class="portal-card p-5 sm:p-6">
+  <%= portal_card class: "p-5 sm:p-6" do %>
     <% if @opted_out %>
       <p class="portal-body mb-4">
         Texts and WhatsApp messages about Hack Club events are off for the number ending <strong><%= @phone.last(4) %></strong>.
         You'll still get emails, and codes you ask for.
       </p>
       <%= button_to "Turn texts back on", sms_opt_out_path(params[:token]), method: :delete,
-            class: "portal-btn portal-btn-secondary w-full sm:w-auto", data: { turbo: false } %>
+            class: portal_button_classes(:secondary, "w-full sm:w-auto"), data: { turbo: false } %>
     <% else %>
       <p class="portal-body mb-4">
         Stop texts and WhatsApp messages about Hack Club events to the number ending <strong><%= @phone.last(4) %></strong>?
         You'll still get emails, and codes you ask for.
       </p>
       <%= button_to "Stop texts", sms_opt_out_path(params[:token]), method: :post,
-            class: "portal-btn portal-btn-primary w-full sm:w-auto", data: { turbo: false } %>
+            class: portal_button_classes(:primary, "w-full sm:w-auto"), data: { turbo: false } %>
     <% end %>
-  </div>
+  <% end %>
 </div>

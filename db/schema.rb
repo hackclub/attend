@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_23_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -398,6 +398,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
     t.index ["participant_event_id"], name: "index_dietaries_on_participant_event_id"
   end
 
+  create_table "email_addresses", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "person_id", null: false
+    t.string "address", null: false
+    t.datetime "verified_at"
+    t.boolean "primary", default: false, null: false
+    t.string "source", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["address"], name: "index_email_addresses_on_address"
+    t.index ["address"], name: "index_email_addresses_on_verified_address", unique: true, where: "(verified_at IS NOT NULL)"
+    t.index ["person_id", "address"], name: "index_email_addresses_on_person_id_and_address", unique: true
+    t.index ["person_id"], name: "index_email_addresses_on_primary_per_person", unique: true, where: "\"primary\""
+  end
+
   create_table "email_log_events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.uuid "email_log_id", null: false
@@ -464,6 +478,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
     t.index ["event_id"], name: "index_event_api_tokens_on_event_id"
     t.index ["token_digest"], name: "index_event_api_tokens_on_token_digest", unique: true
     t.index ["user_id"], name: "index_event_api_tokens_on_user_id"
+  end
+
+  create_table "event_creation_invites", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "accepted_at"
+    t.uuid "accepted_by_id"
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.string "email", null: false
+    t.uuid "event_id"
+    t.uuid "event_series_id"
+    t.datetime "expires_at", null: false
+    t.uuid "invited_by_id"
+    t.datetime "last_sent_at"
+    t.text "note"
+    t.datetime "revoked_at"
+    t.string "token_digest"
+    t.datetime "updated_at", null: false
+    t.index ["accepted_by_id"], name: "index_event_creation_invites_on_accepted_by_id"
+    t.index ["email"], name: "index_event_creation_invites_on_email"
+    t.index ["event_id"], name: "index_event_creation_invites_on_event_id"
+    t.index ["event_series_id"], name: "index_event_creation_invites_on_event_series_id"
+    t.index ["invited_by_id"], name: "index_event_creation_invites_on_invited_by_id"
+    t.index ["token_digest"], name: "index_event_creation_invites_on_token_digest", unique: true
   end
 
   create_table "event_role_assignments", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -655,9 +692,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
     t.string "time_zone", default: "UTC"
     t.datetime "updated_at", null: false
     t.uuid "user_id"
+    t.uuid "person_id"
     t.index ["email"], name: "index_guardians_on_email"
+    t.index ["person_id"], name: "index_guardians_on_person_id"
     t.index ["phone"], name: "index_guardians_on_phone", where: "(phone IS NOT NULL)"
     t.index ["user_id"], name: "index_guardians_on_user_id"
+  end
+
+  create_table "identity_reviews", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "category", null: false
+    t.string "reasons", default: [], null: false, array: true
+    t.uuid "user_ids", default: [], null: false, array: true
+    t.uuid "participant_ids", default: [], null: false, array: true
+    t.uuid "guardian_ids", default: [], null: false, array: true
+    t.string "fingerprint", null: false
+    t.datetime "resolved_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["category"], name: "index_identity_reviews_on_category"
+    t.index ["fingerprint"], name: "index_identity_reviews_on_fingerprint", unique: true
   end
 
   create_table "import_batches", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -993,11 +1046,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
     t.string "tshirt_size"
     t.datetime "updated_at", null: false
     t.uuid "user_id"
+    t.uuid "person_id"
     t.index ["email"], name: "index_participants_on_email"
     t.index ["email"], name: "index_participants_on_email_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["legal_first_name"], name: "index_participants_on_legal_first_name_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["legal_last_name"], name: "index_participants_on_legal_last_name"
     t.index ["legal_last_name"], name: "index_participants_on_legal_last_name_trgm", opclass: :gin_trgm_ops, using: :gin
+    t.index ["person_id"], name: "index_participants_on_person_id"
     t.index ["phone"], name: "index_participants_on_phone", where: "(phone IS NOT NULL)"
     t.index ["preferred_name"], name: "index_participants_on_preferred_name_trgm", opclass: :gin_trgm_ops, using: :gin
     t.index ["public_profile_slug"], name: "index_participants_on_public_profile_slug", unique: true
@@ -1057,6 +1112,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
     t.index ["serial_number"], name: "index_passports_on_serial_number", unique: true
     t.index ["token"], name: "index_passports_on_token", unique: true
     t.index ["user_id"], name: "index_passports_on_user_id"
+  end
+
+  create_table "people", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "phone_numbers", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "person_id", null: false
+    t.text "number", null: false
+    t.datetime "verified_at"
+    t.string "source", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["number"], name: "index_phone_numbers_on_number"
+    t.index ["person_id", "number"], name: "index_phone_numbers_on_person_id_and_number", unique: true
   end
 
   create_table "privacy_token_uses", primary_key: "jti", id: :string, force: :cascade do |t|
@@ -1250,6 +1321,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
 
   create_table "scans", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "client_scan_id"
+    t.datetime "client_scanned_at"
     t.datetime "created_at", null: false
     t.uuid "participant_event_id", null: false
     t.uuid "scan_context_id"
@@ -1759,9 +1831,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
     t.string "time_zone", default: "UTC"
     t.datetime "updated_at", null: false
     t.string "verified_slack_id"
+    t.uuid "person_id"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["global_role"], name: "index_users_on_global_role"
     t.index ["hack_club_account_id"], name: "index_users_on_hack_club_account_id", unique: true
+    t.index ["person_id"], name: "index_users_on_person_id"
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["verified_slack_id"], name: "index_users_on_verified_slack_id"
   end
@@ -1871,12 +1945,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
   add_foreign_key "consents", "participant_events"
   add_foreign_key "custom_documents", "events"
   add_foreign_key "dietaries", "participant_events"
+  add_foreign_key "email_addresses", "people", on_delete: :cascade
   add_foreign_key "email_log_events", "email_logs"
   add_foreign_key "email_logs", "events"
   add_foreign_key "emergency_contacts", "guardian_participant_events"
   add_foreign_key "emergency_contacts", "participant_events"
   add_foreign_key "event_api_tokens", "events"
   add_foreign_key "event_api_tokens", "users", on_delete: :nullify
+  add_foreign_key "event_creation_invites", "event_series", on_delete: :cascade
+  add_foreign_key "event_creation_invites", "events", on_delete: :nullify
+  add_foreign_key "event_creation_invites", "users", column: "accepted_by_id", on_delete: :nullify
+  add_foreign_key "event_creation_invites", "users", column: "invited_by_id", on_delete: :nullify
   add_foreign_key "event_role_assignments", "events"
   add_foreign_key "event_role_assignments", "users"
   add_foreign_key "event_volunteers", "events", on_delete: :cascade
@@ -1893,6 +1972,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
   add_foreign_key "groups", "events"
   add_foreign_key "guardian_participant_events", "guardians"
   add_foreign_key "guardian_participant_events", "participant_events"
+  add_foreign_key "guardians", "people", on_delete: :nullify
   add_foreign_key "guardians", "users"
   add_foreign_key "import_batches", "events"
   add_foreign_key "incident_comments", "incidents"
@@ -1931,10 +2011,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
   add_foreign_key "participant_events", "participants"
   add_foreign_key "participant_events", "users", column: "nfc_badge_assigned_by_id"
   add_foreign_key "participant_events", "users", column: "um_verified_by_id"
+  add_foreign_key "participants", "people", on_delete: :nullify
   add_foreign_key "participants", "users"
   add_foreign_key "passports", "users"
   add_foreign_key "passports", "users", column: "paired_by_id"
   add_foreign_key "passports", "users", column: "revoked_by_id"
+  add_foreign_key "phone_numbers", "people", on_delete: :cascade
   add_foreign_key "push_tokens", "users"
   add_foreign_key "registration_change_requests", "participant_events"
   add_foreign_key "registration_change_requests", "users", column: "requested_by_id"
@@ -2017,6 +2099,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_16_170000) do
   add_foreign_key "training_video_views", "training_lessons", on_delete: :cascade
   add_foreign_key "travel_legs", "travels"
   add_foreign_key "travels", "participant_events"
+  add_foreign_key "users", "people", on_delete: :nullify
   add_foreign_key "visa_letter_applications", "events"
   add_foreign_key "visa_letter_applications", "users", column: "reviewed_by_id", on_delete: :nullify
   add_foreign_key "visa_letter_applications", "users", on_delete: :nullify

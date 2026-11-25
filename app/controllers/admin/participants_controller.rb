@@ -187,7 +187,8 @@ module Admin
         return
       end
 
-      guardian = Guardian.find_or_initialize_by(email: guardian_email)
+      guardian = Guardian.where(email: guardian_email).order(:created_at).first ||
+        Guardian.new(email: guardian_email)
       guardian.assign_attributes(
         legal_first_name: params[:guardian_first_name],
         legal_last_name: params[:guardian_last_name],
@@ -702,29 +703,23 @@ module Admin
         alert: "Merge failed — nothing was changed: #{e.message}"
     end
 
+    # A staff resend is usually because the old link went somewhere it
+    # shouldn't have (wrong inbox, forwarded on), so on this surface it stops
+    # working now and the email carries a fresh one (Guardians::ResendInvite).
     def resend_guardian_invite
-      authorize @participant_event, :manage_guardians?
+      result = Guardians::ResendInvite.call(operation_context,
+        participant_event: @participant_event,
+        guardian_participant_event: params[:guardian_participant_event_id],
+        rotate_token: true)
+      participant_path = admin_event_participant_path(current_event, @participant_event)
 
-      if current_event.guardian_invites_locked?
-        redirect_to admin_event_participant_path(current_event, @participant_event), alert: "Guardian invites are currently locked for this event."
-        return
+      if result.success?
+        redirect_to participant_path, notice: "Guardian invite resent to #{result.value.guardian.email}."
+      elsif result.code == :invites_locked
+        redirect_to participant_path, alert: "Guardian invites are currently locked for this event."
+      else
+        redirect_to participant_path, alert: result.message
       end
-
-      gpe = @participant_event.guardian_participant_events.find(params[:guardian_participant_event_id])
-
-      if gpe.guardian.email_undeliverable?
-        redirect_to admin_event_participant_path(current_event, @participant_event),
-          alert: "#{gpe.guardian.email} is bouncing — correct the guardian's email before resending."
-        return
-      end
-
-      # A staff resend is usually because the old link went somewhere it
-      # shouldn't have (wrong inbox, forwarded on), so it stops working now and
-      # the email carries a fresh one.
-      gpe.revoke_invite_token!
-
-      GuardianMailer.invitation(guardian_participant_event: gpe).deliver_later
-      redirect_to admin_event_participant_path(current_event, @participant_event), notice: "Guardian invite resent to #{gpe.guardian.email}."
     end
 
     # "Copy Portal Link" for a guardian who has no working link: none minted

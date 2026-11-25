@@ -98,7 +98,15 @@ module ApplicationHelper
 def admin_tool(class_name = "", element = "div", **options, &block)
     return unless current_user&.admin?
 
-    concat content_tag(element, class: "border-2 border-dashed border-orange-400 bg-yellow-100 rounded-lg p-2 #{class_name}", **options, &block)
+    concat render(AdminToolComponent.new(class_name, element, **options).with_content(capture(&block)))
+  end
+
+  # The bare dashed-orange marker around an admin-only control, with no wash
+  # or padding of its own and no role check: use it inside the policy check
+  # the control already sits in. Returns the markup, so call it with <%= %>.
+  #   <%= admin_tool_marker "rounded px-4 py-4" do %>…<% end %>
+  def admin_tool_marker(class_name = "", element = "div", **options, &block)
+    render AdminToolComponent.new(class_name, element, panel: false, **options).with_content(capture(&block))
   end
 
   def required_indicator
@@ -191,6 +199,7 @@ def admin_tool(class_name = "", element = "div", **options, &block)
     "Guyana",
     "Haiti",
     "Honduras",
+    "Hong Kong",
     "Hungary",
     "Iceland",
     "India",
@@ -361,12 +370,11 @@ def admin_tool(class_name = "", element = "div", **options, &block)
     leg.public_send(:"local_#{endpoint}_time")&.strftime("%Y-%m-%dT%H:%M")
   end
 
-  def attend_deep_link(participant_id)
-    "attend://checkin/#{participant_id}"
-  end
-
-  def qr_code_svg(data, size: 200)
-    qr = ::RQRCode::QRCode.new(data)
+  # `level` is the error correction: rqrcode defaults to the highest, H. A
+  # signed check-in code is long enough that M keeps it noticeably less
+  # dense, which matters more on a small screen than surviving damage does.
+  def qr_code_svg(data, size: 200, level: :h)
+    qr = ::RQRCode::QRCode.new(data, level: level)
     qr.as_svg(
       color: "000",
       fill: "fff",

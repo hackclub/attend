@@ -8,7 +8,7 @@ RSpec.describe "Admin participants table pagination", type: :request do
 
   let(:event) { create(:event, accommodation_enabled: false) }
   let(:admin) do
-    User.create!(email: "table-pages@example.com", name: "Table Pages", global_role: "global_admin", admin_console_beta: false)
+    User.create!(email: "table-pages@example.com", name: "Table Pages", global_role: "global_admin")
   end
 
   # Last names sort Ashgrove..Ebberly; statuses alternate so grouping splits.
@@ -43,8 +43,7 @@ RSpec.describe "Admin participants table pagination", type: :request do
   end
 
   def each_admin_ui
-    [ false, true ].each do |console|
-      admin.update!(admin_console_beta: console)
+    [ true ].each do |console|
       sign_in admin
       yield console
     end
@@ -114,7 +113,6 @@ RSpec.describe "Admin participants table pagination", type: :request do
   end
 
   it "shows the search as a removable token in the console" do
-    admin.update!(admin_console_beta: true)
     sign_in admin
 
     get table_admin_event_participants_path(event), params: { search: "<b>ebber</b>" }

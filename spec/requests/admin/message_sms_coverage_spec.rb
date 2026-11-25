@@ -6,7 +6,7 @@ require "rails_helper"
 RSpec.describe "Admin message form SMS coverage", type: :request do
   include Devise::Test::IntegrationHelpers
 
-  let(:admin) { User.create!(email: "admin-sms@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
+  let(:admin) { User.create!(email: "admin-sms@example.com", name: "Admin", global_role: "global_admin") }
   let(:event) { create(:event, location_country: "United States") }
   let(:whatsapp) { false }
 
@@ -20,10 +20,8 @@ RSpec.describe "Admin message form SMS coverage", type: :request do
     Nokogiri::HTML(response.body).at_css("input#channel_sms")
   end
 
-  [ false, true ].each do |console|
+  [ true ].each do |console|
     context "(console: #{console})" do
-      before { admin.update!(admin_console_beta: console) }
-
       it "lists the countries where people can't be texted" do
         create(:participant_event, event:, participant: create(:participant, phone: "+998901234567"))
         create(:participant_event, event:, participant: create(:participant, phone: "+998901234568"))

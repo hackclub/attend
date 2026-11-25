@@ -15,7 +15,7 @@ RSpec.describe "Optional custom documents", type: :request do
   let(:event) { create(:event, freedom_waivers_enabled: false) }
 
   describe "admin management" do
-    let(:admin) { User.create!(email: "admin-optional@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
+    let(:admin) { User.create!(email: "admin-optional@example.com", name: "Admin", global_role: "global_admin") }
 
     before { sign_in admin }
 
@@ -38,12 +38,12 @@ RSpec.describe "Optional custom documents", type: :request do
       expect(event.custom_documents.last).not_to be_optional
     end
 
-    it "flags optional documents on the integrations page with a take-up count" do
+    it "flags optional documents on the documents tab with a take-up count" do
       doc = create(:custom_document, :optional, event: event, name: "Zip Lining Waiver")
       create(:consent, participant_event: create(:participant_event, event: event),
         consent_type: :custom_document, custom_document: doc, opted_in_at: Time.current)
 
-      get admin_event_integrations_path(event)
+      get admin_event_documents_path(event)
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("Zip Lining Waiver")
@@ -58,7 +58,7 @@ RSpec.describe "Optional custom documents", type: :request do
       get consents_admin_event_participant_path(event, participant_event)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Optional Documents Not Added")
+      expect(response.body).to include("Optional documents not added")
       expect(response.body).to include("Zip Lining Waiver")
       expect(response.body).to include("nothing has been sent to their parent/guardian")
     end
@@ -508,7 +508,7 @@ RSpec.describe "Optional custom documents", type: :request do
   end
 
   describe "the admin participants list" do
-    let(:admin) { User.create!(email: "admin-list@example.com", name: "Admin", global_role: "global_admin", admin_console_beta: false) }
+    let(:admin) { User.create!(email: "admin-list@example.com", name: "Admin", global_role: "global_admin") }
     let!(:doc) { create(:custom_document, :optional, event: event, name: "Zip Lining Waiver") }
     let!(:added_pe) do
       create(:participant_event, event: event,
@@ -528,7 +528,7 @@ RSpec.describe "Optional custom documents", type: :request do
     it "offers an optional-document filter only when the event has one" do
       get admin_event_participants_path(event.slug)
 
-      expect(response.body).to include("All Optional Docs")
+      expect(response.body).to include("All optional documents")
       expect(response.body).to include("Zip Lining Waiver: added")
     end
 
