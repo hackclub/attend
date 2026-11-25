@@ -93,6 +93,12 @@ module CheckinCode
     bytes_uuid(code.byteslice(2, 16))
   end
 
+  # Registrations whose tickets no longer count, for a scanner to flag a
+  # genuine but cancelled ticket offline.
+  def cancelled_registration_ids(event)
+    event.participant_events.where(status: %w[withdrawn rejected]).pluck(:id)
+  end
+
   # Key id => base64 DER SubjectPublicKeyInfo, for the scanner to verify with.
   def public_keys
     keyring.transform_values { |key| [ key.public_to_der ].pack("m0") }
