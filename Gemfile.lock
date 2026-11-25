@@ -364,7 +364,7 @@ GEM
       logger
       rack (>= 2.2.8)
       rack-protection (>= 2.2.0)
-    omniauth-oauth2 (1.10.0)
+    omniauth-oauth2 (1.10.1)
       oauth2 (>= 2.0.2, < 3)
       omniauth (~> 2.3, >= 2.3.1)
     omniauth-rails_csrf_protection (2.0.1)
