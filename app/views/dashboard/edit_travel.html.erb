@@ -8,6 +8,26 @@
     Please update your travel details for <strong><%= @event.name %></strong>.
   </p>
 
+  <% travel_problems = [ [ @travel_inbound, "Arrival" ], [ @travel_outbound, "Departure" ] ].flat_map do |travel, label|
+       own = travel.errors.reject { |error| error.attribute.to_s.include?(".") }.map { |error| "#{label}: #{error.full_message}" }
+       # Number legs off the same collection the form renders below, so
+       # "leg 2" is the second card on screen.
+       legs = travel.travel_legs.each_with_index.flat_map do |leg, index|
+         leg.errors.full_messages.map { |message| "#{label}, leg #{index + 1}: #{message}" }
+       end
+       own + legs
+     end %>
+  <% if travel_problems.any? %>
+    <div class="rounded-lg border border-red-300 bg-red-50 p-4 mb-6 text-red-900" role="alert">
+      <p class="font-semibold">We couldn't save your travel yet. Please fix:</p>
+      <ul class="mt-2 text-sm list-disc pl-5 space-y-1">
+        <% travel_problems.each do |problem| %>
+          <li><%= problem %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
   <%= form_with url: dashboard_event_travel_path(@participant_event), method: :patch, local: true, data: { turbo: false, controller: "travel-form" } do |f| %>
     <div class="space-y-8">
       <% if @event.visa_options_enabled? %>
